@@ -37,7 +37,9 @@ try {
     spec[p.name] = "file:" + path.split("\\").join("/");
     console.log(`packed ${p.name} -> ${path}`);
   }
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", dependencies: spec }, null, 2));
+  // A packed workspace package declares its sibling dependencies by version (pnpm pack rewrites workspace:*); the consumer
+  // must resolve them to the tarballs, never to a registry, so every sibling is also an override.
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", dependencies: spec, pnpm: { overrides: spec } }, null, 2));
   writeFileSync(join(consumer, ".npmrc"), `store-dir=${join(work, "store").split("\\").join("/")}\nnode-linker=isolated\n`);
   execFileSync("pnpm", ["install", "--ignore-workspace", "--no-frozen-lockfile"], { cwd: consumer, stdio: "inherit", shell: process.platform === "win32" });
   const smoke = `
@@ -50,6 +52,12 @@ if (canonicalize({ b: 1, a: [2, 1] }) !== '{"a":[2,1],"b":1}') throw new Error("
 if (CONTRACT_NAMES.length !== Object.keys(schemas.$defs).length) throw new Error("schemas vs types");
 if (COMMANDS.length < 60) throw new Error("commands");
 console.log("clean consumer ok:", CONTRACT_NAMES.length, "contracts,", COMMANDS.length, "commands, provenance", provenance().files["contracts.json"].slice(0, 12));
+// every other publishable package resolves and exposes its public entry point from the tarball alone
+for (const name of ${JSON.stringify(publishable.map((p) => p.name).filter((n) => n !== "@kauro/contracts"))}) {
+  const m = await import(name);
+  if (typeof m !== "object" || m === null || Object.keys(m).length === 0) throw new Error(name + " has an empty public entry point");
+  console.log("clean consumer ok:", name, Object.keys(m).length, "exports");
+}
 `;
   writeFileSync(join(consumer, "smoke.mjs"), smoke);
   execFileSync("node", ["smoke.mjs"], { cwd: consumer, stdio: "inherit" });
