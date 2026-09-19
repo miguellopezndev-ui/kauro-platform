@@ -39,6 +39,7 @@ import type {
   UserId,
   ValidationReceiptId,
 } from "../model/ids.js";
+import type { AssuranceProof } from "../model/identity.js";
 import type { MembershipRole } from "../model/roles.js";
 import type { ActorRef, IdentityFacts } from "../model/tenant.js";
 
@@ -49,14 +50,7 @@ export type VersionedWrite<T> =
 
 // --- identity ---------------------------------------------------------------------------------------------------------
 
-export interface AssuranceProof {
-  readonly proofId: AssuranceProofId;
-  readonly userId: UserId;
-  readonly kind: "STEP_UP";
-  readonly method: "TOTP" | "WEBAUTHN" | "IDP_REAUTH";
-  readonly issuedAt: UtcInstant;
-  readonly expiresAt: UtcInstant;
-}
+export type { AssuranceProof };
 
 export interface IdentityRepository {
   /** The caller's own identity facts (rows of other users are not visible under the self policy). */

@@ -7,7 +7,6 @@ export type { EventPublisher, PublishedEvent } from "./event-publisher.js";
 export type { CommandJournal, ReservationOutcome, JournalCommit } from "./command-journal.js";
 export type {
   VersionedWrite,
-  AssuranceProof,
   IdentityRepository,
   NewAgency,
   AgencyRepository,

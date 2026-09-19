@@ -110,6 +110,11 @@ export type EventPayload = Readonly<Record<string, SafePayloadValue>>;
 
 const TOKEN = /^[A-Z][A-Z0-9_.-]{0,63}$/;
 
+/** An uppercase machine token (states, roles, modes, reason codes, platform version labels such as R2-INITIAL). */
+export function isSafeToken(value: unknown): value is string {
+  return typeof value === "string" && TOKEN.test(value);
+}
+
 function isSafeScalar(v: unknown): boolean {
   if (typeof v === "boolean") return true;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0;
@@ -151,6 +156,30 @@ export interface NewDomainEvent {
   readonly causationId: CausationId;
   readonly correlationId: CorrelationId;
   readonly payload: EventPayload;
+}
+
+/**
+ * What an aggregate operation yields beside its new record: the event of the new aggregate version without the request
+ * provenance (actor, causation, correlation), which the command handler adds with `withProvenance` before publishing.
+ * Every aggregate function validates its payload against the allowlist at construction, so an event that reaches the
+ * publisher has already been proven free of labels and free text.
+ */
+export type AggregateEvent = Omit<NewDomainEvent, "actor" | "causationId" | "correlationId">;
+
+export interface EventProvenance {
+  readonly actor: ActorRef;
+  readonly causationId: CausationId;
+  readonly correlationId: CorrelationId;
+}
+
+export function aggregateEvent(event: AggregateEvent): AggregateEvent {
+  assertAllowlistedPayload(event.eventType, event.payload);
+  if (!Number.isSafeInteger(event.aggregateVersion) || event.aggregateVersion < 1) throw new RangeError(`${event.eventType}: aggregate version must be a positive integer`);
+  return Object.freeze({ ...event, payload: Object.freeze({ ...event.payload }) });
+}
+
+export function withProvenance(event: AggregateEvent, provenance: EventProvenance): NewDomainEvent {
+  return { ...event, actor: provenance.actor, causationId: provenance.causationId, correlationId: provenance.correlationId };
 }
 
 /** The durable row: the registry DomainEvent contract plus the columns the platform adds. */

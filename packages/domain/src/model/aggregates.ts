@@ -11,6 +11,7 @@ import type {
   AssuranceProofId,
   CapabilityId,
   ClientId,
+  InvitationId,
   MembershipId,
   PlanId,
   ProcessingAuthorityId,
@@ -35,6 +36,25 @@ export interface MembershipRecord extends Membership {
   readonly createdAt: UtcInstant;
   readonly revokedAt?: UtcInstant;
   readonly updatedAt: UtcInstant;
+}
+
+/**
+ * The envelope of a single-use invitation token (08 "Invitation, recovery and ownership transfer": one-use, time-limited
+ * opaque tokens, stored hashed; the invite records agency, intended identity, role and expiry). The membership row in state
+ * INVITED is the invitation; this record is its token envelope (table kauro.membership_invitations). The raw token never
+ * enters the domain: only its SHA-256 does.
+ */
+export interface InvitationRecord {
+  readonly invitationId: InvitationId;
+  readonly agencyId: AgencyId;
+  readonly membershipId: MembershipId;
+  readonly tokenHash: Sha256Hex;
+  readonly role: Membership["role"];
+  readonly invitedByMembershipId: MembershipId;
+  readonly expiresAt: UtcInstant;
+  readonly consumedAt?: UtcInstant;
+  readonly revokedAt?: UtcInstant;
+  readonly createdAt: UtcInstant;
 }
 
 /** Agency evidence of authority to provide an end client's data (EndClient.processingAuthorityRef; 02 §2). */

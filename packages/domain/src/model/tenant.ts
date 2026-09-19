@@ -11,7 +11,8 @@
  * - SYSTEM: the control plane (outbox dispatch, sweeper, capability changes) under the kauro_control database role; it never
  *   carries a user id and never runs a browser command.
  */
-import type { UtcInstant } from "@kauro/contracts";
+import type { Id, UtcInstant } from "@kauro/contracts";
+import { NotFoundFailure } from "./errors.js";
 import type { AgencyId, CorrelationId, MembershipId, UserId } from "./ids.js";
 
 export type ActorRef =
@@ -71,4 +72,34 @@ export interface ResolvedMembership {
   readonly role: "OWNER" | "ADMIN" | "OPERATOR" | "APPROVER" | "VIEWER" | "BILLING";
   readonly version: number;
   readonly assurancePolicy: string;
+}
+
+/**
+ * Scope checks over records the handler read (contract TenantScope, FIELD_CONTRACTS "The server derives agency membership and
+ * client/project ownership; callers cannot self-assert access"; 08 "Database isolation": a row-level filter cannot prevent a
+ * child row from linking to another tenant if the relationship permits it — so the domain compares scopes explicitly and the
+ * database binds them with composite foreign keys).
+ */
+export interface TenantScope {
+  readonly agencyId: AgencyId;
+  readonly clientId?: Id;
+  readonly projectId?: Id;
+}
+
+export function tenantScopeOf(context: TenantContext): TenantScope {
+  return { agencyId: context.agencyId };
+}
+
+/**
+ * A record that is absent or belongs to another agency is NOT_FOUND under this context: the caller learns nothing about a
+ * foreign resource (COMMAND_CATALOGUE "NOT_FOUND is used where revealing a foreign resource would leak existence"; D-AUTHZ-4).
+ */
+export function assertInScope<T extends { readonly agencyId: AgencyId }>(scope: Pick<TenantScope, "agencyId">, resourceKind: string, record: T | null): T {
+  if (record === null || record.agencyId !== scope.agencyId) throw new NotFoundFailure(resourceKind);
+  return record;
+}
+
+/** A child whose scope does not equal the parent's is a cross-tenant link: never followed, reported as not found. */
+export function assertSameScope(resourceKind: string, parent: { readonly agencyId: AgencyId }, child: { readonly agencyId: AgencyId }): void {
+  if (parent.agencyId !== child.agencyId) throw new NotFoundFailure(resourceKind, "CROSS_AGENCY");
 }
