@@ -67,7 +67,7 @@ export function decideCommandAccess(request: AccessRequest): AccessDecision {
   const role = commandRole(request.command);
   // 1. authenticated subject present
   const identity = request.identity;
-  if (identity === null) return deny("AUTHENTICATION_REQUIRED", "NOT_AUTHENTICATED");
+  if (identity === null) return deny("AUTHENTICATION_REQUIRED", "SUBJECT_UNAUTHENTICATED");
   // 2. identity active and verified under the launch policy (08 "Authentication and assurance")
   if (identity.state === "DISABLED") return deny("NOT_AUTHORIZED", "IDENTITY_DISABLED");
   if (!isVerifiedIdentity(identity)) return deny("NOT_AUTHORIZED", "IDENTITY_UNVERIFIED");

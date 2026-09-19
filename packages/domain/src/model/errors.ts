@@ -109,7 +109,7 @@ export const RETRYABLE_FAILURE_CODES: ReadonlySet<FailureCode> = new Set<Failure
  */
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
-  "NOT_AUTHENTICATED",
+  "SUBJECT_UNAUTHENTICATED",
   "IDENTITY_UNVERIFIED",
   "IDENTITY_DISABLED",
   "NOT_A_MEMBER",
@@ -154,6 +154,24 @@ export const FAILURE_REASONS = [
   "MODE_NOT_OFFERED",
   "CAPABILITY_MODE_MISMATCH",
   "TARGET_INSTANCE_REQUIRED",
+  // typed plan patch compilation (CMD023 precondition: "The typed patch names existing candidates/fields and permitted effects")
+  "PATCH_UNKNOWN_CANDIDATE",
+  "PATCH_UNKNOWN_FIELD",
+  "PATCH_EFFECT_NOT_PERMITTED",
+  "PATCH_MALFORMED",
+  // request admission at the HTTP boundary (10 "Request envelope": content type, size, syntax, duplicate keys, schema, headers)
+  "CONTENT_TYPE_UNSUPPORTED",
+  "BODY_TOO_LARGE",
+  "JSON_SYNTAX",
+  "JSON_DUPLICATE_KEY",
+  "JSON_DEPTH_EXCEEDED",
+  "JSON_STRING_TOO_LONG",
+  "SCHEMA_VIOLATION",
+  "IDEMPOTENCY_KEY_MISSING",
+  "IDEMPOTENCY_KEY_INVALID",
+  "AGENCY_SELECTOR_INVALID",
+  "PATH_ID_INVALID",
+  "CORRELATION_ID_INVALID",
   // admission (08 "Abuse controls")
   "DRAFT_AGENCY_EXISTS",
   "CREATION_RATE_LIMITED",

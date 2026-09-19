@@ -10,6 +10,18 @@ The application layer of the Kauro platform: the contracts of the public command
 - `api/views` — safe DTO views (AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView).
 - `ports/*` — authorizer, assurance verifier, abuse limiter, schema validator (closed over known schema ids), plan services
   (artifact resolver, patch compiler, disclosure composer), work inspectors, command handler/bus.
+- `commands/runtime` — `runCommand`: one unit of work per command (journal reserve → authorization → locked preconditions →
+  state + events → journal commit), replay / conflict answers, DomainFailure → CONFLICT / REJECTED / UNAVAILABLE, and the
+  durable security event of every authorization denial (recorded in its own transaction after the rollback).
+- `commands/handlers/*` — the seven handlers (`createB06Handlers(runtime, collaborators)`), each following design §8 step by step.
+- `api/admission` — the transport-neutral admission pipeline of manual 10 (content type, size, strict JSON, closed schema,
+  headers, path ids, agency selector) producing the `CommandEnvelope`.
+- `api/strict-json`, `api/json-schema`, `api/schema-validation` — the RFC 8259 parser with duplicate-key/depth/length bounds
+  and the dependency-free JSON Schema 2020-12 validator over the closed keyword vocabulary of the contract bundle (unknown
+  keywords, foreign `$ref`s and unasserted formats are refused at compile time; `date-time` is a real Gregorian instant).
+- `api/projections` — record → view projections and `readinessBlockersOf`.
+- `testing/in-memory-ports` — the in-memory implementation of the domain ports for pure orchestration tests only.
 
-Handlers, the authorizer implementation and the HTTP adapter belong to the B06 implementation mandate; see
-`docs/design/B06-domain-db-authz.md` §8 and `docs/design/B06-case-map.md`. Depends on `@kauro/contracts` and `@kauro/domain`.
+The authorizer implementation is `@kauro/authorization`; the HTTP adapter is `apps/api`; the PostgreSQL adapters of the ports
+and the B06 case tests against real PostgreSQL are the integration mandate (`docs/design/B06-case-map.md`). Depends on
+`@kauro/contracts` and `@kauro/domain`.

@@ -137,7 +137,7 @@ test("decideCommandAccess: identity checks precede membership; step-up denials n
   const ag = activeAgency();
   const owner = membership(ag.agencyId, "OWNER", users.owner);
   const base = { command: "CMD009" as CmdId, identity: verified(users.owner), agencyId: ag.agencyId, membership: owner };
-  assert.deepEqual(decideCommandAccess({ ...base, identity: null }), { kind: "DENY", code: "AUTHENTICATION_REQUIRED", reason: "NOT_AUTHENTICATED" });
+  assert.deepEqual(decideCommandAccess({ ...base, identity: null }), { kind: "DENY", code: "AUTHENTICATION_REQUIRED", reason: "SUBJECT_UNAUTHENTICATED" });
   assert.deepEqual(decideCommandAccess({ ...base, identity: { ...verified(users.owner), state: "DISABLED" } }), { kind: "DENY", code: "NOT_AUTHORIZED", reason: "IDENTITY_DISABLED" });
   assert.deepEqual(decideCommandAccess({ ...base, identity: { ...verified(users.owner), mfaEnrolledAt: null } }), { kind: "DENY", code: "NOT_AUTHORIZED", reason: "IDENTITY_UNVERIFIED" });
   // CreateAgency needs a verified identity too (CMD001-DENY: unverified identity → NOT_AUTHORIZED)

@@ -1,0 +1,100 @@
+/**
+ * The SchemaValidator adapter over the strict compiler (api/json-schema): closed over exactly the registry contract names,
+ * the request schema ids of this package and the Problem schema (S093: "compile only reviewed application-owned schemas").
+ * The contract bundle is the generated `@kauro/contracts/schemas.json`; the transport reads that file once at start-up and
+ * hands the parsed object here, so this module needs no file system access.
+ */
+import { CONTRACT_NAMES } from "@kauro/contracts";
+import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
+import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports/schema-validator.js";
+import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
+import { PROBLEM_TYPE_PREFIX } from "./problems.js";
+import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
+
+/** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
+export interface ContractSchemaBundle {
+  readonly $schema: string;
+  readonly $id: string;
+  readonly $defs: Readonly<Record<string, unknown>>;
+}
+
+const FIELD_ERROR_CODES = ["REQUIRED", "UNKNOWN_FIELD", "TYPE", "FORMAT", "RANGE", "UNKNOWN_REFERENCE", "ENUM"] as const;
+const NEXT_ACTION_TOKENS = ["RELOAD", "COMPARE_VERSIONS", "REAUTHENTICATE", "STEP_UP", "RETRY_LATER", "RETRY_SAME_KEY", "REQUEST_NEW_REVIEW", "CONTACT_SUPPORT", "CHOOSE_ANOTHER_MODE"] as const;
+
+/**
+ * Wire schema of a Problem (10 "Responses and safe errors"): closed, so a response can never carry a stack, SQL text, a raw
+ * value or an unlisted member. `errors[].field` is a field path, `current` is the safe version/state on STALE_VERSION.
+ */
+export const PROBLEM_SCHEMA = Object.freeze({
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "urn:kauro:api:v1:problem",
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "title", "status", "code", "correlationId", "retryable", "nextActions"],
+  properties: {
+    type: { type: "string", pattern: `^${PROBLEM_TYPE_PREFIX}[A-Z_]+$` },
+    title: { type: "string", minLength: 1, maxLength: 200 },
+    status: { type: "integer", minimum: 400, maximum: 599 },
+    code: { type: "string", enum: [...FAILURE_CODES] },
+    reason: { type: "string", enum: [...FAILURE_REASONS] },
+    correlationId: { type: "string", minLength: 1, maxLength: 128 },
+    errors: {
+      type: "array",
+      maxItems: 100,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["field", "code"],
+        properties: { field: { type: "string", maxLength: 512 }, code: { type: "string", enum: [...FIELD_ERROR_CODES] } },
+      },
+    },
+    retryable: { type: "boolean" },
+    retryAfterSeconds: { type: "integer", minimum: 0, maximum: 86400 },
+    nextActions: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["action"],
+        properties: { action: { type: "string", enum: [...NEXT_ACTION_TOKENS] }, href: { type: "string", pattern: "^/[^\\s]*$", maxLength: 512 } },
+      },
+    },
+    current: {
+      type: "object",
+      additionalProperties: false,
+      required: ["version", "state"],
+      properties: {
+        version: { type: "integer", minimum: 0, maximum: 9007199254740991 },
+        state: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        successorId: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        mismatch: { type: "array", maxItems: 10, items: { type: "string", pattern: "^[A-Za-z][A-Za-z0-9]{0,63}$" } },
+      },
+    },
+  },
+} as const);
+
+/** Builds the closed validator: every registry contract, every request schema and the Problem schema, nothing else. */
+export function createSchemaValidator(bundle: ContractSchemaBundle): SchemaValidator {
+  const roots: Record<string, unknown> = {};
+  for (const name of CONTRACT_NAMES) {
+    const def = bundle.$defs[name];
+    if (def === undefined) throw new DomainFailure("INTEGRITY_FAILURE", `contract bundle has no definition for ${name}`);
+    roots[name] = def;
+  }
+  for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  roots["Problem"] = PROBLEM_SCHEMA;
+  const compiled: CompiledSchemaSet = compileSchemaBundle({ defs: bundle.$defs, roots });
+  const known = compiled.ids as ReadonlyArray<KnownSchemaId>;
+  return {
+    knownSchemaIds: known,
+    validate<T = unknown>(schemaId: KnownSchemaId, input: unknown): ValidationOutcome<T> {
+      if (!compiled.has(schemaId)) {
+        // S093: an id outside the closed set is an integrity failure before any input is inspected
+        throw new DomainFailure("INTEGRITY_FAILURE", `schema ${String(schemaId)} is not a known application-owned schema`);
+      }
+      const fields = compiled.validate(schemaId, input);
+      return fields.length === 0 ? { kind: "VALID", value: input as T } : { kind: "INVALID", fields };
+    },
+  };
+}

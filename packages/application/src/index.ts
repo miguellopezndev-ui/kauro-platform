@@ -1,18 +1,28 @@
 /**
- * @kauro/application — the application layer of the Kauro platform: the public command contracts of B06, the request
- * envelope, the safe problem contract, the closed request schemas, the DTO views, and the ports orchestration needs
- * (authorizer, assurance, admission, schema validation, plan services, work inspectors, command handling).
- * It depends on @kauro/contracts and @kauro/domain only.
+ * @kauro/application — the application layer of the Kauro platform: the public command contracts of B06 and their handlers,
+ * the request envelope and admission, the safe problem contract, the closed request schemas and the strict schema validator,
+ * the DTO views and projections, and the ports orchestration needs (authorizer, assurance, admission, schema validation, plan
+ * services, work inspectors, command handling). It depends on @kauro/contracts and @kauro/domain only.
  */
 export * from "./ports/index.js";
 export type { Problem, NextAction } from "./api/problems.js";
 export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, problemOf, internalProblem, isFailureCode } from "./api/problems.js";
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
 export { REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
-export type { CommandEnvelope, CommandResult } from "./api/envelope.js";
+export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
 export { HEADERS, REQUEST_LIMITS, isSuccess } from "./api/envelope.js";
 export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
+export type { ReadinessFacts } from "./api/projections.js";
+export { agencyView, membershipView, endClientView, projectView, planView, approvalView, readinessBlockersOf } from "./api/projections.js";
+export type { StrictJsonOptions, StrictJsonReason } from "./api/strict-json.js";
+export { parseStrictJson, StrictJsonError } from "./api/strict-json.js";
+export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js";
+export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_KEYWORDS, ANNOTATION_KEYWORDS } from "./api/json-schema.js";
+export type { ContractSchemaBundle } from "./api/schema-validation.js";
+export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
+export type { RawRequest, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
+export { admitStructure, envelopeOf, correlationIdOf, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,
@@ -36,3 +46,20 @@ export type {
   B06CommandId,
 } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS } from "./commands/contracts.js";
+export type { CommandRuntime, CommandContext, CommandOutcome } from "./commands/runtime.js";
+export { runCommand, contextOf, identityOf } from "./commands/runtime.js";
+export type { B06Collaborators, B06Handlers, ApprovalPreimage } from "./commands/handlers/index.js";
+export {
+  createB06Handlers,
+  createAgencyHandler,
+  createClientHandler,
+  archiveClientHandler,
+  createProjectHandler,
+  revisePlanHandler,
+  approvePlanHandler,
+  withdrawApprovalHandler,
+  approvalHashOf,
+  LAUNCH_ASSURANCE_POLICY,
+} from "./commands/handlers/index.js";
+export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
+export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
