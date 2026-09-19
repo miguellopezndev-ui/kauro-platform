@@ -13,6 +13,7 @@ import type { AgencyId, MembershipId, UserId } from "../model/ids.js";
 import type { ExecutionContext } from "../model/tenant.js";
 import type { CommandJournal } from "./command-journal.js";
 import type { EventPublisher } from "./event-publisher.js";
+import type { IdGenerator } from "./id-generator.js";
 import type { LeaseStore } from "./lease-store.js";
 import type {
   AgencyRepository,
@@ -62,13 +63,24 @@ export interface UnitOfWork {
   readonly leases: LeaseStore;
   readonly requestJournal: RequestJournal;
   /**
+   * The id generator of this unit of work (07 "Database representation": server-generated UUIDv7). Every aggregate id a
+   * command mints comes from here, which is what lets `adoptTenant` prove the adopted id was minted inside this unit of work.
+   */
+  readonly ids: IdGenerator;
+  /**
    * CreateAgency only: an IDENTITY context adopts the agency it is about to create so the agency and owner-membership rows
    * pass the WITH CHECK policies of that agency. Allowed once per unit of work, only from IDENTITY to TENANT, and only with an
-   * id the server minted in this unit of work; any other use is an INTEGRITY_FAILURE.
+   * id the server minted in this unit of work (through `ids`); any other use is an INTEGRITY_FAILURE.
    */
   adoptTenant(agencyId: AgencyId): Promise<void>;
   /** The membership the authorizer resolved for this unit of work (TENANT context), once it has been resolved. */
   readonly resolvedMembershipId: MembershipId | null;
+  /**
+   * Records the membership the authorizer resolved (08 "Identity is not permission": the membership the command then uses is
+   * the one read inside this transaction, never a cached grant). TENANT context only, at most once; anything else is an
+   * INTEGRITY_FAILURE.
+   */
+  resolveMembership(membershipId: MembershipId): void;
   /** The user this unit of work runs for (TENANT/IDENTITY contexts). */
   readonly userId: UserId | null;
 }
