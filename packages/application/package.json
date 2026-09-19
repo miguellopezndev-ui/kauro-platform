@@ -1,0 +1,35 @@
+{
+  "name": "@kauro/application",
+  "version": "0.1.0",
+  "description": "Kauro application layer: command contracts (inputs, DTO views, outcomes) for the public API, the request envelope and safe problem contract, closed request schemas, and the ports (authorizer, assurance, admission, schema validation, artifact resolution) that orchestration depends on.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/contracts": "workspace:*",
+    "@kauro/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

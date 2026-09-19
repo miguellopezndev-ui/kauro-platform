@@ -1,0 +1,58 @@
+/**
+ * Request envelope and command results (10 "Request envelope", "Concurrency and preconditions", "Responses and safe errors";
+ * 07 "Command outcomes": COMPLETED, ACCEPTED, CONFLICT, REJECTED, UNAVAILABLE).
+ *
+ * Every mutating request carries an opaque correlation id (echoed), an Idempotency-Key (required on every catalogue command:
+ * idempotency is REQUIRED for all 64), the agency selector (path agencyId, or the X-Kauro-Agency header for routes whose path
+ * names a client/plan/project) and, for edits, expectedVersion in the body. Limits come from the R2 policy registry
+ * (api.jsonBytes = 1 MiB, api.batchItems = 100, api.pageDefault = 25, api.pageMaximum = 100).
+ */
+import type { CommandId } from "@kauro/contracts";
+import type { AgencyId, CorrelationId, Environment, UserId } from "@kauro/domain";
+import type { Problem } from "./problems.js";
+
+export const HEADERS = Object.freeze({
+  correlationId: "x-correlation-id",
+  idempotencyKey: "idempotency-key",
+  /** Active agency context for routes whose path does not carry agencyId (decision D-SCOPE-1). */
+  agency: "x-kauro-agency",
+  contentType: "application/json",
+});
+
+export const REQUEST_LIMITS = Object.freeze({
+  jsonBytes: 1_048_576,
+  batchItems: 100,
+  pageDefault: 25,
+  pageMaximum: 100,
+  /** Parser bounds (10: bounded depth and string lengths; the reverse proxy is not the only guard). */
+  maxDepth: 16,
+  maxStringLength: 40_000,
+});
+
+/** Everything the transport established before application execution (10: validate content type, size, syntax, schema, subject, authorization). */
+export interface CommandEnvelope<Body> {
+  readonly command: CommandId;
+  readonly environment: Environment;
+  readonly correlationId: CorrelationId;
+  readonly idempotencyKey: string;
+  /** Authenticated subject; a request without one never reaches a handler (AUTHENTICATION_REQUIRED at the edge). */
+  readonly userId: UserId;
+  /** Agency selector: from the path or the header; null only for commands without a tenant (CMD001). */
+  readonly agencyId: AgencyId | null;
+  /** Path-bound aggregate ids in route order; validated as ids before use. */
+  readonly path: Readonly<Record<string, string>>;
+  /** The body after structural validation against the closed request schema; never a raw parse result. */
+  readonly body: Body;
+  readonly receivedAt: string;
+}
+
+export type CommandResult<View> =
+  | { readonly kind: "COMPLETED"; readonly status: 200 | 201; readonly view: View; readonly version: number; readonly replayed: boolean }
+  | { readonly kind: "ACCEPTED"; readonly status: 202; readonly operationId: string; readonly state: string; readonly statusPath: string; readonly pollAfterSeconds: number }
+  | { readonly kind: "CONFLICT"; readonly problem: Problem }
+  | { readonly kind: "REJECTED"; readonly problem: Problem }
+  | { readonly kind: "UNAVAILABLE"; readonly problem: Problem };
+
+export function isSuccess<V>(r: CommandResult<V>): r is Extract<CommandResult<V>, { kind: "COMPLETED" | "ACCEPTED" }> {
+  return r.kind === "COMPLETED" || r.kind === "ACCEPTED";
+}
