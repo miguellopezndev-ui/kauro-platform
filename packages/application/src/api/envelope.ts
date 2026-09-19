@@ -7,8 +7,8 @@
  * names a client/plan/project) and, for edits, expectedVersion in the body. Limits come from the R2 policy registry
  * (api.jsonBytes = 1 MiB, api.batchItems = 100, api.pageDefault = 25, api.pageMaximum = 100).
  */
-import type { CommandId } from "@kauro/contracts";
-import type { AgencyId, CorrelationId, Environment, UserId } from "@kauro/domain";
+import type { CommandId, Sha256Hex } from "@kauro/contracts";
+import type { AgencyId, CorrelationId, Environment, IdentityFacts, UserId } from "@kauro/domain";
 import type { Problem } from "./problems.js";
 
 export const HEADERS = Object.freeze({
@@ -17,6 +17,7 @@ export const HEADERS = Object.freeze({
   /** Active agency context for routes whose path does not carry agencyId (decision D-SCOPE-1). */
   agency: "x-kauro-agency",
   contentType: "application/json",
+  problemContentType: "application/problem+json",
 });
 
 export const REQUEST_LIMITS = Object.freeze({
@@ -27,7 +28,20 @@ export const REQUEST_LIMITS = Object.freeze({
   /** Parser bounds (10: bounded depth and string lengths; the reverse proxy is not the only guard). */
   maxDepth: 16,
   maxStringLength: 40_000,
+  /** Correlation ids are opaque tokens the platform echoes; a bound keeps them out of log-injection and header-size games. */
+  correlationIdPattern: /^[A-Za-z0-9._:-]{1,128}$/,
 });
+
+/**
+ * What authentication established about the caller (08 "Identity is not permission": authentication produces an identity
+ * reference and assurance facts; membership and capabilities are resolved server-side afterwards). The provider subject itself
+ * never travels further than the authenticator: only its SHA-256 (identity sync) and the derived user id do.
+ */
+export interface AuthenticatedSubject {
+  readonly identity: IdentityFacts;
+  readonly provider: string;
+  readonly subjectHash: Sha256Hex;
+}
 
 /** Everything the transport established before application execution (10: validate content type, size, syntax, schema, subject, authorization). */
 export interface CommandEnvelope<Body> {
@@ -37,6 +51,7 @@ export interface CommandEnvelope<Body> {
   readonly idempotencyKey: string;
   /** Authenticated subject; a request without one never reaches a handler (AUTHENTICATION_REQUIRED at the edge). */
   readonly userId: UserId;
+  readonly subject: AuthenticatedSubject;
   /** Agency selector: from the path or the header; null only for commands without a tenant (CMD001). */
   readonly agencyId: AgencyId | null;
   /** Path-bound aggregate ids in route order; validated as ids before use. */
@@ -55,4 +70,22 @@ export type CommandResult<View> =
 
 export function isSuccess<V>(r: CommandResult<V>): r is Extract<CommandResult<V>, { kind: "COMPLETED" | "ACCEPTED" }> {
   return r.kind === "COMPLETED" || r.kind === "ACCEPTED";
+}
+
+/** The wire body of a COMPLETED command (10 "Synchronous success returns a validated DTO and version"). */
+export interface CompletedResponse<View> {
+  readonly kind: "COMPLETED";
+  readonly version: number;
+  /** True when the idempotent replay returned the journaled result of the first execution (10 "Idempotency contract"). */
+  readonly replayed: boolean;
+  readonly data: View;
+}
+
+/** The wire body of an ACCEPTED command (10: 202 with operationId, current state, status URL and polling guidance). */
+export interface AcceptedResponse {
+  readonly kind: "ACCEPTED";
+  readonly operationId: string;
+  readonly state: string;
+  readonly statusPath: string;
+  readonly pollAfterSeconds: number;
 }

@@ -6,6 +6,7 @@
  * - ExternalActionInspector (CMD026): "already completed external/customer actions are identified separately" — withdrawal
  *   revokes future execution authority; completed CRM imports and stages are named, never promised reversible (12/05).
  */
+import type { Id } from "@kauro/contracts";
 import type { ClientId, PlanId, UnitOfWork } from "@kauro/domain";
 
 export interface ActiveWorkSummary {
@@ -20,7 +21,8 @@ export interface ActiveWorkInspector {
 
 export interface CompletedExternalAction {
   readonly kind: "IMPORT_STAGE_VERIFIED" | "IMPORT_STAGE_REPORTED" | "PACKAGE_DELIVERED";
-  readonly referenceId: string;
+  /** The platform id of the stage or package (UUIDv7); it is carried in approval.withdrawn.v1, so never a customer value. */
+  readonly referenceId: Id;
 }
 
 export interface ExternalActionInspector {
