@@ -33,6 +33,7 @@ export interface CommandRuntime {
   readonly unitOfWork: UnitOfWorkFactory;
   readonly authorizer: Authorizer;
   readonly clock: Clock;
+  /** Process id generator for identifiers minted outside a unit of work (correlation ids); aggregate ids come from `uow.ids` (D-PORT-1). */
   readonly ids: IdGenerator;
 }
 

@@ -65,6 +65,8 @@ export function createAuthorizer(deps: AuthorizerDependencies): Authorizer {
       if (membership.state !== "ACTIVE") return deny("NOT_AUTHORIZED", "MEMBERSHIP_NOT_ACTIVE");
       // 7. role
       if (!roleSatisfies(commandRole, membership.role)) return deny("NOT_AUTHORIZED", "ROLE_INSUFFICIENT");
+      // the membership the command then uses is the one read in this transaction (D-PORT-1; 07 "do not reuse stale cached grants")
+      uow.resolveMembership(membership.membershipId);
       // 8. step-up
       let assuranceClass: "SESSION" | "STEP_UP" = "SESSION";
       if (STEP_UP_COMMANDS.has(request.command)) {

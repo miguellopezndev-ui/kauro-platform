@@ -32,7 +32,7 @@ export function createClientHandler(runtime: CommandRuntime): CreateClientHandle
         if (!authority || authority.agencyId !== agencyId) {
           throw new DomainFailure("INVALID_REQUEST", "processing authority not visible", { reason: "UNKNOWN_REFERENCE", fields: [{ field: "processingAuthorityRef", code: "UNKNOWN_REFERENCE" }] });
         }
-        const clientId = runtime.ids.next() as ClientId;
+        const clientId = uow.ids.next() as ClientId;
         const client = await uow.endClients.insert({
           clientId,
           agencyId,

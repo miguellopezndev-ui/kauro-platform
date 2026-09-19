@@ -83,7 +83,7 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
         if (disclosed.disclosuresHash !== envelope.body.disclosuresHash) {
           throw new StaleVersionFailure(plan.version, plan.state, { reason: "DISCLOSURES_INCOMPLETE", mismatch: ["disclosuresHash"] });
         }
-        const approvalId = runtime.ids.next() as ApprovalId;
+        const approvalId = uow.ids.next() as ApprovalId;
         const preimage: ApprovalPreimage = {
           approvalId,
           actorId: envelope.userId,

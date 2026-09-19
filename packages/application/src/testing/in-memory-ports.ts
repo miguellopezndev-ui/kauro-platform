@@ -160,11 +160,21 @@ export function createInMemoryPorts(clock: Clock, ids: IdGenerator, initial: InM
   };
 }
 
-function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, clock: Clock, ids: IdGenerator): UnitOfWork {
+function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, clock: Clock, sharedIds: IdGenerator): UnitOfWork {
   let context: ExecutionContext = initialContext;
   let adopted = false;
   let resolvedMembershipId: MembershipId | null = null;
   const appended: DomainEventRecord[] = [];
+  // D-PORT-1: every aggregate id a command mints comes from the unit of work, which is what lets adoptTenant prove the
+  // adopted id was minted here (the pg adapter keeps the same record of minted ids)
+  const minted = new Set<string>();
+  const ids: IdGenerator = {
+    next(): Id {
+      const id = sharedIds.next();
+      minted.add(id);
+      return id;
+    },
+  };
 
   const tenantId = (): AgencyId | null => (context.kind === "TENANT" ? context.agencyId : null);
   const userId = (): UserId | null => (context.kind === "SYSTEM" ? null : context.userId);
@@ -261,8 +271,15 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
     get userId() {
       return userId();
     },
+    ids,
+    resolveMembership(membershipId) {
+      if (context.kind !== "TENANT") throw new DomainFailure("INTEGRITY_FAILURE", "a membership is resolved only inside a TENANT context");
+      if (resolvedMembershipId !== null) throw new DomainFailure("INTEGRITY_FAILURE", "the membership of this unit of work was already resolved");
+      resolvedMembershipId = membershipId;
+    },
     async adoptTenant(agencyId) {
       if (context.kind !== "IDENTITY" || adopted) throw new DomainFailure("INTEGRITY_FAILURE", "adoptTenant is allowed once, from an IDENTITY context");
+      if (!minted.has(agencyId)) throw new DomainFailure("INTEGRITY_FAILURE", "adoptTenant accepts only an agency id minted in this unit of work");
       adopted = true;
       context = { kind: "TENANT", agencyId, userId: context.userId, correlationId: context.correlationId };
     },
@@ -320,7 +337,6 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       async findLive(agencyId, id) {
         if (tenantId() !== agencyId) return null;
         const m = [...s.memberships.values()].find((x) => x.agencyId === agencyId && x.userId === id && LIVE_MEMBERSHIP.has(x.state));
-        if (m) resolvedMembershipId = m.membershipId;
         return m ?? null;
       },
       async listOwn(id) {

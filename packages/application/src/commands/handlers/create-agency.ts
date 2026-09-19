@@ -32,8 +32,8 @@ export function createAgencyHandler(runtime: CommandRuntime, limiter: AbuseLimit
         }
         // the owner membership references the identity row; the caller's own row is written under the self policy
         await uow.identities.syncOwn(envelope.subject.identity, envelope.subject.provider, envelope.subject.subjectHash, ctx.now);
-        const agencyId = runtime.ids.next() as AgencyId;
-        const membershipId = runtime.ids.next() as MembershipId;
+        const agencyId = uow.ids.next() as AgencyId;
+        const membershipId = uow.ids.next() as MembershipId;
         await uow.adoptTenant(agencyId);
         const agency = await uow.agencies.insert({ agencyId, displayName: envelope.body.displayName, createdByUserId: envelope.userId, createdAt: ctx.now });
         const membership = await uow.memberships.insert({

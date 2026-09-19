@@ -43,8 +43,8 @@ export function createProjectHandler(runtime: CommandRuntime): CreateProjectHand
         if (envelope.body.mode !== "CLEAN" && targetInstanceRef === undefined) {
           throw new DomainFailure("INVALID_REQUEST", "CRM modes declare a target instance", { reason: "TARGET_INSTANCE_REQUIRED", fields: [{ field: "targetInstanceRef", code: "REQUIRED" }] });
         }
-        const projectId = runtime.ids.next() as ProjectId;
-        const revisionId = runtime.ids.next() as RevisionId;
+        const projectId = uow.ids.next() as ProjectId;
+        const revisionId = uow.ids.next() as RevisionId;
         const { project, revision } = await uow.projects.insertWithDraftRevision({
           projectId,
           agencyId: membership.agencyId,
