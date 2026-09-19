@@ -467,6 +467,7 @@ with B10/B16. Every payload key is allowlisted (`EVENT_PAYLOAD_ALLOWLIST`), sche
 | Q5 | S089/S090 are worded for mandate materialization (manual 22) but routed to B06/G-DOMAIN. | domain/database half demonstrated here; the behavioural half named for B08/B11 (§10). |
 | Q6 | Whether an APPROVER other than the approving actor may withdraw an approval. | actor or OWNER (D-AUTHZ-3). |
 | Q7 | Whether client/project creation should require an ACTIVE agency. | DRAFT or ACTIVE (D-CMD-2). |
+| Q8 | Whether a cancelled logical operation (cancel_version > 0) must refuse new lease claims, or only be observed by the holder. | observed only; the `CANCELLED` claim refusal is not produced (D-LEASE-2). |
 
 ## 12. Handoff to the implementation mandate
 
@@ -479,6 +480,23 @@ statement timeout, serialization retry), repositories, `EventPublisher`, `Comman
 public result, external effect identity, exit status, artifact digests and independent review (21 "Execution record").
 Nothing in this branch is "done" because its tests are green; G-DOMAIN and G-TENANT close only through the construction
 service's independent review.
+
+## 12a. Implementation record — branch `b06/persistence` (step (1) of §12)
+
+The `pg` adapters of every domain port are delivered in `@kauro/persistence` (`src/pool`, `src/unit-of-work`,
+`src/repositories/{tenancy,workspace,plans}`, `src/event-publisher`, `src/command-journal`, `src/request-journal`,
+`src/lease-store`, `src/sql`) with the harness `test/harness.ts` and four adapter test files (30 tests on real PostgreSQL 17).
+Decisions the implementation had to add:
+
+| id | decision | why (authority) |
+|---|---|---|
+| D-PORT-1 | `UnitOfWork` gains `ids: IdGenerator` and `resolveMembership(membershipId)`. Without them the port's own invariants ("adoptTenant only with an id the server minted in this unit of work"; "resolvedMembershipId once it has been resolved") had no enforcing mechanism. `adoptTenant` accepts only an id minted through `uow.ids`; `resolveMembership` is TENANT-only and once. | 07 "Database representation" (server-generated ids); 08 "Identity is not permission" (the membership the command uses is the one read in this transaction). |
+| D-POOL-1 | The pool verifies every physical connection once: not SUPERUSER, not BYPASSRLS, not CREATEROLE/CREATEDB, not the database owner, member of exactly one runtime group; a privileged login is destroyed. The connection ceiling is a mandatory input (1..24). A SYSTEM context is refused on a `kauro_app` pool and TENANT/IDENTITY on a `kauro_control` pool. | 08 "Database isolation" (runtime roles are not owners, superusers or BYPASSRLS; privileged migration roles never serve requests); 07 "Connection budget" (the ceiling is a capacity decision). |
+| D-UOW-1 | After `COMMIT` the adapter checks the command tag: PostgreSQL answers `ROLLBACK` (no error) when the transaction block was aborted earlier, which would let a handler that swallowed a refusal "succeed" with nothing persisted. Such a unit of work is `INTEGRITY_FAILURE`. | 07 "Transaction discipline" (a successful command commits state, event and outbox atomically — or nothing); 10 "An unexpected 500 does not automatically mean a command did not commit" (the converse must hold too). |
+| D-UOW-2 | Error translation: `DomainFailure` passes through; a database refusal becomes the SQLSTATE-table failure (`57014` query_canceled added as `CAPACITY_UNAVAILABLE`, retryable); an unmapped unique violation is `ConstraintViolation` (INTEGRITY_FAILURE carrying the constraint name for the handler); anything else is `INTERNAL_ERROR` naming only the correlation id, with the original error as server-side `cause`. `40001`/`40P01` re-run the work in a fresh transaction up to `maxRetries` (default 0 at READ COMMITTED, 2 above). | 10 "Responses and safe errors"; 07 "Command outcomes" (resource saturation is distinct and retryable); 07 "bounded serializable retries". |
+| D-JOURNAL-1 | Reservation is `INSERT ... ON CONFLICT (identity index expression) DO NOTHING RETURNING`: a concurrent duplicate blocks on the identity index until the first transaction ends, then reads the committed row (REPLAY / CONFLICT / PENDING) or proceeds as first after a rollback — no savepoint, no second round trip in the common case. A FAILED entry with the same digest replays as FAILED. `commit` accepts only 2xx outcomes. | 10 "Idempotency contract" (a concurrent duplicate receives the same durable result); D-IDEM-2. |
+| D-LEASE-2 | `claim` runs under a savepoint so a refusal is an outcome (`RESUME_WITHOUT_CHECKPOINT` also covers a checkpoint mismatch, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`, `DEADLINE_PASSED`) and the control-plane unit of work continues. The port's `CANCELLED` reason is not produced: the schema has no rule that refuses a claim because of cancellation (cancellation is a generation the owner observes). Open question Q8 for the authority. | 07 "Job and attempt states"; S090; 07 "Outbox" (the sweeper repairs abandoned leases in bounded batches). |
+| D-CAP-1 | `CapabilityRepository.findMode` returns the offered capability of the mode when one is published (at most one by index), otherwise the newest capability of the mode, so the handler names `MODE_NOT_OFFERED` against a real state. | CMD011 precondition; 02 "Capability publication contract". |
 
 ## 13. Verification performed on this branch
 
