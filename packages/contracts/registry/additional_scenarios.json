@@ -1,0 +1,1412 @@
+[
+  {
+    "id": "R2-001",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Distinct equal occurrences",
+    "scenario": "Two CSV records have byte-identical cells but different locators.",
+    "expected": "Preserve two source occurrences until an authorized duplicate decision explicitly combines them; content hashing cannot erase occurrence identity.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-002",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Whitespace is a value",
+    "scenario": "A legal name has leading space while an ID has trailing space and no approved trim step.",
+    "expected": "Preserve both exact values. Applying a field-specific approved trim changes only that field and leaves lineage.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-003",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Unicode normalization collision",
+    "scenario": "Two identifiers differ only by composed/decomposed accent sequences.",
+    "expected": "Do not merge them through an unapproved global normalization. A selected normalization records the resulting collision as an identity decision.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-004",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Negative zero and scale",
+    "scenario": "Decimal strings -0.00, 0 and 001.20 occur in different semantic fields.",
+    "expected": "Preserve lexical identity fields; numerical output follows an explicit scale/sign policy. No incidental JSON-number round trip.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-005",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Locale grammar ambiguity",
+    "scenario": "1.234 appears with conflicting locale evidence and could mean one point two three four or one thousand two hundred thirty-four.",
+    "expected": "Withhold conversion until the declared grammar resolves meaning; no majority vote silently changes minority values.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-006",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Valid low historical year",
+    "scenario": "Date 0099-01-02 enters every supported date-only primitive.",
+    "expected": "Output exactly the same year with independent calendar truth; never use the JavaScript 0\u201399 constructor shortcut.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-007",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Excel calendar endpoints",
+    "scenario": "Serials 59, 60 and 61 use the 1900 system, and the same integers use the 1904 system.",
+    "expected": "59 maps to 1900-02-28, 60 has no Gregorian date, 61 maps to 1900-03-01; the 1904 profile uses its own epoch without copying the false leap day.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-008",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "DST missing hour",
+    "scenario": "2026-03-08 02:30 in America/New_York lacks an offset.",
+    "expected": "Mark a nonexistent local time as unresolved/error under the selected policy; never silently shift it to another hour.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-009",
+    "owner": "03",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Required versus empty target field",
+    "scenario": "A required-on-create target field is present as an empty string.",
+    "expected": "Evaluate actual importer semantics and block invalid creation; presence of a column is not a valid required value.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-010",
+    "owner": "04",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Formula injection as data",
+    "scenario": "A CSV value starts with =, +, - or @ and is viewed in a spreadsheet-compatible report.",
+    "expected": "Keep source meaning in the machine data contract while generating a separately safe human-view artifact; no blanket prefix that corrupts CRM import values.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-011",
+    "owner": "04",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "Duplicate ZIP path aliases",
+    "scenario": "XLSX entries differ only through normalized separators or case where the parser resolves them identically.",
+    "expected": "Reject ambiguous part identity before expansion; no overwrite-by-extraction-order.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-012",
+    "owner": "04",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "XML entity expansion",
+    "scenario": "A workbook relationship/XML part references an external entity.",
+    "expected": "Reject or parse with external resolution disabled; assert zero DNS/HTTP/file fetch.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-013",
+    "owner": "04",
+    "gate": "G-MC-SEMANTICS",
+    "package": "B01",
+    "title": "XLSX absent cached formula result",
+    "scenario": "A formula cell is selected as a required import field but has no cached result.",
+    "expected": "Require a new trusted export or explicit exclusion; do not calculate arbitrary formulas or treat the formula text as its value.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-014",
+    "owner": "04",
+    "gate": "G-CAPACITY",
+    "package": "B02",
+    "title": "Conjunctive upload envelope",
+    "scenario": "A 1.9GB XLSX expands to a 1.1GiB individual XML part while total expansion stays below 20GiB.",
+    "expected": "Block under the per-part limit despite passing compressed-file and total limits; explain CSV/split alternative.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-015",
+    "owner": "04",
+    "gate": "G-CAPACITY",
+    "package": "B02",
+    "title": "Width times cell size",
+    "scenario": "Many individually valid cells combine into a decoded record larger than 8MiB.",
+    "expected": "Enforce the record envelope before allocation grows; a 1MiB cell limit alone is insufficient.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-016",
+    "owner": "04",
+    "gate": "G-CAPACITY",
+    "package": "B02",
+    "title": "Skewed exact join",
+    "scenario": "A large child edge set points to one merged parent cluster.",
+    "expected": "Use bounded indexing/spill and an independent edge count; no Cartesian explosion or dropped edges.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-017",
+    "owner": "04",
+    "gate": "G-MC-RELEASE",
+    "package": "B02",
+    "title": "Hidden release asset mismatch",
+    "scenario": "Source tar and npm package share a version label but one contains a changed compiled helper.",
+    "expected": "Compare actual bytes and consumer installation; version text cannot establish equivalence.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-018",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Native ID from another account",
+    "scenario": "A plausible HubSpot Record ID comes from another portal.",
+    "expected": "Block foreign-instance identity even when its textual shape is valid.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-019",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Identifier precedence side effect",
+    "scenario": "A Contact update contains both Record ID and a secondary email.",
+    "expected": "Require the dedicated approved effect and real importer qualification; no accidental primary-email replacement.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-020",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Association add versus replace",
+    "scenario": "An existing relationship label is present and the file supplies a new label.",
+    "expected": "Compare export-back to the selected add/replace intent; additive importer behavior cannot certify replacement.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-021",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Salesforce relationship depth",
+    "scenario": "A child file uses a grandparent dotted reference unsupported by the selected import mode.",
+    "expected": "Reject at compilation; a syntactically plausible field path is not capability.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-022",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Null marker is literal data",
+    "scenario": "A text field legitimately contains #N/A while the selected importer uses that token to clear.",
+    "expected": "Require a representable approved encoding or block that operation; do not silently delete the field.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-023",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Partial parent success",
+    "scenario": "Parent stage imports eight of ten rows and two fail.",
+    "expected": "Validate the exact eight mappings, block child edges depending on failed parents, and preserve all ten source dispositions.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-024",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Foreign success receipt",
+    "scenario": "A success CSV from another stage has the same number of rows.",
+    "expected": "Reject stage/package/instance mismatch before compiling child identities.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-025",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Receipt retries",
+    "scenario": "The same stage receipt is uploaded twice, then a different one after finalization.",
+    "expected": "Identical content is idempotent; differing finalized evidence opens reconciliation rather than overwriting identity.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-026",
+    "owner": "05",
+    "gate": "G-VENDOR",
+    "package": "B17",
+    "title": "Target enum drift after payment",
+    "scenario": "An approved allowed value disappears before execution.",
+    "expected": "Pause affected execution, show scope consequences and provide included repair/refund/new-scope paths without an automatic extra charge.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-027",
+    "owner": "06",
+    "gate": "G-IC-PRIVACY",
+    "package": "B03",
+    "title": "Low-cardinality secret enum",
+    "scenario": "A destination enum has two customer API tokens as labels.",
+    "expected": "Exclude L4 values everywhere; cardinality and metadata origin do not relax secrecy.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-028",
+    "owner": "06",
+    "gate": "G-IC-PRIVACY",
+    "package": "B03",
+    "title": "Provider error echoes prompt",
+    "scenario": "An adapter error includes the full submitted body.",
+    "expected": "Safe error/telemetry projection removes raw customer content and credentials; secure bounded evidence follows its retention class.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-029",
+    "owner": "06",
+    "gate": "G-IC-PRIVACY",
+    "package": "B03",
+    "title": "Memory cross-client reuse",
+    "scenario": "One agency has two end clients with similar schemas and conflicting historical decisions.",
+    "expected": "Select only compatible scoped memory; agency membership alone does not authorize cross-client examples.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-030",
+    "owner": "06",
+    "gate": "G-IC-PRIVACY",
+    "package": "B03",
+    "title": "Keyed symbol scope",
+    "scenario": "The same personal value appears in two independent attempts.",
+    "expected": "Within-task equality can be preserved; unrelated attempts must not expose a stable unsalted identity hash.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-031",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Crash before dispatch",
+    "scenario": "A task reserves cost then crashes before writing dispatch intent.",
+    "expected": "Recover under the lease and prove no provider effect before releasing/reusing the reservation.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-032",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Crash after dispatch intent",
+    "scenario": "The journal says DISPATCHING and no response exists.",
+    "expected": "Classify possible liability, reconcile available provider identity and avoid a blind free retry assumption.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-033",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Crash after response persistence",
+    "scenario": "Complete response bytes and checksum exist but CONSUMED was not committed.",
+    "expected": "Validate/read the durable response and continue without a new physical request.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-034",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Old worker resumes after fence change",
+    "scenario": "Worker A pauses, B claims a newer fence, then A receives a valid response.",
+    "expected": "A can contribute reconciled evidence if safe but cannot publish or dispatch under the stale fence.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-035",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Cancellation at final commit",
+    "scenario": "Cancellation and SYSTEM_DRAFT promotion contend on the same current version.",
+    "expected": "Exactly one valid transactional outcome; if cancellation wins, no draft is returned as ready.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-036",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Budget cost unknown",
+    "scenario": "A completed response omits usage metadata.",
+    "expected": "Keep conservative possible cost under UNKNOWN; never count it as zero or free budget.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-037",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Candidate partition omission",
+    "scenario": "One of thirty-three useful candidate groups is omitted to fit thirty-two tasks.",
+    "expected": "Return explicit unresolved scope or a permitted bounded repartition; no complete status with a missing candidate.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-038",
+    "owner": "06",
+    "gate": "G-IC-KERNEL",
+    "package": "B03",
+    "title": "Duplicate key JSON authority",
+    "scenario": "The model emits two planHash keys with different values.",
+    "expected": "Reject before ordinary JSON last-key-wins parsing grants authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-039",
+    "owner": "06",
+    "gate": "G-IC-QUALITY",
+    "package": "B04",
+    "title": "Copied independent run",
+    "scenario": "Three reports have different filenames but identical invocation/result identities.",
+    "expected": "Reject independence; verify distinct actual run and provider request provenance.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-040",
+    "owner": "06",
+    "gate": "G-IC-QUALITY",
+    "package": "B04",
+    "title": "Benchmark contamination",
+    "scenario": "Expected answer is accidentally included in model context.",
+    "expected": "Invalidate the affected evaluation and correct the corpus/adapter before new funded runs.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-041",
+    "owner": "06",
+    "gate": "G-IC-QUALITY",
+    "package": "B04",
+    "title": "Cheap model with unsafe retention",
+    "scenario": "A low-price endpoint cannot satisfy the project's required data treatment.",
+    "expected": "Fail eligibility before cost comparison; a cheaper unsafe request is not an optimization.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-042",
+    "owner": "06",
+    "gate": "G-IC-QUALITY",
+    "package": "B04",
+    "title": "Safe but useless model",
+    "scenario": "Supported cases abstain while ambiguity cases score perfectly.",
+    "expected": "Fail supported utility thresholds independently of the safety score.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-043",
+    "owner": "07",
+    "gate": "G-DOMAIN",
+    "package": "B06",
+    "title": "Concurrent final-owner removal",
+    "scenario": "Two owners each remove the other while reading two active owners.",
+    "expected": "Serialize the invariant so at least one valid owner remains, or use explicit closure authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-044",
+    "owner": "07",
+    "gate": "G-DOMAIN",
+    "package": "B08",
+    "title": "Sealing without audit funding",
+    "scenario": "All input checks pass but no model budget is available.",
+    "expected": "Seal may complete; StartAudit is separately blocked without an unfunded provider dispatch.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-045",
+    "owner": "07",
+    "gate": "G-JOB",
+    "package": "B08",
+    "title": "Old valid package after refund",
+    "scenario": "A worker produces semantically valid output after payment reversal revoked publication.",
+    "expected": "Retain evidence privately for reconciliation but deny publication under current commercial authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-046",
+    "owner": "07",
+    "gate": "G-JOB",
+    "package": "B08",
+    "title": "Queue admission fairness",
+    "scenario": "One agency submits four paid-ready jobs while another is waiting.",
+    "expected": "Enforce global active/waiting limits and the documented fair scheduler; do not let one tenant create an unbounded hidden queue.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-047",
+    "owner": "08",
+    "gate": "G-TENANT",
+    "package": "B16",
+    "title": "Database owner bypass",
+    "scenario": "The application test uses a table owner and appears to pass tenant filtering.",
+    "expected": "Reject the test setup as proof of RLS; run real queries under the production runtime role.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-048",
+    "owner": "08",
+    "gate": "G-TENANT",
+    "package": "B16",
+    "title": "Signed URL after role change",
+    "scenario": "A member loses access after a download token was issued.",
+    "expected": "Stop new grants immediately and disclose the bounded residual lifetime; do not promise a provider revocation that is unavailable.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-049",
+    "owner": "08",
+    "gate": "G-SECURITY",
+    "package": "B16",
+    "title": "Metadata-server credential bypass",
+    "scenario": "An isolated worker obtains its base service-account token and tries a foreign raw prefix.",
+    "expected": "Actual IAM denies access; passing only through the application broker is insufficient proof.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-050",
+    "owner": "08",
+    "gate": "G-SECURITY",
+    "package": "B16",
+    "title": "Breakglass renewal after expiry",
+    "scenario": "An operator reuses an old privileged grant to refresh credentials.",
+    "expected": "Deny renewal and require a new justified scope; preserve the audit record.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-051",
+    "owner": "09",
+    "gate": "G-UPLOAD",
+    "package": "B07",
+    "title": "Provider session outlives UI",
+    "scenario": "An application upload reservation expires at twenty-four hours but provider session remains usable.",
+    "expected": "Tombstone acceptance and cancel the provider session where supported; late objects remain quarantined and are cleaned.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-052",
+    "owner": "09",
+    "gate": "G-UPLOAD",
+    "package": "B07",
+    "title": "Concurrent byte reservation",
+    "scenario": "Two files each fit remaining revision quota when checked independently.",
+    "expected": "The aggregate transaction admits only the combination within five billion bytes.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-053",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Seven-day source with fourteen-day quote",
+    "scenario": "Quote and source expire on different dates.",
+    "expected": "Display both; at source expiry checkout is unavailable even if the price remains valid.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-054",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Staged final delivery near hard cap",
+    "scenario": "Final stage completes one day before the thirty-day capture hard deadline.",
+    "expected": "The final seven-day allowance is capped by the hard deadline; show the actual remaining day rather than extending automatically.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-055",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Waiting customer is not active compute",
+    "scenario": "A parent stage waits ten days for an agency receipt.",
+    "expected": "No active heavy job or heartbeat pretends to run; the staged retention deadline continues.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-056",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Soft-delete policy change",
+    "scenario": "Bucket policy changes from seven days to zero while old soft-deleted objects remain.",
+    "expected": "Record actual existing residual expiration; changing policy does not prove prior versions vanished.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-057",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Restore with deleted audit memory",
+    "scenario": "Backup contains model memory derived from a deleted project.",
+    "expected": "Apply tombstones to raw, derived and memory references before allowing reads or provider egress.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-058",
+    "owner": "10",
+    "gate": "G-DOMAIN",
+    "package": "B06",
+    "title": "Boolean coercion",
+    "scenario": "A request uses the string false instead of boolean false.",
+    "expected": "Reject structural validation; no coercion/default that changes approval meaning.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-059",
+    "owner": "10",
+    "gate": "G-DOMAIN",
+    "package": "B06",
+    "title": "Unknown privileged request member",
+    "scenario": "A create-project body includes verified=true and agencyOwner=true.",
+    "expected": "Reject unknown fields before any state change.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-060",
+    "owner": "10",
+    "gate": "G-TENANT",
+    "package": "B16",
+    "title": "Cursor reused across tenants",
+    "scenario": "A cursor from agency A is submitted for agency B with the same list filter.",
+    "expected": "Reject cursor scope/signature mismatch without leaking rows or totals.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-061",
+    "owner": "10",
+    "gate": "G-INTEGRATION",
+    "package": "B15",
+    "title": "Webhook reordering",
+    "scenario": "Refund event arrives before delayed capture notification.",
+    "expected": "Query/reconcile actual provider identities, preserve chronological facts and avoid double-reversing the ledger.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-062",
+    "owner": "11",
+    "gate": "G-UX_AGENCY",
+    "package": "B11",
+    "title": "Keyboard high-impact approval",
+    "scenario": "CLEAR confirmation opens a modal and validation returns an error.",
+    "expected": "Focus remains usable, the error is associated to the exact effect, and no approval occurs on Enter through a hidden default.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-063",
+    "owner": "11",
+    "gate": "G-UX_AGENCY",
+    "package": "B11",
+    "title": "Stale quote tab",
+    "scenario": "Two tabs show old/new revisions and the old tab returns from payment approval.",
+    "expected": "The UI reads durable server state and never offers execution of an unapproved newer revision.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-064",
+    "owner": "11",
+    "gate": "G-UX_AGENCY",
+    "package": "B11",
+    "title": "Unsaved decisions on navigation",
+    "scenario": "The agency edits an enum map and leaves the screen before validation.",
+    "expected": "Show saved/draft status and a recoverable warning; do not silently treat unsaved local edits as approved.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-065",
+    "owner": "11",
+    "gate": "G-UX_AGENCY",
+    "package": "B11",
+    "title": "Report count denominator",
+    "scenario": "A flat source creates company/contact projections and multiple relationship files.",
+    "expected": "Show physical rows, billable source units and output rows separately with understandable definitions.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-066",
+    "owner": "12",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Seller statement after termination",
+    "scenario": "A former seller retains lawful access to their statement but loses operational access.",
+    "expected": "Expose only their financial statement/support route, never customer CRM or new prospect tools.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-067",
+    "owner": "12",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Owner finance unknowns",
+    "scenario": "Dashboard has captures but no verified bank settlement.",
+    "expected": "Show unknown/unavailable balances and liabilities; no optimistic spendable cash card.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-068",
+    "owner": "12",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Prepared message is not sent",
+    "scenario": "Assistant creates an outreach draft without explicit send authorization.",
+    "expected": "State remains DRAFT; no activity log or KPI claims a delivered email.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-069",
+    "owner": "13",
+    "gate": "G-REPORT",
+    "package": "B13",
+    "title": "Human-safe versus import artifact",
+    "scenario": "A malicious spreadsheet prefix needs safe preview escaping.",
+    "expected": "Keep separately identified safe presentation and machine-import bytes; hashes and instructions identify which artifact to use.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-070",
+    "owner": "13",
+    "gate": "G-REPORT",
+    "package": "B13",
+    "title": "White-label legal identity",
+    "scenario": "Agency branding obscures Kavo's actual contracting/fiscal role.",
+    "expected": "Preserve required legal identity in terms/invoices; branding cannot fabricate the issuer.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-071",
+    "owner": "13",
+    "gate": "G-REPORT",
+    "package": "B13",
+    "title": "Long rejection table",
+    "scenario": "A report includes many rejected rows with long untrusted values.",
+    "expected": "Paginate and minimize human output while retaining secure complete machine evidence; no clipped totals or unsafe HTML.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-072",
+    "owner": "14",
+    "gate": "G-CLOUD",
+    "package": "B14",
+    "title": "Cloud Run disk Preview",
+    "scenario": "A new disk feature is available but is Preview and not qualified.",
+    "expected": "Record the changed alternative while retaining Batch until a measured accepted replacement proves the required envelope.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-073",
+    "owner": "14",
+    "gate": "G-CLOUD",
+    "package": "B14",
+    "title": "Autoscaling exhausts SQL pool",
+    "scenario": "API max instances doubles without changing per-instance pool size.",
+    "expected": "Admission/deploy validation detects total connection budget breach before rollout.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-074",
+    "owner": "14",
+    "gate": "G-RECOVERY",
+    "package": "B16",
+    "title": "Restore duplicates notification",
+    "scenario": "Backup outbox contains a previously sent receipt email.",
+    "expected": "Reconcile external sent-event identity and avoid another message unless deliberately authorized as a correction.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-075",
+    "owner": "14",
+    "gate": "G-CLOUD",
+    "package": "B14",
+    "title": "Budget alert arrives late",
+    "scenario": "Cloud spend grows faster than billing alerts update.",
+    "expected": "Application reservations and job limits enforce the local grant; alerts are observability rather than the sole cap.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-076",
+    "owner": "14",
+    "gate": "G-RECOVERY",
+    "package": "B16",
+    "title": "Backup without scratch",
+    "scenario": "A heavy attempt dies and local scratch was never backed up.",
+    "expected": "Recover only from durable source/checkpoint contracts, or rerun under the same authorized job; do not claim ephemeral intermediate recovery.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-077",
+    "owner": "15",
+    "gate": "G-PAYMENT",
+    "package": "B09",
+    "title": "Founding price arithmetic",
+    "scenario": "HubSpot 1\u201350k base is 129500 cents and founding discount is 2500 bps.",
+    "expected": "Discount 32375; service 97125. No floating-point cent drift.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-078",
+    "owner": "15",
+    "gate": "G-PAYMENT",
+    "package": "B09",
+    "title": "PSP reference arithmetic",
+    "scenario": "A 97125-cent service capture uses illustrative 540 bps plus 30 cents.",
+    "expected": "Fee 5275 cents and net 91850 cents under half-up rounding; actual statement fees replace the illustration.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-079",
+    "owner": "15",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "First commission arithmetic",
+    "scenario": "An attributed first service capture is 97125 cents after discount.",
+    "expected": "Commission 9713 cents; do not subtract the PSP fee from its basis.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-080",
+    "owner": "15",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Repeat and refund arithmetic",
+    "scenario": "Base HubSpot service gets 5% repeat discount, then 4% commission and a 20000-cent service refund.",
+    "expected": "Service 123025, original commission 4921, revised commission 4121 and adjustment minus 800 cents.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-081",
+    "owner": "15",
+    "gate": "G-PAYMENT",
+    "package": "B09",
+    "title": "One-cent refund sequence",
+    "scenario": "Many partial service refunds eventually consume the full captured service amount.",
+    "expected": "Cumulative entitlement reaches exactly zero; individual rounding cannot leave a commission residue.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-082",
+    "owner": "15",
+    "gate": "G-FISCAL",
+    "package": "B15",
+    "title": "Tax treatment unresolved",
+    "scenario": "The operator has not supplied reviewed export-service facts.",
+    "expected": "No guessed zero VAT or invalid invoice; concrete fiscal-profile action blocks the sale path while independent work continues.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-083",
+    "owner": "15",
+    "gate": "G-FISCAL",
+    "package": "B15",
+    "title": "Alegra cheapest plan lacks verified API",
+    "scenario": "A public price page lists an affordable plan but account entitlement is absent.",
+    "expected": "Do not buy/declare automation ready by assumption; verify entitlement or use the approved lawful bridge.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-084",
+    "owner": "15",
+    "gate": "G-FISCAL",
+    "package": "B15",
+    "title": "Issued invoice missing from first page",
+    "scenario": "Provider created an invoice before a timeout; it is beyond the first list page.",
+    "expected": "Find exact identity using supported query/pagination before creating any replacement.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-085",
+    "owner": "15",
+    "gate": "G-PAYMENT",
+    "package": "B15",
+    "title": "Held funds and withdrawal",
+    "scenario": "Capture is completed, withdrawal submitted, bank not yet credited.",
+    "expected": "Show separate capture/held/withdrawn/bank-available facts; no payout from imaginary liquidity.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-086",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Second project starts repeat benefit",
+    "scenario": "An agency has one qualifying paid non-fully-refunded project in the lookback.",
+    "expected": "Apply 5% to its second eligible project, even for a different end client.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-087",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Tenth prior project threshold",
+    "scenario": "An agency has ten qualifying prior projects in the 365-day lookback.",
+    "expected": "Apply 10% to the next eligible quote; count prior projects, not the current capture twice.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-088",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Twenty-fifth prior project threshold",
+    "scenario": "An agency has twenty-five qualifying prior projects.",
+    "expected": "Apply 15% to the next eligible quote and preserve the quoted snapshot through later count changes.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-089",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Fully refunded previous purchase",
+    "scenario": "An agency's only prior paid project was fully refunded before new quote calculation.",
+    "expected": "Exclude it from the active repeat-discount count while preserving historical first-project commission designation.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-090",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Concurrent founding slots",
+    "scenario": "Two agencies race for the last of three founding discounts.",
+    "expected": "Reserve/consume the promotion slot transactionally; no fourth discounted first agency unless a new explicit offer is issued.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-091",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Promotion is not admission capacity",
+    "scenario": "Three founding slots are used while safe capacity remains.",
+    "expected": "Continue selling qualified standard/repeat work within operational limits; do not confuse discount cohort with a total customer cap.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-092",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Same-band included replacement",
+    "scenario": "Customer replaces one source before execution without changing priced band.",
+    "expected": "Require new source validation/approval and consume the one included allowance; no automatic new fee or old authority reuse.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-093",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Larger replacement scope",
+    "scenario": "A replacement moves a project from 50000 to 50001 billable units.",
+    "expected": "Prepare a new price/scope decision and explicit acceptance before another charge; never silently capture the difference.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-094",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Recurring calendar leap boundary",
+    "scenario": "First capture is 2028-02-29T15:00:00Z under a twelve-calendar-month term.",
+    "expected": "Window ends exclusively at 2029-02-28T15:00:00Z under the clamp rule; a purchase at the endpoint is outside automatic residual.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-095",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Assignment transfer",
+    "scenario": "Seller B services an agency acquired under seller A's active entitlement.",
+    "expected": "Keep A's contractual residual; B's new service compensation is separately agreed rather than duplicating or erasing the acquisition pool.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-096",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "First purchase fully refunded",
+    "scenario": "The historically first qualifying capture is later fully refunded and the agency buys again within the window.",
+    "expected": "First line becomes zero; the historical first designation and original window do not reset. The later qualifying project uses the recurring rule.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-097",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Split commission pool",
+    "scenario": "Two sellers have an agreed 60/40 split of a first-project commission.",
+    "expected": "Calculate one contractual pool, allocate it deterministically with a remainder rule, and ensure shares sum to the exact pool.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-098",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Organic purchase after twelve months",
+    "scenario": "The agency buys after the exclusive recurrence endpoint with no new assistance assignment.",
+    "expected": "No automatic acquisition residual; earned prior lines remain payable.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-099",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "New work after residual expiry",
+    "scenario": "A seller is asked to conduct a new demo after the original window.",
+    "expected": "Create a prospective project-assistance agreement before requiring work; do not condition old rights on unpaid future activity.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-100",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Termination tail scope",
+    "scenario": "Seller leaves with two enumerated active opportunities and a thousand scraped prospects.",
+    "expected": "Only qualifying enumerated opportunities receive the signed ninety-day tail; the list creates no blanket claim.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-101",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Final staged completion eligibility",
+    "scenario": "First parent file is ready but final contracted preparation remains incomplete.",
+    "expected": "Accrual may exist, but the thirty-day payout-eligibility clock does not start from the first stage by default.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-102",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Partial statement dispute",
+    "scenario": "One line is disputed and other settled lines are eligible.",
+    "expected": "Hold only the justified disputed amount, disclose reasons/review date and pay undisputed amounts on the agreed cycle.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-103",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Changed payout destination",
+    "scenario": "A seller changes bank details immediately before payout.",
+    "expected": "Require verified destination-change assurance; no transfer based solely on an unauthenticated email.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-104",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Negative balance after paid commission",
+    "scenario": "A legitimate refund reduces an already paid commission.",
+    "expected": "Post a visible adjustment and apply only the signed lawful offset/recovery policy; do not debit the person's bank without authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-105",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Retainer economics",
+    "scenario": "Proposed seller compensation is 1000 USD retainer plus 10% of 15000 USD service collections.",
+    "expected": "Total 2500/15000 is 16.67%, exceeding a 15% planning guard; review economics without claiming the guard is employment law.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-106",
+    "owner": "18",
+    "gate": "G-COMMERCIAL",
+    "package": "B20",
+    "title": "Qualified outbound with opt-out",
+    "scenario": "A previously suppressed recipient appears in a new imported prospect batch.",
+    "expected": "Suppression wins before scheduling or drafting an authorized send; no duplicate-list bypass.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-107",
+    "owner": "18",
+    "gate": "G-COMMERCIAL",
+    "package": "B20",
+    "title": "Seller overpromises import success",
+    "scenario": "A proposal claims guaranteed full CRM migration for an unqualified object.",
+    "expected": "Block/correct the claim and route the scope through capability qualification; do not sell a promise from a product aspiration.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-108",
+    "owner": "18",
+    "gate": "G-OPERATING-MATURITY",
+    "package": "B20",
+    "title": "Five real projects without sufficient coverage",
+    "scenario": "Revenue exists but one supported mode and repeat use remain unobserved.",
+    "expected": "Keep capability/operating maturity labels scoped to actual evidence; revenue alone does not prove every product path.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-109",
+    "owner": "19",
+    "gate": "G-BUSINESS",
+    "package": "B19",
+    "title": "Unknown company assets",
+    "scenario": "No observed domain, merchant, tax ID or corporate bank exists.",
+    "expected": "Keep factual fields unknown and prepare exact personal actions; do not manufacture an entity or buy from assumed availability.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-110",
+    "owner": "19",
+    "gate": "G-BUSINESS",
+    "package": "B19",
+    "title": "Contractor label versus actual control",
+    "scenario": "The proposed seller role imposes fixed hours, exclusivity and subordination.",
+    "expected": "Require actual local classification review and budget the lawful arrangement before engagement.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-111",
+    "owner": "19",
+    "gate": "G-BUSINESS",
+    "package": "B19",
+    "title": "Agency processor chain",
+    "scenario": "The agency is itself processing on an end client's instructions.",
+    "expected": "Record the actual chain, permitted subprocessors/transfers and data authority; a generic controller checkbox is insufficient.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-112",
+    "owner": "20",
+    "gate": "G-OPERATING-LOOP",
+    "package": "B21",
+    "title": "Scale without bottleneck evidence",
+    "scenario": "Revenue improves but measured queue, CPU and support remain healthy.",
+    "expected": "Do not add fixed capacity by calendar alone; choose a concrete higher-value use or preserve available funds.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-113",
+    "owner": "21",
+    "gate": "G-RELEASE",
+    "package": "B18",
+    "title": "Gate evidence copied to new image",
+    "scenario": "Source is unchanged but dependency/image digest differs.",
+    "expected": "Review transitive impact and invalidate affected evidence; identical source text is not identical candidate.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-114",
+    "owner": "21",
+    "gate": "G-RELEASE",
+    "package": "B18",
+    "title": "Harness crash treated as rejection",
+    "scenario": "The test runner crashes before invoking the public API.",
+    "expected": "Record HARNESS_ERROR, repair the harness and rerun; do not count a detected sabotage or product refusal.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-115",
+    "owner": "23",
+    "gate": "G-FACTS",
+    "package": "B00",
+    "title": "Bare Claude report",
+    "scenario": "Miguel provides only a final report without asking for an audit.",
+    "expected": "The assistant observes/reviews the subject, updates state and prepares the next concrete mandate automatically.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-116",
+    "owner": "23",
+    "gate": "G-FACTS",
+    "package": "B00",
+    "title": "Active mandate survives edition change",
+    "scenario": "Claude is still running the previously delivered repair prompt.",
+    "expected": "Preserve its clock and scope until safe transition, then apply R2 prospectively.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-117",
+    "owner": "23",
+    "gate": "G-FACTS",
+    "package": "B00",
+    "title": "New IC main with repair claims",
+    "scenario": "Remote main advanced to a commit claiming more tests.",
+    "expected": "Record observation and claims separately; do not mark the repairs independently accepted without review.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-118",
+    "owner": "24",
+    "gate": "G-FACTS",
+    "package": "B00",
+    "title": "Personal action with guessed UI",
+    "scenario": "An action card names a stale menu or nonexistent account.",
+    "expected": "Materialize from current observable state and perform technical preparation before asking Miguel for the irreducible act.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-119",
+    "owner": "25",
+    "gate": "G-PRODUCTION",
+    "package": "B19",
+    "title": "Deadline reached with only technical deployment",
+    "scenario": "The service is reachable but cannot lawfully charge, issue documents or deliver/support the promised scope.",
+    "expected": "Do not relabel it production to satisfy the date; record the shortfall and precise recovery.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-120",
+    "owner": "26",
+    "gate": "G-OPERATING-LOOP",
+    "package": "B21",
+    "title": "Revenue mistaken for wealth",
+    "scenario": "A monthly dashboard treats gross captures, held funds and a hypothetical valuation as Miguel's liquid wealth.",
+    "expected": "Separate gross service revenue, liabilities, settled company cash, lawful distributions and personal assets.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-121",
+    "owner": "26",
+    "gate": "G-OPERATING-LOOP",
+    "package": "B21",
+    "title": "No three-month reserve rule",
+    "scenario": "A saleable qualified launch fits actual current funding but lacks three months of idle cash.",
+    "expected": "Do not impose an arbitrary reserve prerequisite; protect actual near-term obligations and approved exposure.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-122",
+    "owner": "27",
+    "gate": "G-OPERATING-LOOP",
+    "package": "B21",
+    "title": "Year-five forecast without buyers",
+    "scenario": "A scenario assumes one hundred agencies and four projects each.",
+    "expected": "Label the multiplication as a scenario, attach acquisition/capacity/margin conditions and spend only from real authorized funds.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-123",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Soft extension inside hard cap",
+    "scenario": "An agency requests 72 hours before expiry and the hard cap is only 24 hours away.",
+    "expected": "Grant at most the remaining 24 hours, disclose the exact endpoint and consume the one extension; never move the hard cap.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-124",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Second or late extension",
+    "scenario": "A project already used its extension or requests it after expiry.",
+    "expected": "Reject without reviving access, resetting clocks or changing a tombstone.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-125",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Extension versus deletion race",
+    "scenario": "A pre-expiry extension and deletion/expiry compete on the same retention version.",
+    "expected": "One valid transaction wins; a later extension cannot undo committed deletion authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-126",
+    "owner": "09",
+    "gate": "G-DELETE",
+    "package": "B16",
+    "title": "Restore after acknowledged extension",
+    "scenario": "A backup predates a valid acknowledged soft extension.",
+    "expected": "Apply the current durable retention-authority journal before cleanup so the restored old deadline cannot prematurely delete promised data.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-127",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Founding quote reservation",
+    "scenario": "A binding founding quote is issued while one promotion slot remains.",
+    "expected": "Reserve that one slot through the original fourteen-day quote expiry; previews reserve nothing, quote IDs do not renew it, and capture uncertainty prevents unsafe release.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-128",
+    "owner": "15",
+    "gate": "G-FISCAL_LOCAL",
+    "package": "B09",
+    "title": "Local fiscal adapter boundary",
+    "scenario": "A domestic taxable sale and an export-claimed sale share the same payment amount but different evidence.",
+    "expected": "The adapter cannot infer export exemption from currency or foreign email; emit the selected reviewed fiscal treatment or block issuance, preserving capture reconciliation.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-129",
+    "owner": "18",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Uncertain email submission",
+    "scenario": "Gmail accepts a message but the transport response is lost.",
+    "expected": "Record SEND_UNCERTAIN and require scoped reconciliation; do not resend automatically or claim inbox delivery.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-130",
+    "owner": "18",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Opt-out wins dispatch race",
+    "scenario": "A recipient opts out after grant creation and before dispatcher claim.",
+    "expected": "Current suppression blocks the send; a sealed campaign grant cannot override a later refusal.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-131",
+    "owner": "18",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "No cold outreach through transactional provider",
+    "scenario": "A sales draft for an unsolicited prospect selects the Resend route.",
+    "expected": "Reject the route despite valid API credentials and spare quota; preserve the draft for a genuinely permitted channel.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-132",
+    "owner": "18",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Sender consent revoked",
+    "scenario": "A seller OAuth grant is revoked with queued drafts.",
+    "expected": "Stop future dispatch for that sender, preserve uncertain/past activity and never borrow the owner identity.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-133",
+    "owner": "18",
+    "gate": "G-INTEGRATION",
+    "package": "B15",
+    "title": "Notification quota and authenticity",
+    "scenario": "A notification campaign approaches its observed quota and a forged webhook claims delivery.",
+    "expected": "Reserve essential capacity or raise a funded action, reject unauthenticated events and keep authenticated in-app state available.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-134",
+    "owner": "11",
+    "gate": "G-UX_AGENCY",
+    "package": "B11",
+    "title": "Expired login and legal acceptance",
+    "scenario": "An invitation expires while a user reads a newly versioned legal agreement.",
+    "expected": "Authentication recovery does not revive the invitation or silently accept changed terms; show the current required action without leaking account existence.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-135",
+    "owner": "12",
+    "gate": "G-UX_PRIVATE",
+    "package": "B12",
+    "title": "Obsolete seller resource",
+    "scenario": "A seller opens an old offer sheet that promises an unavailable CRM capacity.",
+    "expected": "Show superseded status and current safe resource; prevent its use in a new approved draft while preserving historical records.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-136",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Fractional-cent discount order",
+    "scenario": "A synthetic arithmetic basis of 1002 cents receives a 25 percent discount.",
+    "expected": "Round the 250.5-cent discount to 251, then subtract for 751 net cents. Rounding the complementary 75 percent to 752 is wrong. This vector does not create a new advertised price band.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-137",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Late earlier capture keeps first designation",
+    "scenario": "Project P is durably confirmed first; a later authenticated event proves Q completed at the provider earlier.",
+    "expected": "Keep P as historical first and Q subsequent; preserve actual timestamps and use the verified recurring cutoff without granting a second 10 percent pool.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-138",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Residual exclusive cutoff and delayed notice",
+    "scenario": "Two subsequent captures occur one second before and exactly at the local twelve-month endpoint, both notified later.",
+    "expected": "The first can qualify at 4 percent; the endpoint capture does not. Quote or notification time cannot replace verified provider completion.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-139",
+    "owner": "17",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Controlled banking calendar",
+    "scenario": "A September statement uses a test calendar excluding weekends and 2026-10-12.",
+    "expected": "Compute 2026-10-07 as fifth and 2026-10-15 as tenth business day. Production must bind a verified current banking calendar; the fixture is not a live holiday authority.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-140",
+    "owner": "15",
+    "gate": "G-PAYMENT",
+    "package": "B09",
+    "title": "Two actual captures for one obligation",
+    "scenario": "One order receives two different verified full captures, while a separate delivery repeats one capture event.",
+    "expected": "Account for both real captures and the excess-refund obligation, deduplicate repeated events, keep one service entitlement and cap commission basis to the service obligation.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  },
+  {
+    "id": "R2-141",
+    "owner": "16",
+    "gate": "G-COMMERCIAL",
+    "package": "B10",
+    "title": "Agency rename versus legal consolidation",
+    "scenario": "A buyer changes display name/email; a separate holding-company agency requests shared pricing.",
+    "expected": "A rename preserves history, rights and tenant identity. Consolidation requires an explicit reviewed relationship decision and cannot merge datasets or erase attribution.",
+    "status": "SPECIFIED_NOT_EXECUTED_ON_PRODUCT"
+  }
+]

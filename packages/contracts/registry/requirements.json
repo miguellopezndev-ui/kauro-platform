@@ -1,0 +1,5735 @@
+[
+  {
+    "id": "REQ-MC-01",
+    "owner": "04",
+    "caseIds": [
+      "MC-01"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Reject the mismatched mode before validation; the correctly scoped control remains valid.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-02",
+    "owner": "04",
+    "caseIds": [
+      "MC-02"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Reject foreign object/instance authority; accept only a matching scoped authoritative proof.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-03",
+    "owner": "04",
+    "caseIds": [
+      "MC-03"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Recompute the complete binding and reject before producing executable output.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-04",
+    "owner": "04",
+    "caseIds": [
+      "MC-04"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Block or explicitly dispose the affected scope; permitted values remain intact.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-05",
+    "owner": "04",
+    "caseIds": [
+      "MC-05"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Reject malformed grouping rather than producing 123 or 1234.56; 1,234.56 is the valid control.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-06",
+    "owner": "04",
+    "caseIds": [
+      "MC-06"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve 0099; reject the fictional Gregorian date and out-of-range/nonfinite conversions.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-MC-07",
+    "owner": "04",
+    "caseIds": [
+      "MC-07"
+    ],
+    "gate": "G-MC-RELEASE",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Reject the release dossier; exact bytes and complete true evidence pass.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-01",
+    "owner": "06",
+    "caseIds": [
+      "IC-01"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "One effective dispatch owner; recover the stored response without a new billable request.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-02",
+    "owner": "06",
+    "caseIds": [
+      "IC-02"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Never promote after cancellation/24-hour expiry; valid MC completion can finish within the absolute window without new late model calls.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-03",
+    "owner": "06",
+    "caseIds": [
+      "IC-03"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Return a typed contract failure, never TypeError or permissive acceptance.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-04",
+    "owner": "06",
+    "caseIds": [
+      "IC-04"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Conflict before cache reuse or provider dispatch.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-05",
+    "owner": "06",
+    "caseIds": [
+      "IC-05"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "No raw sentinel in complete outbound bytes, headers, logs or metadata; do not classify by cardinality alone.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-06",
+    "owner": "06",
+    "caseIds": [
+      "IC-06"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Reject self-asserted evidence and operations outside the complete allowed intersection.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-07",
+    "owner": "06",
+    "caseIds": [
+      "IC-07"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Treat it as a signal; no merge/update identity without full scoped proof or explicit authority.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-08",
+    "owner": "06",
+    "caseIds": [
+      "IC-08"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Accept both valid scoped mappings; reject only actual competing mappings in the same output scope.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-09",
+    "owner": "06",
+    "caseIds": [
+      "IC-09"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Require verifiable decision evidence; determinism does not grant an exemption.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-10",
+    "owner": "06",
+    "caseIds": [
+      "IC-10"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Score the entire output and reject extras/stale evidence.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-11",
+    "owner": "06",
+    "caseIds": [
+      "IC-11"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Reject repeated-run qualification and unauthorized spend; three independent valid runs are the control.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-12",
+    "owner": "06",
+    "caseIds": [
+      "IC-12"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Keep conservative liability and block new dispatch/promotion under the defined budget outcome.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-IC-13",
+    "owner": "06",
+    "caseIds": [
+      "IC-13"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Reject during current transport preflight before sending; official compatible body passes.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S021",
+    "owner": "04",
+    "caseIds": [
+      "S021"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve one logical record and identical locators/counts across chunk boundaries.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S022",
+    "owner": "04",
+    "caseIds": [
+      "S022"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Use positional field IDs; never overwrite values in a label-keyed object.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S023",
+    "owner": "04",
+    "caseIds": [
+      "S023"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Surface a parser decision/error; do not silently replace bytes or opportunistically choose a favorable decoding.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S024",
+    "owner": "09",
+    "caseIds": [
+      "S024"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Reject without outside writes, network access or unbounded decompression.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S025",
+    "owner": "04",
+    "caseIds": [
+      "S025"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Do not execute formulas or fabricate values; inventory and explicit selection remain visible.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S026",
+    "owner": "04",
+    "caseIds": [
+      "S026"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Use declared calendar/offset; never let host timezone decide authority.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S027",
+    "owner": "04",
+    "caseIds": [
+      "S027"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve exact text and padding.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S028",
+    "owner": "04",
+    "caseIds": [
+      "S028"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve/ask for authority; a supported contextual normalization retains the extension.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S029",
+    "owner": "04",
+    "caseIds": [
+      "S029"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Produce four distinct intended effects; block unsupported CLEAR.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S030",
+    "owner": "04",
+    "caseIds": [
+      "S030"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "No cross-instance merge or automatic permissive consent resolution.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S031",
+    "owner": "04",
+    "caseIds": [
+      "S031"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Bound memory and time with spill, complete lineage and no quadratic/recursive collapse.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S032",
+    "owner": "04",
+    "caseIds": [
+      "S032"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Independently account for every edge and map valid surviving endpoints.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S033",
+    "owner": "04",
+    "caseIds": [
+      "S033"
+    ],
+    "gate": "G-CAPACITY",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Measure complete process-tree RSS, scratch and wall time on the qualified envelope.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S034",
+    "owner": "04",
+    "caseIds": [
+      "S034"
+    ],
+    "gate": "G-MC-RELEASE",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Canonical data artifacts remain equivalent while declared variable metadata stays separate.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S035",
+    "owner": "07",
+    "caseIds": [
+      "S035"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "No valid package publication; exact failure and bounded cleanup/recovery.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S036",
+    "owner": "06",
+    "caseIds": [
+      "S036"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Block every egress surface before transport and keep telemetry minimized.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S037",
+    "owner": "06",
+    "caseIds": [
+      "S037"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Treat it as data; no tools, arbitrary fetch or secret authority is available.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S038",
+    "owner": "06",
+    "caseIds": [
+      "S038"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Reserve possible charge and reconcile; no universal exactly-once claim or unlimited retry.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S039",
+    "owner": "06",
+    "caseIds": [
+      "S039"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Exclude it before selection and egress; compatible same-scope memory is the control.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S040",
+    "owner": "06",
+    "caseIds": [
+      "S040"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Reject malformed/incomplete output and preserve incremental decoding without duplicate text.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S041",
+    "owner": "06",
+    "caseIds": [
+      "S041"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Only admitted reservations fit the shared grant; available budget never becomes negative.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S042",
+    "owner": "06",
+    "caseIds": [
+      "S042"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Reject nominal coverage inflation; manifest identity alone is insufficient.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S043",
+    "owner": "06",
+    "caseIds": [
+      "S043"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Fail usefulness despite zero critical harm.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S044",
+    "owner": "06",
+    "caseIds": [
+      "S044"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Do not aggregate incompatible subjects as one candidate; invalidate the affected evidence.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S045",
+    "owner": "07",
+    "caseIds": [
+      "S045"
+    ],
+    "gate": "G-MONO",
+    "packages": [
+      "B05"
+    ],
+    "statement": "Install, build and consume packages through declared dependencies.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S046",
+    "owner": "07",
+    "caseIds": [
+      "S046"
+    ],
+    "gate": "G-MONO",
+    "packages": [
+      "B05"
+    ],
+    "statement": "Architecture gate rejects the forbidden edge while the valid public port remains usable.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S047",
+    "owner": "07",
+    "caseIds": [
+      "S047"
+    ],
+    "gate": "G-MONO",
+    "packages": [
+      "B05"
+    ],
+    "statement": "Interoperable digests preserve string and array meaning; no arbitrary normalization.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S048",
+    "owner": "08",
+    "caseIds": [
+      "S048"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Deny without resource-existence or data leakage, including server-rendered caches.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S049",
+    "owner": "08",
+    "caseIds": [
+      "S049"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reset transaction scope and enforce cross-tenant constraints in the real database.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S050",
+    "owner": "08",
+    "caseIds": [
+      "S050"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reject transactionally without escalation.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S051",
+    "owner": "07",
+    "caseIds": [
+      "S051"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "One valid transition and a clear stale-version conflict; no approval of unseen new content.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S052",
+    "owner": "07",
+    "caseIds": [
+      "S052"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Conflict; identical replay recovers the original durable result.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S053",
+    "owner": "09",
+    "caseIds": [
+      "S053"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Observe actual bytes/generation before admission or sealing.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S054",
+    "owner": "09",
+    "caseIds": [
+      "S054"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "NOT_SCANNED/BLOCKED; a fully covered harmless file passes.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S055",
+    "owner": "07",
+    "caseIds": [
+      "S055"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Outbox recovery preserves one logical job without losing intent.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S056",
+    "owner": "07",
+    "caseIds": [
+      "S056"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Only current authority publishes; reconcile provider identity before another create.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S057",
+    "owner": "15",
+    "caseIds": [
+      "S057"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "No execution authority until authenticated capture facts exist.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S058",
+    "owner": "15",
+    "caseIds": [
+      "S058"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "No CommercialAuthorization; reconcile or raise the specific incident.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S059",
+    "owner": "15",
+    "caseIds": [
+      "S059"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Reconcile the real order and apply phase-specific restriction without another charge.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S060",
+    "owner": "15",
+    "caseIds": [
+      "S060"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Block checkout; identical reupload still needs a new verified revision and approval.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S061",
+    "owner": "07",
+    "caseIds": [
+      "S061"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Read-back and attestation fail; no READY publication.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S062",
+    "owner": "07",
+    "caseIds": [
+      "S062"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "One transactional winner; stale promotion cannot undo revoked authority.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S063",
+    "owner": "09",
+    "caseIds": [
+      "S063"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Absolute deadline and watchdog prevent indefinite work or retention.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S064",
+    "owner": "09",
+    "caseIds": [
+      "S064"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Deletion receipt names unresolved residuals and retries; no false complete erasure.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S065",
+    "owner": "09",
+    "caseIds": [
+      "S065"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reapply tombstones/revocations/inbox facts before traffic or external dispatch.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S066",
+    "owner": "11",
+    "caseIds": [
+      "S066"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Recover the same operation and honest state; no duplicate capture.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S067",
+    "owner": "11",
+    "caseIds": [
+      "S067"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "No previous-session data reappears through browser or server caches.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S068",
+    "owner": "11",
+    "caseIds": [
+      "S068"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Usable labels, focus, error association and order without mouse-only steps.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S069",
+    "owner": "11",
+    "caseIds": [
+      "S069"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Safe format/size/escaping; no code or SSRF in report generation.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S070",
+    "owner": "11",
+    "caseIds": [
+      "S070"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Exact counts, readable breaks/legends and selectable accessible text.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S071",
+    "owner": "08",
+    "caseIds": [
+      "S071"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Deny by default; justified exceptional access is scoped, expiring and audited.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S072",
+    "owner": "14",
+    "caseIds": [
+      "S072"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Effective ingress/origin authentication prevents private-surface bypass.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S073",
+    "owner": "14",
+    "caseIds": [
+      "S073"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Deny actual credential/scope escalation; authorized identity remains functional.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S074",
+    "owner": "14",
+    "caseIds": [
+      "S074"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Preload heavy dependencies and prove the separate permitted network routes.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S075",
+    "owner": "07",
+    "caseIds": [
+      "S075"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "An external janitor cleans only exact owned resources and records cost/result.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S076",
+    "owner": "08",
+    "caseIds": [
+      "S076"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "No PASS from missing results; record verified chain, digest and actual execution.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S077",
+    "owner": "04",
+    "caseIds": [
+      "S077"
+    ],
+    "gate": "G-CAPACITY",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Not sufficient: each offered mode gets the required complete dataset on the actual host.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S078",
+    "owner": "05",
+    "caseIds": [
+      "S078"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Reject tool mismatch; require actual selected importer and export-back evidence.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S079",
+    "owner": "21",
+    "caseIds": [
+      "S079"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Do not promote a different digest under old evidence.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S080",
+    "owner": "21",
+    "caseIds": [
+      "S080"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Require the exact subject/run and propagated exit status.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S081",
+    "owner": "19",
+    "caseIds": [
+      "S081"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Keep trusted invoice issuance and authenticated capture facts separate.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S082",
+    "owner": "19",
+    "caseIds": [
+      "S082"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Expose the 30-dollar deficit before spending; no fictional credit.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S083",
+    "owner": "19",
+    "caseIds": [
+      "S083"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Preserve accrual liability and withhold spendability until actual funds are available.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S084",
+    "owner": "19",
+    "caseIds": [
+      "S084"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Apply only the eligible maximum discount and the contractual service basis.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S085",
+    "owner": "26",
+    "caseIds": [
+      "S085"
+    ],
+    "gate": "G-OPERATING-MATURITY",
+    "packages": [
+      "B20"
+    ],
+    "statement": "Insufficient operating-maturity coverage for a broader claim; no fabricated repeat or other-mode evidence.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S086",
+    "owner": "21",
+    "caseIds": [
+      "S086"
+    ],
+    "gate": "G-PRODUCTION",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Do not call it saleable production or proven customer maturity.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S087",
+    "owner": "19",
+    "caseIds": [
+      "S087"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Block/correct the claim or send, preserve suppression and review access.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S088",
+    "owner": "21",
+    "caseIds": [
+      "S088"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Require exact inventory/recovery/authorization; only owned disposable intermediates can be routinely cleaned.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S089",
+    "owner": "07",
+    "caseIds": [
+      "S089"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Reject runnable materialization until actual dependencies and grants are resolved.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S090",
+    "owner": "07",
+    "caseIds": [
+      "S090"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Reject restart; preserve original subject, clock, cost and checkpoint identity.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S091",
+    "owner": "06",
+    "caseIds": [
+      "S091"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "No call until compatible effective retention/privacy configuration is read back.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S092",
+    "owner": "04",
+    "caseIds": [
+      "S092"
+    ],
+    "gate": "G-MC-RELEASE",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Preserve producer evidence only through explicit transitive equivalence, not a blanket assertion.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S093",
+    "owner": "07",
+    "caseIds": [
+      "S093"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Reject the boundary; compile only reviewed application-owned schemas.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S094",
+    "owner": "09",
+    "caseIds": [
+      "S094"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Original data anchors remain; pricing does not grant retention.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S095",
+    "owner": "06",
+    "caseIds": [
+      "S095"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Partition within explicit bounds and preserve unresolved work; no silent truncation.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-S096",
+    "owner": "19",
+    "caseIds": [
+      "S096"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Keep factual profile pending and prepare the exact personal/verified action.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP01",
+    "owner": "06",
+    "caseIds": [
+      "CAP01"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP02",
+    "owner": "06",
+    "caseIds": [
+      "CAP02"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP03",
+    "owner": "06",
+    "caseIds": [
+      "CAP03"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP04",
+    "owner": "06",
+    "caseIds": [
+      "CAP04"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP05",
+    "owner": "06",
+    "caseIds": [
+      "CAP05"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP06",
+    "owner": "06",
+    "caseIds": [
+      "CAP06"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP07",
+    "owner": "06",
+    "caseIds": [
+      "CAP07"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP08",
+    "owner": "06",
+    "caseIds": [
+      "CAP08"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP09",
+    "owner": "06",
+    "caseIds": [
+      "CAP09"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP10",
+    "owner": "06",
+    "caseIds": [
+      "CAP10"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP11",
+    "owner": "06",
+    "caseIds": [
+      "CAP11"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-CAP12",
+    "owner": "06",
+    "caseIds": [
+      "CAP12"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "The evidenced decision reaches the real public MC consumer and produces the permitted effect; a paired missing-authority case rejects or abstains.",
+    "origin": "R1_SCENARIO_PRESERVED_WITH_EXPLICIT_R2_POLICY"
+  },
+  {
+    "id": "REQ-R2-001",
+    "owner": "03",
+    "caseIds": [
+      "R2-001"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve two source occurrences until an authorized duplicate decision explicitly combines them; content hashing cannot erase occurrence identity.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-002",
+    "owner": "03",
+    "caseIds": [
+      "R2-002"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve both exact values. Applying a field-specific approved trim changes only that field and leaves lineage.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-003",
+    "owner": "03",
+    "caseIds": [
+      "R2-003"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Do not merge them through an unapproved global normalization. A selected normalization records the resulting collision as an identity decision.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-004",
+    "owner": "03",
+    "caseIds": [
+      "R2-004"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Preserve lexical identity fields; numerical output follows an explicit scale/sign policy. No incidental JSON-number round trip.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-005",
+    "owner": "03",
+    "caseIds": [
+      "R2-005"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Withhold conversion until the declared grammar resolves meaning; no majority vote silently changes minority values.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-006",
+    "owner": "03",
+    "caseIds": [
+      "R2-006"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Output exactly the same year with independent calendar truth; never use the JavaScript 0–99 constructor shortcut.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-007",
+    "owner": "03",
+    "caseIds": [
+      "R2-007"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "59 maps to 1900-02-28, 60 has no Gregorian date, 61 maps to 1900-03-01; the 1904 profile uses its own epoch without copying the false leap day.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-008",
+    "owner": "03",
+    "caseIds": [
+      "R2-008"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Mark a nonexistent local time as unresolved/error under the selected policy; never silently shift it to another hour.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-009",
+    "owner": "03",
+    "caseIds": [
+      "R2-009"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Evaluate actual importer semantics and block invalid creation; presence of a column is not a valid required value.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-010",
+    "owner": "04",
+    "caseIds": [
+      "R2-010"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Keep source meaning in the machine data contract while generating a separately safe human-view artifact; no blanket prefix that corrupts CRM import values.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-011",
+    "owner": "04",
+    "caseIds": [
+      "R2-011"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Reject ambiguous part identity before expansion; no overwrite-by-extraction-order.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-012",
+    "owner": "04",
+    "caseIds": [
+      "R2-012"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Reject or parse with external resolution disabled; assert zero DNS/HTTP/file fetch.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-013",
+    "owner": "04",
+    "caseIds": [
+      "R2-013"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Require a new trusted export or explicit exclusion; do not calculate arbitrary formulas or treat the formula text as its value.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-014",
+    "owner": "04",
+    "caseIds": [
+      "R2-014"
+    ],
+    "gate": "G-CAPACITY",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Block under the per-part limit despite passing compressed-file and total limits; explain CSV/split alternative.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-015",
+    "owner": "04",
+    "caseIds": [
+      "R2-015"
+    ],
+    "gate": "G-CAPACITY",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Enforce the record envelope before allocation grows; a 1MiB cell limit alone is insufficient.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-016",
+    "owner": "04",
+    "caseIds": [
+      "R2-016"
+    ],
+    "gate": "G-CAPACITY",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Use bounded indexing/spill and an independent edge count; no Cartesian explosion or dropped edges.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-017",
+    "owner": "04",
+    "caseIds": [
+      "R2-017"
+    ],
+    "gate": "G-MC-RELEASE",
+    "packages": [
+      "B02"
+    ],
+    "statement": "Compare actual bytes and consumer installation; version text cannot establish equivalence.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-018",
+    "owner": "05",
+    "caseIds": [
+      "R2-018"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Block foreign-instance identity even when its textual shape is valid.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-019",
+    "owner": "05",
+    "caseIds": [
+      "R2-019"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Require the dedicated approved effect and real importer qualification; no accidental primary-email replacement.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-020",
+    "owner": "05",
+    "caseIds": [
+      "R2-020"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Compare export-back to the selected add/replace intent; additive importer behavior cannot certify replacement.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-021",
+    "owner": "05",
+    "caseIds": [
+      "R2-021"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Reject at compilation; a syntactically plausible field path is not capability.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-022",
+    "owner": "05",
+    "caseIds": [
+      "R2-022"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Require a representable approved encoding or block that operation; do not silently delete the field.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-023",
+    "owner": "05",
+    "caseIds": [
+      "R2-023"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Validate the exact eight mappings, block child edges depending on failed parents, and preserve all ten source dispositions.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-024",
+    "owner": "05",
+    "caseIds": [
+      "R2-024"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Reject stage/package/instance mismatch before compiling child identities.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-025",
+    "owner": "05",
+    "caseIds": [
+      "R2-025"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Identical content is idempotent; differing finalized evidence opens reconciliation rather than overwriting identity.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-026",
+    "owner": "05",
+    "caseIds": [
+      "R2-026"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Pause affected execution, show scope consequences and provide included repair/refund/new-scope paths without an automatic extra charge.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-027",
+    "owner": "06",
+    "caseIds": [
+      "R2-027"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Exclude L4 values everywhere; cardinality and metadata origin do not relax secrecy.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-028",
+    "owner": "06",
+    "caseIds": [
+      "R2-028"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Safe error/telemetry projection removes raw customer content and credentials; secure bounded evidence follows its retention class.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-029",
+    "owner": "06",
+    "caseIds": [
+      "R2-029"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Select only compatible scoped memory; agency membership alone does not authorize cross-client examples.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-030",
+    "owner": "06",
+    "caseIds": [
+      "R2-030"
+    ],
+    "gate": "G-IC-PRIVACY",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Within-task equality can be preserved; unrelated attempts must not expose a stable unsalted identity hash.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-031",
+    "owner": "06",
+    "caseIds": [
+      "R2-031"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Recover under the lease and prove no provider effect before releasing/reusing the reservation.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-032",
+    "owner": "06",
+    "caseIds": [
+      "R2-032"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Classify possible liability, reconcile available provider identity and avoid a blind free retry assumption.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-033",
+    "owner": "06",
+    "caseIds": [
+      "R2-033"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Validate/read the durable response and continue without a new physical request.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-034",
+    "owner": "06",
+    "caseIds": [
+      "R2-034"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "A can contribute reconciled evidence if safe but cannot publish or dispatch under the stale fence.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-035",
+    "owner": "06",
+    "caseIds": [
+      "R2-035"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Exactly one valid transactional outcome; if cancellation wins, no draft is returned as ready.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-036",
+    "owner": "06",
+    "caseIds": [
+      "R2-036"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Keep conservative possible cost under UNKNOWN; never count it as zero or free budget.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-037",
+    "owner": "06",
+    "caseIds": [
+      "R2-037"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Return explicit unresolved scope or a permitted bounded repartition; no complete status with a missing candidate.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-038",
+    "owner": "06",
+    "caseIds": [
+      "R2-038"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Reject before ordinary JSON last-key-wins parsing grants authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-039",
+    "owner": "06",
+    "caseIds": [
+      "R2-039"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Reject independence; verify distinct actual run and provider request provenance.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-040",
+    "owner": "06",
+    "caseIds": [
+      "R2-040"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Invalidate the affected evaluation and correct the corpus/adapter before new funded runs.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-041",
+    "owner": "06",
+    "caseIds": [
+      "R2-041"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Fail eligibility before cost comparison; a cheaper unsafe request is not an optimization.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-042",
+    "owner": "06",
+    "caseIds": [
+      "R2-042"
+    ],
+    "gate": "G-IC-QUALITY",
+    "packages": [
+      "B04"
+    ],
+    "statement": "Fail supported utility thresholds independently of the safety score.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-043",
+    "owner": "07",
+    "caseIds": [
+      "R2-043"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Serialize the invariant so at least one valid owner remains, or use explicit closure authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-044",
+    "owner": "07",
+    "caseIds": [
+      "R2-044"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Seal may complete; StartAudit is separately blocked without an unfunded provider dispatch.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-045",
+    "owner": "07",
+    "caseIds": [
+      "R2-045"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Retain evidence privately for reconciliation but deny publication under current commercial authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-046",
+    "owner": "07",
+    "caseIds": [
+      "R2-046"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Enforce global active/waiting limits and the documented fair scheduler; do not let one tenant create an unbounded hidden queue.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-047",
+    "owner": "08",
+    "caseIds": [
+      "R2-047"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reject the test setup as proof of RLS; run real queries under the production runtime role.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-048",
+    "owner": "08",
+    "caseIds": [
+      "R2-048"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Stop new grants immediately and disclose the bounded residual lifetime; do not promise a provider revocation that is unavailable.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-049",
+    "owner": "08",
+    "caseIds": [
+      "R2-049"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Actual IAM denies access; passing only through the application broker is insufficient proof.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-050",
+    "owner": "08",
+    "caseIds": [
+      "R2-050"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Deny renewal and require a new justified scope; preserve the audit record.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-051",
+    "owner": "09",
+    "caseIds": [
+      "R2-051"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Tombstone acceptance and cancel the provider session where supported; late objects remain quarantined and are cleaned.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-052",
+    "owner": "09",
+    "caseIds": [
+      "R2-052"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "The aggregate transaction admits only the combination within five billion bytes.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-053",
+    "owner": "09",
+    "caseIds": [
+      "R2-053"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Display both; at source expiry checkout is unavailable even if the price remains valid.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-054",
+    "owner": "09",
+    "caseIds": [
+      "R2-054"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "The final seven-day allowance is capped by the hard deadline; show the actual remaining day rather than extending automatically.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-055",
+    "owner": "09",
+    "caseIds": [
+      "R2-055"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "No active heavy job or heartbeat pretends to run; the staged retention deadline continues.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-056",
+    "owner": "09",
+    "caseIds": [
+      "R2-056"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Record actual existing residual expiration; changing policy does not prove prior versions vanished.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-057",
+    "owner": "09",
+    "caseIds": [
+      "R2-057"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Apply tombstones to raw, derived and memory references before allowing reads or provider egress.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-058",
+    "owner": "10",
+    "caseIds": [
+      "R2-058"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Reject structural validation; no coercion/default that changes approval meaning.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-059",
+    "owner": "10",
+    "caseIds": [
+      "R2-059"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Reject unknown fields before any state change.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-060",
+    "owner": "10",
+    "caseIds": [
+      "R2-060"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reject cursor scope/signature mismatch without leaking rows or totals.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-061",
+    "owner": "10",
+    "caseIds": [
+      "R2-061"
+    ],
+    "gate": "G-INTEGRATION",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Query/reconcile actual provider identities, preserve chronological facts and avoid double-reversing the ledger.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-062",
+    "owner": "11",
+    "caseIds": [
+      "R2-062"
+    ],
+    "gate": "G-UX_AGENCY",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Focus remains usable, the error is associated to the exact effect, and no approval occurs on Enter through a hidden default.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-063",
+    "owner": "11",
+    "caseIds": [
+      "R2-063"
+    ],
+    "gate": "G-UX_AGENCY",
+    "packages": [
+      "B11"
+    ],
+    "statement": "The UI reads durable server state and never offers execution of an unapproved newer revision.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-064",
+    "owner": "11",
+    "caseIds": [
+      "R2-064"
+    ],
+    "gate": "G-UX_AGENCY",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Show saved/draft status and a recoverable warning; do not silently treat unsaved local edits as approved.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-065",
+    "owner": "11",
+    "caseIds": [
+      "R2-065"
+    ],
+    "gate": "G-UX_AGENCY",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Show physical rows, billable source units and output rows separately with understandable definitions.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-066",
+    "owner": "12",
+    "caseIds": [
+      "R2-066"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Expose only their financial statement/support route, never customer CRM or new prospect tools.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-067",
+    "owner": "12",
+    "caseIds": [
+      "R2-067"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Show unknown/unavailable balances and liabilities; no optimistic spendable cash card.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-068",
+    "owner": "12",
+    "caseIds": [
+      "R2-068"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "State remains DRAFT; no activity log or KPI claims a delivered email.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-069",
+    "owner": "13",
+    "caseIds": [
+      "R2-069"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Keep separately identified safe presentation and machine-import bytes; hashes and instructions identify which artifact to use.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-070",
+    "owner": "13",
+    "caseIds": [
+      "R2-070"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Preserve required legal identity in terms/invoices; branding cannot fabricate the issuer.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-071",
+    "owner": "13",
+    "caseIds": [
+      "R2-071"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Paginate and minimize human output while retaining secure complete machine evidence; no clipped totals or unsafe HTML.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-072",
+    "owner": "14",
+    "caseIds": [
+      "R2-072"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Record the changed alternative while retaining Batch until a measured accepted replacement proves the required envelope.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-073",
+    "owner": "14",
+    "caseIds": [
+      "R2-073"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Admission/deploy validation detects total connection budget breach before rollout.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-074",
+    "owner": "14",
+    "caseIds": [
+      "R2-074"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reconcile external sent-event identity and avoid another message unless deliberately authorized as a correction.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-075",
+    "owner": "14",
+    "caseIds": [
+      "R2-075"
+    ],
+    "gate": "G-CLOUD",
+    "packages": [
+      "B14"
+    ],
+    "statement": "Application reservations and job limits enforce the local grant; alerts are observability rather than the sole cap.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-076",
+    "owner": "14",
+    "caseIds": [
+      "R2-076"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Recover only from durable source/checkpoint contracts, or rerun under the same authorized job; do not claim ephemeral intermediate recovery.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-077",
+    "owner": "15",
+    "caseIds": [
+      "R2-077"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Discount 32375; service 97125. No floating-point cent drift.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-078",
+    "owner": "15",
+    "caseIds": [
+      "R2-078"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Fee 5275 cents and net 91850 cents under half-up rounding; actual statement fees replace the illustration.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-079",
+    "owner": "15",
+    "caseIds": [
+      "R2-079"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Commission 9713 cents; do not subtract the PSP fee from its basis.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-080",
+    "owner": "15",
+    "caseIds": [
+      "R2-080"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Service 123025, original commission 4921, revised commission 4121 and adjustment minus 800 cents.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-081",
+    "owner": "15",
+    "caseIds": [
+      "R2-081"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Cumulative entitlement reaches exactly zero; individual rounding cannot leave a commission residue.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-082",
+    "owner": "15",
+    "caseIds": [
+      "R2-082"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "No guessed zero VAT or invalid invoice; concrete fiscal-profile action blocks the sale path while independent work continues.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-083",
+    "owner": "15",
+    "caseIds": [
+      "R2-083"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Do not buy/declare automation ready by assumption; verify entitlement or use the approved lawful bridge.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-084",
+    "owner": "15",
+    "caseIds": [
+      "R2-084"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Find exact identity using supported query/pagination before creating any replacement.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-085",
+    "owner": "15",
+    "caseIds": [
+      "R2-085"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Show separate capture/held/withdrawn/bank-available facts; no payout from imaginary liquidity.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-086",
+    "owner": "16",
+    "caseIds": [
+      "R2-086"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Apply 5% to its second eligible project, even for a different end client.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-087",
+    "owner": "16",
+    "caseIds": [
+      "R2-087"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Apply 10% to the next eligible quote; count prior projects, not the current capture twice.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-088",
+    "owner": "16",
+    "caseIds": [
+      "R2-088"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Apply 15% to the next eligible quote and preserve the quoted snapshot through later count changes.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-089",
+    "owner": "16",
+    "caseIds": [
+      "R2-089"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Exclude it from the active repeat-discount count while preserving historical first-project commission designation.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-090",
+    "owner": "16",
+    "caseIds": [
+      "R2-090"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Reserve/consume the promotion slot transactionally; no fourth discounted first agency unless a new explicit offer is issued.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-091",
+    "owner": "16",
+    "caseIds": [
+      "R2-091"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Continue selling qualified standard/repeat work within operational limits; do not confuse discount cohort with a total customer cap.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-092",
+    "owner": "16",
+    "caseIds": [
+      "R2-092"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Require new source validation/approval and consume the one included allowance; no automatic new fee or old authority reuse.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-093",
+    "owner": "16",
+    "caseIds": [
+      "R2-093"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Prepare a new price/scope decision and explicit acceptance before another charge; never silently capture the difference.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-094",
+    "owner": "17",
+    "caseIds": [
+      "R2-094"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Window ends exclusively at 2029-02-28T15:00:00Z under the clamp rule; a purchase at the endpoint is outside automatic residual.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-095",
+    "owner": "17",
+    "caseIds": [
+      "R2-095"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Keep A's contractual residual; B's new service compensation is separately agreed rather than duplicating or erasing the acquisition pool.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-096",
+    "owner": "17",
+    "caseIds": [
+      "R2-096"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "First line becomes zero; the historical first designation and original window do not reset. The later qualifying project uses the recurring rule.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-097",
+    "owner": "17",
+    "caseIds": [
+      "R2-097"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Calculate one contractual pool, allocate it deterministically with a remainder rule, and ensure shares sum to the exact pool.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-098",
+    "owner": "17",
+    "caseIds": [
+      "R2-098"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "No automatic acquisition residual; earned prior lines remain payable.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-099",
+    "owner": "17",
+    "caseIds": [
+      "R2-099"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a prospective project-assistance agreement before requiring work; do not condition old rights on unpaid future activity.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-100",
+    "owner": "17",
+    "caseIds": [
+      "R2-100"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Only qualifying enumerated opportunities receive the signed ninety-day tail; the list creates no blanket claim.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-101",
+    "owner": "17",
+    "caseIds": [
+      "R2-101"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Accrual may exist, but the thirty-day payout-eligibility clock does not start from the first stage by default.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-102",
+    "owner": "17",
+    "caseIds": [
+      "R2-102"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Hold only the justified disputed amount, disclose reasons/review date and pay undisputed amounts on the agreed cycle.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-103",
+    "owner": "17",
+    "caseIds": [
+      "R2-103"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Require verified destination-change assurance; no transfer based solely on an unauthenticated email.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-104",
+    "owner": "17",
+    "caseIds": [
+      "R2-104"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Post a visible adjustment and apply only the signed lawful offset/recovery policy; do not debit the person's bank without authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-105",
+    "owner": "17",
+    "caseIds": [
+      "R2-105"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Total 2500/15000 is 16.67%, exceeding a 15% planning guard; review economics without claiming the guard is employment law.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-106",
+    "owner": "18",
+    "caseIds": [
+      "R2-106"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B20"
+    ],
+    "statement": "Suppression wins before scheduling or drafting an authorized send; no duplicate-list bypass.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-107",
+    "owner": "18",
+    "caseIds": [
+      "R2-107"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B20"
+    ],
+    "statement": "Block/correct the claim and route the scope through capability qualification; do not sell a promise from a product aspiration.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-108",
+    "owner": "18",
+    "caseIds": [
+      "R2-108"
+    ],
+    "gate": "G-OPERATING-MATURITY",
+    "packages": [
+      "B20"
+    ],
+    "statement": "Keep capability/operating maturity labels scoped to actual evidence; revenue alone does not prove every product path.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-109",
+    "owner": "19",
+    "caseIds": [
+      "R2-109"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Keep factual fields unknown and prepare exact personal actions; do not manufacture an entity or buy from assumed availability.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-110",
+    "owner": "19",
+    "caseIds": [
+      "R2-110"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Require actual local classification review and budget the lawful arrangement before engagement.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-111",
+    "owner": "19",
+    "caseIds": [
+      "R2-111"
+    ],
+    "gate": "G-BUSINESS",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Record the actual chain, permitted subprocessors/transfers and data authority; a generic controller checkbox is insufficient.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-112",
+    "owner": "20",
+    "caseIds": [
+      "R2-112"
+    ],
+    "gate": "G-OPERATING-LOOP",
+    "packages": [
+      "B21"
+    ],
+    "statement": "Do not add fixed capacity by calendar alone; choose a concrete higher-value use or preserve available funds.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-113",
+    "owner": "21",
+    "caseIds": [
+      "R2-113"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Review transitive impact and invalidate affected evidence; identical source text is not identical candidate.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-114",
+    "owner": "21",
+    "caseIds": [
+      "R2-114"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Record HARNESS_ERROR, repair the harness and rerun; do not count a detected sabotage or product refusal.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-115",
+    "owner": "23",
+    "caseIds": [
+      "R2-115"
+    ],
+    "gate": "G-FACTS",
+    "packages": [
+      "B00"
+    ],
+    "statement": "The assistant observes/reviews the subject, updates state and prepares the next concrete mandate automatically.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-116",
+    "owner": "23",
+    "caseIds": [
+      "R2-116"
+    ],
+    "gate": "G-FACTS",
+    "packages": [
+      "B00"
+    ],
+    "statement": "Preserve its clock and scope until safe transition, then apply R2 prospectively.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-117",
+    "owner": "23",
+    "caseIds": [
+      "R2-117"
+    ],
+    "gate": "G-FACTS",
+    "packages": [
+      "B00"
+    ],
+    "statement": "Record observation and claims separately; do not mark the repairs independently accepted without review.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-118",
+    "owner": "24",
+    "caseIds": [
+      "R2-118"
+    ],
+    "gate": "G-FACTS",
+    "packages": [
+      "B00"
+    ],
+    "statement": "Materialize from current observable state and perform technical preparation before asking Miguel for the irreducible act.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-119",
+    "owner": "25",
+    "caseIds": [
+      "R2-119"
+    ],
+    "gate": "G-PRODUCTION",
+    "packages": [
+      "B19"
+    ],
+    "statement": "Do not relabel it production to satisfy the date; record the shortfall and precise recovery.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-120",
+    "owner": "26",
+    "caseIds": [
+      "R2-120"
+    ],
+    "gate": "G-OPERATING-LOOP",
+    "packages": [
+      "B21"
+    ],
+    "statement": "Separate gross service revenue, liabilities, settled company cash, lawful distributions and personal assets.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-121",
+    "owner": "26",
+    "caseIds": [
+      "R2-121"
+    ],
+    "gate": "G-OPERATING-LOOP",
+    "packages": [
+      "B21"
+    ],
+    "statement": "Do not impose an arbitrary reserve prerequisite; protect actual near-term obligations and approved exposure.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-122",
+    "owner": "27",
+    "caseIds": [
+      "R2-122"
+    ],
+    "gate": "G-OPERATING-LOOP",
+    "packages": [
+      "B21"
+    ],
+    "statement": "Label the multiplication as a scenario, attach acquisition/capacity/margin conditions and spend only from real authorized funds.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-123",
+    "owner": "09",
+    "caseIds": [
+      "R2-123"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Grant at most the remaining 24 hours, disclose the exact endpoint and consume the one extension; never move the hard cap.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-124",
+    "owner": "09",
+    "caseIds": [
+      "R2-124"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reject without reviving access, resetting clocks or changing a tombstone.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-125",
+    "owner": "09",
+    "caseIds": [
+      "R2-125"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "One valid transaction wins; a later extension cannot undo committed deletion authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-126",
+    "owner": "09",
+    "caseIds": [
+      "R2-126"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Apply the current durable retention-authority journal before cleanup so the restored old deadline cannot prematurely delete promised data.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-127",
+    "owner": "16",
+    "caseIds": [
+      "R2-127"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Reserve that one slot through the original fourteen-day quote expiry; previews reserve nothing, quote IDs do not renew it, and capture uncertainty prevents unsafe release.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-128",
+    "owner": "15",
+    "caseIds": [
+      "R2-128"
+    ],
+    "gate": "G-FISCAL_LOCAL",
+    "packages": [
+      "B09"
+    ],
+    "statement": "The adapter cannot infer export exemption from currency or foreign email; emit the selected reviewed fiscal treatment or block issuance, preserving capture reconciliation.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-129",
+    "owner": "18",
+    "caseIds": [
+      "R2-129"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Record SEND_UNCERTAIN and require scoped reconciliation; do not resend automatically or claim inbox delivery.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-130",
+    "owner": "18",
+    "caseIds": [
+      "R2-130"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Current suppression blocks the send; a sealed campaign grant cannot override a later refusal.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-131",
+    "owner": "18",
+    "caseIds": [
+      "R2-131"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Reject the route despite valid API credentials and spare quota; preserve the draft for a genuinely permitted channel.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-132",
+    "owner": "18",
+    "caseIds": [
+      "R2-132"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Stop future dispatch for that sender, preserve uncertain/past activity and never borrow the owner identity.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-133",
+    "owner": "18",
+    "caseIds": [
+      "R2-133"
+    ],
+    "gate": "G-INTEGRATION",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Reserve essential capacity or raise a funded action, reject unauthenticated events and keep authenticated in-app state available.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-134",
+    "owner": "11",
+    "caseIds": [
+      "R2-134"
+    ],
+    "gate": "G-UX_AGENCY",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Authentication recovery does not revive the invitation or silently accept changed terms; show the current required action without leaking account existence.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-135",
+    "owner": "12",
+    "caseIds": [
+      "R2-135"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Show superseded status and current safe resource; prevent its use in a new approved draft while preserving historical records.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-136",
+    "owner": "16",
+    "caseIds": [
+      "R2-136"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Round the 250.5-cent discount to 251, then subtract for 751 net cents. Rounding the complementary 75 percent to 752 is wrong. This vector does not create a new advertised price band.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-137",
+    "owner": "17",
+    "caseIds": [
+      "R2-137"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Keep P as historical first and Q subsequent; preserve actual timestamps and use the verified recurring cutoff without granting a second 10 percent pool.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-138",
+    "owner": "17",
+    "caseIds": [
+      "R2-138"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "The first can qualify at 4 percent; the endpoint capture does not. Quote or notification time cannot replace verified provider completion.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-139",
+    "owner": "17",
+    "caseIds": [
+      "R2-139"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Compute 2026-10-07 as fifth and 2026-10-15 as tenth business day. Production must bind a verified current banking calendar; the fixture is not a live holiday authority.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-140",
+    "owner": "15",
+    "caseIds": [
+      "R2-140"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Account for both real captures and the excess-refund obligation, deduplicate repeated events, keep one service entitlement and cap commission basis to the service obligation.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-R2-141",
+    "owner": "16",
+    "caseIds": [
+      "R2-141"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "A rename preserves history, rights and tenant identity. Consolidation requires an explicit reviewed relationship decision and cannot merge datasets or erase attribution.",
+    "origin": "R2_EXPANSION"
+  },
+  {
+    "id": "REQ-CMD001-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD001-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create one draft agency and owner membership atomically; do not activate contracts or billing automatically.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD001-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD001-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "A repeated identical key returns the same agency; a conflicting key rejects without a second tenant. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD001-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD001-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create one draft agency and owner membership atomically; do not activate contracts or billing automatically. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD002-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD002-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Record versioned acceptance and activate only eligible capabilities.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD002-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD002-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Missing agreements or a mismatched billing identity leave the agency draft; no implicit signature. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD002-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD002-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Record versioned acceptance and activate only eligible capabilities. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD003-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD003-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Create one expiring invitation with a hashed single-use token and explicit agency scope.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD003-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD003-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "A forwarded or expired token cannot grant membership to a different person. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD003-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD003-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Create one expiring invitation with a hashed single-use token and explicit agency scope. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD004-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD004-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Atomically consume the invitation and activate the intended scoped membership.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD004-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD004-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Concurrent acceptances produce one membership; raw tokens never enter logs. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD004-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD004-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Atomically consume the invitation and activate the intended scoped membership. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD005-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD005-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Change role with an audit event and invalidate affected sessions/authorization caches.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD005-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD005-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "A stale version or client-invented privileged role makes no change. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD005-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD005-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Change role with an audit event and invalidate affected sessions/authorization caches. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD006-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD006-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Revoke future access, invalidate membership caches and prevent new signed-download grants.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD006-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD006-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Existing short-lived bearer links follow their disclosed expiry; do not claim instant revocation where provider capabilities cannot deliver it. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD006-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD006-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Revoke future access, invalidate membership caches and prevent new signed-download grants. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD007-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD007-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Perform a versioned ownership transfer without leaving the agency ownerless.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD007-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD007-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Cross-agency or suspended recipients reject; billing/legal entity is not changed implicitly. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD007-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD007-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Perform a versioned ownership transfer without leaving the agency ownerless. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD008-OK",
+    "owner": "13",
+    "caseIds": [
+      "CMD008-OK"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Create a new branding version for future reports while preserving already delivered artifact identity.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD008-DENY",
+    "owner": "13",
+    "caseIds": [
+      "CMD008-DENY"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Unsafe SVG/script, invalid media or a foreign artifact reject; no remote image fetch from arbitrary URLs. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD008-RACE",
+    "owner": "13",
+    "caseIds": [
+      "CMD008-RACE"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Create a new branding version for future reports while preserving already delivered artifact identity. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD009-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD009-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create one scoped workspace with stable identity separate from its display name.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD009-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD009-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Duplicate labels are not merged by inference; a foreign authority reference rejects. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD009-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD009-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create one scoped workspace with stable identity separate from its display name. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD010-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD010-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Stop new project creation while retaining active work and lawful history according to their own policies.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD010-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD010-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Archiving cannot become an implicit deletion or refund. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD010-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD010-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Stop new project creation while retaining active work and lawful history according to their own policies. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD011-OK",
+    "owner": "02",
+    "caseIds": [
+      "CMD011-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create a project with a draft revision and visible readiness blockers.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD011-DENY",
+    "owner": "02",
+    "caseIds": [
+      "CMD011-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "An unavailable mode returns CAPABILITY_UNAVAILABLE before quoting or charging. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD011-RACE",
+    "owner": "02",
+    "caseIds": [
+      "CMD011-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create a project with a draft revision and visible readiness blockers. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD012-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD012-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Create new mutable input identity and explicit lineage; preserve sealed predecessor bytes.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD012-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD012-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Do not carry old validation, approval or paid execution authority onto changed bytes. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD012-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD012-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Create new mutable input identity and explicit lineage; preserve sealed predecessor bytes. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD013-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD013-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Reserve bytes and create a narrowly scoped resumable session with an application acceptance deadline.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD013-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD013-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "A provider session is returned only to its authorized requester; quota races cannot oversubscribe the revision. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD013-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD013-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Reserve bytes and create a narrowly scoped resumable session with an application acceptance deadline. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD014-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD014-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Observe provider generation/length/hash, scan coverage and structure before admission; completion remains asynchronous.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD014-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD014-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Declared size/hash or browser completion alone cannot mark the file ready. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD014-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD014-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Observe provider generation/length/hash, scan coverage and structure before admission; completion remains asynchronous. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD015-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD015-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Tombstone application acceptance, cancel provider session where supported and clean late objects.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD015-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD015-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Late finalization cannot resurrect the cancelled file or consume freed quota twice. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD015-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD015-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Tombstone application acceptance, cancel provider session where supported and clean late objects. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD016-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD016-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Persist explicit selected/excluded tables and parser choices in the mutable revision.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD016-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD016-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Missing or newly changed tables invalidate previous selection; no hidden-sheet silent inclusion. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD016-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD016-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Persist explicit selected/excluded tables and parser choices in the mutable revision. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD017-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD017-OK"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Atomically seal manifest, bytes, parser settings and billable-unit interpretation.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD017-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD017-DENY"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "A changed generation, incomplete scan or version conflict leaves no executable sealed revision. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD017-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD017-RACE"
+    ],
+    "gate": "G-UPLOAD",
+    "packages": [
+      "B07"
+    ],
+    "statement": "Atomically seal manifest, bytes, parser settings and billable-unit interpretation. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD018-OK",
+    "owner": "05",
+    "caseIds": [
+      "CMD018-OK"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Validate metadata, scope and observed facts and create an immutable draft target version.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD018-DENY",
+    "owner": "05",
+    "caseIds": [
+      "CMD018-DENY"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Reject mismatched CRM/object/instance and unknown fields; caller cannot set verified=true. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD018-RACE",
+    "owner": "05",
+    "caseIds": [
+      "CMD018-RACE"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Validate metadata, scope and observed facts and create an immutable draft target version. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD019-OK",
+    "owner": "05",
+    "caseIds": [
+      "CMD019-OK"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Record confirmation of that exact contract without altering its body.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD019-DENY",
+    "owner": "05",
+    "caseIds": [
+      "CMD019-DENY"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "A reused digest over changed metadata or future observation rejects. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD019-RACE",
+    "owner": "05",
+    "caseIds": [
+      "CMD019-RACE"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Record confirmation of that exact contract without altering its body. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD020-OK",
+    "owner": "06",
+    "caseIds": [
+      "CMD020-OK"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Create a durable audit, deadlines and budget reservation; enqueue one logical operation.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD020-DENY",
+    "owner": "06",
+    "caseIds": [
+      "CMD020-DENY"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "No budget or stale target returns a typed blocker without a provider call. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD020-RACE",
+    "owner": "06",
+    "caseIds": [
+      "CMD020-RACE"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Create a durable audit, deadlines and budget reservation; enqueue one logical operation. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD021-OK",
+    "owner": "06",
+    "caseIds": [
+      "CMD021-OK"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Atomically advance cancellation authority and stop new dispatch/promotion; reconcile possible provider liability.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD021-DENY",
+    "owner": "06",
+    "caseIds": [
+      "CMD021-DENY"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "A late validator response cannot publish SYSTEM_DRAFT after the cancellation wins. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD021-RACE",
+    "owner": "06",
+    "caseIds": [
+      "CMD021-RACE"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Atomically advance cancellation authority and stop new dispatch/promotion; reconcile possible provider liability. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD022-OK",
+    "owner": "06",
+    "caseIds": [
+      "CMD022-OK"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Compile the selected candidate set through the allowed primitive intersection into a new draft plan.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD022-DENY",
+    "owner": "06",
+    "caseIds": [
+      "CMD022-DENY"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Missing, duplicated or invented candidates reject; natural-language rationale is not executable authority. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD022-RACE",
+    "owner": "06",
+    "caseIds": [
+      "CMD022-RACE"
+    ],
+    "gate": "G-IC-KERNEL",
+    "packages": [
+      "B03"
+    ],
+    "statement": "Compile the selected candidate set through the allowed primitive intersection into a new draft plan. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD023-OK",
+    "owner": "07",
+    "caseIds": [
+      "CMD023-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create a new plan revision and invalidate dependent validation/approval.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD023-DENY",
+    "owner": "07",
+    "caseIds": [
+      "CMD023-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "A stale UI cannot edit or approve the previous version as if current. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD023-RACE",
+    "owner": "07",
+    "caseIds": [
+      "CMD023-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create a new plan revision and invalidate dependent validation/approval. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD024-OK",
+    "owner": "04",
+    "caseIds": [
+      "CMD024-OK"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Run full-data deterministic validation and persist a complete receipt with evidence hashes.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD024-DENY",
+    "owner": "04",
+    "caseIds": [
+      "CMD024-DENY"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Null, incomplete, wrong-subject, future or cancelled receipts never become VALID. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD024-RACE",
+    "owner": "04",
+    "caseIds": [
+      "CMD024-RACE"
+    ],
+    "gate": "G-MC-SEMANTICS",
+    "packages": [
+      "B01"
+    ],
+    "statement": "Run full-data deterministic validation and persist a complete receipt with evidence hashes. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD025-OK",
+    "owner": "07",
+    "caseIds": [
+      "CMD025-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create immutable approval for exact plan/source/target/disclosures.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD025-DENY",
+    "owner": "07",
+    "caseIds": [
+      "CMD025-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Any changed effect, expired source or stale receipt requires new review; generic cleanup approval cannot authorize undisclosed CLEAR. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD025-RACE",
+    "owner": "07",
+    "caseIds": [
+      "CMD025-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Create immutable approval for exact plan/source/target/disclosures. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD026-OK",
+    "owner": "07",
+    "caseIds": [
+      "CMD026-OK"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Revoke future execution authority and route active work through the cancellation/reconciliation policy.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD026-DENY",
+    "owner": "07",
+    "caseIds": [
+      "CMD026-DENY"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Do not delete history or promise rollback of an agency-performed CRM import. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD026-RACE",
+    "owner": "07",
+    "caseIds": [
+      "CMD026-RACE"
+    ],
+    "gate": "G-DOMAIN",
+    "packages": [
+      "B06"
+    ],
+    "statement": "Revoke future execution authority and route active work through the cancellation/reconciliation policy. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD027-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD027-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Compute server price, maximum eligible discount, taxes, expiry and immutable terms.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD027-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD027-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Zero-unit or unqualified work cannot be charged as a minimum-price project; incomplete tax facts block issuance. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD027-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD027-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Compute server price, maximum eligible discount, taxes, expiry and immutable terms. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD028-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD028-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Persist payment intent before creating one provider order.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD028-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD028-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Source expiry racing order creation prevents new capture authority; an ambiguous provider creation is reconciled. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD028-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD028-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Persist payment intent before creating one provider order. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD029-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD029-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Capture through the server adapter and authenticate/reconcile the provider result.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD029-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD029-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Browser success, forged event or unknown result cannot create CommercialAuthorization. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD029-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD029-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Capture through the server adapter and authenticate/reconcile the provider result. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD030-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD030-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Store a deduplicated durable inbox entry and reconcile it with the local order.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD030-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD030-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Wrong payee/currency/order or invalid signature rejects; duplicates do not add money or commissions. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD030-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD030-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Store a deduplicated durable inbox entry and reconcile it with the local order. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD031-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD031-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Create a reviewable refund request with delivery, terms and evidence references.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD031-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD031-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Customer cancellation is not direct permission to send arbitrary PSP refunds. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD031-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD031-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Create a reviewable refund request with delivery, terms and evidence references. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD032-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD032-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Record the authorized amount and reason as an immutable refund intent.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD032-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD032-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "The total cannot exceed reconciled remaining capture; a standing authorized policy must be referenced rather than invented. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD032-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD032-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Record the authorized amount and reason as an immutable refund intent. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD033-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD033-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Submit once per reconciled provider identity and publish final refund/credit-note/commission events.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD033-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD033-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Timeout stays UNCERTAIN with no blind duplicate financial effect. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD033-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD033-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Submit once per reconciled provider identity and publish final refund/credit-note/commission events. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD034-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD034-OK"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Advance local facts from actual provider state and record mismatch incidents.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD034-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD034-DENY"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "A provider pending/held state is never coerced to settled available cash. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD034-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD034-RACE"
+    ],
+    "gate": "G-PAYMENT",
+    "packages": [
+      "B09"
+    ],
+    "statement": "Advance local facts from actual provider state and record mismatch incidents. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD035-OK",
+    "owner": "15",
+    "caseIds": [
+      "CMD035-OK"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Issue the exact document and reconcile legal number and fiscal acceptance.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD035-DENY",
+    "owner": "15",
+    "caseIds": [
+      "CMD035-DENY"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "A list's first page is not proof of absence; exact identity/pagination prevents duplicate invoices. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD035-RACE",
+    "owner": "15",
+    "caseIds": [
+      "CMD035-RACE"
+    ],
+    "gate": "G-FISCAL",
+    "packages": [
+      "B15"
+    ],
+    "statement": "Issue the exact document and reconcile legal number and fiscal acceptance. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD036-OK",
+    "owner": "07",
+    "caseIds": [
+      "CMD036-OK"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Atomically create one logical job and outbox command.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD036-DENY",
+    "owner": "07",
+    "caseIds": [
+      "CMD036-DENY"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Duplicate requests reuse the job; revoked authority or full queue cannot silently start a second execution. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD036-RACE",
+    "owner": "07",
+    "caseIds": [
+      "CMD036-RACE"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Atomically create one logical job and outbox command. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD037-OK",
+    "owner": "07",
+    "caseIds": [
+      "CMD037-OK"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Advance cancellation fence, stop new promotion and reconcile actual provider termination.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD037-DENY",
+    "owner": "07",
+    "caseIds": [
+      "CMD037-DENY"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "A still-live old worker cannot publish a valid package; cancellation is not customer CRM rollback. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD037-RACE",
+    "owner": "07",
+    "caseIds": [
+      "CMD037-RACE"
+    ],
+    "gate": "G-JOB",
+    "packages": [
+      "B08"
+    ],
+    "statement": "Advance cancellation fence, stop new promotion and reconcile actual provider termination. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD038-OK",
+    "owner": "13",
+    "caseIds": [
+      "CMD038-OK"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Issue scoped short-lived capabilities and an audit event without exposing unrelated objects.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD038-DENY",
+    "owner": "13",
+    "caseIds": [
+      "CMD038-DENY"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Expired/deleted/quarantined artifacts deny; a shared cache must not reuse another user's signed URL. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD038-RACE",
+    "owner": "13",
+    "caseIds": [
+      "CMD038-RACE"
+    ],
+    "gate": "G-TENANT",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Issue scoped short-lived capabilities and an audit event without exposing unrelated objects. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD039-OK",
+    "owner": "13",
+    "caseIds": [
+      "CMD039-OK"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Recompute artifact bytes, scope, counts, lineage and semantic checks and record the result.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD039-DENY",
+    "owner": "13",
+    "caseIds": [
+      "CMD039-DENY"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Matching manifest sums with wrong data or forbidden fields still fails. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD039-RACE",
+    "owner": "13",
+    "caseIds": [
+      "CMD039-RACE"
+    ],
+    "gate": "G-REPORT",
+    "packages": [
+      "B13"
+    ],
+    "statement": "Recompute artifact bytes, scope, counts, lineage and semantic checks and record the result. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD040-OK",
+    "owner": "05",
+    "caseIds": [
+      "CMD040-OK"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Validate exact membership and source-to-target IDs, including failed and missing records.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD040-DENY",
+    "owner": "05",
+    "caseIds": [
+      "CMD040-DENY"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Foreign IDs, duplicate mappings or partial unresolved parents block affected child edges. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD040-RACE",
+    "owner": "05",
+    "caseIds": [
+      "CMD040-RACE"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Validate exact membership and source-to-target IDs, including failed and missing records. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD041-OK",
+    "owner": "05",
+    "caseIds": [
+      "CMD041-OK"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Prepare the next stage from verified identities without reimporting parents.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD041-DENY",
+    "owner": "05",
+    "caseIds": [
+      "CMD041-DENY"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Expired workflow or mismatched target requires explicit recovery, not guessed IDs. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD041-RACE",
+    "owner": "05",
+    "caseIds": [
+      "CMD041-RACE"
+    ],
+    "gate": "G-VENDOR",
+    "packages": [
+      "B17"
+    ],
+    "statement": "Prepare the next stage from verified identities without reimporting parents. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD042-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD042-OK"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Tombstone authority before deleting raw/derived artifacts and update the external restore journal.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD042-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD042-DENY"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Crash or restored database cannot resurrect data; lawful residuals are shown rather than falsely certified erased. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD042-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD042-RACE"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Tombstone authority before deleting raw/derived artifacts and update the external restore journal. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD043-OK",
+    "owner": "16",
+    "caseIds": [
+      "CMD043-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Stop new work, settle/reconcile existing obligations and schedule managed-scope deletion/closure.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD043-DENY",
+    "owner": "16",
+    "caseIds": [
+      "CMD043-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Closure cannot erase payable seller rights, fiscal obligations or customer refund rights. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD043-RACE",
+    "owner": "16",
+    "caseIds": [
+      "CMD043-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Stop new work, settle/reconcile existing obligations and schedule managed-scope deletion/closure. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD044-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD044-OK"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Create a classified case with accountable next response and visible status.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD044-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD044-DENY"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Raw secrets/CRM files do not enter email or generic telemetry; route secure upload when needed. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD044-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD044-RACE"
+    ],
+    "gate": "G-UX",
+    "packages": [
+      "B11"
+    ],
+    "statement": "Create a classified case with accountable next response and visible status. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD045-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD045-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a minimized prospect without granting customer data access or automatic attribution.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD045-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD045-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "A suppressed identity cannot be reactivated through spelling or duplicate-list import. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD045-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD045-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a minimized prospect without granting customer data access or automatic attribution. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD046-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD046-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a reviewable attribution claim; submission alone does not own the agency.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD046-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD046-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Existing accepted claims or customer history route to conflict review. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD046-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD046-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a reviewable attribution claim; submission alone does not own the agency. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD047-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD047-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Freeze accepted acquisition attribution and claim window; record any agreed split totaling 100%.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD047-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD047-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Assignment edits or two full-rate sellers cannot duplicate the commission pool. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD047-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD047-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Freeze accepted acquisition attribution and claim window; record any agreed split totaling 100%. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD048-OK",
+    "owner": "12",
+    "caseIds": [
+      "CMD048-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Change operational responsibility while preserving historical attribution and earned rights.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD048-DENY",
+    "owner": "12",
+    "caseIds": [
+      "CMD048-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "No silent reset of the twelve-month window or first-project designation. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD048-RACE",
+    "owner": "12",
+    "caseIds": [
+      "CMD048-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Change operational responsibility while preserving historical attribution and earned rights. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD049-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD049-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Activate least-privilege seller capabilities and the agreed compensation version.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD049-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD049-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "A contractor label without reviewed substance or unsigned terms cannot activate. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD049-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD049-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Activate least-privilege seller capabilities and the agreed compensation version. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD050-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD050-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "End new assignment/access, preserve signed residuals and define the eligible ninety-day opportunity tail.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD050-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD050-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Do not erase the ledger, forfeit rights by a role change or grant a tail over an entire scraped list. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD050-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD050-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "End new assignment/access, preserve signed residuals and define the eligible ninety-day opportunity tail. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD051-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD051-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Issue an immutable statement with itemized basis, rates, adjustments, holds and payout date.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD051-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD051-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Unknown settlement or missing final completion remains a reasoned hold, not invented eligibility. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD051-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD051-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Issue an immutable statement with itemized basis, rates, adjustments, holds and payout date. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD052-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD052-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a reviewable authorized payout intent for eligible value.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD052-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD052-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "No arbitrary minimum, silent fee deduction or unauthorized funds transfer. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD052-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD052-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Create a reviewable authorized payout intent for eligible value. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD053-OK",
+    "owner": "17",
+    "caseIds": [
+      "CMD053-OK"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Mark actual paid value and preserve any failed/returned transfer for recovery.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD053-DENY",
+    "owner": "17",
+    "caseIds": [
+      "CMD053-DENY"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Submitting a transfer is not proof the seller received it. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD053-RACE",
+    "owner": "17",
+    "caseIds": [
+      "CMD053-RACE"
+    ],
+    "gate": "G-COMMERCIAL",
+    "packages": [
+      "B10"
+    ],
+    "statement": "Mark actual paid value and preserve any failed/returned transfer for recovery. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD054-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD054-OK"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Issue a short-lived audited least-privilege grant with automatic expiry and review.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD054-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD054-DENY"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Blanket raw-data access, unrelated tenant access or silent reuse rejects. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD054-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD054-RACE"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Issue a short-lived audited least-privilege grant with automatic expiry and review. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD055-OK",
+    "owner": "08",
+    "caseIds": [
+      "CMD055-OK"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Revoke refresh authority and verify expiry of already issued capabilities.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD055-DENY",
+    "owner": "08",
+    "caseIds": [
+      "CMD055-DENY"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Do not claim zero residual bearer lifetime where the provider cannot revoke issued credentials instantly. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD055-RACE",
+    "owner": "08",
+    "caseIds": [
+      "CMD055-RACE"
+    ],
+    "gate": "G-SECURITY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Revoke refresh authority and verify expiry of already issued capabilities. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD056-OK",
+    "owner": "14",
+    "caseIds": [
+      "CMD056-OK"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Create containment/recovery/communication responsibilities and a next checkpoint.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD056-DENY",
+    "owner": "14",
+    "caseIds": [
+      "CMD056-DENY"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "A monitoring false positive is recorded as such; it cannot be fabricated as a resolved production outage. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD056-RACE",
+    "owner": "14",
+    "caseIds": [
+      "CMD056-RACE"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Create containment/recovery/communication responsibilities and a next checkpoint. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD057-OK",
+    "owner": "14",
+    "caseIds": [
+      "CMD057-OK"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Run the authorized isolated restore and release only after integrity/tenant/deletion/financial checks.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD057-DENY",
+    "owner": "14",
+    "caseIds": [
+      "CMD057-DENY"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Restored old captures, jobs or deleted rows cannot trigger duplicate effects or resurrect authority. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD057-RACE",
+    "owner": "14",
+    "caseIds": [
+      "CMD057-RACE"
+    ],
+    "gate": "G-RECOVERY",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Run the authorized isolated restore and release only after integrity/tenant/deletion/financial checks. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD058-OK",
+    "owner": "20",
+    "caseIds": [
+      "CMD058-OK"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Create a prospective version and update sale/admission/compiler consumers together.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD058-DENY",
+    "owner": "20",
+    "caseIds": [
+      "CMD058-DENY"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "A marketing edit cannot promote IMPLEMENTED_UNACCEPTED to AVAILABLE_LIMITED or AVAILABLE. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD058-RACE",
+    "owner": "20",
+    "caseIds": [
+      "CMD058-RACE"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Create a prospective version and update sale/admission/compiler consumers together. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD059-OK",
+    "owner": "20",
+    "caseIds": [
+      "CMD059-OK"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Block new admission, preserve evidence and route current work to the appropriate recovery/refund process.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD059-DENY",
+    "owner": "20",
+    "caseIds": [
+      "CMD059-DENY"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Do not silently change the scope of an already paid project. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD059-RACE",
+    "owner": "20",
+    "caseIds": [
+      "CMD059-RACE"
+    ],
+    "gate": "G-RELEASE",
+    "packages": [
+      "B18"
+    ],
+    "statement": "Block new admission, preserve evidence and route current work to the appropriate recovery/refund process. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD060-OK",
+    "owner": "09",
+    "caseIds": [
+      "CMD060-OK"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Record one explicit contractual soft-deadline extension, its exact capped endpoint and restore-journal event; update all affected UI/scheduler consumers.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD060-DENY",
+    "owner": "09",
+    "caseIds": [
+      "CMD060-DENY"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD060-RACE",
+    "owner": "09",
+    "caseIds": [
+      "CMD060-RACE"
+    ],
+    "gate": "G-DELETE",
+    "packages": [
+      "B16"
+    ],
+    "statement": "Record one explicit contractual soft-deadline extension, its exact capped endpoint and restore-journal event; update all affected UI/scheduler consumers. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD061-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD061-OK"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Create a versioned DRAFT and content binding; no external message is sent.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD061-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD061-DENY"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Wrong assignment or unsupported claims reject without revealing the contact or creating send authority. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD061-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD061-RACE"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Create a versioned DRAFT and content binding; no external message is sent. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD062-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD062-OK"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Commit one revocable bounded grant; record the actual permission without inventing standing consent.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD062-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD062-DENY"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Expired, empty, excessive or ungrounded grants reject and cannot activate a send queue. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD062-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD062-RACE"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Commit one revocable bounded grant; record the actual permission without inventing standing consent. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD063-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD063-OK"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Commit one fenced send intent; persist provider acceptance or explicit uncertainty and never infer delivery.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD063-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD063-DENY"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Cancellation, opt-out or changed content blocks dispatch; uncertain provider acceptance requires reconciliation before any repeat. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD063-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD063-RACE"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Commit one fenced send intent; persist provider acceptance or explicit uncertainty and never infer delivery. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD064-OK",
+    "owner": "18",
+    "caseIds": [
+      "CMD064-OK"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Append deduplicated evidence-backed commercial activity and stop follow-up after refusal, reply, bounce or suppression.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD064-DENY",
+    "owner": "18",
+    "caseIds": [
+      "CMD064-DENY"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Unsupported delivered/replied claims reject; duplicate external identity cannot count twice. No unauthorized committed state or external effect.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  },
+  {
+    "id": "REQ-CMD064-RACE",
+    "owner": "18",
+    "caseIds": [
+      "CMD064-RACE"
+    ],
+    "gate": "G-UX_PRIVATE",
+    "packages": [
+      "B12"
+    ],
+    "statement": "Append deduplicated evidence-backed commercial activity and stop follow-up after refusal, reply, bounce or suppression. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.",
+    "origin": "R2_COMMAND_BOUNDARY"
+  }
+]
