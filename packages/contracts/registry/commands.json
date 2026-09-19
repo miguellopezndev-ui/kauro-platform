@@ -1,0 +1,2002 @@
+[
+  {
+    "id": "CMD001",
+    "name": "CreateAgency",
+    "method": "POST",
+    "path": "/api/v1/agencies",
+    "role": "VERIFIED_USER",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "displayName",
+        "type": "label"
+      }
+    ],
+    "precondition": "No existing membership is assumed. The identity must be verified and creation abuse limits must admit the request.",
+    "effect": "Create one draft agency and owner membership atomically; do not activate contracts or billing automatically.",
+    "failure": "A repeated identical key returns the same agency; a conflicting key rejects without a second tenant.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD001-OK",
+      "CMD001-DENY",
+      "CMD001-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD002",
+    "name": "ActivateAgency",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/activate",
+    "role": "AGENCY_OWNER",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "termsVersion",
+        "type": "label"
+      },
+      {
+        "name": "privacyAgreementVersion",
+        "type": "label"
+      },
+      {
+        "name": "billingProfileRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The caller is the current owner; legal/billing profile and required agreements are complete for the actual purchasing entity.",
+    "effect": "Record versioned acceptance and activate only eligible capabilities.",
+    "failure": "Missing agreements or a mismatched billing identity leave the agency draft; no implicit signature.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD002-OK",
+      "CMD002-DENY",
+      "CMD002-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD003",
+    "name": "InviteMember",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/invitations",
+    "role": "AGENCY_OWNER_OR_ADMIN",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "intendedIdentityRef",
+        "type": "id"
+      },
+      {
+        "name": "role",
+        "type": "label"
+      }
+    ],
+    "precondition": "The requested role is within the inviter's grantable subset; member limits and intended identity are checked.",
+    "effect": "Create one expiring invitation with a hashed single-use token and explicit agency scope.",
+    "failure": "A forwarded or expired token cannot grant membership to a different person.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD003-OK",
+      "CMD003-DENY",
+      "CMD003-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD004",
+    "name": "AcceptInvitation",
+    "method": "POST",
+    "path": "/api/v1/invitations/{invitationId}/accept",
+    "role": "VERIFIED_USER",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "invitationToken",
+        "type": "text"
+      }
+    ],
+    "precondition": "The authenticated identity matches the invitation and the invitation has not been consumed, revoked or expired.",
+    "effect": "Atomically consume the invitation and activate the intended scoped membership.",
+    "failure": "Concurrent acceptances produce one membership; raw tokens never enter logs.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD004-OK",
+      "CMD004-DENY",
+      "CMD004-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD005",
+    "name": "ChangeMembership",
+    "method": "POST",
+    "path": "/api/v1/memberships/{membershipId}/capabilities",
+    "role": "AGENCY_OWNER",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "role",
+        "type": "label"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Step-up is current; the operation cannot remove the final active owner or grant an unauthorized capability.",
+    "effect": "Change role with an audit event and invalidate affected sessions/authorization caches.",
+    "failure": "A stale version or client-invented privileged role makes no change.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD005-OK",
+      "CMD005-DENY",
+      "CMD005-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD006",
+    "name": "RevokeMembership",
+    "method": "POST",
+    "path": "/api/v1/memberships/{membershipId}/revoke",
+    "role": "AGENCY_OWNER_OR_ADMIN",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "reasonCode",
+        "type": "label"
+      }
+    ],
+    "precondition": "The revoker has authority over this membership; last-owner protection is checked in the same transaction.",
+    "effect": "Revoke future access, invalidate membership caches and prevent new signed-download grants.",
+    "failure": "Existing short-lived bearer links follow their disclosed expiry; do not claim instant revocation where provider capabilities cannot deliver it.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD006-OK",
+      "CMD006-DENY",
+      "CMD006-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD007",
+    "name": "TransferOwnership",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/ownership-transfers",
+    "role": "AGENCY_OWNER",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "newOwnerMembershipId",
+        "type": "id"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Both persons and the destination membership are verified; required recipient acceptance is recorded.",
+    "effect": "Perform a versioned ownership transfer without leaving the agency ownerless.",
+    "failure": "Cross-agency or suspended recipients reject; billing/legal entity is not changed implicitly.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD007-OK",
+      "CMD007-DENY",
+      "CMD007-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD008",
+    "name": "UpdateBranding",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/branding",
+    "role": "AGENCY_OWNER_OR_ADMIN",
+    "owner": "13",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "displayName",
+        "type": "label"
+      },
+      {
+        "name": "logoArtifactRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The logo passed the safe media pipeline; branding rights and tenant scope are confirmed.",
+    "effect": "Create a new branding version for future reports while preserving already delivered artifact identity.",
+    "failure": "Unsafe SVG/script, invalid media or a foreign artifact reject; no remote image fetch from arbitrary URLs.",
+    "gate": "G-REPORT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD008-OK",
+      "CMD008-DENY",
+      "CMD008-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD009",
+    "name": "CreateClient",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/clients",
+    "role": "AGENCY_OPERATOR",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "displayName",
+        "type": "label"
+      },
+      {
+        "name": "processingAuthorityRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Active agency membership permits client creation and records the end-client processing authority.",
+    "effect": "Create one scoped workspace with stable identity separate from its display name.",
+    "failure": "Duplicate labels are not merged by inference; a foreign authority reference rejects.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD009-OK",
+      "CMD009-DENY",
+      "CMD009-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD010",
+    "name": "ArchiveClient",
+    "method": "POST",
+    "path": "/api/v1/clients/{clientId}/archive",
+    "role": "AGENCY_ADMIN",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      }
+    ],
+    "precondition": "The workspace belongs to the caller's agency and active paid work has been reviewed.",
+    "effect": "Stop new project creation while retaining active work and lawful history according to their own policies.",
+    "failure": "Archiving cannot become an implicit deletion or refund.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD010-OK",
+      "CMD010-DENY",
+      "CMD010-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD011",
+    "name": "CreateProject",
+    "method": "POST",
+    "path": "/api/v1/clients/{clientId}/projects",
+    "role": "AGENCY_OPERATOR",
+    "owner": "02",
+    "fields": [
+      {
+        "name": "mode",
+        "type": "label"
+      },
+      {
+        "name": "purpose",
+        "type": "label"
+      },
+      {
+        "name": "targetInstanceRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The client is active; the requested mode is offered and target scope is declared without claiming qualification.",
+    "effect": "Create a project with a draft revision and visible readiness blockers.",
+    "failure": "An unavailable mode returns CAPABILITY_UNAVAILABLE before quoting or charging.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD011-OK",
+      "CMD011-DENY",
+      "CMD011-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD012",
+    "name": "CreateRevision",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/revisions",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "supersedesRevisionId",
+        "type": "id"
+      }
+    ],
+    "precondition": "The project permits revision creation; predecessor belongs to it and replacement allowance is evaluated separately.",
+    "effect": "Create new mutable input identity and explicit lineage; preserve sealed predecessor bytes.",
+    "failure": "Do not carry old validation, approval or paid execution authority onto changed bytes.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD012-OK",
+      "CMD012-DENY",
+      "CMD012-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD013",
+    "name": "ReserveUpload",
+    "method": "POST",
+    "path": "/api/v1/revisions/{revisionId}/uploads",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "declaredBytes",
+        "type": "count"
+      },
+      {
+        "name": "declaredFormat",
+        "type": "label"
+      },
+      {
+        "name": "displayName",
+        "type": "label"
+      }
+    ],
+    "precondition": "Revision is mutable; per-file, revision, concurrency and storage reservations fit actual limits.",
+    "effect": "Reserve bytes and create a narrowly scoped resumable session with an application acceptance deadline.",
+    "failure": "A provider session is returned only to its authorized requester; quota races cannot oversubscribe the revision.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD013-OK",
+      "CMD013-DENY",
+      "CMD013-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD014",
+    "name": "CompleteUpload",
+    "method": "POST",
+    "path": "/api/v1/uploads/{uploadId}/complete",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "providerCompletionRef",
+        "type": "text"
+      }
+    ],
+    "precondition": "The upload belongs to the caller and is not cancelled, expired or already sealed.",
+    "effect": "Observe provider generation/length/hash, scan coverage and structure before admission; completion remains asynchronous.",
+    "failure": "Declared size/hash or browser completion alone cannot mark the file ready.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD014-OK",
+      "CMD014-DENY",
+      "CMD014-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD015",
+    "name": "CancelUpload",
+    "method": "POST",
+    "path": "/api/v1/uploads/{uploadId}/cancel",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      }
+    ],
+    "precondition": "The operation belongs to the caller; cancellation remains valid while verification races.",
+    "effect": "Tombstone application acceptance, cancel provider session where supported and clean late objects.",
+    "failure": "Late finalization cannot resurrect the cancelled file or consume freed quota twice.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD015-OK",
+      "CMD015-DENY",
+      "CMD015-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD016",
+    "name": "SelectInputTables",
+    "method": "POST",
+    "path": "/api/v1/revisions/{revisionId}/selection",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "selectionManifestRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Detected worksheets, hidden tables, formulas, parser issues and object projections are visible for review.",
+    "effect": "Persist explicit selected/excluded tables and parser choices in the mutable revision.",
+    "failure": "Missing or newly changed tables invalidate previous selection; no hidden-sheet silent inclusion.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD016-OK",
+      "CMD016-DENY",
+      "CMD016-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD017",
+    "name": "SealRevision",
+    "method": "POST",
+    "path": "/api/v1/revisions/{revisionId}/seal",
+    "role": "AGENCY_OPERATOR",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "selectionHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "All selected files are admitted and immutable, counts/projections are confirmed and no upload remains unresolved.",
+    "effect": "Atomically seal manifest, bytes, parser settings and billable-unit interpretation.",
+    "failure": "A changed generation, incomplete scan or version conflict leaves no executable sealed revision.",
+    "gate": "G-UPLOAD",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD017-OK",
+      "CMD017-DENY",
+      "CMD017-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD018",
+    "name": "CreateTargetContract",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/target-contracts",
+    "role": "AGENCY_OPERATOR",
+    "owner": "05",
+    "fields": [
+      {
+        "name": "metadataArtifactRef",
+        "type": "id"
+      },
+      {
+        "name": "importerProfileId",
+        "type": "id"
+      }
+    ],
+    "precondition": "The structured metadata artifact is admitted and belongs to the target instance; it is data, not executable schema.",
+    "effect": "Validate metadata, scope and observed facts and create an immutable draft target version.",
+    "failure": "Reject mismatched CRM/object/instance and unknown fields; caller cannot set verified=true.",
+    "gate": "G-VENDOR",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD018-OK",
+      "CMD018-DENY",
+      "CMD018-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD019",
+    "name": "ConfirmTargetContract",
+    "method": "POST",
+    "path": "/api/v1/target-contracts/{contractId}/confirm",
+    "role": "AGENCY_APPROVER",
+    "owner": "05",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "bodyHash",
+        "type": "hash"
+      },
+      {
+        "name": "confirmationEvidenceRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The complete body and actual destination scope are disclosed; observation is fresh and the actor has confirmation authority.",
+    "effect": "Record confirmation of that exact contract without altering its body.",
+    "failure": "A reused digest over changed metadata or future observation rejects.",
+    "gate": "G-VENDOR",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD019-OK",
+      "CMD019-DENY",
+      "CMD019-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD020",
+    "name": "StartAudit",
+    "method": "POST",
+    "path": "/api/v1/revisions/{revisionId}/audits",
+    "role": "AGENCY_OPERATOR",
+    "owner": "06",
+    "fields": [
+      {
+        "name": "targetContractId",
+        "type": "id"
+      },
+      {
+        "name": "auditPolicyVersion",
+        "type": "label"
+      }
+    ],
+    "precondition": "Source is sealed/available, target is eligible, agency audit concurrency fits and a conservative funded grant can be reserved.",
+    "effect": "Create a durable audit, deadlines and budget reservation; enqueue one logical operation.",
+    "failure": "No budget or stale target returns a typed blocker without a provider call.",
+    "gate": "G-IC-KERNEL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD020-OK",
+      "CMD020-DENY",
+      "CMD020-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD021",
+    "name": "CancelAudit",
+    "method": "POST",
+    "path": "/api/v1/audits/{auditId}/cancel",
+    "role": "AGENCY_OPERATOR",
+    "owner": "06",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      }
+    ],
+    "precondition": "The caller owns the audit and cancellation has not been superseded by a terminal accepted result.",
+    "effect": "Atomically advance cancellation authority and stop new dispatch/promotion; reconcile possible provider liability.",
+    "failure": "A late validator response cannot publish SYSTEM_DRAFT after the cancellation wins.",
+    "gate": "G-IC-KERNEL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD021-OK",
+      "CMD021-DENY",
+      "CMD021-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD022",
+    "name": "CreatePlan",
+    "method": "POST",
+    "path": "/api/v1/audits/{auditId}/plans",
+    "role": "AGENCY_OPERATOR",
+    "owner": "06",
+    "fields": [
+      {
+        "name": "candidateDecisionArtifactRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The audit result and decision evidence are complete and compatible with source, target and policy.",
+    "effect": "Compile the selected candidate set through the allowed primitive intersection into a new draft plan.",
+    "failure": "Missing, duplicated or invented candidates reject; natural-language rationale is not executable authority.",
+    "gate": "G-IC-KERNEL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD022-OK",
+      "CMD022-DENY",
+      "CMD022-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD023",
+    "name": "RevisePlan",
+    "method": "POST",
+    "path": "/api/v1/plans/{planId}/revisions",
+    "role": "AGENCY_OPERATOR",
+    "owner": "07",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "decisionPatchArtifactRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The typed patch names existing candidates/fields and permitted effects; the caller can edit this scope.",
+    "effect": "Create a new plan revision and invalidate dependent validation/approval.",
+    "failure": "A stale UI cannot edit or approve the previous version as if current.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD023-OK",
+      "CMD023-DENY",
+      "CMD023-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD024",
+    "name": "ValidatePlan",
+    "method": "POST",
+    "path": "/api/v1/plans/{planId}/validate",
+    "role": "AGENCY_OPERATOR",
+    "owner": "04",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "planHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Exact source, target, core and policy bindings are available and the required resource grant is admitted.",
+    "effect": "Run full-data deterministic validation and persist a complete receipt with evidence hashes.",
+    "failure": "Null, incomplete, wrong-subject, future or cancelled receipts never become VALID.",
+    "gate": "G-MC-SEMANTICS",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD024-OK",
+      "CMD024-DENY",
+      "CMD024-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD025",
+    "name": "ApprovePlan",
+    "method": "POST",
+    "path": "/api/v1/plans/{planId}/approve",
+    "role": "AGENCY_APPROVER",
+    "owner": "07",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "planHash",
+        "type": "hash"
+      },
+      {
+        "name": "validationReceiptHash",
+        "type": "hash"
+      },
+      {
+        "name": "disclosuresHash",
+        "type": "hash"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Current nonblocking validation and complete material effects are disclosed to the authorized actor.",
+    "effect": "Create immutable approval for exact plan/source/target/disclosures.",
+    "failure": "Any changed effect, expired source or stale receipt requires new review; generic cleanup approval cannot authorize undisclosed CLEAR.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD025-OK",
+      "CMD025-DENY",
+      "CMD025-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD026",
+    "name": "WithdrawApproval",
+    "method": "POST",
+    "path": "/api/v1/plans/{planId}/withdraw",
+    "role": "AGENCY_APPROVER",
+    "owner": "07",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "reasonCode",
+        "type": "label"
+      }
+    ],
+    "precondition": "The actor controls this approval; already completed external/customer actions are identified separately.",
+    "effect": "Revoke future execution authority and route active work through the cancellation/reconciliation policy.",
+    "failure": "Do not delete history or promise rollback of an agency-performed CRM import.",
+    "gate": "G-DOMAIN",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD026-OK",
+      "CMD026-DENY",
+      "CMD026-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD027",
+    "name": "CreateQuote",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/quotes",
+    "role": "AGENCY_BILLING",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "planId",
+        "type": "id"
+      },
+      {
+        "name": "billingProfileRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The scope, exact count, capability, customer identity and fiscal treatment are resolved for a saleable order.",
+    "effect": "Compute server price, maximum eligible discount, taxes, expiry and immutable terms.",
+    "failure": "Zero-unit or unqualified work cannot be charged as a minimum-price project; incomplete tax facts block issuance.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD027-OK",
+      "CMD027-DENY",
+      "CMD027-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD028",
+    "name": "CreatePaymentOrder",
+    "method": "POST",
+    "path": "/api/v1/quotes/{quoteId}/payment-orders",
+    "role": "AGENCY_BILLING",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "termsHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Price and source are independently valid, approval remains exact, live merchant/fiscal route is qualified and charge terms are accepted.",
+    "effect": "Persist payment intent before creating one provider order.",
+    "failure": "Source expiry racing order creation prevents new capture authority; an ambiguous provider creation is reconciled.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD028-OK",
+      "CMD028-DENY",
+      "CMD028-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD029",
+    "name": "CapturePayment",
+    "method": "POST",
+    "path": "/api/v1/payment-orders/{orderId}/capture",
+    "role": "AGENCY_BILLING",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "providerApprovalRef",
+        "type": "text"
+      }
+    ],
+    "precondition": "The stored order matches amount, currency, payee, environment and still-valid commercial prerequisites.",
+    "effect": "Capture through the server adapter and authenticate/reconcile the provider result.",
+    "failure": "Browser success, forged event or unknown result cannot create CommercialAuthorization.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD029-OK",
+      "CMD029-DENY",
+      "CMD029-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD030",
+    "name": "ReceivePaymentWebhook",
+    "method": "POST",
+    "path": "/api/v1/payments/webhooks/{provider}",
+    "role": "AUTHENTICATED_PROVIDER",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "providerEventArtifactRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Ingress authenticates provider-specific signature, freshness, environment and bounded raw body before event acceptance.",
+    "effect": "Store a deduplicated durable inbox entry and reconcile it with the local order.",
+    "failure": "Wrong payee/currency/order or invalid signature rejects; duplicates do not add money or commissions.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD030-OK",
+      "CMD030-DENY",
+      "CMD030-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD031",
+    "name": "RequestRefund",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/refund-requests",
+    "role": "AGENCY_BILLING",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "reasonCode",
+        "type": "label"
+      },
+      {
+        "name": "evidenceRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The request is within the customer's scope; possible service/tax allocation is visible but not self-approved.",
+    "effect": "Create a reviewable refund request with delivery, terms and evidence references.",
+    "failure": "Customer cancellation is not direct permission to send arbitrary PSP refunds.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD031-OK",
+      "CMD031-DENY",
+      "CMD031-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD032",
+    "name": "ApproveRefund",
+    "method": "POST",
+    "path": "/api/v1/refunds/{refundId}/approve",
+    "role": "KAVO_OWNER",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "serviceCents",
+        "type": "money"
+      },
+      {
+        "name": "taxCents",
+        "type": "money"
+      },
+      {
+        "name": "authorizationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Available refundable balance, exact terms, legal obligations and commission/fiscal effects are prepared.",
+    "effect": "Record the authorized amount and reason as an immutable refund intent.",
+    "failure": "The total cannot exceed reconciled remaining capture; a standing authorized policy must be referenced rather than invented.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD032-OK",
+      "CMD032-DENY",
+      "CMD032-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD033",
+    "name": "ExecuteRefund",
+    "method": "POST",
+    "path": "/api/v1/refunds/{refundId}/execute",
+    "role": "PAYMENT_SERVICE",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      }
+    ],
+    "precondition": "A valid unreversed refund authorization exists and any prior ambiguous submission is reconciled.",
+    "effect": "Submit once per reconciled provider identity and publish final refund/credit-note/commission events.",
+    "failure": "Timeout stays UNCERTAIN with no blind duplicate financial effect.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD033-OK",
+      "CMD033-DENY",
+      "CMD033-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD034",
+    "name": "ReconcilePayment",
+    "method": "POST",
+    "path": "/api/v1/payment-orders/{orderId}/reconcile",
+    "role": "PAYMENT_SERVICE",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "observationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Authenticated current provider observation is available and the service identity has scoped permission.",
+    "effect": "Advance local facts from actual provider state and record mismatch incidents.",
+    "failure": "A provider pending/held state is never coerced to settled available cash.",
+    "gate": "G-PAYMENT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD034-OK",
+      "CMD034-DENY",
+      "CMD034-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD035",
+    "name": "IssueTaxDocument",
+    "method": "POST",
+    "path": "/api/v1/tax-documents/{documentId}/issue",
+    "role": "FISCAL_SERVICE",
+    "owner": "15",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "fiscalProfileId",
+        "type": "id"
+      }
+    ],
+    "precondition": "Actual operator, numbering, reviewed treatment and provider entitlement are valid; no unreconciled prior submission exists.",
+    "effect": "Issue the exact document and reconcile legal number and fiscal acceptance.",
+    "failure": "A list's first page is not proof of absence; exact identity/pagination prevents duplicate invoices.",
+    "gate": "G-FISCAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD035-OK",
+      "CMD035-DENY",
+      "CMD035-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD036",
+    "name": "ExecuteProject",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/execute",
+    "role": "AGENCY_OPERATOR",
+    "owner": "07",
+    "fields": [
+      {
+        "name": "commercialAuthorizationId",
+        "type": "id"
+      }
+    ],
+    "precondition": "Current source, plan, target, approval, capture, retention, capability and funded capacity all bind consistently.",
+    "effect": "Atomically create one logical job and outbox command.",
+    "failure": "Duplicate requests reuse the job; revoked authority or full queue cannot silently start a second execution.",
+    "gate": "G-JOB",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD036-OK",
+      "CMD036-DENY",
+      "CMD036-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD037",
+    "name": "CancelJob",
+    "method": "POST",
+    "path": "/api/v1/jobs/{jobId}/cancel",
+    "role": "AGENCY_OPERATOR",
+    "owner": "07",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "reasonCode",
+        "type": "label"
+      }
+    ],
+    "precondition": "The caller owns the project; active provider state and published artifacts are identified.",
+    "effect": "Advance cancellation fence, stop new promotion and reconcile actual provider termination.",
+    "failure": "A still-live old worker cannot publish a valid package; cancellation is not customer CRM rollback.",
+    "gate": "G-JOB",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD037-OK",
+      "CMD037-DENY",
+      "CMD037-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD038",
+    "name": "AuthorizeDownload",
+    "method": "POST",
+    "path": "/api/v1/packages/{packageId}/download-authorizations",
+    "role": "AGENCY_READER",
+    "owner": "13",
+    "fields": [
+      {
+        "name": "artifactIds",
+        "type": "listText"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Current membership, package status, artifact scope and retention are valid for each requested item.",
+    "effect": "Issue scoped short-lived capabilities and an audit event without exposing unrelated objects.",
+    "failure": "Expired/deleted/quarantined artifacts deny; a shared cache must not reuse another user's signed URL.",
+    "gate": "G-TENANT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD038-OK",
+      "CMD038-DENY",
+      "CMD038-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD039",
+    "name": "VerifyPackage",
+    "method": "POST",
+    "path": "/api/v1/packages/{packageId}/verify",
+    "role": "AGENCY_OPERATOR",
+    "owner": "13",
+    "fields": [
+      {
+        "name": "manifestHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "The exact immutable package is available and the verifier version/inputs are known.",
+    "effect": "Recompute artifact bytes, scope, counts, lineage and semantic checks and record the result.",
+    "failure": "Matching manifest sums with wrong data or forbidden fields still fails.",
+    "gate": "G-REPORT",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD039-OK",
+      "CMD039-DENY",
+      "CMD039-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD040",
+    "name": "SubmitStageReceipt",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/import-stages/{stageId}/receipts",
+    "role": "AGENCY_OPERATOR",
+    "owner": "05",
+    "fields": [
+      {
+        "name": "receiptUploadRef",
+        "type": "id"
+      },
+      {
+        "name": "sourcePackageHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Receipt belongs to the current stage and actual target instance; uploaded content passed admission.",
+    "effect": "Validate exact membership and source-to-target IDs, including failed and missing records.",
+    "failure": "Foreign IDs, duplicate mappings or partial unresolved parents block affected child edges.",
+    "gate": "G-VENDOR",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD040-OK",
+      "CMD040-DENY",
+      "CMD040-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD041",
+    "name": "ContinueStage",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/import-stages/{stageId}/continue",
+    "role": "AGENCY_APPROVER",
+    "owner": "05",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "validatedReceiptHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Required parent receipts, approved child plan and bounded staged retention remain valid.",
+    "effect": "Prepare the next stage from verified identities without reimporting parents.",
+    "failure": "Expired workflow or mismatched target requires explicit recovery, not guessed IDs.",
+    "gate": "G-VENDOR",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD041-OK",
+      "CMD041-DENY",
+      "CMD041-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD042",
+    "name": "RequestDeletion",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/deletion-requests",
+    "role": "AGENCY_OWNER_OR_ADMIN",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "reasonCode",
+        "type": "label"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The exact project scope and consequences are disclosed; applicable legal residuals are identified.",
+    "effect": "Tombstone authority before deleting raw/derived artifacts and update the external restore journal.",
+    "failure": "Crash or restored database cannot resurrect data; lawful residuals are shown rather than falsely certified erased.",
+    "gate": "G-DELETE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD042-OK",
+      "CMD042-DENY",
+      "CMD042-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD043",
+    "name": "CloseAgency",
+    "method": "POST",
+    "path": "/api/v1/agencies/{agencyId}/closure-requests",
+    "role": "AGENCY_OWNER",
+    "owner": "16",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Active jobs, funds, refunds, legal records and team access consequences have been prepared.",
+    "effect": "Stop new work, settle/reconcile existing obligations and schedule managed-scope deletion/closure.",
+    "failure": "Closure cannot erase payable seller rights, fiscal obligations or customer refund rights.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD043-OK",
+      "CMD043-DENY",
+      "CMD043-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD044",
+    "name": "CreateSupportCase",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/support-cases",
+    "role": "AGENCY_MEMBER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "category",
+        "type": "label"
+      },
+      {
+        "name": "summary",
+        "type": "text"
+      },
+      {
+        "name": "evidenceRefs",
+        "type": "listText"
+      }
+    ],
+    "precondition": "The person has access to the project and submitted evidence is safely scoped/minimized.",
+    "effect": "Create a classified case with accountable next response and visible status.",
+    "failure": "Raw secrets/CRM files do not enter email or generic telemetry; route secure upload when needed.",
+    "gate": "G-UX",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD044-OK",
+      "CMD044-DENY",
+      "CMD044-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD045",
+    "name": "RegisterProspect",
+    "method": "POST",
+    "path": "/api/v1/sales/prospects",
+    "role": "ACTIVE_SELLER_OR_OWNER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "organizationLabel",
+        "type": "label"
+      },
+      {
+        "name": "businessContactRef",
+        "type": "id"
+      },
+      {
+        "name": "sourceEvidenceHash",
+        "type": "hash"
+      },
+      {
+        "name": "jurisdiction",
+        "type": "label"
+      }
+    ],
+    "precondition": "Lawful source, purpose, suppression and seller access are checked.",
+    "effect": "Create a minimized prospect without granting customer data access or automatic attribution.",
+    "failure": "A suppressed identity cannot be reactivated through spelling or duplicate-list import.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD045-OK",
+      "CMD045-DENY",
+      "CMD045-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD046",
+    "name": "ClaimProspect",
+    "method": "POST",
+    "path": "/api/v1/sales/prospects/{prospectId}/claims",
+    "role": "ACTIVE_SELLER",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "evidenceHash",
+        "type": "hash"
+      },
+      {
+        "name": "agreementVersion",
+        "type": "label"
+      }
+    ],
+    "precondition": "Seller terms are active and evidence shows substantive acquisition work within allowed scope.",
+    "effect": "Create a reviewable attribution claim; submission alone does not own the agency.",
+    "failure": "Existing accepted claims or customer history route to conflict review.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD046-OK",
+      "CMD046-DENY",
+      "CMD046-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD047",
+    "name": "AcceptAttribution",
+    "method": "POST",
+    "path": "/api/v1/sales/claims/{claimId}/accept",
+    "role": "KAVO_OWNER",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "shareAllocationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Conflicts, actual agency identity, claim timing and pool shares have been reviewed under signed terms.",
+    "effect": "Freeze accepted acquisition attribution and claim window; record any agreed split totaling 100%.",
+    "failure": "Assignment edits or two full-rate sellers cannot duplicate the commission pool.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD047-OK",
+      "CMD047-DENY",
+      "CMD047-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD048",
+    "name": "AssignAccount",
+    "method": "POST",
+    "path": "/api/v1/sales/agencies/{agencyId}/assignment",
+    "role": "KAVO_OWNER",
+    "owner": "12",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "sellerId",
+        "type": "id"
+      },
+      {
+        "name": "serviceAssignmentRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The seller is active and the service role/compensation are prepared.",
+    "effect": "Change operational responsibility while preserving historical attribution and earned rights.",
+    "failure": "No silent reset of the twelve-month window or first-project designation.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD048-OK",
+      "CMD048-DENY",
+      "CMD048-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD049",
+    "name": "ActivateSeller",
+    "method": "POST",
+    "path": "/api/v1/sales/sellers/{sellerId}/activate",
+    "role": "KAVO_OWNER",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "agreementId",
+        "type": "id"
+      },
+      {
+        "name": "assessmentEvidenceRef",
+        "type": "id"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Identity, legal classification, signed terms, English/product assessment, access and payment facts are complete.",
+    "effect": "Activate least-privilege seller capabilities and the agreed compensation version.",
+    "failure": "A contractor label without reviewed substance or unsigned terms cannot activate.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD049-OK",
+      "CMD049-DENY",
+      "CMD049-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD050",
+    "name": "TerminateSeller",
+    "method": "POST",
+    "path": "/api/v1/sales/sellers/{sellerId}/terminate",
+    "role": "KAVO_OWNER",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "terminationTermsRef",
+        "type": "id"
+      },
+      {
+        "name": "activeOpportunityManifestRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Actual legal obligations, earned/residual commissions and enumerated opportunity tail are prepared.",
+    "effect": "End new assignment/access, preserve signed residuals and define the eligible ninety-day opportunity tail.",
+    "failure": "Do not erase the ledger, forfeit rights by a role change or grant a tail over an entire scraped list.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD050-OK",
+      "CMD050-DENY",
+      "CMD050-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD051",
+    "name": "CloseCommissionPeriod",
+    "method": "POST",
+    "path": "/api/v1/sales/commission-periods/{periodId}/close",
+    "role": "COMMISSION_SERVICE",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "ledgerCutoffHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Captures, cumulative refunds, delivery milestones, available funds and disputes are reconciled at cutoff.",
+    "effect": "Issue an immutable statement with itemized basis, rates, adjustments, holds and payout date.",
+    "failure": "Unknown settlement or missing final completion remains a reasoned hold, not invented eligibility.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD051-OK",
+      "CMD051-DENY",
+      "CMD051-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD052",
+    "name": "ApproveCommissionPayout",
+    "method": "POST",
+    "path": "/api/v1/sales/statements/{statementId}/approve-payout",
+    "role": "KAVO_OWNER",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "payeeRef",
+        "type": "id"
+      },
+      {
+        "name": "authorizationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Statement, legal documentation, exact payee/currency/fees and actual available funds are prepared.",
+    "effect": "Create a reviewable authorized payout intent for eligible value.",
+    "failure": "No arbitrary minimum, silent fee deduction or unauthorized funds transfer.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD052-OK",
+      "CMD052-DENY",
+      "CMD052-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD053",
+    "name": "ReconcileCommissionPayout",
+    "method": "POST",
+    "path": "/api/v1/sales/statements/{statementId}/reconcile-payout",
+    "role": "FINANCE_SERVICE",
+    "owner": "17",
+    "fields": [
+      {
+        "name": "providerPayoutEvidenceRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Authenticated payout/bank evidence matches the intended seller and amount.",
+    "effect": "Mark actual paid value and preserve any failed/returned transfer for recovery.",
+    "failure": "Submitting a transfer is not proof the seller received it.",
+    "gate": "G-COMMERCIAL",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD053-OK",
+      "CMD053-DENY",
+      "CMD053-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD054",
+    "name": "OpenBreakglass",
+    "method": "POST",
+    "path": "/api/v1/operations/breakglass-grants",
+    "role": "KAVO_OWNER",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "scopeRef",
+        "type": "id"
+      },
+      {
+        "name": "purpose",
+        "type": "label"
+      },
+      {
+        "name": "assuranceProofRef",
+        "type": "id"
+      },
+      {
+        "name": "authorizationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "A concrete incident/support need and necessary customer-data scope have been established.",
+    "effect": "Issue a short-lived audited least-privilege grant with automatic expiry and review.",
+    "failure": "Blanket raw-data access, unrelated tenant access or silent reuse rejects.",
+    "gate": "G-SECURITY",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD054-OK",
+      "CMD054-DENY",
+      "CMD054-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD055",
+    "name": "RevokeBreakglass",
+    "method": "POST",
+    "path": "/api/v1/operations/breakglass-grants/{grantId}/revoke",
+    "role": "KAVO_OWNER_OR_SECURITY_SERVICE",
+    "owner": "08",
+    "fields": [
+      {
+        "name": "reasonCode",
+        "type": "label"
+      }
+    ],
+    "precondition": "The active grant is identified and revocation is authorized.",
+    "effect": "Revoke refresh authority and verify expiry of already issued capabilities.",
+    "failure": "Do not claim zero residual bearer lifetime where the provider cannot revoke issued credentials instantly.",
+    "gate": "G-SECURITY",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD055-OK",
+      "CMD055-DENY",
+      "CMD055-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD056",
+    "name": "RecordIncident",
+    "method": "POST",
+    "path": "/api/v1/operations/incidents",
+    "role": "OPERATIONS_SERVICE_OR_OWNER",
+    "owner": "14",
+    "fields": [
+      {
+        "name": "severity",
+        "type": "label"
+      },
+      {
+        "name": "affectedScopeRefs",
+        "type": "listText"
+      },
+      {
+        "name": "summary",
+        "type": "text"
+      }
+    ],
+    "precondition": "Evidence identifies an actual event and safe affected scope.",
+    "effect": "Create containment/recovery/communication responsibilities and a next checkpoint.",
+    "failure": "A monitoring false positive is recorded as such; it cannot be fabricated as a resolved production outage.",
+    "gate": "G-RECOVERY",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD056-OK",
+      "CMD056-DENY",
+      "CMD056-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD057",
+    "name": "AuthorizeRecovery",
+    "method": "POST",
+    "path": "/api/v1/operations/recoveries",
+    "role": "KAVO_OWNER",
+    "owner": "14",
+    "fields": [
+      {
+        "name": "restoreCandidateRef",
+        "type": "id"
+      },
+      {
+        "name": "deletionJournalHash",
+        "type": "hash"
+      },
+      {
+        "name": "authorizationRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "The concrete restore plan, costs, side effects, deletion tombstones and financial reconciliation are prepared.",
+    "effect": "Run the authorized isolated restore and release only after integrity/tenant/deletion/financial checks.",
+    "failure": "Restored old captures, jobs or deleted rows cannot trigger duplicate effects or resurrect authority.",
+    "gate": "G-RECOVERY",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD057-OK",
+      "CMD057-DENY",
+      "CMD057-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD058",
+    "name": "ChangeCapability",
+    "method": "POST",
+    "path": "/api/v1/operations/capabilities/{capabilityId}/versions",
+    "role": "KAVO_OWNER",
+    "owner": "20",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "profileHash",
+        "type": "hash"
+      },
+      {
+        "name": "qualificationEvidenceRefs",
+        "type": "listText"
+      }
+    ],
+    "precondition": "Independent acceptance covers the exact object/operation/importer/resource envelope and existing commitments are reviewed.",
+    "effect": "Create a prospective version and update sale/admission/compiler consumers together.",
+    "failure": "A marketing edit cannot promote IMPLEMENTED_UNACCEPTED to AVAILABLE_LIMITED or AVAILABLE.",
+    "gate": "G-RELEASE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD058-OK",
+      "CMD058-DENY",
+      "CMD058-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD059",
+    "name": "RestrictCapability",
+    "method": "POST",
+    "path": "/api/v1/operations/capabilities/{capabilityId}/restrict",
+    "role": "OPERATIONS_SERVICE_OR_OWNER",
+    "owner": "20",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "incidentRef",
+        "type": "id"
+      }
+    ],
+    "precondition": "Concrete evidence shows unsafe or unavailable behavior; customer obligations are identified.",
+    "effect": "Block new admission, preserve evidence and route current work to the appropriate recovery/refund process.",
+    "failure": "Do not silently change the scope of an already paid project.",
+    "gate": "G-RELEASE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD059-OK",
+      "CMD059-DENY",
+      "CMD059-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD060",
+    "name": "RequestRetentionExtension",
+    "method": "POST",
+    "path": "/api/v1/projects/{projectId}/retention-extensions",
+    "role": "AGENCY_OWNER_OR_ADMIN",
+    "owner": "09",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "requestedSeconds",
+        "type": "count"
+      },
+      {
+        "name": "purpose",
+        "type": "label"
+      },
+      {
+        "name": "termsVersion",
+        "type": "label"
+      }
+    ],
+    "precondition": "Current data/workflow is unexpired, the agency has authority, no prior project extension exists, and the requested soft extension is at most 259200 seconds within the original hard cap.",
+    "effect": "Record one explicit contractual soft-deadline extension, its exact capped endpoint and restore-journal event; update all affected UI/scheduler consumers.",
+    "failure": "Reject expired/deleted scope, a second extension, hard-cap change or stale version. A quote/retry cannot create this authority.",
+    "gate": "G-DELETE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_PROJECT_EXTENSION_UNIQUENESS_AND_CURRENT_RETENTION_VERSION",
+    "testIds": [
+      "CMD060-OK",
+      "CMD060-DENY",
+      "CMD060-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD061",
+    "name": "PrepareOutreachDraft",
+    "method": "POST",
+    "path": "/api/v1/ops/outreach/drafts",
+    "role": "ASSIGNED_SELLER_OR_OWNER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "prospectId",
+        "type": "id"
+      },
+      {
+        "name": "senderIdentityRef",
+        "type": "id"
+      },
+      {
+        "name": "purpose",
+        "type": "label"
+      },
+      {
+        "name": "contentRef",
+        "type": "id"
+      },
+      {
+        "name": "provenanceEvidenceHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Current assignment, verified sender and allowed contact provenance are present; content passes safe claim and header checks.",
+    "effect": "Create a versioned DRAFT and content binding; no external message is sent.",
+    "failure": "Wrong assignment or unsupported claims reject without revealing the contact or creating send authority.",
+    "gate": "G-UX_PRIVATE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD061-OK",
+      "CMD061-DENY",
+      "CMD061-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD062",
+    "name": "AuthorizeOutreach",
+    "method": "POST",
+    "path": "/api/v1/ops/outreach/authorizations",
+    "role": "OWNER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "senderIdentityRef",
+        "type": "id"
+      },
+      {
+        "name": "allowedContentHashes",
+        "type": "listHash"
+      },
+      {
+        "name": "validFrom",
+        "type": "utc"
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc"
+      },
+      {
+        "name": "maximumSends",
+        "type": "count"
+      },
+      {
+        "name": "permissionEvidenceHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Explicit owner permission binds reviewed recipients/content and an allowed purpose, sender, validity and bounded count.",
+    "effect": "Commit one revocable bounded grant; record the actual permission without inventing standing consent.",
+    "failure": "Expired, empty, excessive or ungrounded grants reject and cannot activate a send queue.",
+    "gate": "G-UX_PRIVATE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD062-OK",
+      "CMD062-DENY",
+      "CMD062-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD063",
+    "name": "SendAuthorizedOutreach",
+    "method": "POST",
+    "path": "/api/v1/ops/outreach/{draftId}/send",
+    "role": "ASSIGNED_SELLER_OR_OWNER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "expectedVersion",
+        "type": "version"
+      },
+      {
+        "name": "authorizationId",
+        "type": "id"
+      },
+      {
+        "name": "contentHash",
+        "type": "hash"
+      }
+    ],
+    "precondition": "Current sender/assignment, content, suppression, provider policy, validity and remaining grant quota all admit dispatch.",
+    "effect": "Commit one fenced send intent; persist provider acceptance or explicit uncertainty and never infer delivery.",
+    "failure": "Cancellation, opt-out or changed content blocks dispatch; uncertain provider acceptance requires reconciliation before any repeat.",
+    "gate": "G-UX_PRIVATE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD063-OK",
+      "CMD063-DENY",
+      "CMD063-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  },
+  {
+    "id": "CMD064",
+    "name": "RecordSalesActivity",
+    "method": "POST",
+    "path": "/api/v1/ops/sales/activities",
+    "role": "ASSIGNED_SELLER_OWNER_OR_RECONCILER",
+    "owner": "18",
+    "fields": [
+      {
+        "name": "activity",
+        "type": "ref:SalesActivity"
+      }
+    ],
+    "precondition": "Evidence supports the exact activity class and current scoped prospect access; a draft or API acknowledgment cannot become a customer reply.",
+    "effect": "Append deduplicated evidence-backed commercial activity and stop follow-up after refusal, reply, bounce or suppression.",
+    "failure": "Unsupported delivered/replied claims reject; duplicate external identity cannot count twice.",
+    "gate": "G-UX_PRIVATE",
+    "idempotency": "REQUIRED",
+    "stateCheck": "TRANSACTIONAL_EXPECTED_VERSION_WHEN_SUPPLIED_PLUS_STORED_AUTHORITY",
+    "testIds": [
+      "CMD064-OK",
+      "CMD064-DENY",
+      "CMD064-RACE"
+    ],
+    "status": "SPECIFIED_NOT_IMPLEMENTATION_VERIFIED"
+  }
+]

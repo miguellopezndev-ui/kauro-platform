@@ -1,0 +1,4799 @@
+[
+  {
+    "name": "TenantScope",
+    "owner": "08",
+    "flow": "Request authentication → every tenant-owned consumer",
+    "invariant": "The server derives agency membership and client/project ownership; callers cannot self-assert access.",
+    "fields": [
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Owning agency, checked against membership and persisted foreign keys."
+      },
+      {
+        "name": "clientId",
+        "type": "id",
+        "required": false,
+        "description": "End-client workspace where applicable; absence never means cross-client access."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": false,
+        "description": "Project scope when the operation is project-bound."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TenantScope"
+  },
+  {
+    "name": "SourceLocator",
+    "owner": "03",
+    "flow": "Parser → profile, plan, lineage and verifier",
+    "invariant": "A locator identifies an occurrence, not merely equal content.",
+    "fields": [
+      {
+        "name": "revisionId",
+        "type": "id",
+        "required": true,
+        "description": "Sealed revision that fixes raw bytes and parser choices."
+      },
+      {
+        "name": "fileId",
+        "type": "id",
+        "required": true,
+        "description": "Accepted file entry, not its display name."
+      },
+      {
+        "name": "tableId",
+        "type": "id",
+        "required": true,
+        "description": "CSV table or worksheet identity."
+      },
+      {
+        "name": "logicalRow",
+        "type": "count",
+        "required": true,
+        "description": "Zero-based logical data-record ordinal excluding header."
+      },
+      {
+        "name": "projectionId",
+        "type": "id",
+        "required": true,
+        "description": "Declared object projection within the physical row."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/SourceLocator"
+  },
+  {
+    "name": "FileManifest",
+    "owner": "09",
+    "flow": "Upload verifier → revision sealing",
+    "invariant": "Only provider-observed bytes and generations may be admitted.",
+    "fields": [
+      {
+        "name": "fileId",
+        "type": "id",
+        "required": true,
+        "description": "Opaque server file identity."
+      },
+      {
+        "name": "storageRef",
+        "type": "id",
+        "required": true,
+        "description": "Private registry reference, never a public bucket URI."
+      },
+      {
+        "name": "providerGeneration",
+        "type": "text",
+        "required": true,
+        "description": "Exact immutable generation observed after upload."
+      },
+      {
+        "name": "sha256",
+        "type": "hash",
+        "required": true,
+        "description": "Hash recomputed over the complete object bytes."
+      },
+      {
+        "name": "bytes",
+        "type": "count",
+        "required": true,
+        "description": "Observed byte length within the applicable envelope."
+      },
+      {
+        "name": "format",
+        "type": "enum:CSV,XLSX",
+        "required": true,
+        "description": "Detected and validated supported format."
+      },
+      {
+        "name": "scanState",
+        "type": "enum:COVERED_CLEAN,BLOCKED,NOT_SCANNED,ERROR",
+        "required": true,
+        "description": "Coverage is separate from malware absence."
+      },
+      {
+        "name": "parserProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Pinned encoding, dialect, workbook and parser configuration."
+      },
+      {
+        "name": "admitted",
+        "type": "bool",
+        "required": true,
+        "description": "Derived server decision; a browser cannot set this value."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/FileManifest"
+  },
+  {
+    "name": "DatasetRevision",
+    "owner": "07",
+    "flow": "Revision service → audit and execution",
+    "invariant": "Sealing is immutable; replacement creates lineage and invalidates dependent authority.",
+    "fields": [
+      {
+        "name": "revisionId",
+        "type": "id",
+        "required": true,
+        "description": "Revision identity."
+      },
+      {
+        "name": "scope",
+        "type": "ref:TenantScope",
+        "required": true,
+        "description": "Server-validated tenant and project binding."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Optimistic concurrency version."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,UPLOADING,INSPECTING,READY_TO_SEAL,SEALED,REJECTED,CANCELLED,SUPERSEDED,EXPIRED,DELETED",
+        "required": true,
+        "description": "State owned by revision commands."
+      },
+      {
+        "name": "files",
+        "type": "list:FileManifest",
+        "required": true,
+        "description": "Ordered accepted input manifest."
+      },
+      {
+        "name": "manifestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Digest of sealed manifest under the declared canonical profile."
+      },
+      {
+        "name": "projectionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact billable object interpretation."
+      },
+      {
+        "name": "sealedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Present only after successful seal."
+      },
+      {
+        "name": "supersedesRevisionId",
+        "type": "id",
+        "required": false,
+        "description": "Explicit predecessor, never an in-place overwrite."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/DatasetRevision"
+  },
+  {
+    "name": "SourceField",
+    "owner": "03",
+    "flow": "Parser/profile → candidate generation",
+    "invariant": "Labels are untrusted text and positional identity prevents duplicate-header overwrite.",
+    "fields": [
+      {
+        "name": "fieldId",
+        "type": "id",
+        "required": true,
+        "description": "Stable positional field identity within a table."
+      },
+      {
+        "name": "tableId",
+        "type": "id",
+        "required": true,
+        "description": "Owning table."
+      },
+      {
+        "name": "columnOrdinal",
+        "type": "count",
+        "required": true,
+        "description": "Zero-based position."
+      },
+      {
+        "name": "label",
+        "type": "text",
+        "required": true,
+        "description": "Original decoded header, escaped in UI and classified before model use."
+      },
+      {
+        "name": "observedType",
+        "type": "enum:TEXT,INTEGER,DECIMAL,DATE,DATETIME,BOOLEAN,MIXED,EMPTY",
+        "required": true,
+        "description": "Measurement classification, not permission to coerce."
+      },
+      {
+        "name": "privacy",
+        "type": "enum:L0,L1,L2,L3,L4,UNCLASSIFIED",
+        "required": true,
+        "description": "Classification from actual content and meaning."
+      },
+      {
+        "name": "profileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Binding to the full measured profile."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/SourceField"
+  },
+  {
+    "name": "RowCounts",
+    "owner": "03",
+    "flow": "Independent counters → quote, validation and report",
+    "invariant": "Counters have named denominators and cannot be substituted for one another.",
+    "fields": [
+      {
+        "name": "physicalSourceRows",
+        "type": "count",
+        "required": true,
+        "description": "Admitted data occurrences before object projection."
+      },
+      {
+        "name": "logicalSourceRecords",
+        "type": "count",
+        "required": true,
+        "description": "Source object occurrences after explicit projection."
+      },
+      {
+        "name": "billableSourceUnits",
+        "type": "count",
+        "required": true,
+        "description": "Units selected by the pricing definition, frozen before capture."
+      },
+      {
+        "name": "associationEdges",
+        "type": "count",
+        "required": true,
+        "description": "Relationship candidates admitted within the edge envelope."
+      },
+      {
+        "name": "emittedRepresentatives",
+        "type": "count",
+        "required": true,
+        "description": "Terminal source representatives represented in output."
+      },
+      {
+        "name": "mergedNonSurvivors",
+        "type": "count",
+        "required": true,
+        "description": "Source occurrences accounted for by a selected survivor."
+      },
+      {
+        "name": "rejected",
+        "type": "count",
+        "required": true,
+        "description": "Terminal rejected source units with reasons."
+      },
+      {
+        "name": "withheld",
+        "type": "count",
+        "required": true,
+        "description": "Explicitly withheld source units with disposition."
+      },
+      {
+        "name": "unresolved",
+        "type": "count",
+        "required": true,
+        "description": "Nonterminal decisions; positive value blocks final acceptance."
+      },
+      {
+        "name": "emittedArtifactRows",
+        "type": "count",
+        "required": true,
+        "description": "Actual output lines excluding headers; not a conservation proxy."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/RowCounts"
+  },
+  {
+    "name": "FieldProfile",
+    "owner": "04",
+    "flow": "Full-data profiler → IC and validation",
+    "invariant": "A sample can describe a sample only; exact claims require complete measured scope.",
+    "fields": [
+      {
+        "name": "fieldId",
+        "type": "id",
+        "required": true,
+        "description": "Field being measured."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source binding."
+      },
+      {
+        "name": "methodVersion",
+        "type": "text",
+        "required": true,
+        "description": "Pinned measurement implementation."
+      },
+      {
+        "name": "denominator",
+        "type": "count",
+        "required": true,
+        "description": "Number of eligible source occurrences."
+      },
+      {
+        "name": "nullCount",
+        "type": "count",
+        "required": true,
+        "description": "Typed null or absent count according to parser policy."
+      },
+      {
+        "name": "emptyStringCount",
+        "type": "count",
+        "required": true,
+        "description": "Exact decoded empty strings, separately counted."
+      },
+      {
+        "name": "distinctCount",
+        "type": "count",
+        "required": true,
+        "description": "Exact distinct count only if exact=true."
+      },
+      {
+        "name": "exact",
+        "type": "bool",
+        "required": true,
+        "description": "Whether the claimed measure covers the complete scope."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Independent evidence artifact digest."
+      },
+      {
+        "name": "issues",
+        "type": "listText",
+        "required": true,
+        "description": "Stable issue codes; raw cells remain in authorized evidence storage."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/FieldProfile"
+  },
+  {
+    "name": "UniquenessProof",
+    "owner": "03",
+    "flow": "Authoritative source/target measurement → identity compiler",
+    "invariant": "Uniqueness is scoped by provider, instance, object, field and null/case semantics.",
+    "fields": [
+      {
+        "name": "provider",
+        "type": "enum:SOURCE,HUBSPOT,SALESFORCE",
+        "required": true,
+        "description": "Authority domain."
+      },
+      {
+        "name": "instanceId",
+        "type": "id",
+        "required": true,
+        "description": "Exact source or destination instance."
+      },
+      {
+        "name": "objectApiName",
+        "type": "label",
+        "required": true,
+        "description": "Object whose identity is proved."
+      },
+      {
+        "name": "fieldApiName",
+        "type": "label",
+        "required": true,
+        "description": "Field carrying the eligible key."
+      },
+      {
+        "name": "caseSensitive",
+        "type": "bool",
+        "required": true,
+        "description": "Observed equality semantics."
+      },
+      {
+        "name": "nullBehavior",
+        "type": "enum:EXCLUDE,UNIQUE_VALUE,DISALLOW",
+        "required": true,
+        "description": "Explicit null treatment."
+      },
+      {
+        "name": "completeScope",
+        "type": "bool",
+        "required": true,
+        "description": "True only for the required full scope."
+      },
+      {
+        "name": "contractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Bound target/source contract."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Verifiable underlying measurement or authoritative metadata."
+      },
+      {
+        "name": "observedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Time of observation, checked for future/staleness."
+      },
+      {
+        "name": "operation",
+        "type": "enum:CREATE_ONLY,UPDATE_ONLY,UPSERT,MATCH",
+        "required": true,
+        "description": "Operation for which this proof is admissible."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/UniquenessProof"
+  },
+  {
+    "name": "TargetField",
+    "owner": "05",
+    "flow": "Target observer → contract compiler",
+    "invariant": "Actual API names, writability, types and constraints control output.",
+    "fields": [
+      {
+        "name": "apiName",
+        "type": "label",
+        "required": true,
+        "description": "Exact field API name, not translated display label."
+      },
+      {
+        "name": "dataType",
+        "type": "enum:TEXT,INTEGER,DECIMAL,DATE,DATETIME,BOOLEAN,ENUM,MULTI_ENUM,REFERENCE",
+        "required": true,
+        "description": "Qualified destination type."
+      },
+      {
+        "name": "createable",
+        "type": "knownBoolean",
+        "required": true,
+        "description": "Actual create capability. Null is explicitly unknown and cannot authorize the operation."
+      },
+      {
+        "name": "updateable",
+        "type": "knownBoolean",
+        "required": true,
+        "description": "Actual update capability. Null is explicitly unknown and cannot authorize the operation."
+      },
+      {
+        "name": "requiredOnCreate",
+        "type": "knownBoolean",
+        "required": true,
+        "description": "Observed create requirement, including object profile rules. Null is explicitly unknown and cannot authorize the operation."
+      },
+      {
+        "name": "maxLength",
+        "type": "count",
+        "required": false,
+        "description": "Character or byte unit is specified in the owning importer profile."
+      },
+      {
+        "name": "allowedValues",
+        "type": "listText",
+        "required": true,
+        "description": "Complete allowed option API values when relevant; labels may be sensitive."
+      },
+      {
+        "name": "clearMechanism",
+        "type": "enum:UNSUPPORTED,EXPLICIT_NULL_MARKER,EXPLICIT_API_OPERATION",
+        "required": true,
+        "description": "Qualified mechanism; blank is not assumed clear."
+      },
+      {
+        "name": "unique",
+        "type": "bool",
+        "required": true,
+        "description": "Metadata claim still requires correct scope and semantics."
+      },
+      {
+        "name": "referenceObject",
+        "type": "label",
+        "required": false,
+        "description": "Exact referenced object when type=REFERENCE."
+      },
+      {
+        "name": "nillable",
+        "type": "knownBoolean",
+        "required": true,
+        "description": "Whether the actual target permits null; null means unknown."
+      },
+      {
+        "name": "constraintStatus",
+        "type": "enum:VERIFIED,DECLARED,UNKNOWN,NOT_APPLICABLE",
+        "required": true,
+        "description": "Evidence status of the field constraints; does not grant authority by itself."
+      },
+      {
+        "name": "allowedValuesStatus",
+        "type": "enum:COMPLETE,UNKNOWN,NOT_APPLICABLE",
+        "required": true,
+        "description": "An empty list with UNKNOWN is not an unconstrained enum."
+      },
+      {
+        "name": "precision",
+        "type": "count",
+        "required": false,
+        "description": "Observed numeric precision where applicable."
+      },
+      {
+        "name": "scale",
+        "type": "count",
+        "required": false,
+        "description": "Observed numeric scale where applicable."
+      },
+      {
+        "name": "constraintEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Verified field-specific metadata and dependent/record-type constraint evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TargetField"
+  },
+  {
+    "name": "TargetObject",
+    "owner": "05",
+    "flow": "Target observer → mapping and export",
+    "invariant": "Only declared object operations and fields may be compiled.",
+    "fields": [
+      {
+        "name": "apiName",
+        "type": "label",
+        "required": true,
+        "description": "Destination object identity."
+      },
+      {
+        "name": "operations",
+        "type": "listText",
+        "required": true,
+        "description": "Qualified CREATE, UPDATE and/or UPSERT operations."
+      },
+      {
+        "name": "fields",
+        "type": "list:TargetField",
+        "required": true,
+        "description": "Closed observed field inventory."
+      },
+      {
+        "name": "identifierFields",
+        "type": "listText",
+        "required": true,
+        "description": "Eligible identity API fields, each with its own proof."
+      },
+      {
+        "name": "relationships",
+        "type": "listText",
+        "required": true,
+        "description": "Qualified relationship API names, not arbitrary dotted paths."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TargetObject"
+  },
+  {
+    "name": "TargetContract",
+    "owner": "05",
+    "flow": "Authenticated observer plus agency confirmation → MC/IC",
+    "invariant": "Hash/body/mode/instance/tool/authority all bind together.",
+    "fields": [
+      {
+        "name": "contractId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable contract version identity."
+      },
+      {
+        "name": "mode",
+        "type": "enum:CLEAN,HUBSPOT,SALESFORCE",
+        "required": true,
+        "description": "Public mode; legacy adapter mapping is explicit."
+      },
+      {
+        "name": "instanceId",
+        "type": "id",
+        "required": true,
+        "description": "Actual destination/source instance identity."
+      },
+      {
+        "name": "importerProfileId",
+        "type": "id",
+        "required": true,
+        "description": "Qualified tool and operation profile."
+      },
+      {
+        "name": "importerVersion",
+        "type": "text",
+        "required": true,
+        "description": "Observed tool/API contract version."
+      },
+      {
+        "name": "objects",
+        "type": "list:TargetObject",
+        "required": true,
+        "description": "Complete relevant supported metadata."
+      },
+      {
+        "name": "bodyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Digest of the immutable target-body preimage defined in HASHING_AND_ACCOUNTING_RULES; confirmation and attestation envelope are verified separately."
+      },
+      {
+        "name": "observedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Metadata observation instant."
+      },
+      {
+        "name": "confirmedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Agency confirmation of this exact version."
+      },
+      {
+        "name": "authorityEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Attestation and observation evidence."
+      },
+      {
+        "name": "capabilityVersion",
+        "type": "text",
+        "required": true,
+        "description": "Version of the supported capability matrix."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TargetContract"
+  },
+  {
+    "name": "ValueIntent",
+    "owner": "03",
+    "flow": "Decision compiler → transform and importer",
+    "invariant": "SET requires an exact value; CLEAR requires an authority binding; other kinds cannot smuggle values.",
+    "fields": [
+      {
+        "name": "kind",
+        "type": "enum:KEEP,SET,CLEAR,OMIT,REJECT,UNRESOLVED",
+        "required": true,
+        "description": "Desired semantic effect."
+      },
+      {
+        "name": "value",
+        "type": "scalar",
+        "required": false,
+        "description": "Exact typed value for SET only; large numeric values use decimal strings."
+      },
+      {
+        "name": "authorityHash",
+        "type": "hash",
+        "required": false,
+        "description": "Scoped agency-decision/effect evidence hash, not the final PlanApproval hash; prevents circular plan authority."
+      },
+      {
+        "name": "reasonCode",
+        "type": "label",
+        "required": true,
+        "description": "Stable reason with evidence in the decision record."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ValueIntent"
+  },
+  {
+    "name": "DecisionEvidence",
+    "owner": "06",
+    "flow": "Rule/human/model decision → compiler/verifier",
+    "invariant": "A rationale cannot invent its own facts; every decision names verifiable inputs.",
+    "fields": [
+      {
+        "name": "evidenceId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable evidence identity."
+      },
+      {
+        "name": "candidateId",
+        "type": "id",
+        "required": true,
+        "description": "Candidate being resolved."
+      },
+      {
+        "name": "provenance",
+        "type": "enum:RULE,AGENCY,MODEL_ASSISTED,MEMORY",
+        "required": true,
+        "description": "Decision origin, not authority level by itself."
+      },
+      {
+        "name": "factHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Profile, target, agency or compatible memory facts actually checked."
+      },
+      {
+        "name": "ruleVersion",
+        "type": "text",
+        "required": true,
+        "description": "Rule/compiler logic used."
+      },
+      {
+        "name": "comparisonHash",
+        "type": "hash",
+        "required": true,
+        "description": "Recorded comparison over the referenced facts."
+      },
+      {
+        "name": "fragmentHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact resulting configuration fragment."
+      },
+      {
+        "name": "actorId",
+        "type": "id",
+        "required": false,
+        "description": "Required for agency decisions; opaque authorized identity."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/DecisionEvidence"
+  },
+  {
+    "name": "FieldMapping",
+    "owner": "06",
+    "flow": "Candidate compiler → MC plan",
+    "invariant": "Same target field in distinct source-object scopes is not automatically a conflict.",
+    "fields": [
+      {
+        "name": "mappingId",
+        "type": "id",
+        "required": true,
+        "description": "Mapping identity."
+      },
+      {
+        "name": "sourceTableId",
+        "type": "id",
+        "required": true,
+        "description": "Source table/object scope."
+      },
+      {
+        "name": "sourceFieldId",
+        "type": "id",
+        "required": true,
+        "description": "Positional source field."
+      },
+      {
+        "name": "targetObject",
+        "type": "label",
+        "required": true,
+        "description": "Exact allowed target object."
+      },
+      {
+        "name": "targetField",
+        "type": "label",
+        "required": true,
+        "description": "Exact allowed target field."
+      },
+      {
+        "name": "intent",
+        "type": "ref:ValueIntent",
+        "required": true,
+        "description": "Typed write behavior."
+      },
+      {
+        "name": "evidence",
+        "type": "ref:DecisionEvidence",
+        "required": true,
+        "description": "Verified decision trace."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/FieldMapping"
+  },
+  {
+    "name": "IdentityDecision",
+    "owner": "03",
+    "flow": "Agency plus scoped proof → dedup/matching",
+    "invariant": "Similarity does not grant merge or update identity.",
+    "fields": [
+      {
+        "name": "decisionId",
+        "type": "id",
+        "required": true,
+        "description": "Identity decision identity."
+      },
+      {
+        "name": "objectScope",
+        "type": "label",
+        "required": true,
+        "description": "Exact projected object."
+      },
+      {
+        "name": "strategy",
+        "type": "enum:PRESERVE_OCCURRENCES,AUTHORITATIVE_KEY,AGENCY_SELECTED_CLUSTER",
+        "required": true,
+        "description": "Selected admissible strategy."
+      },
+      {
+        "name": "proof",
+        "type": "ref:UniquenessProof",
+        "required": false,
+        "description": "Scoped proof required where the strategy relies on it."
+      },
+      {
+        "name": "memberSetHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact affected source occurrence set."
+      },
+      {
+        "name": "survivorRuleHash",
+        "type": "hash",
+        "required": true,
+        "description": "Deterministic approved survivor choice."
+      },
+      {
+        "name": "fieldConflictPolicyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Per-field conflict resolution, including consent restrictions."
+      },
+      {
+        "name": "approvalHash",
+        "type": "hash",
+        "required": false,
+        "description": "Scoped agency-decision/effect evidence hash, not the final PlanApproval hash; prevents circular plan authority."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/IdentityDecision"
+  },
+  {
+    "name": "TransformStep",
+    "owner": "04",
+    "flow": "Plan compiler → deterministic executor",
+    "invariant": "Parameters use a primitive-specific closed schema, not arbitrary executable code.",
+    "fields": [
+      {
+        "name": "stepId",
+        "type": "id",
+        "required": true,
+        "description": "Stable operation identity."
+      },
+      {
+        "name": "primitive",
+        "type": "label",
+        "required": true,
+        "description": "Member of the qualified primitive catalogue."
+      },
+      {
+        "name": "inputFieldIds",
+        "type": "listText",
+        "required": true,
+        "description": "Ordered positional inputs."
+      },
+      {
+        "name": "outputFieldId",
+        "type": "id",
+        "required": true,
+        "description": "Declared derived or mapped output."
+      },
+      {
+        "name": "parameterSchemaId",
+        "type": "label",
+        "required": true,
+        "description": "Exact registered parameter schema."
+      },
+      {
+        "name": "parametersHash",
+        "type": "hash",
+        "required": true,
+        "description": "Canonical parameter artifact reference."
+      },
+      {
+        "name": "dependsOn",
+        "type": "listText",
+        "required": true,
+        "description": "Predecessor steps in an acyclic graph."
+      },
+      {
+        "name": "evidenceId",
+        "type": "id",
+        "required": true,
+        "description": "Decision evidence authorizing this step."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TransformStep"
+  },
+  {
+    "name": "RelationshipDecision",
+    "owner": "03",
+    "flow": "Edge resolver → importer stages",
+    "invariant": "Every endpoint is scoped and every edge gets a disposition.",
+    "fields": [
+      {
+        "name": "relationshipId",
+        "type": "id",
+        "required": true,
+        "description": "Decision identity."
+      },
+      {
+        "name": "relationType",
+        "type": "label",
+        "required": true,
+        "description": "Qualified target relationship/API name."
+      },
+      {
+        "name": "sourceObject",
+        "type": "label",
+        "required": true,
+        "description": "Child or source object."
+      },
+      {
+        "name": "targetObject",
+        "type": "label",
+        "required": true,
+        "description": "Parent or target object."
+      },
+      {
+        "name": "edgeSetHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact source edge set."
+      },
+      {
+        "name": "resolution",
+        "type": "enum:SOURCE_KEY,TARGET_NATIVE_ID,STAGED_RECEIPT,WITHHOLD,REJECT",
+        "required": true,
+        "description": "Resolution mechanism."
+      },
+      {
+        "name": "identityEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Endpoint identity authority."
+      },
+      {
+        "name": "requiredStageId",
+        "type": "id",
+        "required": false,
+        "description": "Parent stage whose receipt supplies new IDs."
+      },
+      {
+        "name": "approvalHash",
+        "type": "hash",
+        "required": true,
+        "description": "Scoped agency-decision/effect evidence hash, not the final PlanApproval hash; prevents circular plan authority."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/RelationshipDecision"
+  },
+  {
+    "name": "Plan",
+    "owner": "07",
+    "flow": "Compiler and authorized edits → full validation",
+    "invariant": "A plan revision is immutable after validation/approval and cannot execute from a stale binding.",
+    "fields": [
+      {
+        "name": "planId",
+        "type": "id",
+        "required": true,
+        "description": "Plan identity."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Plan revision version."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Sealed source subject."
+      },
+      {
+        "name": "targetContractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact target subject."
+      },
+      {
+        "name": "policyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Applicable operation/capability rules."
+      },
+      {
+        "name": "mappings",
+        "type": "list:FieldMapping",
+        "required": true,
+        "description": "Closed selected mapping set."
+      },
+      {
+        "name": "identities",
+        "type": "list:IdentityDecision",
+        "required": true,
+        "description": "Explicit identity strategies."
+      },
+      {
+        "name": "transforms",
+        "type": "list:TransformStep",
+        "required": true,
+        "description": "Ordered acyclic computation."
+      },
+      {
+        "name": "relationships",
+        "type": "list:RelationshipDecision",
+        "required": true,
+        "description": "Complete admitted relationship decisions."
+      },
+      {
+        "name": "bodyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Digest of immutable plan semantics; lifecycle state/version envelope and final approval are excluded by the named preimage."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,VALIDATION_REQUIRED,VALIDATING,VALIDATED,APPROVED,SUPERSEDED,WITHDRAWN",
+        "required": true,
+        "description": "Domain-owned plan state."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Plan"
+  },
+  {
+    "name": "Approval",
+    "owner": "07",
+    "flow": "Authorized agency actor → commercial/execution authority",
+    "invariant": "Approval is a signed-off subject, not a mutable boolean.",
+    "fields": [
+      {
+        "name": "approvalId",
+        "type": "id",
+        "required": true,
+        "description": "Approval identity."
+      },
+      {
+        "name": "actorId",
+        "type": "id",
+        "required": true,
+        "description": "Authenticated actor with approval capability."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Owning agency."
+      },
+      {
+        "name": "planHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact approved plan."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact approved source."
+      },
+      {
+        "name": "targetContractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact approved destination scope."
+      },
+      {
+        "name": "validationReceiptHash",
+        "type": "hash",
+        "required": true,
+        "description": "Accepted complete-data validation."
+      },
+      {
+        "name": "disclosuresHash",
+        "type": "hash",
+        "required": true,
+        "description": "UI-disclosed effects, counts, risks and limitations."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Server creation time."
+      },
+      {
+        "name": "withdrawnAt",
+        "type": "utc",
+        "required": false,
+        "description": "Withdrawal revokes future execution authority."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Approval"
+  },
+  {
+    "name": "ValidationReceipt",
+    "owner": "04",
+    "flow": "MC validator → IC/domain/verifier",
+    "invariant": "All bindings and evidence digests are required, internally consistent and independently checked.",
+    "fields": [
+      {
+        "name": "receiptId",
+        "type": "id",
+        "required": true,
+        "description": "Unique validation result."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source subject."
+      },
+      {
+        "name": "targetContractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Target body and scope subject."
+      },
+      {
+        "name": "planHash",
+        "type": "hash",
+        "required": true,
+        "description": "Validated plan/configuration subject."
+      },
+      {
+        "name": "corePackageHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual consumed MC package bytes."
+      },
+      {
+        "name": "profileEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Complete-data profile evidence."
+      },
+      {
+        "name": "dispositionEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Conservation and disposition evidence."
+      },
+      {
+        "name": "artifactEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Output/preview validation evidence for this phase."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Validation start."
+      },
+      {
+        "name": "completedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Completion, not before start or in the future."
+      },
+      {
+        "name": "result",
+        "type": "enum:VALID,INVALID,CANCELLED,ERROR",
+        "required": true,
+        "description": "Explicit result; no truthy success coercion."
+      },
+      {
+        "name": "counts",
+        "type": "ref:RowCounts",
+        "required": true,
+        "description": "Independent denominators and dispositions."
+      },
+      {
+        "name": "blockingIssueCodes",
+        "type": "listText",
+        "required": true,
+        "description": "Must be empty for VALID."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ValidationReceipt"
+  },
+  {
+    "name": "ModelTask",
+    "owner": "06",
+    "flow": "Candidate partitioner → provider orchestrator",
+    "invariant": "The candidate set and policy are part of idempotency identity.",
+    "fields": [
+      {
+        "name": "taskId",
+        "type": "id",
+        "required": true,
+        "description": "Stable logical task."
+      },
+      {
+        "name": "auditId",
+        "type": "id",
+        "required": true,
+        "description": "Owning audit."
+      },
+      {
+        "name": "candidateManifestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact candidate set and dependencies."
+      },
+      {
+        "name": "policyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Model/operation/privacy policy binding."
+      },
+      {
+        "name": "minimizedRequestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Hash of complete final serialized outbound content."
+      },
+      {
+        "name": "providerProfileId",
+        "type": "id",
+        "required": true,
+        "description": "Qualified endpoint/model/request adapter."
+      },
+      {
+        "name": "maximumCostCents",
+        "type": "money",
+        "required": true,
+        "description": "Conservative worst-case reservation rounded upward."
+      },
+      {
+        "name": "interpretationDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "No new semantic calls after this deadline."
+      },
+      {
+        "name": "auditDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "Absolute finalization boundary."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ModelTask"
+  },
+  {
+    "name": "RequestJournal",
+    "owner": "06",
+    "flow": "Durable orchestrator → recovery and cost reconciler",
+    "invariant": "Persist response before marking consumed; ambiguity is an explicit state.",
+    "fields": [
+      {
+        "name": "requestId",
+        "type": "id",
+        "required": true,
+        "description": "Physical dispatch attempt identity."
+      },
+      {
+        "name": "taskId",
+        "type": "id",
+        "required": true,
+        "description": "Logical task."
+      },
+      {
+        "name": "requestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact final request bytes or canonical transport representation."
+      },
+      {
+        "name": "fence",
+        "type": "version",
+        "required": true,
+        "description": "Current ownership generation."
+      },
+      {
+        "name": "state",
+        "type": "enum:RESERVED,DISPATCHING,UNCERTAIN,RESPONSE_STORED,CONSUMED,FAILED,CANCELLED",
+        "required": true,
+        "description": "Durable state."
+      },
+      {
+        "name": "providerRequestId",
+        "type": "text",
+        "required": false,
+        "description": "Provider identifier when observed."
+      },
+      {
+        "name": "responseArtifactHash",
+        "type": "hash",
+        "required": false,
+        "description": "Required once a complete response is durable."
+      },
+      {
+        "name": "usageState",
+        "type": "enum:KNOWN,UNKNOWN,ESTIMATED,RECONCILED",
+        "required": true,
+        "description": "Cost epistemic status."
+      },
+      {
+        "name": "reservedCents",
+        "type": "money",
+        "required": true,
+        "description": "Possible liability held until reconciled."
+      },
+      {
+        "name": "actualCents",
+        "type": "money",
+        "required": false,
+        "description": "Known billed/estimated usage under explicit status."
+      },
+      {
+        "name": "updatedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Monotonic server revision time."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/RequestJournal"
+  },
+  {
+    "name": "Lease",
+    "owner": "07",
+    "flow": "Transactional claimant → worker finalizer",
+    "invariant": "An old live worker cannot publish after another owner advances the fence.",
+    "fields": [
+      {
+        "name": "resourceId",
+        "type": "id",
+        "required": true,
+        "description": "Leased logical operation."
+      },
+      {
+        "name": "ownerId",
+        "type": "id",
+        "required": true,
+        "description": "Worker attempt identity."
+      },
+      {
+        "name": "fence",
+        "type": "version",
+        "required": true,
+        "description": "Strictly increasing generation."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Lease expiration."
+      },
+      {
+        "name": "heartbeatAt",
+        "type": "utc",
+        "required": true,
+        "description": "Last accepted heartbeat."
+      },
+      {
+        "name": "cancelVersion",
+        "type": "count",
+        "required": true,
+        "description": "Cancellation generation observed by the worker."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Lease"
+  },
+  {
+    "name": "Quote",
+    "owner": "16",
+    "flow": "Pricing/fiscal service → agency and checkout",
+    "invariant": "Price validity is separate from source availability; terms are immutable once issued.",
+    "fields": [
+      {
+        "name": "quoteId",
+        "type": "id",
+        "required": true,
+        "description": "Quote identity."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Purchasing agency."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": true,
+        "description": "Scoped project."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Priced sealed source."
+      },
+      {
+        "name": "planHash",
+        "type": "hash",
+        "required": true,
+        "description": "Priced approved scope."
+      },
+      {
+        "name": "billableUnits",
+        "type": "count",
+        "required": true,
+        "description": "Exact price denominator."
+      },
+      {
+        "name": "mode",
+        "type": "enum:CLEAN,HUBSPOT,SALESFORCE",
+        "required": true,
+        "description": "Qualified service mode."
+      },
+      {
+        "name": "pricePolicyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Version of price bands."
+      },
+      {
+        "name": "discountPolicyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Version and cohort rules."
+      },
+      {
+        "name": "baseServiceCents",
+        "type": "money",
+        "required": true,
+        "description": "Pre-discount service amount."
+      },
+      {
+        "name": "discountCents",
+        "type": "money",
+        "required": true,
+        "description": "Applied maximum eligible promotion, not stacked."
+      },
+      {
+        "name": "serviceCents",
+        "type": "money",
+        "required": true,
+        "description": "Exact service amount after discount."
+      },
+      {
+        "name": "taxCents",
+        "type": "money",
+        "required": true,
+        "description": "Reviewed applicable tax amount."
+      },
+      {
+        "name": "totalCents",
+        "type": "money",
+        "required": true,
+        "description": "Service plus tax."
+      },
+      {
+        "name": "currency",
+        "type": "enum:USD",
+        "required": true,
+        "description": "Launch order currency."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Price expiry."
+      },
+      {
+        "name": "sourceAvailableUntil",
+        "type": "utc",
+        "required": true,
+        "description": "Separate source deadline."
+      },
+      {
+        "name": "termsHash",
+        "type": "hash",
+        "required": true,
+        "description": "Accepted scope, refund, retention and contract terms."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Quote"
+  },
+  {
+    "name": "PaymentOrder",
+    "owner": "15",
+    "flow": "Payment service → PSP and reconciler",
+    "invariant": "Local intent precedes provider effect; order identity cannot migrate between tenants.",
+    "fields": [
+      {
+        "name": "orderId",
+        "type": "id",
+        "required": true,
+        "description": "Internal immutable order."
+      },
+      {
+        "name": "quoteId",
+        "type": "id",
+        "required": true,
+        "description": "Exact priced quote."
+      },
+      {
+        "name": "provider",
+        "type": "label",
+        "required": true,
+        "description": "Qualified payment adapter."
+      },
+      {
+        "name": "environment",
+        "type": "enum:SANDBOX,LIVE",
+        "required": true,
+        "description": "Provider environment."
+      },
+      {
+        "name": "merchantRef",
+        "type": "id",
+        "required": true,
+        "description": "Actual receiving merchant identity reference."
+      },
+      {
+        "name": "providerOrderId",
+        "type": "text",
+        "required": false,
+        "description": "Observed external order."
+      },
+      {
+        "name": "expectedAmountCents",
+        "type": "money",
+        "required": true,
+        "description": "Exact expected capture amount."
+      },
+      {
+        "name": "currency",
+        "type": "enum:USD",
+        "required": true,
+        "description": "Expected currency."
+      },
+      {
+        "name": "state",
+        "type": "enum:INTENT_CREATED,CREATING,CREATED,APPROVED,CAPTURING,CAPTURE_UNCERTAIN,CAPTURED,FAILED,CANCELLED,EXPIRED",
+        "required": true,
+        "description": "Reconciled state."
+      },
+      {
+        "name": "idempotencyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Intent binding; same key different payload conflicts."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/PaymentOrder"
+  },
+  {
+    "name": "CaptureFact",
+    "owner": "15",
+    "flow": "Authenticated PSP observation → commercial authorization",
+    "invariant": "Browser claims cannot produce a capture fact.",
+    "fields": [
+      {
+        "name": "captureId",
+        "type": "id",
+        "required": true,
+        "description": "Local capture fact."
+      },
+      {
+        "name": "orderId",
+        "type": "id",
+        "required": true,
+        "description": "Matched internal order."
+      },
+      {
+        "name": "providerCaptureId",
+        "type": "text",
+        "required": true,
+        "description": "Unique provider capture identity."
+      },
+      {
+        "name": "merchantRef",
+        "type": "id",
+        "required": true,
+        "description": "Observed payee matched to expected merchant."
+      },
+      {
+        "name": "environment",
+        "type": "enum:SANDBOX,LIVE",
+        "required": true,
+        "description": "Must match the order and production gate."
+      },
+      {
+        "name": "amountCents",
+        "type": "money",
+        "required": true,
+        "description": "Observed amount."
+      },
+      {
+        "name": "currency",
+        "type": "enum:USD",
+        "required": true,
+        "description": "Observed currency."
+      },
+      {
+        "name": "status",
+        "type": "enum:COMPLETED,PENDING,DENIED,REVERSED",
+        "required": true,
+        "description": "Provider state mapped without optimistic coercion."
+      },
+      {
+        "name": "observedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Reconciliation time."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Authenticated event/query evidence, minimized for retention."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CaptureFact"
+  },
+  {
+    "name": "Refund",
+    "owner": "15",
+    "flow": "Reviewed request → PSP/fiscal/commission consumers",
+    "invariant": "A refund is a reconciled effect, not merely a submitted request.",
+    "fields": [
+      {
+        "name": "refundId",
+        "type": "id",
+        "required": true,
+        "description": "Refund identity."
+      },
+      {
+        "name": "captureId",
+        "type": "id",
+        "required": true,
+        "description": "Original captured service."
+      },
+      {
+        "name": "serviceCents",
+        "type": "money",
+        "required": true,
+        "description": "Service portion of the refund."
+      },
+      {
+        "name": "taxCents",
+        "type": "money",
+        "required": true,
+        "description": "Tax portion separately allocated."
+      },
+      {
+        "name": "reasonCode",
+        "type": "label",
+        "required": true,
+        "description": "Approved reason."
+      },
+      {
+        "name": "state",
+        "type": "enum:REQUESTED,APPROVED,SUBMITTING,UNCERTAIN,COMPLETED,FAILED,REJECTED",
+        "required": true,
+        "description": "Durable effect state."
+      },
+      {
+        "name": "providerRefundId",
+        "type": "text",
+        "required": false,
+        "description": "External identity when known."
+      },
+      {
+        "name": "authorizationHash",
+        "type": "hash",
+        "required": true,
+        "description": "Required approval or standing authorized policy reference."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": false,
+        "description": "Final provider evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Refund"
+  },
+  {
+    "name": "Settlement",
+    "owner": "15",
+    "flow": "PSP/bank reconciliation → available cash",
+    "invariant": "Captured, held, withdrawn and bank-available funds are distinct.",
+    "fields": [
+      {
+        "name": "settlementId",
+        "type": "id",
+        "required": true,
+        "description": "Reconciliation identity."
+      },
+      {
+        "name": "providerBalanceRef",
+        "type": "id",
+        "required": true,
+        "description": "Private balance/source reference."
+      },
+      {
+        "name": "grossCents",
+        "type": "money",
+        "required": true,
+        "description": "Observed gross funds."
+      },
+      {
+        "name": "feeCents",
+        "type": "money",
+        "required": true,
+        "description": "Observed provider fees."
+      },
+      {
+        "name": "heldCents",
+        "type": "money",
+        "required": true,
+        "description": "Unavailable restricted funds."
+      },
+      {
+        "name": "withdrawnCents",
+        "type": "money",
+        "required": true,
+        "description": "Funds sent to bank, not automatically credited."
+      },
+      {
+        "name": "bankAvailableCents",
+        "type": "money",
+        "required": true,
+        "description": "Actually available amount under observed statement."
+      },
+      {
+        "name": "fxRate",
+        "type": "decimal",
+        "required": false,
+        "description": "Exact observed conversion when present."
+      },
+      {
+        "name": "observedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Freshness reference."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Safe ledger/statement evidence reference."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Settlement"
+  },
+  {
+    "name": "CommercialAuthorization",
+    "owner": "07",
+    "flow": "Validated capture and scope → execution",
+    "invariant": "Every prerequisite binds the same source and policy; server creates this record.",
+    "fields": [
+      {
+        "name": "authorizationId",
+        "type": "id",
+        "required": true,
+        "description": "Execution commercial authority."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Owning tenant."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": true,
+        "description": "Project."
+      },
+      {
+        "name": "approvalHash",
+        "type": "hash",
+        "required": true,
+        "description": "Current non-withdrawn agency approval."
+      },
+      {
+        "name": "quoteId",
+        "type": "id",
+        "required": true,
+        "description": "Accepted valid commercial terms."
+      },
+      {
+        "name": "captureId",
+        "type": "id",
+        "required": true,
+        "description": "Qualifying capture fact."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Still-available source."
+      },
+      {
+        "name": "planHash",
+        "type": "hash",
+        "required": true,
+        "description": "Approved execution plan."
+      },
+      {
+        "name": "capabilityVersion",
+        "type": "text",
+        "required": true,
+        "description": "Actually qualified scope."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Atomic authorization creation."
+      },
+      {
+        "name": "revokedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Prevents future execution/finalization as defined by state."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CommercialAuthorization"
+  },
+  {
+    "name": "Job",
+    "owner": "07",
+    "flow": "Command/outbox → Batch worker and delivery",
+    "invariant": "One logical job may have attempts; only a fenced accepted attempt publishes.",
+    "fields": [
+      {
+        "name": "jobId",
+        "type": "id",
+        "required": true,
+        "description": "Logical job identity."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": true,
+        "description": "Scoped project."
+      },
+      {
+        "name": "authorizationId",
+        "type": "id",
+        "required": true,
+        "description": "Commercial authority."
+      },
+      {
+        "name": "state",
+        "type": "enum:QUEUED,ADMITTED,RUNNING,VERIFYING,READY,FAILED,CANCEL_REQUESTED,CANCELLED,EXPIRED",
+        "required": true,
+        "description": "Honest durable execution phase."
+      },
+      {
+        "name": "attempt",
+        "type": "count",
+        "required": true,
+        "description": "Physical attempt ordinal."
+      },
+      {
+        "name": "fence",
+        "type": "version",
+        "required": true,
+        "description": "Current publication fence."
+      },
+      {
+        "name": "lease",
+        "type": "ref:Lease",
+        "required": false,
+        "description": "Active ownership."
+      },
+      {
+        "name": "providerJobId",
+        "type": "text",
+        "required": false,
+        "description": "Actual Batch or equivalent execution identity."
+      },
+      {
+        "name": "inputBindingHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source, plan, target, core and policy bundle."
+      },
+      {
+        "name": "packageId",
+        "type": "id",
+        "required": false,
+        "description": "Accepted output, present only after verified publication."
+      },
+      {
+        "name": "deadline",
+        "type": "utc",
+        "required": true,
+        "description": "Absolute execution boundary."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Job"
+  },
+  {
+    "name": "ImportStage",
+    "owner": "05",
+    "flow": "Stage compiler → agency import and continuation",
+    "invariant": "A stage is a preparation step, not proof the customer imported successfully.",
+    "fields": [
+      {
+        "name": "stageId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable stage identity."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": true,
+        "description": "Scoped project."
+      },
+      {
+        "name": "sequence",
+        "type": "count",
+        "required": true,
+        "description": "Dependency order."
+      },
+      {
+        "name": "objectApiName",
+        "type": "label",
+        "required": true,
+        "description": "Target object."
+      },
+      {
+        "name": "operation",
+        "type": "enum:CREATE_ONLY,UPDATE_ONLY,UPSERT,ASSOCIATION_ONLY",
+        "required": true,
+        "description": "Qualified operation."
+      },
+      {
+        "name": "state",
+        "type": "enum:PREPARED,RELEASED,AWAITING_AGENCY_IMPORT,RECEIPT_UPLOADED,RECEIPT_VALIDATING,VERIFIED_SUCCESS,VERIFIED_PARTIAL,NEEDS_CORRECTION,CANCELLED,EXPIRED",
+        "required": true,
+        "description": "Stage state."
+      },
+      {
+        "name": "parentStageIds",
+        "type": "listText",
+        "required": true,
+        "description": "Required completed predecessors."
+      },
+      {
+        "name": "packageHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact released stage files."
+      },
+      {
+        "name": "receiptRequired",
+        "type": "bool",
+        "required": true,
+        "description": "Whether target-generated identities are needed."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Effective bounded workflow deadline."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ImportStage"
+  },
+  {
+    "name": "StageReceipt",
+    "owner": "05",
+    "flow": "Agency upload plus validator → child-stage compiler",
+    "invariant": "Receipt scope, membership, target IDs and completeness must be proved.",
+    "fields": [
+      {
+        "name": "receiptId",
+        "type": "id",
+        "required": true,
+        "description": "Receipt identity."
+      },
+      {
+        "name": "stageId",
+        "type": "id",
+        "required": true,
+        "description": "Exact stage that produced the imported records."
+      },
+      {
+        "name": "instanceId",
+        "type": "id",
+        "required": true,
+        "description": "Destination instance."
+      },
+      {
+        "name": "sourcePackageHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact parent package imported."
+      },
+      {
+        "name": "receiptFileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Verified uploaded result bytes."
+      },
+      {
+        "name": "identityMappingHash",
+        "type": "hash",
+        "required": true,
+        "description": "Complete checked source-to-target ID mapping."
+      },
+      {
+        "name": "matchedRows",
+        "type": "count",
+        "required": true,
+        "description": "Unambiguous validated mappings."
+      },
+      {
+        "name": "failedRows",
+        "type": "count",
+        "required": true,
+        "description": "Explicit failed source rows."
+      },
+      {
+        "name": "unresolvedRows",
+        "type": "count",
+        "required": true,
+        "description": "Missing/ambiguous mappings, which block dependent edges."
+      },
+      {
+        "name": "validatedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Validation time."
+      },
+      {
+        "name": "validatorVersion",
+        "type": "text",
+        "required": true,
+        "description": "Pinned receipt validator."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/StageReceipt"
+  },
+  {
+    "name": "Artifact",
+    "owner": "13",
+    "flow": "Package assembler → downloader and verifier",
+    "invariant": "Artifact role, bytes, identity and privacy determine its use.",
+    "fields": [
+      {
+        "name": "artifactId",
+        "type": "id",
+        "required": true,
+        "description": "Artifact identity."
+      },
+      {
+        "name": "relativePath",
+        "type": "text",
+        "required": true,
+        "description": "Portable normalized path with traversal/absolute/control characters rejected."
+      },
+      {
+        "name": "role",
+        "type": "enum:IMPORT_DATA,REJECTIONS,LINEAGE,MANIFEST,REPORT,INSTRUCTIONS,EVIDENCE",
+        "required": true,
+        "description": "Declared consumer purpose."
+      },
+      {
+        "name": "sha256",
+        "type": "hash",
+        "required": true,
+        "description": "Complete actual bytes."
+      },
+      {
+        "name": "bytes",
+        "type": "count",
+        "required": true,
+        "description": "Actual length."
+      },
+      {
+        "name": "mediaType",
+        "type": "label",
+        "required": true,
+        "description": "Validated content type."
+      },
+      {
+        "name": "recordCount",
+        "type": "count",
+        "required": false,
+        "description": "Declared data records excluding headers where relevant."
+      },
+      {
+        "name": "privacy",
+        "type": "enum:CUSTOMER_DATA,SAFE_SUMMARY,INTERNAL_EVIDENCE",
+        "required": true,
+        "description": "Access/retention class."
+      },
+      {
+        "name": "objectApiName",
+        "type": "label",
+        "required": false,
+        "description": "Exact target object for import files."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Artifact"
+  },
+  {
+    "name": "PackageManifest",
+    "owner": "13",
+    "flow": "Independent assembler/verifier → release and delivery",
+    "invariant": "Hashes alone do not prove conservation or permitted target effects.",
+    "fields": [
+      {
+        "name": "packageId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable package version."
+      },
+      {
+        "name": "revisionHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source binding."
+      },
+      {
+        "name": "planHash",
+        "type": "hash",
+        "required": true,
+        "description": "Approved plan binding."
+      },
+      {
+        "name": "targetContractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Target scope."
+      },
+      {
+        "name": "corePackageHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual MC bytes."
+      },
+      {
+        "name": "validationReceiptHash",
+        "type": "hash",
+        "required": true,
+        "description": "Accepted complete receipt."
+      },
+      {
+        "name": "artifacts",
+        "type": "list:Artifact",
+        "required": true,
+        "description": "Closed complete artifact inventory."
+      },
+      {
+        "name": "counts",
+        "type": "ref:RowCounts",
+        "required": true,
+        "description": "Named denominator and disposition accounting."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Creation metadata excluded from deterministic content where specified."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Actual access deadline."
+      },
+      {
+        "name": "manifestVersion",
+        "type": "text",
+        "required": true,
+        "description": "Schema and canonicalization version."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/PackageManifest"
+  },
+  {
+    "name": "DeletionRequest",
+    "owner": "09",
+    "flow": "Authorized request/retention scheduler → cleanup and restore",
+    "invariant": "Delete authority revokes new work before cleanup and survives backup restore.",
+    "fields": [
+      {
+        "name": "deletionId",
+        "type": "id",
+        "required": true,
+        "description": "Request identity."
+      },
+      {
+        "name": "scope",
+        "type": "ref:TenantScope",
+        "required": true,
+        "description": "Exact deletion boundary."
+      },
+      {
+        "name": "requestedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Authoritative request time."
+      },
+      {
+        "name": "reason",
+        "type": "enum:RETENTION,AGENCY_REQUEST,ACCOUNT_CLOSURE,INCIDENT",
+        "required": true,
+        "description": "Trigger."
+      },
+      {
+        "name": "state",
+        "type": "enum:REQUESTED,AUTHORITY_REVOKED,DELETING,VERIFYING,COMPLETED,RESIDUAL_HOLD,FAILED_RETRYABLE",
+        "required": true,
+        "description": "Actual managed-scope progress."
+      },
+      {
+        "name": "tombstoneHash",
+        "type": "hash",
+        "required": true,
+        "description": "External durable restore-reconciliation evidence."
+      },
+      {
+        "name": "residualClasses",
+        "type": "listText",
+        "required": true,
+        "description": "Lawful financial/security or provider-retained residuals, explicitly named."
+      },
+      {
+        "name": "verifiedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Final managed-scope verification time."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/DeletionRequest"
+  },
+  {
+    "name": "Agency",
+    "owner": "16",
+    "flow": "Agency service → product/commercial boundaries",
+    "invariant": "An agency may contain many end clients; the seller does not gain CRM access.",
+    "fields": [
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Tenant identity."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Optimistic concurrency version."
+      },
+      {
+        "name": "legalProfileRef",
+        "type": "id",
+        "required": false,
+        "description": "Private reviewed customer billing profile."
+      },
+      {
+        "name": "displayName",
+        "type": "label",
+        "required": true,
+        "description": "Safe agency label, not a unique legal identity."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,ACTIVE,RESTRICTED,CLOSING,CLOSED",
+        "required": true,
+        "description": "Agency lifecycle."
+      },
+      {
+        "name": "termsVersion",
+        "type": "text",
+        "required": false,
+        "description": "Accepted service terms."
+      },
+      {
+        "name": "privacyAgreementVersion",
+        "type": "text",
+        "required": false,
+        "description": "Accepted processing agreement."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Creation time."
+      },
+      {
+        "name": "firstQualifyingCaptureId",
+        "type": "id",
+        "required": false,
+        "description": "Sticky historical first-project designation."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Agency"
+  },
+  {
+    "name": "Membership",
+    "owner": "08",
+    "flow": "Identity service → authorization",
+    "invariant": "Membership capabilities are assigned by authorized commands, never browser claims.",
+    "fields": [
+      {
+        "name": "membershipId",
+        "type": "id",
+        "required": true,
+        "description": "Membership identity."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Tenant."
+      },
+      {
+        "name": "userId",
+        "type": "id",
+        "required": true,
+        "description": "Authenticated person identity."
+      },
+      {
+        "name": "role",
+        "type": "enum:OWNER,ADMIN,OPERATOR,APPROVER,VIEWER,BILLING",
+        "required": true,
+        "description": "Selected least-privilege role."
+      },
+      {
+        "name": "state",
+        "type": "enum:INVITED,ACTIVE,SUSPENDED,REVOKED,EXPIRED",
+        "required": true,
+        "description": "Membership state."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Concurrency protection."
+      },
+      {
+        "name": "assurancePolicy",
+        "type": "label",
+        "required": true,
+        "description": "Required authentication strength."
+      },
+      {
+        "name": "acceptedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Invitation acceptance by intended identity."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Membership"
+  },
+  {
+    "name": "EndClient",
+    "owner": "16",
+    "flow": "Agency team → project isolation",
+    "invariant": "Client labels are presentation; legal and data boundaries remain explicit.",
+    "fields": [
+      {
+        "name": "clientId",
+        "type": "id",
+        "required": true,
+        "description": "Client workspace."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Owning agency."
+      },
+      {
+        "name": "displayName",
+        "type": "label",
+        "required": true,
+        "description": "Safe label."
+      },
+      {
+        "name": "state",
+        "type": "enum:ACTIVE,ARCHIVED",
+        "required": true,
+        "description": "New-project eligibility."
+      },
+      {
+        "name": "processingAuthorityRef",
+        "type": "id",
+        "required": true,
+        "description": "Agency evidence of authority to provide this client's data."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Server time."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/EndClient"
+  },
+  {
+    "name": "Prospect",
+    "owner": "18",
+    "flow": "Authorized acquisition → seller pipeline",
+    "invariant": "Prospect data remains limited to lawful commercial context.",
+    "fields": [
+      {
+        "name": "prospectId",
+        "type": "id",
+        "required": true,
+        "description": "Lead identity."
+      },
+      {
+        "name": "organizationLabel",
+        "type": "label",
+        "required": true,
+        "description": "Business organization."
+      },
+      {
+        "name": "businessContactRef",
+        "type": "id",
+        "required": false,
+        "description": "Restricted contact record, not raw details in reports."
+      },
+      {
+        "name": "sourceEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Where and why the prospect was legitimately collected."
+      },
+      {
+        "name": "jurisdiction",
+        "type": "label",
+        "required": true,
+        "description": "Applicable outreach territory, not guessed from language alone."
+      },
+      {
+        "name": "state",
+        "type": "enum:RESEARCHED,QUALIFIED,CONTACTED,ENGAGED,OPPORTUNITY,WON,LOST,SUPPRESSED",
+        "required": true,
+        "description": "Commercial stage."
+      },
+      {
+        "name": "suppressed",
+        "type": "bool",
+        "required": true,
+        "description": "Global no-send control that overrides automation."
+      },
+      {
+        "name": "ownerSellerId",
+        "type": "id",
+        "required": false,
+        "description": "Current operational assignment."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Prospect"
+  },
+  {
+    "name": "AttributionClaim",
+    "owner": "17",
+    "flow": "Evidence review → commission entitlement",
+    "invariant": "Accepted acquisition rights differ from current account servicing.",
+    "fields": [
+      {
+        "name": "claimId",
+        "type": "id",
+        "required": true,
+        "description": "Claim identity."
+      },
+      {
+        "name": "prospectId",
+        "type": "id",
+        "required": true,
+        "description": "Evidence-backed prospect."
+      },
+      {
+        "name": "sellerId",
+        "type": "id",
+        "required": true,
+        "description": "Claiming person under an active agreement."
+      },
+      {
+        "name": "acceptedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Owner acceptance after conflict review."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Ninety-day initial claim window unless documented qualifying extension applies."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Substantive acquisition evidence, not a scraped list."
+      },
+      {
+        "name": "state",
+        "type": "enum:SUBMITTED,ACCEPTED,DISPUTED,REJECTED,EXPIRED,CONVERTED",
+        "required": true,
+        "description": "Claim state."
+      },
+      {
+        "name": "agreementVersion",
+        "type": "text",
+        "required": true,
+        "description": "Applicable signed terms."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/AttributionClaim"
+  },
+  {
+    "name": "SellerAgreement",
+    "owner": "17",
+    "flow": "Reviewed signed terms → compensation engine",
+    "invariant": "Actual legal classification requires substance-based review before activation.",
+    "fields": [
+      {
+        "name": "agreementId",
+        "type": "id",
+        "required": true,
+        "description": "Agreement version identity."
+      },
+      {
+        "name": "sellerId",
+        "type": "id",
+        "required": true,
+        "description": "Person."
+      },
+      {
+        "name": "classification",
+        "type": "enum:INDEPENDENT_COLLABORATION,EMPLOYMENT,OTHER_REVIEWED",
+        "required": true,
+        "description": "Actual reviewed relationship."
+      },
+      {
+        "name": "startsAt",
+        "type": "utc",
+        "required": true,
+        "description": "Effective start."
+      },
+      {
+        "name": "endsAt",
+        "type": "utc",
+        "required": false,
+        "description": "Termination if any."
+      },
+      {
+        "name": "firstBps",
+        "type": "bps",
+        "required": true,
+        "description": "Initial 1000 basis points unless a prospective signed exception."
+      },
+      {
+        "name": "repeatBps",
+        "type": "bps",
+        "required": true,
+        "description": "Initial 400 basis points."
+      },
+      {
+        "name": "recurringMonths",
+        "type": "count",
+        "required": true,
+        "description": "Initial twelve calendar months."
+      },
+      {
+        "name": "signedTermsHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact operative agreement."
+      },
+      {
+        "name": "legalReviewRef",
+        "type": "id",
+        "required": true,
+        "description": "Reviewed applicability record."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/SellerAgreement"
+  },
+  {
+    "name": "CommissionEntitlement",
+    "owner": "17",
+    "flow": "Qualifying captures and accepted attribution → seller ledger",
+    "invariant": "Rate and window bind a historical agency acquisition; refunds adjust the basis.",
+    "fields": [
+      {
+        "name": "entitlementId",
+        "type": "id",
+        "required": true,
+        "description": "Entitlement identity."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Acquired agency."
+      },
+      {
+        "name": "sellerId",
+        "type": "id",
+        "required": true,
+        "description": "Beneficiary."
+      },
+      {
+        "name": "firstCaptureId",
+        "type": "id",
+        "required": true,
+        "description": "Sticky first qualifying capture."
+      },
+      {
+        "name": "windowStartsAt",
+        "type": "utc",
+        "required": true,
+        "description": "First capture instant."
+      },
+      {
+        "name": "windowEndsAt",
+        "type": "utc",
+        "required": true,
+        "description": "Exclusive calendar-month endpoint under policy."
+      },
+      {
+        "name": "agreementVersion",
+        "type": "text",
+        "required": true,
+        "description": "Signed terms version."
+      },
+      {
+        "name": "shareBps",
+        "type": "bps",
+        "required": true,
+        "description": "Share of the commission pool, totals exactly 10000 across a split."
+      },
+      {
+        "name": "state",
+        "type": "enum:ACTIVE,EXPIRED,DISPUTED,TERMINATED_WITH_RESIDUAL",
+        "required": true,
+        "description": "State without erasing earned obligations."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CommissionEntitlement"
+  },
+  {
+    "name": "CommissionLine",
+    "owner": "17",
+    "flow": "Service/refund ledger → monthly statement",
+    "invariant": "Calculate cumulative entitlement in exact minor units and derive adjustments.",
+    "fields": [
+      {
+        "name": "lineId",
+        "type": "id",
+        "required": true,
+        "description": "Commission line identity."
+      },
+      {
+        "name": "entitlementId",
+        "type": "id",
+        "required": true,
+        "description": "Beneficiary/window."
+      },
+      {
+        "name": "captureId",
+        "type": "id",
+        "required": true,
+        "description": "Paid project."
+      },
+      {
+        "name": "rateBps",
+        "type": "bps",
+        "required": true,
+        "description": "Applicable first or repeat rate."
+      },
+      {
+        "name": "netServiceBasisCents",
+        "type": "money",
+        "required": true,
+        "description": "Service collected after discount and cumulative refunds, excluding tax."
+      },
+      {
+        "name": "cumulativeEntitlementCents",
+        "type": "money",
+        "required": true,
+        "description": "Rounded current total entitlement."
+      },
+      {
+        "name": "previousPostedCents",
+        "type": "money",
+        "required": true,
+        "description": "Prior positive total before explicit adjustments."
+      },
+      {
+        "name": "state",
+        "type": "enum:ACCRUED_PENDING,ELIGIBLE,HELD,PAYABLE,PAID,ADJUSTED,VOID",
+        "required": true,
+        "description": "Ledger state."
+      },
+      {
+        "name": "eligibleAt",
+        "type": "utc",
+        "required": false,
+        "description": "Thirty days after final contracted preparation completion plus stated conditions."
+      },
+      {
+        "name": "policyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Calculation and rounding rules."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CommissionLine"
+  },
+  {
+    "name": "CommissionStatement",
+    "owner": "17",
+    "flow": "Monthly close → seller reconciliation and payout",
+    "invariant": "Statements reveal each project and adjustment without exposing customer CRM data.",
+    "fields": [
+      {
+        "name": "statementId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable statement version."
+      },
+      {
+        "name": "sellerId",
+        "type": "id",
+        "required": true,
+        "description": "Payee."
+      },
+      {
+        "name": "periodStart",
+        "type": "utc",
+        "required": true,
+        "description": "Inclusive period boundary."
+      },
+      {
+        "name": "periodEnd",
+        "type": "utc",
+        "required": true,
+        "description": "Exclusive period boundary."
+      },
+      {
+        "name": "lineIds",
+        "type": "listText",
+        "required": true,
+        "description": "Complete included commission and adjustment references."
+      },
+      {
+        "name": "payableCents",
+        "type": "money",
+        "required": true,
+        "description": "Actual payable amount after reconciled adjustments."
+      },
+      {
+        "name": "heldCents",
+        "type": "money",
+        "required": true,
+        "description": "Held with specific reason and review date."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,ISSUED,DISPUTED,APPROVED,PAID,CORRECTED",
+        "required": true,
+        "description": "Statement lifecycle."
+      },
+      {
+        "name": "payoutEvidenceHash",
+        "type": "hash",
+        "required": false,
+        "description": "Actual settled payout evidence, not only submission."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CommissionStatement"
+  },
+  {
+    "name": "FiscalProfile",
+    "owner": "15",
+    "flow": "Reviewed operator/customer tax facts → invoice adapter",
+    "invariant": "No default tax rate can substitute for actual fiscal applicability.",
+    "fields": [
+      {
+        "name": "profileId",
+        "type": "id",
+        "required": true,
+        "description": "Reviewed version identity."
+      },
+      {
+        "name": "operatorLegalRef",
+        "type": "id",
+        "required": true,
+        "description": "Actual contracting/invoicing entity."
+      },
+      {
+        "name": "customerLegalRef",
+        "type": "id",
+        "required": true,
+        "description": "Actual purchaser identity."
+      },
+      {
+        "name": "serviceClassification",
+        "type": "label",
+        "required": true,
+        "description": "Reviewed service classification."
+      },
+      {
+        "name": "territory",
+        "type": "label",
+        "required": true,
+        "description": "Applicable territory and export facts."
+      },
+      {
+        "name": "taxTreatment",
+        "type": "enum:REVIEW_REQUIRED,DOMESTIC_TAXABLE,EXEMPT_EXPORT,OTHER_REVIEWED",
+        "required": true,
+        "description": "Reviewed conclusion only."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Supporting facts and professional review."
+      },
+      {
+        "name": "validFrom",
+        "type": "utc",
+        "required": true,
+        "description": "Effective start."
+      },
+      {
+        "name": "validUntil",
+        "type": "utc",
+        "required": false,
+        "description": "Review/expiry condition."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/FiscalProfile"
+  },
+  {
+    "name": "TaxDocument",
+    "owner": "15",
+    "flow": "Fiscal adapter → accounting and customer",
+    "invariant": "Provider issuance uncertainty is reconciled by exact identity before retry.",
+    "fields": [
+      {
+        "name": "documentId",
+        "type": "id",
+        "required": true,
+        "description": "Internal immutable fiscal document."
+      },
+      {
+        "name": "paymentOrderId",
+        "type": "id",
+        "required": true,
+        "description": "Commercial transaction."
+      },
+      {
+        "name": "fiscalProfileId",
+        "type": "id",
+        "required": true,
+        "description": "Reviewed tax treatment."
+      },
+      {
+        "name": "kind",
+        "type": "enum:INVOICE,CREDIT_NOTE,DEBIT_NOTE",
+        "required": true,
+        "description": "Document type."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,VALIDATED,SUBMITTING,UNCERTAIN,ISSUED,REJECTED,CORRECTED",
+        "required": true,
+        "description": "Issuance state."
+      },
+      {
+        "name": "providerDocumentId",
+        "type": "text",
+        "required": false,
+        "description": "Actual external identity."
+      },
+      {
+        "name": "legalNumber",
+        "type": "text",
+        "required": false,
+        "description": "Actual authorized number after issuance."
+      },
+      {
+        "name": "serviceCents",
+        "type": "money",
+        "required": true,
+        "description": "Service basis."
+      },
+      {
+        "name": "taxCents",
+        "type": "money",
+        "required": true,
+        "description": "Applicable tax."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": false,
+        "description": "Provider/fiscal acceptance evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/TaxDocument"
+  },
+  {
+    "name": "LedgerEntry",
+    "owner": "15",
+    "flow": "Reconciled events → operational finance",
+    "invariant": "The ledger is append-only; corrections use reversal and new entries.",
+    "fields": [
+      {
+        "name": "entryId",
+        "type": "id",
+        "required": true,
+        "description": "Unique posting identity."
+      },
+      {
+        "name": "eventId",
+        "type": "id",
+        "required": true,
+        "description": "Idempotent source event."
+      },
+      {
+        "name": "accountCode",
+        "type": "label",
+        "required": true,
+        "description": "Versioned operational account classification."
+      },
+      {
+        "name": "direction",
+        "type": "enum:DEBIT,CREDIT",
+        "required": true,
+        "description": "Signed effect represented explicitly."
+      },
+      {
+        "name": "amountCents",
+        "type": "money",
+        "required": true,
+        "description": "Nonnegative exact amount."
+      },
+      {
+        "name": "currency",
+        "type": "label",
+        "required": true,
+        "description": "ISO currency for this ledger partition."
+      },
+      {
+        "name": "postedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Posting instant."
+      },
+      {
+        "name": "sourceRef",
+        "type": "id",
+        "required": true,
+        "description": "Capture, refund, fee, payout or reviewed adjustment."
+      },
+      {
+        "name": "reversesEntryId",
+        "type": "id",
+        "required": false,
+        "description": "Original entry if reversal."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/LedgerEntry"
+  },
+  {
+    "name": "SupportCase",
+    "owner": "18",
+    "flow": "Agency request/monitor → operator response",
+    "invariant": "Support metadata must not become an unrestricted raw-data channel.",
+    "fields": [
+      {
+        "name": "caseId",
+        "type": "id",
+        "required": true,
+        "description": "Case identity."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Owning customer."
+      },
+      {
+        "name": "projectId",
+        "type": "id",
+        "required": false,
+        "description": "Affected project."
+      },
+      {
+        "name": "category",
+        "type": "enum:PRODUCT_DEFECT,IMPORT_GUIDANCE,BILLING,PRIVACY,SECURITY,GENERAL",
+        "required": true,
+        "description": "Routing category."
+      },
+      {
+        "name": "severity",
+        "type": "enum:S1,S2,S3,S4",
+        "required": true,
+        "description": "Impact-based severity."
+      },
+      {
+        "name": "state",
+        "type": "enum:OPEN,TRIAGED,WAITING_KAVO,WAITING_AGENCY,RESOLVED,CLOSED",
+        "required": true,
+        "description": "Actual responsibility state."
+      },
+      {
+        "name": "summary",
+        "type": "text",
+        "required": true,
+        "description": "Minimized safe description."
+      },
+      {
+        "name": "evidenceRefs",
+        "type": "listText",
+        "required": true,
+        "description": "Scoped safe attachments."
+      },
+      {
+        "name": "nextReviewAt",
+        "type": "utc",
+        "required": true,
+        "description": "Named follow-up deadline."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/SupportCase"
+  },
+  {
+    "name": "Incident",
+    "owner": "14",
+    "flow": "Observed failure → containment/recovery",
+    "invariant": "Containment, restoration and customer communication are separately evidenced.",
+    "fields": [
+      {
+        "name": "incidentId",
+        "type": "id",
+        "required": true,
+        "description": "Incident identity."
+      },
+      {
+        "name": "severity",
+        "type": "enum:S1,S2,S3,S4",
+        "required": true,
+        "description": "Actual impact."
+      },
+      {
+        "name": "state",
+        "type": "enum:DETECTED,CONTAINING,CONTAINED,RECOVERING,MONITORING,CLOSED",
+        "required": true,
+        "description": "Incident phase."
+      },
+      {
+        "name": "affectedScopes",
+        "type": "listText",
+        "required": true,
+        "description": "Safe scope identifiers, no raw customer values."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Observed start."
+      },
+      {
+        "name": "containmentHash",
+        "type": "hash",
+        "required": false,
+        "description": "Actual containment evidence."
+      },
+      {
+        "name": "recoveryHash",
+        "type": "hash",
+        "required": false,
+        "description": "Restore/reconciliation evidence."
+      },
+      {
+        "name": "communicationState",
+        "type": "enum:NOT_REQUIRED,REVIEW_REQUIRED,AUTHORIZED,SENT",
+        "required": true,
+        "description": "No automatic claim of sending."
+      },
+      {
+        "name": "reviewAt",
+        "type": "utc",
+        "required": true,
+        "description": "Next accountable checkpoint."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Incident"
+  },
+  {
+    "name": "Capability",
+    "owner": "02",
+    "flow": "Qualification review → sale/admission/compiler",
+    "invariant": "Requested, implemented and qualified are different states.",
+    "fields": [
+      {
+        "name": "capabilityId",
+        "type": "id",
+        "required": true,
+        "description": "Mode/object/operation/tool/envelope capability identity."
+      },
+      {
+        "name": "version",
+        "type": "text",
+        "required": true,
+        "description": "Capability revision."
+      },
+      {
+        "name": "state",
+        "type": "enum:DESIGN,IMPLEMENTED_UNACCEPTED,QUALIFIED_INTERNAL,AVAILABLE_LIMITED,AVAILABLE,SUSPENDED",
+        "required": true,
+        "description": "Sale eligibility state."
+      },
+      {
+        "name": "profileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact profile and limits."
+      },
+      {
+        "name": "qualificationEvidenceHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Independent evidence on the accepted candidate."
+      },
+      {
+        "name": "validFrom",
+        "type": "utc",
+        "required": false,
+        "description": "Activation after acceptance."
+      },
+      {
+        "name": "reviewTrigger",
+        "type": "label",
+        "required": true,
+        "description": "Vendor/resource/contract changes that invalidate confidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Capability"
+  },
+  {
+    "name": "GateEvidence",
+    "owner": "21",
+    "flow": "Executor plus independent reviewer → acceptance",
+    "invariant": "Evidence names an exact subject, command, result, environment and immutable artifact.",
+    "fields": [
+      {
+        "name": "evidenceId",
+        "type": "id",
+        "required": true,
+        "description": "Evidence identity."
+      },
+      {
+        "name": "gateId",
+        "type": "label",
+        "required": true,
+        "description": "Registered gate."
+      },
+      {
+        "name": "subjectCommit",
+        "type": "hash40",
+        "required": true,
+        "description": "Full commit, never shortened."
+      },
+      {
+        "name": "subjectTree",
+        "type": "hash40",
+        "required": true,
+        "description": "Exact tree."
+      },
+      {
+        "name": "artifactHash",
+        "type": "hash",
+        "required": true,
+        "description": "Immutable evidence artifact."
+      },
+      {
+        "name": "command",
+        "type": "text",
+        "required": true,
+        "description": "Exact command without secrets."
+      },
+      {
+        "name": "exitCode",
+        "type": "integer",
+        "required": true,
+        "description": "Observed exit, not a summarized success word."
+      },
+      {
+        "name": "runnerProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Runtime, resource and dependency environment."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Actual start."
+      },
+      {
+        "name": "completedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Actual completion."
+      },
+      {
+        "name": "classification",
+        "type": "enum:EXECUTOR_CLAIM,OBSERVED_ARTIFACT,INDEPENDENTLY_REPRODUCED,ACCEPTED,REJECTED",
+        "required": true,
+        "description": "Evidence confidence and review."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/GateEvidence"
+  },
+  {
+    "name": "Finding",
+    "owner": "21",
+    "flow": "Independent audit → grouped repair mandate",
+    "invariant": "A finding separates expected behavior, observed result and harness limitations.",
+    "fields": [
+      {
+        "name": "findingId",
+        "type": "id",
+        "required": true,
+        "description": "Stable finding identity."
+      },
+      {
+        "name": "requirementId",
+        "type": "label",
+        "required": true,
+        "description": "Owning normative requirement."
+      },
+      {
+        "name": "subjectHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact tested bundle."
+      },
+      {
+        "name": "severity",
+        "type": "enum:S1,S2,S3,S4",
+        "required": true,
+        "description": "Materiality by consequence."
+      },
+      {
+        "name": "expected",
+        "type": "text",
+        "required": true,
+        "description": "Independent expected outcome."
+      },
+      {
+        "name": "observed",
+        "type": "text",
+        "required": true,
+        "description": "Actual outcome with safe details."
+      },
+      {
+        "name": "reproductionRef",
+        "type": "text",
+        "required": true,
+        "description": "Artifact/command needed to reproduce."
+      },
+      {
+        "name": "status",
+        "type": "enum:OPEN,REPAIRED_UNVERIFIED,CLOSED,NOT_REPRODUCED,BLOCKED",
+        "required": true,
+        "description": "Review state."
+      },
+      {
+        "name": "affectedEvidence",
+        "type": "listText",
+        "required": true,
+        "description": "Evidence to invalidate or retain with reason."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Finding"
+  },
+  {
+    "name": "OwnerAction",
+    "owner": "24",
+    "flow": "Prepared concrete decision → personal act",
+    "invariant": "An unmaterialized card is not an instruction to click a guessed UI.",
+    "fields": [
+      {
+        "name": "actionId",
+        "type": "id",
+        "required": true,
+        "description": "Registry action identity."
+      },
+      {
+        "name": "trigger",
+        "type": "label",
+        "required": true,
+        "description": "Actual prerequisite/phase."
+      },
+      {
+        "name": "state",
+        "type": "enum:NOT_MATERIALIZED,PREPARED,AWAITING_PERSONAL_ACT,COMPLETED,BLOCKED,EXPIRED",
+        "required": true,
+        "description": "Action readiness."
+      },
+      {
+        "name": "destination",
+        "type": "text",
+        "required": false,
+        "description": "Verified current URL/screen or actual professional recipient."
+      },
+      {
+        "name": "requiredInput",
+        "type": "text",
+        "required": false,
+        "description": "Minimal private fact or consent, without secrets in this source."
+      },
+      {
+        "name": "maximumCostCents",
+        "type": "money",
+        "required": false,
+        "description": "Concrete ceiling when spending is involved."
+      },
+      {
+        "name": "expectedResult",
+        "type": "text",
+        "required": true,
+        "description": "Observable completion."
+      },
+      {
+        "name": "agentPreparationHash",
+        "type": "hash",
+        "required": false,
+        "description": "Evidence the technical work is already prepared."
+      },
+      {
+        "name": "completionEvidenceHash",
+        "type": "hash",
+        "required": false,
+        "description": "Safe proof after personal action."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/OwnerAction"
+  },
+  {
+    "name": "UploadSession",
+    "owner": "09",
+    "flow": "Upload reservation → storage verification",
+    "invariant": "Application acceptance and provider session lifetime are independent.",
+    "fields": [
+      {
+        "name": "uploadId",
+        "type": "id",
+        "required": true,
+        "description": "Opaque reservation identity."
+      },
+      {
+        "name": "revisionId",
+        "type": "id",
+        "required": true,
+        "description": "Mutable destination revision."
+      },
+      {
+        "name": "reservedBytes",
+        "type": "count",
+        "required": true,
+        "description": "Atomic quota reservation."
+      },
+      {
+        "name": "state",
+        "type": "enum:RESERVED,UPLOADING,VERIFYING,ADMITTED,CANCELLED,EXPIRED,REJECTED",
+        "required": true,
+        "description": "Owned lifecycle."
+      },
+      {
+        "name": "providerSessionSecretRef",
+        "type": "id",
+        "required": true,
+        "description": "Private bearer reference; never included in generic DTO/logs."
+      },
+      {
+        "name": "applicationExpiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Twenty-four-hour acceptance deadline."
+      },
+      {
+        "name": "providerCancellationState",
+        "type": "enum:NOT_REQUESTED,REQUESTED,CONFIRMED,UNSUPPORTED,UNCERTAIN",
+        "required": true,
+        "description": "Actual provider cancellation result."
+      },
+      {
+        "name": "observedGeneration",
+        "type": "text",
+        "required": false,
+        "description": "Immutable generation after completion."
+      },
+      {
+        "name": "inspectionReceiptHash",
+        "type": "hash",
+        "required": false,
+        "description": "Full coverage and parser checks."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Concurrent completion/cancellation fence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/UploadSession"
+  },
+  {
+    "name": "Audit",
+    "owner": "06",
+    "flow": "StartAudit → durable interpretation/validation",
+    "invariant": "The logical audit retains its original deadlines and grant across retries.",
+    "fields": [
+      {
+        "name": "auditId",
+        "type": "id",
+        "required": true,
+        "description": "Logical audit identity."
+      },
+      {
+        "name": "revisionId",
+        "type": "id",
+        "required": true,
+        "description": "Sealed source."
+      },
+      {
+        "name": "targetContractId",
+        "type": "id",
+        "required": true,
+        "description": "Exact target version."
+      },
+      {
+        "name": "state",
+        "type": "enum:QUEUED,PROFILING,INTERPRETING,VALIDATING,DRAFT_READY,NEEDS_DECISION,UNSUPPORTED,FAILED,CANCELLED,EXPIRED",
+        "required": true,
+        "description": "Durable visible phase."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Original logical start."
+      },
+      {
+        "name": "interpretationDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "No new semantic dispatch afterward."
+      },
+      {
+        "name": "absoluteDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "No successful finalization afterward."
+      },
+      {
+        "name": "grantId",
+        "type": "id",
+        "required": true,
+        "description": "Funded budget reservation."
+      },
+      {
+        "name": "candidateManifestHash",
+        "type": "hash",
+        "required": false,
+        "description": "Complete expected candidate set after planning."
+      },
+      {
+        "name": "cancelVersion",
+        "type": "count",
+        "required": true,
+        "description": "Cancellation generation."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Aggregate concurrency version."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Audit"
+  },
+  {
+    "name": "CostGrant",
+    "owner": "06",
+    "flow": "Funding authority → provider admission",
+    "invariant": "A monthly funding statement is not a grant of currently available money.",
+    "fields": [
+      {
+        "name": "grantId",
+        "type": "id",
+        "required": true,
+        "description": "Unique spend allocation."
+      },
+      {
+        "name": "currency",
+        "type": "enum:USD",
+        "required": true,
+        "description": "Accounting currency."
+      },
+      {
+        "name": "ceilingCents",
+        "type": "money",
+        "required": true,
+        "description": "Total authorized maximum liability."
+      },
+      {
+        "name": "reservedCents",
+        "type": "money",
+        "required": true,
+        "description": "Possible in-flight liability."
+      },
+      {
+        "name": "reconciledSpendCents",
+        "type": "money",
+        "required": true,
+        "description": "Known consumption under the actual tariff."
+      },
+      {
+        "name": "availableCents",
+        "type": "money",
+        "required": true,
+        "description": "Derived remaining amount; never browser-provided authority."
+      },
+      {
+        "name": "priceProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact dated rates and conservative overhead."
+      },
+      {
+        "name": "authorizationRef",
+        "type": "id",
+        "required": true,
+        "description": "Actual session/account authorization evidence."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "No new spend after expiry."
+      },
+      {
+        "name": "state",
+        "type": "enum:PREPARED,AUTHORIZED,EXHAUSTED,EXPIRED,CLOSED",
+        "required": true,
+        "description": "Grant state."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Atomic concurrent reservation guard."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CostGrant"
+  },
+  {
+    "name": "Candidate",
+    "owner": "06",
+    "flow": "Full profile/target planner → semantic compiler",
+    "invariant": "Coverage and permissible choices are fixed before provider response evaluation.",
+    "fields": [
+      {
+        "name": "candidateId",
+        "type": "id",
+        "required": true,
+        "description": "Stable nonidentifying identity."
+      },
+      {
+        "name": "family",
+        "type": "enum:OBJECT_MAPPING,FIELD_MAPPING,SEMANTIC_TYPE,TRANSFORMATION_SELECTION,VALUE_MAP,IDENTITY_STRATEGY,DUPLICATE_SIGNAL_STRATEGY,ASSOCIATION_MAPPING,UNMAPPED_HANDLING,TARGET_REQUIREMENT,CONSISTENCY_REVIEW,SEMANTIC_REPAIR",
+        "required": true,
+        "description": "One supported family."
+      },
+      {
+        "name": "sourceScopeHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact source object/field set."
+      },
+      {
+        "name": "targetScopeHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact allowed destination set."
+      },
+      {
+        "name": "alternativeIds",
+        "type": "listText",
+        "required": true,
+        "description": "Closed allowed alternatives including explicit abstention where appropriate."
+      },
+      {
+        "name": "primitiveIds",
+        "type": "listText",
+        "required": true,
+        "description": "Candidate-specific allowed operation subset."
+      },
+      {
+        "name": "requiredFactHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Facts needed for authoritative resolution."
+      },
+      {
+        "name": "dependencyCandidateIds",
+        "type": "listText",
+        "required": true,
+        "description": "Cross-task dependencies preserved by partitioning."
+      },
+      {
+        "name": "privacyProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Minimized outbound classification/substitution policy."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/Candidate"
+  },
+  {
+    "name": "MemoryDecision",
+    "owner": "06",
+    "flow": "Previously accepted scoped decision → future candidate assistance",
+    "invariant": "Memory is evidence with scope and expiry, never automatic authority.",
+    "fields": [
+      {
+        "name": "memoryId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable memory record."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Tenant owner."
+      },
+      {
+        "name": "clientId",
+        "type": "id",
+        "required": true,
+        "description": "End-client boundary."
+      },
+      {
+        "name": "sourceShapeHash",
+        "type": "hash",
+        "required": true,
+        "description": "Compatible structural source context."
+      },
+      {
+        "name": "targetContractHash",
+        "type": "hash",
+        "required": true,
+        "description": "Compatible target scope."
+      },
+      {
+        "name": "decisionEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Original accepted decision."
+      },
+      {
+        "name": "policyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Applicable operation/privacy policy."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Creation time."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Retention/compatibility endpoint."
+      },
+      {
+        "name": "revokedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Stops selection and provider egress."
+      },
+      {
+        "name": "privacy",
+        "type": "enum:L0,L1,L2,L3,L4",
+        "required": true,
+        "description": "Actual content classification."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/MemoryDecision"
+  },
+  {
+    "name": "PrimitiveDefinition",
+    "owner": "04",
+    "flow": "Reviewed core catalogue → candidate/compiler",
+    "invariant": "A primitive is executable only within its typed input/output/effect contract.",
+    "fields": [
+      {
+        "name": "primitiveId",
+        "type": "label",
+        "required": true,
+        "description": "Stable operation name."
+      },
+      {
+        "name": "version",
+        "type": "text",
+        "required": true,
+        "description": "Behavioral version."
+      },
+      {
+        "name": "parameterSchemaId",
+        "type": "label",
+        "required": true,
+        "description": "Closed trusted schema."
+      },
+      {
+        "name": "inputTypes",
+        "type": "listText",
+        "required": true,
+        "description": "Permitted semantic types."
+      },
+      {
+        "name": "outputType",
+        "type": "label",
+        "required": true,
+        "description": "Declared result type."
+      },
+      {
+        "name": "allowedModes",
+        "type": "listText",
+        "required": true,
+        "description": "Qualified CLEAN/HUBSPOT/SALESFORCE contexts."
+      },
+      {
+        "name": "effect",
+        "type": "enum:PRESERVING,NORMALIZING,DERIVING,IDENTITY_AFFECTING,DESTRUCTIVE",
+        "required": true,
+        "description": "Risk/authority classification."
+      },
+      {
+        "name": "requiresAgencyAuthority",
+        "type": "bool",
+        "required": true,
+        "description": "Necessary but not sufficient approval condition."
+      },
+      {
+        "name": "resourceClass",
+        "type": "label",
+        "required": true,
+        "description": "Bounded algorithm and scratch requirements."
+      },
+      {
+        "name": "acceptanceEvidenceHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Current independent semantic/capacity evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/PrimitiveDefinition"
+  },
+  {
+    "name": "PaymentAttempt",
+    "owner": "15",
+    "flow": "Payment intent → provider/reconciliation",
+    "invariant": "Network failure alone cannot establish no external effect.",
+    "fields": [
+      {
+        "name": "attemptId",
+        "type": "id",
+        "required": true,
+        "description": "Physical payment/refund attempt."
+      },
+      {
+        "name": "orderId",
+        "type": "id",
+        "required": true,
+        "description": "Logical commercial order."
+      },
+      {
+        "name": "operation",
+        "type": "enum:CREATE_ORDER,CAPTURE,REFUND,WITHDRAW",
+        "required": true,
+        "description": "Explicit provider effect."
+      },
+      {
+        "name": "state",
+        "type": "enum:PREPARED,DISPATCHING,PROVIDER_PENDING,CONFIRMED,FAILED_NO_EFFECT,UNCERTAIN,CANCELLED_BEFORE_DISPATCH",
+        "required": true,
+        "description": "Durable uncertainty semantics."
+      },
+      {
+        "name": "requestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact normalized intended provider request."
+      },
+      {
+        "name": "providerRequestId",
+        "type": "text",
+        "required": false,
+        "description": "Observed provider idempotency/request identity."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Attempt start."
+      },
+      {
+        "name": "lastObservedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Most recent authenticated observation."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": false,
+        "description": "Final or uncertain provider evidence."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/PaymentAttempt"
+  },
+  {
+    "name": "PriceEligibilitySnapshot",
+    "owner": "16",
+    "flow": "Qualifying agency history → immutable quote",
+    "invariant": "A price snapshot cannot change after capture because later history changes.",
+    "fields": [
+      {
+        "name": "snapshotId",
+        "type": "id",
+        "required": true,
+        "description": "Eligibility identity."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": true,
+        "description": "Commercial buyer."
+      },
+      {
+        "name": "quoteId",
+        "type": "id",
+        "required": true,
+        "description": "Owning quote."
+      },
+      {
+        "name": "asOf",
+        "type": "utc",
+        "required": true,
+        "description": "Server issuance/cutoff."
+      },
+      {
+        "name": "lookbackStartsAt",
+        "type": "utc",
+        "required": true,
+        "description": "Exact 365-day boundary."
+      },
+      {
+        "name": "qualifyingProjectIds",
+        "type": "listText",
+        "required": true,
+        "description": "Complete prior distinct paid/non-fully-refunded project set."
+      },
+      {
+        "name": "qualifyingCount",
+        "type": "count",
+        "required": true,
+        "description": "Must equal that unique set size."
+      },
+      {
+        "name": "repeatDiscountBps",
+        "type": "bps",
+        "required": true,
+        "description": "Tier-derived discount."
+      },
+      {
+        "name": "foundingSlotRef",
+        "type": "id",
+        "required": false,
+        "description": "Atomic promotion reservation if eligible."
+      },
+      {
+        "name": "appliedDiscountBps",
+        "type": "bps",
+        "required": true,
+        "description": "Maximum eligible rate without stacking."
+      },
+      {
+        "name": "policyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Price/promotion rule version."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/PriceEligibilitySnapshot"
+  },
+  {
+    "name": "RetentionRecord",
+    "owner": "09",
+    "flow": "Admission/payment/stage lifecycle → deletion scheduler",
+    "invariant": "The effective deadline is a minimum of named anchors; retries do not extend it.",
+    "fields": [
+      {
+        "name": "retentionId",
+        "type": "id",
+        "required": true,
+        "description": "Lifecycle policy identity."
+      },
+      {
+        "name": "scope",
+        "type": "ref:TenantScope",
+        "required": true,
+        "description": "Affected data boundary."
+      },
+      {
+        "name": "class",
+        "type": "enum:UNPAID,PAID_ORDINARY,PAID_STAGED,IMPORT_RECEIPT,TARGET_METADATA,ORDINARY_LOG,SECURITY_LOG,LEGAL_FINANCIAL",
+        "required": true,
+        "description": "Owning retention class."
+      },
+      {
+        "name": "anchorEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual seal/capture/ready/stage/terminal facts."
+      },
+      {
+        "name": "softDeadline",
+        "type": "utc",
+        "required": false,
+        "description": "Policy interval from the applicable ready event."
+      },
+      {
+        "name": "hardDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "Absolute maximum from the owning immutable event."
+      },
+      {
+        "name": "effectiveDeadline",
+        "type": "utc",
+        "required": true,
+        "description": "Minimum active deadline after all relevant caps."
+      },
+      {
+        "name": "policyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Retention rule at collection/contract."
+      },
+      {
+        "name": "providerResiduals",
+        "type": "listText",
+        "required": true,
+        "description": "Observed classes that outlive active access with reasons."
+      },
+      {
+        "name": "state",
+        "type": "enum:ACTIVE,EXPIRED,DELETING,DELETED_WITH_RESIDUALS,DELETED",
+        "required": true,
+        "description": "Actual managed lifecycle."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/RetentionRecord"
+  },
+  {
+    "name": "DomainEvent",
+    "owner": "07",
+    "flow": "Atomic command transaction → outbox/inbox consumers",
+    "invariant": "Payload is allowlisted references and safe counts, never raw CRM rows.",
+    "fields": [
+      {
+        "name": "eventId",
+        "type": "id",
+        "required": true,
+        "description": "Unique durable event."
+      },
+      {
+        "name": "aggregateId",
+        "type": "id",
+        "required": true,
+        "description": "Owning aggregate."
+      },
+      {
+        "name": "aggregateVersion",
+        "type": "version",
+        "required": true,
+        "description": "Committed ordering within aggregate."
+      },
+      {
+        "name": "agencyId",
+        "type": "id",
+        "required": false,
+        "description": "Tenant scope where applicable."
+      },
+      {
+        "name": "eventType",
+        "type": "label",
+        "required": true,
+        "description": "Registered versioned event type."
+      },
+      {
+        "name": "causationId",
+        "type": "id",
+        "required": true,
+        "description": "Command or prior event cause."
+      },
+      {
+        "name": "correlationId",
+        "type": "id",
+        "required": true,
+        "description": "Safe operation trace."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Server event time."
+      },
+      {
+        "name": "payloadArtifactHash",
+        "type": "hash",
+        "required": true,
+        "description": "Closed event-specific payload/reference artifact."
+      },
+      {
+        "name": "schemaVersion",
+        "type": "text",
+        "required": true,
+        "description": "Consumer compatibility version."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/DomainEvent"
+  },
+  {
+    "name": "OutboxRecord",
+    "owner": "07",
+    "flow": "Atomic domain write → at-least-once dispatcher",
+    "invariant": "Outbox delivery is not the business effect itself.",
+    "fields": [
+      {
+        "name": "outboxId",
+        "type": "id",
+        "required": true,
+        "description": "Dispatch record."
+      },
+      {
+        "name": "eventId",
+        "type": "id",
+        "required": true,
+        "description": "Atomic domain event."
+      },
+      {
+        "name": "consumer",
+        "type": "label",
+        "required": true,
+        "description": "Registered destination."
+      },
+      {
+        "name": "state",
+        "type": "enum:PENDING,CLAIMED,DELIVERED,RETRYABLE,DEAD_LETTER",
+        "required": true,
+        "description": "Dispatcher lifecycle."
+      },
+      {
+        "name": "attempts",
+        "type": "count",
+        "required": true,
+        "description": "Physical dispatch count."
+      },
+      {
+        "name": "nextAttemptAt",
+        "type": "utc",
+        "required": true,
+        "description": "Bounded retry schedule."
+      },
+      {
+        "name": "lease",
+        "type": "ref:Lease",
+        "required": false,
+        "description": "Current dispatcher owner."
+      },
+      {
+        "name": "deliveredAt",
+        "type": "utc",
+        "required": false,
+        "description": "Transport acceptance observation."
+      },
+      {
+        "name": "lastErrorCode",
+        "type": "label",
+        "required": false,
+        "description": "Safe classified failure."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/OutboxRecord"
+  },
+  {
+    "name": "InboxRecord",
+    "owner": "07",
+    "flow": "Authenticated ingress → idempotent consumer",
+    "invariant": "Environment and provider identity participate in deduplication.",
+    "fields": [
+      {
+        "name": "inboxId",
+        "type": "id",
+        "required": true,
+        "description": "Durable receipt."
+      },
+      {
+        "name": "provider",
+        "type": "label",
+        "required": true,
+        "description": "Origin."
+      },
+      {
+        "name": "environment",
+        "type": "enum:LOCAL,SANDBOX,LIVE",
+        "required": true,
+        "description": "Prevents cross-environment collision."
+      },
+      {
+        "name": "externalEventId",
+        "type": "text",
+        "required": true,
+        "description": "Observed unique external identity."
+      },
+      {
+        "name": "bodyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Authenticated exact event body digest."
+      },
+      {
+        "name": "state",
+        "type": "enum:RECEIVED,PROCESSING,APPLIED,IGNORED,RETRYABLE,REJECTED",
+        "required": true,
+        "description": "Actual consumer outcome."
+      },
+      {
+        "name": "receivedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Server receipt time."
+      },
+      {
+        "name": "appliedAt",
+        "type": "utc",
+        "required": false,
+        "description": "Committed business application."
+      },
+      {
+        "name": "resultEventId",
+        "type": "id",
+        "required": false,
+        "description": "Resulting domain event, if any."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/InboxRecord"
+  },
+  {
+    "name": "QualificationRun",
+    "owner": "21",
+    "flow": "Actual campaign runner → independent aggregator",
+    "invariant": "Run identity must represent a separate actual invocation on the same candidate.",
+    "fields": [
+      {
+        "name": "runId",
+        "type": "id",
+        "required": true,
+        "description": "Unique physical campaign identity."
+      },
+      {
+        "name": "candidateHash",
+        "type": "hash",
+        "required": true,
+        "description": "Code/model/prompt/policy/adapter subject."
+      },
+      {
+        "name": "corpusHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact substantive input manifest."
+      },
+      {
+        "name": "truthHash",
+        "type": "hash",
+        "required": true,
+        "description": "Presealed independent expected answers."
+      },
+      {
+        "name": "evaluatorHash",
+        "type": "hash",
+        "required": true,
+        "description": "Accepted scorer bytes."
+      },
+      {
+        "name": "runnerProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Resources/runtime/transport profile."
+      },
+      {
+        "name": "invocationEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual process/provider provenance."
+      },
+      {
+        "name": "resultArtifactHash",
+        "type": "hash",
+        "required": true,
+        "description": "Complete raw/minimized result inventory."
+      },
+      {
+        "name": "startedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Actual start."
+      },
+      {
+        "name": "completedAt",
+        "type": "utc",
+        "required": true,
+        "description": "Actual completion."
+      },
+      {
+        "name": "caseCount",
+        "type": "count",
+        "required": true,
+        "description": "Complete unique case count."
+      },
+      {
+        "name": "criticalFailures",
+        "type": "count",
+        "required": true,
+        "description": "Actual observed critical violations."
+      },
+      {
+        "name": "supportedSuccesses",
+        "type": "count",
+        "required": true,
+        "description": "Correct useful supported cases."
+      },
+      {
+        "name": "supportedDenominator",
+        "type": "count",
+        "required": true,
+        "description": "Applicable supported cases."
+      },
+      {
+        "name": "status",
+        "type": "enum:COMPLETED,INCOMPLETE,HARNESS_ERROR,CANCELLED",
+        "required": true,
+        "description": "No incomplete run counted as qualification."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/QualificationRun"
+  },
+  {
+    "name": "ModelProfile",
+    "owner": "06",
+    "flow": "Current provider/privacy review → dispatch adapter",
+    "invariant": "A model name alone is not an eligible transport or production winner.",
+    "fields": [
+      {
+        "name": "profileId",
+        "type": "id",
+        "required": true,
+        "description": "Versioned endpoint profile."
+      },
+      {
+        "name": "provider",
+        "type": "label",
+        "required": true,
+        "description": "Actual provider/platform."
+      },
+      {
+        "name": "modelId",
+        "type": "text",
+        "required": true,
+        "description": "Exact served/requested model identity."
+      },
+      {
+        "name": "region",
+        "type": "label",
+        "required": true,
+        "description": "Actual route."
+      },
+      {
+        "name": "endpointProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Request shape and audience binding without credentials."
+      },
+      {
+        "name": "privacyEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Effective retention/cache/log read-back and terms."
+      },
+      {
+        "name": "priceProfileHash",
+        "type": "hash",
+        "required": true,
+        "description": "Current conservative rates/overheads."
+      },
+      {
+        "name": "requestSchemaHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual supported request contract."
+      },
+      {
+        "name": "state",
+        "type": "enum:PROPOSED,ELIGIBLE_FOR_PILOT,QUALIFIED,INELIGIBLE,RETIRED",
+        "required": true,
+        "description": "Measured status."
+      },
+      {
+        "name": "qualificationEvidenceHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Independent final campaigns where required."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ModelProfile"
+  },
+  {
+    "name": "ReportSnapshot",
+    "owner": "13",
+    "flow": "Verified domain facts → safe rendering",
+    "invariant": "Presentation cannot invent facts or expose raw data beyond the chosen report class.",
+    "fields": [
+      {
+        "name": "reportId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable report model."
+      },
+      {
+        "name": "packageId",
+        "type": "id",
+        "required": true,
+        "description": "Delivered package."
+      },
+      {
+        "name": "counts",
+        "type": "ref:RowCounts",
+        "required": true,
+        "description": "Independent named measures."
+      },
+      {
+        "name": "findingIds",
+        "type": "listText",
+        "required": true,
+        "description": "Complete relevant findings."
+      },
+      {
+        "name": "materialDecisionIds",
+        "type": "listText",
+        "required": true,
+        "description": "Disclosed high-impact decisions."
+      },
+      {
+        "name": "brandingVersion",
+        "type": "text",
+        "required": true,
+        "description": "Tenant branding snapshot."
+      },
+      {
+        "name": "termsVersion",
+        "type": "text",
+        "required": true,
+        "description": "Relevant service scope/retention."
+      },
+      {
+        "name": "modelHash",
+        "type": "hash",
+        "required": true,
+        "description": "Canonical rendering input."
+      },
+      {
+        "name": "rendererVersion",
+        "type": "text",
+        "required": true,
+        "description": "Pinned HTML/PDF generator."
+      },
+      {
+        "name": "privacyClass",
+        "type": "enum:AGENCY_SUMMARY,SECURE_DETAIL,INTERNAL_EVIDENCE",
+        "required": true,
+        "description": "Authorized audience."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ReportSnapshot"
+  },
+  {
+    "name": "ReleaseCandidate",
+    "owner": "21",
+    "flow": "Frozen build → reviewer/promotion",
+    "invariant": "A changed dependency or image produces a different candidate even with identical source text.",
+    "fields": [
+      {
+        "name": "candidateId",
+        "type": "id",
+        "required": true,
+        "description": "Release identity."
+      },
+      {
+        "name": "sourceCommit",
+        "type": "hash40",
+        "required": true,
+        "description": "Full code commit."
+      },
+      {
+        "name": "sourceTree",
+        "type": "hash40",
+        "required": true,
+        "description": "Exact tree."
+      },
+      {
+        "name": "dependencyLockHash",
+        "type": "hash",
+        "required": true,
+        "description": "Pinned resolved dependencies."
+      },
+      {
+        "name": "corePackageHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Actual installed MC/IC bytes."
+      },
+      {
+        "name": "imageDigests",
+        "type": "listHash",
+        "required": true,
+        "description": "Exact OCI content digests without display aliases."
+      },
+      {
+        "name": "contractBundleHash",
+        "type": "hash",
+        "required": true,
+        "description": "Wire/domain contract versions."
+      },
+      {
+        "name": "policyHash",
+        "type": "hash",
+        "required": true,
+        "description": "Material behavior/configuration."
+      },
+      {
+        "name": "evidenceManifestHash",
+        "type": "hash",
+        "required": true,
+        "description": "Complete immutable qualification graph."
+      },
+      {
+        "name": "state",
+        "type": "enum:PREPARED,FROZEN,UNDER_REVIEW,ACCEPTED,REJECTED,PROMOTED,RETIRED",
+        "required": true,
+        "description": "Reviewer-owned acceptance transition."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/ReleaseCandidate"
+  },
+  {
+    "name": "CommissionAdjustment",
+    "owner": "17",
+    "flow": "Refund/dispute reconciliation → seller ledger",
+    "invariant": "An adjustment records a difference without editing historical paid lines.",
+    "fields": [
+      {
+        "name": "adjustmentId",
+        "type": "id",
+        "required": true,
+        "description": "Unique adjustment."
+      },
+      {
+        "name": "commissionLineId",
+        "type": "id",
+        "required": true,
+        "description": "Original accrual."
+      },
+      {
+        "name": "reason",
+        "type": "enum:REFUND,REVERSAL,SPLIT_CORRECTION,AGREED_ERROR_CORRECTION",
+        "required": true,
+        "description": "Grounded cause."
+      },
+      {
+        "name": "direction",
+        "type": "enum:INCREASE,DECREASE",
+        "required": true,
+        "description": "Explicit sign."
+      },
+      {
+        "name": "amountCents",
+        "type": "money",
+        "required": true,
+        "description": "Exact difference from prior cumulative entitlement."
+      },
+      {
+        "name": "newCumulativeEntitlementCents",
+        "type": "money",
+        "required": true,
+        "description": "Recomputed current entitlement."
+      },
+      {
+        "name": "sourceEventId",
+        "type": "id",
+        "required": true,
+        "description": "Reconciled financial or reviewed correction event."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Posting time."
+      },
+      {
+        "name": "agreementVersion",
+        "type": "text",
+        "required": true,
+        "description": "Lawful applicable adjustment/offset terms."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/CommissionAdjustment"
+  },
+  {
+    "name": "OutreachDraft",
+    "owner": "18",
+    "flow": "Assigned seller/owner → authorization and sender",
+    "invariant": "Editing a draft cannot send it or imply recipient permission.",
+    "fields": [
+      {
+        "name": "draftId",
+        "type": "id",
+        "required": true,
+        "description": "Stable draft identity."
+      },
+      {
+        "name": "prospectId",
+        "type": "id",
+        "required": true,
+        "description": "Authorized business recipient record."
+      },
+      {
+        "name": "senderIdentityRef",
+        "type": "id",
+        "required": true,
+        "description": "Registry-bound human sender."
+      },
+      {
+        "name": "purpose",
+        "type": "enum:REQUESTED_REPLY,INDIVIDUAL_PROSPECT_CONTACT,FOLLOW_UP",
+        "required": true,
+        "description": "Reviewed contact purpose."
+      },
+      {
+        "name": "contentHash",
+        "type": "hash",
+        "required": true,
+        "description": "Exact safe subject/body/recipient/sender binding."
+      },
+      {
+        "name": "contentRef",
+        "type": "id",
+        "required": true,
+        "description": "Private draft content reference; never raw customer CRM."
+      },
+      {
+        "name": "provenanceEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Source and permission/legal-policy basis."
+      },
+      {
+        "name": "version",
+        "type": "version",
+        "required": true,
+        "description": "Optimistic concurrency boundary."
+      },
+      {
+        "name": "state",
+        "type": "enum:DRAFT,AUTHORIZED,SUBMITTING,PROVIDER_ACCEPTED,SEND_UNCERTAIN,BOUNCED,REPLIED,SUPPRESSED,CANCELLED",
+        "required": true,
+        "description": "Observed Kavo send/activity state."
+      },
+      {
+        "name": "createdAt",
+        "type": "utc",
+        "required": true,
+        "description": "Creation time."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/OutreachDraft"
+  },
+  {
+    "name": "OutreachAuthorization",
+    "owner": "18",
+    "flow": "Explicit owner grant → bounded dispatch",
+    "invariant": "Permission is specific to recipients, content, sender, purpose, time and count.",
+    "fields": [
+      {
+        "name": "authorizationId",
+        "type": "id",
+        "required": true,
+        "description": "Immutable grant identity."
+      },
+      {
+        "name": "grantingActorId",
+        "type": "id",
+        "required": true,
+        "description": "Authenticated authorized owner."
+      },
+      {
+        "name": "senderIdentityRef",
+        "type": "id",
+        "required": true,
+        "description": "Permitted sender."
+      },
+      {
+        "name": "allowedContentHashes",
+        "type": "listHash",
+        "required": true,
+        "description": "Sealed recipient/content combinations."
+      },
+      {
+        "name": "validFrom",
+        "type": "utc",
+        "required": true,
+        "description": "Inclusive beginning."
+      },
+      {
+        "name": "expiresAt",
+        "type": "utc",
+        "required": true,
+        "description": "Exclusive deadline."
+      },
+      {
+        "name": "maximumSends",
+        "type": "count",
+        "required": true,
+        "description": "Bounded positive maximum, also no greater than sealed unique drafts."
+      },
+      {
+        "name": "permissionEvidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Actual explicit authorization."
+      },
+      {
+        "name": "policyVersion",
+        "type": "text",
+        "required": true,
+        "description": "Applicable provider, suppression and contact policy."
+      },
+      {
+        "name": "revoked",
+        "type": "bool",
+        "required": true,
+        "description": "Current server-observed revocation, checked at dispatch."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/OutreachAuthorization"
+  },
+  {
+    "name": "SalesActivity",
+    "owner": "18",
+    "flow": "Sender/reconciler → scoped commercial history",
+    "invariant": "Observed submission, receipt and customer response are different facts.",
+    "fields": [
+      {
+        "name": "activityId",
+        "type": "id",
+        "required": true,
+        "description": "Unique activity event."
+      },
+      {
+        "name": "prospectId",
+        "type": "id",
+        "required": true,
+        "description": "Scoped business record."
+      },
+      {
+        "name": "draftId",
+        "type": "id",
+        "required": true,
+        "description": "Bound draft."
+      },
+      {
+        "name": "authorizationId",
+        "type": "id",
+        "required": true,
+        "description": "Authority applied to this event."
+      },
+      {
+        "name": "kind",
+        "type": "enum:PROVIDER_ACCEPTED,SEND_UNCERTAIN,BOUNCED,REPLIED,SUPPRESSED,HUMAN_SEND_OBSERVED",
+        "required": true,
+        "description": "Exact evidence class."
+      },
+      {
+        "name": "occurredAt",
+        "type": "utc",
+        "required": true,
+        "description": "Observed event time; unknown time cannot be fabricated."
+      },
+      {
+        "name": "evidenceHash",
+        "type": "hash",
+        "required": true,
+        "description": "Minimal safe supporting record."
+      },
+      {
+        "name": "providerMessageRef",
+        "type": "text",
+        "required": true,
+        "description": "Opaque external identity or explicit NONE for a local suppression."
+      }
+    ],
+    "schemaRef": "urn:kavo:r2:contracts#/$defs/SalesActivity"
+  }
+]

@@ -1,0 +1,146 @@
+// Architecture gate (07_DOMAIN "Platform topology": dependencies flow contracts -> domain ports -> application -> adapters; UI
+// consumes HTTP DTOs; the cores depend on no persistence/payments/framework/UI; checks reject cycles, private core imports,
+// server credentials in client bundles and deep imports). Static, dependency-free, deterministic: it scans every import/export
+// specifier of every workspace package and applies architecture.rules.json. Exit 1 on any violation, listing file:line.
+import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const rules = JSON.parse(readFileSync(join(root, "architecture.rules.json"), "utf8"));
+const argvRoot = process.argv[2] ? resolve(process.argv[2]) : root; // a fixture tree can be gated the same way (tests)
+
+const SOURCE_EXT = new Set([".ts", ".tsx", ".mts", ".js", ".mjs"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "coverage", "tmp"]);
+
+function* walk(dir) {
+  for (const entry of readdirSync(dir)) {
+    if (SKIP_DIRS.has(entry)) continue;
+    const p = join(dir, entry);
+    const st = statSync(p);
+    if (st.isDirectory()) yield* walk(p);
+    else if (SOURCE_EXT.has(p.slice(p.lastIndexOf(".")))) yield p;
+  }
+}
+
+function workspacePackages(base) {
+  const out = [];
+  for (const group of ["packages", "apps"]) {
+    const dir = join(base, group);
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      const pkgPath = join(dir, name, "package.json");
+      if (!existsSync(pkgPath)) continue;
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      out.push({ name: pkg.name, dir: join(dir, name), group, layer: rules.layers[pkg.name] ?? null, deps: { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}) } });
+    }
+  }
+  return out;
+}
+
+const IMPORT_RE = /\b(?:import|export)\s+(?:[^'"`;]*?\s+from\s+)?['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+function specifiersOf(file) {
+  const text = readFileSync(file, "utf8");
+  const found = [];
+  const lines = text.split("\n");
+  lines.forEach((line, i) => {
+    let m;
+    IMPORT_RE.lastIndex = 0;
+    while ((m = IMPORT_RE.exec(line)) !== null) found.push({ spec: m[1] ?? m[2] ?? m[3], line: i + 1 });
+  });
+  return found;
+}
+
+function packageOfSpecifier(spec, pkgs) {
+  const m = /^(@[^/]+\/[^/]+|[^@./][^/]*)(\/.*)?$/.exec(spec);
+  if (!m) return null;
+  const name = m[1];
+  const sub = m[2] ?? "";
+  return { name, sub, pkg: pkgs.find((p) => p.name === name) ?? null };
+}
+
+const pkgs = workspacePackages(argvRoot);
+const violations = [];
+const edges = new Map(); // pkg -> Set(pkg) for cycle detection
+
+for (const pkg of pkgs) {
+  if (!pkg.layer) {
+    violations.push({ file: join(pkg.dir, "package.json"), line: 1, rule: "layer", text: `${pkg.name} has no layer in architecture.rules.json` });
+    continue;
+  }
+  const allowed = new Set(rules.allowedDependencies[pkg.layer] ?? []);
+  for (const file of walk(pkg.dir)) {
+    const rel = relative(argvRoot, file).split(sep).join("/");
+    const isClientBundle = rules.clientBundles.some((prefix) => rel.startsWith(prefix));
+    for (const { spec, line } of specifiersOf(file)) {
+      if (spec.startsWith("node:")) {
+        if (isClientBundle) violations.push({ file: rel, line, rule: "client-bundle", text: `client bundle imports a Node built-in (${spec})` });
+        continue;
+      }
+      if (spec.startsWith(".")) {
+        // relative import: must stay inside the package
+        const target = resolve(dirname(file), spec);
+        if (!target.startsWith(pkg.dir + sep) && target !== pkg.dir) {
+          violations.push({ file: rel, line, rule: "sibling", text: `relative import escapes the package (${spec}); depend on a published entry point instead` });
+        }
+        continue;
+      }
+      const ref = packageOfSpecifier(spec, pkgs);
+      if (!ref) continue;
+      if (ref.pkg) {
+        edges.set(pkg.name, (edges.get(pkg.name) ?? new Set()).add(ref.pkg.name));
+        if (!(ref.name in pkg.deps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
+        if (!allowed.has(ref.pkg.layer)) violations.push({ file: rel, line, rule: "layer", text: `${pkg.layer} package ${pkg.name} may not import ${ref.pkg.layer} package ${ref.name}` });
+        if (ref.sub && !rules.publicSubpaths.some((s) => ref.sub === s || ref.sub.startsWith(s + "/"))) {
+          violations.push({ file: rel, line, rule: "deep-import", text: `deep import into ${ref.name}${ref.sub}; only the public entry points are allowed` });
+        }
+        if (ref.sub.startsWith("/src/") || ref.sub.startsWith("/dist/")) violations.push({ file: rel, line, rule: "private", text: `private module import ${spec}` });
+      } else if (isClientBundle && rules.serverOnlyPackages.includes(ref.name)) {
+        violations.push({ file: rel, line, rule: "client-bundle", text: `server-only package ${ref.name} imported from a client bundle` });
+      }
+    }
+    if (isClientBundle) {
+      const text = readFileSync(file, "utf8");
+      for (const pattern of rules.credentialPatterns) {
+        const re = new RegExp(pattern);
+        const idx = text.search(re);
+        if (idx >= 0) violations.push({ file: rel, line: text.slice(0, idx).split("\n").length, rule: "credential", text: `credential-like identifier ${pattern} in a client bundle` });
+      }
+    }
+  }
+}
+
+// cycles (Tarjan is overkill: depth-first with a path stack over <= a few dozen packages)
+function findCycle() {
+  const state = new Map();
+  const stack = [];
+  function visit(n) {
+    state.set(n, 1);
+    stack.push(n);
+    for (const m of edges.get(n) ?? []) {
+      if (state.get(m) === 1) return [...stack.slice(stack.indexOf(m)), m];
+      if (!state.has(m)) {
+        const c = visit(m);
+        if (c) return c;
+      }
+    }
+    stack.pop();
+    state.set(n, 2);
+    return null;
+  }
+  for (const n of edges.keys()) if (!state.has(n)) {
+    const c = visit(n);
+    if (c) return c;
+  }
+  return null;
+}
+const cycle = findCycle();
+if (cycle) violations.push({ file: "(graph)", line: 0, rule: "cycle", text: `dependency cycle ${cycle.join(" -> ")}` });
+
+if (violations.length) {
+  for (const v of violations) console.error(`${v.file}:${v.line}: [${v.rule}] ${v.text}`);
+  console.error(`architecture gate: ${violations.length} violation(s) in ${pkgs.length} package(s)`);
+  process.exit(1);
+}
+console.log(`architecture gate: ${pkgs.length} package(s), ${[...edges.values()].reduce((n, s) => n + s.size, 0)} edge(s), no violation`);

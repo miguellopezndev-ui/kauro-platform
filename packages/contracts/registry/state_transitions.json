@@ -1,0 +1,1091 @@
+[
+  {
+    "contract": "Agency",
+    "initial": "DRAFT",
+    "terminal": [
+      "CLOSED"
+    ],
+    "transitions": [
+      {
+        "from": "DRAFT",
+        "event": "agreements_and_profile_accepted",
+        "to": "ACTIVE",
+        "guard": "Verified owner, legal/billing profile and required agreement versions are present.",
+        "effect": "Enable only separately qualified capabilities; activation does not create payment or import authority."
+      },
+      {
+        "from": "ACTIVE",
+        "event": "material_risk_or_account_failure",
+        "to": "RESTRICTED",
+        "guard": "A documented incident/account fact justifies the specific restriction.",
+        "effect": "Block affected new work while preserving support, lawful refunds, records and deletion."
+      },
+      {
+        "from": "RESTRICTED",
+        "event": "restriction_remedied",
+        "to": "ACTIVE",
+        "guard": "Exact blocking facts are resolved and independently reviewed where material.",
+        "effect": "Restore only the accepted capability scope; old invalid approvals remain invalid."
+      },
+      {
+        "from": "ACTIVE",
+        "event": "owner_requests_closure",
+        "to": "CLOSING",
+        "guard": "Step-up and current owner authority; active obligations inventoried.",
+        "effect": "Stop new work and revoke new access grants, then settle/reconcile existing obligations."
+      },
+      {
+        "from": "RESTRICTED",
+        "event": "owner_requests_closure",
+        "to": "CLOSING",
+        "guard": "Same closure authority and obligation review.",
+        "effect": "Restriction cannot prevent lawful account closure and data-rights handling."
+      },
+      {
+        "from": "DRAFT",
+        "event": "owner_abandons_setup",
+        "to": "CLOSING",
+        "guard": "Verified identity controls the draft.",
+        "effect": "Delete unnecessary setup data under its policy; no customer charge exists."
+      },
+      {
+        "from": "CLOSING",
+        "event": "closure_obligations_completed",
+        "to": "CLOSED",
+        "guard": "Jobs, access, data lifecycle and financial/legal residual classes are accounted for.",
+        "effect": "Retain only declared lawful residuals; no automatic resurrection on login."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "Membership",
+    "initial": "INVITED",
+    "terminal": [
+      "REVOKED",
+      "EXPIRED"
+    ],
+    "transitions": [
+      {
+        "from": "INVITED",
+        "event": "intended_identity_accepts",
+        "to": "ACTIVE",
+        "guard": "Single-use invitation is unexpired, unrevoked and matches authenticated identity.",
+        "effect": "Consume token atomically and enable only the invited role."
+      },
+      {
+        "from": "INVITED",
+        "event": "invitation_deadline",
+        "to": "EXPIRED",
+        "guard": "Server time reaches the invitation endpoint.",
+        "effect": "Refuse acceptance; a new invitation has a new identity/token."
+      },
+      {
+        "from": "INVITED",
+        "event": "inviter_revokes",
+        "to": "REVOKED",
+        "guard": "Authorized scoped inviter/owner.",
+        "effect": "Invalidate invitation and token acceptance."
+      },
+      {
+        "from": "ACTIVE",
+        "event": "authorized_suspension",
+        "to": "SUSPENDED",
+        "guard": "Actor has authority and final-owner invariant remains safe.",
+        "effect": "Stop new commands/capabilities; preserve account history."
+      },
+      {
+        "from": "SUSPENDED",
+        "event": "authorized_reactivation",
+        "to": "ACTIVE",
+        "guard": "Current role, identity, assurance and agency readiness are rechecked.",
+        "effect": "Refresh effective authorization; do not reuse stale cached grants."
+      },
+      {
+        "from": "ACTIVE",
+        "event": "authorized_revocation",
+        "to": "REVOKED",
+        "guard": "Scoped authority and last-owner protection hold transactionally.",
+        "effect": "Revoke future access and record bounded residual bearer lifetimes."
+      },
+      {
+        "from": "SUSPENDED",
+        "event": "authorized_revocation",
+        "to": "REVOKED",
+        "guard": "Same role/ownership safeguards.",
+        "effect": "Preserve required personal statement/support access through a separately scoped role, not this membership."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "DatasetRevision",
+    "initial": "DRAFT",
+    "terminal": [
+      "SUPERSEDED",
+      "DELETED"
+    ],
+    "transitions": [
+      {
+        "from": "DRAFT",
+        "event": "upload_reserved",
+        "to": "UPLOADING",
+        "guard": "Mutable revision and aggregate byte/concurrency quota fit.",
+        "effect": "Record provider-session intent and reservation."
+      },
+      {
+        "from": "UPLOADING",
+        "event": "all_uploads_completed",
+        "to": "INSPECTING",
+        "guard": "Actual provider completion is observed for selected uploads.",
+        "effect": "Run full structural and scan-coverage admission; no seal yet."
+      },
+      {
+        "from": "DRAFT",
+        "event": "previously_admitted_inputs_selected",
+        "to": "INSPECTING",
+        "guard": "Reuse is explicitly authorized and immutable generations still exist.",
+        "effect": "Verify retained byte identity and selection under current policy."
+      },
+      {
+        "from": "INSPECTING",
+        "event": "all_selected_inputs_admitted",
+        "to": "READY_TO_SEAL",
+        "guard": "Every selected table/file passes and projection/count decisions are complete.",
+        "effect": "Expose exact source scope for final seal review."
+      },
+      {
+        "from": "INSPECTING",
+        "event": "fatal_input_rejection",
+        "to": "REJECTED",
+        "guard": "A selected input violates the admission contract.",
+        "effect": "Return safe remediation; no silent removal from the source set."
+      },
+      {
+        "from": "READY_TO_SEAL",
+        "event": "selection_changes",
+        "to": "INSPECTING",
+        "guard": "Authorized edit under expected version.",
+        "effect": "Invalidate selected-scope readiness and recompute affected facts."
+      },
+      {
+        "from": "READY_TO_SEAL",
+        "event": "seal_command",
+        "to": "SEALED",
+        "guard": "All exact generations, receipts, parser choices and projection hashes match.",
+        "effect": "Freeze the revision and emit revision-sealed; StartAudit separately reserves funds."
+      },
+      {
+        "from": "SEALED",
+        "event": "new_revision_explicitly_supersedes",
+        "to": "SUPERSEDED",
+        "guard": "New lineage and affected approval/payment scope analysis are recorded.",
+        "effect": "Prevent future execution from stale authority without deleting historical facts."
+      },
+      {
+        "from": "DRAFT",
+        "event": "cancel_revision",
+        "to": "CANCELLED",
+        "guard": "Authorized caller controls the revision.",
+        "effect": "Cancel acceptance and schedule scoped cleanup."
+      },
+      {
+        "from": "UPLOADING",
+        "event": "cancel_revision",
+        "to": "CANCELLED",
+        "guard": "Cancellation fence wins the transaction.",
+        "effect": "Cancel sessions where supported and quarantine late objects."
+      },
+      {
+        "from": "INSPECTING",
+        "event": "cancel_revision",
+        "to": "CANCELLED",
+        "guard": "Cancellation wins before admission/selection finalization.",
+        "effect": "Stop new promotion and clean only owned artifacts."
+      },
+      {
+        "from": "READY_TO_SEAL",
+        "event": "cancel_revision",
+        "to": "CANCELLED",
+        "guard": "No prior sealed immutable subject is overwritten.",
+        "effect": "Cancel the mutable revision."
+      },
+      {
+        "from": "SEALED",
+        "event": "retention_expires",
+        "to": "EXPIRED",
+        "guard": "Effective deadline derived from immutable anchors is reached.",
+        "effect": "Revoke reads/execution and schedule deletion without extending for a quote."
+      },
+      {
+        "from": "REJECTED",
+        "event": "retention_expires",
+        "to": "EXPIRED",
+        "guard": "Rejected-input cleanup deadline is reached.",
+        "effect": "Account for raw/quarantine/derived classes."
+      },
+      {
+        "from": "CANCELLED",
+        "event": "managed_cleanup_verified",
+        "to": "DELETED",
+        "guard": "Active objects and lawful residuals are verified.",
+        "effect": "Leave a safe tombstone and source history reference."
+      },
+      {
+        "from": "EXPIRED",
+        "event": "managed_cleanup_verified",
+        "to": "DELETED",
+        "guard": "All active customer-data classes removed; residuals recorded separately.",
+        "effect": "Persist restore tombstone outside the rolled-back database."
+      },
+      {
+        "from": "SUPERSEDED",
+        "event": "retention_cleanup_verified",
+        "to": "DELETED",
+        "guard": "No lawful retention basis extends beyond the applicable cap.",
+        "effect": "Do not remove new revision or shared lawful financial evidence."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "Audit",
+    "initial": "QUEUED",
+    "terminal": [
+      "DRAFT_READY",
+      "NEEDS_DECISION",
+      "UNSUPPORTED",
+      "FAILED",
+      "CANCELLED",
+      "EXPIRED"
+    ],
+    "transitions": [
+      {
+        "from": "QUEUED",
+        "event": "profile_worker_claims",
+        "to": "PROFILING",
+        "guard": "Source and grant remain valid; lease/fence acquired.",
+        "effect": "Measure full-data facts without granting identity authority."
+      },
+      {
+        "from": "PROFILING",
+        "event": "profile_and_candidates_complete",
+        "to": "INTERPRETING",
+        "guard": "Candidate set is complete and minimized outbound requests fit the funded envelope.",
+        "effect": "Dispatch only eligible model/rule tasks before semantic deadline."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "compiled_decisions_ready",
+        "to": "VALIDATING",
+        "guard": "All required candidates are resolved with admissible evidence.",
+        "effect": "Invoke the actual MC validator with exact hashes; no new late semantic calls."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "unresolved_material_choice",
+        "to": "NEEDS_DECISION",
+        "guard": "A required candidate lacks authority or cannot fit the bounded supported path.",
+        "effect": "Preserve useful partial facts and exact pending decisions; no executable draft."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "capability_not_supported",
+        "to": "UNSUPPORTED",
+        "guard": "The requested scope cannot be represented by accepted primitives/target profile.",
+        "effect": "Return explicit supported alternatives without charging for unqualified execution."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "complete_valid_receipt_and_current_authority",
+        "to": "DRAFT_READY",
+        "guard": "All hashes/evidence/counts validate and cancellation/deadline checks pass atomically.",
+        "effect": "Publish only the reviewed system draft, which still requires agency approval."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "validatable_issue_needs_agency_choice",
+        "to": "NEEDS_DECISION",
+        "guard": "Receipt is structurally valid but required decisions remain unresolved.",
+        "effect": "Expose exact safe findings and next typed decisions."
+      },
+      {
+        "from": "QUEUED",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Authorized current cancellation.",
+        "effect": "Prevent new dispatch; reconcile reserved cost."
+      },
+      {
+        "from": "PROFILING",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Cancellation fence is current.",
+        "effect": "Stop promotion and clean/reconcile bounded work."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Atomic cancellation authority wins.",
+        "effect": "No new requests or final draft; preserve possible provider liability."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Cancellation commits before final promotion.",
+        "effect": "A later valid MC receipt cannot undo cancellation."
+      },
+      {
+        "from": "QUEUED",
+        "event": "absolute_deadline",
+        "to": "EXPIRED",
+        "guard": "Original absolute deadline reached.",
+        "effect": "Release only provably unused reservations."
+      },
+      {
+        "from": "PROFILING",
+        "event": "absolute_deadline",
+        "to": "EXPIRED",
+        "guard": "Original deadline, not a restarted attempt clock.",
+        "effect": "Stop work and retain safe evidence."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "absolute_deadline",
+        "to": "EXPIRED",
+        "guard": "Original deadline reached.",
+        "effect": "No provider retry or draft promotion."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "absolute_deadline",
+        "to": "EXPIRED",
+        "guard": "Absolute audit deadline reached even if MC is still active.",
+        "effect": "Stop successful finalization and reconcile worker state."
+      },
+      {
+        "from": "PROFILING",
+        "event": "fatal_integrity_error",
+        "to": "FAILED",
+        "guard": "Classified actual error, not a missing optional warning.",
+        "effect": "Return a safe error and repair requirement."
+      },
+      {
+        "from": "INTERPRETING",
+        "event": "fatal_contract_or_provider_error",
+        "to": "FAILED",
+        "guard": "Retry policy exhausted or nonretryable integrity failure.",
+        "effect": "Preserve actual journal and cost status."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "fatal_contract_error",
+        "to": "FAILED",
+        "guard": "Null/foreign/corrupt receipt or deterministic failure.",
+        "effect": "No TypeError-as-success or weak validation fallback."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "Plan",
+    "initial": "DRAFT",
+    "terminal": [
+      "SUPERSEDED",
+      "WITHDRAWN"
+    ],
+    "transitions": [
+      {
+        "from": "DRAFT",
+        "event": "compiled_or_edited",
+        "to": "VALIDATION_REQUIRED",
+        "guard": "Typed complete plan and evidence references exist.",
+        "effect": "Freeze this version's body hash; do not inherit old validation."
+      },
+      {
+        "from": "VALIDATION_REQUIRED",
+        "event": "validation_admitted",
+        "to": "VALIDATING",
+        "guard": "Exact source/target/core and resource authority exist.",
+        "effect": "Create a durable validation intent."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "valid_receipt",
+        "to": "VALIDATED",
+        "guard": "Complete receipt and current subject/deadline/cancellation checks pass.",
+        "effect": "Store immutable evidence binding."
+      },
+      {
+        "from": "VALIDATING",
+        "event": "invalid_receipt_result",
+        "to": "VALIDATION_REQUIRED",
+        "guard": "Actual invalid or incomplete semantics are reported safely.",
+        "effect": "Keep findings; no old VALIDATED status."
+      },
+      {
+        "from": "VALIDATED",
+        "event": "agency_approval",
+        "to": "APPROVED",
+        "guard": "Authorized actor, current assurance and exact disclosed effects match.",
+        "effect": "Create immutable Approval."
+      },
+      {
+        "from": "DRAFT",
+        "event": "new_plan_revision",
+        "to": "SUPERSEDED",
+        "guard": "A new version is created under current edit authority.",
+        "effect": "Keep predecessor history."
+      },
+      {
+        "from": "VALIDATION_REQUIRED",
+        "event": "new_plan_revision",
+        "to": "SUPERSEDED",
+        "guard": "Typed edit creates a different body.",
+        "effect": "Invalidate only dependent evidence with impact map."
+      },
+      {
+        "from": "VALIDATED",
+        "event": "new_plan_revision",
+        "to": "SUPERSEDED",
+        "guard": "New source/target/decision content is explicit.",
+        "effect": "Old approval cannot attach to new content."
+      },
+      {
+        "from": "APPROVED",
+        "event": "new_plan_revision",
+        "to": "SUPERSEDED",
+        "guard": "Commercial/execution consequences are reconciled.",
+        "effect": "Pause affected future work pending new approval."
+      },
+      {
+        "from": "APPROVED",
+        "event": "withdraw_approval",
+        "to": "WITHDRAWN",
+        "guard": "Current organization authority withdraws future use.",
+        "effect": "Cancel/reconcile active work under its own state machine."
+      },
+      {
+        "from": "VALIDATED",
+        "event": "withdraw_plan",
+        "to": "WITHDRAWN",
+        "guard": "Authorized project actor.",
+        "effect": "Prevent future approval/execution without erasing receipts."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "Job",
+    "initial": "QUEUED",
+    "terminal": [
+      "READY",
+      "FAILED",
+      "CANCELLED",
+      "EXPIRED"
+    ],
+    "transitions": [
+      {
+        "from": "QUEUED",
+        "event": "capacity_reserved",
+        "to": "ADMITTED",
+        "guard": "Global/agency limits and exact commercial authority fit.",
+        "effect": "Reserve one logical slot and create a fenced attempt."
+      },
+      {
+        "from": "ADMITTED",
+        "event": "provider_start_observed",
+        "to": "RUNNING",
+        "guard": "Actual provider identity is reconciled; input bindings unchanged.",
+        "effect": "Track process-tree resources and durable lease."
+      },
+      {
+        "from": "RUNNING",
+        "event": "complete_staging_submitted",
+        "to": "VERIFYING",
+        "guard": "All artifacts are closed and the current attempt submits its manifest.",
+        "effect": "Independently verify bytes, conservation and target semantics."
+      },
+      {
+        "from": "VERIFYING",
+        "event": "atomic_publication_accepted",
+        "to": "READY",
+        "guard": "Current fence, noncancelled/nondeleted scope, payment and complete receipt hold.",
+        "effect": "Create immutable available PackageVersion and safe notification event."
+      },
+      {
+        "from": "QUEUED",
+        "event": "cancel_command",
+        "to": "CANCEL_REQUESTED",
+        "guard": "Authorized current request.",
+        "effect": "Remove future admission and begin reconciliation."
+      },
+      {
+        "from": "ADMITTED",
+        "event": "cancel_command",
+        "to": "CANCEL_REQUESTED",
+        "guard": "Cancellation wins against start/publish authority.",
+        "effect": "Terminate/reconcile provider creation; no new attempt."
+      },
+      {
+        "from": "RUNNING",
+        "event": "cancel_command",
+        "to": "CANCEL_REQUESTED",
+        "guard": "Current cancellation version committed.",
+        "effect": "Stop new publication and request worker termination."
+      },
+      {
+        "from": "VERIFYING",
+        "event": "cancel_command",
+        "to": "CANCEL_REQUESTED",
+        "guard": "Cancellation wins before publication commit.",
+        "effect": "Keep valid but unauthorized artifacts private for cleanup."
+      },
+      {
+        "from": "CANCEL_REQUESTED",
+        "event": "provider_and_artifacts_reconciled",
+        "to": "CANCELLED",
+        "guard": "No further accepted output can be promoted.",
+        "effect": "Release capacity and unused reservations; preserve actual costs."
+      },
+      {
+        "from": "QUEUED",
+        "event": "deadline_reached",
+        "to": "EXPIRED",
+        "guard": "Original delivery/execution deadline reached.",
+        "effect": "No automatic retry with a fresh deadline."
+      },
+      {
+        "from": "ADMITTED",
+        "event": "deadline_reached",
+        "to": "EXPIRED",
+        "guard": "Actual start uncertainty reconciled.",
+        "effect": "Cancel exact owned provider job if necessary."
+      },
+      {
+        "from": "RUNNING",
+        "event": "deadline_reached",
+        "to": "EXPIRED",
+        "guard": "Hard execution wall time reached.",
+        "effect": "Terminate and preserve failure/resource evidence."
+      },
+      {
+        "from": "VERIFYING",
+        "event": "deadline_reached",
+        "to": "EXPIRED",
+        "guard": "No accepted finalization before deadline.",
+        "effect": "Do not publish merely because bytes were almost ready."
+      },
+      {
+        "from": "ADMITTED",
+        "event": "unrecoverable_start_error",
+        "to": "FAILED",
+        "guard": "Known failure/no-effect or exhausted recovery with explicit uncertainty.",
+        "effect": "Record remaining provider liability and cleanup duty."
+      },
+      {
+        "from": "RUNNING",
+        "event": "fatal_resource_or_integrity_error",
+        "to": "FAILED",
+        "guard": "Actual ENOSPC/OOM/contract/input failure classified.",
+        "effect": "No package READY; preserve meaningful independent failure evidence."
+      },
+      {
+        "from": "VERIFYING",
+        "event": "verification_failure",
+        "to": "FAILED",
+        "guard": "Artifact/body/count/authority verification rejects.",
+        "effect": "Repair the cause; do not weaken verification."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "PaymentAttempt",
+    "initial": "PREPARED",
+    "terminal": [
+      "CONFIRMED",
+      "FAILED_NO_EFFECT",
+      "CANCELLED_BEFORE_DISPATCH"
+    ],
+    "transitions": [
+      {
+        "from": "PREPARED",
+        "event": "dispatch_intent_committed",
+        "to": "DISPATCHING",
+        "guard": "Exact order/refund, current authorization and provider idempotency scope exist.",
+        "effect": "Perform only the recorded external effect."
+      },
+      {
+        "from": "PREPARED",
+        "event": "cancel_before_dispatch",
+        "to": "CANCELLED_BEFORE_DISPATCH",
+        "guard": "No possible provider effect is evidenced.",
+        "effect": "Release only the unused reservation."
+      },
+      {
+        "from": "DISPATCHING",
+        "event": "authenticated_pending",
+        "to": "PROVIDER_PENDING",
+        "guard": "Provider acknowledges a pending state.",
+        "effect": "Display pending without execution authority."
+      },
+      {
+        "from": "DISPATCHING",
+        "event": "authenticated_completed",
+        "to": "CONFIRMED",
+        "guard": "Exact amount/currency/payee/environment and provider identity match.",
+        "effect": "Publish reconciled financial fact once."
+      },
+      {
+        "from": "DISPATCHING",
+        "event": "ambiguous_transport_result",
+        "to": "UNCERTAIN",
+        "guard": "A provider effect may exist.",
+        "effect": "Retain possible liability and reconcile exact identity."
+      },
+      {
+        "from": "DISPATCHING",
+        "event": "proved_no_effect",
+        "to": "FAILED_NO_EFFECT",
+        "guard": "Actual provider evidence proves no intended effect.",
+        "effect": "Allow a new deliberate attempt under policy, not a blind exception retry."
+      },
+      {
+        "from": "PROVIDER_PENDING",
+        "event": "authenticated_completed",
+        "to": "CONFIRMED",
+        "guard": "Provider final state matches intended effect.",
+        "effect": "Deduplicate financial postings."
+      },
+      {
+        "from": "PROVIDER_PENDING",
+        "event": "proved_no_effect",
+        "to": "FAILED_NO_EFFECT",
+        "guard": "Provider terminal rejection/no effect is verified.",
+        "effect": "Do not count a capture/refund."
+      },
+      {
+        "from": "PROVIDER_PENDING",
+        "event": "observation_lost",
+        "to": "UNCERTAIN",
+        "guard": "Current effect cannot be established.",
+        "effect": "Preserve pending customer guidance and reconcile."
+      },
+      {
+        "from": "UNCERTAIN",
+        "event": "reconciliation_completed",
+        "to": "CONFIRMED",
+        "guard": "Authenticated exact provider effect found.",
+        "effect": "Reuse the same logical order and ledger event."
+      },
+      {
+        "from": "UNCERTAIN",
+        "event": "reconciliation_proves_no_effect",
+        "to": "FAILED_NO_EFFECT",
+        "guard": "Reliable provider evidence excludes the effect.",
+        "effect": "Document why a retry can now be safe."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "ImportStage",
+    "initial": "PREPARED",
+    "terminal": [
+      "VERIFIED_SUCCESS",
+      "VERIFIED_PARTIAL",
+      "EXPIRED",
+      "CANCELLED"
+    ],
+    "transitions": [
+      {
+        "from": "PREPARED",
+        "event": "verified_stage_package",
+        "to": "RELEASED",
+        "guard": "Exact source/target/plan and artifact evidence hold.",
+        "effect": "Release only this stage with settings and receipt requirements."
+      },
+      {
+        "from": "RELEASED",
+        "event": "agency_starts_import_workflow",
+        "to": "AWAITING_AGENCY_IMPORT",
+        "guard": "Instructions and current bounded retention are disclosed.",
+        "effect": "No active compute is falsely shown while awaiting customer action."
+      },
+      {
+        "from": "AWAITING_AGENCY_IMPORT",
+        "event": "receipt_submitted",
+        "to": "RECEIPT_UPLOADED",
+        "guard": "Admitted receipt matches the stage/package/instance.",
+        "effect": "Validate complete source-to-target identity partition."
+      },
+      {
+        "from": "RECEIPT_VALIDATING",
+        "event": "receipt_complete",
+        "to": "VERIFIED_SUCCESS",
+        "guard": "All required identities and failed/unresolved dispositions are accounted for.",
+        "effect": "Enable only valid dependent edges/stages."
+      },
+      {
+        "from": "RECEIPT_VALIDATING",
+        "event": "receipt_missing_or_ambiguous",
+        "to": "NEEDS_CORRECTION",
+        "guard": "Validation identifies specific unresolved identities.",
+        "effect": "Preserve valid mappings and request exact remediation."
+      },
+      {
+        "from": "NEEDS_CORRECTION",
+        "event": "corrected_receipt_admitted",
+        "to": "RECEIPT_VALIDATING",
+        "guard": "New evidence is a versioned reconciliation, not silent overwrite.",
+        "effect": "Revalidate affected stage identity and dependent scope."
+      },
+      {
+        "from": "RELEASED",
+        "event": "stage_requires_no_receipt_and_preparation_complete",
+        "to": "VERIFIED_SUCCESS",
+        "guard": "Contracted preparation milestone is actually complete.",
+        "effect": "Do not relabel it independently verified CRM import."
+      },
+      {
+        "from": "AWAITING_AGENCY_IMPORT",
+        "event": "retention_deadline",
+        "to": "EXPIRED",
+        "guard": "Effective staged/hard cap reached.",
+        "effect": "Revoke continuation; no old receipt resurrection."
+      },
+      {
+        "from": "NEEDS_CORRECTION",
+        "event": "retention_deadline",
+        "to": "EXPIRED",
+        "guard": "Same immutable staged anchors.",
+        "effect": "Offer a new verified revision/scope recovery where supported."
+      },
+      {
+        "from": "PREPARED",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Current cancellation authority.",
+        "effect": "No stage publication."
+      },
+      {
+        "from": "RELEASED",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Future action authority revoked.",
+        "effect": "Account for previously downloaded customer-owned copies honestly."
+      },
+      {
+        "from": "AWAITING_AGENCY_IMPORT",
+        "event": "cancellation_wins",
+        "to": "CANCELLED",
+        "guard": "Current cancellation and service obligations reconciled.",
+        "effect": "No promise to roll back customer-performed target imports."
+      },
+      {
+        "from": "RECEIPT_UPLOADED",
+        "event": "receipt_validator_claims",
+        "to": "RECEIPT_VALIDATING",
+        "guard": "Current stage/package/instance and admitted receipt identity match.",
+        "effect": "Validate exact source-to-target mappings under the current fence."
+      },
+      {
+        "from": "RECEIPT_VALIDATING",
+        "event": "approved_partial_scope_accounted",
+        "to": "VERIFIED_PARTIAL",
+        "guard": "Exact success/failure partition and explicit approved dependent subset exist.",
+        "effect": "Permit only supported child edges with complete parent identities; preserve all failures and withheld source dispositions."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "Capability",
+    "initial": "DESIGN",
+    "terminal": [
+      "SUSPENDED"
+    ],
+    "transitions": [
+      {
+        "from": "DESIGN",
+        "event": "implementation_observed",
+        "to": "IMPLEMENTED_UNACCEPTED",
+        "guard": "Exact code/contract exists.",
+        "effect": "Permit local review but no sale based on this status."
+      },
+      {
+        "from": "IMPLEMENTED_UNACCEPTED",
+        "event": "internal_qualification_accepted",
+        "to": "QUALIFIED_INTERNAL",
+        "guard": "Required exact-subject semantic/privacy/resource evidence passes.",
+        "effect": "Permit only authorized internal/synthetic operation."
+      },
+      {
+        "from": "QUALIFIED_INTERNAL",
+        "event": "limited_production_gates_accepted",
+        "to": "AVAILABLE_LIMITED",
+        "guard": "Business, payment, fiscal, delivery, support and production acceptance hold.",
+        "effect": "Admit real customers within the explicit accepted envelope."
+      },
+      {
+        "from": "AVAILABLE_LIMITED",
+        "event": "operating_maturity_accepted",
+        "to": "AVAILABLE",
+        "guard": "Actual customer/recurrence/support coverage meets the defined maturity gate.",
+        "effect": "Broaden only the demonstrated scope and operational capacity."
+      },
+      {
+        "from": "IMPLEMENTED_UNACCEPTED",
+        "event": "material_counterexample",
+        "to": "SUSPENDED",
+        "guard": "Failure invalidates safe use.",
+        "effect": "Retain evidence and prepare repair."
+      },
+      {
+        "from": "QUALIFIED_INTERNAL",
+        "event": "material_counterexample",
+        "to": "SUSPENDED",
+        "guard": "A privacy/semantic/vendor/resource failure invalidates acceptance.",
+        "effect": "Stop affected consequential use."
+      },
+      {
+        "from": "AVAILABLE_LIMITED",
+        "event": "material_counterexample",
+        "to": "SUSPENDED",
+        "guard": "Actual incident/vendor failure requires restriction.",
+        "effect": "Protect current customer obligations and prepare recovery/refund."
+      },
+      {
+        "from": "AVAILABLE",
+        "event": "material_counterexample",
+        "to": "SUSPENDED",
+        "guard": "Same exact affected-scope review.",
+        "effect": "New version and requalification are required to restore sale eligibility."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "CostGrant",
+    "initial": "PREPARED",
+    "terminal": [
+      "CLOSED",
+      "EXPIRED"
+    ],
+    "transitions": [
+      {
+        "from": "PREPARED",
+        "event": "actual_authorization_and_funding",
+        "to": "AUTHORIZED",
+        "guard": "Evidence of funds, ceiling, scope and expiry exists.",
+        "effect": "Enable atomic bounded reservations."
+      },
+      {
+        "from": "AUTHORIZED",
+        "event": "remaining_budget_unavailable",
+        "to": "EXHAUSTED",
+        "guard": "Known spend plus possible liability consumes the ceiling.",
+        "effect": "Block new dispatch; reconcile existing work."
+      },
+      {
+        "from": "EXHAUSTED",
+        "event": "reconciliation_releases_unused_reserve",
+        "to": "AUTHORIZED",
+        "guard": "Evidence proves an amount was not consumed and grant remains unexpired.",
+        "effect": "Restore only that exact available amount."
+      },
+      {
+        "from": "AUTHORIZED",
+        "event": "expiry_reached",
+        "to": "EXPIRED",
+        "guard": "Actual grant expiry reached.",
+        "effect": "No new spend; settle existing liability."
+      },
+      {
+        "from": "EXHAUSTED",
+        "event": "expiry_reached",
+        "to": "EXPIRED",
+        "guard": "Same expiry boundary.",
+        "effect": "Do not turn a new session into renewed funding."
+      },
+      {
+        "from": "AUTHORIZED",
+        "event": "all_effects_reconciled_and_scope_closed",
+        "to": "CLOSED",
+        "guard": "No unknown liability remains or an explicit liability transfer is recorded.",
+        "effect": "Close grant and release justified residual funds."
+      },
+      {
+        "from": "EXPIRED",
+        "event": "all_effects_reconciled",
+        "to": "CLOSED",
+        "guard": "Actual final costs and unused reserves are known.",
+        "effect": "Preserve the complete historical spend record."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "TaxDocument",
+    "initial": "DRAFT",
+    "terminal": [
+      "CORRECTED"
+    ],
+    "transitions": [
+      {
+        "from": "DRAFT",
+        "event": "fiscal_profile_validated",
+        "to": "VALIDATED",
+        "guard": "Actual operator/customer/tax/numbering fields pass reviewed rules.",
+        "effect": "Prepare exact provider issuance intent."
+      },
+      {
+        "from": "VALIDATED",
+        "event": "issue_intent_committed",
+        "to": "SUBMITTING",
+        "guard": "Provider entitlement and specific issuance authority exist.",
+        "effect": "Submit one intended fiscal document."
+      },
+      {
+        "from": "SUBMITTING",
+        "event": "authenticated_issuance",
+        "to": "ISSUED",
+        "guard": "Legal number and fiscal/provider acceptance are observed.",
+        "effect": "Deliver actual fiscal evidence and post the ledger reference."
+      },
+      {
+        "from": "SUBMITTING",
+        "event": "ambiguous_result",
+        "to": "UNCERTAIN",
+        "guard": "Provider may already have issued the document.",
+        "effect": "Reconcile exact identity, including pagination, before another create."
+      },
+      {
+        "from": "SUBMITTING",
+        "event": "authenticated_rejection",
+        "to": "REJECTED",
+        "guard": "Provider/fiscal rejection is known.",
+        "effect": "Preserve rejection reasons; no fake invoice success."
+      },
+      {
+        "from": "UNCERTAIN",
+        "event": "issued_document_found",
+        "to": "ISSUED",
+        "guard": "Exact issued identity and values match.",
+        "effect": "Reuse the actual document, not a duplicate."
+      },
+      {
+        "from": "UNCERTAIN",
+        "event": "no_effect_and_rejection_proved",
+        "to": "REJECTED",
+        "guard": "Reliable evidence proves nonissuance.",
+        "effect": "Permit corrected new version after review."
+      },
+      {
+        "from": "REJECTED",
+        "event": "corrected_draft_version",
+        "to": "CORRECTED",
+        "guard": "A new draft with explicit lineage is created.",
+        "effect": "Never overwrite the original rejection."
+      },
+      {
+        "from": "ISSUED",
+        "event": "lawful_credit_or_correction_issued",
+        "to": "CORRECTED",
+        "guard": "Actual valid correction document exists.",
+        "effect": "Retain both legal records and customer/commission consequences."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  },
+  {
+    "contract": "CommissionLine",
+    "initial": "ACCRUED_PENDING",
+    "terminal": [
+      "VOID"
+    ],
+    "transitions": [
+      {
+        "from": "ACCRUED_PENDING",
+        "event": "eligibility_conditions_met",
+        "to": "ELIGIBLE",
+        "guard": "Thirty days after final preparation, available funds and no justified hold.",
+        "effect": "Include eligible value in the correct monthly close."
+      },
+      {
+        "from": "ACCRUED_PENDING",
+        "event": "justified_dispute_or_funds_hold",
+        "to": "HELD",
+        "guard": "Specific amount/reason/review date recorded.",
+        "effect": "Preserve earned entitlement separately from payout timing."
+      },
+      {
+        "from": "HELD",
+        "event": "hold_resolved_and_eligible",
+        "to": "ELIGIBLE",
+        "guard": "Actual dispute/funds/documentation facts resolved.",
+        "effect": "Release only the affected payable amount."
+      },
+      {
+        "from": "ELIGIBLE",
+        "event": "statement_closed",
+        "to": "PAYABLE",
+        "guard": "Reconciled exact statement and lawful payee documentation.",
+        "effect": "Schedule by the agreed tenth business day."
+      },
+      {
+        "from": "PAYABLE",
+        "event": "settled_payout_evidence",
+        "to": "PAID",
+        "guard": "Actual authorized transfer receipt matches payee and amount.",
+        "effect": "Record payment; submission alone is insufficient."
+      },
+      {
+        "from": "PAYABLE",
+        "event": "payout_blocked",
+        "to": "HELD",
+        "guard": "Specific failed/returned transfer or legal issue.",
+        "effect": "Notify the seller with exact reason and next review."
+      },
+      {
+        "from": "PAID",
+        "event": "reconciled_refund_adjustment",
+        "to": "ADJUSTED",
+        "guard": "Cumulative entitlement recalculated under signed lawful terms.",
+        "effect": "Post explicit difference and any lawful offset; do not debit bank without authority."
+      },
+      {
+        "from": "ACCRUED_PENDING",
+        "event": "full_service_reversal",
+        "to": "VOID",
+        "guard": "Remaining eligible service basis is zero.",
+        "effect": "Entitlement is exactly zero, preserving the historical first designation."
+      },
+      {
+        "from": "HELD",
+        "event": "full_service_reversal",
+        "to": "VOID",
+        "guard": "Same cumulative zero basis.",
+        "effect": "Remove only the unwarranted liability with evidence."
+      },
+      {
+        "from": "ELIGIBLE",
+        "event": "full_service_reversal",
+        "to": "VOID",
+        "guard": "Reconciled full reversal before payout.",
+        "effect": "Update statement through a versioned correction."
+      },
+      {
+        "from": "ADJUSTED",
+        "event": "further_reconciled_adjustment",
+        "to": "ADJUSTED",
+        "guard": "Another actual refund/correction changes cumulative basis.",
+        "effect": "Recompute from remaining service and preserve all previous postings."
+      }
+    ],
+    "unlistedTransition": "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED"
+  }
+]

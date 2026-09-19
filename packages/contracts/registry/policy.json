@@ -1,0 +1,249 @@
+{
+  "edition": "KAVO-2026.09-R2",
+  "status": "NORMATIVE_DESIGN_NOT_PRODUCT_ACCEPTANCE",
+  "calendar": {
+    "timezone": "America/Bogota",
+    "day0": "2026-09-11",
+    "internalTarget": "2026-10-23",
+    "deadlineExclusive": "2026-10-28",
+    "days": 47
+  },
+  "language": {
+    "source": "en",
+    "prompts": "en",
+    "product": "en",
+    "ownerConversation": "es"
+  },
+  "money": {
+    "currency": "USD",
+    "minorUnit": 2,
+    "rounding": "HALF_UP_ON_NONNEGATIVE_RATIONAL",
+    "monthlyOwnerFundingCents": 22000,
+    "actualAvailableFunding": null
+  },
+  "modes": {
+    "public": [
+      "CLEAN",
+      "HUBSPOT",
+      "SALESFORCE"
+    ],
+    "legacyAdapter": {
+      "CLEAN_ONLY": "CLEAN"
+    }
+  },
+  "input": {
+    "files": 50,
+    "fileBytes": 2000000000,
+    "revisionBytes": 5000000000,
+    "columns": 800,
+    "decodedCellBytes": 1048576,
+    "decodedRecordBytes": 8388608,
+    "xlsxExpandedTotalBytes": 21474836480,
+    "xlsxExpandedPartBytes": 1073741824,
+    "associationCandidates": 5000000
+  },
+  "capacity": {
+    "ramHardBytes": 8589934592,
+    "rssQualificationBytes": 6012954214,
+    "scratchHardBytes": 68719476736,
+    "scratchQualificationBytes": 51539607552,
+    "executionSeconds": 28800,
+    "heavyActive": 1,
+    "heavyQueued": 3,
+    "agencyUploads": 2,
+    "agencyAudits": 1,
+    "launchSourceUnits": 500000,
+    "launchQualificationRecords": 1000000,
+    "oneMillionOfferQualificationRecords": 2000000,
+    "largerOfferQualificationRecords": 5000000
+  },
+  "retention": {
+    "uploadReservationSeconds": 86400,
+    "unpaidDaysFromReady": 7,
+    "unpaidDaysHardFromSeal": 14,
+    "paidDaysFromFirstPackage": 7,
+    "paidDaysHardFromCapture": 14,
+    "stagedDaysFromFirstRelease": 21,
+    "stagedDaysHardFromCapture": 30,
+    "stagedFinalDays": 7,
+    "ordinaryPaidNoTerminalHours": 48,
+    "importReceiptDaysFromTerminal": 7,
+    "targetMetadataDaysFromLastUse": 180,
+    "targetExecutionFreshnessDays": 30,
+    "ordinaryLogsDays": 30,
+    "securityLogsDays": 180,
+    "signedDownloadSeconds": 900,
+    "breakglassSeconds": 1800,
+    "softExtensionsPerProject": 1,
+    "softExtensionMaximumSeconds": 259200,
+    "extendHardCap": false
+  },
+  "api": {
+    "jsonBytes": 1048576,
+    "batchItems": 100,
+    "pageDefault": 25,
+    "pageMaximum": 100,
+    "schemaDraft": "2020-12",
+    "prefix": "/api/v1",
+    "unknownFields": "REJECT",
+    "coerceTypes": false
+  },
+  "intelligence": {
+    "pilotCases": 60,
+    "pilotRunsPerCandidate": 2,
+    "qualificationCases": 600,
+    "qualificationRuns": 3,
+    "interpretationSeconds": 1200,
+    "auditAbsoluteSeconds": 86400,
+    "tasks": 32,
+    "semanticAttemptsPerTask": 2,
+    "qualifiedTransportRetries": 2,
+    "inputTokensPerRequest": 200000,
+    "outputTokensPerRequest": 8192,
+    "inputTokensPerAudit": 2000000,
+    "outputTokensPerAudit": 131072,
+    "freeAuditCeilingCents": 150,
+    "assignedPaidAuditCeilingCents": 500,
+    "ambiguityMinimum": 0.99,
+    "supportedEachRunMinimum": 0.97,
+    "supportedMeanMinimum": 0.98,
+    "criticalFailuresMaximum": 0,
+    "selectedProductionModel": null
+  },
+  "pricing": {
+    "scheduleVersion": "R2-INITIAL",
+    "quoteDays": 14,
+    "foundingAgencyCount": 3,
+    "foundingDiscountBps": 2500,
+    "repeatLookbackDays": 365,
+    "repeatTiers": [
+      {
+        "minimum": 0,
+        "bps": 0
+      },
+      {
+        "minimum": 1,
+        "bps": 500
+      },
+      {
+        "minimum": 10,
+        "bps": 1000
+      },
+      {
+        "minimum": 25,
+        "bps": 1500
+      }
+    ],
+    "discountCombination": "MAX_NOT_STACKED",
+    "bands": [
+      {
+        "maximum": 50000,
+        "CLEAN": 69500,
+        "HUBSPOT": 129500,
+        "SALESFORCE": 149500
+      },
+      {
+        "maximum": 150000,
+        "CLEAN": 109500,
+        "HUBSPOT": 199500,
+        "SALESFORCE": 229500
+      },
+      {
+        "maximum": 500000,
+        "CLEAN": 179500,
+        "HUBSPOT": 299500,
+        "SALESFORCE": 349500
+      },
+      {
+        "maximum": 1000000,
+        "CLEAN": 269500,
+        "HUBSPOT": 449500,
+        "SALESFORCE": 499500
+      }
+    ],
+    "futureAdditional500k": {
+      "CLEAN": 45000,
+      "HUBSPOT": 75000,
+      "SALESFORCE": 85000
+    },
+    "customerPreExecutionSourceReplacementsIncluded": 1,
+    "foundingReservationDays": 14,
+    "pendingFoundingReservationsPerAgency": 1
+  },
+  "commission": {
+    "firstBps": 1000,
+    "repeatBps": 400,
+    "recurrenceCalendarMonths": 12,
+    "acceptedClaimDays": 90,
+    "terminationOpportunityTailDays": 90,
+    "eligibilityDaysAfterFinalCompletion": 30,
+    "statementBusinessDay": 5,
+    "payBusinessDay": 10,
+    "firstProjectDesignation": "STICKY_AFTER_FIRST_CAPTURE",
+    "base": "SERVICE_COLLECTED_AFTER_DISCOUNT_NET_OF_REFUND_EXCLUDING_TAX",
+    "minimumPayoutCents": 0,
+    "feeBearer": "KAVO_BY_DEFAULT",
+    "operationalTimezone": "America/Bogota",
+    "calendarMonthRollover": "CLAMP_DAY_TO_LAST_DAY_OF_DESTINATION_MONTH",
+    "windowAnchor": "FIRST_DURABLE_CAPTURE_CONFIRMATION",
+    "subsequentCutoff": "VERIFIED_PROVIDER_COMPLETION_BEFORE_EXCLUSIVE_END",
+    "splitRemainder": "LARGEST_FRACTION_THEN_BENEFICIARY_ID_ASC"
+  },
+  "support": {
+    "timezone": "America/Bogota",
+    "days": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "start": "09:00",
+    "end": "17:00",
+    "defectReportDays": 30,
+    "defectRepairTargetBusinessDays": 5
+  },
+  "reserves": {
+    "provisionalIncomeServiceBasisBps": 2500,
+    "provisionalIncomePositiveContributionBps": 4000,
+    "rule": "GREATER_PLUS_SEPARATE_KNOWN_INDIRECT_TAX_WITHOUT_DOUBLE_COUNT",
+    "refundTrailingDays": 90,
+    "refundFloorBps": 500,
+    "refundRule": "MAX_PERCENT_OF_TRAILING_COLLECTIONS_OR_KNOWN_EXPOSURE"
+  },
+  "provenance": {
+    "sourceBaselineZipBytes": 1584927,
+    "sourceBaselineZipSha256": "b2caa9577e16cd4d811660a81de9625b8696c6d7903eeed5ba1a25e8cb4723a1",
+    "minimumOriginalScopeZipBytes": 4754781,
+    "scopeExclusions": [
+      "companion/",
+      "history/",
+      "project_load/",
+      "validation/results/",
+      "validation/examples/",
+      "00_INDEX_AND_ADOPTION.md",
+      "28_DECISIONS_AND_SOURCES.md",
+      "30_PROJECT_INSTRUCTION.md",
+      "31_EDITION_VALIDATION.md",
+      "MANIFEST_SHA256.json",
+      "registry/sources.json",
+      "registry/decisions.json",
+      "registry/package_metrics.json",
+      "registry/project_load_manifest.json",
+      "validation/package_edition.py"
+    ],
+    "scopeMeasurement": "ZIP_DEFLATED_LEVEL_9_ORIGINAL_SCOPE_WITH_CONSERVATIVE_MIXED_DOCUMENT_EXCLUSIONS"
+  },
+  "messaging": {
+    "transactionalProvider": "RESEND",
+    "humanMailboxProvider": "GOOGLE_WORKSPACE",
+    "integratedSendScope": "https://www.googleapis.com/auth/gmail.send",
+    "ordinaryDailyQuotaShareBps": 8000,
+    "initialNewProspectsPerSenderBusinessDay": 10,
+    "sequenceMaximumMessages": 3,
+    "sequenceCalendarDays": 14,
+    "trackingPixels": false,
+    "uncertainSubmission": "RECONCILE_BEFORE_REPEAT",
+    "coldOutreachViaResend": false
+  }
+}

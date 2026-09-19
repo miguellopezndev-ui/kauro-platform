@@ -1,0 +1,25 @@
+{
+  "name": "kauro-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Kauro platform monorepo: contracts, domain, application, authorization, persistence, data plane, reports, and the api/control/web/ops/worker entrypoints.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.16.1",
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test && node --test --test-reporter=spec \"tools/test/**/*.test.mjs\"",
+    "generate": "pnpm --filter @kauro/contracts run generate",
+    "arch": "node tools/architecture-gate.mjs",
+    "clean-consume": "node tools/clean-consume.mjs",
+    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run clean-consume"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

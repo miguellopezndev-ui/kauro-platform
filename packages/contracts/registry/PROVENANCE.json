@@ -1,0 +1,13 @@
+{
+  "source": "Kauro authority edition R2 (KAVO_REINICIO_20260913, restored 2026-09-13), registry directory authority_r2/registry as installed read-only at /srv/kavo/authority/reinicio/authority_r2/registry on the owner's host; packet manifest PACKET_MANIFEST_SHA256.json sha256 prefix e806ef4e7339fa7a",
+  "vendored_at": "2026-09-19T19:45:00Z",
+  "brand_note": "The authority text names the product Kavo (edition KAVO-2026.09-R2). The product is Kauro since 2026-09-15; every identifier this platform emits is KAURO_* / kauro-* (amendment A2, docs/BRAND_AMENDMENT_A2.md). The vendored files are byte-identical to the authority and still say Kavo.",
+  "files": {
+    "contracts.json": "9608c2de39ae0dc5e66c537d241a7257a190c581374aba2c63fd4a1c7d2f29d2",
+    "commands.json": "6fa1a124821609a5ac911779304e8876df1a6954c530e895604da107826af0b6",
+    "state_transitions.json": "5d770459eb0ce40148edcc31cd01ed72f07fcd1666853c2d8b3240b11d94a6f5",
+    "gates.json": "3be0a803d118a44351bf11b5d4b2568f7a8fc182e6ae651abc71eb2deb31fc2c",
+    "screens.json": "c9963d7ebe713d88c4f4d2af3ea2b1ad7d44e74c6649fc705f62f49e71a49f80",
+    "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e"
+  }
+}

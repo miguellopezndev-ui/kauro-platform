@@ -1,0 +1,35 @@
+{
+  "$comment": "07_DOMAIN_AND_STATE_MACHINES 'Platform topology': dependencies flow from contracts to domain ports, application orchestration and concrete adapters; UI consumes HTTP DTOs; the cores do not depend on persistence, payments, framework or UI. Every workspace package must be assigned a layer here; tools/architecture-gate.mjs enforces the allowed edges, forbids deep/private/sibling imports, cycles, and server-only code or credentials in client bundles.",
+  "layers": {
+    "@kauro/contracts": "contracts",
+    "@kauro/domain": "domain",
+    "@kauro/application": "application",
+    "@kauro/authorization": "application",
+    "@kauro/persistence": "adapter",
+    "@kauro/data-plane": "adapter",
+    "@kauro/migration-core": "core",
+    "@kauro/intelligence-core": "core",
+    "@kauro/reports": "application",
+    "@kauro/ui": "ui",
+    "@kauro/api": "entrypoint",
+    "@kauro/control": "entrypoint",
+    "@kauro/web": "web",
+    "@kauro/ops": "entrypoint",
+    "@kauro/intelligence-worker": "entrypoint",
+    "@kauro/migration-worker": "entrypoint"
+  },
+  "allowedDependencies": {
+    "contracts": [],
+    "core": ["contracts"],
+    "domain": ["contracts", "core"],
+    "application": ["contracts", "domain", "core", "application"],
+    "adapter": ["contracts", "domain", "application", "core"],
+    "entrypoint": ["contracts", "domain", "application", "adapter", "core"],
+    "ui": ["contracts"],
+    "web": ["contracts", "ui"]
+  },
+  "publicSubpaths": ["/canonical", "/digest", "/registry", "/generated/types", "/schemas.json", "/package.json"],
+  "clientBundles": ["apps/web/", "packages/ui/"],
+  "serverOnlyPackages": ["pg", "fastify", "@kauro/persistence", "@kauro/data-plane", "@kauro/application", "@kauro/domain", "@kauro/authorization"],
+  "credentialPatterns": ["DATABASE_URL", "PAYPAL_CLIENT_SECRET", "SERVICE_ACCOUNT_KEY", "PRIVATE_KEY", "process\\.env\\.[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|KEY)"]
+}

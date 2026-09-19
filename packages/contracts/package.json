@@ -1,0 +1,50 @@
+{
+  "name": "@kauro/contracts",
+  "version": "0.1.0",
+  "description": "Kauro contract authority: the R2 registry (contracts, commands, state transitions, gates, screens, policy) vendored with provenance, generated TypeScript types and JSON Schemas, the canonical JSON profile and domain-separated digests.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./canonical": {
+      "types": "./dist/src/canonical.d.ts",
+      "default": "./dist/src/canonical.js"
+    },
+    "./digest": {
+      "types": "./dist/src/digest.d.ts",
+      "default": "./dist/src/digest.js"
+    },
+    "./registry": {
+      "types": "./dist/src/registry.d.ts",
+      "default": "./dist/src/registry.js"
+    },
+    "./generated/types": {
+      "types": "./dist/src/generated/types.d.ts",
+      "default": "./dist/src/generated/types.js"
+    },
+    "./schemas.json": "./dist/src/generated/schemas.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "registry",
+    "README.md"
+  ],
+  "scripts": {
+    "generate": "node tools/generate.mjs",
+    "build": "node tools/generate.mjs && tsc -p tsconfig.json && node tools/copy-generated-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}
