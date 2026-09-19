@@ -36,7 +36,7 @@ pnpm run clean-consume   # S045: every publishable package installs and works fr
 | `@kauro/contracts` | the contract authority: vendored R2 registry (provenance-checked), generated TypeScript types and JSON Schemas, canonical JSON profile, domain-separated digests |
 | `@kauro/domain` | aggregate identity (UUIDv7 / UUIDv5), tenant contexts, role and capability model, state-machine guards over the registry, registered domain events, failure taxonomy, idempotency identity, and the ports adapters implement (B06 design) |
 | `@kauro/application` | command contracts of the seven B06 commands, request envelope, safe problem contract, closed request schemas, DTO views, and the orchestration ports (authorizer, assurance, admission, schema validation, plan services) |
-| `@kauro/persistence` | the PostgreSQL 17 migrations (schema, roles, composite tenant keys, forced RLS, outbox/inbox, journals, leases), the checksummed migration runner, the temporary-cluster test helper and the SQLSTATE translation |
+| `@kauro/persistence` | the PostgreSQL 17 migrations (schema, roles, composite tenant keys, forced RLS, outbox/inbox, journals, leases), the checksummed migration runner, the verified pool factory, the unit of work that binds the tenant context, the `pg` adapters of every domain port (repositories, event publisher, command journal, request journal, lease store), the SQLSTATE translation and the temporary-cluster test helper |
 
 Design documents: `docs/design/B06-domain-db-authz.md` (domain, database and authorization) and `docs/design/B06-case-map.md`
 (the 29 B06 acceptance cases and the tests that demonstrate them). Persistence tests start a real PostgreSQL 17 (binaries from

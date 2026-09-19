@@ -1,6 +1,6 @@
 # @kauro/persistence
 
-PostgreSQL 17 persistence of the Kauro platform.
+PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements the ports of `@kauro/domain`).
 
 - `migrations/0001..0007_*.sql` — the ordered schema: roles and helpers, identities/agencies/memberships, capabilities/
   clients/projects/revisions/target contracts, plans/receipts/approvals, event types/domain events/outbox/inbox, command
@@ -8,10 +8,45 @@ PostgreSQL 17 persistence of the Kauro platform.
   tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event.
 - `src/migrations/runner` — `applyMigrations(client)`: one transaction per file, checksum ledger in
   `kauro_meta.schema_migrations`, drift refusal, explicit lock/statement timeouts. Run as the owner role, never the runtime.
+- `src/pool` — `createPool(config)`: a `pg` pool with a mandatory connection ceiling (07 "Connection budget") whose every
+  physical connection is verified once on first use: not SUPERUSER, not BYPASSRLS, not CREATEROLE/CREATEDB, not the database
+  owner, member of exactly one runtime group (`kauro_app` or `kauro_control`). A privileged login is destroyed, never pooled.
+- `src/unit-of-work` — `createUnitOfWorkFactory(pool, {clock})`: `run(context, work, options)` opens one transaction at the
+  requested isolation (READ COMMITTED by default), sets a transaction-local `statement_timeout`, binds the TENANT / IDENTITY /
+  SYSTEM context with `set_config(..., true)` (the settings vanish at COMMIT/ROLLBACK, so a connection returns to the pool
+  with no context), refuses a context on the wrong pool (SYSTEM needs `kauro_control`, the others `kauro_app`), hands the
+  repositories, event publisher, command journal, request journal and lease store to `work`, commits when it returns (the
+  deferred constraints fire here and the COMMIT tag is checked — an aborted transaction never passes as committed) and rolls
+  back when it throws. A `DomainFailure` is the business outcome; a database refusal becomes the failure of the SQLSTATE
+  table; anything else is `INTERNAL_ERROR` with the correlation id (the cause stays server-side). `serialization_failure`
+  and `deadlock_detected` are retried with a fresh transaction up to `maxRetries`. `adoptTenant` (CreateAgency) accepts only
+  an id minted through `uow.ids` in the same unit of work; `resolveMembership` records the authorizer's decision once.
+- `src/repositories/*` — `PgAgencyRepository`, `PgMembershipRepository`, `PgIdentityRepository`, `PgSecurityEventRepository`
+  (`tenancy`), `PgProcessingAuthorityRepository`, `PgEndClientRepository`, `PgProjectRepository`, `PgDatasetRevisionRepository`,
+  `PgTargetContractRepository`, `PgCapabilityRepository` (`workspace`), `PgPlanRepository`, `PgValidationReceiptRepository`,
+  `PgApprovalRepository` (`plans`). Reads return `null` for rows the policies hide; versioned writes are compare-and-swap on
+  `version` and answer `STALE` with the current safe version and state, or `NOT_FOUND` for an invisible row; foreign
+  references fail on the composite keys as `INVALID_REQUEST / UNKNOWN_REFERENCE`.
+- `src/event-publisher` — `PgEventPublisher.publish`: allowlist check, id and time from the ports, canonical payload digest,
+  `domain_events` row plus one `outbox_records` row per registered consumer; a second event for an aggregate version is
+  `INTEGRITY_FAILURE / VERSION_DISCIPLINE`.
+- `src/command-journal` — `PgCommandJournal`: reservation by `INSERT ... ON CONFLICT (identity) DO NOTHING`, so a concurrent
+  duplicate waits for the first transaction and then replays (same digest), conflicts (other digest) or proceeds (rollback);
+  `commit` stores the 2xx status, body and resource link; final entries never change.
+- `src/request-journal` — `PgRequestJournal`: fence-scoped dispatch attempts; a full hash, a positive ceiling and a grant are
+  required; response before consume; terminal states final.
+- `src/lease-store` — `PgLeaseStore` over `kauro.claim_lease / heartbeat_lease / checkpoint_lease / cancel_lease`; a claim
+  runs under a savepoint so a refusal (`RESUME_WITHOUT_CHECKPOINT`, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`,
+  `DEADLINE_PASSED`) is an outcome, not an aborted transaction. The port's `CANCELLED` reason is not produced by this adapter:
+  the schema has no cancellation rule that refuses a claim (cancellation is a generation the owner observes).
+- `src/sqlstate` / `src/sql` — the SQLSTATE vocabulary the schema raises (KA001..KA008) and its translation into
+  `DomainFailure`; `ConstraintViolation` for a unique constraint the handler must interpret; `LeaseRefusal` for KA005/KA004
+  raised by the lease functions.
 - `src/testing/temporary-postgres` — `startTemporaryPostgres()`: initdb + pg_ctl on a free 127.0.0.1 port, database and
   roles, migrations applied, login roles for `kauro_app` / `kauro_control`; `stop()` removes everything. Binaries from
   `PGBIN`, else `C:\Tools\pgsql17\bin` (Windows) or `/usr/lib/postgresql/17/bin` (Linux).
-- `src/sqlstate` — the SQLSTATE vocabulary the schema raises (KA001..KA008) and its translation into `DomainFailure`.
 
-Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. Repository, unit-of-work,
-event-publisher, journal and lease adapters are the B06 implementation mandate (`docs/design/B06-domain-db-authz.md` §12).
+Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. `test/harness.ts` builds the two
+verified pools and unit-of-work factories on a fresh cluster and writes every fixture through the adapters under a real
+context. `migrations`, `tenant-isolation`, `discipline`, `last-owner` and `journals-leases` review the SQL directly;
+`adapters-unit-of-work`, `adapters-tenant-isolation`, `adapters-journals-outbox` and `adapters-leases` review the adapters.

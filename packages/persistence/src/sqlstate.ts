@@ -22,6 +22,8 @@ export const SQLSTATE = Object.freeze({
   SERIALIZATION_FAILURE: "40001",
   DEADLOCK_DETECTED: "40P01",
   LOCK_NOT_AVAILABLE: "55P03",
+  // statement_timeout / lock wait cancelled inside a unit of work: resource saturation, retryable (07 "Command outcomes")
+  QUERY_CANCELED: "57014",
 });
 
 const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; retryable?: boolean }>> = Object.freeze({
@@ -39,6 +41,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   "40001": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "40P01": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "55P03": { code: "CAPACITY_UNAVAILABLE", retryable: true },
+  "57014": { code: "CAPACITY_UNAVAILABLE", retryable: true },
 });
 
 /**
