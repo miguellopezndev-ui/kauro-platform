@@ -1,0 +1,162 @@
+// The migrations against a real PostgreSQL 17 (07 "Acceptance obligations"): they apply in order, re-apply as a no-op,
+// refuse drift, and the schema they build agrees with the vendored registry (state vocabularies, listed transitions, event
+// types) and with the isolation rules (runtime roles are not owners/superusers/BYPASSRLS; every kauro table has RLS forced).
+import assert from "node:assert/strict";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, test } from "node:test";
+import { STATE_MACHINES, registryJson } from "@kauro/contracts";
+import { EVENT_TYPES } from "@kauro/domain";
+import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations, startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
+
+let pg: TemporaryPostgres;
+before(async () => {
+  pg = await startTemporaryPostgres();
+});
+after(async () => {
+  await pg.stop();
+});
+
+test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
+  const files = listMigrations();
+  assert.equal(files.length, 7);
+  assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
+  const owner = await pg.connect("kauro_owner");
+  try {
+    const again = await applyMigrations(owner);
+    assert.equal(again.applied.length, 0);
+    assert.equal(again.skipped.length, files.length);
+    const ledger = await appliedMigrations(owner);
+    assert.deepEqual(ledger.map((l) => [l.version, l.checksum]), files.map((f) => [f.version, f.checksum]));
+    for (const l of ledger) assert.equal(l.appliedBy, "kauro_owner");
+  } finally {
+    await owner.end();
+  }
+});
+
+test("a migration file edited after being applied is refused as drift", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "kauro-mig-drift-"));
+  try {
+    cpSync(MIGRATIONS_DIR, dir, { recursive: true });
+    const owner = await pg.connect("kauro_owner");
+    try {
+      const first = await applyMigrations(owner, { dir });
+      assert.equal(first.applied.length, 0, "the copy matches the applied set");
+      writeFileSync(join(dir, "0007_security_events.sql"), "-- edited after application\nSELECT 1;\n");
+      await assert.rejects(applyMigrations(owner, { dir }), MigrationDriftError);
+    } finally {
+      await owner.end();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the owner never serves requests", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const roles = await su.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; rolcreaterole: boolean }>(
+      "SELECT rolname, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname IN ('kauro_app', 'kauro_control', 'kauro_app_test', 'kauro_control_test')",
+    );
+    assert.equal(roles.rows.length, 4);
+    for (const r of roles.rows) {
+      assert.equal(r.rolsuper, false, r.rolname);
+      assert.equal(r.rolbypassrls, false, r.rolname);
+      assert.equal(r.rolcreaterole, false, r.rolname);
+    }
+    const owners = await su.query<{ tableowner: string }>("SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname = 'kauro'");
+    assert.deepEqual(owners.rows.map((o) => o.tableowner), ["kauro_owner"]);
+    const rls = await su.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+      "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'kauro' AND c.relkind = 'r' ORDER BY c.relname",
+    );
+    assert.ok(rls.rows.length >= 20);
+    for (const t of rls.rows) {
+      if (t.relname === "state_transitions") continue; // reference data, SELECT only, no tenant rows
+      assert.equal(t.relrowsecurity, true, `${t.relname} has no RLS`);
+      assert.equal(t.relforcerowsecurity, true, `${t.relname} does not FORCE RLS`);
+    }
+    // no SECURITY DEFINER function anywhere in the schema (08: requires specific justification; none is used)
+    const definers = await su.query<{ proname: string }>("SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
+    assert.deepEqual(definers.rows, []);
+    // request handlers never hold DELETE on any table
+    const deletes = await su.query<{ table_name: string }>(
+      "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'kauro_app' AND privilege_type = 'DELETE' AND table_schema = 'kauro'",
+    );
+    assert.deepEqual(deletes.rows, []);
+  } finally {
+    await su.end();
+  }
+});
+
+interface RegistryContract {
+  name: string;
+  fields: Array<{ name: string; type: string }>;
+}
+
+function registryEnum(contract: string, field: string): string[] {
+  const contracts = registryJson<RegistryContract[]>("contracts.json");
+  const f = contracts.find((c) => c.name === contract)?.fields.find((x) => x.name === field);
+  assert.ok(f && f.type.startsWith("enum:"), `${contract}.${field}`);
+  return f.type.slice(5).split(",");
+}
+
+test("state and enum CHECK constraints carry exactly the registry vocabularies", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const expect: Array<[string, string, string, string]> = [
+      ["agencies", "state", "Agency", "state"],
+      ["memberships", "role", "Membership", "role"],
+      ["memberships", "state", "Membership", "state"],
+      ["end_clients", "state", "EndClient", "state"],
+      ["dataset_revisions", "state", "DatasetRevision", "state"],
+      ["plans", "state", "Plan", "state"],
+      ["capabilities", "state", "Capability", "state"],
+      ["validation_receipts", "result", "ValidationReceipt", "result"],
+      ["request_journal", "state", "RequestJournal", "state"],
+      ["request_journal", "usage_state", "RequestJournal", "usageState"],
+      ["outbox_records", "state", "OutboxRecord", "state"],
+      ["inbox_records", "state", "InboxRecord", "state"],
+      ["inbox_records", "environment", "InboxRecord", "environment"],
+      ["target_contracts", "mode", "TargetContract", "mode"],
+    ];
+    for (const [table, column, contract, field] of expect) {
+      const r = await su.query<{ def: string }>(
+        `SELECT pg_get_constraintdef(c.oid) AS def FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+         WHERE n.nspname = 'kauro' AND t.relname = $1 AND c.contype = 'c' AND pg_get_constraintdef(c.oid) ~ ('^CHECK \\(\\(' || $2 || ' = ANY')`,
+        [table, column],
+      );
+      assert.equal(r.rows.length, 1, `${table}.${column} has no enum CHECK`);
+      const values = [...r.rows[0]!.def.matchAll(/'([A-Z_]+)'::text/g)].map((m) => m[1]);
+      assert.deepEqual(values, registryEnum(contract, field), `${table}.${column}`);
+    }
+  } finally {
+    await su.end();
+  }
+});
+
+test("the listed-transition seed equals the registry machines for every machine the schema guards", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    for (const name of ["Agency", "Membership", "DatasetRevision", "Plan", "Capability"]) {
+      const m = STATE_MACHINES.find((x) => x.contract === name)!;
+      const expected = [...new Set(m.transitions.map((t) => `${t.from}>${t.to}`))].sort();
+      const r = await su.query<{ edge: string }>("SELECT from_state || '>' || to_state AS edge FROM kauro.state_transitions WHERE machine = $1 ORDER BY 1", [name]);
+      assert.deepEqual(r.rows.map((x) => x.edge), expected, name);
+    }
+    const others = await su.query<{ machine: string }>("SELECT DISTINCT machine FROM kauro.state_transitions ORDER BY 1");
+    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"]);
+  } finally {
+    await su.end();
+  }
+});
+
+test("registered event types in the database are exactly the domain EVENT_TYPES", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const r = await su.query<{ event_type: string }>("SELECT event_type FROM kauro.event_types ORDER BY 1");
+    assert.deepEqual(r.rows.map((x) => x.event_type), [...EVENT_TYPES].sort());
+  } finally {
+    await su.end();
+  }
+});

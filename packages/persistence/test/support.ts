@@ -1,0 +1,244 @@
+// Shared fixtures for the persistence tests. Every fixture write goes through the runtime role (kauro_app_test) under a
+// real tenant context, so the fixtures themselves prove the policies admit legitimate writes (21 "Positive and negative
+// symmetry"). Oracle reads use the superuser, which bypasses RLS and therefore sees every row of every tenant.
+import { randomBytes, createHash } from "node:crypto";
+import type { Client } from "pg";
+import { createIdGenerator, identityUserId, toUtcInstant, type IdGenerator } from "@kauro/domain";
+
+export const clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
+export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
+
+export function sha(s: string): string {
+  return createHash("sha256").update(s).digest("hex");
+}
+
+export interface Context {
+  readonly agencyId?: string;
+  readonly userId?: string;
+}
+
+/** Binds the context with SET LOCAL semantics (set_config(..., true)) inside the transaction the caller opened. */
+export async function bind(client: Client, ctx: Context): Promise<void> {
+  await client.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [ctx.agencyId ?? "", ctx.userId ?? ""]);
+}
+
+/** One transaction with the context bound; commits when fn returns, rolls back and rethrows otherwise. */
+export async function tx<T>(client: Client, ctx: Context, fn: (c: Client) => Promise<T>): Promise<T> {
+  await client.query("BEGIN");
+  try {
+    await bind(client, ctx);
+    const out = await fn(client);
+    await client.query("COMMIT");
+    return out;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  }
+}
+
+export interface EventInput {
+  readonly aggregateKind: string;
+  readonly aggregateId: string;
+  readonly aggregateVersion: number;
+  readonly agencyId: string | null;
+  readonly eventType: string;
+  readonly actorUserId: string | null;
+  readonly correlationId?: string;
+  readonly payload?: Record<string, unknown>;
+}
+
+/** Appends a domain event row (what the EventPublisher adapter will do). */
+export async function event(client: Client, e: EventInput): Promise<string> {
+  const eventId = ids.next();
+  const payload = e.payload ?? {};
+  await client.query(
+    `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, '1', now())`,
+    [eventId, e.aggregateKind, e.aggregateId, e.aggregateVersion, e.agencyId, e.eventType, e.actorUserId ? "USER" : "SYSTEM", e.actorUserId, ids.next(), e.correlationId ?? ids.next(), JSON.stringify(payload), sha(JSON.stringify(payload))],
+  );
+  return eventId;
+}
+
+export interface Person {
+  readonly userId: string;
+}
+
+/** Syncs an identity row (verified email + MFA) under the identity's own context. */
+export async function person(app: Client, subject: string, verified = true): Promise<Person> {
+  const userId = identityUserId("identity-platform", subject);
+  await tx(app, { userId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.identities (user_id, provider, subject_hash, state, email_verified_at, mfa_enrolled_at, created_at, updated_at)
+       VALUES ($1, 'identity-platform', $2, 'ACTIVE', $3, $3, now(), now()) ON CONFLICT (user_id) DO NOTHING`,
+      [userId, sha(subject), verified ? new Date() : null],
+    );
+  });
+  return { userId };
+}
+
+export interface AgencyFixture {
+  readonly agencyId: string;
+  readonly ownerMembershipId: string;
+  readonly ownerUserId: string;
+}
+
+/** CreateAgency as the handler will do it: IDENTITY context adopts the minted agency id, inserts agency + owner + events. */
+export async function agency(app: Client, owner: Person, displayName = "Acme Agency"): Promise<AgencyFixture> {
+  const agencyId = ids.next();
+  const membershipId = ids.next();
+  await app.query("BEGIN");
+  try {
+    await bind(app, { userId: owner.userId });
+    await bind(app, { userId: owner.userId, agencyId }); // adoptTenant
+    await app.query(
+      `INSERT INTO kauro.agencies (agency_id, display_name, created_by_user_id, created_at, updated_at) VALUES ($1, $2, $3, now(), now())`,
+      [agencyId, displayName, owner.userId],
+    );
+    await app.query(
+      `INSERT INTO kauro.memberships (membership_id, agency_id, user_id, role, state, assurance_policy, accepted_at, created_at, updated_at)
+       VALUES ($1, $2, $3, 'OWNER', 'ACTIVE', 'MFA_REQUIRED', now(), now(), now())`,
+      [membershipId, agencyId, owner.userId],
+    );
+    await event(app, { aggregateKind: "agency", aggregateId: agencyId, aggregateVersion: 1, agencyId, eventType: "agency.created.v1", actorUserId: owner.userId, payload: { agencyId, createdByUserId: owner.userId, state: "DRAFT" } });
+    await event(app, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: 1, agencyId, eventType: "membership.created.v1", actorUserId: owner.userId, payload: { membershipId, agencyId, userId: owner.userId, role: "OWNER", state: "ACTIVE" } });
+    await app.query("COMMIT");
+  } catch (e) {
+    await app.query("ROLLBACK");
+    throw e;
+  }
+  return { agencyId, ownerMembershipId: membershipId, ownerUserId: owner.userId };
+}
+
+/** Adds an ACTIVE member with the given role inside the tenant context (as InviteMember + AcceptInvitation will). */
+export async function member(app: Client, ag: AgencyFixture, who: Person, role: string): Promise<string> {
+  const membershipId = ids.next();
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.memberships (membership_id, agency_id, user_id, role, state, assurance_policy, accepted_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'ACTIVE', 'MFA_REQUIRED', now(), now(), now())`,
+      [membershipId, ag.agencyId, who.userId, role],
+    );
+    await event(c, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "membership.created.v1", actorUserId: ag.ownerUserId, payload: { membershipId, agencyId: ag.agencyId, userId: who.userId, role, state: "ACTIVE" } });
+  });
+  return membershipId;
+}
+
+export async function processingAuthority(app: Client, ag: AgencyFixture): Promise<string> {
+  const id = ids.next();
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.processing_authorities (processing_authority_id, agency_id, kind, evidence_hash, recorded_by_membership_id, recorded_at)
+       VALUES ($1, $2, 'CLIENT_AUTHORIZATION', $3, $4, now())`,
+      [id, ag.agencyId, sha("dpa-" + id), ag.ownerMembershipId],
+    );
+  });
+  return id;
+}
+
+export async function endClient(app: Client, ag: AgencyFixture, authorityId: string, displayName = "Client One"): Promise<string> {
+  const clientId = ids.next();
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.end_clients (client_id, agency_id, display_name, processing_authority_ref, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, now(), now())`,
+      [clientId, ag.agencyId, displayName, authorityId, ag.ownerMembershipId],
+    );
+    await event(c, { aggregateKind: "end_client", aggregateId: clientId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "end_client.created.v1", actorUserId: ag.ownerUserId, payload: { clientId, agencyId: ag.agencyId, processingAuthorityRef: authorityId } });
+  });
+  return clientId;
+}
+
+/** Publishes a mode capability as the control plane (CMD058 territory; here a fixture). */
+export async function offeredCapability(control: Client, mode: string, state = "AVAILABLE_LIMITED"): Promise<string> {
+  const id = ids.next();
+  await control.query(
+    `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
+     VALUES ($1, 'R2-INITIAL', 'MODE', $2, $3, $4, $5, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+    [id, mode, state, sha("profile-" + mode), JSON.stringify(state === "DESIGN" || state === "IMPLEMENTED_UNACCEPTED" ? [] : [sha("evidence-" + mode)])],
+  );
+  return id;
+}
+
+export async function project(app: Client, ag: AgencyFixture, clientId: string, capabilityId: string, mode = "CLEAN"): Promise<{ projectId: string; revisionId: string }> {
+  const projectId = ids.next();
+  const revisionId = ids.next();
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.projects (project_id, agency_id, client_id, mode, purpose, target_instance_ref, capability_id, capability_version, current_revision_id, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'Quarterly cleanup', $5, $6, 'R2-INITIAL', $7, $8, now(), now())`,
+      [projectId, ag.agencyId, clientId, mode, mode === "CLEAN" ? null : ids.next(), capabilityId, revisionId, ag.ownerMembershipId],
+    );
+    await c.query(
+      `INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, created_at, updated_at) VALUES ($1, $2, $3, now(), now())`,
+      [revisionId, ag.agencyId, projectId],
+    );
+    await event(c, { aggregateKind: "project", aggregateId: projectId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "project.created.v1", actorUserId: ag.ownerUserId, payload: { projectId, agencyId: ag.agencyId, clientId, mode, initialRevisionId: revisionId } });
+    await event(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "dataset_revision.created.v1", actorUserId: ag.ownerUserId, payload: { revisionId, agencyId: ag.agencyId, projectId, state: "DRAFT" } });
+  });
+  return { projectId, revisionId };
+}
+
+export interface PlanFixture {
+  readonly planId: string;
+  readonly bodyHash: string;
+  readonly revisionHash: string;
+  readonly targetContractHash: string;
+}
+
+/** A plan revision at the given state (fixtures walk the listed edges with one event per version). */
+export async function plan(app: Client, ag: AgencyFixture, projectId: string, state: "DRAFT" | "VALIDATION_REQUIRED" | "VALIDATED", seed = "plan"): Promise<PlanFixture & { version: number; receiptHash?: string }> {
+  const planId = ids.next();
+  const bodyHash = sha(seed + "-body-" + planId);
+  const revisionHash = sha(seed + "-revision-" + projectId);
+  const targetContractHash = sha(seed + "-target-" + projectId);
+  let version = 1;
+  let receiptHash: string | undefined;
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.plans (plan_id, agency_id, project_id, revision_hash, target_contract_hash, policy_hash, body, body_hash, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, '{"mappings":[]}', $7, $8, now(), now())`,
+      [planId, ag.agencyId, projectId, revisionHash, targetContractHash, sha("policy"), bodyHash, ag.ownerMembershipId],
+    );
+    await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "plan.created.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, projectId, bodyHash } });
+    if (state !== "DRAFT") {
+      version = 2;
+      await c.query(`UPDATE kauro.plans SET state = 'VALIDATION_REQUIRED', version = 2 WHERE plan_id = $1`, [planId]);
+      await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 2, agencyId: ag.agencyId, eventType: "plan.validation_required.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash } });
+    }
+    if (state === "VALIDATED") {
+      receiptHash = sha(seed + "-receipt-" + planId);
+      await c.query(`UPDATE kauro.plans SET state = 'VALIDATING', version = 3 WHERE plan_id = $1`, [planId]);
+      await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 3, agencyId: ag.agencyId, eventType: "plan.validating.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash } });
+      await c.query(
+        `INSERT INTO kauro.validation_receipts (receipt_id, agency_id, plan_id, receipt_hash, revision_hash, target_contract_hash, plan_hash, core_package_hash, profile_evidence_hash, disposition_evidence_hash, artifact_evidence_hash, started_at, completed_at, result, counts, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() - interval '1 minute', now(), 'VALID', '{"physicalSourceRows": 10}', now())`,
+        [ids.next(), ag.agencyId, planId, receiptHash, revisionHash, targetContractHash, bodyHash, sha("core"), sha("profile"), sha("disposition"), sha("artifact")],
+      );
+      await c.query(`UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1`, [planId, receiptHash]);
+      await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 4, agencyId: ag.agencyId, eventType: "plan.validated.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash, validationReceiptHash: receiptHash } });
+      version = 4;
+    }
+  });
+  return receiptHash === undefined ? { planId, bodyHash, revisionHash, targetContractHash, version } : { planId, bodyHash, revisionHash, targetContractHash, version, receiptHash };
+}
+
+export async function stepUpProof(app: Client, who: Person): Promise<string> {
+  const proofId = ids.next();
+  await tx(app, { userId: who.userId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.assurance_proofs (proof_id, user_id, kind, method, issued_at, expires_at, correlation_id, created_at)
+       VALUES ($1, $2, 'STEP_UP', 'TOTP', now(), now() + interval '15 minutes', $3, now())`,
+      [proofId, who.userId, ids.next()],
+    );
+  });
+  return proofId;
+}
+
+/** Extracts the SQLSTATE of a pg error (or the message when it is not a database error). */
+export function sqlState(e: unknown): string {
+  return typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : `no sqlstate: ${String(e)}`;
+}
+
+export function constraintOf(e: unknown): string | undefined {
+  return typeof e === "object" && e !== null && "constraint" in e ? String((e as { constraint: unknown }).constraint) : undefined;
+}

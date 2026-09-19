@@ -1,0 +1,39 @@
+{
+  "name": "@kauro/persistence",
+  "version": "0.1.0",
+  "description": "Kauro PostgreSQL 17 persistence: the ordered SQL migrations (schema, roles, tenant constraints, RLS, outbox, journals, leases), the checksummed migration runner, and the temporary-cluster helper every persistence test uses (real PostgreSQL, never a fake).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "migrations",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec --test-concurrency=2 \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/application": "workspace:*",
+    "@kauro/contracts": "workspace:*",
+    "@kauro/domain": "workspace:*",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "@types/pg": "8.23.1",
+    "typescript": "5.9.2"
+  }
+}
