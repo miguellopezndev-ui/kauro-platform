@@ -11,6 +11,7 @@
     "policy.json": "5ad638f13153723aa81f4cb49c9dd718c599988257f384858f20141fc6f2d23e",
     "cases.json": "b0a7960d9c44f4d950ae60cf40f8dd61fd29c41d26713c5d76b96dada66302c1",
     "additional_scenarios.json": "a0a46d8fc8c41821a1b9728fdd052fd7f59e3fa794b080f3015951e31873b363",
-    "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1"
+    "requirements.json": "3bd812bb80ce7daac35283060916c1dfdd3de30d7566f62b5dd037be63066ae1",
+    "program.json": "24d14cd0dcd20762f7a725fb54e334389dbaf22a9117f71f5c06a9543ad02144"
   }
 }
