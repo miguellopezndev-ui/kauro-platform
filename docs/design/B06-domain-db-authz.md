@@ -480,6 +480,19 @@ public result, external effect identity, exit status, artifact digests and indep
 Nothing in this branch is "done" because its tests are green; G-DOMAIN and G-TENANT close only through the construction
 service's independent review.
 
+## 12a. Implementation notes (branch `b06/application-api`)
+
+Recorded where the implementation had to decide something this document left open or stated ambiguously:
+
+| id | note | why |
+|---|---|---|
+| I-DENY-1 | A DENY is recorded as a `security_events` row in its **own** unit of work after the command's transaction rolled back (`runCommand` → `recordDenial`). §6.1 says "DENY appends a security event and rolls back": inside one transaction the rollback would erase the event, and the case map requires the denial fact to survive with no journal row. The `Authorizer` therefore only decides; the runtime persists. Every AUTHENTICATION_REQUIRED / NOT_AUTHORIZED / ASSURANCE_REQUIRED outcome of a consequential command is recorded, including handler-level ones (CMD026 NOT_APPROVAL_CONTROLLER). | 08 "Audit events and retention": denials are durable facts, not logs; 10 "rejections leave no journal row" (D-IDEM-2). |
+| I-ENV-1 | `CommandEnvelope` carries the `AuthenticatedSubject` (identity facts, provider label, subject SHA-256) beside `userId`; CMD001 calls `identities.syncOwn` before the owner membership insert so the membership's identity foreign key resolves under the self policy. | 08 "Authentication produces an identity reference and assurance facts"; §4.1 `memberships` FK identities. |
+| I-VAL-1 | The schema validator is dependency-free (`api/json-schema`): it compiles exactly the keyword vocabulary the generated bundle and the request schemas use and refuses anything else at start-up, so no keyword is ever ignored and no schema can be compiled from a runtime value. Fastify's Ajv is not on the command path. | 10 "Version and validation" (strict, no coercion/defaults/removal), "Schema format execution" (calendar `date-time`, 2026-02-30 control), S093. |
+| I-ERR-1 | New safe reasons for the HTTP boundary (`CONTENT_TYPE_UNSUPPORTED`, `BODY_TOO_LARGE`, `JSON_*`, `SCHEMA_VIOLATION`, `IDEMPOTENCY_KEY_*`, `AGENCY_SELECTOR_INVALID`, `PATH_ID_INVALID`, `CORRELATION_ID_INVALID`, `SUBJECT_UNAUTHENTICATED`) and for the typed patch (`PATCH_*`); a body larger than 1 MiB is `INVALID_REQUEST / BODY_TOO_LARGE` (400) to stay inside the closed status table. | 10 "Request envelope"; §7 status table. |
+| I-ADM-1 | The admission limiter is process-local (sliding windows per identity and per client address hash; interim values five creations per identity per hour, twenty per address per hour). A fleet-wide counter is an operations concern behind the same port. | 08 "Abuse controls"; open question Q2. |
+| I-AUTH-1 | `apps/api` authenticates through an `Authenticator` port; the shipped implementation binds opaque bearer tokens to subjects for LOCAL and tests. The Identity Platform verifier (issuer, audience, signature, email and MFA claims) is not in this branch. | 08 "Authentication and assurance". |
+
 ## 13. Verification performed on this branch
 
 `pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) passes: 57 tests — contracts 12,

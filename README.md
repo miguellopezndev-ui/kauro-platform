@@ -35,7 +35,9 @@ pnpm run clean-consume   # S045: every publishable package installs and works fr
 |---|---|
 | `@kauro/contracts` | the contract authority: vendored R2 registry (provenance-checked), generated TypeScript types and JSON Schemas, canonical JSON profile, domain-separated digests |
 | `@kauro/domain` | aggregate identity (UUIDv7 / UUIDv5), tenant contexts, role and capability model, state-machine guards over the registry, registered domain events, failure taxonomy, idempotency identity, and the ports adapters implement (B06 design) |
-| `@kauro/application` | command contracts of the seven B06 commands, request envelope, safe problem contract, closed request schemas, DTO views, and the orchestration ports (authorizer, assurance, admission, schema validation, plan services) |
+| `@kauro/application` | command contracts of the seven B06 commands and their handlers (one unit of work each: journal reserve, authorization, locked preconditions, state + events, journal commit), request envelope and admission pipeline, safe problem contract, closed request schemas with the dependency-free strict validator, DTO projections, the orchestration ports (authorizer, assurance, admission, schema validation, plan services), and the in-memory ports for pure orchestration tests |
+| `@kauro/authorization` | the Authorizer (identity status, live membership, agency scope, role, step-up; default deny with safe reason and policy version), the step-up assurance verifier and the admission limiter |
+| `@kauro/api` (`apps/api`) | the Fastify HTTP API: the seven B06 command routes with the manual-10 admission order, typed replies and safe problems; the PostgreSQL adapters and the Identity Platform verifier are bound at integration |
 | `@kauro/persistence` | the PostgreSQL 17 migrations (schema, roles, composite tenant keys, forced RLS, outbox/inbox, journals, leases), the checksummed migration runner, the temporary-cluster test helper and the SQLSTATE translation |
 
 Design documents: `docs/design/B06-domain-db-authz.md` (domain, database and authorization) and `docs/design/B06-case-map.md`
