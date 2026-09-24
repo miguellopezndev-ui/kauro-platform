@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Client } from "pg";
+import { Client } from "pg";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -134,4 +134,49 @@ export async function appliedMigrations(client: Client): Promise<ReadonlyArray<A
     "SELECT version, name, checksum, applied_at, applied_by FROM kauro_meta.schema_migrations ORDER BY version",
   );
   return r.rows.map((x) => ({ version: x.version, name: x.name, checksum: x.checksum, appliedAt: x.applied_at.toISOString(), appliedBy: x.applied_by }));
+}
+
+/** Where the migrator connects (07 "Restoration and migration": migration roles are separate from runtime). */
+export interface MigratorConnection {
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  /** The owner role of the kauro objects (LOGIN, not SUPERUSER, not BYPASSRLS); never a runtime login role. */
+  readonly user: string;
+  readonly password?: string;
+  readonly applicationName?: string;
+}
+
+export class MigratorRoleError extends Error {
+  constructor(role: string, what: string) {
+    super(`migrator role ${role} is ${what}; migrations run as the owner role only (07 Restoration and migration, 08 Database isolation)`);
+    this.name = "MigratorRoleError";
+  }
+}
+
+/**
+ * Opens one dedicated connection as the migrator, refuses a superuser or BYPASSRLS login (the schema's own guard in
+ * migration 0001 runs only on first application; this check runs every time), applies every pending migration and closes
+ * the connection. Used by an entrypoint that migrates on start; the runtime pool is never involved.
+ */
+export async function applyMigrationsAs(connection: MigratorConnection, options: ApplyOptions = {}): Promise<ApplyResult> {
+  const client = new Client({
+    host: connection.host,
+    port: connection.port,
+    database: connection.database,
+    user: connection.user,
+    ...(connection.password === undefined ? {} : { password: connection.password }),
+    application_name: connection.applicationName ?? "kauro-migrator",
+  });
+  await client.connect();
+  try {
+    const r = await client.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean }>("SELECT rolname, rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user");
+    const role = r.rows[0];
+    if (!role) throw new MigratorRoleError(connection.user, "unknown to the server");
+    if (role.rolsuper) throw new MigratorRoleError(role.rolname, "SUPERUSER");
+    if (role.rolbypassrls) throw new MigratorRoleError(role.rolname, "BYPASSRLS");
+    return await applyMigrations(client, options);
+  } finally {
+    await client.end();
+  }
 }

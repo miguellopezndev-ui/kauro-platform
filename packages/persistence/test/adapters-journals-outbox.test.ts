@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { DomainFailure, commandRequestDigest, isDomainFailure, type ApprovalId, type AssuranceProofId, type CausationId, type ClientId, type IdempotencyIdentity, type PlanId, type ProcessingAuthorityId, type ProjectId, type RequestId, type RevisionId, type TaskId, type UserId } from "@kauro/domain";
-import { barrier, clock, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "./harness.js";
+import { barrier, clock, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { plan as planFixture, stepUpProof } from "./support.js";
 
 let h: Harness;

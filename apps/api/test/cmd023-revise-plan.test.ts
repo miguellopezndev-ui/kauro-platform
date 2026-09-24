@@ -1,0 +1,183 @@
+// CMD023 RevisePlan — POST /api/v1/plans/{planId}/revisions — AGENCY_OPERATOR (registry cases CMD023-OK / -DENY / -RACE and
+// S051 at the command level; design §8, D-PLAN-1; Plan machine edge new_plan_revision "Keep predecessor history",
+// "Invalidate only dependent evidence with impact map", "Old approval cannot attach to new content"; catalogue failure "A
+// stale UI cannot edit or approve the previous version as if current"). Real route over real plan rows; the typed patch
+// resolver and compiler are the test-bound ports of this edition (I-INT-2).
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+import type { RevisePlanView } from "@kauro/application";
+import type { ProjectId } from "@kauro/domain";
+import { SimulatedCrash, asProblem, bodyHashOf, call, completed, freshKey, outcome, rootCause, routes, waitForApiLockWait, world, type PlanFixture, type World } from "./support.js";
+
+let w: World;
+let projectId: ProjectId;
+before(async () => {
+  w = await world();
+  projectId = (await w.project(w.A, w.clientA)).projectId;
+});
+after(async () => {
+  await w.stop();
+});
+
+function patchBody(plan: PlanFixture, candidate = "Phone", reasonCode = "AGENCY_DECISION") {
+  return { expectedVersion: plan.version, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate, reasonCode }) };
+}
+
+test("OK: an OPERATOR revises a VALIDATED plan; predecessor SUPERSEDED, successor VALIDATION_REQUIRED with a new body hash; the impact map names the invalidated receipt", async () => {
+  const plan = await w.approvable(w.A, projectId, "revise-ok");
+  const key = freshKey("cmd023-ok");
+  const revised = completed<RevisePlanView>(await call(w, { url: routes.revisePlan(plan.planId), token: w.operator.token, key, body: patchBody(plan) }), 201);
+  assert.equal(revised.replayed, false);
+  assert.equal(revised.version, 2, "the version of the successor, the resource the command created");
+  const { plan: successor, supersededPlan, invalidated } = revised.data;
+  assert.equal(successor.state, "VALIDATION_REQUIRED");
+  assert.equal(successor.version, 2);
+  assert.equal(successor.supersedesPlanId, plan.planId);
+  assert.notEqual(successor.bodyHash, plan.bodyHash, "the compiled body has a new hash");
+  assert.equal(successor.revisionHash, plan.revisionHash);
+  assert.equal(successor.targetContractHash, plan.targetContractHash);
+  assert.equal(successor.validationReceiptHash, undefined, "no inherited validation");
+  assert.equal(successor.approvalId, undefined);
+  assert.deepEqual(supersededPlan, { planId: plan.planId, version: 5, state: "SUPERSEDED" });
+  assert.deepEqual(invalidated, { validationReceiptHash: plan.receiptHash });
+
+  // oracle: the predecessor keeps its history (receipt bound, row present, names its successor); the successor has no
+  // receipt and no approval; the body stored for the successor hashes to the reported bodyHash
+  const predecessor = await w.row<{ state: string; version: string; validation_receipt_hash: string | null; superseded_by_plan_id: string | null; body_hash: string }>("plans", "plan_id = $1", [plan.planId]);
+  assert.deepEqual(predecessor && { state: predecessor.state, version: predecessor.version, receipt: predecessor.validation_receipt_hash, successor: predecessor.superseded_by_plan_id, body: predecessor.body_hash }, {
+    state: "SUPERSEDED",
+    version: "5",
+    receipt: plan.receiptHash,
+    successor: successor.planId,
+    body: plan.bodyHash,
+  });
+  assert.equal(await w.count("validation_receipts", "plan_id = $1", [plan.planId]), 1, "the receipt survives");
+  const stored = await w.row<{ state: string; version: string; validation_receipt_hash: string | null; approval_id: string | null; supersedes_plan_id: string; body: unknown; body_hash: string }>("plans", "plan_id = $1", [successor.planId]);
+  assert.equal(stored?.state, "VALIDATION_REQUIRED");
+  assert.equal(stored?.version, "2");
+  assert.equal(stored?.validation_receipt_hash, null);
+  assert.equal(stored?.approval_id, null);
+  assert.equal(stored?.supersedes_plan_id, plan.planId);
+  assert.equal(bodyHashOf(stored!.body as PlanFixture["body"]), successor.bodyHash);
+  assert.equal(await w.count("validation_receipts", "plan_id = $1", [successor.planId]), 0);
+  // events: plan.superseded.v1 (predecessor v5, impact map) → EXECUTION_CONTROL; plan.created.v1 (v1) and
+  // plan.validation_required.v1 (v2) on the successor
+  const predecessorEvents = await w.events("plan", plan.planId);
+  assert.deepEqual(predecessorEvents.map((e) => [e.version, e.type]).slice(-1), [[5, "plan.superseded.v1"]]);
+  assert.deepEqual(predecessorEvents.at(-1)?.payload, { planId: plan.planId, agencyId: w.A.agencyId, successorPlanId: successor.planId, invalidatedReceiptHash: plan.receiptHash });
+  assert.deepEqual(await w.outbox(predecessorEvents.at(-1)!.eventId), ["EXECUTION_CONTROL"]);
+  const successorEvents = await w.events("plan", successor.planId);
+  assert.deepEqual(successorEvents.map((e) => [e.version, e.type]), [[1, "plan.created.v1"], [2, "plan.validation_required.v1"]]);
+  assert.equal(successorEvents[0]?.payload["supersedesPlanId"], plan.planId);
+  const journal = await w.journal(key);
+  assert.deepEqual(journal && { state: journal.state, status: journal.status, kind: journal.resourceKind, id: journal.resourceId }, { state: "COMMITTED", status: 201, kind: "plan", id: successor.planId });
+});
+
+test("DENY: APPROVER → 403; foreign plan → 404; expectedVersion of a superseded plan → 409 STALE_VERSION with successorId; patch naming an unknown candidate → 400", async () => {
+  const plan = await w.approvable(w.A, projectId, "revise-deny");
+  const plansBefore = await w.count("plans");
+  const journalBefore = await w.count("command_journal");
+  const denialsBefore = (await w.securityEvents("CMD023")).length;
+  const url = routes.revisePlan(plan.planId);
+
+  for (const person of [w.approver, w.viewer]) {
+    assert.equal(outcome(w, await call(w, { url, token: person.token, body: patchBody(plan) })), "403 NOT_AUTHORIZED ROLE_INSUFFICIENT");
+  }
+  assert.equal(outcome(w, await call(w, { url, token: w.stranger.token, agency: w.B.agencyId, body: patchBody(plan) })), "404 NOT_FOUND -", "A's plan is invisible under B's context");
+  assert.equal(outcome(w, await call(w, { url, token: w.stranger.token, body: patchBody(plan) })), "404 NOT_FOUND NOT_A_MEMBER");
+  // a patch naming a candidate the plan does not have: the compiler refuses, nothing is written
+  const unknownCandidate = await call(w, { url, token: w.operator.token, body: patchBody(plan, "Fax") });
+  assert.equal(outcome(w, unknownCandidate), "400 INVALID_REQUEST PATCH_UNKNOWN_CANDIDATE");
+  assert.deepEqual(asProblem(w, unknownCandidate).errors, [{ field: "decisionPatchArtifactRef", code: "UNKNOWN_REFERENCE" }]);
+  // an artifact of another agency (or none at all) is unknown, never revealed
+  const foreignArtifact = await call(w, { url, token: w.operator.token, body: { expectedVersion: plan.version, decisionPatchArtifactRef: w.plans.registerPatch(w.B.agencyId, { candidate: "Phone", reasonCode: "X" }) } });
+  assert.equal(outcome(w, foreignArtifact), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
+  // a patch that changes nothing is not a new revision
+  const noChange = await call(w, { url, token: w.operator.token, body: patchBody(plan, "Phone", "MAPPED") });
+  assert.equal(outcome(w, noChange), "409 PRECONDITION_FAILED NO_SEMANTIC_CHANGE");
+  assert.equal(await w.count("plans"), plansBefore, "no new plan row from any denied call");
+  assert.equal((await w.row<{ version: string; state: string }>("plans", "plan_id = $1", [plan.planId]))?.version, "4");
+
+  // a stale UI: after a real revision, the predecessor's old version answers STALE_VERSION pointing at the live revision
+  const revised = completed<RevisePlanView>(await call(w, { url, token: w.operator.token, body: patchBody(plan) }), 201);
+  const stale = await call(w, { url, token: w.operator.token, body: patchBody(plan) });
+  assert.equal(outcome(w, stale), "409 STALE_VERSION -");
+  assert.deepEqual(asProblem(w, stale).current, { version: 5, state: "SUPERSEDED", successorId: revised.data.plan.planId });
+  // even with the right version, a SUPERSEDED plan cannot be revised: the edge is not listed
+  const superseded = await call(w, { url, token: w.operator.token, body: { ...patchBody(plan), expectedVersion: 5 } });
+  assert.equal(outcome(w, superseded), "409 PRECONDITION_FAILED PLAN_SUPERSEDED");
+  assert.equal(asProblem(w, superseded).current?.successorId, revised.data.plan.planId);
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
+  assert.equal(await w.count("command_journal"), journalBefore + 1, "only the successful revision journaled");
+  const denials = (await w.securityEvents("CMD023")).slice(denialsBefore);
+  assert.deepEqual(denials.map((d) => d.reason), ["ROLE_INSUFFICIENT", "ROLE_INSUFFICIENT"]);
+});
+
+test("RACE: two RevisePlan calls with expectedVersion 2 — one 201, one 409 STALE_VERSION carrying successorId", async () => {
+  // S051 at the command level: two edits race on one aggregate version (a VALIDATION_REQUIRED plan at version 2)
+  const source = await w.revision(w.A, projectId);
+  const target = await w.targetContract(w.A, projectId);
+  const plan = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "s051", state: "VALIDATION_REQUIRED" });
+  assert.equal(plan.version, 2);
+  const url = routes.revisePlan(plan.planId);
+  // A locks the predecessor and holds while resolving its patch; B blocks on the row lock; A supersedes the plan; B reads
+  // version 3 SUPERSEDED and answers STALE_VERSION with the successor id
+  const hold = w.holds.arm("collaborator");
+  const requestA = call(w, { url, token: w.operator.token, key: freshKey("s051-a"), body: patchBody(plan, "Phone", "EDIT_A") });
+  await hold.reached;
+  const requestB = call(w, { url, token: w.owner.token, key: freshKey("s051-b"), body: patchBody(plan, "Phone", "EDIT_B") });
+  await waitForApiLockWait(w, "FOR UPDATE");
+  hold.release();
+  const [a, b] = await Promise.all([requestA, requestB]);
+  const winner = completed<RevisePlanView>(a, 201);
+  assert.equal(outcome(w, b), "409 STALE_VERSION -");
+  assert.deepEqual(asProblem(w, b).current, { version: 3, state: "SUPERSEDED", successorId: winner.data.plan.planId });
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1, "exactly one successor (plans_supersedes_once)");
+  assert.deepEqual((await w.events("plan", plan.planId)).map((e) => e.type), ["plan.created.v1", "plan.validation_required.v1", "plan.superseded.v1"]);
+  // no approval of unseen new content: a stale UI approving the predecessor at the version it displayed is told where the
+  // live content is; the predecessor at its true version is SUPERSEDED (unlisted edge); the successor was never validated
+  const proof = await w.stepUp(w.approver);
+  const approval = (expectedVersion: number) => ({ expectedVersion, planHash: plan.bodyHash, validationReceiptHash: "0".repeat(64), disclosuresHash: "0".repeat(64), assuranceProofRef: proof });
+  const staleApproval = await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, body: approval(2) });
+  assert.equal(outcome(w, staleApproval), "409 STALE_VERSION -");
+  assert.deepEqual(asProblem(w, staleApproval).current, { version: 3, state: "SUPERSEDED", successorId: winner.data.plan.planId });
+  const supersededApproval = await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, body: approval(3) });
+  assert.equal(outcome(w, supersededApproval), "409 PRECONDITION_FAILED PLAN_SUPERSEDED");
+  const successorApproval = await call(w, { url: routes.approvePlan(winner.data.plan.planId), token: w.approver.token, body: { ...approval(2), planHash: winner.data.plan.bodyHash } });
+  assert.equal(outcome(w, successorApproval), "422 PLAN_NOT_VALIDATED -");
+  assert.equal(await w.count("approvals", "plan_id IN ($1, $2)", [plan.planId, winner.data.plan.planId]), 0);
+});
+
+test("RACE: two revisions on one version → one successor; identical retry replays; crash leaves the predecessor unsuperseded", async () => {
+  const plan = await w.approvable(w.A, projectId, "revise-race");
+  const url = routes.revisePlan(plan.planId);
+  const keyA = freshKey("cmd023-race-a");
+  const bodyA = patchBody(plan, "Phone", "EDIT_A");
+  const hold = w.holds.arm("collaborator");
+  const requestA = call(w, { url, token: w.operator.token, key: keyA, body: bodyA });
+  await hold.reached;
+  const requestB = call(w, { url, token: w.operator.token, key: freshKey("cmd023-race-b"), body: patchBody(plan, "Phone", "EDIT_B") });
+  await waitForApiLockWait(w, "FOR UPDATE");
+  hold.release();
+  const [a, b] = await Promise.all([requestA, requestB]);
+  const winner = completed<RevisePlanView>(a, 201);
+  assert.equal(outcome(w, b), "409 STALE_VERSION -");
+  assert.equal(asProblem(w, b).current?.successorId, winner.data.plan.planId);
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
+  // identical retry of the winner replays the journaled 201 without a second successor
+  const replay = completed<RevisePlanView>(await call(w, { url, token: w.operator.token, key: keyA, body: bodyA }), 201);
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(replay.data, winner.data);
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
+  // crash before COMMIT on a fresh plan: the predecessor stays VALIDATED at its version, no successor row exists
+  const fresh = await w.approvable(w.A, projectId, "revise-crash");
+  const crashKey = freshKey("cmd023-crash");
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
+  const crashed = await call(w, { url: routes.revisePlan(fresh.planId), token: w.operator.token, key: crashKey, body: patchBody(fresh) });
+  assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
+  assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
+  const row = await w.row<{ state: string; version: string; superseded_by_plan_id: string | null }>("plans", "plan_id = $1", [fresh.planId]);
+  assert.deepEqual(row && { state: row.state, version: row.version, successor: row.superseded_by_plan_id }, { state: "VALIDATED", version: "4", successor: null });
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [fresh.planId]), 0);
+  assert.equal(await w.journal(crashKey), null);
+});

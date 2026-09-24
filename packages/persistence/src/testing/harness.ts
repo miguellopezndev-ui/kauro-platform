@@ -1,9 +1,13 @@
-// Test harness for the adapters (07 "Acceptance obligations": real PostgreSQL for tenant constraints, transactions,
-// migrations and concurrency; 21 "Independent oracles": the superuser oracle sees every tenant, the runtime pools see every
-// policy). start() runs initdb + pg_ctl on a free 127.0.0.1 port, creates the owner role and the runtime login roles
-// (NOSUPERUSER, NOBYPASSRLS), applies the migrations as the owner, and opens one verified pool per runtime group with a
-// unit-of-work factory on each. Every fixture below is written through the adapters under a real context, so the fixtures
-// themselves prove the policies admit legitimate writes (21 "Positive and negative symmetry").
+/**
+ * Test harness over a real PostgreSQL 17 (07 "Acceptance obligations": real PostgreSQL for tenant constraints, transactions,
+ * migrations and concurrency; 21 "Independent oracles": the superuser oracle sees every tenant, the runtime pools see every
+ * policy). start() runs initdb + pg_ctl on a free 127.0.0.1 port, creates the owner role and the runtime login roles
+ * (NOSUPERUSER, NOBYPASSRLS), applies the migrations as the owner, and opens one verified pool per runtime group with a
+ * unit-of-work factory on each. Every fixture below is written through the adapters under a real context, so the fixtures
+ * themselves prove the policies admit legitimate writes (21 "Positive and negative symmetry"). It is exported (like
+ * startTemporaryPostgres) so the entrypoint packages run their acceptance cases against the same cluster discipline; it is
+ * never wired into a deployment.
+ */
 import { randomBytes, createHash } from "node:crypto";
 import type { Client } from "pg";
 import {
@@ -24,7 +28,9 @@ import {
   type TenantContext,
   type UserId,
 } from "@kauro/domain";
-import { createPool, createUnitOfWorkFactory, startTemporaryPostgres, ROLES, type KauroPool, type PgUnitOfWorkFactory, type TemporaryPostgres } from "../src/index.js";
+import { createPool, type KauroPool } from "../pool.js";
+import { createUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));

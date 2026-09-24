@@ -4,10 +4,12 @@
  * factory, the unit of work that binds the tenant context, the repositories, event publisher, journals and lease store that
  * implement the @kauro/domain ports, the SQLSTATE translation, and the temporary cluster helper for real-database tests.
  */
-export { MIGRATIONS_DIR, listMigrations, applyMigrations, appliedMigrations, MigrationDriftError } from "./migrations/runner.js";
-export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult } from "./migrations/runner.js";
+export { MIGRATIONS_DIR, listMigrations, applyMigrations, applyMigrationsAs, appliedMigrations, MigrationDriftError, MigratorRoleError } from "./migrations/runner.js";
+export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
 export { startTemporaryPostgres, ROLES } from "./testing/temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions } from "./testing/temporary-postgres.js";
+export { start as startHarness, waitForLockWait, barrier } from "./testing/harness.js";
+export type { Harness, AgencyFixture } from "./testing/harness.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
 export { createPool, KauroPool, PrivilegedRoleError } from "./pool.js";
 export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";

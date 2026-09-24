@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { isDomainFailure, toUtcInstant, type DomainFailure, type LeaseOwnerId, type ResourceId, type UserId } from "@kauro/domain";
-import { ids, sha, start, type AgencyFixture, type Harness } from "./harness.js";
+import { ids, sha, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
 let h: Harness;
 let owner: UserId;

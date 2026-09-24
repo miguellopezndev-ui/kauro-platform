@@ -1,7 +1,7 @@
 {
   "name": "@kauro/api",
   "version": "0.1.0",
-  "description": "Kauro HTTP API (Fastify): the seven B06 command routes with the manual-10 admission pipeline (content type, size, strict JSON, closed schema, envelope headers, authenticated subject), typed replies and safe problem responses.",
+  "description": "Kauro HTTP API (Fastify): the seven B06 command routes with the manual-10 admission pipeline (content type, size, strict JSON, closed schema, envelope headers, authenticated subject), typed replies and safe problem responses, and the composition root that binds the PostgreSQL adapters (configuration from the environment, migrations on start, verified pool, tenant context per unit of work).",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
@@ -22,17 +22,20 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+    "test": "node --test --test-reporter=spec --test-concurrency=3 \"dist/test/**/*.test.js\"",
+    "start": "node dist/src/main.js"
   },
   "dependencies": {
     "@kauro/application": "workspace:*",
     "@kauro/authorization": "workspace:*",
     "@kauro/contracts": "workspace:*",
     "@kauro/domain": "workspace:*",
+    "@kauro/persistence": "workspace:*",
     "fastify": "5.12.5"
   },
   "devDependencies": {
     "@types/node": "24.3.1",
+    "@types/pg": "8.23.1",
     "typescript": "5.9.2"
   }
 }

@@ -4,7 +4,9 @@
  * thrown anywhere inside rolls the transaction back (journal reservation included: rejections leave no journal row, D-IDEM-2)
  * and becomes a CONFLICT / REJECTED / UNAVAILABLE result; an authorization denial is additionally recorded as a durable
  * security event in its own transaction after the rollback (08 "Audit events": denials are facts, not logs). Any other
- * exception propagates to the transport, which answers INTERNAL_ERROR by correlation id (07 "Command outcomes").
+ * exception propagates to the transport, which answers INTERNAL_ERROR by correlation id (07 "Command outcomes") — including
+ * an INTERNAL_ERROR failure the unit-of-work adapter classified (it carries the original error as `cause`): the transport is
+ * the one place that hands unexpected exceptions to the server log, so nothing is swallowed between the adapter and the wire.
  */
 import type { CommandId, Id, UtcInstant } from "@kauro/contracts";
 import type {
@@ -178,7 +180,7 @@ export async function runCommand<Body, View>(
     }
     return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: false };
   } catch (e) {
-    if (!(e instanceof DomainFailure)) throw e;
+    if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
     if (DENIAL_CODES.has(e.code)) {
       await recordDenial(runtime, context, spec.id, envelope, e, denial.current?.policyVersion ?? AUTHORIZATION_POLICY_VERSION);
     }

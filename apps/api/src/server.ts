@@ -57,9 +57,15 @@ function sendProblem(reply: FastifyReply, problem: Problem): FastifyReply {
   return reply.code(problem.status).header(HEADERS.correlationId, problem.correlationId).type(HEADERS.problemContentType).send(problem);
 }
 
-function defaultInternalErrorSink(correlationId: string, error: unknown): void {
+/** The safe classification of an unexpected exception: class names only (the adapter attaches the original error as cause). */
+export function classifyInternalError(error: unknown): string {
   const name = error instanceof Error ? error.name : typeof error;
-  process.stderr.write(`kauro-api internal error correlation=${correlationId} class=${name}\n`);
+  const cause = error instanceof Error ? error.cause : undefined;
+  return cause === undefined ? name : `${name} cause=${cause instanceof Error ? cause.name : typeof cause}`;
+}
+
+function defaultInternalErrorSink(correlationId: string, error: unknown): void {
+  process.stderr.write(`kauro-api internal error correlation=${correlationId} class=${classifyInternalError(error)}\n`);
 }
 
 export function createApiServer(options: ApiServerOptions): FastifyInstance {

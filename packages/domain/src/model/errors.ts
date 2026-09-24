@@ -180,7 +180,8 @@ export const FAILURE_REASONS = [
   "OPERATION_PENDING",
   // ownership invariant (07 "Agency and membership states")
   "LAST_OWNER_PROTECTED",
-  // integrity (database discipline, persistence migrations)
+  // integrity (database discipline, persistence migrations, deployment completeness)
+  "PLAN_SERVICES_UNAVAILABLE",
   "EVENT_MISSING",
   "VERSION_DISCIPLINE",
   "IMMUTABLE_COLUMN",
