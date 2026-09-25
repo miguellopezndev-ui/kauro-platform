@@ -12,6 +12,7 @@
  * policy so the same guard applies; the persistence migrations seed the same edges (migration 0003).
  */
 import { STATE_MACHINES, type StateMachine, type StateTransition } from "@kauro/contracts";
+import { COMMERCE_PLATFORM_MACHINES, type CommercePlatformMachineName } from "../commerce/machines.js";
 import { PreconditionFailure } from "./errors.js";
 
 export type RegistryMachineName =
@@ -28,7 +29,8 @@ export type RegistryMachineName =
   | "TaxDocument"
   | "CommissionLine";
 
-export type PlatformMachineName = "EndClient" | "Project";
+/** EndClient and Project (B06, D-AGG-1/2) and the commerce machines of package B09 (commerce/machines.ts). */
+export type PlatformMachineName = "EndClient" | "Project" | CommercePlatformMachineName;
 
 export type MachineName = RegistryMachineName | PlatformMachineName;
 
@@ -63,6 +65,7 @@ export const PLATFORM_STATE_MACHINES: ReadonlyArray<StateMachine> = Object.freez
     ],
     unlistedTransition: UNLISTED_TRANSITION_POLICY,
   },
+  ...COMMERCE_PLATFORM_MACHINES,
 ]);
 
 export function machine(name: MachineName): StateMachine {

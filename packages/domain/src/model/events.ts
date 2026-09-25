@@ -10,6 +10,7 @@
  */
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
+import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
 import type { ActorRef } from "./tenant.js";
@@ -59,6 +60,8 @@ export const EVENT_TYPES = [
   "plan.withdrawn.v1",
   "approval.created.v1",
   "approval.withdrawn.v1",
+  // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0008)
+  ...COMMERCE_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -66,9 +69,9 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * The aggregate kinds an event may name. The database registry `kauro.aggregate_kinds` (migration 0008, the foundation shared by
  * every package: docs/design/FOUNDATION-aggregate-kinds.md) holds the same kinds, each bound to its table and uuid primary-key
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
- * its own migration and adds it here.
+ * its own migration and adds it here (B09: the commerce kinds, registered by migration 0009).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", ...COMMERCE_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -111,10 +114,12 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "approval.created.v1": ["approvalId", "agencyId", "planId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "actorMembershipId", "approvalHash"],
   // the withdrawal reason is a label (CMD026 reasonCode, decision D-API-1): it stays on the approval row, never in a payload
   "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "withdrawnByMembershipId", "completedExternalActions", "supersededByPlanId"],
+  // payments and fiscal workflow (package B09, commerce/events.ts)
+  ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /** Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL"] as const;
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", ...COMMERCE_CONSUMERS] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -125,6 +130,7 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "approval.withdrawn.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "plan.withdrawn.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "plan.superseded.v1", consumer: "EXECUTION_CONTROL" },
+  ...COMMERCE_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

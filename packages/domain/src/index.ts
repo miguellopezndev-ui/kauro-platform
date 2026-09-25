@@ -81,8 +81,22 @@ export {
   withProvenance,
 } from "./model/events.js";
 
-export type { ActorRef, SecurityActor, TenantContext, IdentityContext, SystemContext, AnonymousContext, ActingContext, ExecutionContext, IdentityFacts, ResolvedMembership, TenantScope } from "./model/tenant.js";
-export { actorOf, isVerifiedIdentity, tenantScopeOf, assertInScope, assertSameScope } from "./model/tenant.js";
+export type {
+  ActorRef,
+  SecurityActor,
+  TenantContext,
+  IdentityContext,
+  SystemContext,
+  AnonymousContext,
+  ServiceContext,
+  OperatorContext,
+  ActingContext,
+  ExecutionContext,
+  IdentityFacts,
+  ResolvedMembership,
+  TenantScope,
+} from "./model/tenant.js";
+export { actorOf, userIdOf, isVerifiedIdentity, tenantScopeOf, assertInScope, assertSameScope } from "./model/tenant.js";
 
 export type { IdentityState, IdentityRecord, AuthenticatedSubject, AssuranceMethod, AssuranceProof, StepUpOutcome, StepUpCheck } from "./model/identity.js";
 export { IDENTITY_STATES, ASSURANCE_METHODS, subjectDigest, registerIdentity, syncIdentity, identityFacts, assertVerifiedIdentity, evaluateStepUp, assertFreshStepUp } from "./model/identity.js";
@@ -178,3 +192,6 @@ export type { Environment, IdempotencyIdentity, CommandRequestSubject, JournalSt
 export { ENVIRONMENTS, IDEMPOTENCY_KEY, COMMAND_REQUEST_DOMAIN, commandRequestDigest } from "./model/idempotency.js";
 
 export * from "./ports/index.js";
+
+// payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
+export * from "./commerce/index.js";

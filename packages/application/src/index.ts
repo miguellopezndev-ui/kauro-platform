@@ -120,3 +120,6 @@ export {
 } from "./commands/handlers/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
+
+// payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
+export * from "./commerce/index.js";

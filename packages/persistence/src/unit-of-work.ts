@@ -6,7 +6,8 @@
  *
  * `run(context, work)`:
  *   1. acquires a verified connection (pool.ts) and refuses a context the connection's role may not serve (D-CTX-1; SYSTEM runs
- *      under kauro_control, TENANT, IDENTITY and ANONYMOUS under kauro_app);
+ *      under kauro_control, SERVICE under kauro_payment (package B09, D-CTX-B1), TENANT, IDENTITY, ANONYMOUS and OPERATOR under
+ *      kauro_app);
  *   2. BEGIN at the requested isolation, SET LOCAL statement_timeout, then binds the context with set_config(..., true) —
  *      the settings die with the transaction, so the connection returns to the pool with no context (verified by test);
  *   3. hands the repositories, publisher, journals and lease store — all on that one connection — to `work`;
@@ -24,6 +25,7 @@ import {
   createIdGenerator,
   isDomainFailure,
   isUuidV7,
+  userIdOf,
   type AgencyId,
   type Clock,
   type ExecutionContext,
@@ -63,8 +65,16 @@ const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
   SERIALIZABLE: "SERIALIZABLE",
 });
 
+/** SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1), every other context under the request handlers. */
 function roleFor(context: ExecutionContext): RuntimeRole {
-  return context.kind === "SYSTEM" ? "kauro_control" : "kauro_app";
+  switch (context.kind) {
+    case "SYSTEM":
+      return "kauro_control";
+    case "SERVICE":
+      return "kauro_payment";
+    default:
+      return "kauro_app";
+  }
 }
 
 /** An id generator that remembers what it minted, so adoptTenant can prove the agency id was minted here. */
@@ -135,7 +145,7 @@ export class PgUnitOfWork implements UnitOfWork {
   }
 
   get userId(): UserId | null {
-    return this.context.kind === "TENANT" || this.context.kind === "IDENTITY" ? this.context.userId : null;
+    return userIdOf(this.context);
   }
 
   get resolvedMembershipId(): MembershipId | null {
@@ -162,11 +172,21 @@ export class PgUnitOfWork implements UnitOfWork {
   }
 }
 
-/** TENANT binds agency and user, IDENTITY the user only; SYSTEM and ANONYMOUS bind neither (every policy then matches nothing). */
+/**
+ * Binds the context transaction-locally (SET LOCAL through set_config(..., true)): TENANT binds agency and user; IDENTITY and
+ * OPERATOR (package B09) the user only; SYSTEM, ANONYMOUS and SERVICE (package B09) bind neither, so every policy keyed on them
+ * matches nothing until a SERVICE unit of work adopts the one agency of its stored operation. Every context starts without a
+ * finance scope: only the commerce unit of work of an OPERATOR adopts one (kauro.finance_agency_id; decisions D-CTX-B1, D-CTX-B2,
+ * D-SCOPE-B1 of docs/design/B09-payments-fiscal.md).
+ */
 async function bindContext(client: PoolClient, context: ExecutionContext): Promise<void> {
   const agencyId = context.kind === "TENANT" ? context.agencyId : "";
-  const userId = context.kind === "TENANT" || context.kind === "IDENTITY" ? context.userId : "";
-  await execute(client, "SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agencyId, userId]);
+  const userId = userIdOf(context) ?? "";
+  await execute(
+    client,
+    "SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true), set_config('kauro.finance_agency_id', '', true)",
+    [agencyId, userId],
+  );
 }
 
 function transientSqlState(e: unknown): boolean {

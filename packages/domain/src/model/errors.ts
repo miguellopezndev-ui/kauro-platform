@@ -13,6 +13,8 @@
  * tokens); it names ids, states, versions and field names only. 07: "HTTP status follows the API contract; business state is
  * not inferred solely from status code" — the status is a projection of the code, never the other way round.
  */
+import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
+
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
   "AUTHENTICATION_REQUIRED",
@@ -211,6 +213,8 @@ export const FAILURE_REASONS = [
   // a list read's cursor that is not one this server issued for this caller, scope, filter and order (10 "Cursors are opaque,
   // integrity-protected and bound to actor scope, filter, sort and snapshot policy"; R2-060; re-check finding N16)
   "CURSOR_INVALID",
+  // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
+  ...COMMERCE_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

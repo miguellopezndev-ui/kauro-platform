@@ -1,0 +1,134 @@
+/**
+ * The normalized provider vocabulary (10 "Provider adapter contract": each adapter implements prepare, dispatch, observe,
+ * reconcile and classify; prepared intent is durable before a potentially billable dispatch; provider-specific ids are
+ * namespaced by environment and account; timeout, connection reset, rejected request, accepted-but-pending response, unknown
+ * status and confirmed terminal state are distinct; unknown statuses are never coerced to success or failure).
+ *
+ * The domain never sees a vendor payload: an adapter (payment processor, fiscal authority) classifies what it received into
+ * these closed shapes, and an unknown status arrives as UNRECOGNIZED (15 "Unknown provider statuses become
+ * UNRECOGNIZED_PROVIDER_STATE and block consequential assumptions").
+ */
+import { DOMAINS, canonicalBytes, rawDigest, structuredDigest, type CanonicalValue, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
+import type { CaptureStatus, FundsState, PaymentEnvironment, ScopeKind } from "./records.js";
+
+/** What a dispatch or an observation proved (10: "which observations can prove no effect, which prove an effect and which remain uncertain"). */
+export type ProviderOutcomeKind = "COMPLETED" | "PENDING" | "PROVED_NO_EFFECT" | "AMBIGUOUS" | "UNRECOGNIZED";
+
+/** Safe classification of an ambiguous transport result; never "no effect". */
+export type AmbiguityReason = "TIMEOUT" | "CONNECTION_RESET" | "PROVIDER_5XX" | "UNREADABLE_RESPONSE" | "OBSERVATION_LOST";
+
+/**
+ * The exact normalized request an attempt is allowed to send (reference/HASHING "Provider request hash: complete actual
+ * method/endpoint-profile/body/semantically relevant headers after minimization, excluding secrets by explicit credential
+ * reference"; excluded: retry counters and transport timing). Its digest is PaymentAttempt.requestHash.
+ */
+export interface ProviderRequest {
+  readonly method: "POST" | "GET";
+  /** A versioned endpoint profile of the adapter, e.g. ORDERS_V2_CREATE, ORDERS_V2_CAPTURE, CAPTURES_V2_REFUND. */
+  readonly endpointProfile: string;
+  readonly body: CanonicalValue;
+  /** Semantically relevant headers only, e.g. the provider idempotency key; never a credential value. */
+  readonly headers: Readonly<Record<string, string>>;
+  /** The name/version of the credential in the secret manager (08 "Secrets and supply chain"), never its value. */
+  readonly credentialRef: string;
+}
+
+export function providerRequestHash(request: ProviderRequest): Sha256Hex {
+  return structuredDigest(DOMAINS.PROVIDER_REQUEST, 1, request);
+}
+
+/**
+ * The provider idempotency/request identity of an attempt (sent as the provider's idempotency header where the endpoint
+ * documents one; 15 "Provider idempotency support is used only where documented for the exact endpoint; local idempotency
+ * remains necessary"). Deterministic from the attempt: a retry of the same attempt can only ever repeat the same request.
+ */
+export function providerRequestIdOf(attemptId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(attemptId)) throw new TypeError("an attempt id is a UUIDv7");
+  return `kauro-${attemptId}`;
+}
+
+/** The scope-index key of a provider identity: `<provider>|<ENVIRONMENT>|<external id>` (migration 0008 commerce_scopes). */
+export function providerScopeKey(provider: string, environment: PaymentEnvironment, externalId: string): string {
+  if (!/^[a-z][a-z0-9_-]{1,63}$/.test(provider)) throw new TypeError("provider label");
+  if (!/^[A-Za-z0-9._:-]{1,256}$/.test(externalId)) throw new TypeError("provider external identity");
+  return `${provider}|${environment}|${externalId}`;
+}
+
+export interface ScopeKey {
+  readonly kind: ScopeKind;
+  readonly key: string;
+}
+
+/** A capture as an adapter observed it (authenticated response, verified webhook or query), already normalized. */
+export interface ObservedCapture {
+  readonly provider: string;
+  readonly environment: PaymentEnvironment;
+  readonly providerOrderId: string | null;
+  readonly providerCaptureId: string;
+  readonly status: CaptureStatus;
+  readonly amountCents: bigint;
+  /** ISO 4217 as observed; a currency other than the order's is a mismatch, never converted. */
+  readonly currency: string;
+  readonly payeeDigest: Sha256Hex;
+  readonly providerCompletedAt: UtcInstant | null;
+  readonly fundsState: FundsState;
+  /** The fee the provider reported for this capture, when it did. */
+  readonly feeCents: bigint | null;
+  readonly evidenceHash: Sha256Hex;
+}
+
+/** A refund as an adapter observed it. */
+export interface ObservedRefund {
+  readonly provider: string;
+  readonly environment: PaymentEnvironment;
+  readonly providerCaptureId: string;
+  readonly providerRefundId: string;
+  readonly status: "COMPLETED" | "PENDING" | "FAILED";
+  readonly amountCents: bigint;
+  readonly currency: string;
+  readonly evidenceHash: Sha256Hex;
+}
+
+export type NormalizedProviderEventKind =
+  | "ORDER_APPROVED"
+  | "ORDER_VOIDED"
+  | "CAPTURE_COMPLETED"
+  | "CAPTURE_PENDING"
+  | "CAPTURE_DENIED"
+  | "CAPTURE_REVERSED"
+  | "REFUND_COMPLETED"
+  | "REFUND_PENDING"
+  | "REFUND_FAILED"
+  | "UNRECOGNIZED";
+
+/** A verified provider event after classification (the webhook row of CMD030 is this normalized form, not the vendor schema). */
+export interface NormalizedProviderEvent {
+  readonly kind: NormalizedProviderEventKind;
+  readonly provider: string;
+  readonly environment: PaymentEnvironment;
+  readonly externalEventId: string;
+  readonly providerOrderId?: string;
+  readonly capture?: ObservedCapture;
+  readonly refund?: ObservedRefund;
+  /** Provider chronology of the event (never used to roll a fact back). */
+  readonly providerEventAt?: UtcInstant;
+  /** SHA-256 of the exact authenticated raw body (InboxRecord.bodyHash). */
+  readonly bodyHash: Sha256Hex;
+}
+
+/** PaymentOrder.idempotencyHash: the intent binding (same key, other payload conflicts). Platform domain KAURO_PAYMENT_INTENT_V1. */
+export const PAYMENT_INTENT_DOMAIN = "KAURO_PAYMENT_INTENT_V1";
+
+export interface PaymentIntentPreimage {
+  readonly quoteId: string;
+  readonly termsHash: Sha256Hex;
+  readonly expectedAmountCents: string;
+  readonly currency: "USD";
+  readonly routeId: string;
+  readonly provider: string;
+  readonly environment: PaymentEnvironment;
+}
+
+export function paymentIntentHash(p: PaymentIntentPreimage): Sha256Hex {
+  return rawDigest(canonicalBytes({ domain: PAYMENT_INTENT_DOMAIN, version: 1, payload: p }));
+}
