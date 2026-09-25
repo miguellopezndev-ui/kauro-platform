@@ -133,6 +133,7 @@ export function approvalView(a: ApprovalRecord): ApprovalView {
     approvalHash: a.approvalHash,
     createdAt: a.createdAt,
     ...(a.withdrawnAt !== undefined ? { withdrawnAt: a.withdrawnAt } : {}),
+    ...(a.withdrawnByMembershipId !== undefined ? { withdrawnByMembershipId: a.withdrawnByMembershipId } : {}),
     ...(a.withdrawReasonCode !== undefined ? { withdrawReasonCode: a.withdrawReasonCode } : {}),
   };
 }

@@ -13,15 +13,16 @@
  * Deterministic interleavings (21 "Concurrency and crash matrix"): the unit-of-work factory is decorated with hold points
  * (`journal.reserved`, `journal.commit`, `collaborator`, `after.commit`). A RACE test arms one, starts request A, waits until
  * A reached the hold (its transaction open: journal row reserved or aggregate row locked), starts request B, observes B
- * waiting on the lock in pg_stat_activity, releases A and reads both outcomes. A hold armed with a failure throws there —
- * a simulated crash before COMMIT (journal.commit) or a lost response after COMMIT (after.commit). No sleep synchronizes
- * anything; the only polling is the observation of pg_stat_activity.
+ * waiting on the lock in pg_stat_activity, then releases A — or aborts it, which makes A throw where it waits — and reads
+ * both outcomes. A hold armed with a failure throws as soon as it is reached — a simulated crash before COMMIT
+ * (journal.commit) or a lost response after COMMIT (after.commit). No sleep synchronizes anything; the only polling is the
+ * observation of pg_stat_activity.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -69,7 +70,10 @@ interface ArmedHold {
 export interface Hold {
   /** Resolves when a unit of work reached the hold (its transaction is open at that point). */
   readonly reached: Promise<void>;
+  /** Lets the held unit of work continue. */
   release(): void;
+  /** Makes the held unit of work throw `error` where it waits: a crash placed after another request was observed waiting. */
+  abort(error: Error): void;
 }
 
 /** One-shot hold points inside the unit of work; armed by a test, passed by the decorated port. */
@@ -83,11 +87,16 @@ export class HoldPoints {
       reachedResolve = resolve;
     });
     let releaseResolve: () => void = () => undefined;
-    const release = new Promise<void>((resolve) => {
+    let releaseReject: (error: Error) => void = () => undefined;
+    const release = new Promise<void>((resolve, reject) => {
       releaseResolve = resolve;
+      releaseReject = reject;
     });
+    // the holder awaits `release` once it is reached; this handler only keeps an abort of a hold that is never reached from
+    // surfacing as an unhandled rejection (the holder still receives the rejection through its own await)
+    release.catch(() => undefined);
     this.#armed.set(name, { reached: reachedResolve, release, failure: options.fail });
-    return { reached, release: () => releaseResolve() };
+    return { reached, release: () => releaseResolve(), abort: (error) => releaseReject(error) };
   }
 
   async pass(name: HoldName): Promise<void> {
@@ -784,6 +793,70 @@ export function outcome(w: World, reply: Reply): string {
 /** Waits until a backend of the api pool is blocked on a lock while running a statement containing `fragment`. */
 export function waitForApiLockWait(w: World, fragment: string): Promise<number> {
   return waitForLockWait(w.h.oracle, API_APPLICATION_NAME, fragment);
+}
+
+/**
+ * The exact bytes an identical replay of `first` must carry (D-PORT-2): the first answer's body with only the `replayed`
+ * flag flipped — same status line content, same envelope, same journaled `data`, byte for byte.
+ */
+export function replayTextOf(first: Reply): string {
+  const marker = '"replayed":false';
+  if (first.text.indexOf(marker) < 0 || first.text.indexOf(marker) !== first.text.lastIndexOf(marker)) throw new Error(`not a first COMPLETED answer: ${first.text}`);
+  return first.text.replace(marker, '"replayed":true');
+}
+
+/** Every table a B06 command, its denial or its fixtures can write: the "no committed state or external effect" oracle. */
+export const EFFECT_TABLES = [
+  "identities",
+  "assurance_proofs",
+  "agencies",
+  "memberships",
+  "processing_authorities",
+  "end_clients",
+  "projects",
+  "dataset_revisions",
+  "target_contracts",
+  "plans",
+  "validation_receipts",
+  "approvals",
+  "capabilities",
+  "domain_events",
+  "outbox_records",
+  "command_journal",
+  "security_events",
+] as const;
+export type EffectTable = (typeof EFFECT_TABLES)[number];
+
+/** Superuser oracle: the row count of every effect table across all tenants, read in one statement. */
+export async function effectCounts(w: World): Promise<Readonly<Record<EffectTable, number>>> {
+  const r = await w.h.oracle.query<Record<EffectTable, string>>(`SELECT ${EFFECT_TABLES.map((t) => `(SELECT count(*) FROM kauro.${t})::text AS ${t}`).join(", ")}`);
+  const row = r.rows[0];
+  if (!row) throw new Error("the count query returned no row");
+  const out = {} as Record<EffectTable, number>;
+  for (const t of EFFECT_TABLES) out[t] = Number(row[t]);
+  return out;
+}
+
+/** The body an approver sends after reviewing the complete disclosure set the server composes (CMD025). */
+export function approvalBodyOf(plan: PlanFixture, proof: string, overrides: Partial<Record<"expectedVersion" | "planHash" | "validationReceiptHash" | "disclosuresHash", string | number>> = {}) {
+  if (plan.receiptHash === null) throw new Error("the plan fixture has no receipt");
+  return {
+    expectedVersion: plan.version,
+    planHash: plan.bodyHash,
+    validationReceiptHash: plan.receiptHash,
+    disclosuresHash: disclosuresHashOf(plan.bodyHash, plan.receiptHash, disclosureItemsOf(plan.body, plan.affectedRows)),
+    assuranceProofRef: proof,
+    ...overrides,
+  };
+}
+
+/**
+ * A VALIDATED plan approved through the real CMD025 route by `approver` with a fresh step-up (APPROVED v5, approval v1). The
+ * agency selector defaults to agency A; a plan of agency B is approved by a member of B under B's selector.
+ */
+export async function approveThroughRoute(w: World, plan: PlanFixture, approver: Person = w.approver, agencyId: string = w.A.agencyId): Promise<Completed<ApprovePlanView>> {
+  const proof = await w.stepUp(approver);
+  return completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(plan.planId), token: approver.token, agency: agencyId, key: freshKey("approve"), body: approvalBodyOf(plan, proof) }), 201);
 }
 
 /** The routes of the seven commands. */

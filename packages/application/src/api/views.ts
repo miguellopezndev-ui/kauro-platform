@@ -100,6 +100,8 @@ export interface ApprovalView {
   readonly disclosuresHash: string;
   readonly approvalHash: string;
   readonly createdAt: UtcInstant;
+  /** Withdrawal (CMD026) — when, by which membership and why; all three or none (approvals_withdrawal_complete). */
   readonly withdrawnAt?: Approval["withdrawnAt"];
+  readonly withdrawnByMembershipId?: string;
   readonly withdrawReasonCode?: string;
 }
