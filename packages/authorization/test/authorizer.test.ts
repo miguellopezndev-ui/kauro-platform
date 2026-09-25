@@ -46,9 +46,20 @@ function member(store: InMemoryStore, agencyId: AgencyId, identity: IdentityFact
   return membershipId;
 }
 
+/** The decision of a new execution, as the runtime takes it: access (steps 1–7), then assurance (step 8) when access allows. */
 async function decide(f: Fixture, request: AuthorizationRequest, agencyId: AgencyId | null = request.agencyId): Promise<AuthorizationDecision> {
   const correlationId = ids.next() as CorrelationId;
   const context = agencyId === null ? ({ kind: "IDENTITY", userId: request.identity.userId, correlationId } as const) : ({ kind: "TENANT", agencyId, userId: request.identity.userId, correlationId } as const);
+  return f.uow.run(context, async (uow) => {
+    const access = await f.authorizer.authorize(uow, request);
+    return access.kind === "ALLOW" ? f.authorizer.assure(uow, request, access) : access;
+  });
+}
+
+/** The access decision alone (steps 1–7): what a replay is answered against. */
+async function access(f: Fixture, request: AuthorizationRequest): Promise<AuthorizationDecision> {
+  const correlationId = ids.next() as CorrelationId;
+  const context = request.agencyId === null ? ({ kind: "IDENTITY", userId: request.identity.userId, correlationId } as const) : ({ kind: "TENANT", agencyId: request.agencyId, userId: request.identity.userId, correlationId } as const);
   return f.uow.run(context, (uow) => f.authorizer.authorize(uow, request));
 }
 
@@ -180,4 +191,41 @@ test("commands whose role is not a membership (corporate, service) are denied by
   const d = await decide(f, { command: "CMD058", identity: owner, agencyId: AGENCY });
   assert.equal(d.kind, "DENY");
   if (d.kind === "DENY") assert.equal(d.reason, "ROLE_INSUFFICIENT");
+});
+
+test("R16: the stored identity row is consulted beside the token — a DISABLED row refuses a token that says ACTIVE, for a member and for CreateAgency; a stored row never verifies a token that is not, and no stored row leaves the token's facts to decide", async () => {
+  const f = fixture();
+  const operator = facts("stored-disabled-member");
+  member(f.store, AGENCY, operator, "OPERATOR");
+  assert.equal((await decide(f, { command: "CMD009", identity: operator, agencyId: AGENCY })).kind, "ALLOW");
+  f.store.identities.set(operator.userId, { ...f.store.identities.get(operator.userId)!, state: "DISABLED" });
+  assert.deepEqual(await decide(f, { command: "CMD009", identity: operator, agencyId: AGENCY }), { kind: "DENY", code: "NOT_AUTHORIZED", reason: "IDENTITY_DISABLED", policyVersion: AUTHORIZATION_POLICY_VERSION });
+  assert.deepEqual(await decide(f, { command: "CMD001", identity: operator, agencyId: null }), { kind: "DENY", code: "NOT_AUTHORIZED", reason: "IDENTITY_DISABLED", policyVersion: AUTHORIZATION_POLICY_VERSION });
+  // a verified row does not verify an unverified token (the token is the fresher source of verification facts)
+  const lapsed = facts("stored-verified-token-not");
+  member(f.store, AGENCY, lapsed, "OPERATOR");
+  assert.deepEqual(await decide(f, { command: "CMD009", identity: { ...lapsed, mfaEnrolledAt: null }, agencyId: AGENCY }), { kind: "DENY", code: "NOT_AUTHORIZED", reason: "IDENTITY_UNVERIFIED", policyVersion: AUTHORIZATION_POLICY_VERSION });
+  // never synced: the token decides
+  assert.equal((await decide(f, { command: "CMD001", identity: facts("never-synced"), agencyId: null })).kind, "ALLOW");
+});
+
+test("access and assurance are two decisions (R7): access never reads a proof — the replay of a step-up command is answered to a current member whose proof has aged; assurance is step 8 of a new execution only; a unit of work bound to another person decides nothing", async () => {
+  const f = fixture();
+  const approver = facts("split-approver");
+  member(f.store, AGENCY, approver, "APPROVER");
+  const stale = ids.next() as AssuranceProofId;
+  f.store.proofs.set(stale, { proofId: stale, userId: approver.userId, kind: "STEP_UP", method: "TOTP", issuedAt: new Date(clock.nowMs() - 3_600_000).toISOString(), expiresAt: new Date(clock.nowMs() - 2_700_000).toISOString() });
+  const allowed = await access(f, { command: "CMD025", identity: approver, agencyId: AGENCY, assuranceProofRef: stale });
+  assert.equal(allowed.kind, "ALLOW");
+  if (allowed.kind === "ALLOW") assert.equal(allowed.assuranceClass, "SESSION", "access carries no assurance claim");
+  assert.deepEqual(await decide(f, { command: "CMD025", identity: approver, agencyId: AGENCY, assuranceProofRef: stale }), { kind: "DENY", code: "ASSURANCE_REQUIRED", reason: "STEP_UP_STALE", policyVersion: AUTHORIZATION_POLICY_VERSION });
+  // a command without step-up passes assurance with its access decision unchanged
+  const operator = facts("split-operator");
+  member(f.store, AGENCY, operator, "OPERATOR");
+  const plain = await decide(f, { command: "CMD009", identity: operator, agencyId: AGENCY });
+  assert.equal(plain.kind === "ALLOW" && plain.assuranceClass, "SESSION");
+  // the unit of work runs for another person than the authenticated subject: nobody is authorized in it
+  const correlationId = ids.next() as CorrelationId;
+  const foreignContext = await f.uow.run({ kind: "TENANT", agencyId: AGENCY, userId: approver.userId, correlationId }, (uow) => f.authorizer.authorize(uow, { command: "CMD009", identity: operator, agencyId: AGENCY }));
+  assert.deepEqual(foreignContext, { kind: "DENY", code: "AUTHENTICATION_REQUIRED", reason: "SUBJECT_UNAUTHENTICATED", policyVersion: AUTHORIZATION_POLICY_VERSION });
 });

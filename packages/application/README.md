@@ -10,10 +10,13 @@ The application layer of the Kauro platform: the contracts of the public command
 - `api/views` — safe DTO views (AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView).
 - `ports/*` — authorizer, assurance verifier, abuse limiter, schema validator (closed over known schema ids), plan services
   (artifact resolver, patch compiler, disclosure composer), work inspectors, command handler/bus.
-- `commands/runtime` — `runCommand`: one unit of work per command (journal reserve → authorization → locked preconditions →
-  state + events → journal commit, whose stored record is the answer: D-PORT-2), replay / conflict answers, DomainFailure →
-  CONFLICT / REJECTED / UNAVAILABLE, and the durable security event of every authorization denial (recorded in its own
-  transaction after the rollback).
+- `commands/runtime` — `runCommand`: one unit of work per command (access authorization with the membership share-locked →
+  journal reserve, whose replay / conflict / pending answers go only to the caller just authorized → step-up assurance of a
+  new execution → locked preconditions → state + events → journal commit, whose stored record is the answer: D-PORT-2),
+  DomainFailure → CONFLICT / REJECTED / UNAVAILABLE, and the durable security fact of every authorization denial (recorded in
+  its own transaction after the rollback, in the agency's stream only for a proven live member, otherwise in the caller's
+  identity stream); `refuseUnauthenticated`: the anonymous fact of a command without an authenticated subject. Review record
+  `docs/design/B06-review/A-pipeline-authorization.md`.
 - `commands/handlers/*` — the seven handlers (`createB06Handlers(runtime, collaborators)`), each following design §8 step by step.
 - `api/admission` — the transport-neutral admission pipeline of manual 10 (correlation id, content type, size, strict JSON,
   closed schema, headers, path ids, agency selector) producing the `CommandEnvelope`; `admitHeaders` is its header-only head

@@ -80,7 +80,7 @@ export {
   withProvenance,
 } from "./model/events.js";
 
-export type { ActorRef, TenantContext, IdentityContext, SystemContext, ExecutionContext, IdentityFacts, ResolvedMembership, TenantScope } from "./model/tenant.js";
+export type { ActorRef, SecurityActor, TenantContext, IdentityContext, SystemContext, AnonymousContext, ActingContext, ExecutionContext, IdentityFacts, ResolvedMembership, TenantScope } from "./model/tenant.js";
 export { actorOf, isVerifiedIdentity, tenantScopeOf, assertInScope, assertSameScope } from "./model/tenant.js";
 
 export type { IdentityState, IdentityRecord, AuthenticatedSubject, AssuranceMethod, AssuranceProof, StepUpOutcome, StepUpCheck } from "./model/identity.js";

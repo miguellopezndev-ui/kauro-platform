@@ -3,6 +3,15 @@
  * agency scope, resource relationship, capability, state/version and required assurance; default is deny; the decision
  * includes a safe reason code and policy version). Implemented by @kauro/authorization inside the unit of work so the
  * membership it resolves is the one the command then uses (no cached grant, 07 "authorized_reactivation" effect).
+ *
+ * Two decisions, in the pipeline order of 10 "Request envelope" (authenticated subject, then authorization, then execution)
+ * and 10 "Idempotency contract" (review record docs/design/B06-review/A-pipeline-authorization.md):
+ *   - `authorize` (design §6.1 steps 1–7): may this subject act in the selected scope with this command's role? It runs first,
+ *     before anything tenant-scoped is written, so a nonexistent and a foreign agency look alike, and a journaled replay, a
+ *     conflict or a pending entry is answered only to a caller it allows;
+ *   - `assure` (step 8): the assurance a new execution requires — a fresh step-up for a command that names assuranceProofRef.
+ *     A replay performs no effect and is answered without it (a response lost after commit stays recoverable by its key once
+ *     the proof has aged; a new proof would change the request digest and could never recover it).
  */
 import type { CommandId } from "@kauro/contracts";
 import type { AgencyId, AssuranceProofId, FailureCode, FailureReason, IdentityFacts, ResolvedMembership, UnitOfWork } from "@kauro/domain";
@@ -33,11 +42,20 @@ export type AuthorizationDecision =
       readonly policyVersion: string;
     };
 
+export type AllowDecision = Extract<AuthorizationDecision, { kind: "ALLOW" }>;
+
 export interface Authorizer {
   /**
-   * Decides inside the unit of work (reads the membership under the tenant context that was just bound) and appends the
-   * security event for a DENY of a consequential command. NOT_FOUND is returned, not NOT_AUTHORIZED, when the caller holds no
-   * live membership in the selected agency (08: foreign and nonexistent resources look the same).
+   * Access, steps 1–7: subject, identity status (the token's facts and the stored identity row), agency selector, live
+   * membership (read with a share lock held to the end of the unit of work, so a concurrent suspension, revocation or role
+   * change of it serializes with the command), ACTIVE, role. NOT_FOUND, not NOT_AUTHORIZED, when the caller holds no live
+   * membership in the selected agency (08: foreign and nonexistent resources look the same). Writes nothing; the runtime
+   * records every DENY as a durable security fact.
    */
   authorize(uow: UnitOfWork, request: AuthorizationRequest): Promise<AuthorizationDecision>;
+  /**
+   * Assurance, step 8, for a new execution the access decision allowed: ASSURANCE_REQUIRED unless the command's step-up proof
+   * is the caller's and fresh; otherwise the access decision with its assurance class (STEP_UP when a proof was verified).
+   */
+  assure(uow: UnitOfWork, request: AuthorizationRequest, access: AllowDecision): Promise<AuthorizationDecision>;
 }

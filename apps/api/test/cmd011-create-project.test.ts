@@ -133,7 +133,7 @@ test("DENY: foreign/wrong role → 404/403; HUBSPOT with no offered capability �
   assert.equal(await w.count("dataset_revisions"), revisionsBefore);
   assert.equal(await w.count("command_journal"), journalBefore + 2, "only the two fixture commands (client creation and archive) journaled");
   const denials = (await w.securityEvents("CMD011")).slice(denialsBefore);
-  assert.deepEqual(denials.map((d) => d.reason).sort(), ["MEMBERSHIP_SUSPENDED", "ROLE_INSUFFICIENT", "ROLE_INSUFFICIENT"]);
+  assert.deepEqual(denials.map((d) => d.reason).sort(), ["MEMBERSHIP_SUSPENDED", "NOT_A_MEMBER", "ROLE_INSUFFICIENT", "ROLE_INSUFFICIENT"]);
   // the declared HUBSPOT project, with its target, is admitted now that the mode is offered: the declaration claims no
   // qualification — the readiness blockers say so
   const hubspot = completed<ProjectView>(await call(w, { url, token: w.operator.token, body: { mode: "HUBSPOT", purpose: "Import", targetInstanceRef: ids.next() } }), 201);

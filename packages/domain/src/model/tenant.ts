@@ -9,7 +9,10 @@
  * - IDENTITY: an authenticated user without an agency (CreateAgency, own memberships, own identity sync); only rows keyed
  *   on kauro.user_id are visible;
  * - SYSTEM: the control plane (outbox dispatch, sweeper, capability changes) under the kauro_control database role; it never
- *   carries a user id and never runs a browser command.
+ *   carries a user id and never runs a browser command;
+ * - ANONYMOUS: the edge recording the denial of a request that carried no authenticated subject (08 "Threat model and
+ *   assets": an unauthenticated visitor is a threat actor and every trust boundary has an audit event). It binds neither an
+ *   agency nor a user, so it sees no row, and the only thing it can write is an anonymous DENY security fact (migration 0007).
  */
 import type { Id, UtcInstant } from "@kauro/contracts";
 import { NotFoundFailure } from "./errors.js";
@@ -39,9 +42,20 @@ export interface SystemContext {
   readonly correlationId: CorrelationId;
 }
 
-export type ExecutionContext = TenantContext | IdentityContext | SystemContext;
+export interface AnonymousContext {
+  readonly kind: "ANONYMOUS";
+  readonly correlationId: CorrelationId;
+}
 
-export function actorOf(context: ExecutionContext): ActorRef {
+export type ExecutionContext = TenantContext | IdentityContext | SystemContext | AnonymousContext;
+
+/** The contexts that act as someone: every context but ANONYMOUS, which records denials and never acts. */
+export type ActingContext = TenantContext | IdentityContext | SystemContext;
+
+/** Who a security fact is about: an actor, or nobody (the denial of a request without an authenticated subject). */
+export type SecurityActor = ActorRef | { readonly kind: "ANONYMOUS" };
+
+export function actorOf(context: ActingContext): ActorRef {
   switch (context.kind) {
     case "TENANT":
     case "IDENTITY":

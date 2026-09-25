@@ -5,7 +5,7 @@
  * "Any changed effect, expired source or stale receipt requires new review; generic cleanup approval cannot authorize
  * undisclosed CLEAR").
  *
- * Order: reserve → authorize including the fresh step-up (ASSURANCE_REQUIRED) → lock plan (NOT_FOUND) → expectedVersion →
+ * Order: authorize → reserve → the fresh step-up (ASSURANCE_REQUIRED; its ALLOW fact commits with the approval) → lock plan (NOT_FOUND) → expectedVersion →
  * state VALIDATED (else PLAN_NOT_VALIDATED, or PRECONDITION_FAILED for SUPERSEDED / WITHDRAWN / APPROVED) → planHash equals
  * the plan body hash (else STALE_VERSION mismatch [planHash]) → the named receipt is the plan's current receipt, exists, is
  * VALID with no blocking codes and binds this body/source/target (else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or

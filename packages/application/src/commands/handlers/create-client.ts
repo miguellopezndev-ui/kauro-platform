@@ -3,7 +3,7 @@
  * clients creates a scoped client workspace"; catalogue: "Create one scoped workspace with stable identity separate from its
  * display name. Duplicate labels are not merged by inference; a foreign authority reference rejects.").
  *
- * Order: reserve → authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → lock agency (DRAFT or ACTIVE, D-CMD-2) → processing authority
+ * Order: authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → reserve → lock agency (DRAFT or ACTIVE, D-CMD-2) → processing authority
  * visible under RLS (absent, foreign or nonexistent alike → INVALID_REQUEST / UNKNOWN_REFERENCE; the composite foreign key
  * is the second line of defence) → INSERT end_clients (ACTIVE v1) → end_client.created.v1 → journal 201 EndClientView.
  */

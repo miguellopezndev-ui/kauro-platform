@@ -109,8 +109,11 @@ test("DENY: OPERATOR → 403; foreign client → 404; stale expectedVersion → 
   assert.equal(before.client?.archived_at, null);
   assert.equal(await w.count("command_journal"), journalBefore);
   const denials = (await w.securityEvents("CMD010")).slice(denialsBefore);
-  assert.equal(denials.length, 3);
-  assert.ok(denials.every((d) => d.outcome === "DENY" && d.reason === "ROLE_INSUFFICIENT" && d.agencyId === w.A.agencyId));
+  assert.equal(denials.length, 4);
+  assert.ok(denials.every((d) => d.outcome === "DENY"));
+  assert.deepEqual(denials.filter((d) => d.reason === "ROLE_INSUFFICIENT").map((d) => d.agencyId), [w.A.agencyId, w.A.agencyId, w.A.agencyId]);
+  // the owner of A selecting B is no member of B: the fact is the owner's own, never B's (review R2, R26)
+  assert.deepEqual(denials.filter((d) => d.reason === "NOT_A_MEMBER").map((d) => [d.agencyId, d.actorId]), [[null, w.owner.userId]]);
   // no deletion request, refund or job aggregate exists in this schema for a handler to write as a side effect
   const tables = await w.h.oracle.query<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema = 'kauro' AND (table_name LIKE '%deletion%' OR table_name LIKE '%refund%' OR table_name LIKE '%job%')");
   assert.deepEqual(tables.rows, []);
