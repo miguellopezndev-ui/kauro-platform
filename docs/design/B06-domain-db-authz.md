@@ -976,8 +976,8 @@ refusal regressed, so the reverted N7 fix hung the test file instead of failing 
 After the re-check was resolved (§12d.5), `pnpm run verify` (generate, build, typecheck, test, architecture gate, OpenAPI
 check, matrix check, clean-consume) passes on Windows 11 (Node 24.14.1, pnpm 10.16.1, PostgreSQL 17.6 from
 `C:\Tools\pgsql17\bin`) and on Linux (Ubuntu 24.04 under WSL as the unprivileged user `miguel`, a fresh clone of the branch,
-`pnpm install --frozen-lockfile`, Node 24.21.0, pnpm 10.16.1, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11): 368
-tests, 0 failures — contracts 12, domain 53, application 55, authorization 11, persistence 98, api 118, tools 21 (after the
+`pnpm install --frozen-lockfile`, Node 24.21.0, pnpm 10.16.1, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11): 371
+tests, 0 failures — contracts 12, domain 53, application 55, authorization 11, persistence 98, api 118, tools 24 (after the
 review: 312; before it: 216). One api test reads the serving process's initial environment block from `/proc/<pid>/environ`
 and runs on Linux, the deployment OS, only: Windows reports it skipped with that reason, Linux passes it. Every persistence
 and api test file starts its own PostgreSQL 17 cluster (initdb/pg_ctl on a free 127.0.0.1 port, the seven migrations applied
@@ -1017,8 +1017,9 @@ consumption, the per-project plan bindings and the plan body digest, KA020 both 
 reviewed matrix of every runtime role's privileges and policies (persistence); the route-level role matrix with BILLING and
 INVITED members, the outcome catalogue of every route and every failure site, the five reads with their projections and bound
 cursors, permitted actions, the private cache policy, the framework-error request log, and the one-shot migration job with the
-serving process's refusal of the owner's credential (api); the matrix, the OpenAPI catalogues and the case map's citations and
-evidence bundle (tools). Every re-check fix was proven by a revert (§12d.5).
+serving process's refusal of the owner's credential (api); the matrix, the OpenAPI catalogues, the case map's citations, its
+bookkeeping (one PARTIAL criterion, the gate records, the answered verification clauses) and the evidence bundle (tools).
+Every re-check fix was proven by a revert (§12d.5).
 
 ## 14. Owner boundary and next dependency
 
