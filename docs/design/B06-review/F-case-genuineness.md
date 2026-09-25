@@ -7,7 +7,9 @@ Method for every finding: (1) reproduce it first: the mutation the refuter descr
 existing test passes; (2) fix it as the authority reads (section cited); (3) re-apply the same mutation: the strengthened test
 now fails, at the assertion that names the protected behaviour, and passes on the unmutated product. The mutations are exact
 string edits applied, built and reverted by a script outside the repository; none is committed. Every test starts its own
-PostgreSQL 17 cluster; nothing fakes the database.
+PostgreSQL 17 cluster; nothing fakes the database. The whole mutation matrix was re-run on the final tree (section "Mutation
+matrix"): each "before" row puts the test file of `e435a9a` back beside the mutated product, each "after" row runs the test of
+this branch against the same mutation.
 
 ## R48 — CMD025-OK: the approval-hash oracle is not independent
 
@@ -23,8 +25,8 @@ PostgreSQL 17 cluster; nothing fakes the database.
   `hashlib.sha256`; neither used `@kauro/contracts` or `@kauro/application`. The derivation is written in the test file. The
   oracle (`independentApprovalHash`) spells the canonical wrapper literally; it is checked against the golden vector before the
   api test trusts it, and the api test reads all nine members from the superuser oracle's row (not from the product's view).
-- **Authority:** reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation" (approval hash: domain KAVO_PLAN_APPROVAL_V1 —
-  KAURO_ under amendment A2 — over approvalId, actorId, agencyId, planHash, revisionHash, targetContractHash,
+- **Authority:** reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation" (approval hash: domain KAURO_PLAN_APPROVAL_V1,
+  as amendment A2 names the table's approval domain, over approvalId, actorId, agencyId, planHash, revisionHash, targetContractHash,
   validationReceiptHash, disclosuresHash, createdAt; preimage = UTF-8 of the closed wrapper under the canonical JSON profile);
   21 "Independent oracles" (expected results must not be calculated with the helper being tested; golden files need a known
   origin); registry CMD025-OK.
@@ -94,8 +96,13 @@ PostgreSQL 17 cluster; nothing fakes the database.
   CostGrant (and RequestJournal) are not in prompts/B06 "Contract and consumer coverage" (they are in prompts/B03 and B08);
   grant admission is registry S041 (B03: "Only admitted reservations fit the shared grant; available budget never becomes
   negative"), IC-12 (B03) and R2-044 (B08: "StartAudit is separately blocked without an unfunded provider dispatch"). The
-  public commands that materialize provider work are CMD020 StartAudit (B03) and CMD036 ExecuteProject (B08); no B06 route
-  materializes a dispatch, so the `RequestJournal` port of the control plane is the most public boundary B06 has for it.
+  public commands that materialize provider work are CMD020 StartAudit (B03) and CMD036 ExecuteProject (B08: CMD036-OK
+  "Current source, plan, target, approval, capture, retention, capability and funded capacity all bind consistently"); no B06
+  route materializes a dispatch, so the `RequestJournal` port of the control plane is the most public boundary B06 has for it.
+  The downgrade rests on the later package: B08 follows B06 in the program (`program.json`: B08 → B07 → B06) and owns both the
+  command that binds funded capacity (CMD036) and the unfunded-dispatch block (R2-044). B03 precedes B06; it is cited because
+  its cases define grant admission for the Intelligence kernel, not because it could take the half over — the platform has no
+  CostGrant aggregate and prompts/B06 names none, which is why the half stays open (PARTIAL) and Q5 goes to the authority.
 - **S090 decision (implemented):** `leases.cost_authority_id` — the funding authority the leased operation spends against (the
   CostGrant of a MODEL_TASK, the CommercialAuthorization of a JOB_ATTEMPT; required exactly for those kinds by
   `leases_cost_authority_by_kind`) — is fixed by the first claim and immutable (`forbid_column_change`); `claim_lease` takes
@@ -122,18 +129,30 @@ PostgreSQL 17 cluster; nothing fakes the database.
   reset deadline, another subject or another cost authority is refused"; `packages/persistence/test/adapters-leases.test.ts` ::
   "S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes (no or another checkpoint, reset deadline,
   another subject, another cost authority), a valid takeover that keeps subject, clock, cost and checkpoint identity, advances
-  the fence and fences the old owner out".
+  the fence and fences the old owner out"; `packages/persistence/test/adapters-journals-outbox.test.ts` :: "S089 (structural):
+  the request journal refuses a short hash, a zero ceiling and an absent grant; fence-scoped updates; response before consume;
+  terminal states final" (strengthened: see below).
+- **A second overstated S089 test:** the adapter-level structural test named "an absent grant" but never reserved without one,
+  so a nullable `cost_grant_id` (S089-c) passed it — the refuter's own matrix recorded that survival beside the raw test that
+  caught it. The test now reserves through `PgRequestJournal` with the grant omitted at run time (the port's type requires it,
+  so only a caller that bypasses the type can omit it) and asserts the database's NOT NULL refusal on `cost_grant_id` as the
+  cause the unit of work carries, with no row materialized; it asserts the cause rather than the wire code because 23502 has no
+  entry in the SQLSTATE table and the translation is not this fixer's area.
 - **Evidence:** before the change `git grep -i upstream` found no code and the lease had no cost column (the finding's own
   reproduction). After: removing the `CREATE TRIGGER request_journal_upstream_resolved` statement fails both S089 tests
-  ("Missing expected rejection … FAILED" / "… upstream RESERVED"); dropping `cost_authority_id` from the lease immutability list
-  fails both S090 tests (a takeover with another cost authority returns CLAIMED, expected REFUSED COST_IMMUTABLE; the raw
-  claim is not rejected). Both pass on the fixed schema; the whole persistence suite (57) passes.
+  ("Missing expected rejection … FAILED" / "… upstream RESERVED"); a guard that treats FAILED, CANCELLED and UNCERTAIN as
+  resolved, a guard that ignores the tenant scope, a guard that reads the upstream without `FOR SHARE` (the dependent reservation
+  no longer waits: "no backend of kauro-test-control waited on a lock") and a mutable upstream list each fail them too; dropping
+  `cost_authority_id` from the lease immutability list fails both S090 tests (a takeover with another cost authority returns
+  CLAIMED, expected REFUSED COST_IMMUTABLE; the raw claim is not rejected), and so does dropping
+  `leases_cost_authority_by_kind`. S089-c fails the adapter-level structural test only after its strengthening (matrix).
 - **Files:** `packages/persistence/migrations/0006_journals_leases.sql` (in place), `packages/persistence/migrations/0001_schema_roles_helpers.sql`
   (SQLSTATE vocabulary comment: KA009), `packages/persistence/src/{sqlstate,request-journal,lease-store}.ts`,
   `packages/domain/src/model/errors.ts` (`UPSTREAM_UNRESOLVED`), `packages/domain/src/ports/{request-journal,lease-store}.ts`
   (`upstreamRequestIds`, `costAuthorityId`, `COST_IMMUTABLE`), the three persistence test files above,
   `packages/persistence/README.md`, `docs/design/B06-domain-db-authz.md` (D-LEASE-1, D-LEASE-2, D-S089/S090/S093, §4.1, §10,
-  Q5), `docs/design/B06-case-map.md`. Commit `0bd7455` and the documentation commit.
+  Q5), `docs/design/B06-case-map.md`. Commit `0bd7455`, the absent-grant assertion in its own commit, and the documentation
+  commits.
 
 ## R50 — S089 and S090 only partly demonstrated but reported as PASS (duplicate of R24)
 
@@ -211,6 +230,51 @@ PostgreSQL 17 cluster; nothing fakes the database.
   adapter treating the revision insert as best effort (a savepoint that swallows its failure) — passes the old test and fails
   the new one (400 INVALID_REQUEST UNKNOWN_REFERENCE from the deferred key at COMMIT instead of the interrupted command's 503).
 - **Files:** `apps/api/test/cmd011-create-project.test.ts`. Commit `4bb0d84`.
+
+## Mutation matrix (re-run on the final tree, 2026-09-25, Windows 11, PostgreSQL 17 from `C:\Tools\pgsql17\bin`)
+
+Each mutation is an exact string edit of the product (or migration), built, run and reverted by a runner outside the
+repository; "before" puts the test file as it was at `e435a9a` (for S089-c: at `a5fca54`) beside the same mutation. Killed =
+the named test fails; survived = it passes. 59 runs. The first pass (56 runs) had one unexpected survivor — S089-c on the
+adapter-level structural test — which led to the strengthening recorded under R24; the three runs after it (the old test
+survives, the new test and the raw test are killed) complete the matrix, and every other verdict was as expected. Nothing
+mutated was committed.
+
+| finding | mutation | test (file /name pattern/) | before | after |
+|---|---|---|---|---|
+| R48 | `approvalHashOf` hashes `planHash` as `disclosuresHash` | `application/test/handlers` /CMD025 OK/; `api/test/cmd025-approve-plan` /^OK:/ | survived, survived | killed, killed |
+| R48 | same | `application/test/approval-hash` /golden vector/, /nine members/ | (new file) | killed, killed |
+| R48 | `approvalHashOf` binds `agencyId` as `actorId` and a fixed `createdAt` | handlers /CMD025 OK/; cmd025 /^OK:/; approval-hash /golden vector/ | survived, survived, (new) | killed ×3 |
+| R48 | the handler composes the preimage with `plan.bodyHash` as `disclosuresHash` (CMD025-OK-c) | handlers /CMD025 OK/; cmd025 /^OK:/ | — | killed ×2 |
+| R49 | R1b: the unit of work COMMITs when the failure is a `SimulatedCrash` | cmd010 /^RACE:/; cmd025 /^RACE: two approvers/ | survived, survived | killed, killed |
+| R49 | R1b | cmd023 /^RACE: two revisions/ | (killed already) | killed |
+| R49 | R3: the request digest ignores the body | cmd010 /^RACE:/; cmd023 /^RACE: two revisions/ | survived, survived | killed, killed |
+| R49 | R3 | cmd025 /^RACE: two approvers/ | (killed already) | killed |
+| R51 | S051-c: `plans_supersedes_once` not unique | `persistence/test/discipline` /^S051/ | survived | killed |
+| R51 | S051-d: the plan CAS ignores the version | discipline /^S051/ | survived | killed |
+| R52 | S052-c: another digest replays unless the entry FAILED | `persistence/test/journals-leases` /^S052/ | survived | killed |
+| R52 | S052-c | `persistence/test/adapters-journals-outbox` /^S052/ | (killed already) | killed |
+| R53 | `command_journal_identity` not unique (no wait can happen) | journals-leases /^a concurrent duplicate/ | fell through (inspection) | killed at the wait |
+| R54 | the revision insert is best effort (savepoint swallows its failure) | `api/test/cmd011-create-project` /^RACE:/ | survived | killed |
+| R54 | CMD011-RACE-a: the deferred project/revision key dropped | cmd011 /^RACE:/ | (killed already) | killed |
+| R24 | the upstream guard trigger removed (the fix reverted) | journals-leases /^S089/; adapters-journals-outbox /^S089 failed upstream/ | (no guard existed) | killed, killed |
+| R24 | FAILED, CANCELLED, UNCERTAIN count as resolved | same two | — | killed, killed |
+| R24 | the upstream's tenant scope not checked | same two | — | killed, killed |
+| R24 | the upstream read without `FOR SHARE` | adapters-journals-outbox /^S089 failed upstream/ | — | killed (no lock wait) |
+| R24 | the upstream list mutable | journals-leases /^S089/ | — | killed |
+| R24 | S089-a short SHA, S089-b zero ceiling | journals-leases /^S089/; adapters-journals-outbox /^S089 \(structural\)/ | — | killed ×4 |
+| R24 | S089-c grant optional | journals-leases /^S089/ | (killed already) | killed |
+| R24 | S089-c grant optional | adapters-journals-outbox /^S089 \(structural\)/ | survived (test of `a5fca54`) | killed |
+| R24 | `cost_authority_id` mutable (the fix reverted) | journals-leases /^S090/; `persistence/test/adapters-leases` /^S090/ | (no column existed) | killed, killed |
+| R24 | `leases_cost_authority_by_kind` dropped | same two | — | killed, killed |
+| R24 | S090-a resume without checkpoint, S090-b deadline mutable | same two | — | killed ×4 |
+
+## Verification
+
+`pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) on Windows 11 in this worktree:
+contracts 12, domain 53, application 46, authorization 9, persistence 57, api 39, tools 3 — 219 tests, 0 failures;
+architecture gate 6 packages, 13 edges, no violation; clean-consume ok. Every test named by the case map and by this record
+exists under exactly that name (checked by a script over both files).
 
 ## Shared changes (outside the case-genuineness area), for the integrator
 
