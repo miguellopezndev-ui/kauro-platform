@@ -4,6 +4,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import type { Client } from "pg";
 import { createIdGenerator, identityUserId, toUtcInstant, type IdGenerator } from "@kauro/domain";
+import { CAPABILITY_PUBLICATION_PATH, type CapabilityPublicationState } from "../src/testing/harness.js";
 
 export const clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -148,14 +149,23 @@ export async function endClient(app: Client, ag: AgencyFixture, authorityId: str
   return clientId;
 }
 
-/** Publishes a mode capability as the control plane (CMD058 territory; here a fixture). */
-export async function offeredCapability(control: Client, mode: string, state = "AVAILABLE_LIMITED"): Promise<string> {
+/**
+ * A mode capability as the control plane publishes it (CMD058 territory; here a fixture, D-CAP-2): the row is born DESIGN and
+ * moves along the listed Capability edges to `state`, each edge after IMPLEMENTED_UNACCEPTED citing its gate's evidence.
+ */
+export async function offeredCapability(control: Client, mode: string, state: CapabilityPublicationState = "AVAILABLE_LIMITED"): Promise<string> {
   const id = ids.next();
   await control.query(
     `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-     VALUES ($1, 'R2-INITIAL', 'MODE', $2, $3, $4, $5, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
-    [id, mode, state, sha("profile-" + mode), JSON.stringify(state === "DESIGN" || state === "IMPLEMENTED_UNACCEPTED" ? [] : [sha("evidence-" + mode)])],
+     VALUES ($1, 'R2-INITIAL', 'MODE', $2, 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+    [id, mode, sha("profile-" + mode)],
   );
+  const target = CAPABILITY_PUBLICATION_PATH.indexOf(state);
+  for (let step = 1; step <= target; step++) {
+    const next = CAPABILITY_PUBLICATION_PATH[step] as CapabilityPublicationState;
+    const evidence = next === "IMPLEMENTED_UNACCEPTED" ? [] : [sha(`evidence-${mode}-${next}`)];
+    await control.query("UPDATE kauro.capabilities SET state = $2, qualification_evidence_hashes = qualification_evidence_hashes || $3::jsonb WHERE capability_id = $1", [id, next, JSON.stringify(evidence)]);
+  }
   return id;
 }
 
