@@ -22,7 +22,7 @@ import type { ApplyResult, KauroPool } from "@kauro/persistence";
 import { applyMigrationsAs, createPool, createUnitOfWorkFactory } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig } from "./config.js";
-import { noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
+import { noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions } from "./server.js";
 
@@ -111,6 +111,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     abuseLimiter: createAdmissionLimiter(),
     activeWork: openProjectsInspector,
     externalActions: noExternalActionsInThisEdition,
+    commercialConsequences: noCommercialConsequencesInThisEdition,
     ...unavailablePlanServices(),
     ...assembly.collaborators,
   };

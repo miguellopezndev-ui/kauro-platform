@@ -13,7 +13,7 @@ export type { Authenticator, SubjectFacts, BearerTokenEntry } from "./authentica
 export { loadContractSchemas } from "./schemas.js";
 export { loadConfig, ConfigError } from "./config.js";
 export type { ApiConfig, DatabaseConnectionConfig } from "./config.js";
-export { openProjectsInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
+export { openProjectsInspector, noExternalActionsInThisEdition, noCommercialConsequencesInThisEdition, unavailablePlanServices } from "./edition.js";
 export type { PlanServices } from "./edition.js";
 export { openDatabase, assembleApi, startApi, systemClock, systemRandom, API_APPLICATION_NAME } from "./composition.js";
 export type { DatabaseHandle, DatabaseDependencies, ApiAssembly, StartOptions, StartedApi } from "./composition.js";

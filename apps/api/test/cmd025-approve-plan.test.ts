@@ -233,8 +233,9 @@ test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superse
   const [a, b] = await Promise.all([requestA, requestB]);
   const approved = completed<ApprovePlanView>(a, 201);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");
-  // the revision supersedes the approved body and names the invalidated approval in its impact map
-  const revised = completed<RevisePlanView>(await call(w, { url: routes.revisePlan(plan.planId), token: w.operator.token, body: { expectedVersion: 5, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "SECOND_THOUGHTS" }) } }), 201);
+  // the revision supersedes the approved body and names the invalidated approval in its impact map; superseding an approved
+  // plan ends the approval, so it is revised by who controls the approval — here an OWNER (D-AUTHZ-3, design D-PLAN-4)
+  const revised = completed<RevisePlanView>(await call(w, { url: routes.revisePlan(plan.planId), token: w.owner.token, body: { expectedVersion: 5, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "SECOND_THOUGHTS" }) } }), 201);
   assert.deepEqual(revised.data.invalidated, { validationReceiptHash: plan.receiptHash, approvalId: approved.data.approval.approvalId });
   assert.deepEqual((await w.events("plan", plan.planId)).at(-1)?.payload, { planId: plan.planId, agencyId: w.A.agencyId, successorPlanId: revised.data.plan.planId, invalidatedApprovalId: approved.data.approval.approvalId, invalidatedReceiptHash: plan.receiptHash });
   // a stale UI approving the superseded body at the version it saw is told where the content went; the successor was never
@@ -245,6 +246,7 @@ test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superse
   const successorApproval = await call(w, { url: routes.approvePlan(revised.data.plan.planId), token: w.approver.token, body: { ...approvalBody(plan, await w.stepUp(w.approver)), expectedVersion: 2, planHash: revised.data.plan.bodyHash } });
   assert.equal(outcome(w, successorApproval), "422 PLAN_NOT_VALIDATED -");
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 1);
+  assert.equal(await w.count("approvals", "plan_id = $1 AND withdrawn_at IS NULL", [plan.planId]), 0, "the superseded body keeps no live approval");
   assert.equal(await w.count("approvals", "plan_id = $1", [revised.data.plan.planId]), 0);
 });
 

@@ -8,6 +8,11 @@
  *   aggregates do not exist (07 "Aggregate ownership": ProcessingJob and CommercialAuthorization are later aggregates).
  * - `noExternalActionsInThisEdition`: CMD026 identifies completed external actions separately (import stages, delivered
  *   packages). No ImportStage or PackageVersion aggregate exists in the B06 schema, so the set is empty by construction.
+ * - `noCommercialConsequencesInThisEdition`: CMD023 revising an APPROVED plan checks the edge guard "Commercial/execution
+ *   consequences are reconciled" (registry Plan machine). The facts that could be unreconciled are a Quote, a PaymentOrder, a
+ *   CommercialAuthorization or a ProcessingJob resting on the approval; none of those aggregates exists in the B06 schema
+ *   (07 "Aggregate ownership"; packages B08 job admission, B09 quotes and CommercialAuthorization), so nothing can be
+ *   unreconciled and the guard holds vacuously in this edition. Their packages bind the real inspector through the same port.
  * - `unavailablePlanServices`: CMD023 and CMD025 need the typed patch compiler and the disclosure composer. Until their
  *   packages bind real adapters the routes answer INTEGRITY_FAILURE / PLAN_SERVICES_UNAVAILABLE inside the unit of work
  *   (rolled back, no journal row, no effect): 07 "Command outcomes and error taxonomy" — integrity failure is a distinct,
@@ -15,7 +20,7 @@
  *   not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" — a local result is never
  *   presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md.
  */
-import type { ActiveWorkInspector, ArtifactResolver, DisclosureComposer, ExternalActionInspector, PlanPatchCompiler } from "@kauro/application";
+import type { ActiveWorkInspector, ArtifactResolver, CommercialConsequenceInspector, DisclosureComposer, ExternalActionInspector, PlanPatchCompiler } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 
 export const openProjectsInspector: ActiveWorkInspector = {
@@ -26,6 +31,12 @@ export const openProjectsInspector: ActiveWorkInspector = {
 
 export const noExternalActionsInThisEdition: ExternalActionInspector = {
   async completedForPlan() {
+    return [];
+  },
+};
+
+export const noCommercialConsequencesInThisEdition: CommercialConsequenceInspector = {
+  async unreconciledForPlan() {
     return [];
   },
 };

@@ -131,6 +131,8 @@ export const FAILURE_REASONS = [
   "PLAN_SUPERSEDED",
   "PLAN_WITHDRAWN",
   "NO_SEMANTIC_CHANGE",
+  // Plan edge APPROVED -new_plan_revision-> SUPERSEDED, guard "Commercial/execution consequences are reconciled"
+  "CONSEQUENCES_UNRECONCILED",
   // membership, invitation and ownership (07 "Agency and membership states"; 08 "Invitation, recovery and ownership transfer")
   "INVITATION_EXPIRED",
   "INVITATION_NOT_EXPIRED",
@@ -185,6 +187,7 @@ export const FAILURE_REASONS = [
   "EVENT_MISSING",
   "VERSION_DISCIPLINE",
   "IMMUTABLE_COLUMN",
+  "LIVE_APPROVAL_UNBOUND",
   "LEASE_FENCED",
   "RESUME_WITHOUT_CHECKPOINT",
   "DEADLINE_IMMUTABLE",

@@ -24,6 +24,7 @@ function collaborators(w: World, overrides: Partial<B06Collaborators> = {}): B06
     patchCompiler: { apply: async (): Promise<PatchCompilation> => ({ kind: "COMPILED", body: patched, bodyHash: bodyHashOf(patched) }) },
     disclosures: { compose: async (_uow, plan): Promise<DisclosureSet> => ({ disclosuresHash: sha(`disclosures:${plan.bodyHash}:CLEAR`), items: ["CLEAR:Contact.Phone:120"], includesClear: true }) },
     externalActions: { completedForPlan: async () => [] },
+    commercialConsequences: { unreconciledForPlan: async () => [] },
     ...overrides,
   };
 }

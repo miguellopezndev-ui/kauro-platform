@@ -84,7 +84,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "plan.approved.v1": ["planId", "agencyId", "approvalId", "approvalHash"],
   "plan.withdrawn.v1": ["planId", "agencyId", "approvalId", "reasonCode"],
   "approval.created.v1": ["approvalId", "agencyId", "planId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "actorMembershipId", "approvalHash"],
-  "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "reasonCode", "withdrawnByMembershipId", "completedExternalActions"],
+  "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "reasonCode", "withdrawnByMembershipId", "completedExternalActions", "supersededByPlanId"],
 });
 
 /** Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. */
