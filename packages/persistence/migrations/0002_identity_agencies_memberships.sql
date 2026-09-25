@@ -39,7 +39,9 @@ CREATE TABLE kauro.assurance_proofs (
   issued_at       timestamptz NOT NULL,
   expires_at      timestamptz NOT NULL CHECK (expires_at > issued_at),
   correlation_id  uuid NOT NULL,
-  created_at      timestamptz NOT NULL
+  created_at      timestamptz NOT NULL,
+  -- binding target: an approval cites a proof of its own actor (approvals FK (actor_id, assurance_proof_ref))
+  UNIQUE (user_id, proof_id)
 );
 CREATE INDEX assurance_proofs_by_user ON kauro.assurance_proofs (user_id, issued_at DESC);
 CREATE TRIGGER assurance_proofs_append_only BEFORE UPDATE OR DELETE ON kauro.assurance_proofs
@@ -105,6 +107,9 @@ CREATE TABLE kauro.memberships (
   created_at        timestamptz NOT NULL,
   updated_at        timestamptz NOT NULL,
   UNIQUE (agency_id, membership_id),
+  -- binding target: an approval names the acting membership of its own actor (approvals FK (agency_id, actor_membership_id,
+  -- actor_id)); 08 "Foreign keys bind tenant and parent identity"
+  UNIQUE (agency_id, membership_id, user_id),
   CONSTRAINT memberships_active_requires_acceptance CHECK (state NOT IN ('ACTIVE', 'SUSPENDED') OR accepted_at IS NOT NULL),
   CONSTRAINT memberships_revoked_requires_time CHECK ((state = 'REVOKED') = (revoked_at IS NOT NULL))
 );

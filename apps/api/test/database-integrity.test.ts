@@ -22,6 +22,10 @@ function sqlStateOf(e: unknown): string | undefined {
   return typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : undefined;
 }
 
+function constraintOf(e: unknown): string | undefined {
+  return typeof e === "object" && e !== null && "constraint" in e ? String((e as { constraint: unknown }).constraint) : undefined;
+}
+
 test("R3: agency A's runtime role cannot occupy the next version of B's client; B's owner then archives it through CMD010 (200, version 2)", async () => {
   // the refuter's F7: under A's tenant context, an end_client.archived.v1 event naming B's client at version 2
   await assert.rejects(
@@ -36,6 +40,26 @@ test("R3: agency A's runtime role cannot occupy the next version of B's client; 
   const events = await w.events("end_client", w.clientB);
   assert.deepEqual(events.map((e) => [e.version, e.type]), [[1, "end_client.created.v1"], [2, "end_client.archived.v1"]]);
   assert.equal(w.internalErrors.length, 0);
+});
+
+test("R11: plan X approved through CMD025; plan Y cannot be pointed at X's approval, and CMD025 then approves Y with an approval of its own", async () => {
+  const x = await w.approvable(w.A, projectId, "r11-route-x");
+  const y = await w.approvable(w.A, projectId, "r11-route-y");
+  const ax = await approveThroughRoute(w, x);
+  // the review's PROBE-4
+  await assert.rejects(
+    w.asTenant(w.A, async (c) => {
+      await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = version + 1 WHERE plan_id = $1", [y.planId, ax.data.approval.approvalId]);
+      await rawEvent(c, { aggregateKind: "plan", aggregateId: y.planId, aggregateVersion: 5, agencyId: w.A.agencyId, eventType: "plan.approved.v1", actorUserId: w.owner.userId, payload: { planId: y.planId, agencyId: w.A.agencyId, approvalId: ax.data.approval.approvalId, approvalHash: ax.data.approval.approvalHash } });
+    }),
+    (e: unknown) => sqlStateOf(e) === "23503" && constraintOf(e) === "plans_approval_fk",
+  );
+  const stillY = await w.row<{ state: string; version: string; approval_id: string | null }>("plans", "plan_id = $1", [y.planId]);
+  assert.deepEqual(stillY && { state: stillY.state, version: stillY.version, approval: stillY.approval_id }, { state: "VALIDATED", version: "4", approval: null });
+  const ay = await approveThroughRoute(w, y);
+  assert.notEqual(ay.data.approval.approvalId, ax.data.approval.approvalId);
+  const approvedY = await w.row<{ approval_id: string }>("plans", "plan_id = $1", [y.planId]);
+  assert.equal(approvedY?.approval_id, ay.data.approval.approvalId);
 });
 
 test("R14/R30: the request-handler role cannot mint the evidence CMD025 checks — a step-up proof or a VALID receipt — while the verifier's proof and the validator's receipt admit the approval", async () => {

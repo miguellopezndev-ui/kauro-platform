@@ -146,7 +146,7 @@ CREATE TABLE kauro.approvals (
   actor_id                    uuid NOT NULL REFERENCES kauro.identities (user_id),
   actor_membership_id         uuid NOT NULL,
   actor_membership_version    bigint NOT NULL CHECK (actor_membership_version >= 1),
-  assurance_proof_ref         uuid NOT NULL REFERENCES kauro.assurance_proofs (proof_id),
+  assurance_proof_ref         uuid NOT NULL,
   plan_hash                   text NOT NULL CHECK (kauro.is_sha256_hex(plan_hash)),
   revision_hash               text NOT NULL CHECK (kauro.is_sha256_hex(revision_hash)),
   target_contract_hash        text NOT NULL CHECK (kauro.is_sha256_hex(target_contract_hash)),
@@ -160,8 +160,17 @@ CREATE TABLE kauro.approvals (
   updated_at                  timestamptz NOT NULL,
   UNIQUE (agency_id, approval_id),
   UNIQUE (agency_id, approval_hash),
+  -- binding target of plans_approval_fk: a plan names an approval of itself, never another plan's
+  UNIQUE (agency_id, approval_id, plan_id),
   FOREIGN KEY (agency_id, plan_id) REFERENCES kauro.plans (agency_id, plan_id),
-  FOREIGN KEY (agency_id, actor_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
+  -- 07 "PlanApproval records actor identity, membership version, assurance evidence": the three are one binding. The acting
+  -- membership is the actor's own membership in this agency, and the step-up proof is a proof of that same actor
+  -- (08 "Foreign keys bind tenant and parent identity"; a key check ignores the self-only policy on proofs, so a single-column
+  -- key would let an approval cite, and probe, another person's proof)
+  CONSTRAINT approvals_actor_membership_fk
+    FOREIGN KEY (agency_id, actor_membership_id, actor_id) REFERENCES kauro.memberships (agency_id, membership_id, user_id),
+  CONSTRAINT approvals_actor_proof_fk
+    FOREIGN KEY (actor_id, assurance_proof_ref) REFERENCES kauro.assurance_proofs (user_id, proof_id),
   FOREIGN KEY (agency_id, withdrawn_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
   -- exact bindings (CMD025 effect: "immutable approval for exact plan/source/target/disclosures"): the approved hashes must be
   -- the plan's own body/source/target, and the receipt must be a receipt of that same plan and subjects
@@ -196,9 +205,12 @@ END
 $$;
 CREATE TRIGGER approvals_withdraw_once BEFORE UPDATE ON kauro.approvals FOR EACH ROW EXECUTE FUNCTION kauro.approvals_withdraw_once();
 
--- the plan names its live approval; checked at commit so the approval and the plan transition can be written in either order
+-- The plan names its own approval: an approval whose plan_id is this plan (the approval in turn binds this plan's exact
+-- body/source/target through its own keys), never another plan's approval of different content (CMD025 effect "immutable
+-- approval for exact plan/source/target/disclosures"; D-PLAN-2). The two rows reference each other, so the key is checked at
+-- commit and the approval and the plan transition can be written in either order.
 ALTER TABLE kauro.plans ADD CONSTRAINT plans_approval_fk
-  FOREIGN KEY (agency_id, approval_id) REFERENCES kauro.approvals (agency_id, approval_id) DEFERRABLE INITIALLY DEFERRED;
+  FOREIGN KEY (agency_id, approval_id, plan_id) REFERENCES kauro.approvals (agency_id, approval_id, plan_id) DEFERRABLE INITIALLY DEFERRED;
 
 -- --- row-level security ---------------------------------------------------------------------------------------------------------
 ALTER TABLE kauro.plans ENABLE ROW LEVEL SECURITY;

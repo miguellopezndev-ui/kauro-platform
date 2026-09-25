@@ -58,6 +58,25 @@ function ctx(agency: AgencyFixture, userId: string): { readonly agencyId: string
   return { agencyId: agency.agencyId, userId };
 }
 
+/**
+ * An approval as the request handlers write it (CMD025) — the row (v1) and its approval.created.v1 event — with the
+ * actor/membership/proof triple under test, so that nothing but the binding under test can refuse it.
+ */
+async function insertApproval(c: Client, p: PlanFixture & { receiptHash?: string }, approvalId: string, actor: string, membership: string, proof: string): Promise<void> {
+  await c.query(
+    `INSERT INTO kauro.approvals (approval_id, agency_id, plan_id, actor_id, actor_membership_id, actor_membership_version, assurance_proof_ref, plan_hash, revision_hash, target_contract_hash, validation_receipt_hash, disclosures_hash, approval_hash, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 2, $6, $7, $8, $9, $10, $11, $12, now(), now())`,
+    [approvalId, A.agencyId, p.planId, actor, membership, proof, p.bodyHash, p.revisionHash, p.targetContractHash, p.receiptHash, sha("disclosures-" + approvalId), sha("approval-" + approvalId)],
+  );
+  await event(c, { aggregateKind: "approval", aggregateId: approvalId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "approval.created.v1", actorUserId: actor, payload: { approvalId, agencyId: A.agencyId, planId: p.planId } });
+}
+
+/** The rest of CMD025's writes for plan `p`: the plan APPROVED (v5) naming the approval, and its event. */
+async function approve(c: Client, p: PlanFixture, approvalId: string): Promise<void> {
+  await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = 5 WHERE plan_id = $1 AND version = 4", [p.planId, approvalId]);
+  await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 5, agencyId: A.agencyId, eventType: "plan.approved.v1", actorUserId: approver, payload: { planId: p.planId, agencyId: A.agencyId, approvalId } });
+}
+
 test("R3: an event names an aggregate of its own agency — agency A's runtime role can neither occupy B's next client version nor tell B's ids from unknown ones, and B's own event still commits", async () => {
   const eventAsA = (aggregateId: string, aggregateVersion: number, agencyId: string = A.agencyId) =>
     tx(app, ctx(A, alice), (c) => event(c, { aggregateKind: "end_client", aggregateId, aggregateVersion, agencyId, eventType: "end_client.archived.v1", actorUserId: alice, payload: {} }));
@@ -97,6 +116,53 @@ test("R3: an event names an aggregate of its own agency — agency A's runtime r
   ]);
   const stateB = await h.oracle.query("SELECT state, version FROM kauro.end_clients WHERE client_id = $1", [clientB]);
   assert.deepEqual(stateB.rows[0], { state: "ARCHIVED", version: "2" });
+});
+
+test("R5/R13: an approval binds its actor, the actor's own membership in this agency and a step-up proof of that same actor", async () => {
+  const p = await plan(app, A, projectA, "VALIDATED", "r5", validator);
+  const approverProof = await h.recordStepUp(approver);
+  const bobProof = await h.recordStepUp(bob);
+  // the refuter's F4: a stranger (member of B only) as the actor, A's approver membership, the stranger's proof
+  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), bob, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  // the approver's own membership with somebody else's step-up proof
+  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_proof_fk"));
+  // another agency's membership named inside agency A, even with the matching actor and proof
+  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), bob, B.ownerMembershipId, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  // another member's membership of A with the approver as actor
+  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, A.ownerMembershipId, approverProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.approvals WHERE plan_id = $1", [p.planId])).rows[0].n, 0);
+  // the exact binding commits with the plan transition and both events
+  const approvalId = ids.next();
+  await tx(app, ctx(A, approver), async (c) => {
+    await insertApproval(c, p, approvalId, approver, approverMembership, approverProof);
+    await approve(c, p, approvalId);
+  });
+  const row = await h.oracle.query("SELECT actor_id, actor_membership_id, assurance_proof_ref FROM kauro.approvals WHERE approval_id = $1", [approvalId]);
+  assert.deepEqual(row.rows[0], { actor_id: approver, actor_membership_id: approverMembership, assurance_proof_ref: approverProof });
+});
+
+test("R11: a plan names only its own approval — pointing plan Y at plan X's approval is refused at COMMIT and Y stays VALIDATED", async () => {
+  const x = await plan(app, A, projectA, "VALIDATED", "r11-x", validator);
+  const y = await plan(app, A, projectA, "VALIDATED", "r11-y", validator);
+  const proof = await h.recordStepUp(approver);
+  const approvalOfX = ids.next();
+  await tx(app, ctx(A, approver), async (c) => {
+    await insertApproval(c, x, approvalOfX, approver, approverMembership, proof);
+    await approve(c, x, approvalOfX);
+  });
+  // the review's PROBE-4: Y becomes APPROVED naming X's approval, with a version bump and its event
+  await assert.rejects(
+    tx(app, ctx(A, alice), async (c) => {
+      await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = version + 1 WHERE plan_id = $1", [y.planId, approvalOfX]);
+      await event(c, { aggregateKind: "plan", aggregateId: y.planId, aggregateVersion: 5, agencyId: A.agencyId, eventType: "plan.approved.v1", actorUserId: alice, payload: { planId: y.planId, agencyId: A.agencyId, approvalId: approvalOfX } });
+    }),
+    refusedWith("23503", "plans_approval_fk"),
+  );
+  const rows = await h.oracle.query("SELECT plan_id, state, version, approval_id FROM kauro.plans WHERE plan_id = ANY($1::uuid[]) ORDER BY state", [[x.planId, y.planId]]);
+  assert.deepEqual(rows.rows, [
+    { plan_id: x.planId, state: "APPROVED", version: "5", approval_id: approvalOfX },
+    { plan_id: y.planId, state: "VALIDATED", version: "4", approval_id: null },
+  ]);
 });
 
 test("R14: step-up proofs are written only by the step-up verifier — the request handlers cannot mint one, not even their own; the verifier writes only for the identity it binds and reads nothing", async () => {
