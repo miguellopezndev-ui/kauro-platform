@@ -10,7 +10,7 @@ export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, pr
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
 export { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
 export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
-export { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
+export { HEADERS, PRIVATE_CACHE_POLICY, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
 export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
 export type { ReadinessFacts } from "./api/projections.js";
@@ -53,6 +53,8 @@ export {
   openObjects,
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
+export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,

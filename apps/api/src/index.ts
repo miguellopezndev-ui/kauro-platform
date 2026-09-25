@@ -5,7 +5,8 @@
  * once at start-up. The composition root binds the PostgreSQL adapters: `loadConfig` reads the environment, `openDatabase`
  * applies migrations on start when configured and opens the verified runtime pool, `assembleApi` binds the authorizer, the
  * handlers and the server over a unit-of-work factory, `startApi` runs both, and `bootstrap` adds the authenticator of the
- * environment, listens and offers the bounded `shutdown` (`main.ts` is the process entry).
+ * environment, listens and offers the bounded `shutdown` (`main.ts` is the process entry). `runMigrationJob` is the one-shot
+ * migration job (`migrate.ts` is its process entry): the only process that receives the owner's credential (N7).
  */
 export { createApiServer, fastifyPath, classifyInternalError, clientNetworkOf, routeInventoryOf, DEFAULT_HTTP_LIMITS } from "./server.js";
 export type { ApiServerOptions, ApiLogger, CommandReply, HttpLimits, RouteInventoryEntry } from "./server.js";
@@ -14,12 +15,24 @@ export type { DatabaseReadiness, HealthOptions, LivenessResponse, ProbeResponse,
 export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError } from "./authenticator.js";
 export type { Authenticator, SubjectFacts, BearerTokenEntry } from "./authenticator.js";
 export { loadContractSchemas } from "./schemas.js";
-export { loadConfig, ConfigError, API_POOL_CEILING, SHUTDOWN_DEADLINE_CEILING_MS, MIGRATOR_PASSWORD_VARIABLE } from "./config.js";
-export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig } from "./config.js";
+export {
+  loadConfig,
+  loadMigrationJobConfig,
+  readSecretFile,
+  ConfigError,
+  API_POOL_CEILING,
+  SHUTDOWN_DEADLINE_CEILING_MS,
+  MIGRATOR_PASSWORD_VARIABLE,
+  MIGRATOR_PASSWORD_FILE_VARIABLE,
+} from "./config.js";
+export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
+export { runMigrationJob } from "./migration-job.js";
+export type { MigrationJobOutcome } from "./migration-job.js";
 export { openProjectsInspector, noExternalActionsInThisEdition, noCommercialConsequencesInThisEdition, unavailablePlanServices } from "./edition.js";
 export type { PlanServices } from "./edition.js";
 export {
   openDatabase,
+  applyMigrationsWith,
   assembleApi,
   startApi,
   reportingUnavailability,

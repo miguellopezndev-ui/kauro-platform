@@ -1,7 +1,7 @@
 /**
- * Process entry of the Kauro api (`node dist/src/main.js`). The whole start sequence is `bootstrap` (configuration, the
- * migrator's secret taken out of the process environment, authenticator, migrations on start when configured, verified pool,
- * server, listen); this file adds the process concerns only: SIGTERM/SIGINT drain the server and then the pool within the
+ * Process entry of the Kauro api (`node dist/src/main.js`). The whole start sequence is `bootstrap` (configuration — which
+ * refuses the owner's credential in the environment (N7) —, authenticator, LOCAL migrations on start when configured,
+ * verified pool, server, listen; SANDBOX and LIVE migrate with the one-shot job `node dist/src/migrate.js`); this file adds the process concerns only: SIGTERM/SIGINT drain the server and then the pool within the
  * shutdown deadline (KAURO_SHUTDOWN_DEADLINE_MS, below the platform's grace period; review R35) and exit, and every start
  * failure is reported by class and variable name, never by value (08 "Secrets and supply chain").
  */

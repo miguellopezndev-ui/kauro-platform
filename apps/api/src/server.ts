@@ -54,6 +54,7 @@ import type {
 } from "@kauro/application";
 import {
   HEADERS,
+  PRIVATE_CACHE_POLICY,
   REQUEST_LIMITS,
   ResponseContractViolation,
   UNROUTED_RESPONSES,
@@ -155,7 +156,13 @@ function singleValued(headers: FastifyRequest["headers"]): Readonly<Record<strin
 }
 
 function sendProblem(reply: FastifyReply, problem: Problem): FastifyReply {
-  return reply.code(problem.status).header(HEADERS.correlationId, problem.correlationId).type(HEADERS.problemContentType).send(problem);
+  // the headers every reply carries are set here too: a framework error is answered outside the hooks that set them (N15)
+  return reply
+    .code(problem.status)
+    .header(HEADERS.correlationId, problem.correlationId)
+    .header(HEADERS.cacheControl, PRIVATE_CACHE_POLICY)
+    .type(HEADERS.problemContentType)
+    .send(problem);
 }
 
 /** The safe classification of an unexpected exception: class names only (the adapter attaches the original error as cause). */
@@ -322,6 +329,10 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     // a request arriving on an open connection while draining is answered by the hook below with a problem, not Fastify's JSON
     return503OnClosing: false,
     frameworkErrors: (error, request, reply) => {
+      // a framework error (an undecodable URL, an asynchronous constraint) is answered before routing, outside the request
+      // life cycle whose end Fastify logs, so its completion line is written here once the answer is finished: every request
+      // is found in the log by its correlation id with what it was answered (R45, re-check finding N8)
+      reply.raw.once("finish", () => request.log.info({ res: reply, responseTime: reply.elapsedTime }, "request completed"));
       answerFrameworkError(error, request, reply);
     },
     // errors below HTTP (parser errors, header overflow, the request timeout): a problem written on the socket, then closed.
@@ -348,7 +359,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
       if (socket.writable) {
         socket.write(
           `HTTP/1.1 ${problem.status} ${STATUS_CODES[problem.status] ?? "Error"}\r\nContent-Type: ${HEADERS.problemContentType}; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\n` +
-            `X-Correlation-Id: ${correlationId}\r\nConnection: close\r\n\r\n${body}`,
+            `X-Correlation-Id: ${correlationId}\r\nCache-Control: ${PRIVATE_CACHE_POLICY}\r\nConnection: close\r\n\r\n${body}`,
         );
       }
       socket.destroy(error);
@@ -375,6 +386,8 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   });
   app.addHook("onSend", async (request, reply, payload) => {
     reply.header(HEADERS.correlationId, request.id);
+    // every reply is private: success views, problems and probes alike are never stored by any cache (N15)
+    reply.header(HEADERS.cacheControl, PRIVATE_CACHE_POLICY);
     // once shutdown began, no connection is kept alive past its current answer: close() then ends with the in-flight requests
     if (draining) reply.header("connection", "close");
     return payload;

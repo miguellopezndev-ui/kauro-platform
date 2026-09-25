@@ -7,7 +7,8 @@
 //   node tools/openapi.mjs check      exits 1, listing every failure, when the committed document is not the generated one,
 //                                     an operation has no (or a duplicate) operationId, a registered route is undocumented,
 //                                     a documented route is not registered, a route's declared replies differ from the
-//                                     documented response schemas, or a response schema declares a forbidden member
+//                                     documented response schemas, a route's outcome catalogue differs from the problems it
+//                                     documents per status (x-kauro-outcomes), or a response schema declares a forbidden member
 //
 // Sources (nothing is written by hand): the served commands come from the provenance-verified registry commands.json (path,
 // method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their request schemas, the
@@ -100,6 +101,14 @@ function pathParameters(path) {
   return [...path.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]);
 }
 
+/** A catalogue as documented problem responses: [status, entries] in ascending status order, each entry a plain object. */
+export function problemResponsesOf(application, outcomes) {
+  return application.outcomesByStatus(outcomes).map(([status, entries]) => [
+    String(status),
+    entries.map((e) => ({ code: e.code, reason: e.reason, ...(e.fieldCodes !== undefined ? { fieldCodes: [...e.fieldCodes] } : {}), ...(e.current !== undefined ? { current: e.current } : {}), layer: e.layer, meaning: e.meaning })),
+  ]);
+}
+
 /** Generates the OpenAPI 3.1 document. Deterministic: the same sources give the same bytes. */
 export function generateOpenApi(sources) {
   const { application, domain, registryCommands, provenance, operationalRoutes } = sources;
@@ -134,13 +143,29 @@ export function generateOpenApi(sources) {
     schema: { type: "string", pattern: application.REQUEST_LIMITS.correlationIdPattern.source },
   };
   components.headers.CorrelationId = { description: "The correlation id of the request, on every reply.", schema: { type: "string", minLength: 1, maxLength: 128 } };
+  components.headers.CacheControl = {
+    description: "Every reply is private (08 \"Browser, API and cache isolation\": private responses use an explicit no-shared-cache policy): it is never stored by a shared or a private cache.",
+    schema: { type: "string", const: application.PRIVATE_CACHE_POLICY },
+  };
+  const REPLY_HEADERS = { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" }, "Cache-Control": { $ref: "#/components/headers/CacheControl" } };
   components.securitySchemes.bearerAuth = { type: "http", scheme: "bearer", description: "Authenticated subject (08 \"Authentication and assurance\")." };
 
   const problemResponse = {
     description: "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
-    headers: { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" } },
+    headers: REPLY_HEADERS,
     content: { [application.PROBLEM_RESPONSE.contentType]: { schema: { $ref: `${COMPONENTS}Problem` } } },
   };
+  // a route with an outcome catalogue (re-check finding N13) documents each problem status with the closed list of the
+  // outcomes that answer it; the send guard refuses any other problem on that route
+  const problemResponses = (outcomes) => Object.fromEntries(problemResponsesOf(application, outcomes).map(([status, entries]) => [
+    status,
+    {
+      description: `Problem (10 "Responses and safe errors"): the ${entries.length === 1 ? "outcome" : `${entries.length} outcomes`} of this operation answered ${status}, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.`,
+      headers: REPLY_HEADERS,
+      content: { [application.PROBLEM_RESPONSE.contentType]: { schema: { $ref: `${COMPONENTS}Problem` } } },
+      "x-kauro-outcomes": entries,
+    },
+  ]));
 
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
@@ -159,11 +184,12 @@ export function generateOpenApi(sources) {
       addComponent(`${command.name}Completed`, byId[declared.schemaId], declared.schemaId);
       responses[status] = {
         description: `COMPLETED: ${command.effect}`,
-        headers: { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" } },
+        headers: REPLY_HEADERS,
         content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}${command.name}Completed` } } },
       };
     }
-    responses.default = problemResponse;
+    if (contract.outcomes === null) throw new Error(`${command.id} has no outcome catalogue`);
+    Object.assign(responses, problemResponses(contract.outcomes));
     const parameters = [
       ...pathParameters(command.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
       { $ref: "#/components/parameters/IdempotencyKey" },
@@ -199,7 +225,7 @@ export function generateOpenApi(sources) {
       addComponent(name, byId[declared.schemaId], declared.schemaId);
       responses[status] = {
         description: route.responses[status].description,
-        headers: { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" } },
+        headers: REPLY_HEADERS,
         content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}${name}` } } },
       };
     }
@@ -387,10 +413,18 @@ export function checkOpenApi({ document, expected, inventory, sources }) {
     }
     if (doc.operation.operationId !== contract.operationId) failures.push(`operationId mismatch on ${key}: documented ${doc.operation.operationId}, registered ${contract.operationId}`);
     const responses = doc.operation.responses ?? {};
+    // the problems: one "default" Problem for a route without a catalogue; one Problem per status of its catalogue otherwise,
+    // listing exactly the route's outcomes of that status
+    const problemStatuses = contract.outcomes === null ? ["default"] : problemResponsesOf(sources.application, contract.outcomes).map(([status]) => status);
     for (const status of Object.keys(responses)) {
-      if (status !== "default" && !(status in contract.declared)) failures.push(`response schema mismatch on ${key}: status ${status} is documented but the route does not declare it`);
+      if (!(status in contract.declared) && !problemStatuses.includes(status)) failures.push(`response schema mismatch on ${key}: status ${status} is documented but the route does not declare it`);
     }
-    for (const [status, declared] of [...Object.entries(contract.declared), ["default", contract.problem]]) {
+    if (contract.outcomes !== null) {
+      for (const [status, entries] of problemResponsesOf(sources.application, contract.outcomes)) {
+        if (!isDeepStrictEqual(responses[status]?.["x-kauro-outcomes"], entries)) failures.push(`outcome catalogue mismatch on ${key}: status ${status} does not document exactly the route's outcomes`);
+      }
+    }
+    for (const [status, declared] of [...Object.entries(contract.declared), ...problemStatuses.map((s) => [s, contract.problem])]) {
       const content = responses[status]?.content;
       const media = content?.[declared.contentType];
       if (!media) {
@@ -436,7 +470,7 @@ async function main(mode) {
       for (const f of failures) console.error(`openapi: ${f}`);
       return 1;
     }
-    console.log(`openapi: the document is the generated one and matches the ${inventory.length} registered routes (${operationsOf(document).length} operations, every operationId present, response schemas equal to the ones the routes validate with, no forbidden field)`);
+    console.log(`openapi: the document is the generated one and matches the ${inventory.length} registered routes (${operationsOf(document).length} operations, every operationId present, response schemas equal to the ones the routes validate with, every problem status documenting exactly its route's outcome catalogue, no forbidden field)`);
     return 0;
   }
   console.error("usage: node tools/openapi.mjs generate|check");

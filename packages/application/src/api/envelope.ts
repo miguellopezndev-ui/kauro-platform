@@ -18,7 +18,14 @@ export const HEADERS = Object.freeze({
   agency: "x-kauro-agency",
   contentType: "application/json",
   problemContentType: "application/problem+json",
+  cacheControl: "cache-control",
 });
+
+/**
+ * The cache policy of every reply (08 "Browser, API and cache isolation": "Private responses use an explicit no-shared-cache
+ * policy"; re-check finding N15): tenant views, problems and probes are never stored by a shared or a private cache.
+ */
+export const PRIVATE_CACHE_POLICY = "no-store";
 
 export const REQUEST_LIMITS = Object.freeze({
   jsonBytes: 1_048_576,

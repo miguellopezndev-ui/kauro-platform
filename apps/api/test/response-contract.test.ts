@@ -174,7 +174,7 @@ test("R23: every served route declares its replies (the route inventory the Open
     app.route({
       method: "GET",
       url: "/api/v1/unknown-schema-probe",
-      config: { responses: { operationId: "UnknownSchemaProbe", declared: { "200": { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:neverCompiled:200" } }, problem: PROBLEM_RESPONSE } },
+      config: { responses: { operationId: "UnknownSchemaProbe", declared: { "200": { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:neverCompiled:200" } }, problem: PROBLEM_RESPONSE, outcomes: null } },
       handler: async (_request, reply) => reply.code(200).header("x-correlation-id", ids.next()).send({ secret: SENTINEL }),
     });
     await app.ready();

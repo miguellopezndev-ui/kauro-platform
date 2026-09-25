@@ -334,7 +334,11 @@ export interface World {
   readonly viewer: Person;
   readonly suspended: Person;
   readonly suspendedMembershipId: MembershipId;
-  readonly memberships: Readonly<Record<"owner" | "admin" | "operator" | "approver" | "approver2" | "viewer", MembershipId>>;
+  /** A BILLING member (ACTIVE) and an invited OPERATOR who never accepted (INVITED): re-check finding N17. */
+  readonly billing: Person;
+  readonly invited: Person;
+  readonly invitedMembershipId: MembershipId;
+  readonly memberships: Readonly<Record<"owner" | "admin" | "operator" | "approver" | "approver2" | "viewer" | "billing", MembershipId>>;
   readonly authorityA: ProcessingAuthorityId;
   readonly clientA: ClientId;
   /** Agency B, owned by the stranger; a member of B is a non-member of A. */
@@ -468,6 +472,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const approver2 = await person("approver-two");
   const viewer = await person("viewer");
   const suspended = await person("suspended");
+  const billing = await person("billing");
+  const invited = await person("invited");
   const stranger = await person("stranger");
   const unverified = await person("unverified", { verified: false });
 
@@ -479,7 +485,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     approver: await h.addMember(A, approver.userId, "APPROVER"),
     approver2: await h.addMember(A, approver2.userId, "APPROVER"),
     viewer: await h.addMember(A, viewer.userId, "VIEWER"),
+    billing: await h.addMember(A, billing.userId, "BILLING"),
   };
+  // invited through the ports (an INVITED membership with its open invitation), never accepted
+  const invitedMembershipId = (await h.inviteMember(A, invited.userId, "OPERATOR")).membershipId;
   const suspendedMembershipId = await h.addMember(A, suspended.userId, "OPERATOR");
   await h.app.run(h.tenant(A.agencyId, owner.userId), async (uow) => {
     const member = await uow.memberships.lock(suspendedMembershipId);
@@ -525,6 +534,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     viewer,
     suspended,
     suspendedMembershipId,
+    billing,
+    invited,
+    invitedMembershipId,
     memberships,
     authorityA,
     clientA,
@@ -760,6 +772,8 @@ export async function call(w: World, c: Call): Promise<Reply> {
   const payload = c.rawBody ?? (c.body === undefined ? undefined : JSON.stringify(c.body));
   const options: InjectOptions = { method: c.method ?? "POST", url: c.url, headers, ...(payload !== undefined ? { payload } : {}) };
   const res = await w.app.inject(options);
+  // every reply any test observes is private (08 "Browser, API and cache isolation"; re-check finding N15)
+  if (res.headers["cache-control"] !== "no-store") throw new Error(`a reply without Cache-Control: no-store (${String(res.headers["cache-control"])}): ${res.statusCode} ${options.method} ${c.url}`);
   return {
     status: res.statusCode,
     headers: res.headers as Record<string, string | string[] | number | undefined>,

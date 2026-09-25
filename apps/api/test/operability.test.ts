@@ -3,10 +3,12 @@
 // supply chain"): bootstrap() from an environment, a real socket, a real PostgreSQL 17. Every wait is bounded and fails
 // loudly; interleavings are fixed by a lock held from a superuser session and observed in pg_stat_activity, never by a sleep.
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect, createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import { compileSchemaBundle } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
@@ -19,6 +21,8 @@ import {
   HEALTH_ROUTES,
   bootstrap,
   loadConfig,
+  loadMigrationJobConfig,
+  runMigrationJob,
   writeNotReady,
   writeUnavailable,
   type BootstrappedApi,
@@ -89,6 +93,44 @@ async function within<T>(promise: Promise<T>, ms: number, what: string): Promise
   }
 }
 
+/** A file holding the migrator's password, as a mounted secret would (N7). */
+function passwordFile(): string {
+  const path = join(dir, "migrator-password");
+  writeFileSync(path, `${MIGRATOR_SECRET}\n`);
+  return path;
+}
+
+const MAIN_ENTRY = fileURLToPath(new URL("../src/main.js", import.meta.url));
+const MIGRATE_ENTRY = fileURLToPath(new URL("../src/migrate.js", import.meta.url));
+
+/** The environment of a spawned entry: the given Kauro variables plus what the platform needs to start node, nothing else. */
+function childEnvironment(kauro: Record<string, string | undefined>): Record<string, string> {
+  const inherited = ["PATH", "Path", "SystemRoot", "TEMP", "TMP", "HOME"].flatMap((name) => {
+    const value = process.env[name];
+    return value === undefined ? [] : [[name, value] as const];
+  });
+  return Object.fromEntries([...inherited, ...Object.entries(kauro).filter((e): e is [string, string] => e[1] !== undefined)]);
+}
+
+/** Runs an entry of this package to its exit (bounded) and returns its exit code and output. */
+async function runProcess(entry: string, env: Record<string, string | undefined>, what: string): Promise<{ readonly code: number | null; readonly stdout: string; readonly stderr: string }> {
+  const child = spawn(process.execPath, [entry], { env: childEnvironment(env), stdio: ["ignore", "pipe", "pipe"] });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (d: Buffer) => (stdout += d.toString("utf8")));
+  child.stderr.on("data", (d: Buffer) => (stderr += d.toString("utf8")));
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code));
+  });
+  try {
+    const code = await within(exited, 60_000, what);
+    return { code, stdout, stderr };
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  }
+}
+
 function configError(variable: string): (e: unknown) => boolean {
   return (e) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
 }
@@ -141,7 +183,7 @@ function conforms(operationId: string, status: number, body: unknown): void {
   assert.deepEqual(probeReplies.validate(`${operationId}:${status}`, body), [], `${operationId} ${status}: ${JSON.stringify(body)}`);
 }
 
-test("configuration of the operating limits: the api pool stays inside the four-connection budget (R43), the proxy hop count is explicit outside LOCAL (R34), request, socket and shutdown deadlines are bounded (R35, R36), the migrator's limits are read with migrations on start (R37), and its password is never configuration (R44)", async () => {
+test("configuration of the operating limits: the api pool stays inside the four-connection budget (R43), the proxy hop count is explicit outside LOCAL (R34), request, socket and shutdown deadlines are bounded (R35, R36), the migrator's limits are read with migrations on start (R37), and its password is never configuration (R44) nor accepted by the serving process, whose migrations on start are LOCAL only (N7)", async () => {
   const base = await envOf(pg);
   // R43: 07 "API at most two instances with four connections each"
   assert.equal(loadConfig({ ...base, KAURO_DB_POOL_MAX: "4" }).database.poolMax, 4);
@@ -159,25 +201,107 @@ test("configuration of the operating limits: the api pool stays inside the four-
   assert.throws(() => loadConfig({ ...base, KAURO_HTTP_REQUEST_TIMEOUT_MS: "0" }), configError("KAURO_HTTP_REQUEST_TIMEOUT_MS"));
   assert.throws(() => loadConfig({ ...base, KAURO_HTTP_CONNECTION_TIMEOUT_MS: "999" }), configError("KAURO_HTTP_CONNECTION_TIMEOUT_MS"));
   assert.throws(() => loadConfig({ ...base, KAURO_SHUTDOWN_DEADLINE_MS: "10000" }), configError("KAURO_SHUTDOWN_DEADLINE_MS"), "the deadline stays below Cloud Run's ten-second grace period");
-  // R37 / R44
-  const migrating = loadConfig({ ...base, KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_CONNECT_TIMEOUT_MS: "300" });
-  assert.deepEqual(migrating.migrateOnStart, { host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner, connectTimeoutMs: 300, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000 });
+  // R37 / R44 / N7
+  const secretFile = passwordFile();
+  const migrating = loadConfig({ ...base, KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile, KAURO_DB_MIGRATOR_CONNECT_TIMEOUT_MS: "300" });
+  assert.deepEqual(migrating.migrateOnStart, { host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner, connectTimeoutMs: 300, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: secretFile });
   assert.ok(!JSON.stringify(migrating).includes(MIGRATOR_SECRET), "the migrator password is not configuration");
   assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_LOCK_TIMEOUT_MS: "50" }), configError("KAURO_DB_MIGRATOR_LOCK_TIMEOUT_MS"));
-  assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET }), (e: unknown) => configError("KAURO_DB_MIGRATOR_PASSWORD")(e) && !(e as Error).message.includes(MIGRATOR_SECRET), "an instance that does not migrate never receives owner credentials");
+  // N7: the serving process refuses the owner's credential in its environment by name, never by value, whatever the mode
+  for (const migrate of [undefined, "true", "false"]) {
+    assert.throws(
+      () => loadConfig({ ...base, KAURO_DB_MIGRATE_ON_START: migrate, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET }),
+      (e: unknown) => configError("KAURO_DB_MIGRATOR_PASSWORD")(e) && !(e as Error).message.includes(MIGRATOR_SECRET),
+      `a serving instance never receives owner credentials (KAURO_DB_MIGRATE_ON_START=${String(migrate)})`,
+    );
+  }
+  // N7: migrations on start are a LOCAL convenience; SANDBOX and LIVE migrate with the one-shot job before traffic shifts
+  for (const environment of ["SANDBOX", "LIVE"]) {
+    assert.throws(
+      () => loadConfig({ ...base, KAURO_ENVIRONMENT: environment, KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner }),
+      configError("KAURO_DB_MIGRATE_ON_START"),
+      environment,
+    );
+  }
+  assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"), "a password file without migrations on start");
+  // the job's own configuration: the password in its environment or as a file, never both, and never configuration
+  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET }), {
+    environment: "LIVE",
+    migrator: { host: "10.0.0.5", port: 5432, database: "kauro", user: ROLES.owner, connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
+  });
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
 });
 
-test("R44: bootstrap consumes the migrator password — it leaves the environment before anything runs and is no part of the configuration the running process keeps", async () => {
-  const env = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_PASSWORD: RUNTIME_SECRET });
+test("R44/N7: bootstrap never holds the owner's credential in an environment — it refuses KAURO_DB_MIGRATOR_PASSWORD by name before anything opens; LOCAL migrations on start read the password from a file, and it is no part of the configuration the running process keeps", async () => {
+  const refused = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET });
+  await assert.rejects(bootstrap(refused, { logger: false }), (e: unknown) => configError("KAURO_DB_MIGRATOR_PASSWORD")(e) && !(e as Error).message.includes(MIGRATOR_SECRET));
+  const env = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile(), KAURO_DB_PASSWORD: RUNTIME_SECRET });
+  const given = JSON.stringify(env);
   const api = await bootstrap(env, { logger: false });
   try {
-    assert.ok(!("KAURO_DB_MIGRATOR_PASSWORD" in env), "removed from the environment the process was given");
+    assert.equal(JSON.stringify(env), given, "the environment is read, never changed");
+    assert.ok(!given.includes(MIGRATOR_SECRET), "the environment names the file, never the password");
     assert.deepEqual(api.database.migrations && [api.database.migrations.applied.length, api.database.migrations.skipped.length], [0, listMigrations().length]);
     assert.ok(api.config.migrateOnStart !== null && !("password" in api.config.migrateOnStart));
     assert.ok(!JSON.stringify(api.config).includes(MIGRATOR_SECRET));
     assert.equal(api.config.database.password, RUNTIME_SECRET, "the runtime login keeps its own credential: the pool reconnects with it");
   } finally {
     await api.close();
+  }
+  // an unreadable password file refuses the start by variable and error class
+  const missing = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: join(dir, "no-such-secret") });
+  await assert.rejects(bootstrap(missing, { logger: false }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
+});
+
+test("N7: a serving process (node dist/src/main.js) given the owner's password in its environment exits 1 before it listens, naming the variable and never the value; the one-shot job (node dist/src/migrate.js) migrates a fresh database, exits 0, and a second run applies nothing", async () => {
+  const fresh = await startTemporaryPostgres({ migrate: false });
+  try {
+    const serving = await envOf(fresh, { KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET });
+    const refused = await runProcess(MAIN_ENTRY, serving, "the serving process given the owner's password");
+    assert.equal(refused.code, 1, refused.stderr);
+    assert.match(refused.stderr, /kauro-api failed to start: ConfigError: KAURO_DB_MIGRATOR_PASSWORD: is never accepted by the serving process/);
+    assert.ok(!refused.stderr.includes(MIGRATOR_SECRET) && !refused.stdout.includes(MIGRATOR_SECRET), "never the value");
+    assert.ok(!refused.stderr.includes("listening"), "it never listened");
+    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "127.0.0.1", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET };
+    const first = await runProcess(MIGRATE_ENTRY, job, "the migration job on a fresh database");
+    assert.equal(first.code, 0, first.stderr);
+    assert.equal(first.stdout, `kauro-migrate LIVE: migrations applied: ${listMigrations().length}, already applied: 0\n`);
+    const second = await runProcess(MIGRATE_ENTRY, job, "the migration job again");
+    assert.equal(second.code, 0, second.stderr);
+    assert.equal(second.stdout, `kauro-migrate LIVE: migrations applied: 0, already applied: ${listMigrations().length}\n`);
+    // a job pointed at a superuser login refuses (the owner role only), by class, and exits 1
+    const superuser = await runProcess(MIGRATE_ENTRY, { ...job, KAURO_DB_MIGRATOR_USER: ROLES.superuser }, "the migration job as a superuser");
+    assert.equal(superuser.code, 1);
+    assert.match(superuser.stderr, /kauro-migrate failed: MigratorRoleError: /);
+    // the in-process form of the job, with the password from a file
+    const inProcess = await runMigrationJob({ ...job, KAURO_DB_MIGRATOR_PASSWORD: undefined, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile() });
+    assert.deepEqual([inProcess.result.applied.length, inProcess.result.skipped.length], [0, listMigrations().length]);
+  } finally {
+    await fresh.stop();
+  }
+});
+
+test("N7 (Linux): the initial environment block of a running serving process holds no migrator secret — /proc/<pid>/environ of node dist/src/main.js migrating on start from a password file", { skip: process.platform === "linux" ? false : "the initial environment block is read from /proc/<pid>/environ, which only Linux (the deployment OS) provides" }, async () => {
+  const env = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile() });
+  const child = spawn(process.execPath, [MAIN_ENTRY], { env: childEnvironment(env), stdio: ["ignore", "pipe", "pipe"] });
+  let stderr = "";
+  const exited = new Promise<number | null>((resolve) => child.once("exit", (code) => resolve(code)));
+  const listening = new Promise<void>((resolve, reject) => {
+    child.stderr.on("data", (d: Buffer) => {
+      stderr += d.toString("utf8");
+      if (stderr.includes(" listening on ")) resolve();
+    });
+    void exited.then((code) => reject(new Error(`the serving process exited ${String(code)} before listening: ${stderr}`)));
+  });
+  try {
+    await within(listening, 30_000, "the serving process listening");
+    const block = readFileSync(`/proc/${String(child.pid)}/environ`, "latin1").split("\0");
+    assert.ok(block.some((entry) => entry.startsWith("KAURO_DB_MIGRATOR_PASSWORD_FILE=")), "the block is the process's own environment");
+    assert.deepEqual(block.filter((entry) => entry.startsWith("KAURO_DB_MIGRATOR_PASSWORD=") || entry.includes(MIGRATOR_SECRET)), []);
+  } finally {
+    child.kill("SIGTERM");
+    await within(exited, 15_000, "the serving process exit after SIGTERM");
   }
 });
 

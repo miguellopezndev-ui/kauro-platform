@@ -18,7 +18,9 @@
     "clean-consume": "node tools/clean-consume.mjs",
     "openapi": "node tools/openapi.mjs check",
     "openapi:generate": "node tools/openapi.mjs generate",
-    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run openapi && pnpm run clean-consume"
+    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run openapi && pnpm run matrix && pnpm run clean-consume",
+    "matrix": "node tools/matrix.mjs check",
+    "matrix:generate": "node tools/matrix.mjs generate"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

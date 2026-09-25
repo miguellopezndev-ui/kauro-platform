@@ -28,7 +28,7 @@ import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
 import { applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
-import type { ApiConfig } from "./config.js";
+import type { ApiConfig, MigratorConfig } from "./config.js";
 import { noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
@@ -60,10 +60,22 @@ export interface DatabaseHandle {
 export interface DatabaseDependencies {
   readonly clock?: Clock;
   readonly random?: RandomBytes;
-  /** The migrator's password (KAURO_DB_MIGRATOR_PASSWORD): used for the migration connection only, never retained (R44). */
+  /** LOCAL migrations on start: the owner's password read from its file by bootstrap, for the migration connection only (N7). */
   readonly migratorPassword?: string;
   /** Receives every error a connection of the runtime pool raises, idle or held (R38); default: one stderr line. */
   readonly onPoolError?: PoolErrorSink;
+}
+
+/**
+ * Applies every pending migration as `migrator` on its own bounded connection (R37), closed afterwards: the LOCAL migrations on
+ * start and the one-shot migration job (migration-job.ts). `password` is handed to that connection only; nothing keeps it.
+ */
+export function applyMigrationsWith(migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
+  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, ...connection } = migrator;
+  return applyMigrationsAs(
+    { ...connection, ...(password === undefined ? {} : { password }), applicationName: `${API_APPLICATION_NAME}-migrator` },
+    { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
+  );
 }
 
 /** What opening the database needs from the configuration. */
@@ -81,13 +93,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const shipped = listMigrations();
   const codeSchemaVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
   let migrations: ApplyResult | null = null;
-  if (config.migrateOnStart !== null) {
-    const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, ...connection } = config.migrateOnStart;
-    migrations = await applyMigrationsAs(
-      { ...connection, ...(deps.migratorPassword === undefined ? {} : { password: deps.migratorPassword }), applicationName: `${API_APPLICATION_NAME}-migrator` },
-      { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
-    );
-  }
+  if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.migrateOnStart, deps.migratorPassword);
   const { poolMax, statementTimeoutMs, ...connection } = config.database;
   const pool = createPool({ ...connection, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {

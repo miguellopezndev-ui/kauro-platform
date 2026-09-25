@@ -145,6 +145,76 @@ test("R45: the request log's id is the correlation id — supplied or minted, ev
   }
 });
 
+test("N8: a framework-error answer (an undecodable URL) is logged like every request — one 'incoming request' and one 'request completed' line with the status it was answered, under the correlation id its problem names", async () => {
+  // Re-check finding N8 (R45 gap): the frameworkErrors path left only the 'incoming request' line, so an operator holding the
+  // correlation id could not see what was answered.
+  const lines: Array<Record<string, unknown>> = [];
+  const app = assembleApi({
+    environment: "LOCAL",
+    unitOfWork: w.db.unitOfWork,
+    database: w.db,
+    authenticator: createBearerTokenAuthenticator(new Map([[w.admin.token, w.admin.subject]])),
+    validator: loadContractSchemas(),
+    clock,
+    ids,
+    logger: { level: "info", stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } },
+  });
+  await app.ready();
+  try {
+    for (const url of ["/api/v1/clients/%zz/archive", "/api/v1/plans/%E0%A4%A/approve"]) {
+      const res = await app.inject({ method: "POST", url, headers: { "content-type": "application/json", authorization: `Bearer ${w.admin.token}` }, payload: JSON.stringify({ expectedVersion: 1 }) });
+      assert.equal(res.statusCode, 400);
+      const correlationId = String(res.headers["x-correlation-id"]);
+      assert.match(correlationId, MINTED);
+      const own = lines.filter((l) => l["correlationId"] === correlationId);
+      assert.deepEqual(
+        own.filter((l) => "req" in l || "res" in l).map((l) => [l["msg"], (l["res"] as { statusCode?: number } | undefined)?.statusCode ?? null]),
+        [
+          ["incoming request", null],
+          ["request completed", 400],
+        ],
+        `the request ${url} is found in the log with its answer`,
+      );
+      assert.ok(!own.some((l) => JSON.stringify(l).includes("%zz") && l["msg"] === "request completed"), "the completion line echoes nothing of the path");
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("N15: every reply is private — Cache-Control: no-store on command successes and replays, problems of every layer (pipeline, not-found route, framework error, media type), the liveness and readiness probes, and an answer written below HTTP", async () => {
+  // Re-check finding N15 (08 "Browser, API and cache isolation": "Private responses use an explicit no-shared-cache policy").
+  const noStore = (what: string, headers: Record<string, unknown>): void => assert.equal(headers["cache-control"], "no-store", what);
+  const key = freshKey("n15");
+  const founder = await w.person("n15-founder");
+  const created = await w.app.inject({ method: "POST", url: routes.createAgency(), headers: { "content-type": "application/json", authorization: `Bearer ${founder.token}`, "idempotency-key": key }, payload: JSON.stringify({ displayName: "Private Agency" }) });
+  assert.equal(created.statusCode, 201);
+  noStore("a command success", created.headers);
+  const replayed = await w.app.inject({ method: "POST", url: routes.createAgency(), headers: { "content-type": "application/json", authorization: `Bearer ${founder.token}`, "idempotency-key": key }, payload: JSON.stringify({ displayName: "Private Agency" }) });
+  assert.equal(replayed.statusCode, 201);
+  noStore("an identical replay", replayed.headers);
+  const denied = await w.app.inject({ method: "POST", url: routes.createClient(w.A.agencyId), headers: { "content-type": "application/json", authorization: `Bearer ${w.viewer.token}`, "idempotency-key": freshKey("n15") }, payload: JSON.stringify({ displayName: "Denied", processingAuthorityRef: w.authorityA }) });
+  assert.equal(denied.statusCode, 403);
+  noStore("a pipeline problem", denied.headers);
+  const unrouted = await w.app.inject({ method: "GET", url: "/api/v1/agencies" });
+  assert.equal(unrouted.statusCode, 404);
+  noStore("a not-found problem", unrouted.headers);
+  const badUrl = await w.app.inject({ method: "POST", url: "/api/v1/clients/%zz/archive", headers: { "content-type": "application/json" }, payload: "{}" });
+  assert.equal(badUrl.statusCode, 400);
+  noStore("a framework-error problem", badUrl.headers);
+  const media = await w.app.inject({ method: "POST", url: routes.createAgency(), headers: { "content-type": "text/plain", authorization: `Bearer ${w.owner.token}`, "idempotency-key": freshKey("n15") }, payload: "{}" });
+  assert.equal(media.statusCode, 400);
+  noStore("a media-type problem", media.headers);
+  for (const probe of ["/livez", "/readyz"]) {
+    const answer = await fetch(`http://127.0.0.1:${port}${probe}`);
+    assert.equal(answer.status, 200, probe);
+    assert.equal(answer.headers.get("cache-control"), "no-store", probe);
+  }
+  const garbled = await exchange([["POST /api/v1/agencies HTTP/1.1", "Host: kauro.test", "this is not a header", "", ""].join("\r\n")]);
+  assert.equal(garbled.status, 400);
+  noStore("an answer below HTTP", garbled.headers);
+});
+
 test("R39: framework errors are problems — an undecodable URL is REQUEST_MALFORMED, an over-long path parameter PATH_ID_INVALID, an unreadable request line REQUEST_MALFORMED; each with a correlation id and nothing echoed", async () => {
   const counts = await effectCounts(w);
   const bad = await call(w, { url: "/api/v1/clients/%zz/archive", token: w.admin.token, body: { expectedVersion: 1 } });
