@@ -23,7 +23,7 @@ after(async () => {
 /**
  * The approval-hash oracle of this file, written from reference/HASHING_AND_ACCOUNTING_RULES and not from the product (21
  * "Independent oracles"): SHA-256 over the UTF-8 bytes of the canonical wrapper {domain, payload, version} with the domain
- * KAURO_PLAN_APPROVAL_V1 (KAVO_PLAN_APPROVAL_V1 under amendment A2), version 1 and exactly the nine preimage members, every key
+ * KAURO_PLAN_APPROVAL_V1 (the authority's approval-hash domain as amendment A2 names it), version 1 and exactly the nine preimage members, every key
  * in code-point order, no whitespace. It uses neither approvalHashOf nor the canonical serializer of @kauro/contracts.
  */
 function independentApprovalHash(p: Readonly<Record<"approvalId" | "actorId" | "agencyId" | "planHash" | "revisionHash" | "targetContractHash" | "validationReceiptHash" | "disclosuresHash" | "createdAt", string>>): string {

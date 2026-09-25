@@ -1,6 +1,6 @@
 // CMD025-OK golden vector for the approval hash (registry case CMD025-OK "Create immutable approval for exact
 // plan/source/target/disclosures"; reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation": the approval hash has the
-// domain KAVO_PLAN_APPROVAL_V1 — KAURO_PLAN_APPROVAL_V1 under amendment A2 — over exactly approvalId, actorId, agencyId,
+// domain KAURO_PLAN_APPROVAL_V1 (the name amendment A2, docs/BRAND_AMENDMENT_A2.md, gives it) over exactly approvalId, actorId, agencyId,
 // planHash, revisionHash, targetContractHash, validationReceiptHash, disclosuresHash and createdAt, and "the digest preimage is
 // the UTF-8 bytes of a closed wrapper with domain, version and payload, serialized under the accepted canonical JSON profile";
 // 21 "Independent oracles": expected results must not be calculated with the same helper being tested; "Golden files are useful
