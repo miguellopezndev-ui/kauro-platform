@@ -204,6 +204,20 @@ test("S089 (structural): the request journal refuses a short hash, a zero ceilin
   await assert.rejects(reserve((await mint()) as RequestId, 1, "abc1234", "150"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "short SHA");
   await assert.rejects(reserve((await mint()) as RequestId, 1, sha("request"), "0"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "no reserved ceiling");
   await assert.rejects(reserve((await mint()) as RequestId, 1, sha("request"), "-5"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "negative ceiling");
+  // an absent grant: the port's type requires costGrantId, so only a caller that bypasses the type (a decoded message) can
+  // omit it; the database refuses that reservation (NOT NULL on cost_grant_id, the refusal the unit of work carries as its
+  // cause) and nothing is materialized
+  const ungranted = (await mint()) as RequestId;
+  await assert.rejects(
+    h.control.run(h.system(), (uow) => uow.requestJournal.reserve({ requestId: ungranted, taskId: task, agencyId: A.agencyId, requestHash: sha("request"), fence: 1, reservedCents: "150", costGrantId: null as unknown as string, upstreamRequestIds: [], reservedAt: clock.now() })),
+    (e: unknown) => {
+      const cause = failure(e).cause as { code?: unknown; column?: unknown } | undefined;
+      return cause?.code === "23502" && cause.column === "cost_grant_id";
+    },
+    "no grant",
+  );
+  const ungrantedRows = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE request_id = $1", [ungranted]);
+  assert.equal(ungrantedRows.rows[0].n, 0, "the ungranted intent was not materialized");
   const requestId = (await mint()) as RequestId;
   const first = await reserve(requestId, 1, sha("request"), "150");
   assert.deepEqual({ state: first.state, usageState: first.usageState, reservedCents: first.reservedCents, fence: first.fence }, { state: "RESERVED", usageState: "UNKNOWN", reservedCents: "150", fence: 1 });
