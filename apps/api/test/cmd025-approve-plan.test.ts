@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { asProblem, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { SimulatedCrash, asProblem, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
 
 let w: World;
 let projectId: ProjectId;
@@ -225,7 +225,7 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   assert.equal(await w.count("approvals"), approvalsBefore);
 });
 
-test("RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT", async () => {
+test("RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the plan VALIDATED with no approval and the same key then approves it once", async () => {
   const plan = await w.approvable(w.A, projectId, "approve-race");
   const url = routes.approvePlan(plan.planId);
   const proofA = await w.stepUp(w.approver);
@@ -254,6 +254,28 @@ test("RACE: two approvers on one version → one 201, one 409; identical retry r
   const conflict = await call(w, { url, token: w.approver.token, key: keyA, body: { ...bodyA, disclosuresHash: sha("other") } });
   assert.equal(outcome(w, conflict), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 1);
+
+  // crash at the intent/commit boundary, before COMMIT: the approval row, the plan transition to APPROVED and both events were
+  // written inside the transaction, then the process dies where the journal entry would complete. Nothing is committed — the
+  // plan is VALIDATED at version 4 with no approval, no event and no journal row — and the same key is then the first
+  // execution of that logical operation, which approves the plan exactly once
+  const fresh = await w.approvable(w.A, projectId, "approve-race-crash");
+  const crashKey = freshKey("cmd025-crash");
+  const crashBody = approvalBody(fresh, await w.stepUp(w.approver));
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
+  const crashed = await call(w, { url: routes.approvePlan(fresh.planId), token: w.approver.token, key: crashKey, body: crashBody });
+  assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
+  assert.deepEqual(asProblem(w, crashed).nextActions, [{ action: "RETRY_SAME_KEY" }]);
+  assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
+  const crashedPlan = await w.row<{ state: string; version: string; approval_id: string | null }>("plans", "plan_id = $1", [fresh.planId]);
+  assert.deepEqual(crashedPlan && [crashedPlan.state, crashedPlan.version, crashedPlan.approval_id], ["VALIDATED", "4", null]);
+  assert.equal(await w.count("approvals", "plan_id = $1", [fresh.planId]), 0);
+  assert.equal(await w.count("domain_events", "aggregate_id = $1 AND event_type = 'plan.approved.v1'", [fresh.planId]), 0);
+  assert.equal(await w.journal(crashKey), null);
+  const retried = completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(fresh.planId), token: w.approver.token, key: crashKey, body: crashBody }), 201);
+  assert.equal(retried.replayed, false);
+  assert.equal(await w.count("approvals", "plan_id = $1", [fresh.planId]), 1);
+  assert.equal(await w.count("domain_events", "aggregate_id = $1 AND event_type = 'plan.approved.v1'", [fresh.planId]), 1);
 });
 
 test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superseded body", async () => {
