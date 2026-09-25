@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ArchiveClientView, EndClientView, ProjectView } from "@kauro/application";
 import type { ClientId } from "@kauro/domain";
-import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type World } from "./support.js";
+import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Reply, type World } from "./support.js";
 
 let w: World;
 before(async () => {
@@ -141,7 +141,7 @@ test("DENY: foreign/wrong role → 404/403; HUBSPOT with no offered capability �
   assert.deepEqual(hubspot.data.readinessBlockers, ["AGENCY_NOT_ACTIVE", "NO_SEALED_REVISION", "TARGET_CONTRACT_MISSING", "PLAN_MISSING"]);
 });
 
-test("RACE: identical retry replays; conflicting same key → 409; crash after the project insert and before the revision insert commits nothing (deferred FK)", async () => {
+test("RACE: identical retry replays; conflicting same key → 409; a crash before COMMIT commits nothing; a unit of work interrupted between the project insert and the revision insert commits nothing and the same key then creates the pair once; a project row without its revision cannot commit (deferred FK)", async () => {
   const url = routes.createProject(w.clientA);
   const key = freshKey("cmd011-race");
   const body = { mode: "CLEAN", purpose: "Raced project" };
@@ -173,8 +173,46 @@ test("RACE: identical retry replays; conflicting same key → 409; crash after t
   assert.equal(await w.count("projects", "purpose = $1", ["Crashed project"]), 0);
   assert.equal(await w.journal(crashKey), null);
 
-  // a project can never exist without its draft revision: a project row inserted alone (a crash between the two inserts of
-  // the pair, replayed as the runtime role under the tenant context) fails the deferred key at COMMIT and nothing persists
+  // interruption between the two inserts of the pair, through the real route and the project adapter
+  // (insertWithDraftRevision writes the project row, then the revision row). Another session holds a SHARE lock on the
+  // revision table, so the command writes its project row and then waits on its revision insert: that wait is the hold
+  // point, observed in pg_stat_activity together with the row-exclusive lock the project insert took on kauro.projects. The
+  // waiting statement is cancelled there, so the unit of work ends without COMMIT while its project row exists and its
+  // revision row does not.
+  const betweenKey = freshKey("cmd011-between");
+  const betweenBody = { mode: "CLEAN", purpose: "Interrupted project" };
+  const locker = await w.h.pg.connect("postgres");
+  let interrupted: Reply | undefined;
+  try {
+    await locker.query("BEGIN");
+    await locker.query("LOCK TABLE kauro.dataset_revisions IN SHARE MODE");
+    const pending = call(w, { url, token: w.operator.token, key: betweenKey, body: betweenBody });
+    const pid = await waitForApiLockWait(w, "INSERT INTO kauro.dataset_revisions");
+    const locks = await w.h.oracle.query<{ mode: string }>("SELECT mode FROM pg_locks WHERE pid = $1 AND relation = 'kauro.projects'::regclass", [pid]);
+    assert.ok(locks.rows.some((l) => l.mode === "RowExclusiveLock"), "the waiting unit of work has already inserted its project row");
+    const cancelled = await w.h.oracle.query<{ ok: boolean }>("SELECT pg_cancel_backend($1) AS ok", [pid]);
+    assert.equal(cancelled.rows[0]?.ok, true);
+    interrupted = await pending;
+  } finally {
+    await locker.query("ROLLBACK");
+    await locker.end();
+  }
+  assert.ok(interrupted);
+  assert.equal(outcome(w, interrupted), "503 CAPACITY_UNAVAILABLE -");
+  assert.equal(await w.count("projects", "purpose = $1", ["Interrupted project"]), 0, "the project row of the interrupted pair did not commit");
+  assert.equal(await w.journal(betweenKey), null);
+  // the same key is then the first execution of that logical operation: one project with its DRAFT revision, one event each
+  const created = completed<ProjectView>(await call(w, { url, token: w.operator.token, key: betweenKey, body: betweenBody }), 201);
+  assert.equal(created.replayed, false);
+  const pair = await w.row<{ state: string; current_revision_id: string }>("projects", "project_id = $1", [created.data.projectId]);
+  assert.equal(pair?.state, "OPEN");
+  assert.equal((await w.row<{ state: string }>("dataset_revisions", "revision_id = $1", [pair?.current_revision_id]))?.state, "DRAFT");
+  assert.equal(await w.count("projects", "purpose = $1", ["Interrupted project"]), 1);
+  assert.deepEqual((await w.events("project", created.data.projectId)).map((e) => e.type), ["project.created.v1"]);
+
+  // a project can never exist without its draft revision: a project row inserted alone (a writer that stops between the two
+  // inserts and still commits, replayed as the runtime role under the tenant context) fails the deferred key at COMMIT and
+  // nothing persists
   const orphanId = ids.next();
   await assert.rejects(
     w.asTenant(w.A, async (c) => {
