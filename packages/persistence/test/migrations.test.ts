@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
 import { EVENT_TYPES } from "@kauro/domain";
-import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations, startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
+import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
+import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
 let pg: TemporaryPostgres;
 before(async () => {

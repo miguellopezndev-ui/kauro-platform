@@ -78,6 +78,42 @@ test("forbidden edges are rejected with their rule, and the valid port in the sa
   }
 });
 
+test("a test-only subpath is importable from a test file only, never from production source; a declared workspace dependency nothing imports is refused", () => {
+  const files = {
+    "packages/contracts/package.json": pkg("@kauro/contracts"),
+    "packages/contracts/src/index.ts": "export const x = 1;",
+    "packages/persistence/package.json": pkg("@kauro/persistence", { "@kauro/contracts": "workspace:*" }),
+    "packages/persistence/src/index.ts": 'import { x } from "@kauro/contracts"; export const db = x;',
+    "packages/persistence/src/testing/index.ts": "export const startTemporaryPostgres = () => 1;",
+    "apps/api/package.json": pkg("@kauro/api", { "@kauro/persistence": "workspace:*" }),
+    "apps/api/src/main.ts": 'import { db } from "@kauro/persistence";\nexport default db;',
+    "apps/api/test/support.ts": 'import { startTemporaryPostgres } from "@kauro/persistence/testing";\nexport const pg = startTemporaryPostgres;',
+  };
+  const clean = tree(files);
+  try {
+    const r = run(clean);
+    assert.equal(r.code, 0, r.out);
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const dirty = tree({
+    ...files,
+    "apps/api/src/main.ts": 'import { db } from "@kauro/persistence";\nimport { startTemporaryPostgres } from "@kauro/persistence/testing";\nexport default [db, startTemporaryPostgres];',
+    "packages/persistence/package.json": pkg("@kauro/persistence", { "@kauro/contracts": "workspace:*", "@kauro/application": "workspace:*" }),
+    "packages/application/package.json": pkg("@kauro/application", { "@kauro/contracts": "workspace:*" }),
+    "packages/application/src/index.ts": 'import { x } from "@kauro/contracts"; export const a = x;',
+  });
+  try {
+    const r = run(dirty);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /apps\/api\/src\/main\.ts:2: \[test-only\] production source imports the test-only subpath @kauro\/persistence\/testing/);
+    assert.match(r.out, /packages\/persistence\/package\.json:1: \[unused\] @kauro\/application is declared in @kauro\/persistence\/package\.json dependencies but never imported/);
+    assert.doesNotMatch(r.out, /apps\/api\/test\/support\.ts/, "a test file may import the test-only subpath");
+  } finally {
+    rmSync(dirty, { recursive: true, force: true });
+  }
+});
+
 test("undeclared dependencies and cycles are rejected", () => {
   const root = tree({
     "packages/contracts/package.json": pkg("@kauro/contracts"),

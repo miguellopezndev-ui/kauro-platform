@@ -2,14 +2,12 @@
  * @kauro/persistence — PostgreSQL 17 persistence of the Kauro platform: the ordered SQL migrations (schema, roles, tenant
  * constraints, row-level security, outbox/inbox, journals, leases), the checksummed migration runner, the verified pool
  * factory, the unit of work that binds the tenant context, the repositories, event publisher, journals and lease store that
- * implement the @kauro/domain ports, the SQLSTATE translation, and the temporary cluster helper for real-database tests.
+ * implement the @kauro/domain ports, and the SQLSTATE translation. The temporary cluster, the harness and the interleaving
+ * helpers of the real-database tests are the separate, test-only subpath `@kauro/persistence/testing` (src/testing/index.ts):
+ * nothing here imports it, so no production import graph carries them.
  */
 export { MIGRATIONS_DIR, listMigrations, applyMigrations, applyMigrationsAs, appliedMigrations, MigrationDriftError, MigratorRoleError } from "./migrations/runner.js";
 export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
-export { startTemporaryPostgres, ROLES } from "./testing/temporary-postgres.js";
-export type { TemporaryPostgres, StartOptions } from "./testing/temporary-postgres.js";
-export { start as startHarness, waitForLockWait, barrier, CAPABILITY_PUBLICATION_PATH } from "./testing/harness.js";
-export type { Harness, AgencyFixture, CapabilityPublicationState } from "./testing/harness.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
 export { createPool, KauroPool, PrivilegedRoleError } from "./pool.js";
 export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";

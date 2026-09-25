@@ -9,7 +9,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { MigratorRoleError, PrivilegedRoleError, ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence";
+import { MigratorRoleError, PrivilegedRoleError } from "@kauro/persistence";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 
 let pg: TemporaryPostgres;

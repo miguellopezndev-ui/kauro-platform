@@ -5,7 +5,8 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { DomainFailure, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
-import { PrivilegedRoleError, ROLES, createPool } from "../src/index.js";
+import { PrivilegedRoleError, createPool } from "../src/index.js";
+import { ROLES } from "../src/testing/index.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
 let h: Harness;

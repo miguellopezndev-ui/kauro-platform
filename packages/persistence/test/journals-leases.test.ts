@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { commandRequestDigest } from "@kauro/domain";
-import { startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
+import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, constraintOf, ids, person, sha, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;

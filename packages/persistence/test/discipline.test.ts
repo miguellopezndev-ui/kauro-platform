@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
+import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, constraintOf, endClient, event, ids, offeredCapability, person, plan, processingAuthority, project, sha, sqlState, stepUpProof, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;
