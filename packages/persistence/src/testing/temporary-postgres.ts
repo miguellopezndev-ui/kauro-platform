@@ -3,8 +3,8 @@
  * migrations and concurrency; fakes cannot prove RLS, unique constraints, lock behaviour or pool reset).
  *
  * startTemporaryPostgres() runs initdb into a fresh directory, starts the server on a free 127.0.0.1 port, creates the
- * database and the roles the platform expects, applies the migrations as the owner role, creates login roles that are
- * members of the runtime group roles, and returns connection factories. stop() shuts the server down and removes the
+ * database and the roles the platform expects, applies the migrations as the owner role, creates one login role per runtime
+ * group (request handlers, control plane, step-up verifier, validator), and returns connection factories. stop() shuts the server down and removes the
  * directory. Binaries: env PGBIN first, then C:\Tools\pgsql17\bin on Windows, /usr/lib/postgresql/17/bin on Linux.
  */
 import { spawnSync } from "node:child_process";
@@ -19,18 +19,24 @@ export const ROLES = Object.freeze({
   owner: "kauro_owner",
   app: "kauro_app",
   control: "kauro_control",
+  assurance: "kauro_assurance",
+  validator: "kauro_validator",
   appLogin: "kauro_app_test",
   controlLogin: "kauro_control_test",
+  assuranceLogin: "kauro_assurance_test",
+  validatorLogin: "kauro_validator_test",
   superuser: "postgres",
   database: "kauro",
 });
+
+export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test";
 
 export interface TemporaryPostgres {
   readonly port: number;
   readonly dataDir: string;
   readonly migrations: ApplyResult;
   /** A connected client as the given role (LOGIN roles only). The caller ends it. */
-  connect(role: "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test"): Promise<Client>;
+  connect(role: LoginRole): Promise<Client>;
   stop(): Promise<void>;
 }
 
@@ -119,6 +125,8 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
       try {
         await su2.query(`CREATE ROLE ${ROLES.appLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.app}`);
         await su2.query(`CREATE ROLE ${ROLES.controlLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.control}`);
+        await su2.query(`CREATE ROLE ${ROLES.assuranceLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.assurance}`);
+        await su2.query(`CREATE ROLE ${ROLES.validatorLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.validator}`);
       } finally {
         await su2.end();
       }

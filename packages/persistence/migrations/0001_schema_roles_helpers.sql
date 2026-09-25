@@ -8,15 +8,25 @@
 -- outbox record atomically).
 --
 -- Roles (cluster-wide, created once, verified on every run):
---   kauro_app      request handlers (api). Tenant policies keyed on kauro.agency_id / kauro.user_id.
---   kauro_control  control plane (outbox dispatch, sweeper, capability publication). Operational tables only.
--- Login roles are provisioning concerns: CREATE ROLE kauro_api LOGIN IN ROLE kauro_app; they inherit the group grants.
+--   kauro_app        request handlers (api). Tenant policies keyed on kauro.agency_id / kauro.user_id.
+--   kauro_control    control plane (outbox dispatch, sweeper, capability publication). Operational tables and safe
+--                    technical metadata only (08 "Role and capability model": the Technical Operator inspects safe
+--                    technical metadata; no tenant business data).
+--   kauro_assurance  the step-up verifier (08 "Authentication and assurance": authentication produces the assurance facts;
+--                    a service account has only its technical role). It records step-up proofs and nothing else; the
+--                    request handlers read the proofs but can never mint one.
+--   kauro_validator  the independent Migration validator (registry ValidationReceipt: producer "MC validator", "independently
+--                    checked"; 06 "Migration validation and final states"). It records validation receipts and nothing
+--                    else; the request handlers read receipts but can never mint one.
+-- Login roles are provisioning concerns: CREATE ROLE kauro_api LOGIN IN ROLE kauro_app; they inherit the group grants. A
+-- login is a member of exactly one of these groups (the verified pool refuses any other arrangement).
 -- The migrator (table owner) is a separate role that never serves requests; FORCE ROW LEVEL SECURITY binds it as well.
 --
 -- SQLSTATE vocabulary raised by this schema (adapters map them to the failure taxonomy of @kauro/domain):
 --   KA001 LAST_OWNER_PROTECTED   KA002 VERSION_DISCIPLINE   KA003 EVENT_MISSING   KA004 IMMUTABLE_COLUMN
 --   KA005 LEASE guard (fence / deadline / subject / checkpoint)   KA006 CONTEXT (row not visible inside a trigger)
---   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION
+--   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION (an unlisted edge, or an aggregate born outside its machine's
+--   initial state)
 
 CREATE SCHEMA IF NOT EXISTS kauro;
 REVOKE ALL ON SCHEMA kauro FROM PUBLIC;
@@ -29,9 +39,15 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'kauro_control') THEN
     CREATE ROLE kauro_control NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'kauro_assurance') THEN
+    CREATE ROLE kauro_assurance NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'kauro_validator') THEN
+    CREATE ROLE kauro_validator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+  END IF;
   IF EXISTS (
     SELECT 1 FROM pg_catalog.pg_roles
-    WHERE rolname IN ('kauro_app', 'kauro_control')
+    WHERE rolname IN ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator')
       AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication)
   ) THEN
     RAISE EXCEPTION 'runtime roles must not be SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION (08 Database isolation)';
@@ -42,7 +58,7 @@ BEGIN
 END
 $$;
 
-GRANT USAGE ON SCHEMA kauro TO kauro_app, kauro_control;
+GRANT USAGE ON SCHEMA kauro TO kauro_app, kauro_control, kauro_assurance, kauro_validator;
 
 -- Tenant context: SET LOCAL kauro.agency_id / kauro.user_id (set_config(..., true)) inside the transaction. Missing or empty
 -- settings yield NULL, and every policy compares against NULL as false: no context, no rows (fail closed). An unparsable
@@ -156,15 +172,43 @@ BEGIN
 END
 $$;
 
--- Listed transitions (reference/TRANSITIONS_AND_EVENT_EFFECTS.md: an unlisted edge is rejected). The edge table is seeded
--- per aggregate from the registry; the trigger refuses any state change that is not a listed edge.
+-- State machines and their listed transitions (reference/TRANSITIONS_AND_EVENT_EFFECTS.md: every machine names its initial
+-- state; an unlisted edge is rejected rather than inferred; registry state_transitions: unlistedTransition =
+-- REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED). Both tables are seeded per aggregate from the registry (EndClient and
+-- Project from the platform machines of decisions D-AGG-1/D-AGG-2) in the migration that creates the aggregate's table; the
+-- persistence tests compare both seeds with the registry. kauro.enforce_initial_state refuses an aggregate born in any other
+-- state than its machine's initial one (an INSERT is the edge "from nothing"; skipping the listed edges by inserting a row in a
+-- later state is the same unlisted transition), and kauro.enforce_listed_transition refuses any unlisted state change.
+CREATE TABLE kauro.state_machines (
+  machine text PRIMARY KEY,
+  initial_state text NOT NULL
+);
+GRANT SELECT ON kauro.state_machines TO kauro_app, kauro_control;
+
 CREATE TABLE kauro.state_transitions (
-  machine text NOT NULL,
+  machine text NOT NULL REFERENCES kauro.state_machines (machine),
   from_state text NOT NULL,
   to_state text NOT NULL,
   PRIMARY KEY (machine, from_state, to_state)
 );
 GRANT SELECT ON kauro.state_transitions TO kauro_app, kauro_control;
+
+CREATE OR REPLACE FUNCTION kauro.enforce_initial_state() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  initial text;
+BEGIN
+  SELECT m.initial_state INTO initial FROM kauro.state_machines m WHERE m.machine = TG_ARGV[0];
+  IF initial IS NULL THEN
+    RAISE EXCEPTION 'UNLISTED_TRANSITION: machine % has no seeded initial state', TG_ARGV[0] USING ERRCODE = 'KA008';
+  END IF;
+  IF NEW.state IS DISTINCT FROM initial THEN
+    RAISE EXCEPTION 'UNLISTED_TRANSITION: a % is born %; its initial state is % and later states are reached by the listed edges', TG_ARGV[0], NEW.state, initial USING ERRCODE = 'KA008';
+  END IF;
+  RETURN NEW;
+END
+$$;
 
 CREATE OR REPLACE FUNCTION kauro.enforce_listed_transition() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS

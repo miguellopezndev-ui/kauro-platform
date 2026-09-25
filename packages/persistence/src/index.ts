@@ -7,12 +7,13 @@
 export { MIGRATIONS_DIR, listMigrations, applyMigrations, applyMigrationsAs, appliedMigrations, MigrationDriftError, MigratorRoleError } from "./migrations/runner.js";
 export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
 export { startTemporaryPostgres, ROLES } from "./testing/temporary-postgres.js";
-export type { TemporaryPostgres, StartOptions } from "./testing/temporary-postgres.js";
+export type { TemporaryPostgres, StartOptions, LoginRole } from "./testing/temporary-postgres.js";
 export { start as startHarness, waitForLockWait, barrier, CAPABILITY_PUBLICATION_PATH } from "./testing/harness.js";
 export type { Harness, AgencyFixture, CapabilityPublicationState } from "./testing/harness.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
-export { createPool, KauroPool, PrivilegedRoleError } from "./pool.js";
+export { createPool, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";
+export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";

@@ -20,6 +20,9 @@ INSERT INTO kauro.event_types (event_type) VALUES
   ('agency.ownership_transferred.v1'),
   ('end_client.created.v1'), ('end_client.archived.v1'),
   ('project.created.v1'), ('dataset_revision.created.v1'),
+  ('dataset_revision.uploading.v1'), ('dataset_revision.inspecting.v1'), ('dataset_revision.ready_to_seal.v1'),
+  ('dataset_revision.sealed.v1'), ('dataset_revision.rejected.v1'), ('dataset_revision.cancelled.v1'),
+  ('dataset_revision.superseded.v1'), ('dataset_revision.expired.v1'), ('dataset_revision.deleted.v1'),
   ('plan.created.v1'), ('plan.validation_required.v1'), ('plan.validating.v1'), ('plan.validated.v1'), ('plan.superseded.v1'),
   ('plan.approved.v1'), ('plan.withdrawn.v1'),
   ('approval.created.v1'), ('approval.withdrawn.v1');

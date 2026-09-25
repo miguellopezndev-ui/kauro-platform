@@ -59,7 +59,7 @@ test("two owners removing each other: one transition commits, the other is refus
       assert.equal(n.rows[0].n, 2);
     }
     // T1 (alice) revokes bob: the owner-count trigger takes the agency row lock and sees one owner remaining
-    await revoke(c1, ag, alice, bobMembership, 1);
+    await revoke(c1, ag, alice, bobMembership, 2); // invited v1, accepted v2
     // T2 (bob) revokes alice: blocks on the agency row lock held by T1
     const t2 = revoke(c2, ag, bob, ag.ownerMembershipId, 1);
     await waitForLockWait(pid2);
@@ -78,7 +78,7 @@ test("two owners removing each other: one transition commits, the other is refus
   const count = await oracle.query("SELECT active_owner_count FROM kauro.agencies WHERE agency_id = $1", [ag.agencyId]);
   assert.equal(count.rows[0].active_owner_count, 1);
   const events = await oracle.query("SELECT event_type FROM kauro.domain_events WHERE aggregate_id = $1 ORDER BY sequence", [bobMembership]);
-  assert.deepEqual(events.rows.map((e) => e.event_type), ["membership.created.v1", "membership.revoked.v1"]);
+  assert.deepEqual(events.rows.map((e) => e.event_type), ["membership.invited.v1", "membership.accepted.v1", "membership.revoked.v1"]);
 });
 
 test("the sole owner cannot revoke themselves; a non-owner can be revoked; closure authority permits the removal", async () => {
@@ -92,7 +92,7 @@ test("the sole owner cannot revoke themselves; a non-owner can be revoked; closu
   );
   const still = await oracle.query("SELECT state, version FROM kauro.memberships WHERE membership_id = $1", [ag.ownerMembershipId]);
   assert.deepEqual(still.rows[0], { state: "ACTIVE", version: "1" });
-  await tx(app, { agencyId: ag.agencyId, userId: dana.userId }, (c) => revoke(c, ag, dana, eveMembership, 1));
+  await tx(app, { agencyId: ag.agencyId, userId: dana.userId }, (c) => revoke(c, ag, dana, eveMembership, 2));
   // explicit closure authority (CMD043 territory): DRAFT -> CLOSING is a listed edge; then the last owner may leave
   await tx(app, { agencyId: ag.agencyId, userId: dana.userId }, async (c) => {
     await c.query("UPDATE kauro.agencies SET state = 'CLOSING', version = 2 WHERE agency_id = $1", [ag.agencyId]);

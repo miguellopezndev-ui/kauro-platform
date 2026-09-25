@@ -27,7 +27,10 @@ CREATE TRIGGER identities_immutable BEFORE UPDATE ON kauro.identities
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('user_id,provider,subject_hash,created_at');
 
 -- Step-up proofs (08: high-impact actions require recent step-up; freshness is checked by the application against the
--- policy value, the row records what was obtained and when).
+-- policy value, the row records what was obtained and when). A proof is evidence produced by the authentication boundary
+-- (08 "Authentication and assurance": authentication produces the assurance facts), so only the step-up verifier role
+-- (kauro_assurance) writes it; the request handlers (kauro_app) read their own proofs and can never mint one — the gate a
+-- proof satisfies (CMD025 step-up) is enforced by the very role it would otherwise be protecting against.
 CREATE TABLE kauro.assurance_proofs (
   proof_id        uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(proof_id)),
   user_id         uuid NOT NULL REFERENCES kauro.identities (user_id),
@@ -75,7 +78,10 @@ CREATE TRIGGER agencies_immutable BEFORE UPDATE ON kauro.agencies
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('agency_id,created_by_user_id,created_at');
 CREATE TRIGGER agencies_transition BEFORE UPDATE OF state ON kauro.agencies
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('Agency');
+CREATE TRIGGER agencies_initial_state BEFORE INSERT ON kauro.agencies
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Agency');
 
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Agency', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Agency', 'DRAFT', 'ACTIVE'),
   ('Agency', 'ACTIVE', 'RESTRICTED'),
@@ -115,6 +121,42 @@ CREATE TRIGGER memberships_immutable BEFORE UPDATE ON kauro.memberships
 CREATE TRIGGER memberships_transition BEFORE UPDATE OF state ON kauro.memberships
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('Membership');
 
+-- Membership initial state (registry Membership machine: initial INVITED; every later state is reached through a listed edge,
+-- INVITED -> ACTIVE being intended_identity_accepts). The one narrow exemption is the founding owner of CreateAgency (CMD001
+-- effect "Create one draft agency and owner membership atomically"; decision D-CTX-2): the creator is the intended identity
+-- and accepts implicitly, so that single membership is born ACTIVE. It is admitted only when every one of these holds — the
+-- row is an ACTIVE OWNER; its identity is the session's own identity and the agency's creator; the agency is DRAFT and counts
+-- no active owner yet; and the agency has no membership row at all (the founding membership is the first one). A second
+-- owner, an owner for somebody else, a founding ADMIN or a founding membership of an agency that already has members is born
+-- INVITED or refused.
+CREATE OR REPLACE FUNCTION kauro.enforce_membership_initial_state() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  initial text;
+BEGIN
+  SELECT m.initial_state INTO initial FROM kauro.state_machines m WHERE m.machine = 'Membership';
+  IF initial IS NULL THEN
+    RAISE EXCEPTION 'UNLISTED_TRANSITION: machine Membership has no seeded initial state' USING ERRCODE = 'KA008';
+  END IF;
+  IF NEW.state = initial THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.state = 'ACTIVE' AND NEW.role = 'OWNER' AND NEW.user_id = kauro.current_user_id()
+     AND EXISTS (
+       SELECT 1 FROM kauro.agencies a
+       WHERE a.agency_id = NEW.agency_id AND a.created_by_user_id = NEW.user_id AND a.state = 'DRAFT' AND a.active_owner_count = 0
+     )
+     AND NOT EXISTS (SELECT 1 FROM kauro.memberships m WHERE m.agency_id = NEW.agency_id) THEN
+    RETURN NEW; -- the founding owner of CreateAgency
+  END IF;
+  RAISE EXCEPTION 'UNLISTED_TRANSITION: a Membership is born %; its initial state is % (only the founding owner of a new agency is born ACTIVE)', NEW.state, initial USING ERRCODE = 'KA008';
+END
+$$;
+CREATE TRIGGER memberships_initial_state BEFORE INSERT ON kauro.memberships
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_membership_initial_state();
+
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Membership', 'INVITED');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Membership', 'INVITED', 'ACTIVE'),
   ('Membership', 'INVITED', 'EXPIRED'),
@@ -185,8 +227,12 @@ CREATE POLICY identities_self ON kauro.identities FOR ALL TO kauro_app
 
 ALTER TABLE kauro.assurance_proofs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.assurance_proofs FORCE ROW LEVEL SECURITY;
-CREATE POLICY assurance_proofs_self ON kauro.assurance_proofs FOR ALL TO kauro_app
-  USING (user_id = kauro.current_user_id()) WITH CHECK (user_id = kauro.current_user_id());
+-- a request handler reads the proofs of the identity it serves; the step-up verifier records a proof for the identity whose
+-- reauthentication it verified (its context binds that identity) and reads nothing
+CREATE POLICY assurance_proofs_self_read ON kauro.assurance_proofs FOR SELECT TO kauro_app
+  USING (user_id = kauro.current_user_id());
+CREATE POLICY assurance_proofs_verifier ON kauro.assurance_proofs FOR INSERT TO kauro_assurance
+  WITH CHECK (user_id = kauro.current_user_id());
 
 ALTER TABLE kauro.agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.agencies FORCE ROW LEVEL SECURITY;
@@ -214,4 +260,5 @@ CREATE POLICY membership_invitations_tenant ON kauro.membership_invitations FOR 
 
 -- --- grants (no DELETE for request handlers anywhere: deletion is a managed lifecycle, never a request) -----------------------
 GRANT SELECT, INSERT, UPDATE ON kauro.identities, kauro.agencies, kauro.memberships, kauro.membership_invitations TO kauro_app;
-GRANT SELECT, INSERT ON kauro.assurance_proofs TO kauro_app;
+GRANT SELECT ON kauro.assurance_proofs TO kauro_app;
+GRANT INSERT ON kauro.assurance_proofs TO kauro_assurance;

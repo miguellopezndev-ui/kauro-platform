@@ -1,6 +1,9 @@
-// Shared fixtures for the persistence tests. Every fixture write goes through the runtime role (kauro_app_test) under a
-// real tenant context, so the fixtures themselves prove the policies admit legitimate writes (21 "Positive and negative
-// symmetry"). Oracle reads use the superuser, which bypasses RLS and therefore sees every row of every tenant.
+// Shared fixtures for the persistence tests. Every fixture write goes through the runtime role that owns it — the request
+// handlers (kauro_app_test) under a real tenant context, the control plane (kauro_control_test), the step-up verifier
+// (kauro_assurance_test) or the validator (kauro_validator_test) — so the fixtures themselves prove the policies admit
+// legitimate writes (21 "Positive and negative symmetry"). Aggregates are born in their machine's initial state and walk the
+// listed edges, one version and one event per edge. Oracle reads use the superuser, which bypasses RLS and therefore sees
+// every row of every tenant.
 import { randomBytes, createHash } from "node:crypto";
 import type { Client } from "pg";
 import { createIdGenerator, identityUserId, toUtcInstant, type IdGenerator } from "@kauro/domain";
@@ -110,16 +113,25 @@ export async function agency(app: Client, owner: Person, displayName = "Acme Age
   return { agencyId, ownerMembershipId: membershipId, ownerUserId: owner.userId };
 }
 
-/** Adds an ACTIVE member with the given role inside the tenant context (as InviteMember + AcceptInvitation will). */
+/**
+ * Adds an ACTIVE member with the given role along the registry Membership machine, as InviteMember + AcceptInvitation will:
+ * the owner invites (INVITED v1, membership.invited.v1), the intended identity accepts under its own context (ACTIVE v2,
+ * membership.accepted.v1). The membership ends at version 2.
+ */
 export async function member(app: Client, ag: AgencyFixture, who: Person, role: string): Promise<string> {
   const membershipId = ids.next();
   await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
     await c.query(
-      `INSERT INTO kauro.memberships (membership_id, agency_id, user_id, role, state, assurance_policy, accepted_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'ACTIVE', 'MFA_REQUIRED', now(), now(), now())`,
+      `INSERT INTO kauro.memberships (membership_id, agency_id, user_id, role, state, assurance_policy, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'INVITED', 'MFA_REQUIRED', now(), now())`,
       [membershipId, ag.agencyId, who.userId, role],
     );
-    await event(c, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "membership.created.v1", actorUserId: ag.ownerUserId, payload: { membershipId, agencyId: ag.agencyId, userId: who.userId, role, state: "ACTIVE" } });
+    await event(c, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "membership.invited.v1", actorUserId: ag.ownerUserId, payload: { membershipId, agencyId: ag.agencyId, role, invitedByMembershipId: ag.ownerMembershipId } });
+  });
+  await tx(app, { agencyId: ag.agencyId, userId: who.userId }, async (c) => {
+    const r = await c.query("UPDATE kauro.memberships SET state = 'ACTIVE', accepted_at = now(), version = 2 WHERE membership_id = $1 AND state = 'INVITED' AND version = 1", [membershipId]);
+    if (r.rowCount !== 1) throw new Error(`membership ${membershipId} did not accept its invitation`);
+    await event(c, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: 2, agencyId: ag.agencyId, eventType: "membership.accepted.v1", actorUserId: who.userId, payload: { membershipId, agencyId: ag.agencyId, userId: who.userId, role } });
   });
   return membershipId;
 }
@@ -195,14 +207,42 @@ export interface PlanFixture {
   readonly targetContractHash: string;
 }
 
-/** A plan revision at the given state (fixtures walk the listed edges with one event per version). */
-export async function plan(app: Client, ag: AgencyFixture, projectId: string, state: "DRAFT" | "VALIDATION_REQUIRED" | "VALIDATED", seed = "plan"): Promise<PlanFixture & { version: number; receiptHash?: string }> {
+/** Records a validation receipt as the validator (kauro_validator_test) under the plan's tenant context. */
+export async function validationReceipt(
+  validator: Client,
+  ag: AgencyFixture,
+  p: PlanFixture,
+  receiptHash: string,
+  result: "VALID" | "INVALID" | "CANCELLED" | "ERROR" = "VALID",
+): Promise<void> {
+  await tx(validator, { agencyId: ag.agencyId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.validation_receipts (receipt_id, agency_id, plan_id, receipt_hash, revision_hash, target_contract_hash, plan_hash, core_package_hash, profile_evidence_hash, disposition_evidence_hash, artifact_evidence_hash, started_at, completed_at, result, counts, blocking_issue_codes, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() - interval '1 minute', now(), $12, '{"physicalSourceRows": 10}', $13::jsonb, now())`,
+      [ids.next(), ag.agencyId, p.planId, receiptHash, p.revisionHash, p.targetContractHash, p.bodyHash, sha("core"), sha("profile"), sha("disposition"), sha("artifact"), result, result === "VALID" ? "[]" : '["UNRESOLVED_REQUIRED_DECISION"]'],
+    );
+  });
+}
+
+/**
+ * A plan revision at the given state, walked along the listed Plan edges with one event per version. The request handlers
+ * apply DRAFT -> VALIDATION_REQUIRED -> VALIDATING; for VALIDATED the validator (a kauro_validator_test connection) records the
+ * VALID receipt and the handlers then apply valid_receipt (VALIDATING -> VALIDATED binding it).
+ */
+export async function plan(
+  app: Client,
+  ag: AgencyFixture,
+  projectId: string,
+  state: "DRAFT" | "VALIDATION_REQUIRED" | "VALIDATING" | "VALIDATED",
+  seed = "plan",
+  validator?: Client,
+): Promise<PlanFixture & { version: number; receiptHash?: string }> {
   const planId = ids.next();
   const bodyHash = sha(seed + "-body-" + planId);
   const revisionHash = sha(seed + "-revision-" + projectId);
   const targetContractHash = sha(seed + "-target-" + projectId);
+  const fixture: PlanFixture = { planId, bodyHash, revisionHash, targetContractHash };
   let version = 1;
-  let receiptHash: string | undefined;
   await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
     await c.query(
       `INSERT INTO kauro.plans (plan_id, agency_id, project_id, revision_hash, target_contract_hash, policy_hash, body, body_hash, created_by_membership_id, created_at, updated_at)
@@ -215,26 +255,27 @@ export async function plan(app: Client, ag: AgencyFixture, projectId: string, st
       await c.query(`UPDATE kauro.plans SET state = 'VALIDATION_REQUIRED', version = 2 WHERE plan_id = $1`, [planId]);
       await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 2, agencyId: ag.agencyId, eventType: "plan.validation_required.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash } });
     }
-    if (state === "VALIDATED") {
-      receiptHash = sha(seed + "-receipt-" + planId);
+    if (state === "VALIDATING" || state === "VALIDATED") {
+      version = 3;
       await c.query(`UPDATE kauro.plans SET state = 'VALIDATING', version = 3 WHERE plan_id = $1`, [planId]);
       await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 3, agencyId: ag.agencyId, eventType: "plan.validating.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash } });
-      await c.query(
-        `INSERT INTO kauro.validation_receipts (receipt_id, agency_id, plan_id, receipt_hash, revision_hash, target_contract_hash, plan_hash, core_package_hash, profile_evidence_hash, disposition_evidence_hash, artifact_evidence_hash, started_at, completed_at, result, counts, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() - interval '1 minute', now(), 'VALID', '{"physicalSourceRows": 10}', now())`,
-        [ids.next(), ag.agencyId, planId, receiptHash, revisionHash, targetContractHash, bodyHash, sha("core"), sha("profile"), sha("disposition"), sha("artifact")],
-      );
-      await c.query(`UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1`, [planId, receiptHash]);
-      await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 4, agencyId: ag.agencyId, eventType: "plan.validated.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash, validationReceiptHash: receiptHash } });
-      version = 4;
     }
   });
-  return receiptHash === undefined ? { planId, bodyHash, revisionHash, targetContractHash, version } : { planId, bodyHash, revisionHash, targetContractHash, version, receiptHash };
+  if (state !== "VALIDATED") return { ...fixture, version };
+  if (!validator) throw new Error("a VALIDATED plan needs the validator connection that records its receipt");
+  const receiptHash = sha(seed + "-receipt-" + planId);
+  await validationReceipt(validator, ag, fixture, receiptHash);
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(`UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1`, [planId, receiptHash]);
+    await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 4, agencyId: ag.agencyId, eventType: "plan.validated.v1", actorUserId: ag.ownerUserId, payload: { planId, agencyId: ag.agencyId, bodyHash, validationReceiptHash: receiptHash } });
+  });
+  return { ...fixture, version: 4, receiptHash };
 }
 
-export async function stepUpProof(app: Client, who: Person): Promise<string> {
+/** Records a step-up proof as the step-up verifier (kauro_assurance_test) for the identity it verified. */
+export async function stepUpProof(assurance: Client, who: Person): Promise<string> {
   const proofId = ids.next();
-  await tx(app, { userId: who.userId }, async (c) => {
+  await tx(assurance, { userId: who.userId }, async (c) => {
     await c.query(
       `INSERT INTO kauro.assurance_proofs (proof_id, user_id, kind, method, issued_at, expires_at, correlation_id, created_at)
        VALUES ($1, $2, 'STEP_UP', 'TOTP', now(), now() + interval '15 minutes', $3, now())`,
