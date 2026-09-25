@@ -241,8 +241,9 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       for (const [k, e] of s.journal) {
         if (e.entryId === entryId) {
           if (e.state !== "RESERVED") throw new DomainFailure("INTEGRITY_FAILURE", "journal entry is final");
-          s.journal.set(k, { ...e, state: "COMMITTED", responseStatus: result.responseStatus, responseBody: structuredClone(result.responseBody), resourceKind: result.resourceKind, resourceId: result.resourceId, committedAt: clock.now() });
-          return;
+          const committed: CommandJournalEntry = { ...e, state: "COMMITTED", responseStatus: result.responseStatus, responseBody: structuredClone(result.responseBody), resourceKind: result.resourceKind, resourceId: result.resourceId, committedAt: clock.now() };
+          s.journal.set(k, committed);
+          return committed;
         }
       }
       throw new DomainFailure("INTEGRITY_FAILURE", "journal entry not found");

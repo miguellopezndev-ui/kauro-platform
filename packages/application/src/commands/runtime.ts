@@ -166,14 +166,18 @@ export async function runCommand<Body, View>(
         agencyId: identity.agencyId,
         causationId: reservation.entryId as Id as CausationId,
       });
-      // 5. the response snapshot is part of the same transaction
-      await uow.journal.commit(reservation.entryId, {
+      // 5. the response snapshot is part of the same transaction, and the answer is the journaled record itself (D-PORT-2): the
+      //    first execution, a concurrent duplicate and a retry after a lost response answer with the same durable bytes
+      const committed = await uow.journal.commit(reservation.entryId, {
         responseStatus: outcome.status,
         responseBody: outcome.view,
         resourceKind: outcome.resourceKind,
         resourceId: outcome.resourceId,
       });
-      return outcome;
+      if (committed.state !== "COMMITTED" || committed.responseStatus !== outcome.status || committed.responseBody === undefined) {
+        throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
+      }
+      return { ...outcome, view: committed.responseBody as View };
     });
     if (completed instanceof ReplayedResult) {
       return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: true };

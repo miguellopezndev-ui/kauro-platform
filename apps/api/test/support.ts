@@ -121,7 +121,7 @@ function instrumentUnitOfWork(uow: UnitOfWork, holds: HoldPoints): UnitOfWork {
     },
     async commit(entryId, result) {
       await holds.pass("journal.commit");
-      await uow.journal.commit(entryId, result);
+      return uow.journal.commit(entryId, result);
     },
     markUncertain: (entryId) => uow.journal.markUncertain(entryId),
     find: (identity) => uow.journal.find(identity),

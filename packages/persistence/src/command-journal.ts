@@ -110,16 +110,23 @@ export class PgCommandJournal implements CommandJournal {
     return { kind: "REPLAY", entry: existing };
   }
 
-  async commit(entryId: JournalEntryId, result: JournalCommit): Promise<void> {
+  /**
+   * Completes the RESERVED entry and returns the row as stored (RETURNING): the response body comes back through the same
+   * jsonb decoding a replay uses, so the first answer and every later replay serialize to the same bytes (D-PORT-2).
+   */
+  async commit(entryId: JournalEntryId, result: JournalCommit): Promise<CommandJournalEntry> {
     if (!Number.isInteger(result.responseStatus) || result.responseStatus < 200 || result.responseStatus > 299) throw new DomainFailure("INTEGRITY_FAILURE", "a committed command records a 2xx status");
     if (result.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a committed command records its response body");
-    const r = await execute(
+    const r = await execute<JournalRow>(
       this.db,
       `UPDATE kauro.command_journal SET state = 'COMMITTED', response_status = $2, response_body = $3::jsonb, resource_kind = $4, resource_id = $5, committed_at = $6
-       WHERE entry_id = $1 AND state = 'RESERVED'`,
+       WHERE entry_id = $1 AND state = 'RESERVED'
+       RETURNING ${JOURNAL_COLUMNS}`,
       [entryId, result.responseStatus, JSON.stringify(result.responseBody), result.resourceKind, result.resourceId, this.clock.now()],
     );
-    if (r.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "journal commit found no RESERVED entry to complete");
+    const row = r.rows[0];
+    if (r.rowCount !== 1 || !row) throw new DomainFailure("INTEGRITY_FAILURE", "journal commit found no RESERVED entry to complete");
+    return entryOf(row);
   }
 
   async markUncertain(entryId: JournalEntryId): Promise<void> {
