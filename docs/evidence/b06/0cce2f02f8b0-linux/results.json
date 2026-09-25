@@ -1,0 +1,100 @@
+{
+  "subject": {
+    "commit": "0cce2f02f8b06759903afe001fc4a9949e5e4612",
+    "tree": "ef348b3c44844666559aba8464ea9e2af5ce5653"
+  },
+  "suites": [
+    {
+      "name": "build",
+      "command": "pnpm run build",
+      "exitCode": 0,
+      "started": "2026-09-25T21:31:42.760Z",
+      "ended": "2026-09-25T21:31:51.048Z"
+    },
+    {
+      "name": "contracts",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/contracts.xml \"dist/test/**/*.test.js\"",
+      "cwd": "packages/contracts",
+      "exitCode": 0,
+      "started": "2026-09-25T21:31:51.048Z",
+      "ended": "2026-09-25T21:31:51.151Z",
+      "tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "domain",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/domain.xml \"dist/test/**/*.test.js\"",
+      "cwd": "packages/domain",
+      "exitCode": 0,
+      "started": "2026-09-25T21:31:51.152Z",
+      "ended": "2026-09-25T21:31:51.343Z",
+      "tests": 53,
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "application",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/application.xml \"dist/test/**/*.test.js\"",
+      "cwd": "packages/application",
+      "exitCode": 0,
+      "started": "2026-09-25T21:31:51.344Z",
+      "ended": "2026-09-25T21:31:51.607Z",
+      "tests": 55,
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "persistence",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/persistence.xml --test-concurrency=2 \"dist/test/**/*.test.js\"",
+      "cwd": "packages/persistence",
+      "exitCode": 0,
+      "started": "2026-09-25T21:31:51.608Z",
+      "ended": "2026-09-25T21:32:11.265Z",
+      "tests": 98,
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "authorization",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/authorization.xml \"dist/test/**/*.test.js\"",
+      "cwd": "packages/authorization",
+      "exitCode": 0,
+      "started": "2026-09-25T21:32:11.267Z",
+      "ended": "2026-09-25T21:32:11.412Z",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "api",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/api.xml --test-concurrency=3 \"dist/test/**/*.test.js\"",
+      "cwd": "apps/api",
+      "exitCode": 0,
+      "started": "2026-09-25T21:32:11.412Z",
+      "ended": "2026-09-25T21:32:35.068Z",
+      "tests": 118,
+      "passed": 118,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "tools",
+      "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit/tools.xml \"tools/test/**/*.test.mjs\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "started": "2026-09-25T21:32:35.069Z",
+      "ended": "2026-09-25T21:32:35.488Z",
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "tests": 371
+}

@@ -14,6 +14,11 @@ commit it names. The directory is named `<first 12 hex digits of the commit>-<pl
 | `cases.json` | Every test each case cites, found by file and name in the reports, with its outcome (PASSED, FAILED, SKIPPED or MISSING), and whether every cited test of the case PASSED. |
 | `MANIFEST.sha256` | The SHA-256 of every other file of the bundle; `sha256sum -c MANIFEST.sha256` in the bundle directory checks it. |
 
+| bundle | subject | platform | result |
+|---|---|---|---|
+| `0cce2f02f8b0-windows/` | `0cce2f02f8b06759903afe001fc4a9949e5e4612` (tree `ef348b3c`), branch `b06/integration` | Windows 11 (10.0.26200), Node 24.14.1, pnpm 10.16.1, PostgreSQL 17.6 | 371 tests: 370 passed, 1 skipped (the Linux-only `/proc/<pid>/environ` test); every step exit 0; 29/29 cases with every cited test PASSED |
+| `0cce2f02f8b0-linux/` | the same commit and tree, a fresh clone as the unprivileged user `miguel` | Ubuntu 24.04 under WSL2, Node 24.21.0, pnpm 10.16.1, PostgreSQL 17.11 | 371 tests: 371 passed; every step exit 0; 29/29 cases with every cited test PASSED |
+
 `pnpm run evidence` exits 0 only when the build and every suite exit 0 and every cited test of every case PASSED. A bundle is
 evidence of the commit it names and of nothing else: a later commit does not borrow it (registry CMD011 verification: "A
 failed harness or changed binary cannot borrow a previous green result"). What the bundles prove and what they do not — the

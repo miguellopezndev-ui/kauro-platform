@@ -1,0 +1,19 @@
+{
+  "subject": {
+    "commit": "0cce2f02f8b06759903afe001fc4a9949e5e4612",
+    "tree": "ef348b3c44844666559aba8464ea9e2af5ce5653",
+    "branch": "b06/integration"
+  },
+  "node": "v24.21.0",
+  "pnpm": "10.16.1",
+  "postgres": "postgres (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg24.04+2)",
+  "os": {
+    "platform": "linux",
+    "type": "Linux",
+    "release": "6.18.33.2-microsoft-standard-WSL2",
+    "arch": "x64",
+    "cpus": 12
+  },
+  "truthSealedAt": "2026-09-25T21:31:42.527Z",
+  "truthSha256": "2177bc2ae53afdf1625ec01d573e16225ad61c4227e45cdf9c609f85bda6e273"
+}

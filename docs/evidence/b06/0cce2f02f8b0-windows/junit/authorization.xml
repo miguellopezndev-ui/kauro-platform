@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="the identity window admits `limit` requests, refuses the next with a retry-after, and reopens after the window" time="0.002283" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\admission.test.js"/>
+	<testcase name="the address window applies across identities when the transport supplies the hashed address" time="0.000296" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\admission.test.js"/>
+	<testcase name="memory stays bounded: subjects beyond maxTrackedSubjects are swept, oldest first; defaults and invalid limits" time="0.000652" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\admission.test.js"/>
+	<testcase name="every membership role against every tenant command: the decision equals the COMMAND_ROLE_MEMBERS table; OWNER passes everything; every denial names ROLE_INSUFFICIENT and the policy version" time="0.007096" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="identity is not permission: a disabled or unverified identity is denied before any membership is read; CreateAgency needs no membership" time="0.001173" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="scope: a caller without a live membership in the selected agency gets NOT_FOUND (foreign and nonexistent alike); a SUSPENDED member is NOT_AUTHORIZED / MEMBERSHIP_SUSPENDED; an INVITED one MEMBERSHIP_NOT_ACTIVE; a REVOKED one NOT_FOUND" time="0.000924" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="no cached grant: a SUSPENDED member reactivated in the store is allowed on the next decision, and a revoked one is refused on the next decision" time="0.000363" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="step-up (CMD025): a fresh proof of the actor allows with assurance class STEP_UP; missing, foreign, expired or stale proofs are ASSURANCE_REQUIRED with the exact reason" time="0.001183" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="commands whose role is not a membership (corporate, service) are denied by default" time="0.000279" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="R16: the stored identity row is consulted beside the token — a DISABLED row refuses a token that says ACTIVE, for a member and for CreateAgency; a stored row never verifies a token that is not, and no stored row leaves the token's facts to decide" time="0.000500" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<testcase name="access and assurance are two decisions (R7): access never reads a proof — the replay of a step-up command is answered to a current member whose proof has aged; assurance is step 8 of a new execution only; a unit of work bound to another person decides nothing" time="0.000578" classname="test" file="C:\Projects\Kauro\repos\kauro-platform\packages\authorization\dist\test\authorizer.test.js"/>
+	<!-- tests 11 -->
+	<!-- suites 0 -->
+	<!-- pass 11 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 159.5313 -->
+</testsuites>

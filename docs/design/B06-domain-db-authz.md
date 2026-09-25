@@ -1001,8 +1001,9 @@ commands, the five reads and the two probes), every problem status documenting e
 matrix check finds the committed state/command/event matrix to be the generated one (14 machines and 155 edges each owned, 7
 commands and 5 reads with their catalogues, every applicability citation resolved); clean-consume installs the publishable
 packages from their tarballs alone and type-checks their ten typed entry points. `pnpm run evidence` wrote the bundle of the
-candidate commit on each platform (`docs/evidence/b06/`, D-EVIDENCE-1): every suite's JUnit report and every cited test of
-the 29 cases with its outcome.
+candidate commit `0cce2f02f8b0` on each platform (`docs/evidence/b06/0cce2f02f8b0-windows/` and `-linux/`, D-EVIDENCE-1),
+committed after it: every suite's JUnit report and every cited test of the 29 cases with its outcome — 371 tests, every step
+exit 0, 29/29 cases with every cited test PASSED on both platforms.
 
 The persistence tests are the review of the SQL: application and idempotent re-application, drift refusal, the serialized and
 bounded runner, role/RLS/ownership facts, enum CHECK lists equal to the registry, listed-transition and initial-state seeds
