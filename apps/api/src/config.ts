@@ -67,6 +67,11 @@ export interface ApiConfig {
   readonly migrateOnStart: MigratorConfig | null;
   /** LOCAL only: a JSON file binding opaque bearer tokens to authenticated subjects (design 12b I-AUTH-1). */
   readonly bearerTokensFile: string | null;
+  /**
+   * KAURO_API_CURSOR_KEY_FILE: a file (a mounted secret) of at least 32 bytes, the key list cursors are sealed with, shared by
+   * every instance (N16). Required outside LOCAL; in LOCAL, when absent, each process uses a fresh random key.
+   */
+  readonly cursorKeyFile: string | null;
 }
 
 /** 07 "Connection budget": the API runs at most two instances with four connections each (R43). */
@@ -198,7 +203,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   }
   const bearerTokensFile = optional(env, "KAURO_AUTH_BEARER_TOKENS_FILE") ?? null;
   if (bearerTokensFile !== null && environment !== "LOCAL") throw new ConfigError("KAURO_AUTH_BEARER_TOKENS_FILE", "is accepted in the LOCAL environment only");
-  return {
+  const config: ApiConfig = {
     environment,
     http: {
       host: optional(env, "KAURO_HTTP_HOST") ?? "127.0.0.1",
@@ -220,7 +225,27 @@ export function loadConfig(env: Env = process.env): ApiConfig {
     },
     migrateOnStart,
     bearerTokensFile,
+    cursorKeyFile: optional(env, CURSOR_KEY_FILE_VARIABLE) ?? null,
   };
+  // every instance behind the load balancer must open the cursors another one sealed (10 "Pagination, search and exports")
+  if (config.cursorKeyFile === null && environment !== "LOCAL") throw new ConfigError(CURSOR_KEY_FILE_VARIABLE, "is required outside LOCAL: every instance seals and opens the same list cursors");
+  return config;
+}
+
+/** The list cursors' key as a file (N16). */
+export const CURSOR_KEY_FILE_VARIABLE = "KAURO_API_CURSOR_KEY_FILE";
+
+/** A key read from a file (a mounted secret): its bytes, at least 32. A refusal names the variable and the class, never bytes. */
+export function readKeyFile(variable: string, path: string): Uint8Array {
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(path);
+  } catch (e) {
+    const code = e instanceof Error && typeof (e as NodeJS.ErrnoException).code === "string" ? String((e as NodeJS.ErrnoException).code) : "unreadable";
+    throw new ConfigError(variable, `names a file that cannot be read (${code})`);
+  }
+  if (bytes.byteLength < 32) throw new ConfigError(variable, "names a key shorter than 32 bytes");
+  return new Uint8Array(bytes);
 }
 
 /** The one-shot migration job's configuration (N7): the owner role, its limits and, when given, its password file. */

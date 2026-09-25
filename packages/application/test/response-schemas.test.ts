@@ -186,7 +186,7 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
 test("R23: checkReply refuses an undeclared status, another content type, a closed-schema violation and a problem whose status is not the HTTP status; it names paths and codes, never values; the replacement problem is itself a valid Problem", () => {
   const contract = commandRouteResponses("CMD009", "CreateClient");
   const secret = "sentinel-value-0f9e8d";
-  const client = { clientId: "0192f3a4-5b6c-7d8e-9f01-23456789abcd", agencyId: "0192f3a4-5b6c-7d8e-9f01-23456789abce", version: 1, displayName: "Client", state: "ACTIVE", processingAuthorityRef: "0192f3a4-5b6c-7d8e-9f01-23456789abcf", createdAt: "2026-09-25T10:00:00.000Z" };
+  const client = { clientId: "0192f3a4-5b6c-7d8e-9f01-23456789abcd", agencyId: "0192f3a4-5b6c-7d8e-9f01-23456789abce", version: 1, displayName: "Client", state: "ACTIVE", processingAuthorityRef: "0192f3a4-5b6c-7d8e-9f01-23456789abcf", createdAt: "2026-09-25T10:00:00.000Z", permittedActions: ["ArchiveClient", "CreateProject"] };
   const completed = { kind: "COMPLETED", version: 1, replayed: false, data: client };
   checkReply(validator, contract, 201, "application/json; charset=utf-8", completed);
   const refused = (status: number, contentType: string, body: unknown): ResponseContractViolation => {

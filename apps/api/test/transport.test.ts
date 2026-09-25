@@ -196,7 +196,7 @@ test("N15: every reply is private — Cache-Control: no-store on command success
   const denied = await w.app.inject({ method: "POST", url: routes.createClient(w.A.agencyId), headers: { "content-type": "application/json", authorization: `Bearer ${w.viewer.token}`, "idempotency-key": freshKey("n15") }, payload: JSON.stringify({ displayName: "Denied", processingAuthorityRef: w.authorityA }) });
   assert.equal(denied.statusCode, 403);
   noStore("a pipeline problem", denied.headers);
-  const unrouted = await w.app.inject({ method: "GET", url: "/api/v1/agencies" });
+  const unrouted = await w.app.inject({ method: "GET", url: "/api/v1/nothing" });
   assert.equal(unrouted.statusCode, 404);
   noStore("a not-found problem", unrouted.headers);
   const badUrl = await w.app.inject({ method: "POST", url: "/api/v1/clients/%zz/archive", headers: { "content-type": "application/json" }, payload: "{}" });

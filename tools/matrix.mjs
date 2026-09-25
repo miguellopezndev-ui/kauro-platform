@@ -289,6 +289,9 @@ export async function loadMatrixSources() {
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
     specs: application.B06_COMMANDS,
     outcomes: application.COMMAND_OUTCOMES,
+    reads: application.READ_ROUTES,
+    readOutcomes: application.READ_OUTCOMES,
+    readViews: application.READ_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
     served: new Set(application.SERVED_COMMAND_IDS),
@@ -301,9 +304,8 @@ export async function loadMatrixSources() {
 
 // --- checking the owner table and the citations -----------------------------------------------------------------------------------
 
-export function checkSources(s) {
+export function checkSources(s, owners = EDGE_OWNERS, applicability = APPLICABILITY) {
   const failures = [];
-  const owners = EDGE_OWNERS;
   for (const m of s.machines) {
     const table = owners[m.contract];
     if (!table) {
@@ -323,7 +325,7 @@ export function checkSources(s) {
       if (o.command !== undefined && s.served.has(o.command) && o.event !== null && !s.published[o.command].includes(o.event)) failures.push(`${machine}: ${k} says ${o.command} publishes ${o.event}, which its handler never publishes`);
     }
   }
-  for (const [command, row] of Object.entries(APPLICABILITY)) {
+  for (const [command, row] of Object.entries(applicability)) {
     for (const mutation of MUTATIONS) {
       const cell = row[mutation];
       if (cell === undefined) failures.push(`${command}: no applicability for "${mutation}"`);
@@ -338,7 +340,7 @@ export function checkSources(s) {
       }
     }
   }
-  for (const id of s.served) if (!(id in APPLICABILITY)) failures.push(`${id} is served but has no applicability row`);
+  for (const id of s.served) if (!(id in applicability)) failures.push(`${id} is served but has no applicability row`);
   return failures;
 }
 
@@ -445,6 +447,31 @@ export function generateMatrix(s) {
     }
     line();
   }
+  line("## 5. The manual-10 reads (re-check finding N16)");
+  line();
+  line("Every read runs under the caller's own context and policies after the same access decision as a command (identity, and for an");
+  line("agency read an ACTIVE live membership after its transition lock; every membership role reads, AGENCY_READER); a denial is a");
+  line("durable security fact under the read's action token. Lists page by keyset with an opaque cursor bound to the caller, the agency,");
+  line("the list, its filter and its order (`api/cursor`, KEYSET_V1). What differs by role is the projection: a team manager");
+  line("(MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view");
+  line("carries the caller's permitted actions (`api/permitted-actions`).");
+  line();
+  line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
+  line("| --- | --- | --- | --- | --- | --- | --- |");
+  for (const spec of Object.values(s.reads)) {
+    line(`| ${spec.operationId} | GET ${cell(spec.path)} | ${spec.scope} | ${spec.paginated ? "limit, cursor" : "—"} | ${s.readViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
+  }
+  line();
+  for (const spec of Object.values(s.reads)) {
+    line(`### ${spec.operationId}`);
+    line();
+    line("| Status | Code | Reason | Field codes | current | Layer | Meaning |");
+    line("| --- | --- | --- | --- | --- | --- | --- |");
+    for (const [status, entries] of s.outcomesByStatus(s.readOutcomes[spec.operationId])) {
+      for (const e of entries) line(`| ${status} | ${e.code} | ${e.reason ?? "—"} | ${e.fieldCodes ? e.fieldCodes.join(", ") : "—"} | ${e.current ? e.current.toLowerCase() : "—"} | ${e.layer} | ${cell(e.meaning)} |`);
+    }
+    line();
+  }
   return out.join("\n") + "\n";
 }
 
@@ -481,7 +508,7 @@ async function main() {
     return;
   }
   const edges = s.machines.reduce((n, m) => n + m.transitions.length + 1, 0);
-  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands with their catalogues, every applicability citation resolved)\n`);
+  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands and ${Object.keys(s.reads).length} reads with their catalogues, every applicability citation resolved)\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

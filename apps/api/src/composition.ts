@@ -21,7 +21,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { B06Collaborators, CommandRuntime, SchemaValidator } from "@kauro/application";
-import { createB06Handlers, refuseUnauthenticated } from "@kauro/application";
+import { createB06Handlers, createReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, Environment, IdGenerator, RandomBytes, UnitOfWorkFactory } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
@@ -182,10 +182,16 @@ export interface ApiAssembly {
   readonly onNotReady?: HealthOptions["onNotReady"];
   readonly trustedProxyHops?: number;
   readonly clientAddressKey?: Uint8Array;
+  /**
+   * The key list cursors are sealed with (N16; 10 "Cursors are opaque, integrity-protected ..."): every instance that serves the
+   * same lists shares it (KAURO_API_CURSOR_KEY_FILE, required outside LOCAL). Absent — LOCAL only — a fresh random key per
+   * process: a cursor then does not survive a restart, and its list starts over.
+   */
+  readonly cursorKey?: Uint8Array;
   readonly limits?: HttpLimits;
 }
 
-/** Binds the authorizer, the seven handlers and the HTTP server over an open unit-of-work factory. */
+/** Binds the authorizer, the seven command handlers, the five reads and the HTTP server over an open unit-of-work factory. */
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
@@ -203,11 +209,14 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ...unavailablePlanServices(),
     ...assembly.collaborators,
   };
+  const cursorKey = assembly.cursorKey ?? systemRandom(32);
+  if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
   return createApiServer({
     environment: assembly.environment,
     handlers: createB06Handlers(runtime, collaborators),
+    reads: createReadHandlers({ unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey }),
     authenticator: assembly.authenticator,
-    refuseUnauthenticated: (command, request) => refuseUnauthenticated(runtime, command, request),
+    refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
     validator: assembly.validator ?? loadContractSchemas(),
     clock,
     ids,

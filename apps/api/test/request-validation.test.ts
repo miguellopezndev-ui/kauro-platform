@@ -9,9 +9,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
+import { B06_COMMANDS, READ_ROUTES, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { classifyInternalError, fastifyPath } from "../src/index.js";
+import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
 
 let w: World;
@@ -222,19 +222,28 @@ test("the correlation id is echoed when supplied, generated otherwise, and prese
   const unknown = await call(w, { url: "/api/v1/nothing", body: {} });
   assert.equal(outcome(w, unknown), "404 NOT_FOUND -");
   assert.equal(asProblem(w, unknown).correlationId, unknown.headers["x-correlation-id"]);
-  const wrongMethod = await call(w, { method: "GET", url: "/api/v1/agencies", agency: null, key: null, contentType: null });
+  const wrongMethod = await call(w, { method: "GET", url: routes.archiveClient(w.clientA), key: null, contentType: null });
   assert.equal(outcome(w, wrongMethod), "404 NOT_FOUND -");
   assert.equal(asProblem(w, wrongMethod).correlationId, wrongMethod.headers["x-correlation-id"]);
 });
 
-test("exactly the seven catalogue routes are registered, as POST, under /api/v1", async () => {
+test("exactly the seven catalogue routes are registered as POST and the five manual-10 reads as GET, under /api/v1", async () => {
+  const reads = new Set(Object.values(READ_ROUTES).map((r) => r.path));
   for (const spec of Object.values(B06_COMMANDS)) {
     assert.ok(w.app.hasRoute({ method: "POST", url: fastifyPath(spec.path) }), spec.path);
-    assert.ok(!w.app.hasRoute({ method: "GET", url: fastifyPath(spec.path) }), `no GET on ${spec.path}`);
+    // a command path is readable only where manual 10 names the read on the same path (GET /agencies, GET .../clients)
+    assert.equal(w.app.hasRoute({ method: "GET", url: fastifyPath(spec.path) }), reads.has(spec.path), `GET on ${spec.path}`);
     assert.ok(spec.path.startsWith("/api/v1/"), spec.path);
   }
+  for (const read of Object.values(READ_ROUTES)) {
+    assert.ok(w.app.hasRoute({ method: "GET", url: fastifyPath(read.path) }), read.path);
+    assert.ok(!w.app.hasRoute({ method: "POST", url: fastifyPath(read.path) }) || Object.values(B06_COMMANDS).some((c) => c.path === read.path), `no POST on ${read.path} unless a command owns it`);
+    assert.ok(read.path.startsWith("/api/v1/"), read.path);
+  }
   assert.equal(fastifyPath("/api/v1/agencies/{agencyId}/clients"), "/api/v1/agencies/:agencyId/clients");
-  assert.equal(w.app.printRoutes().split("\n").filter((l) => l.includes("(POST)")).length, 7);
+  const inventory = routeInventoryOf(w.app);
+  assert.equal(inventory.filter((r) => r.method === "POST").length, 7);
+  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/")).length, 5);
   // each route validates its body against its own closed request schema
   for (const id of Object.keys(B06_COMMANDS) as Array<keyof typeof B06_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
 });

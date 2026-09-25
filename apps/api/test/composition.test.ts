@@ -89,6 +89,7 @@ test("configuration: every variable is validated and a missing or malformed one 
     database: { host: "127.0.0.1", port: pg.port, database: "kauro", user: ROLES.appLogin, poolMax: 2, statementTimeoutMs: 10_000 },
     migrateOnStart: null,
     bearerTokensFile: null,
+    cursorKeyFile: null,
   });
 });
 
@@ -110,7 +111,9 @@ test("authentication of this edition: the LOCAL bearer-token file is a closed do
   refused(JSON.stringify({ subjects: [entry, entry] }), "repeats an earlier token");
   refused(JSON.stringify({ subjects: [{ ...entry, token: "short" }] }), "16..512");
   for (const environment of ["SANDBOX", "LIVE"]) {
-    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" }))), configError("KAURO_ENVIRONMENT"), environment);
+    // outside LOCAL the list cursors' key is a required shared secret (N16); with it, the missing verifier refuses the start
+    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" })), configError("KAURO_API_CURSOR_KEY_FILE"), environment);
+    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key" }))), configError("KAURO_ENVIRONMENT"), environment);
   }
   assert.throws(() => authenticatorOf(loadConfig(envOf())), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
 });

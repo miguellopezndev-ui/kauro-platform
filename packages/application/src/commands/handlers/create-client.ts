@@ -13,6 +13,7 @@
  */
 import type { AgencyId, ClientId, ProcessingAuthorityId } from "@kauro/domain";
 import { AGENCY_OPEN_STATES, DomainFailure } from "@kauro/domain";
+import { clientActions } from "../../api/permitted-actions.js";
 import { endClientView } from "../../api/projections.js";
 import type { EndClientView } from "../../api/views.js";
 import { CREATE_CLIENT, type CreateClientBody, type CreateClientHandler } from "../contracts.js";
@@ -59,7 +60,7 @@ export function createClientHandler(runtime: CommandRuntime): CreateClientHandle
           correlationId: envelope.correlationId,
           payload: { clientId, agencyId, processingAuthorityRef: authorityRef, createdByMembershipId: membership.membershipId },
         });
-        return { status: 201, view: endClientView(client), version: client.version, resourceKind: "end_client", resourceId: clientId };
+        return { status: 201, view: endClientView(client, clientActions(membership.role, client, agency)), version: client.version, resourceKind: "end_client", resourceId: clientId };
       }),
   };
 }

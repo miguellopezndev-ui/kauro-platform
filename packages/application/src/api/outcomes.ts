@@ -19,7 +19,7 @@
  */
 import type { FailureCode, FailureReason, FieldError } from "@kauro/domain";
 import { PROBLEM_STATUS } from "./problems.js";
-import type { ServedCommandId } from "./response-schemas.js";
+import type { ReadOperationId, ServedCommandId } from "./response-schemas.js";
 
 /** Where an outcome is decided (design §6.1, the admission order of manual 10). */
 export type OutcomeLayer = "TRANSPORT" | "ADMISSION" | "AUTHENTICATION" | "ACCESS" | "IDEMPOTENCY" | "ASSURANCE" | "COMMAND" | "PLATFORM";
@@ -190,6 +190,53 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD023: catalogueOf("CMD023"),
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
+});
+
+// --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
+
+/** Every read: a GET without a body or an idempotency key, so no body admission outcome applies. */
+const EVERY_READ: ReadonlyArray<ProblemOutcome> = Object.freeze(
+  EVERY_ROUTE.filter((o) => o.layer !== "ADMISSION" && o.layer !== "IDEMPOTENCY"),
+);
+
+/** Tenant reads: the authorizer's membership decisions; every membership role reads its agency (AGENCY_READER). */
+const TENANT_READ: ReadonlyArray<ProblemOutcome> = Object.freeze(TENANT.filter((o) => o.reason !== "ROLE_INSUFFICIENT"));
+
+/** A read that takes no query parameter refuses any (the query is a closed schema too). */
+const NO_QUERY = outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the read takes no query parameter, or one was repeated", { fieldCodes: ["UNKNOWN_FIELD", "TYPE"] });
+
+/** A list read: its closed query (limit, cursor) and its cursor. */
+const PAGINATED: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the query is not limit (1..100, default 25) and cursor, or a member was repeated or malformed", { fieldCodes: ["UNKNOWN_FIELD", "TYPE", "FORMAT", "RANGE"] }),
+  outcome("ADMISSION", "INVALID_REQUEST", "CURSOR_INVALID", "the cursor is not one this server issued for this caller, scope, list, filter and order (R2-060): nothing of another scope is read or disclosed"),
+]);
+
+const READ_SPECIFIC: Readonly<Record<ReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  ListAgencies: [...PAGINATED],
+  GetAgency: [...PATH_IDS, ...TENANT_READ, NO_QUERY],
+  ListMembers: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
+  ListClients: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
+  GetProject: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the project")],
+});
+
+function readCatalogueOf(operationId: ReadOperationId): ReadonlyArray<ProblemOutcome> {
+  const entries = [...EVERY_READ, ...READ_SPECIFIC[operationId]];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const key = `${e.code}/${e.reason ?? "-"}`;
+    if (seen.has(key)) throw new TypeError(`${operationId}: the outcome ${key} is listed twice`);
+    seen.add(key);
+  }
+  return Object.freeze(entries);
+}
+
+/** The closed problem catalogue of each served read. */
+export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  ListAgencies: readCatalogueOf("ListAgencies"),
+  GetAgency: readCatalogueOf("GetAgency"),
+  ListMembers: readCatalogueOf("ListMembers"),
+  ListClients: readCatalogueOf("ListClients"),
+  GetProject: readCatalogueOf("GetProject"),
 });
 
 /** The catalogue entry a problem is an instance of, or null. */

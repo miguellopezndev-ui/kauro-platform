@@ -26,6 +26,7 @@ import type { Sha256Hex } from "@kauro/contracts";
 import { DOMAINS, structuredDigest } from "@kauro/contracts";
 import type { ApprovalId, AssuranceProofId, PlanId } from "@kauro/domain";
 import { DomainFailure, StaleVersionFailure } from "@kauro/domain";
+import { approvalActions, planActions } from "../../api/permitted-actions.js";
 import { approvalView, planView } from "../../api/projections.js";
 import type { DisclosureComposer } from "../../ports/plan-services.js";
 import { APPROVE_PLAN, type ApprovePlanBody, type ApprovePlanHandler, type ApprovePlanView } from "../contracts.js";
@@ -160,7 +161,7 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
           correlationId: envelope.correlationId,
           payload: { planId, agencyId: membership.agencyId, approvalId, approvalHash: approval.approvalHash },
         });
-        return { status: 201, view: { approval: approvalView(approval), plan: planView(approved) }, version: approved.version, resourceKind: "approval", resourceId: approvalId };
+        return { status: 201, view: { approval: approvalView(approval, approvalActions(membership, approval)), plan: planView(approved, planActions(membership.role, approved, true)) }, version: approved.version, resourceKind: "approval", resourceId: approvalId };
       }),
   };
 }

@@ -20,7 +20,7 @@
  */
 import { createBearerTokenAuthenticator, loadBearerTokenFile, type Authenticator } from "./authenticator.js";
 import { startApi, type StartedApi, type StartOptions } from "./composition.js";
-import { ConfigError, MIGRATOR_PASSWORD_FILE_VARIABLE, loadConfig, readSecretFile, type ApiConfig } from "./config.js";
+import { CURSOR_KEY_FILE_VARIABLE, ConfigError, MIGRATOR_PASSWORD_FILE_VARIABLE, loadConfig, readKeyFile, readSecretFile, type ApiConfig } from "./config.js";
 
 export function authenticatorOf(config: ApiConfig): Authenticator {
   if (config.environment === "LOCAL") {
@@ -73,10 +73,12 @@ export async function bootstrap(env: Readonly<Record<string, string | undefined>
   const authenticator = authenticatorOf(config);
   const passwordFile = config.migrateOnStart?.passwordFile ?? null;
   const migratorPassword = passwordFile === null ? undefined : readSecretFile(MIGRATOR_PASSWORD_FILE_VARIABLE, passwordFile);
+  const cursorKey = config.cursorKeyFile === null ? undefined : readKeyFile(CURSOR_KEY_FILE_VARIABLE, config.cursorKeyFile);
   const started = await startApi(config, {
     authenticator,
     logger: options.logger ?? true,
     ...(migratorPassword !== undefined ? { migratorPassword } : {}),
+    ...(cursorKey !== undefined ? { cursorKey } : {}),
     ...(options.onInternalError !== undefined ? { onInternalError: options.onInternalError } : {}),
     ...(options.onUnavailable !== undefined ? { onUnavailable: options.onUnavailable } : {}),
     ...(options.onNotReady !== undefined ? { onNotReady: options.onNotReady } : {}),

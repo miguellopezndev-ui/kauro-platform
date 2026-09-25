@@ -88,7 +88,9 @@ test("OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose recei
   assert.equal(approval.validationReceiptHash, plan.receiptHash);
   assert.equal(approval.disclosuresHash, disclosuresHashOf(plan.bodyHash, plan.receiptHash!, disclosureItemsOf(plan.body, plan.affectedRows)));
   assert.equal(approval.withdrawnAt, undefined);
-  assert.deepEqual(Object.keys(approval).sort(), ["actorId", "actorMembershipId", "agencyId", "approvalHash", "approvalId", "createdAt", "disclosuresHash", "planHash", "planId", "revisionHash", "targetContractHash", "validationReceiptHash", "version"], "no token, recovery setting or security evidence in the view");
+  assert.deepEqual(Object.keys(approval).sort(), ["actorId", "actorMembershipId", "agencyId", "approvalHash", "approvalId", "createdAt", "disclosuresHash", "permittedActions", "planHash", "planId", "revisionHash", "targetContractHash", "validationReceiptHash", "version"], "no token, recovery setting or security evidence in the view");
+  // the approving actor controls the live approval it just created (N16: permitted actions derived server-side)
+  assert.deepEqual(approval.permittedActions, ["WithdrawApproval"]);
 
   // oracle: the approvals row binds the actor's membership version and step-up proof, the five hashes equal the plan and
   // receipt (the disclosures hash the one the test composer computes, CLEAR included), and the approval hash recomputed

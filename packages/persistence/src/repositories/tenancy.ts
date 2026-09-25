@@ -23,6 +23,7 @@ import {
   type InvitationIssue,
   type InvitationRecord,
   type InvitationRepository,
+  type KeysetPage,
   type MembershipId,
   type MembershipRecord,
   type MembershipRepository,
@@ -248,6 +249,39 @@ export class PgAgencyRepository implements AgencyRepository {
     );
     return r.rows.map((x) => ({ agencyId: x.agency_id as AgencyId, displayName: x.display_name, state: x.state }));
   }
+
+  /**
+   * A page of the caller's actual memberships with their agencies (GET /agencies, re-check finding N16), under the identity's own
+   * policies: the agencies in (createdAt, agencyId) order after the keyset position, then the caller's live membership of each.
+   * An agency whose membership ended between the two statements is left out (it is no longer an actual membership).
+   */
+  async pageOwnMemberships(userId: UserId, page: KeysetPage<AgencyId>): Promise<ReadonlyArray<{ readonly agency: AgencyRecord; readonly membership: MembershipRecord }>> {
+    if (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > 100) throw new DomainFailure("INVALID_REQUEST", "page limit must be 1..100 (R2 policy api)");
+    const params: unknown[] = [userId, page.limit];
+    let after = "";
+    if (page.after) {
+      params.push(page.after.createdAt, page.after.id);
+      after = " AND (a.created_at, a.agency_id) > ($3, $4)";
+    }
+    const agencies = await execute<AgencyRow>(
+      this.db,
+      `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies a
+        WHERE EXISTS (SELECT 1 FROM kauro.memberships m WHERE m.agency_id = a.agency_id AND m.user_id = $1 AND m.state IN ('ACTIVE', 'SUSPENDED'))${after}
+        ORDER BY a.created_at, a.agency_id LIMIT $2`,
+      params,
+    );
+    if (agencies.rows.length === 0) return [];
+    const memberships = await execute<MembershipRow>(
+      this.db,
+      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE user_id = $1 AND state IN ('ACTIVE', 'SUSPENDED') AND agency_id = ANY($2::uuid[])`,
+      [userId, agencies.rows.map((a) => a.agency_id)],
+    );
+    const byAgency = new Map(memberships.rows.map((m) => [m.agency_id, m]));
+    return agencies.rows.flatMap((a) => {
+      const m = byAgency.get(a.agency_id);
+      return m === undefined ? [] : [{ agency: agencyRecord(a), membership: membershipRecord(m) }];
+    });
+  }
 }
 
 // --- memberships -----------------------------------------------------------------------------------------------------------
@@ -355,6 +389,20 @@ export class PgMembershipRepository implements MembershipRepository {
   async countActiveOwners(agencyId: AgencyId): Promise<number> {
     const r = await execute<{ n: string }>(this.db, "SELECT count(*)::text AS n FROM kauro.memberships WHERE agency_id = $1 AND role = 'OWNER' AND state = 'ACTIVE'", [agencyId]);
     return int(text(r.rows[0]?.n));
+  }
+
+  /** A page of the agency's team in (createdAt, membershipId) order: every state, or only ACTIVE (GET members, N16). */
+  async pageTeam(agencyId: AgencyId, everyState: boolean, page: KeysetPage<MembershipId>): Promise<ReadonlyArray<MembershipRecord>> {
+    if (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > 100) throw new DomainFailure("INVALID_REQUEST", "page limit must be 1..100 (R2 policy api)");
+    const params: unknown[] = [agencyId, page.limit];
+    let where = "agency_id = $1";
+    if (!everyState) where += " AND state = 'ACTIVE'";
+    if (page.after) {
+      params.push(page.after.createdAt, page.after.id);
+      where += " AND (created_at, membership_id) > ($3, $4)";
+    }
+    const r = await execute<MembershipRow>(this.db, `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE ${where} ORDER BY created_at, membership_id LIMIT $2`, params);
+    return r.rows.map(membershipRecord);
   }
 }
 

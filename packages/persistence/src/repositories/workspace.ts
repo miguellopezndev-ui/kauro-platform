@@ -383,6 +383,11 @@ export class PgTargetContractRepository implements TargetContractRepository {
     const r = await execute<ContractRow>(this.db, `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1`, [id]);
     return r.rows[0] ? contractRecord(r.rows[0]) : null;
   }
+
+  async findLatestForProject(projectId: ProjectId): Promise<TargetContractRecord | null> {
+    const r = await execute<ContractRow>(this.db, `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE project_id = $1 ORDER BY observed_at DESC, contract_id DESC LIMIT 1`, [projectId]);
+    return r.rows[0] ? contractRecord(r.rows[0]) : null;
+  }
 }
 
 // --- capabilities (platform-wide; read by handlers, written by the control plane) ------------------------------------------

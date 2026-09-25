@@ -17,7 +17,8 @@ import type {
   TargetContractRecord,
 } from "@kauro/domain";
 import { OFFERED_CAPABILITY_STATES, capabilitiesOf } from "@kauro/domain";
-import type { AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, ReadinessBlocker } from "./views.js";
+import type { ResourceAction } from "./permitted-actions.js";
+import type { AgencyMembershipView, AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, ReadinessBlocker, TeamMemberView } from "./views.js";
 
 export function agencyView(agency: AgencyRecord, callerRole: MembershipRole): AgencyView {
   return {
@@ -45,7 +46,7 @@ export function membershipView(m: MembershipRecord): MembershipView {
   };
 }
 
-export function endClientView(c: EndClientRecord): EndClientView {
+export function endClientView(c: EndClientRecord, permittedActions: ReadonlyArray<ResourceAction>): EndClientView {
   return {
     clientId: c.clientId,
     agencyId: c.agencyId,
@@ -55,6 +56,7 @@ export function endClientView(c: EndClientRecord): EndClientView {
     processingAuthorityRef: c.processingAuthorityRef,
     createdAt: c.createdAt,
     ...(c.archivedAt !== undefined ? { archivedAt: c.archivedAt } : {}),
+    permittedActions,
   };
 }
 
@@ -82,7 +84,7 @@ export function readinessBlockersOf(facts: ReadinessFacts): ReadonlyArray<Readin
   return out;
 }
 
-export function projectView(p: ProjectRecord, revision: DatasetRevisionRecord, blockers: ReadonlyArray<ReadinessBlocker>): ProjectView {
+export function projectView(p: ProjectRecord, revision: DatasetRevisionRecord, blockers: ReadonlyArray<ReadinessBlocker>, permittedActions: ReadonlyArray<ResourceAction>): ProjectView {
   return {
     projectId: p.projectId,
     agencyId: p.agencyId,
@@ -96,10 +98,11 @@ export function projectView(p: ProjectRecord, revision: DatasetRevisionRecord, b
     currentRevision: { revisionId: revision.revisionId, state: revision.state, version: revision.version },
     readinessBlockers: blockers,
     createdAt: p.createdAt,
+    permittedActions,
   };
 }
 
-export function planView(p: PlanRecord): PlanView {
+export function planView(p: PlanRecord, permittedActions: ReadonlyArray<ResourceAction>): PlanView {
   return {
     planId: p.planId,
     agencyId: p.agencyId,
@@ -115,10 +118,11 @@ export function planView(p: PlanRecord): PlanView {
     ...(p.supersedesPlanId !== undefined ? { supersedesPlanId: p.supersedesPlanId } : {}),
     ...(p.supersededByPlanId !== undefined ? { supersededByPlanId: p.supersededByPlanId } : {}),
     createdAt: p.createdAt,
+    permittedActions,
   };
 }
 
-export function approvalView(a: ApprovalRecord): ApprovalView {
+export function approvalView(a: ApprovalRecord, permittedActions: ReadonlyArray<ResourceAction>): ApprovalView {
   return {
     approvalId: a.approvalId,
     actorId: a.actorId,
@@ -136,5 +140,37 @@ export function approvalView(a: ApprovalRecord): ApprovalView {
     ...(a.withdrawnAt !== undefined ? { withdrawnAt: a.withdrawnAt } : {}),
     ...(a.withdrawnByMembershipId !== undefined ? { withdrawnByMembershipId: a.withdrawnByMembershipId } : {}),
     ...(a.withdrawReasonCode !== undefined ? { withdrawReasonCode: a.withdrawReasonCode } : {}),
+    permittedActions,
+  };
+}
+
+/** GET /agencies: an actual membership and its agency; a SUSPENDED membership carries no capability (N16). */
+export function agencyMembershipView(agency: AgencyRecord, membership: MembershipRecord): AgencyMembershipView {
+  return {
+    agencyId: agency.agencyId,
+    displayName: agency.displayName,
+    state: agency.state,
+    version: agency.version,
+    membershipId: membership.membershipId,
+    role: membership.role,
+    membershipState: membership.state,
+    permittedActions: membership.state === "ACTIVE" ? capabilitiesOf(membership.role) : [],
+  };
+}
+
+/**
+ * GET /agencies/{agencyId}/members: a teammate as the caller may see it (N16; 10 "returns only team information appropriate to
+ * the caller"). A team manager also sees when the membership was created and accepted; no caller sees another member's identity
+ * reference, assurance policy or security evidence.
+ */
+export function teamMemberView(m: MembershipRecord, callerMembershipId: string, managesTeam: boolean): TeamMemberView {
+  return {
+    membershipId: m.membershipId,
+    role: m.role,
+    state: m.state,
+    version: m.version,
+    self: m.membershipId === callerMembershipId,
+    ...(managesTeam ? { createdAt: m.createdAt } : {}),
+    ...(managesTeam && m.acceptedAt !== undefined ? { acceptedAt: m.acceptedAt } : {}),
   };
 }

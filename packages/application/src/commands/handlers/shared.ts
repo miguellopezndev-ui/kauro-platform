@@ -5,7 +5,7 @@
  */
 import type { Sha256Hex } from "@kauro/contracts";
 import { DOMAINS, structuredDigest } from "@kauro/contracts";
-import type { ApprovalRecord, PlanBody, ResolvedMembership, VersionedWrite } from "@kauro/domain";
+import type { PlanBody, ResolvedMembership, VersionedWrite } from "@kauro/domain";
 import { DomainFailure, StaleVersionFailure } from "@kauro/domain";
 import type { CommandContext } from "../runtime.js";
 
@@ -22,11 +22,10 @@ export function checkExpectedVersion(row: { readonly version: number; readonly s
 /**
  * Whether the membership controls an approval (D-AUTHZ-3: the approving actor or any OWNER; CMD026 precondition "The actor
  * controls this approval"; Plan edge withdraw_approval "Current organization authority withdraws future use"). Every command
- * that ends a live approval's future use — withdrawing it, or superseding the approved plan — requires this authority.
+ * that ends a live approval's future use — withdrawing it, or superseding the approved plan — requires this authority, and the
+ * permitted actions of a view apply the same rule (api/permitted-actions).
  */
-export function controlsApproval(approval: Pick<ApprovalRecord, "actorMembershipId">, membership: ResolvedMembership): boolean {
-  return approval.actorMembershipId === membership.membershipId || membership.role === "OWNER";
-}
+export { controlsApproval } from "../../api/permitted-actions.js";
 
 /** Unwraps a compare-and-swap write; a miss after the lock means a concurrent writer won on the same version. */
 export function applied<T>(write: VersionedWrite<T>, extra: { readonly successorId?: string } = {}): T {

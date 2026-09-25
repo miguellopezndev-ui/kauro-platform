@@ -11,6 +11,7 @@
  */
 import type { ClientId } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
+import { clientActions } from "../../api/permitted-actions.js";
 import { endClientView } from "../../api/projections.js";
 import type { ActiveWorkInspector } from "../../ports/work-inspectors.js";
 import { ARCHIVE_CLIENT, type ArchiveClientBody, type ArchiveClientHandler, type ArchiveClientView } from "../contracts.js";
@@ -45,7 +46,7 @@ export function archiveClientHandler(runtime: CommandRuntime, inspector: ActiveW
         });
         return {
           status: 200,
-          view: { client: endClientView(archived), retainedActiveWork: retained },
+          view: { client: endClientView(archived, clientActions(membership.role, archived, null)), retainedActiveWork: retained },
           version: archived.version,
           resourceKind: "end_client",
           resourceId: clientId,

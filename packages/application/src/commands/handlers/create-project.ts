@@ -19,6 +19,7 @@
  */
 import type { ClientId, ProjectId, RevisionId, TargetInstanceRef } from "@kauro/domain";
 import { AGENCY_OPEN_STATES, DomainFailure, isOffered } from "@kauro/domain";
+import { projectActions } from "../../api/permitted-actions.js";
 import { projectView, readinessBlockersOf } from "../../api/projections.js";
 import type { ProjectView } from "../../api/views.js";
 import { CREATE_PROJECT, type CreateProjectBody, type CreateProjectHandler } from "../contracts.js";
@@ -98,7 +99,7 @@ export function createProjectHandler(runtime: CommandRuntime): CreateProjectHand
           payload: { revisionId, agencyId: membership.agencyId, projectId, state: revision.state },
         });
         const blockers = readinessBlockersOf({ agency, capability, currentRevision: revision, targetContract: null, plan: null });
-        return { status: 201, view: projectView(project, revision, blockers), version: project.version, resourceKind: "project", resourceId: projectId };
+        return { status: 201, view: projectView(project, revision, blockers, projectActions()), version: project.version, resourceKind: "project", resourceId: projectId };
       }),
   };
 }

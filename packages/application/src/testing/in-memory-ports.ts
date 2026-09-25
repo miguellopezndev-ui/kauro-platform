@@ -340,6 +340,8 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         const mine = [...s.memberships.values()].filter((m) => m.userId === id && (m.state === "ACTIVE" || m.state === "SUSPENDED"));
         return mine.map((m) => s.agencies.get(m.agencyId)).filter((a): a is AgencyRecord => a !== undefined).map((a) => ({ agencyId: a.agencyId, displayName: a.displayName, state: a.state }));
       },
+      // the manual-10 reads are exercised over PostgreSQL only (apps/api/test/reads.test.ts)
+      pageOwnMemberships: () => notInMemory("AgencyRepository.pageOwnMemberships"),
     },
     memberships: {
       async get(membershipId) {
@@ -385,6 +387,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       async countActiveOwners(agencyId) {
         return [...s.memberships.values()].filter((m) => m.agencyId === agencyId && m.role === "OWNER" && m.state === "ACTIVE").length;
       },
+      pageTeam: () => notInMemory("MembershipRepository.pageTeam"),
     },
     invitations: {
       insert: () => notInMemory("InvitationRepository.insert"),
@@ -511,6 +514,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         if (tenantId() !== agencyId) return null;
         return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.projectId === projectId && t.bodyHash === hash) ?? null;
       },
+      findLatestForProject: () => notInMemory("TargetContractRepository.findLatestForProject"),
     },
     plans: {
       async get(planId: PlanId) {
@@ -560,6 +564,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         if (w.kind === "APPLIED") s.plans.set(planId, w.record);
         return w;
       },
+      findCurrentForProject: () => notInMemory("PlanRepository.findCurrentForProject"),
     },
     receipts: {
       async get(receiptId: ValidationReceiptId) {

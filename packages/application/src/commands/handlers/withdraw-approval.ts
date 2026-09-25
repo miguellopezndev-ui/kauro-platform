@@ -16,6 +16,7 @@
  */
 import type { PlanId } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
+import { approvalActions, planActions } from "../../api/permitted-actions.js";
 import { approvalView, planView } from "../../api/projections.js";
 import type { ExternalActionInspector } from "../../ports/work-inspectors.js";
 import { WITHDRAW_APPROVAL, type WithdrawApprovalBody, type WithdrawApprovalHandler, type WithdrawApprovalView } from "../contracts.js";
@@ -87,7 +88,7 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
         });
         return {
           status: 200,
-          view: { approval: approvalView(withdrawn.record), plan: planView(withdrawnPlan), completedExternalActions: completed },
+          view: { approval: approvalView(withdrawn.record, approvalActions(membership, withdrawn.record)), plan: planView(withdrawnPlan, planActions(membership.role, withdrawnPlan, false)), completedExternalActions: completed },
           version: withdrawnPlan.version,
           resourceKind: "plan",
           resourceId: planId,

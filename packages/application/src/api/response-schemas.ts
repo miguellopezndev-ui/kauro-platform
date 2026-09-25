@@ -22,6 +22,8 @@
  */
 import type { ContractName } from "@kauro/contracts";
 import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
+import { CURSOR_PATTERN } from "./cursor.js";
+import { RESOURCE_ACTIONS } from "./permitted-actions.js";
 import { LABEL_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 
@@ -33,7 +35,10 @@ export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD02
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
-export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId;
+/** The manual-10 reads this edition serves (re-check finding N16), by operation id. */
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject";
+export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
+export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId;
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
@@ -101,6 +106,12 @@ const ref = (name: string): JsonSchema => ({ $ref: `#/$defs/${name}` });
 const NARROW_ID = Object.freeze({ pattern: UUID_PATTERN });
 /** A registry label narrowed by the platform's control-character rule (the request schemas and kauro.is_label; N6). */
 const NARROW_LABEL = Object.freeze({ pattern: LABEL_PATTERN });
+/** The served commands a caller may issue on a resource, derived server-side (api/permitted-actions; N16). */
+const RESOURCE_ACTIONS_SCHEMA = Object.freeze({ type: "array", maxItems: RESOURCE_ACTIONS.length, items: { type: "string", enum: [...RESOURCE_ACTIONS] } });
+const RESOURCE_ACTIONS_DESCRIPTION =
+  "The served commands the caller may issue on this resource, derived server-side from the caller's role, the resource's state and, for an approval, its control (07 \"The handoff to UI includes every state, safe field, permitted action\"); informative, never authority (re-check finding N16).";
+/** An opaque list cursor (api/cursor): integrity-protected and bound to the caller, the scope, the filter and the order. */
+const CURSOR = Object.freeze({ type: "string", pattern: CURSOR_PATTERN, maxLength: 600 });
 
 /**
  * Every DTO definition of the served routes. Order is the order of the OpenAPI components. A view is closed: a member not
@@ -156,6 +167,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       processingAuthorityRef: registry(true, NARROW_ID),
       createdAt: registry(true),
       archivedAt: platform(false, UTC, "When the client was archived (CMD010); present exactly when the state is ARCHIVED."),
+      permittedActions: platform(true, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION),
     },
   },
   {
@@ -194,6 +206,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       currentRevision: platform(true, ref("RevisionSummary"), "Current revision summary."),
       readinessBlockers: platform(true, { type: "array", maxItems: READINESS_BLOCKERS.length, items: { type: "string", enum: [...READINESS_BLOCKERS] } }, "Readiness blockers in a fixed order."),
       createdAt: platform(true, UTC, "Server creation time."),
+      permittedActions: platform(true, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION),
     },
   },
   {
@@ -221,6 +234,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       supersedesPlanId: platform(false, ID, "The predecessor revision (design D-PLAN-1)."),
       supersededByPlanId: platform(false, ID, "The successor revision once superseded (design D-PLAN-1)."),
       createdAt: platform(true, UTC, "Server creation time."),
+      permittedActions: platform(true, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION),
     },
   },
   {
@@ -245,6 +259,72 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       withdrawnAt: registry(false),
       withdrawnByMembershipId: platform(false, ID, "The membership that withdrew the approval (CMD026)."),
       withdrawReasonCode: platform(false, LABEL, "The reason the withdrawal named (CMD026 field reasonCode, registry type label)."),
+      permittedActions: platform(true, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION),
+    },
+  },
+  {
+    name: "AgencyMembershipView",
+    description: "One of the caller's actual memberships (ACTIVE or SUSPENDED) with its agency (10 \"GET /agencies lists only actual memberships\"; re-check finding N16).",
+    contract: null,
+    withheld: {},
+    members: {
+      agencyId: registry(true, NARROW_ID, ["Agency", "agencyId"]),
+      displayName: registry(true, NARROW_LABEL, ["Agency", "displayName"]),
+      state: registry(true, undefined, ["Agency", "state"]),
+      version: registry(true, undefined, ["Agency", "version"]),
+      membershipId: registry(true, NARROW_ID, ["Membership", "membershipId"]),
+      role: registry(true, undefined, ["Membership", "role"]),
+      membershipState: registry(true, undefined, ["Membership", "state"]),
+      permittedActions: platform(true, { type: "array", maxItems: AGENCY_CAPABILITIES.length, items: { type: "string", enum: [...AGENCY_CAPABILITIES] } }, "The caller's capabilities in the agency, derived from the membership role server-side; none while the membership is SUSPENDED."),
+    },
+  },
+  {
+    name: "TeamMemberView",
+    description: "A teammate as the caller may see it (10 \"GET /agencies/{agencyId}/members returns only team information appropriate to the caller. It does not expose authentication provider tokens, recovery settings or another member's private security evidence\"; re-check finding N16). A caller who manages the team sees every membership with its lifecycle times; any other member sees the ACTIVE team's roles.",
+    contract: "Membership",
+    withheld: {
+      agencyId: "The path names the agency every listed membership belongs to.",
+      userId: "Another person's identity reference is not team information appropriate to every caller; the caller's own membership is marked self.",
+      assurancePolicy: "The membership's authentication-strength configuration is security configuration, not team information (10: no recovery settings or security evidence).",
+    },
+    members: {
+      membershipId: registry(true, NARROW_ID),
+      role: registry(true),
+      state: registry(true),
+      version: registry(true),
+      self: platform(true, { type: "boolean" }, "Whether this is the caller's own membership."),
+      createdAt: platform(false, UTC, "When the membership was created; shown to a caller who manages the team."),
+      acceptedAt: registry(false),
+    },
+  },
+  {
+    name: "AgencyPage",
+    description: "A page of the caller's actual memberships in (agency createdAt, agencyId) order (10 \"Pagination, search and exports\"; the R2 policy's api.pageDefault and api.pageMaximum).",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("AgencyMembershipView") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller and this list)."),
+    },
+  },
+  {
+    name: "TeamPage",
+    description: "A page of the agency's team as the caller may see it, in (createdAt, membershipId) order.",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("TeamMemberView") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the agency and this list)."),
+    },
+  },
+  {
+    name: "ClientPage",
+    description: "A page of the agency's safe client summaries in (createdAt, clientId) order (10 \"GET lists safe client summaries with pagination\").",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("EndClientView") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the agency and this list)."),
     },
   },
   {
@@ -361,6 +441,37 @@ export function commandResponseSchemaId(command: ServedCommandId): CommandRespon
 }
 
 export const ACCEPTED_RESPONSE_SCHEMA_ID: AcceptedResponseSchemaId = `${RESPONSE_SCHEMA_PREFIX}accepted`;
+
+/** The reply of every served read (N16): 200 and the view it carries. */
+export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: string }>> = Object.freeze({
+  ListAgencies: { view: "AgencyPage" },
+  GetAgency: { view: "AgencyView" },
+  ListMembers: { view: "TeamPage" },
+  ListClients: { view: "ClientPage" },
+  GetProject: { view: "ProjectView" },
+});
+
+export const READ_OPERATION_IDS = Object.freeze(Object.keys(READ_RESPONSES) as ReadOperationId[]);
+
+export function readResponseSchemaId(operationId: ReadOperationId): ReadResponseSchemaId {
+  return `${RESPONSE_SCHEMA_PREFIX}read:${operationId}`;
+}
+
+function readEnvelope(operationId: ReadOperationId): JsonSchema {
+  return {
+    $schema: DIALECT,
+    $id: readResponseSchemaId(operationId),
+    title: `${operationId} READ`,
+    description: "A read: the safe projection the caller may see, with the version of every resource that edits compare (10 \"Read endpoints return safe projections\", \"Resource reads return a version or ETag where edits are supported\").",
+    type: "object",
+    additionalProperties: false,
+    required: ["kind", "data"],
+    properties: {
+      kind: { type: "string", const: "READ" },
+      data: ref(READ_RESPONSES[operationId].view),
+    },
+  };
+}
 
 function completedEnvelope(command: ServedCommandId): JsonSchema {
   return {
@@ -711,6 +822,10 @@ export function buildResponseSchemas(bundle: RegistryBundle, operational: Readon
     roots[commandResponseSchemaId(command)] = completedEnvelope(command);
   }
   roots[ACCEPTED_RESPONSE_SCHEMA_ID] = ACCEPTED_RESPONSE_SCHEMA;
+  for (const operationId of READ_OPERATION_IDS) {
+    if (!(READ_RESPONSES[operationId].view in defs)) refuse(`${operationId} names an unknown view ${READ_RESPONSES[operationId].view}`);
+    roots[readResponseSchemaId(operationId)] = readEnvelope(operationId);
+  }
   Object.assign(roots, operationalRoots(operational));
   for (const [where, schema] of [...Object.entries(defs), ...Object.entries(roots)]) {
     for (const member of declaredMembers(schema)) {

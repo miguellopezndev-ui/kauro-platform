@@ -16,14 +16,16 @@ import type { FieldError } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
 import { HEADERS } from "./envelope.js";
-import { COMMAND_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
+import { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
 import { problemOf, type Problem } from "./problems.js";
 import {
   COMMAND_RESPONSES,
   OPERATIONAL_ROUTES,
   commandResponseSchemaId,
   operationalResponseSchemaId,
+  readResponseSchemaId,
   type OperationalRoute,
+  type ReadOperationId,
   type ServedCommandId,
 } from "./response-schemas.js";
 
@@ -60,6 +62,16 @@ export function commandRouteResponses(command: ServedCommandId, operationId: str
     declared: Object.freeze({ [String(success.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId: commandResponseSchemaId(command) }) }),
     problem: PROBLEM_RESPONSE,
     outcomes: COMMAND_OUTCOMES[command],
+  });
+}
+
+/** The declared replies of a served read (N16): 200 with its READ envelope, problems from its catalogue otherwise. */
+export function readRouteResponses(operationId: ReadOperationId): RouteResponses {
+  return Object.freeze({
+    operationId,
+    declared: Object.freeze({ "200": Object.freeze({ contentType: HEADERS.contentType, schemaId: readResponseSchemaId(operationId) }) }),
+    problem: PROBLEM_RESPONSE,
+    outcomes: READ_OUTCOMES[operationId],
   });
 }
 

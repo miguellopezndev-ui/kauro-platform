@@ -208,6 +208,9 @@ export const FAILURE_REASONS = [
   // provider ingress (15 "Webhooks and reconciliation"; migration 0005 KA012): a recorded event with a conflicting delivery
   // cannot be applied before it is reconciled
   "INBOX_BODY_CONFLICT",
+  // a list read's cursor that is not one this server issued for this caller, scope, filter and order (10 "Cursors are opaque,
+  // integrity-protected and bound to actor scope, filter, sort and snapshot policy"; R2-060; re-check finding N16)
+  "CURSOR_INVALID",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

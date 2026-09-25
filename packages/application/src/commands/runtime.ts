@@ -247,9 +247,9 @@ export async function runCommand<Body, View>(
   } catch (e) {
     if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
     if (e instanceof AuthorizationDenied) {
-      await recordDenial(runtime, context, spec.id, correlationId, e, e.decision.policyVersion);
+      await recordDenialFact(runtime, context, spec.id, correlationId, e, e.decision.policyVersion);
     } else if (DENIAL_CODES.has(e.code)) {
-      await recordDenial(runtime, context, spec.id, correlationId, e, AUTHORIZATION_POLICY_VERSION);
+      await recordDenialFact(runtime, context, spec.id, correlationId, e, AUTHORIZATION_POLICY_VERSION);
     }
     return resultOf<View>(e, correlationId);
   }
@@ -260,12 +260,13 @@ export async function runCommand<Body, View>(
  * when this transaction proves — and holds, until COMMIT — the caller's live membership in the selected agency; otherwise it is
  * a fact of the caller's own identity stream that names the agency the request selected (a name, never a reference: recording
  * the probe of a nonexistent agency is not an existence check). The insert policy of migration 0007 enforces the same rule.
+ * `action` is the command id, or the action token of a read (queries/reads, re-check finding N16).
  */
-async function recordDenial(runtime: CommandRuntime, context: TenantContext | IdentityContext, command: CommandId, correlationId: CorrelationId, failure: DomainFailure, policyVersion: string): Promise<void> {
+export async function recordDenialFact(runtime: Pick<CommandRuntime, "unitOfWork" | "clock">, context: TenantContext | IdentityContext, action: string, correlationId: CorrelationId, failure: DomainFailure, policyVersion: string): Promise<void> {
   const fact = (scope: Pick<SecurityEvent, "agencyId" | "requestedAgencyId">): SecurityEvent => ({
     ...scope,
     actor: actorOf(context),
-    action: command,
+    action,
     outcome: "DENY",
     reasonCode: failure.details.reason ?? failure.code,
     policyVersion,
@@ -297,14 +298,14 @@ export interface UnauthenticatedRequest {
  * stream and names only the selector the request carried — and the problem is AUTHENTICATION_REQUIRED. When the fact cannot be
  * recorded the answer is that failure (a saturated database is 503 and retryable), never a 401 without its fact.
  */
-export async function refuseUnauthenticated(runtime: CommandRuntime, command: CommandId, request: UnauthenticatedRequest): Promise<Problem> {
+export async function refuseUnauthenticated(runtime: Pick<CommandRuntime, "unitOfWork" | "clock">, action: string, request: UnauthenticatedRequest): Promise<Problem> {
   try {
     await runtime.unitOfWork.run({ kind: "ANONYMOUS", correlationId: request.correlationId }, (uow) =>
       uow.securityEvents.append({
         agencyId: null,
         requestedAgencyId: request.agencyId,
         actor: { kind: "ANONYMOUS" },
-        action: command,
+        action,
         outcome: "DENY",
         reasonCode: "SUBJECT_UNAUTHENTICATED",
         policyVersion: AUTHORIZATION_POLICY_VERSION,

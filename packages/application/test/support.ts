@@ -90,6 +90,9 @@ export const allowingAuthorizer: Authorizer = {
   async assure(_uow, request, access) {
     return request.assuranceProofRef !== undefined ? { ...access, assuranceClass: "STEP_UP" } : access;
   },
+  async authorizeRead() {
+    throw new Error("the manual-10 reads are exercised over PostgreSQL with the real authorizer (apps/api/test/reads.test.ts)");
+  },
 };
 
 export interface World {

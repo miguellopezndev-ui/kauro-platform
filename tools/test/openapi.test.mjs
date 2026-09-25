@@ -25,10 +25,16 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.equal(readFileSync(DOCUMENT_PATH, "utf8"), serialize(expected));
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
-  // the seven registry commands B06 serves, under their registry paths and names, and the two operational probes
+  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16) and the two
+  // operational probes
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
+      "GET /api/v1/agencies ListAgencies",
+      "GET /api/v1/agencies/{agencyId} GetAgency",
+      "GET /api/v1/agencies/{agencyId}/clients ListClients",
+      "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/projects/{projectId} GetProject",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
@@ -46,7 +52,18 @@ test("the committed document is the generated one, byte for byte, and matches ev
     assert.equal(op["x-kauro-command"], command.id);
     assert.deepEqual(op["x-kauro-cases"], command.testIds);
     assert.equal(op.requestBody.content["application/json"].schema.$ref, `#/components/schemas/${command.name}Request`);
-    assert.deepEqual(Object.keys(op.responses).sort(), [String(sources.application.COMMAND_RESPONSES[command.id].status), "default"]);
+    // the success status and one Problem per status of the command's outcome catalogue (N13), no catch-all
+    const problemStatuses = sources.application.outcomesByStatus(sources.application.COMMAND_OUTCOMES[command.id]).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), [String(sources.application.COMMAND_RESPONSES[command.id].status), ...problemStatuses].sort());
+    for (const status of problemStatuses) assert.ok(Array.isArray(op.responses[status]["x-kauro-outcomes"]) && op.responses[status]["x-kauro-outcomes"].length > 0, `${command.name} ${status}`);
+  }
+  // the manual-10 reads (N16): 200 and their catalogue's problem statuses
+  for (const read of Object.values(sources.application.READ_ROUTES)) {
+    const op = expected.paths[read.path].get;
+    assert.equal(op.operationId, read.operationId);
+    assert.equal(op["x-kauro-read"], true);
+    const problemStatuses = sources.application.outcomesByStatus(sources.application.READ_OUTCOMES[read.operationId]).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), ["200", ...problemStatuses].sort());
   }
   // the probes are the operational routes of @kauro/application (R42 connected to R23): documented with the replies they declare
   for (const route of sources.operationalRoutes) {
@@ -64,8 +81,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
 });
 
 test("an undocumented registered route fails the check", () => {
-  const extra = { method: "GET", url: "/api/v1/agencies/:agencyId/members", responses: inventory[0].responses };
-  assert.deepEqual(check({ inventory: [...inventory, extra] }).filter((f) => f.startsWith("undocumented")), ["undocumented registered route: GET /api/v1/agencies/{agencyId}/members"]);
+  const extra = { method: "GET", url: "/api/v1/agencies/:agencyId/invitations", responses: inventory[0].responses };
+  assert.deepEqual(check({ inventory: [...inventory, extra] }).filter((f) => f.startsWith("undocumented")), ["undocumented registered route: GET /api/v1/agencies/{agencyId}/invitations"]);
 });
 
 test("a documented route that is not registered fails the check", () => {
@@ -101,7 +118,7 @@ test("a response schema that differs from the one the route validates its replie
   assert.ok(statusFailures.includes("response schema mismatch on POST /api/v1/agencies: status 200 is documented but the route does not declare it"), statusFailures.join("\n"));
   assert.ok(statusFailures.includes("response schema mismatch on POST /api/v1/agencies: status 201 is not documented as application/json"), statusFailures.join("\n"));
   // the registered route validates with another schema than the one documented
-  const rewired = inventory.map((r) => (r.url === "/api/v1/agencies" ? { ...r, responses: { ...r.responses, declared: { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD009" } } } } : r));
+  const rewired = inventory.map((r) => (r.url === "/api/v1/agencies" && r.method === "POST" ? { ...r, responses: { ...r.responses, declared: { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD009" } } } } : r));
   assert.deepEqual(check({ inventory: rewired }), ["response schema mismatch on POST /api/v1/agencies: status 201 is not the schema urn:kauro:api:v1:response:CMD009 the route validates its replies with"]);
   // problems are the closed Problem document
   const loose = clone(committed);
@@ -127,7 +144,7 @@ test("generation refuses registry prose that carries the pre-A2 brand (amendment
 });
 
 test("a registered route without a declared response contract and a stale document fail the check", () => {
-  const undeclared = inventory.map((r) => (r.url === "/api/v1/agencies" ? { ...r, responses: null } : r));
+  const undeclared = inventory.map((r) => (r.url === "/api/v1/agencies" && r.method === "POST" ? { ...r, responses: null } : r));
   assert.deepEqual(check({ inventory: undeclared }), ["registered route declares no response contract: POST /api/v1/agencies"]);
   const stale = clone(committed);
   stale.paths["/api/v1/agencies"].post.summary = "edited by hand";

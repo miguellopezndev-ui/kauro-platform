@@ -12,8 +12,9 @@
 //
 // Sources (nothing is written by hand): the served commands come from the provenance-verified registry commands.json (path,
 // method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their request schemas, the
-// response views (derived from the registry contract bundle), the envelopes, the Problem document and the operational routes
-// come from @kauro/application — the very objects the api's validator compiles and its send guard validates with. The routes
+// response views (derived from the registry contract bundle), the envelopes, the Problem document, the manual-10 reads
+// (READ_ROUTES, re-check finding N16) and the operational routes come from @kauro/application — the very objects the api's
+// validator compiles and its send guard validates with. The routes
 // are the ones the composition root actually registers: tools/openapi.mjs builds the api with `assembleApi` over the real pg
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
 // never connected, and the check asserts that it opened no connection.
@@ -143,6 +144,20 @@ export function generateOpenApi(sources) {
     schema: { type: "string", pattern: application.REQUEST_LIMITS.correlationIdPattern.source },
   };
   components.headers.CorrelationId = { description: "The correlation id of the request, on every reply.", schema: { type: "string", minLength: 1, maxLength: 128 } };
+  components.parameters.PageLimit = {
+    name: "limit",
+    in: "query",
+    required: false,
+    description: `Page size (10 "Pagination, search and exports"; the R2 policy's api.pageDefault ${application.REQUEST_LIMITS.pageDefault} and api.pageMaximum ${application.REQUEST_LIMITS.pageMaximum}).`,
+    schema: { type: "integer", minimum: 1, maximum: application.REQUEST_LIMITS.pageMaximum, default: application.REQUEST_LIMITS.pageDefault },
+  };
+  components.parameters.PageCursor = {
+    name: "cursor",
+    in: "query",
+    required: false,
+    description: "The nextCursor of the previous page: opaque, integrity-protected and bound to the caller, the agency, the list, its filter and its order (10 \"Pagination, search and exports\"; R2-060). Any other cursor is CURSOR_INVALID.",
+    schema: { type: "string", pattern: application.CURSOR_PATTERN, maxLength: 600 },
+  };
   components.headers.CacheControl = {
     description: "Every reply is private (08 \"Browser, API and cache isolation\": private responses use an explicit no-shared-cache policy): it is never stored by a shared or a private cache.",
     schema: { type: "string", const: application.PRIVATE_CACHE_POLICY },
@@ -216,6 +231,38 @@ export function generateOpenApi(sources) {
   }
   const missing = [...served].filter((id) => !registryCommands.some((c) => c.id === id));
   if (missing.length > 0) throw new Error(`served commands absent from the registry: ${missing.join(", ")}`);
+
+  // the manual-10 reads (N16): not registry commands; their paths, operation ids and authority come from READ_ROUTES
+  for (const spec of Object.values(application.READ_ROUTES)) {
+    const contract = application.readRouteResponses(spec.operationId);
+    const schemaId = application.readResponseSchemaId(spec.operationId);
+    addComponent(`${spec.operationId}Reply`, byId[schemaId], schemaId);
+    const parameters = [
+      ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
+      ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+      ...(spec.paginated ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
+      { $ref: "#/components/parameters/CorrelationId" },
+    ];
+    paths[spec.path] = {
+      ...(paths[spec.path] ?? {}),
+      get: {
+        operationId: spec.operationId,
+        summary: spec.summary,
+        description: `Authority: ${spec.authority}`,
+        "x-kauro-read": true,
+        security: [{ bearerAuth: [] }],
+        parameters,
+        responses: {
+          200: {
+            description: `READ: ${spec.summary}`,
+            headers: REPLY_HEADERS,
+            content: { [contract.declared["200"].contentType]: { schema: { $ref: `${COMPONENTS}${spec.operationId}Reply` } } },
+          },
+          ...problemResponses(contract.outcomes),
+        },
+      },
+    };
+  }
 
   for (const route of operationalRoutes) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);

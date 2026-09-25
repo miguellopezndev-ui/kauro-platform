@@ -672,3 +672,125 @@ the check proves every citation resolves to an existing test.
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
 
+## 5. The manual-10 reads (re-check finding N16)
+
+Every read runs under the caller's own context and policies after the same access decision as a command (identity, and for an
+agency read an ACTIVE live membership after its transition lock; every membership role reads, AGENCY_READER); a denial is a
+durable security fact under the read's action token. Lists page by keyset with an opaque cursor bound to the caller, the agency,
+the list, its filter and its order (`api/cursor`, KEYSET_V1). What differs by role is the projection: a team manager
+(MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view
+carries the caller's permitted actions (`api/permitted-actions`).
+
+| Read | Route | Scope | List | Reply view | Action token | Authority |
+| --- | --- | --- | --- | --- | --- | --- |
+| ListAgencies | GET /api/v1/agencies | NONE | limit, cursor | AgencyPage | LIST_AGENCIES | 10 "Agency and team routes": "GET /agencies lists only actual memberships" |
+| GetAgency | GET /api/v1/agencies/{agencyId} | AGENCY_PATH | — | AgencyView | GET_AGENCY | 10 "Agency and team routes": "GET /agencies/{agencyId} returns the safe agency view" |
+| ListMembers | GET /api/v1/agencies/{agencyId}/members | AGENCY_PATH | limit, cursor | TeamPage | LIST_MEMBERS | 10 "Agency and team routes": "GET /agencies/{agencyId}/members returns only team information appropriate to the caller" |
+| ListClients | GET /api/v1/agencies/{agencyId}/clients | AGENCY_PATH | limit, cursor | ClientPage | LIST_CLIENTS | 10 "Client and project routes": "GET lists safe client summaries with pagination" |
+| GetProject | GET /api/v1/projects/{projectId} | AGENCY_HEADER | — | ProjectView | GET_PROJECT | 10 "Client and project routes": "GET /projects/{projectId} returns the current revision summary, commercial state, retention deadlines, safe progress and permitted actions" |
+
+### ListAgencies
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE, FORMAT, RANGE | — | ADMISSION | the query is not limit (1..100, default 25) and cursor, or a member was repeated or malformed |
+| 400 | INVALID_REQUEST | CURSOR_INVALID | — | — | ADMISSION | the cursor is not one this server issued for this caller, scope, list, filter and order (R2-060): nothing of another scope is read or disclosed |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetAgency
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### ListMembers
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE, FORMAT, RANGE | — | ADMISSION | the query is not limit (1..100, default 25) and cursor, or a member was repeated or malformed |
+| 400 | INVALID_REQUEST | CURSOR_INVALID | — | — | ADMISSION | the cursor is not one this server issued for this caller, scope, list, filter and order (R2-060): nothing of another scope is read or disclosed |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### ListClients
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE, FORMAT, RANGE | — | ADMISSION | the query is not limit (1..100, default 25) and cursor, or a member was repeated or malformed |
+| 400 | INVALID_REQUEST | CURSOR_INVALID | — | — | ADMISSION | the cursor is not one this server issued for this caller, scope, list, filter and order (R2-060): nothing of another scope is read or disclosed |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetProject
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's agency |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+

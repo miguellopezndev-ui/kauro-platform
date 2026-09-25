@@ -103,6 +103,22 @@ export interface AgencyRepository {
   transition(agencyId: AgencyId, expectedVersion: number, change: Partial<Pick<Agency, "state" | "termsVersion" | "privacyAgreementVersion" | "legalProfileRef" | "firstQualifyingCaptureId">>, now: UtcInstant): Promise<VersionedWrite<AgencyRecord>>;
   /** Agencies where the caller holds an ACTIVE or SUSPENDED membership (GET /agencies lists only actual memberships). */
   listOwnAgencies(userId: UserId): Promise<ReadonlyArray<Pick<AgencyRecord, "agencyId" | "displayName" | "state">>>;
+  /**
+   * A page of the caller's actual memberships (ACTIVE or SUSPENDED) with their agencies, in the total order (agency createdAt,
+   * agencyId), under the identity's own policies (memberships_self_read, agencies_member_read) — GET /agencies (re-check finding
+   * N16; 10 "GET /agencies lists only actual memberships").
+   */
+  pageOwnMemberships(userId: UserId, page: KeysetPage<AgencyId>): Promise<ReadonlyArray<{ readonly agency: AgencyRecord; readonly membership: MembershipRecord }>>;
+}
+
+/**
+ * A keyset page (07 "Pagination uses a total ordering"): the rows strictly after `after` in (createdAt, id) order, at most
+ * `limit` (the R2 policy's api.pageMaximum bounds it). Rows inserted before the position are not revisited and rows inserted
+ * after it appear on a later page; a removed row never shifts the page after it (the consistency model of the reads, N16).
+ */
+export interface KeysetPage<Id extends string = string> {
+  readonly after?: { readonly createdAt: UtcInstant; readonly id: Id };
+  readonly limit: number;
 }
 
 export interface NewMembership {
@@ -139,6 +155,11 @@ export interface MembershipRepository {
    */
   transition(membershipId: MembershipId, expectedVersion: number, change: Partial<Pick<Membership, "state" | "role" | "acceptedAt">> & { readonly revokedAt?: UtcInstant }, now: UtcInstant): Promise<VersionedWrite<MembershipRecord>>;
   countActiveOwners(agencyId: AgencyId): Promise<number>;
+  /**
+   * A page of the current agency's team in (createdAt, membershipId) order (GET /agencies/{agencyId}/members, re-check finding
+   * N16): every membership when `everyState` (a caller with MANAGE_TEAM), the ACTIVE ones otherwise.
+   */
+  pageTeam(agencyId: AgencyId, everyState: boolean, page: KeysetPage<MembershipId>): Promise<ReadonlyArray<MembershipRecord>>;
 }
 
 /** Outcome of issuing an invitation: issued, or refused because the membership already has an open one. */
@@ -193,7 +214,7 @@ export interface EndClientRepository {
   /** Inserts an ACTIVE client at version 1; a processingAuthorityRef of another agency fails the composite foreign key. */
   insert(client: NewEndClient): Promise<EndClientRecord>;
   archive(clientId: ClientId, expectedVersion: number, now: UtcInstant): Promise<VersionedWrite<EndClientRecord>>;
-  /** Safe summaries, paginated by (createdAt, clientId) inside the current agency (07 "Pagination uses a total ordering"). */
+  /** Safe summaries, paginated by (createdAt, clientId) inside the current agency (07 "Pagination uses a total ordering"; GET /agencies/{agencyId}/clients, N16). */
   list(agencyId: AgencyId, page: { readonly after?: { readonly createdAt: UtcInstant; readonly clientId: ClientId }; readonly limit: number }): Promise<ReadonlyArray<EndClientRecord>>;
   countOpenProjects(clientId: ClientId): Promise<number>;
 }
@@ -240,6 +261,8 @@ export interface TargetContractRepository {
    * meanwhile waits, one committed first is what is returned. The caller checks it is confirmed and not superseded.
    */
   lockCurrentByHash(agencyId: AgencyId, projectId: ProjectId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
+  /** The project's most recently observed contract, whatever its confirmation (a project read's readiness facts, N16). */
+  findLatestForProject(projectId: ProjectId): Promise<TargetContractRecord | null>;
 }
 
 // --- plans and approvals ----------------------------------------------------------------------------------------------
@@ -272,6 +295,8 @@ export interface PlanRepository {
     change: { readonly state: PlanRecord["state"]; readonly supersededByPlanId?: PlanId; readonly validationReceiptHash?: Sha256Hex | null; readonly approvalId?: ApprovalId | null },
     now: UtcInstant,
   ): Promise<VersionedWrite<PlanRecord>>;
+  /** The project's current plan revision: the newest one no revision superseded (a project read's readiness facts, N16). */
+  findCurrentForProject(projectId: ProjectId): Promise<PlanRecord | null>;
 }
 
 export interface ValidationReceiptRepository {

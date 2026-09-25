@@ -48,6 +48,9 @@ import type {
   CompletedResponse,
   Problem,
   RawRequest,
+  ReadHandler,
+  ReadHandlers,
+  ReadResult,
   RouteResponses,
   SchemaValidator,
   UnauthenticatedRequest,
@@ -59,6 +62,7 @@ import {
   ResponseContractViolation,
   UNROUTED_RESPONSES,
   admitHeaders,
+  admitRead,
   admitStructure,
   checkReply,
   commandRouteResponses,
@@ -67,6 +71,7 @@ import {
   internalProblem,
   isServedCommand,
   problemOf,
+  readRouteResponses,
   repeatedHeaderNames,
   responseIntegrityProblem,
 } from "@kauro/application";
@@ -115,13 +120,15 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 export interface ApiServerOptions {
   readonly environment: Environment;
   readonly handlers: B06Handlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16). */
+  readonly reads: ReadHandlers;
   readonly authenticator: Authenticator;
   /**
    * Answers a structurally admitted command request that carried no authenticated subject: records the durable anonymous
    * DENY fact and returns the problem (AUTHENTICATION_REQUIRED, or the failure that kept the fact from being recorded).
    * The composition root binds the runtime's `refuseUnauthenticated`.
    */
-  readonly refuseUnauthenticated: (command: CommandId, request: UnauthenticatedRequest) => Promise<Problem>;
+  readonly refuseUnauthenticated: (action: string, request: UnauthenticatedRequest) => Promise<Problem>;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -400,7 +407,64 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   for (const handler of Object.values(options.handlers) as ReadonlyArray<CommandHandler<unknown, unknown>>) {
     registerCommand(app, options, handler, sink, hashAddress);
   }
+  for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
+    registerRead(app, options, handler, sink);
+  }
   return app;
+}
+
+/**
+ * A manual-10 read (N16): GET, no body, no idempotency key. Admission (repeated envelope header, path ids, the closed query, the
+ * agency selector), then the authenticated subject — a request without one is refused with its anonymous fact like a
+ * command's — then the read, whose access decision and projection belong to @kauro/application (queries/reads). The reply is
+ * the READ envelope, validated against the route's declared schema before it is sent like every reply.
+ */
+function registerRead<View>(app: FastifyInstance, options: ApiServerOptions, handler: ReadHandler<View>, sink: (correlationId: string, error: unknown) => void): void {
+  const spec = handler.spec;
+  app.route<{ Params: Record<string, string>; Querystring: Record<string, unknown>; Reply: ReadReply<View> | Problem }>({
+    method: spec.method,
+    url: fastifyPath(spec.path),
+    config: { responses: readRouteResponses(spec.operationId) },
+    handler: async (request, reply) => {
+      const headers = singleValued(request.headers);
+      const admission = admitRead(spec, {
+        headers,
+        repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders),
+        correlationId: request.id as CorrelationId,
+        params: request.params,
+        query: request.query,
+      });
+      if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
+      const correlationId = admission.correlationId;
+      const subject = await options.authenticator.authenticate(headers);
+      if (!subject) {
+        let refusal: Problem;
+        try {
+          refusal = await options.refuseUnauthenticated(spec.action, { correlationId, agencyId: admission.agencyId });
+        } catch (error) {
+          sink(correlationId, error);
+          return sendProblem(reply, internalProblem(correlationId));
+        }
+        return sendProblem(reply, refusal);
+      }
+      let result: ReadResult<View>;
+      try {
+        result = await handler.execute({ correlationId, subject, agencyId: admission.agencyId, path: admission.path, query: admission.query });
+      } catch (error) {
+        sink(correlationId, error);
+        return sendProblem(reply, internalProblem(correlationId));
+      }
+      if (result.kind === "PROBLEM") return sendProblem(reply, result.problem);
+      const body: ReadReply<View> = { kind: "READ", data: result.view };
+      return reply.code(200).type(HEADERS.contentType).send(body);
+    },
+  });
+}
+
+/** The body of a read's 200 (the READ envelope of @kauro/application's read response schemas). */
+export interface ReadReply<View> {
+  readonly kind: "READ";
+  readonly data: View;
 }
 
 function registerCommand<Body, View>(

@@ -103,6 +103,11 @@ export class PgPlanRepository implements PlanRepository {
     return r.rows[0] ? planRecord(r.rows[0]) : null;
   }
 
+  async findCurrentForProject(projectId: ProjectId): Promise<PlanRecord | null> {
+    const r = await execute<PlanRow>(this.db, `SELECT ${PLAN_COLUMNS} FROM kauro.plans WHERE project_id = $1 AND superseded_by_plan_id IS NULL ORDER BY created_at DESC, plan_id DESC LIMIT 1`, [projectId]);
+    return r.rows[0] ? planRecord(r.rows[0]) : null;
+  }
+
   async getBody(planId: PlanId): Promise<PlanBody | null> {
     const r = await execute<{ body: unknown }>(this.db, "SELECT body FROM kauro.plans WHERE plan_id = $1", [planId]);
     const row = r.rows[0];

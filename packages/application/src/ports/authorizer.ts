@@ -44,6 +44,13 @@ export type AuthorizationDecision =
 
 export type AllowDecision = Extract<AuthorizationDecision, { kind: "ALLOW" }>;
 
+/** The access request of a manual-10 read (re-check finding N16). */
+export interface ReadAuthorizationRequest {
+  readonly identity: IdentityFacts;
+  /** The agency the read selects (path agencyId or active-agency header); null for the caller's own memberships (GET /agencies). */
+  readonly agencyId: AgencyId | null;
+}
+
 export interface Authorizer {
   /**
    * Access, steps 1–7: subject, identity status (the token's facts and the stored identity row), agency selector, live
@@ -58,4 +65,11 @@ export interface Authorizer {
    * is the caller's and fresh; otherwise the access decision with its assurance class (STEP_UP when a proof was verified).
    */
   assure(uow: UnitOfWork, request: AuthorizationRequest, access: AllowDecision): Promise<AuthorizationDecision>;
+  /**
+   * Access of a read (N16), steps 1–6 of `authorize` with the role every membership holds (AGENCY_READER: a read's projection,
+   * not its admission, differs by role): subject, identity status, and — for an agency read — the selector and an ACTIVE live
+   * membership read after its transition lock. The same NOT_FOUND for a foreign and a nonexistent agency. Writes nothing; the
+   * read runtime records every DENY as a durable security fact.
+   */
+  authorizeRead(uow: UnitOfWork, request: ReadAuthorizationRequest): Promise<AuthorizationDecision>;
 }

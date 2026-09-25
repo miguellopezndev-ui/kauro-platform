@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { B06_COMMANDS, COMMAND_OUTCOMES, PROBLEM_STATUS, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { B06_COMMANDS, COMMAND_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
@@ -238,6 +238,26 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
     }
   }
   assert.deepEqual([...unreachableSeen].sort(), UNREACHABLE_PIPELINE_SITES.map((u) => `${u.code}/${u.reason}`).sort(), "every named unreachable site still exists and is still unreachable");
+});
+
+test("N13/N16: every failure site of the reads (queries/reads.ts) is an entry of the read catalogues — the tenant-scoped decisions of every agency read, the query and cursor refusals of every list", () => {
+  const sites = sitesOf(source("packages/application/src/queries/reads.ts"), "reads.ts");
+  // the read's own selector guard: admission refuses a tenant read without its selector first (AGENCY_SELECTOR_INVALID; an
+  // AGENCY_PATH id is a path parameter), so runRead's refusal is a defensive guard no request reaches
+  const unreachable = new Set(["INVALID_REQUEST/TENANT_CONTEXT_MISSING"]);
+  const union = Object.values(READ_OUTCOMES).flat();
+  assert.ok(sites.length >= 8, `${sites.length} read sites`);
+  for (const site of sites) {
+    const key = `${site.code}/${site.reason ?? "-"}`;
+    if (unreachable.has(key)) continue;
+    assert.ok(union.some((o) => o.code === site.code && o.reason === site.reason), `the read failure site ${key} (${site.site}) is in no read catalogue`);
+  }
+  assert.ok(sites.some((s) => `${s.code}/${s.reason}` === "INVALID_REQUEST/TENANT_CONTEXT_MISSING"), "the named unreachable site still exists");
+  // the membership decisions of authorizeRead reach every tenant read; ROLE_INSUFFICIENT reaches none (every role reads)
+  for (const operationId of ["GetAgency", "ListMembers", "ListClients", "GetProject"] as const) {
+    for (const reason of ["TENANT_CONTEXT_MISSING", "NOT_A_MEMBER", "MEMBERSHIP_SUSPENDED", "MEMBERSHIP_NOT_ACTIVE"] as const) assert.ok(READ_OUTCOMES[operationId].some((o) => o.reason === reason), `${operationId} ${reason}`);
+    assert.ok(!READ_OUTCOMES[operationId].some((o) => o.reason === "ROLE_INSUFFICIENT"), operationId);
+  }
 });
 
 // --- the route ------------------------------------------------------------------------------------------------------------------

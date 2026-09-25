@@ -24,6 +24,7 @@
  */
 import type { ArtifactRef, FailureReason, PlanId, TypedPatchFieldCode } from "@kauro/domain";
 import { DomainFailure, findTransition } from "@kauro/domain";
+import { planActions } from "../../api/permitted-actions.js";
 import { planView } from "../../api/projections.js";
 import type { ArtifactResolver, PatchCompilation, PlanPatchCompiler } from "../../ports/plan-services.js";
 import type { CommercialConsequenceInspector } from "../../ports/work-inspectors.js";
@@ -185,7 +186,7 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
         return {
           status: 201,
           view: {
-            plan: planView(successor),
+            plan: planView(successor, planActions(membership.role, successor, false)),
             supersededPlan: { planId, version: superseded.version, state: "SUPERSEDED" },
             invalidated,
           },

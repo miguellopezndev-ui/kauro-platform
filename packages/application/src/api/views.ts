@@ -8,6 +8,7 @@
  */
 import type { Agency, Approval, EndClient, Membership, Plan, UtcInstant } from "@kauro/contracts";
 import type { AgencyCapability, ProjectState, ServiceMode } from "@kauro/domain";
+import type { ResourceAction } from "./permitted-actions.js";
 
 export interface AgencyView {
   readonly agencyId: string;
@@ -42,6 +43,8 @@ export interface EndClientView {
   readonly processingAuthorityRef: string;
   readonly createdAt: UtcInstant;
   readonly archivedAt?: UtcInstant;
+  /** The served commands the caller may issue on this client (api/permitted-actions; re-check finding N16). */
+  readonly permittedActions: ReadonlyArray<ResourceAction>;
 }
 
 export const READINESS_BLOCKERS = [
@@ -70,6 +73,8 @@ export interface ProjectView {
   /** Visible readiness blockers (CMD011 effect): computed from durable facts at read time, never stored as a flag. */
   readonly readinessBlockers: ReadonlyArray<ReadinessBlocker>;
   readonly createdAt: UtcInstant;
+  /** The served commands the caller may issue on this project: none in this edition (api/permitted-actions; N16). */
+  readonly permittedActions: ReadonlyArray<ResourceAction>;
 }
 
 export interface PlanView {
@@ -87,6 +92,8 @@ export interface PlanView {
   readonly supersedesPlanId?: string;
   readonly supersededByPlanId?: string;
   readonly createdAt: UtcInstant;
+  /** The served commands the caller may issue on this revision (api/permitted-actions; N16). */
+  readonly permittedActions: ReadonlyArray<ResourceAction>;
 }
 
 /**
@@ -113,4 +120,43 @@ export interface ApprovalView {
   readonly withdrawnAt?: Approval["withdrawnAt"];
   readonly withdrawnByMembershipId?: string;
   readonly withdrawReasonCode?: string;
+  /** The served commands the caller may issue on this approval (api/permitted-actions; N16). */
+  readonly permittedActions: ReadonlyArray<ResourceAction>;
+}
+
+// --- the manual-10 reads (re-check finding N16) ---------------------------------------------------------------------------
+
+/** GET /agencies: one of the caller's actual memberships (ACTIVE or SUSPENDED) with its agency. */
+export interface AgencyMembershipView {
+  readonly agencyId: string;
+  readonly displayName: string;
+  readonly state: Agency["state"];
+  readonly version: number;
+  readonly membershipId: string;
+  readonly role: Membership["role"];
+  readonly membershipState: Membership["state"];
+  /** The caller's capabilities in the agency (none while the membership is SUSPENDED). */
+  readonly permittedActions: ReadonlyArray<AgencyCapability>;
+}
+
+/**
+ * GET /agencies/{agencyId}/members: a teammate as the caller may see it. A caller who manages the team (MANAGE_TEAM) sees every
+ * membership with its lifecycle times; any other member sees the ACTIVE team's roles. Never an identity reference of another
+ * person, an authentication fact, a token or security evidence (10 "Agency and team routes").
+ */
+export interface TeamMemberView {
+  readonly membershipId: string;
+  readonly role: Membership["role"];
+  readonly state: Membership["state"];
+  readonly version: number;
+  /** Whether this is the caller's own membership. */
+  readonly self: boolean;
+  readonly createdAt?: UtcInstant;
+  readonly acceptedAt?: UtcInstant;
+}
+
+/** A page of a list read: at most the page size, and the cursor of the next page when there may be one. */
+export interface Page<Item> {
+  readonly items: ReadonlyArray<Item>;
+  readonly nextCursor?: string;
 }
