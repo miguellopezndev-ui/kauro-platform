@@ -1,9 +1,16 @@
 /**
  * CMD025 ApprovePlan — POST /api/v1/plans/{planId}/approve — AGENCY_APPROVER (design §8, D-PLAN-2, D-PLAN-3; Plan machine edge
  * `agency_approval` VALIDATED → APPROVED "Authorized actor, current assurance and exact disclosed effects match. Create
- * immutable Approval"; 10 "Approval commands name sourceRevisionHash, planHash and targetContractHash"; catalogue failure
- * "Any changed effect, expired source or stale receipt requires new review; generic cleanup approval cannot authorize
- * undisclosed CLEAR").
+ * immutable Approval"; catalogue failure "Any changed effect, expired source or stale receipt requires new review; generic
+ * cleanup approval cannot authorize undisclosed CLEAR").
+ *
+ * Manual 10 "Concurrency and preconditions" says "Approval commands name sourceRevisionHash, planHash and
+ * targetContractHash"; the catalogue's CMD025 fields name planHash but neither source nor target hash. This edition follows
+ * the catalogue (the request schema is exactly its fields) and binds source and target through the plan the approver names:
+ * planHash is the Plan bodyHash, whose preimage contains revisionHash and targetContractHash (reference/HASHING_AND_ACCOUNTING_
+ * RULES), the plan row's source and target columns are immutable, the approval's composite foreign key binds them to that
+ * row, and expectedVersion pins the version displayed. The conflict is open question Q9 of the B06 review record
+ * (docs/design/B06-review/C-handler-semantics.md, R32).
  *
  * Order: reserve → authorize including the fresh step-up (ASSURANCE_REQUIRED) → lock plan (NOT_FOUND) → expectedVersion →
  * state VALIDATED (else PLAN_NOT_VALIDATED, or PRECONDITION_FAILED for SUPERSEDED / WITHDRAWN / APPROVED) → planHash equals

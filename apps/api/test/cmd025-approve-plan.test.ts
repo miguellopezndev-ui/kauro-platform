@@ -8,7 +8,7 @@ import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import { approvalHashOf } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { asProblem, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
 import { reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
 let w: World;
@@ -248,6 +248,23 @@ test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superse
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 1);
   assert.equal(await w.count("approvals", "plan_id = $1 AND withdrawn_at IS NULL", [plan.planId]), 0, "the superseded body keeps no live approval");
   assert.equal(await w.count("approvals", "plan_id = $1", [revised.data.plan.planId]), 0);
+});
+
+test("the approval binds its source and target through the planHash the approver names (the interim binding of the manual-10 / catalogue conflict, open question Q9)", async () => {
+  // Manual 10 "Approval commands name sourceRevisionHash, planHash and targetContractHash"; the catalogue's CMD025 fields
+  // name planHash only. Review finding R32. What the interim binding rests on, observed on the real rows: the planHash is the
+  // digest of a body that names the source and the target, the plan row carries exactly those two hashes, and the approval
+  // row binds them — so no approval can bind a source or a target its planHash does not commit to.
+  const plan = await w.approvable(w.A, projectId, "q9-binding");
+  const approval = (await approveThroughRoute(w, plan)).data.approval;
+  const stored = await w.row<{ body: PlanFixture["body"]; body_hash: string; revision_hash: string; target_contract_hash: string }>("plans", "plan_id = $1", [plan.planId]);
+  assert.ok(stored);
+  assert.equal(bodyHashOf(stored.body), approval.planHash, "the planHash is the digest of the stored body");
+  assert.deepEqual([stored.body.revisionHash, stored.body.targetContractHash], [stored.revision_hash, stored.target_contract_hash], "the body names the plan's source and target");
+  assert.deepEqual([approval.revisionHash, approval.targetContractHash], [stored.revision_hash, stored.target_contract_hash], "the approval binds them");
+  // the preimage commits to each of them: another source or another target is another planHash
+  assert.notEqual(bodyHashOf({ ...stored.body, revisionHash: sha("another source") }), approval.planHash);
+  assert.notEqual(bodyHashOf({ ...stored.body, targetContractHash: sha("another target") }), approval.planHash);
 });
 
 /** The dataset_revisions row a plan fixture's source hash names (superuser oracle). */
