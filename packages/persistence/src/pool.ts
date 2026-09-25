@@ -5,19 +5,23 @@
  * BYPASSRLS — every physical connection is verified once, on first use, and a privileged login is refused before it can
  * serve a single statement; that is what makes the RLS policies the authority rather than a convention).
  *
- * The pool knows which runtime group its login role belongs to (kauro_app or kauro_control). The unit-of-work factory uses
- * that fact to refuse a SYSTEM context on the request-handler pool and a TENANT/IDENTITY context on the control pool
- * (decision D-CTX-1: three contexts, two roles, no crossing).
+ * The pool knows which runtime group its login role belongs to. The unit-of-work factory uses that fact to refuse a SYSTEM
+ * context on the request-handler pool and a TENANT/IDENTITY context on the control pool (decision D-CTX-1: three contexts, two
+ * command roles, no crossing). The two evidence producers — kauro_assurance (the step-up verifier) and kauro_validator (the
+ * independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
+ * login that belongs to two groups is refused, so a request handler can never also be the producer of the evidence it checks.
  */
 import { Pool, type PoolClient } from "pg";
 
-export type RuntimeRole = "kauro_app" | "kauro_control";
+export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator";
+
+export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator"]);
 
 export interface PoolConfig {
   readonly host: string;
   readonly port: number;
   readonly database: string;
-  /** The LOGIN role; must be a member of exactly one runtime group role (kauro_app or kauro_control). */
+  /** The LOGIN role; must be a member of exactly one runtime group role (RUNTIME_ROLES). */
   readonly user: string;
   readonly password?: string;
   /** Connection ceiling of this instance (07 connection budget). Required: the budget is a decision, not a default. */
@@ -46,8 +50,7 @@ export class PrivilegedRoleError extends Error {
 const VERIFY_SQL = `
 SELECT current_user AS login_role,
        r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb,
-       pg_has_role(current_user, 'kauro_app', 'MEMBER') AS is_app,
-       pg_has_role(current_user, 'kauro_control', 'MEMBER') AS is_control,
+       ARRAY(SELECT g FROM unnest($1::text[]) AS g WHERE pg_has_role(current_user, g, 'MEMBER') ORDER BY g) AS groups,
        EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid) AS owns_database
 FROM pg_catalog.pg_roles r WHERE r.rolname = current_user`;
 
@@ -57,9 +60,12 @@ interface VerifyRow {
   rolbypassrls: boolean;
   rolcreaterole: boolean;
   rolcreatedb: boolean;
-  is_app: boolean;
-  is_control: boolean;
+  groups: string[];
   owns_database: boolean;
+}
+
+function isRuntimeRole(value: string): value is RuntimeRole {
+  return (RUNTIME_ROLES as ReadonlyArray<string>).includes(value);
 }
 
 /** A pool whose every physical connection was verified to be an unprivileged runtime role of one known group. */
@@ -106,7 +112,7 @@ export class KauroPool {
     if (known) return { client, connection: known };
     let row: VerifyRow;
     try {
-      const r = await client.query<VerifyRow>(VERIFY_SQL);
+      const r = await client.query<VerifyRow>(VERIFY_SQL, [[...RUNTIME_ROLES]]);
       const first = r.rows[0];
       if (!first) throw new Error("role verification returned no row");
       row = first;
@@ -124,8 +130,10 @@ export class KauroPool {
     if (row.rolcreaterole) refuse("CREATEROLE");
     if (row.rolcreatedb) refuse("CREATEDB");
     if (row.owns_database) refuse("the database owner");
-    if (row.is_app === row.is_control) refuse(row.is_app ? "a member of both runtime groups" : "a member of no runtime group");
-    const connection: VerifiedConnection = { role: row.is_app ? "kauro_app" : "kauro_control", loginRole: row.login_role };
+    const [role, ...others] = row.groups.filter(isRuntimeRole);
+    if (role === undefined) return refuse("a member of no runtime group");
+    if (others.length > 0) return refuse(`a member of more than one runtime group (${[role, ...others].join(", ")})`);
+    const connection: VerifiedConnection = { role, loginRole: row.login_role };
     this.#verified.set(client, connection);
     return { client, connection };
   }

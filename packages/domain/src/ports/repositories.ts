@@ -57,9 +57,11 @@ export interface IdentityRepository {
   getOwn(userId: UserId): Promise<IdentityFacts | null>;
   /** Upserts the caller's own identity facts from the authenticator (08: authentication produces assurance facts). */
   syncOwn(facts: IdentityFacts, provider: string, subjectHash: Sha256Hex, now: UtcInstant): Promise<IdentityFacts>;
-  /** A step-up proof of the caller (null when not visible or unknown). */
+  /**
+   * A step-up proof of the caller (null when not visible or unknown). Reading only: a proof is recorded by the step-up verifier
+   * (08 "Authentication and assurance"), never by a unit of work of the request handlers whose step-up gate it satisfies.
+   */
   getOwnProof(userId: UserId, proofId: AssuranceProofId): Promise<AssuranceProof | null>;
-  recordProof(proof: AssuranceProof, correlationId: CorrelationId): Promise<void>;
 }
 
 // --- agency and membership --------------------------------------------------------------------------------------------

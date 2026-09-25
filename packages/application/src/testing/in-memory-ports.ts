@@ -298,9 +298,6 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         const p = s.proofs.get(proofId);
         return p && p.userId === id && userId() === id ? p : null;
       },
-      async recordProof(proof) {
-        s.proofs.set(proof.proofId, proof);
-      },
     },
     agencies: {
       async get(agencyId) {

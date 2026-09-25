@@ -20,6 +20,9 @@ INSERT INTO kauro.event_types (event_type) VALUES
   ('agency.ownership_transferred.v1'),
   ('end_client.created.v1'), ('end_client.archived.v1'),
   ('project.created.v1'), ('dataset_revision.created.v1'),
+  ('dataset_revision.uploading.v1'), ('dataset_revision.inspecting.v1'), ('dataset_revision.ready_to_seal.v1'),
+  ('dataset_revision.sealed.v1'), ('dataset_revision.rejected.v1'), ('dataset_revision.cancelled.v1'),
+  ('dataset_revision.superseded.v1'), ('dataset_revision.expired.v1'), ('dataset_revision.deleted.v1'),
   ('plan.created.v1'), ('plan.validation_required.v1'), ('plan.validating.v1'), ('plan.validated.v1'), ('plan.superseded.v1'),
   ('plan.approved.v1'), ('plan.withdrawn.v1'),
   ('approval.created.v1'), ('approval.withdrawn.v1');
@@ -43,8 +46,10 @@ CREATE TABLE kauro.domain_events (
   payload_hash       text NOT NULL CHECK (kauro.is_sha256_hex(payload_hash)),
   schema_version     text NOT NULL CHECK (schema_version ~ '^[0-9]+$'),
   created_at         timestamptz NOT NULL,
-  -- event sequence numbers establish order within an aggregate (07): one event per committed version
-  UNIQUE (aggregate_kind, aggregate_id, aggregate_version),
+  -- event sequence numbers establish order within an aggregate (07): one event per committed version. The identity includes
+  -- the tenant scope (08 "Database isolation": aggregate uniqueness includes scope), and the aggregate itself is bound to the
+  -- event's agency by kauro.domain_events_bind_aggregate below, so no tenant can occupy another tenant's next version.
+  CONSTRAINT domain_events_one_per_aggregate_version UNIQUE NULLS NOT DISTINCT (agency_id, aggregate_kind, aggregate_id, aggregate_version),
   CONSTRAINT domain_events_actor_shape CHECK (
     (actor_kind = 'USER' AND actor_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
     OR (actor_kind = 'SERVICE' AND actor_id ~ '^[a-z][a-z0-9_-]{1,63}$')
@@ -55,6 +60,49 @@ CREATE INDEX domain_events_by_agency ON kauro.domain_events (agency_id, sequence
 CREATE INDEX domain_events_by_correlation ON kauro.domain_events (correlation_id);
 CREATE TRIGGER domain_events_append_only BEFORE UPDATE OR DELETE ON kauro.domain_events
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+
+-- An event records a committed version of an aggregate of its own agency (07 "Outbox, inbox and event ordering": aggregate ID
+-- and version, agency scope; 08 "Database isolation": foreign keys bind tenant and parent identity). The aggregate reference
+-- is polymorphic, so this trigger is the enforced equivalent of the composite foreign key: the named aggregate row must exist
+-- in the event's agency and be visible to the writer (the writer's policies apply), and it must already carry the version the
+-- event records (every command writes the row, then its event). An event naming another tenant's aggregate is refused
+-- exactly like one naming an id that does not exist (KA006), so the event table can neither occupy another tenant's next
+-- version nor tell another tenant's ids from unknown ones.
+CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  current_version bigint;
+BEGIN
+  CASE NEW.aggregate_kind
+    WHEN 'agency' THEN
+      SELECT a.version INTO current_version FROM kauro.agencies a WHERE a.agency_id = NEW.aggregate_id AND a.agency_id = NEW.agency_id;
+    WHEN 'membership' THEN
+      SELECT m.version INTO current_version FROM kauro.memberships m WHERE m.membership_id = NEW.aggregate_id AND m.agency_id = NEW.agency_id;
+    WHEN 'end_client' THEN
+      SELECT c.version INTO current_version FROM kauro.end_clients c WHERE c.client_id = NEW.aggregate_id AND c.agency_id = NEW.agency_id;
+    WHEN 'project' THEN
+      SELECT p.version INTO current_version FROM kauro.projects p WHERE p.project_id = NEW.aggregate_id AND p.agency_id = NEW.agency_id;
+    WHEN 'dataset_revision' THEN
+      SELECT r.version INTO current_version FROM kauro.dataset_revisions r WHERE r.revision_id = NEW.aggregate_id AND r.agency_id = NEW.agency_id;
+    WHEN 'plan' THEN
+      SELECT p.version INTO current_version FROM kauro.plans p WHERE p.plan_id = NEW.aggregate_id AND p.agency_id = NEW.agency_id;
+    WHEN 'approval' THEN
+      SELECT a.version INTO current_version FROM kauro.approvals a WHERE a.approval_id = NEW.aggregate_id AND a.agency_id = NEW.agency_id;
+    ELSE
+      RAISE EXCEPTION 'CONTEXT: aggregate kind % has no binding', NEW.aggregate_kind USING ERRCODE = 'KA006';
+  END CASE;
+  IF current_version IS NULL THEN
+    RAISE EXCEPTION 'CONTEXT: % % is not an aggregate of agency % visible in this transaction', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
+  END IF;
+  IF NEW.aggregate_version > current_version THEN
+    RAISE EXCEPTION 'VERSION_DISCIPLINE: an event of % % records version % ahead of the aggregate (version %)', NEW.aggregate_kind, NEW.aggregate_id, NEW.aggregate_version, current_version USING ERRCODE = 'KA002';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER domain_events_bind_aggregate BEFORE INSERT ON kauro.domain_events
+  FOR EACH ROW EXECUTE FUNCTION kauro.domain_events_bind_aggregate();
 
 -- --- outbox records --------------------------------------------------------------------------------------------------------------
 CREATE TABLE kauro.outbox_records (
@@ -137,7 +185,9 @@ ALTER TABLE kauro.domain_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.domain_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY domain_events_tenant ON kauro.domain_events FOR ALL TO kauro_app
   USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
-CREATE POLICY domain_events_control ON kauro.domain_events FOR ALL TO kauro_control USING (true) WITH CHECK (true);
+-- the control plane reads events to dispatch their outbox records (allowlisted references and safe counts only); it writes no
+-- aggregate, so it appends no aggregate event — a cross-tenant writer here could occupy any tenant's next version
+CREATE POLICY domain_events_control_read ON kauro.domain_events FOR SELECT TO kauro_control USING (true);
 
 ALTER TABLE kauro.outbox_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.outbox_records FORCE ROW LEVEL SECURITY;
@@ -149,15 +199,25 @@ CREATE POLICY outbox_records_control ON kauro.outbox_records FOR ALL TO kauro_co
 
 ALTER TABLE kauro.inbox_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.inbox_records FORCE ROW LEVEL SECURITY;
--- provider ingress (api webhook route) and the control plane both operate on inbox rows; the rows carry no tenant data
-CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR ALL TO kauro_app USING (true) WITH CHECK (true);
+-- Provider ingress (an api webhook route: 10 "POST /payments/webhooks/{provider} ... durable inbox handling") records the
+-- authenticated event reference once, as RECEIVED, and learns only whether it was new (15 "Webhooks and reconciliation":
+-- "stores a minimized immutable event reference in the inbox and deduplicates by provider, environment and event ID" — an
+-- INSERT ... ON CONFLICT DO NOTHING without a conflict target, since naming an arbiter needs a read of the table; the fresh
+-- inbox id and the inbox identity are its only unique keys). Reading, processing and settling inbox rows is the consumer's
+-- work (07 "consumers deduplicate by their own durable inbox identity and verify state before an effect"), i.e. the control
+-- plane. The request handlers therefore can neither read nor rewrite any inbox row: under no tenant context can one agency's
+-- handler see which provider events exist or suppress another's before its consumer runs (08 trust boundary "provider
+-- webhook to inbox").
+CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR INSERT TO kauro_app
+  WITH CHECK (state = 'RECEIVED' AND applied_at IS NULL AND result_event_id IS NULL);
 CREATE POLICY inbox_records_control ON kauro.inbox_records FOR ALL TO kauro_control USING (true) WITH CHECK (true);
 
 -- --- grants -----------------------------------------------------------------------------------------------------------------------
 GRANT SELECT ON kauro.event_types TO kauro_app, kauro_control;
 GRANT SELECT, INSERT ON kauro.domain_events TO kauro_app;
-GRANT SELECT, INSERT ON kauro.domain_events TO kauro_control;
-GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app, kauro_control;
+GRANT SELECT ON kauro.domain_events TO kauro_control;
+GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app;
 GRANT SELECT, INSERT ON kauro.outbox_records TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.outbox_records TO kauro_control;
-GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_app, kauro_control;
+GRANT INSERT ON kauro.inbox_records TO kauro_app;
+GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_control;

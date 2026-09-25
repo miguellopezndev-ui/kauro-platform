@@ -12,6 +12,8 @@ import { agency, bind, constraintOf, endClient, event, ids, offeredCapability, p
 let pg: TemporaryPostgres;
 let app: Client;
 let control: Client;
+let validator: Client;
+let assurance: Client;
 let oracle: Client;
 let owner: Person;
 let A: AgencyFixture;
@@ -22,6 +24,8 @@ before(async () => {
   pg = await startTemporaryPostgres();
   app = await pg.connect("kauro_app_test");
   control = await pg.connect("kauro_control_test");
+  validator = await pg.connect("kauro_validator_test");
+  assurance = await pg.connect("kauro_assurance_test");
   oracle = await pg.connect("postgres");
   owner = await person(app, "owner-discipline");
   A = await agency(app, owner, "Discipline Agency");
@@ -33,6 +37,8 @@ before(async () => {
 after(async () => {
   await app.end();
   await control.end();
+  await validator.end();
+  await assurance.end();
   await oracle.end();
   await pg.stop();
 });
@@ -137,8 +143,8 @@ test("S051: two edits racing on one plan version — one revision is created, th
 });
 
 test("an approval binds exact plan/source/target/receipt hashes; a foreign or stale hash cannot be recorded; one live approval per plan", async () => {
-  const p = await plan(app, A, projectId, "VALIDATED", "approve");
-  const proof = await stepUpProof(app, owner);
+  const p = await plan(app, A, projectId, "VALIDATED", "approve", validator);
+  const proof = await stepUpProof(assurance, owner);
   const insertApproval = (c: Client, id: string, overrides: Partial<Record<"planHash" | "receiptHash" | "revisionHash", string>>) =>
     c.query(
       `INSERT INTO kauro.approvals (approval_id, agency_id, plan_id, actor_id, actor_membership_id, actor_membership_version, assurance_proof_ref, plan_hash, revision_hash, target_contract_hash, validation_receipt_hash, disclosures_hash, approval_hash, created_at, updated_at)

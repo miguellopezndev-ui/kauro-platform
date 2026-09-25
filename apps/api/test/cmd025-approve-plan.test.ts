@@ -61,7 +61,8 @@ test("OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose recei
   assert.ok(row);
   assert.deepEqual(
     { actor: row.actor_id, membership: row.actor_membership_id, membershipVersion: row.actor_membership_version, proof: row.assurance_proof_ref, plan: row.plan_hash, revision: row.revision_hash, target: row.target_contract_hash, receipt: row.validation_receipt_hash, version: row.version, withdrawn: row.withdrawn_at },
-    { actor: w.approver.userId, membership: w.memberships.approver, membershipVersion: "1", proof, plan: plan.bodyHash, revision: plan.revisionHash, target: plan.targetContractHash, receipt: plan.receiptHash, version: "1", withdrawn: null },
+    // the approver's membership is at version 2: invited (v1), then accepted by the approver (v2)
+    { actor: w.approver.userId, membership: w.memberships.approver, membershipVersion: "2", proof, plan: plan.bodyHash, revision: plan.revisionHash, target: plan.targetContractHash, receipt: plan.receiptHash, version: "1", withdrawn: null },
   );
   const recomputed = approvalHashOf({
     approvalId: approval.approvalId,

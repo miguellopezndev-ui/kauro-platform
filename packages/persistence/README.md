@@ -5,12 +5,18 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
 - `migrations/0001..0007_*.sql` — the ordered schema: roles and helpers, identities/agencies/memberships, capabilities/
   clients/projects/revisions/target contracts, plans/receipts/approvals, event types/domain events/outbox/inbox, command
   journal/request journal/leases, security events. Every tenant table has row-level security enabled and forced; every
-  tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event.
+  tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
+  (an event of its own agency, bound to an aggregate of that agency at or below its version); every aggregate is born in its
+  machine's initial state (`kauro.state_machines`, seeded from the registry) and changes state only along a listed edge.
+  Four runtime groups, one per writer: `kauro_app` (request handlers), `kauro_control` (control plane; safe technical
+  metadata only), `kauro_assurance` (the step-up verifier: the only writer of step-up proofs) and `kauro_validator` (the
+  independent Migration validator: the only writer of validation receipts).
 - `src/migrations/runner` — `applyMigrations(client)`: one transaction per file, checksum ledger in
   `kauro_meta.schema_migrations`, drift refusal, explicit lock/statement timeouts. Run as the owner role, never the runtime.
 - `src/pool` — `createPool(config)`: a `pg` pool with a mandatory connection ceiling (07 "Connection budget") whose every
   physical connection is verified once on first use: not SUPERUSER, not BYPASSRLS, not CREATEROLE/CREATEDB, not the database
-  owner, member of exactly one runtime group (`kauro_app` or `kauro_control`). A privileged login is destroyed, never pooled.
+  owner, member of exactly one runtime group (`kauro_app`, `kauro_control`, `kauro_assurance` or `kauro_validator`). A
+  privileged login, or one in two groups, is destroyed, never pooled.
 - `src/unit-of-work` — `createUnitOfWorkFactory(pool, {clock})`: `run(context, work, options)` opens one transaction at the
   requested isolation (READ COMMITTED by default), sets a transaction-local `statement_timeout`, binds the TENANT / IDENTITY /
   SYSTEM context with `set_config(..., true)` (the settings vanish at COMMIT/ROLLBACK, so a connection returns to the pool
@@ -27,6 +33,9 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   `PgApprovalRepository` (`plans`). Reads return `null` for rows the policies hide; versioned writes are compare-and-swap on
   `version` and answer `STALE` with the current safe version and state, or `NOT_FOUND` for an invisible row; foreign
   references fail on the composite keys as `INVALID_REQUEST / UNKNOWN_REFERENCE`.
+- `src/evidence` — `PgAssuranceProofRecorder` (on a `kauro_assurance` pool: one append-only step-up proof of the identity
+  the verifier bound) and `PgValidationReceiptRecorder` (on a `kauro_validator` pool: one append-only receipt under the
+  tenant of the plan it validated), each in a short transaction of its own. The request handlers only read both.
 - `src/event-publisher` — `PgEventPublisher.publish`: allowlist check, id and time from the ports, canonical payload digest,
   `domain_events` row plus one `outbox_records` row per registered consumer; a second event for an aggregate version is
   `INTEGRITY_FAILURE / VERSION_DISCIPLINE`.
@@ -44,15 +53,18 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   `DomainFailure`; `ConstraintViolation` for a unique constraint the handler must interpret; `LeaseRefusal` for KA005/KA004
   raised by the lease functions.
 - `src/testing/temporary-postgres` — `startTemporaryPostgres()`: initdb + pg_ctl on a free 127.0.0.1 port, database and
-  roles, migrations applied, login roles for `kauro_app` / `kauro_control`; `stop()` removes everything. Binaries from
+  roles, migrations applied, one login role per runtime group; `stop()` removes everything. Binaries from
   `PGBIN`, else `C:\Tools\pgsql17\bin` (Windows) or `/usr/lib/postgresql/17/bin` (Linux).
 
-- `src/testing/harness` — `startHarness()`: the two verified pools and unit-of-work factories on a fresh cluster, the
-  superuser oracle, and fixtures written through the adapters under a real context; capabilities are born DESIGN and
-  published through the listed Capability edges with each gate's evidence (`offeredCapability`, `publishCapability`: D-CAP-2);
+- `src/testing/harness` — `startHarness()`: a verified pool per runtime group (unit-of-work factories on the request and
+  control pools, the evidence recorders on the verifier and validator pools) on a fresh cluster, the superuser oracle, and
+  fixtures written by the role that owns each write under a real context; aggregates are born in their initial state and
+  walk the listed edges — members are invited and accept (`addMember`), revisions are sealed (`sealedRevision`),
+  capabilities are born DESIGN and published with each gate's evidence (`offeredCapability`, `publishCapability`: D-CAP-2);
+  step-up proofs and receipts come from their producers (`recordStepUp`, `recordValidationReceipt`);
   `waitForLockWait` and `barrier` fix interleavings. Exported for the entrypoints' acceptance tests, never wired into a
   deployment.
 
 Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. `migrations`, `tenant-isolation`,
-`discipline`, `last-owner` and `journals-leases` review the SQL directly; `adapters-unit-of-work`, `adapters-tenant-isolation`,
+`discipline`, `last-owner`, `journals-leases` and `integrity-guards` review the SQL directly; `adapters-unit-of-work`, `adapters-tenant-isolation`,
 `adapters-journals-outbox` and `adapters-leases` review the adapters.

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { EVENT_TYPES } from "@kauro/domain";
+import { EVENT_TYPES, PLATFORM_STATE_MACHINES } from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations, startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
 
 let pg: TemporaryPostgres;
@@ -57,9 +57,10 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
   const su = await pg.connect("postgres");
   try {
     const roles = await su.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; rolcreaterole: boolean }>(
-      "SELECT rolname, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname IN ('kauro_app', 'kauro_control', 'kauro_app_test', 'kauro_control_test')",
+      `SELECT rolname, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname IN
+         ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator', 'kauro_app_test', 'kauro_control_test', 'kauro_assurance_test', 'kauro_validator_test')`,
     );
-    assert.equal(roles.rows.length, 4);
+    assert.equal(roles.rows.length, 8);
     for (const r of roles.rows) {
       assert.equal(r.rolsuper, false, r.rolname);
       assert.equal(r.rolbypassrls, false, r.rolname);
@@ -72,7 +73,7 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     );
     assert.ok(rls.rows.length >= 20);
     for (const t of rls.rows) {
-      if (t.relname === "state_transitions") continue; // reference data, SELECT only, no tenant rows
+      if (t.relname === "state_transitions" || t.relname === "state_machines") continue; // reference data, SELECT only, no tenant rows
       assert.equal(t.relrowsecurity, true, `${t.relname} has no RLS`);
       assert.equal(t.relforcerowsecurity, true, `${t.relname} does not FORCE RLS`);
     }
@@ -146,6 +147,44 @@ test("the listed-transition seed equals the registry machines for every machine 
     }
     const others = await su.query<{ machine: string }>("SELECT DISTINCT machine FROM kauro.state_transitions ORDER BY 1");
     assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"]);
+  } finally {
+    await su.end();
+  }
+});
+
+test("R20: the initial-state seed equals the registry machines (and the platform machines of D-AGG-1/D-AGG-2); every table that guards its listed edges also guards its birth state", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const seeded = await su.query<{ machine: string; initial_state: string }>("SELECT machine, initial_state FROM kauro.state_machines ORDER BY machine");
+    const expected = ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"].map((name) => {
+      const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name);
+      assert.ok(m, `${name} is a registry or platform machine`);
+      return { machine: name, initial_state: m.initial };
+    });
+    assert.deepEqual(seeded.rows, expected);
+    // every machine with listed edges has its initial state, and every edge starts from a state of that machine
+    const orphanEdges = await su.query("SELECT DISTINCT machine FROM kauro.state_transitions t WHERE NOT EXISTS (SELECT 1 FROM kauro.state_machines m WHERE m.machine = t.machine)");
+    assert.deepEqual(orphanEdges.rows, []);
+    // the birth guard sits on exactly the tables whose state changes are guarded, for the same machine
+    const defs = await su.query<{ relname: string; def: string }>(
+      `SELECT c.relname, pg_get_triggerdef(t.oid) AS def FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'kauro' AND NOT t.tgisinternal ORDER BY c.relname, t.tgname`,
+    );
+    const machineOf = (fn: string): Map<string, string> => {
+      const out = new Map<string, string>();
+      for (const d of defs.rows) {
+        const m = new RegExp(`EXECUTE FUNCTION kauro\\.${fn}\\('([A-Za-z]+)'\\)`).exec(d.def);
+        if (m?.[1]) out.set(d.relname, m[1]);
+      }
+      return out;
+    };
+    const edges = machineOf("enforce_listed_transition");
+    const births = machineOf("enforce_initial_state");
+    for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
+    assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
+    for (const d of defs.rows) {
+      if (/enforce_initial_state|enforce_membership_initial_state/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
+    }
   } finally {
     await su.end();
   }

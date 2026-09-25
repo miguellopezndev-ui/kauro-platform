@@ -11,13 +11,14 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { DomainFailure, commandRequestDigest, isDomainFailure, type ApprovalId, type AssuranceProofId, type CausationId, type ClientId, type IdempotencyIdentity, type PlanId, type ProcessingAuthorityId, type ProjectId, type RequestId, type RevisionId, type TaskId, type UserId } from "@kauro/domain";
 import { barrier, clock, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
-import { plan as planFixture, stepUpProof } from "./support.js";
+import { plan as planFixture } from "./support.js";
 
 let h: Harness;
 let owner: UserId;
 let A: AgencyFixture;
 let authority: ProcessingAuthorityId;
 let rawApp: Client;
+let rawValidator: Client;
 
 before(async () => {
   h = await start();
@@ -25,9 +26,11 @@ before(async () => {
   A = await h.createAgency(owner, "Journal Agency");
   authority = await h.processingAuthority(A);
   rawApp = await h.pg.connect("kauro_app_test");
+  rawValidator = await h.pg.connect("kauro_validator_test");
 });
 after(async () => {
   await rawApp.end();
+  await rawValidator.end();
   await h.stop();
 });
 
@@ -264,9 +267,9 @@ test("outbox ordering by aggregate version: events of one aggregate are appended
     await uow.events.publish({ aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "dataset_revision.created.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { revisionId, agencyId: A.agencyId, projectId, state: "DRAFT" } });
     return projectId;
   });
-  // a VALIDATED plan with its receipt (fixture over the runtime role) and a step-up proof of the owner
-  const p = await planFixture(rawApp, A, projectId, "VALIDATED", "outbox");
-  const proof = (await stepUpProof(rawApp, { userId: owner })) as AssuranceProofId;
+  // a VALIDATED plan with its receipt (recorded by the validator role) and a step-up proof of the owner (by the verifier)
+  const p = await planFixture(rawApp, A, projectId, "VALIDATED", "outbox", rawValidator);
+  const proof: AssuranceProofId = await h.recordStepUp(owner);
   const planId = p.planId as PlanId;
   const approvalId = await h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
     const approvalId = uow.ids.next() as ApprovalId;

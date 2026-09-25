@@ -86,22 +86,28 @@ test("DENY: foreign/wrong role → 404/403; HUBSPOT with no offered capability �
   assert.equal(outcome(w, unknownMode), "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED", "a mode with no capability row at all");
 
   // publication is the capability's own lifecycle (D-CAP-2; registry machine Capability, initial DESIGN): the database refuses
-  // the shortcuts — an unlisted edge DESIGN -> AVAILABLE_LIMITED (KA008) and a second HUBSPOT row for the same revision
-  // (capabilities_mode_version) — so the control plane moves the existing row along the listed edges, citing each gate's
-  // evidence. Implemented and internally qualified are still not offered ("Requested, implemented and qualified are different
-  // states"): the mode stays refused until AVAILABLE_LIMITED.
+  // the shortcuts — an unlisted edge DESIGN -> AVAILABLE_LIMITED (KA008), a row born offered under any revision label (KA008:
+  // every capability is born DESIGN) and a second HUBSPOT row for the same revision (capabilities_mode_version) — so the
+  // control plane moves the existing row along the listed edges, citing each gate's evidence. Implemented and internally
+  // qualified are still not offered ("Requested, implemented and qualified are different states"): the mode stays refused
+  // until AVAILABLE_LIMITED.
   const control = await w.h.pg.connect("kauro_control_test");
   try {
     await assert.rejects(
       control.query("UPDATE kauro.capabilities SET state = 'AVAILABLE_LIMITED', qualification_evidence_hashes = $2::jsonb WHERE capability_id = $1", [w.hubspotCapabilityId, JSON.stringify([sha("shortcut")])]),
       (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "KA008",
     );
-    await assert.rejects(
+    const bornAs = (version: string, state: string) =>
       control.query(
         `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-         VALUES ($1, 'R2-INITIAL', 'MODE', 'HUBSPOT', 'AVAILABLE_LIMITED', $2, $3::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
-        [ids.next(), sha("profile-HUBSPOT"), JSON.stringify([sha("shortcut")])],
-      ),
+         VALUES ($1, $2, 'MODE', 'HUBSPOT', $3, $4, $5::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+        [ids.next(), version, state, sha("profile-HUBSPOT"), JSON.stringify(state === "DESIGN" ? [] : [sha("shortcut")])],
+      );
+    for (const version of ["R2-INITIAL", "R2-SHORTCUT"]) {
+      await assert.rejects(bornAs(version, "AVAILABLE_LIMITED"), (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "KA008", `born offered under ${version}`);
+    }
+    await assert.rejects(
+      bornAs("R2-INITIAL", "DESIGN"),
       (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "23505" && (e as { constraint?: string }).constraint === "capabilities_mode_version",
     );
   } finally {

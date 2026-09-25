@@ -45,6 +45,7 @@ import type {
   UnitOfWorkFactory,
   UnitOfWorkOptions,
   UserId,
+  ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence";
@@ -477,7 +478,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   };
   const suspendedMembershipId = await h.addMember(A, suspended.userId, "OPERATOR");
   await h.app.run(h.tenant(A.agencyId, owner.userId), async (uow) => {
-    const written = await uow.memberships.transition(suspendedMembershipId, 1, { state: "SUSPENDED" }, clock.now());
+    const member = await uow.memberships.lock(suspendedMembershipId);
+    if (!member) throw new Error("the member to suspend is not visible");
+    const written = await uow.memberships.transition(suspendedMembershipId, member.version, { state: "SUSPENDED" }, clock.now());
     if (written.kind !== "APPLIED") throw new Error("suspension fixture did not apply");
     await uow.events.publish({
       aggregateKind: "membership",
@@ -555,16 +558,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     },
 
     async revision(agency, projectId, state = "SEALED") {
-      const revisionId = ids.next() as RevisionId;
-      const revisionHash = sha(`manifest-${revisionId}`);
-      await w.asTenant(agency, async (c) => {
-        await c.query(
-          `INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, version, state, manifest_hash, projection_hash, sealed_at, created_at, updated_at)
-           VALUES ($1, $2, $3, 1, $4, $5, $6, now(), now(), now())`,
-          [revisionId, agency.agencyId, projectId, state, revisionHash, sha(`projection-${revisionId}`)],
-        );
-        await rawEvent(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 1, agencyId: agency.agencyId, eventType: "dataset_revision.created.v1", actorUserId: agency.ownerUserId, payload: { revisionId, agencyId: agency.agencyId, projectId, state } });
-      });
+      // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED)
+      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state);
       return { revisionId, revisionHash };
     },
 
@@ -589,34 +584,56 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       const affectedRows = 120;
       let receiptHash: Sha256Hex | null = null;
       let version = 1;
+      const ev = (c: PoolClient, aggregateVersion: number, eventType: string, payload: Record<string, string | number | boolean>): Promise<void> =>
+        rawEvent(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion, agencyId: agency.agencyId, eventType, actorUserId: agency.ownerUserId, payload });
+      // the request handlers' part of the lifecycle: DRAFT -> VALIDATION_REQUIRED (-> VALIDATING, the durable validation intent)
       await w.asTenant(agency, async (c) => {
-        const ev = (aggregateVersion: number, eventType: string, payload: Record<string, string | number | boolean>): Promise<void> =>
-          rawEvent(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion, agencyId: agency.agencyId, eventType, actorUserId: agency.ownerUserId, payload });
         await c.query(
           `INSERT INTO kauro.plans (plan_id, agency_id, project_id, version, state, revision_hash, target_contract_hash, policy_hash, body, body_hash, created_by_membership_id, created_at, updated_at)
            VALUES ($1, $2, $3, 1, 'DRAFT', $4, $5, $6, $7::jsonb, $8, $9, now(), now())`,
           [planId, agency.agencyId, projectId, body.revisionHash, body.targetContractHash, body.policyHash, JSON.stringify(body), bodyHash, agency.ownerMembershipId],
         );
-        await ev(1, "plan.created.v1", { planId, agencyId: agency.agencyId, projectId, bodyHash, createdByMembershipId: agency.ownerMembershipId });
+        await ev(c, 1, "plan.created.v1", { planId, agencyId: agency.agencyId, projectId, bodyHash, createdByMembershipId: agency.ownerMembershipId });
         await c.query("UPDATE kauro.plans SET state = 'VALIDATION_REQUIRED', version = 2 WHERE plan_id = $1", [planId]);
-        await ev(2, "plan.validation_required.v1", { planId, agencyId: agency.agencyId, bodyHash });
+        await ev(c, 2, "plan.validation_required.v1", { planId, agencyId: agency.agencyId, bodyHash });
         version = 2;
         if (state === "VALIDATED") {
           await c.query("UPDATE kauro.plans SET state = 'VALIDATING', version = 3 WHERE plan_id = $1", [planId]);
-          await ev(3, "plan.validating.v1", { planId, agencyId: agency.agencyId, bodyHash });
-          const hash = sha(`receipt-${planId}`);
-          receiptHash = hash;
-          const counts = { physicalSourceRows: affectedRows, logicalSourceRecords: affectedRows, billableSourceUnits: affectedRows, associationEdges: 0, emittedRepresentatives: affectedRows, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: affectedRows };
-          await c.query(
-            `INSERT INTO kauro.validation_receipts (receipt_id, agency_id, plan_id, receipt_hash, revision_hash, target_contract_hash, plan_hash, core_package_hash, profile_evidence_hash, disposition_evidence_hash, artifact_evidence_hash, started_at, completed_at, result, counts, blocking_issue_codes, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() - interval '1 minute', now(), 'VALID', $12::jsonb, '[]'::jsonb, now())`,
-            [ids.next(), agency.agencyId, planId, hash, body.revisionHash, body.targetContractHash, bodyHash, sha("core"), sha("profile"), sha("disposition"), sha("artifact"), JSON.stringify(counts)],
-          );
-          await c.query("UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1", [planId, hash]);
-          await ev(4, "plan.validated.v1", { planId, agencyId: agency.agencyId, bodyHash, validationReceiptHash: hash });
-          version = 4;
+          await ev(c, 3, "plan.validating.v1", { planId, agencyId: agency.agencyId, bodyHash });
+          version = 3;
         }
       });
+      if (state === "VALIDATED") {
+        // the independent validator records its receipt (kauro_validator; the request-handler role cannot write receipts) ...
+        const hash = sha(`receipt-${planId}`);
+        receiptHash = hash;
+        const counts = { physicalSourceRows: affectedRows, logicalSourceRecords: affectedRows, billableSourceUnits: affectedRows, associationEdges: 0, emittedRepresentatives: affectedRows, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: affectedRows };
+        const completedMs = Date.now();
+        await h.recordValidationReceipt({
+          receiptId: ids.next() as ValidationReceiptId,
+          agencyId: agency.agencyId,
+          planId,
+          receiptHash: hash,
+          revisionHash: body.revisionHash,
+          targetContractHash: body.targetContractHash,
+          planHash: bodyHash,
+          corePackageHash: sha("core"),
+          profileEvidenceHash: sha("profile"),
+          dispositionEvidenceHash: sha("disposition"),
+          artifactEvidenceHash: sha("artifact"),
+          startedAt: toUtcInstant(completedMs - 60_000),
+          completedAt: toUtcInstant(completedMs),
+          result: "VALID",
+          counts,
+          blockingIssueCodes: [],
+        });
+        // ... and the valid_receipt edge binds it: VALIDATING -> VALIDATED (the plan names a VALID receipt of its own subjects)
+        await w.asTenant(agency, async (c) => {
+          await c.query("UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1", [planId, hash]);
+          await ev(c, 4, "plan.validated.v1", { planId, agencyId: agency.agencyId, bodyHash, validationReceiptHash: hash });
+        });
+        version = 4;
+      }
       return { planId, projectId, version, state, body, bodyHash, revisionHash: subjects.revisionHash, targetContractHash: subjects.targetContractHash, receiptHash, affectedRows };
     },
 
@@ -627,12 +644,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     },
 
     async stepUp(person, freshness = "FRESH") {
-      const proofId = ids.next() as AssuranceProofId;
+      // recorded by the step-up verifier (kauro_assurance), never by the request-handler role whose gate the proof satisfies
       const issuedMs = freshness === "FRESH" ? Date.now() : Date.now() - 20 * 60_000;
-      await h.app.run(h.identity(person.userId), async (uow) => {
-        await uow.identities.recordProof({ proofId, userId: person.userId, kind: "STEP_UP", method: "TOTP", issuedAt: toUtcInstant(issuedMs), expiresAt: toUtcInstant(issuedMs + 15 * 60_000) }, uow.context.correlationId);
-      });
-      return proofId;
+      return h.recordStepUp(person.userId, { issuedAt: toUtcInstant(issuedMs) });
     },
 
     async asTenant(agency, fn) {

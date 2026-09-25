@@ -36,9 +36,19 @@ export const EVENT_TYPES = [
   // End clients
   "end_client.created.v1",
   "end_client.archived.v1",
-  // Projects and revisions
+  // Projects and revisions (registry DatasetRevision machine: one event per target state, registered with the machine the
+  // schema seeds, as the Agency and Membership lifecycles are; their commands arrive with B07)
   "project.created.v1",
   "dataset_revision.created.v1",
+  "dataset_revision.uploading.v1",
+  "dataset_revision.inspecting.v1",
+  "dataset_revision.ready_to_seal.v1",
+  "dataset_revision.sealed.v1",
+  "dataset_revision.rejected.v1",
+  "dataset_revision.cancelled.v1",
+  "dataset_revision.superseded.v1",
+  "dataset_revision.expired.v1",
+  "dataset_revision.deleted.v1",
   // Plans and approvals (registry Plan machine)
   "plan.created.v1",
   "plan.validation_required.v1",
@@ -76,6 +86,15 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "end_client.archived.v1": ["clientId", "agencyId", "openProjects", "archivedByMembershipId"],
   "project.created.v1": ["projectId", "agencyId", "clientId", "mode", "capabilityId", "capabilityVersion", "initialRevisionId", "createdByMembershipId"],
   "dataset_revision.created.v1": ["revisionId", "agencyId", "projectId", "state"],
+  "dataset_revision.uploading.v1": ["revisionId", "agencyId", "projectId"],
+  "dataset_revision.inspecting.v1": ["revisionId", "agencyId", "projectId"],
+  "dataset_revision.ready_to_seal.v1": ["revisionId", "agencyId", "projectId"],
+  "dataset_revision.sealed.v1": ["revisionId", "agencyId", "projectId", "manifestHash", "projectionHash"],
+  "dataset_revision.rejected.v1": ["revisionId", "agencyId", "projectId", "reasonCode"],
+  "dataset_revision.cancelled.v1": ["revisionId", "agencyId", "projectId"],
+  "dataset_revision.superseded.v1": ["revisionId", "agencyId", "projectId", "successorRevisionId"],
+  "dataset_revision.expired.v1": ["revisionId", "agencyId", "projectId"],
+  "dataset_revision.deleted.v1": ["revisionId", "agencyId", "projectId"],
   "plan.created.v1": ["planId", "agencyId", "projectId", "bodyHash", "supersedesPlanId", "createdByMembershipId"],
   "plan.validation_required.v1": ["planId", "agencyId", "bodyHash"],
   "plan.validating.v1": ["planId", "agencyId", "bodyHash"],

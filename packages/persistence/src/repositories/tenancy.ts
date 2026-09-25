@@ -16,7 +16,6 @@ import {
   type AgencyRepository,
   type AssuranceProof,
   type AssuranceProofId,
-  type CorrelationId,
   type IdentityFacts,
   type IdentityRepository,
   type MembershipId,
@@ -86,15 +85,6 @@ export class PgIdentityRepository implements IdentityRepository {
     const p = r.rows[0];
     if (!p) return null;
     return { proofId: p.proof_id as AssuranceProofId, userId: p.user_id as UserId, kind: p.kind, method: p.method, issuedAt: instant(p.issued_at), expiresAt: instant(p.expires_at) };
-  }
-
-  async recordProof(proof: AssuranceProof, correlationId: CorrelationId): Promise<void> {
-    await execute(
-      this.db,
-      `INSERT INTO kauro.assurance_proofs (proof_id, user_id, kind, method, issued_at, expires_at, correlation_id, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $5)`,
-      [proof.proofId, proof.userId, proof.kind, proof.method, proof.issuedAt, proof.expiresAt, correlationId],
-    );
   }
 }
 

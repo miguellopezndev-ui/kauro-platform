@@ -270,6 +270,11 @@ CREATE POLICY command_journal_tenant ON kauro.command_journal FOR ALL TO kauro_a
     (agency_id IS NOT NULL AND agency_id = kauro.current_agency_id())
     OR (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text)
   );
+-- The control plane may observe the journal across tenants (a sweeper of RESERVED/UNCERTAIN entries), but only its safe
+-- technical metadata (08 "Role and capability model": the Technical Operator inspects safe technical metadata, customer-record
+-- access needs a case-specific grant): the column grant below leaves out the journaled response snapshot (it carries every
+-- DTO a command answered — client labels, project purposes, agency names), the client-chosen idempotency key, the request
+-- digest (a digest of a short label is guessable) and the acting person.
 CREATE POLICY command_journal_control ON kauro.command_journal FOR SELECT TO kauro_control USING (true);
 
 ALTER TABLE kauro.request_journal ENABLE ROW LEVEL SECURITY;
@@ -283,7 +288,8 @@ CREATE POLICY leases_control ON kauro.leases FOR ALL TO kauro_control USING (tru
 
 -- --- grants ------------------------------------------------------------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE ON kauro.command_journal TO kauro_app;
-GRANT SELECT ON kauro.command_journal TO kauro_control;
+GRANT SELECT (entry_id, environment, actor_kind, agency_id, operation, state, correlation_id, response_status, resource_kind, resource_id, reserved_at, committed_at, updated_at)
+  ON kauro.command_journal TO kauro_control;
 GRANT SELECT ON kauro.request_journal TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.request_journal TO kauro_control;
 GRANT SELECT, INSERT, UPDATE, DELETE ON kauro.leases TO kauro_control;

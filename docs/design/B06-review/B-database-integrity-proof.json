@@ -1,0 +1,172 @@
+[
+  {
+    "id": "R3",
+    "what": "event identity: binding trigger + tenant-scoped unique + agency in require_event_for_version + control read-only on events, all reverted",
+    "revert": [
+      { "file": "0005_events_outbox_inbox.sql", "from": "  CONSTRAINT domain_events_one_per_aggregate_version UNIQUE NULLS NOT DISTINCT (agency_id, aggregate_kind, aggregate_id, aggregate_version),", "to": "  UNIQUE (aggregate_kind, aggregate_id, aggregate_version)," },
+      { "file": "0005_events_outbox_inbox.sql", "from": "CREATE TRIGGER domain_events_bind_aggregate BEFORE INSERT ON kauro.domain_events\n  FOR EACH ROW EXECUTE FUNCTION kauro.domain_events_bind_aggregate();", "to": "" },
+      { "file": "0005_events_outbox_inbox.sql", "from": "CREATE POLICY domain_events_control_read ON kauro.domain_events FOR SELECT TO kauro_control USING (true);", "to": "CREATE POLICY domain_events_control ON kauro.domain_events FOR ALL TO kauro_control USING (true) WITH CHECK (true);" },
+      { "file": "0005_events_outbox_inbox.sql", "from": "GRANT SELECT ON kauro.domain_events TO kauro_control;\nGRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app;", "to": "GRANT SELECT, INSERT ON kauro.domain_events TO kauro_control;\nGRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app, kauro_control;" },
+      { "file": "0001_schema_roles_helpers.sql", "from": "WHERE e.agency_id = agg_agency AND e.aggregate_kind = TG_ARGV[0]", "to": "WHERE e.aggregate_kind = TG_ARGV[0]" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R3:" },
+      { "suite": "api", "pattern": "^R3:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R3-bind",
+    "what": "event identity: only the aggregate binding trigger reverted (tenant-scoped unique kept)",
+    "revert": [
+      { "file": "0005_events_outbox_inbox.sql", "from": "CREATE TRIGGER domain_events_bind_aggregate BEFORE INSERT ON kauro.domain_events\n  FOR EACH ROW EXECUTE FUNCTION kauro.domain_events_bind_aggregate();", "to": "" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R3:" },
+      { "suite": "api", "pattern": "^R3:" }
+    ]
+  },
+  {
+    "id": "R4",
+    "what": "control-plane column grant on command_journal reverted to a table-wide SELECT",
+    "revert": [
+      { "file": "0006_journals_leases.sql", "from": "GRANT SELECT (entry_id, environment, actor_kind, agency_id, operation, state, correlation_id, response_status, resource_kind, resource_id, reserved_at, committed_at, updated_at)\n  ON kauro.command_journal TO kauro_control;", "to": "GRANT SELECT ON kauro.command_journal TO kauro_control;" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R4:" },
+      { "suite": "api", "pattern": "^R4:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R5-membership",
+    "what": "approval actor/membership composite key reverted to (agency_id, actor_membership_id)",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "  CONSTRAINT approvals_actor_membership_fk\n    FOREIGN KEY (agency_id, actor_membership_id, actor_id) REFERENCES kauro.memberships (agency_id, membership_id, user_id),", "to": "  FOREIGN KEY (agency_id, actor_membership_id) REFERENCES kauro.memberships (agency_id, membership_id)," }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R5/R13:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R5-proof",
+    "what": "approval actor/proof composite key reverted to the single-column proof reference",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "  CONSTRAINT approvals_actor_proof_fk\n    FOREIGN KEY (actor_id, assurance_proof_ref) REFERENCES kauro.assurance_proofs (user_id, proof_id),", "to": "  FOREIGN KEY (assurance_proof_ref) REFERENCES kauro.assurance_proofs (proof_id)," }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R5/R13:" }
+    ]
+  },
+  {
+    "id": "R6",
+    "what": "inbox ingress policy and grant reverted to FOR ALL / SELECT, INSERT, UPDATE for kauro_app",
+    "revert": [
+      { "file": "0005_events_outbox_inbox.sql", "from": "CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR INSERT TO kauro_app\n  WITH CHECK (state = 'RECEIVED' AND applied_at IS NULL AND result_event_id IS NULL);", "to": "CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR ALL TO kauro_app USING (true) WITH CHECK (true);" },
+      { "file": "0005_events_outbox_inbox.sql", "from": "GRANT INSERT ON kauro.inbox_records TO kauro_app;\nGRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_control;", "to": "GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_app, kauro_control;" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R6:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R10",
+    "what": "active_owner_count guard trigger removed",
+    "revert": [
+      { "file": "0002_identity_agencies_memberships.sql", "from": "CREATE TRIGGER agencies_owner_count_guard BEFORE INSERT OR UPDATE ON kauro.agencies\n  FOR EACH ROW EXECUTE FUNCTION kauro.guard_active_owner_count();", "to": "" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R10:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R11",
+    "what": "plans_approval_fk reverted to (agency_id, approval_id)",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "FOREIGN KEY (agency_id, approval_id, plan_id) REFERENCES kauro.approvals (agency_id, approval_id, plan_id) DEFERRABLE INITIALLY DEFERRED;", "to": "FOREIGN KEY (agency_id, approval_id) REFERENCES kauro.approvals (agency_id, approval_id) DEFERRABLE INITIALLY DEFERRED;" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R11:" },
+      { "suite": "api", "pattern": "^R11:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R14",
+    "what": "assurance_proofs self policy and grant for kauro_app reverted to FOR ALL / SELECT, INSERT",
+    "revert": [
+      { "file": "0002_identity_agencies_memberships.sql", "from": "CREATE POLICY assurance_proofs_self_read ON kauro.assurance_proofs FOR SELECT TO kauro_app\n  USING (user_id = kauro.current_user_id());", "to": "CREATE POLICY assurance_proofs_self ON kauro.assurance_proofs FOR ALL TO kauro_app\n  USING (user_id = kauro.current_user_id()) WITH CHECK (user_id = kauro.current_user_id());" },
+      { "file": "0002_identity_agencies_memberships.sql", "from": "GRANT SELECT ON kauro.assurance_proofs TO kauro_app;", "to": "GRANT SELECT, INSERT ON kauro.assurance_proofs TO kauro_app;" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R14: step-up" },
+      { "suite": "api", "pattern": "^R14/R30:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R20",
+    "what": "every BEFORE INSERT initial-state trigger removed",
+    "revert": [
+      { "file": "0002_identity_agencies_memberships.sql", "from": "CREATE TRIGGER agencies_initial_state BEFORE INSERT ON kauro.agencies\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Agency');", "to": "" },
+      { "file": "0002_identity_agencies_memberships.sql", "from": "CREATE TRIGGER memberships_initial_state BEFORE INSERT ON kauro.memberships\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_membership_initial_state();", "to": "" },
+      { "file": "0003_capabilities_clients_projects.sql", "from": "CREATE TRIGGER capabilities_initial_state BEFORE INSERT ON kauro.capabilities\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Capability');", "to": "" },
+      { "file": "0003_capabilities_clients_projects.sql", "from": "CREATE TRIGGER end_clients_initial_state BEFORE INSERT ON kauro.end_clients\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('EndClient');", "to": "" },
+      { "file": "0003_capabilities_clients_projects.sql", "from": "CREATE TRIGGER projects_initial_state BEFORE INSERT ON kauro.projects\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Project');", "to": "" },
+      { "file": "0003_capabilities_clients_projects.sql", "from": "CREATE TRIGGER dataset_revisions_initial_state BEFORE INSERT ON kauro.dataset_revisions\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('DatasetRevision');", "to": "" },
+      { "file": "0004_plans_receipts_approvals.sql", "from": "CREATE TRIGGER plans_initial_state BEFORE INSERT ON kauro.plans\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Plan');", "to": "" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R20: every aggregate" },
+      { "suite": "persist", "pattern": "^R20: the founding" },
+      { "suite": "migtest", "pattern": "^R20:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R20-membership",
+    "what": "only the Membership birth guard (founding-owner exemption) removed",
+    "revert": [
+      { "file": "0002_identity_agencies_memberships.sql", "from": "CREATE TRIGGER memberships_initial_state BEFORE INSERT ON kauro.memberships\n  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_membership_initial_state();", "to": "" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R20: the founding" }
+    ]
+  },
+  {
+    "id": "R30-insert",
+    "what": "validation_receipts policy and grant for kauro_app reverted to FOR ALL / SELECT, INSERT",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "CREATE POLICY validation_receipts_tenant_read ON kauro.validation_receipts FOR SELECT TO kauro_app\n  USING (agency_id = kauro.current_agency_id());", "to": "CREATE POLICY validation_receipts_tenant ON kauro.validation_receipts FOR ALL TO kauro_app\n  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());" },
+      { "file": "0004_plans_receipts_approvals.sql", "from": "GRANT SELECT ON kauro.validation_receipts TO kauro_app;", "to": "GRANT SELECT, INSERT ON kauro.validation_receipts TO kauro_app;" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R30:" },
+      { "suite": "api", "pattern": "^R14/R30:" }
+    ],
+    "restoreCheck": true
+  },
+  {
+    "id": "R30-fk",
+    "what": "plans_receipt_fk reverted to (agency_id, validation_receipt_hash)",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "  FOREIGN KEY (agency_id, plan_id, validation_receipt_hash, body_hash, revision_hash, target_contract_hash)\n  REFERENCES kauro.validation_receipts (agency_id, plan_id, receipt_hash, plan_hash, revision_hash, target_contract_hash);", "to": "  FOREIGN KEY (agency_id, validation_receipt_hash) REFERENCES kauro.validation_receipts (agency_id, receipt_hash);" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R30:" }
+    ]
+  },
+  {
+    "id": "R30-valid",
+    "what": "the VALID-receipt binding trigger on plans removed",
+    "revert": [
+      { "file": "0004_plans_receipts_approvals.sql", "from": "CREATE TRIGGER plans_bind_valid_receipt BEFORE UPDATE OF validation_receipt_hash ON kauro.plans\n  FOR EACH ROW EXECUTE FUNCTION kauro.plans_bind_valid_receipt();", "to": "" }
+    ],
+    "tests": [
+      { "suite": "persist", "pattern": "^R30:" }
+    ]
+  }
+]

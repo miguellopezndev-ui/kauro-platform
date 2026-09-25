@@ -36,7 +36,12 @@ CREATE TRIGGER capabilities_immutable BEFORE UPDATE ON kauro.capabilities
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('capability_id,kind,mode,created_at');
 CREATE TRIGGER capabilities_transition BEFORE UPDATE OF state ON kauro.capabilities
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('Capability');
+-- D-CAP-2: a capability row is born DESIGN (registry Capability initial state) under any revision label; an offered state is
+-- reached only through the listed edges, each recording its gate's evidence
+CREATE TRIGGER capabilities_initial_state BEFORE INSERT ON kauro.capabilities
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Capability');
 
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Capability', 'DESIGN');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Capability', 'DESIGN', 'IMPLEMENTED_UNACCEPTED'),
   ('Capability', 'IMPLEMENTED_UNACCEPTED', 'QUALIFIED_INTERNAL'),
@@ -88,8 +93,12 @@ CREATE TRIGGER end_clients_immutable BEFORE UPDATE ON kauro.end_clients
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('client_id,agency_id,processing_authority_ref,created_by_membership_id,created_at');
 CREATE TRIGGER end_clients_transition BEFORE UPDATE OF state ON kauro.end_clients
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('EndClient');
+CREATE TRIGGER end_clients_initial_state BEFORE INSERT ON kauro.end_clients
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('EndClient');
 
--- D-AGG-2: EndClient has no registry machine; ARCHIVED is terminal in this edition (an archived workspace is not revived).
+-- D-AGG-2: EndClient has no registry machine (platform machine, initial ACTIVE); ARCHIVED is terminal in this edition (an
+-- archived workspace is not revived, and none is born archived).
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('EndClient', 'ACTIVE');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES ('EndClient', 'ACTIVE', 'ARCHIVED');
 
 -- --- projects -------------------------------------------------------------------------------------------------------------------
@@ -121,8 +130,12 @@ CREATE TRIGGER projects_immutable BEFORE UPDATE ON kauro.projects
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('project_id,agency_id,client_id,mode,capability_id,capability_version,created_by_membership_id,created_at');
 CREATE TRIGGER projects_transition BEFORE UPDATE OF state ON kauro.projects
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('Project');
+CREATE TRIGGER projects_initial_state BEFORE INSERT ON kauro.projects
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Project');
 
--- D-AGG-1: Project states OPEN, CLOSED, DELETION_REQUESTED, DELETED (closure distinctions live on the delivery aggregates).
+-- D-AGG-1: Project states OPEN, CLOSED, DELETION_REQUESTED, DELETED (closure distinctions live on the delivery aggregates);
+-- platform machine, initial OPEN.
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Project', 'OPEN');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Project', 'OPEN', 'CLOSED'),
   ('Project', 'OPEN', 'DELETION_REQUESTED'),
@@ -159,7 +172,10 @@ CREATE TRIGGER dataset_revisions_immutable BEFORE UPDATE ON kauro.dataset_revisi
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('revision_id,agency_id,project_id,supersedes_revision_id,created_at');
 CREATE TRIGGER dataset_revisions_transition BEFORE UPDATE OF state ON kauro.dataset_revisions
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('DatasetRevision');
+CREATE TRIGGER dataset_revisions_initial_state BEFORE INSERT ON kauro.dataset_revisions
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('DatasetRevision');
 
+INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('DatasetRevision', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('DatasetRevision', 'DRAFT', 'UPLOADING'),
   ('DatasetRevision', 'UPLOADING', 'INSPECTING'),
