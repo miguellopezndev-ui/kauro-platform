@@ -199,8 +199,17 @@ CREATE POLICY outbox_records_control ON kauro.outbox_records FOR ALL TO kauro_co
 
 ALTER TABLE kauro.inbox_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.inbox_records FORCE ROW LEVEL SECURITY;
--- provider ingress (api webhook route) and the control plane both operate on inbox rows; the rows carry no tenant data
-CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR ALL TO kauro_app USING (true) WITH CHECK (true);
+-- Provider ingress (an api webhook route: 10 "POST /payments/webhooks/{provider} ... durable inbox handling") records the
+-- authenticated event reference once, as RECEIVED, and learns only whether it was new (15 "Webhooks and reconciliation":
+-- "stores a minimized immutable event reference in the inbox and deduplicates by provider, environment and event ID" — an
+-- INSERT ... ON CONFLICT DO NOTHING without a conflict target, since naming an arbiter needs a read of the table; the fresh
+-- inbox id and the inbox identity are its only unique keys). Reading, processing and settling inbox rows is the consumer's
+-- work (07 "consumers deduplicate by their own durable inbox identity and verify state before an effect"), i.e. the control
+-- plane. The request handlers therefore can neither read nor rewrite any inbox row: under no tenant context can one agency's
+-- handler see which provider events exist or suppress another's before its consumer runs (08 trust boundary "provider
+-- webhook to inbox").
+CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR INSERT TO kauro_app
+  WITH CHECK (state = 'RECEIVED' AND applied_at IS NULL AND result_event_id IS NULL);
 CREATE POLICY inbox_records_control ON kauro.inbox_records FOR ALL TO kauro_control USING (true) WITH CHECK (true);
 
 -- --- grants -----------------------------------------------------------------------------------------------------------------------
@@ -210,4 +219,5 @@ GRANT SELECT ON kauro.domain_events TO kauro_control;
 GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app;
 GRANT SELECT, INSERT ON kauro.outbox_records TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.outbox_records TO kauro_control;
-GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_app, kauro_control;
+GRANT INSERT ON kauro.inbox_records TO kauro_app;
+GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_control;

@@ -42,6 +42,24 @@ test("R3: agency A's runtime role cannot occupy the next version of B's client; 
   assert.equal(w.internalErrors.length, 0);
 });
 
+test("R4: a client created through CMD009 journals its label; the control pool reads the journal's metadata of that entry but never its response", async () => {
+  const key = freshKey("r4-confidential");
+  const created = completed<EndClientView>(await call(w, { url: routes.createClient(w.A.agencyId), token: w.operator.token, agency: null, key, body: { displayName: "Confidential End Client Label", processingAuthorityRef: w.authorityA } }), 201);
+  const c = await w.h.controlPool.raw.connect();
+  try {
+    const meta = await c.query("SELECT state, operation, response_status, resource_kind FROM kauro.command_journal WHERE resource_id = $1", [created.data.clientId]);
+    assert.deepEqual(meta.rows, [{ state: "COMMITTED", operation: "CMD009", response_status: 201, resource_kind: "end_client" }]);
+    // the refuter's F3
+    await assert.rejects(c.query("SELECT response_body->>'displayName' AS label FROM kauro.command_journal WHERE response_body->>'displayName' IS NOT NULL"), (e: unknown) => sqlStateOf(e) === "42501");
+    await assert.rejects(c.query("SELECT display_name FROM kauro.end_clients"), (e: unknown) => sqlStateOf(e) === "42501");
+  } finally {
+    c.release();
+  }
+  // the label is still what the replay answers: the journal keeps the response for its own identity
+  const replay = await call(w, { url: routes.createClient(w.A.agencyId), token: w.operator.token, agency: null, key, body: { displayName: "Confidential End Client Label", processingAuthorityRef: w.authorityA } });
+  assert.equal(completed<EndClientView>(replay, 201).data.displayName, "Confidential End Client Label");
+});
+
 test("R11: plan X approved through CMD025; plan Y cannot be pointed at X's approval, and CMD025 then approves Y with an approval of its own", async () => {
   const x = await w.approvable(w.A, projectId, "r11-route-x");
   const y = await w.approvable(w.A, projectId, "r11-route-y");

@@ -118,6 +118,30 @@ test("R3: an event names an aggregate of its own agency — agency A's runtime r
   assert.deepEqual(stateB.rows[0], { state: "ARCHIVED", version: "2" });
 });
 
+test("R4: the control plane reads the command journal's safe technical metadata across tenants, never the journaled response, the key, the digest or the actor", async () => {
+  const entryId = ids.next();
+  const resourceId = ids.next();
+  await tx(app, ctx(A, alice), async (c) => {
+    await c.query(
+      `INSERT INTO kauro.command_journal (entry_id, environment, actor_kind, actor_id, agency_id, operation, idempotency_key, request_digest, correlation_id, reserved_at, updated_at)
+       VALUES ($1, 'LOCAL', 'USER', $2, $3, 'CMD009', 'k_r4_confidential_01', $4, $5, now(), now())`,
+      [entryId, alice, A.agencyId, sha("request"), ids.next()],
+    );
+    await c.query(
+      "UPDATE kauro.command_journal SET state = 'COMMITTED', response_status = 201, response_body = $2::jsonb, resource_kind = 'end_client', resource_id = $3, committed_at = now() WHERE entry_id = $1",
+      [entryId, JSON.stringify({ displayName: "Confidential End Client Label" }), resourceId],
+    );
+  });
+  const meta = await control.query("SELECT entry_id, state, operation, agency_id, response_status, resource_kind, resource_id FROM kauro.command_journal WHERE entry_id = $1", [entryId]);
+  assert.deepEqual(meta.rows, [{ entry_id: entryId, state: "COMMITTED", operation: "CMD009", agency_id: A.agencyId, response_status: 201, resource_kind: "end_client", resource_id: resourceId }]);
+  for (const column of ["response_body", "idempotency_key", "request_digest", "actor_id"]) {
+    await assert.rejects(control.query(`SELECT ${column} FROM kauro.command_journal WHERE entry_id = $1`, [entryId]), refusedWith("42501"), column);
+  }
+  // the refuter's F3 query
+  await assert.rejects(control.query("SELECT response_body->>'displayName' AS label FROM kauro.command_journal WHERE response_body->>'displayName' IS NOT NULL"), refusedWith("42501"));
+  await assert.rejects(control.query("SELECT * FROM kauro.command_journal"), refusedWith("42501"));
+});
+
 test("R5/R13: an approval binds its actor, the actor's own membership in this agency and a step-up proof of that same actor", async () => {
   const p = await plan(app, A, projectA, "VALIDATED", "r5", validator);
   const approverProof = await h.recordStepUp(approver);
@@ -163,6 +187,33 @@ test("R11: a plan names only its own approval — pointing plan Y at plan X's ap
     { plan_id: x.planId, state: "APPROVED", version: "5", approval_id: approvalOfX },
     { plan_id: y.planId, state: "VALIDATED", version: "4", approval_id: null },
   ]);
+});
+
+test("R6: the request handlers record provider events into the inbox once and can neither read nor rewrite any inbox row; the control plane consumes them", async () => {
+  const inboxId = ids.next();
+  // ingress dedupe without a conflict target: the only unique keys are the fresh inbox id and the inbox identity, and naming
+  // an arbiter would need a read of the table that the ingress role does not have
+  const receive = (c: Client, id: string, state = "RECEIVED") =>
+    c.query(
+      `INSERT INTO kauro.inbox_records (inbox_id, provider, environment, external_event_id, body_hash, state, received_at, updated_at)
+       VALUES ($1, 'hubspot', 'LIVE', 'portal-123:evt-1', $2, $3, now(), now()) ON CONFLICT DO NOTHING`,
+      [id, sha("body"), state],
+    );
+  const first = await tx(app, ctx(A, alice), (c) => receive(c, inboxId));
+  assert.equal(first.rowCount, 1);
+  const duplicate = await tx(app, ctx(B, bob), (c) => receive(c, ids.next()));
+  assert.equal(duplicate.rowCount, 0, "a duplicate delivery is absorbed by the inbox identity");
+  // the refuter's F5: under another tenant's context the handler reads the row and rewrites its state
+  await assert.rejects(tx(app, ctx(B, bob), (c) => c.query("SELECT external_event_id FROM kauro.inbox_records WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
+  await assert.rejects(tx(app, ctx(B, bob), (c) => c.query("UPDATE kauro.inbox_records SET state = 'IGNORED' WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
+  await assert.rejects(tx(app, ctx(A, alice), (c) => c.query("UPDATE kauro.inbox_records SET state = 'IGNORED' WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
+  // ingress records a receipt, never an outcome
+  await assert.rejects(tx(app, ctx(A, alice), (c) => receive(c, ids.next(), "IGNORED")), refusedWith("42501"));
+  // the consumer (control plane) reads and settles it
+  const seen = await control.query("SELECT state FROM kauro.inbox_records WHERE inbox_id = $1", [inboxId]);
+  assert.deepEqual(seen.rows, [{ state: "RECEIVED" }]);
+  const processing = await control.query("UPDATE kauro.inbox_records SET state = 'PROCESSING' WHERE inbox_id = $1", [inboxId]);
+  assert.equal(processing.rowCount, 1);
 });
 
 test("R10: active_owner_count is written only by the membership trigger — the runtime role can neither raise it by hand nor forge it at birth, so the last real owner stays protected", async () => {
