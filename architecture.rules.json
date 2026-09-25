@@ -1,5 +1,5 @@
 {
-  "$comment": "07_DOMAIN_AND_STATE_MACHINES 'Platform topology': dependencies flow from contracts to domain ports, application orchestration and concrete adapters; UI consumes HTTP DTOs; the cores do not depend on persistence, payments, framework or UI. Every workspace package must be assigned a layer here; tools/architecture-gate.mjs enforces the allowed edges, forbids deep/private/sibling imports, cycles, and server-only code or credentials in client bundles.",
+  "$comment": "07_DOMAIN_AND_STATE_MACHINES 'Platform topology': dependencies flow from contracts to domain ports, application orchestration and concrete adapters; UI consumes HTTP DTOs; the cores do not depend on persistence, payments, framework or UI. Every workspace package must be assigned a layer here; tools/architecture-gate.mjs enforces the allowed edges, forbids deep/private/sibling imports, cycles, and server-only code or credentials in client bundles. A test-only subpath (testOnlySubpaths) may be imported only from a package's test/ directory, never from production source, so no deployment import graph carries test code; a workspace dependency a package declares but never imports is refused, because an unused edge still ships and installs with the package.",
   "layers": {
     "@kauro/contracts": "contracts",
     "@kauro/domain": "domain",
@@ -28,7 +28,8 @@
     "ui": ["contracts"],
     "web": ["contracts", "ui"]
   },
-  "publicSubpaths": ["/canonical", "/digest", "/registry", "/generated/types", "/schemas.json", "/package.json"],
+  "publicSubpaths": ["/canonical", "/digest", "/registry", "/generated/types", "/schemas.json", "/package.json", "/testing"],
+  "testOnlySubpaths": ["/testing"],
   "clientBundles": ["apps/web/", "packages/ui/"],
   "serverOnlyPackages": ["pg", "fastify", "@kauro/persistence", "@kauro/data-plane", "@kauro/application", "@kauro/domain", "@kauro/authorization"],
   "credentialPatterns": ["DATABASE_URL", "PAYPAL_CLIENT_SECRET", "SERVICE_ACCOUNT_KEY", "PRIVATE_KEY", "process\\.env\\.[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|KEY)"]

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="a valid tree passes: application uses the contracts public port, api uses application" time="0.041813" classname="test" file="/home/miguel/kp-b06-verify/tools/test/architecture-gate.test.mjs"/>
+	<testcase name="forbidden edges are rejected with their rule, and the valid port in the same tree still passes on its own" time="0.037582" classname="test" file="/home/miguel/kp-b06-verify/tools/test/architecture-gate.test.mjs"/>
+	<testcase name="a test-only subpath is importable from a test file only, never from production source; a declared workspace dependency nothing imports is refused" time="0.065974" classname="test" file="/home/miguel/kp-b06-verify/tools/test/architecture-gate.test.mjs"/>
+	<testcase name="undeclared dependencies and cycles are rejected" time="0.031183" classname="test" file="/home/miguel/kp-b06-verify/tools/test/architecture-gate.test.mjs"/>
+	<testcase name="N12: one PARTIAL criterion — exactly the reviewed cases are PARTIAL, each naming its demonstrated half, what B06 does not demonstrate and the package that owns it; no EXECUTED_LOCAL row rests on a SIMULATED clause; an edition constant a row relies on is NOT_APPLICABLE with its reason" time="0.002111" classname="test" file="/home/miguel/kp-b06-verify/tools/test/case-map.test.mjs"/>
+	<testcase name="N18: every closure gate of B06 has its record — its owner and package, every field of manual 21 for a gate of B06 with each gate case outside B06 and the package the registry routes it to, and for a gate another package owns what B06 contributes to each of its cases" time="0.001935" classname="test" file="/home/miguel/kp-b06-verify/tools/test/case-map.test.mjs"/>
+	<testcase name="N18: every registry verification clause of B06's command cases is quoted and answered — NOT_APPLICABLE with the package whose domain it is, or the evidence that answers it" time="0.002821" classname="test" file="/home/miguel/kp-b06-verify/tools/test/case-map.test.mjs"/>
+	<testcase name="the case map reads as exactly the 29 cases of B06 (registry program.json), once each, every row citing at least one test" time="0.001665" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="every test the case map cites exists under exactly that name in the file it names" time="0.003025" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="a citation continues the file of the previous cell, and a title before any file is refused" time="0.000517" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="a node:test JUnit report reads as its cases with their outcomes, names unescaped as the reporter escapes them; a compiled file maps to its source" time="0.000682" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="a case is proven only when every cited test PASSED: a failed, skipped or missing citation leaves it unproven, and two tests of one file sharing a name are refused" time="0.000384" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="the suites the tool runs are the packages' own test scripts, and canonical JSON is key-order independent" time="0.001019" classname="test" file="/home/miguel/kp-b06-verify/tools/test/evidence.test.mjs"/>
+	<testcase name="the committed matrix is the generated one and every source check passes: every edge of the 12 registry and 2 platform machines is owned, every served command has its catalogue and its applicability row" time="0.014634" classname="test" file="/home/miguel/kp-b06-verify/tools/test/matrix.test.mjs"/>
+	<testcase name="an unowned edge, an owner of an edge the machine does not list, an unknown command, an unregistered event and a served edge naming an event its handler never publishes fail the check" time="0.002073" classname="test" file="/home/miguel/kp-b06-verify/tools/test/matrix.test.mjs"/>
+	<testcase name="an applicability row citing a test that does not exist, or answering a mutation with neither tests nor a reason, fails the check" time="0.001070" classname="test" file="/home/miguel/kp-b06-verify/tools/test/matrix.test.mjs"/>
+	<testcase name="the committed document is the generated one, byte for byte, and matches every registered route of the composed api" time="0.181108" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="an undocumented registered route fails the check" time="0.009920" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="a documented route that is not registered fails the check" time="0.008852" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="a missing or duplicate operationId fails the check" time="0.016567" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="a response schema that differs from the one the route validates its replies with fails the check" time="0.025403" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="a DTO that exposes a forbidden field fails the check" time="0.011286" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="generation refuses registry prose that carries the pre-A2 brand (amendment A2)" time="0.002416" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<testcase name="a registered route without a declared response contract and a stale document fail the check" time="0.010145" classname="test" file="/home/miguel/kp-b06-verify/tools/test/openapi.test.mjs"/>
+	<!-- tests 24 -->
+	<!-- suites 0 -->
+	<!-- pass 24 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 378.147854 -->
+</testsuites>
