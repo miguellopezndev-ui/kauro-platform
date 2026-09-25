@@ -63,6 +63,7 @@ function packageOfSpecifier(spec, pkgs) {
 const pkgs = workspacePackages(argvRoot);
 const violations = [];
 const edges = new Map(); // pkg -> Set(pkg) for cycle detection
+const testOnlySubpaths = rules.testOnlySubpaths ?? [];
 
 for (const pkg of pkgs) {
   if (!pkg.layer) {
@@ -70,8 +71,11 @@ for (const pkg of pkgs) {
     continue;
   }
   const allowed = new Set(rules.allowedDependencies[pkg.layer] ?? []);
+  const imported = new Set(); // workspace packages this package's files import (source and tests)
   for (const file of walk(pkg.dir)) {
     const rel = relative(argvRoot, file).split(sep).join("/");
+    const inPackage = relative(pkg.dir, file).split(sep).join("/");
+    const isTestFile = inPackage.startsWith("test/");
     const isClientBundle = rules.clientBundles.some((prefix) => rel.startsWith(prefix));
     for (const { spec, line } of specifiersOf(file)) {
       if (spec.startsWith("node:")) {
@@ -90,10 +94,14 @@ for (const pkg of pkgs) {
       if (!ref) continue;
       if (ref.pkg) {
         edges.set(pkg.name, (edges.get(pkg.name) ?? new Set()).add(ref.pkg.name));
+        imported.add(ref.pkg.name);
         if (!(ref.name in pkg.deps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
         if (!allowed.has(ref.pkg.layer)) violations.push({ file: rel, line, rule: "layer", text: `${pkg.layer} package ${pkg.name} may not import ${ref.pkg.layer} package ${ref.name}` });
         if (ref.sub && !rules.publicSubpaths.some((s) => ref.sub === s || ref.sub.startsWith(s + "/"))) {
           violations.push({ file: rel, line, rule: "deep-import", text: `deep import into ${ref.name}${ref.sub}; only the public entry points are allowed` });
+        }
+        if (!isTestFile && testOnlySubpaths.some((s) => ref.sub === s || ref.sub.startsWith(s + "/"))) {
+          violations.push({ file: rel, line, rule: "test-only", text: `production source imports the test-only subpath ${ref.name}${ref.sub}; only files under test/ may` });
         }
         if (ref.sub.startsWith("/src/") || ref.sub.startsWith("/dist/")) violations.push({ file: rel, line, rule: "private", text: `private module import ${spec}` });
       } else if (isClientBundle && rules.serverOnlyPackages.includes(ref.name)) {
@@ -107,6 +115,12 @@ for (const pkg of pkgs) {
         const idx = text.search(re);
         if (idx >= 0) violations.push({ file: rel, line: text.slice(0, idx).split("\n").length, rule: "credential", text: `credential-like identifier ${pattern} in a client bundle` });
       }
+    }
+  }
+  // a declared workspace dependency that no file of the package imports is an edge that still ships and installs
+  for (const dep of Object.keys(pkg.deps)) {
+    if (pkgs.some((p) => p.name === dep) && !imported.has(dep)) {
+      violations.push({ file: relative(argvRoot, join(pkg.dir, "package.json")).split(sep).join("/"), line: 1, rule: "unused", text: `${dep} is declared in ${pkg.name}/package.json dependencies but never imported` });
     }
   }
 }

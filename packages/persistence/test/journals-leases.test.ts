@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { commandRequestDigest, type AgencyId, type IdempotencyIdentity, type UserId } from "@kauro/domain";
-import { PgCommandJournal, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/index.js";
+import { PgCommandJournal } from "../src/index.js";
+import { startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, clock, constraintOf, ids, person, sha, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;

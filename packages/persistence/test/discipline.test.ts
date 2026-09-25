@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import type { AgencyId, MembershipId, NewPlanRevision, PlanBody, PlanId, ProjectId } from "@kauro/domain";
-import { ConstraintViolation, PgPlanRepository, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/index.js";
+import { ConstraintViolation, PgPlanRepository } from "../src/index.js";
+import { startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, clock, constraintOf, endClient, event, ids, offeredCapability, person, plan, processingAuthority, project, sha, sqlState, stepUpProof, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;

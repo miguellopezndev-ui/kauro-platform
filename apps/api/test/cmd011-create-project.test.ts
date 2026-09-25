@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ArchiveClientView, EndClientView, ProjectView } from "@kauro/application";
 import type { ClientId } from "@kauro/domain";
-import type { AgencyFixture } from "@kauro/persistence";
+import type { AgencyFixture } from "@kauro/persistence/testing";
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Reply, type World } from "./support.js";
 import { controlWriter, reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 

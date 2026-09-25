@@ -8,7 +8,7 @@
  * silently. No sleep synchronizes anything.
  */
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
-import { waitForLockWait, type AgencyFixture } from "@kauro/persistence";
+import { waitForLockWait, type AgencyFixture } from "@kauro/persistence/testing";
 import type { Hold, Reply, World } from "./support.js";
 
 export interface HeldTransaction {

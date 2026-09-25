@@ -17,7 +17,7 @@ import type { PoolClient } from "pg";
 import type { AgencyView, ApprovePlanView, EndClientView, MembershipView, WithdrawApprovalView } from "@kauro/application";
 import type { Clock, ProjectId } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
-import { waitForLockWait } from "@kauro/persistence";
+import { waitForLockWait } from "@kauro/persistence/testing";
 import {
   approvalBodyOf,
   approveThroughRoute,

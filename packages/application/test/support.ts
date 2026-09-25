@@ -254,7 +254,7 @@ export function world(): World {
   };
 }
 
-export function envelope<Body>(spec: CommandSpec<Body>, s: AuthenticatedSubject, input: { key: string; agencyId?: AgencyId; path?: Record<string, string>; body: Body }): CommandEnvelope<Body> {
+export function envelope<Body>(spec: CommandSpec<Body>, s: AuthenticatedSubject, input: { key: string; agencyId?: AgencyId; path?: Record<string, string>; body: Body; clientAddressHash?: Sha256Hex }): CommandEnvelope<Body> {
   const agencyId = spec.scope === "NONE" ? null : spec.scope === "AGENCY_PATH" ? ((input.path?.["agencyId"] as AgencyId | undefined) ?? null) : (input.agencyId ?? null);
   return {
     command: spec.id,
@@ -264,6 +264,7 @@ export function envelope<Body>(spec: CommandSpec<Body>, s: AuthenticatedSubject,
     userId: s.identity.userId,
     subject: s,
     agencyId,
+    clientAddressHash: input.clientAddressHash ?? null,
     path: input.path ?? {},
     body: input.body,
     receivedAt: clock.now(),

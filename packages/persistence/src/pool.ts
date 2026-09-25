@@ -11,6 +11,11 @@
  * two command roles, no crossing). The two evidence producers — kauro_assurance (the step-up verifier) and kauro_validator
  * (the independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
  * login that belongs to two groups is refused, so a request handler can never also be the producer of the evidence it checks.
+ *
+ * An error of an idle pooled connection (server restart, administrator termination, network loss) is not swallowed (review
+ * finding R38; 14 "Monitoring and service health": a database outage is visible without exposing credentials): pg drops the
+ * connection, and the pool hands a safe classification — pool name, error class, SQLSTATE or errno code, never the message
+ * or a connection parameter — to the configured sink, by default one line on stderr.
  */
 import { Pool, type PoolClient } from "pg";
 
@@ -34,6 +39,40 @@ export interface PoolConfig {
   readonly idleTimeoutMs?: number;
   /** Time to wait for a free connection before failing (the caller answers CAPACITY_UNAVAILABLE). Default 5 s. */
   readonly connectionTimeoutMs?: number;
+  /** Receives the safe classification of every idle-connection error; default: one line on stderr naming only the pool, the class and the code. */
+  readonly onError?: PoolErrorSink;
+}
+
+/** A failure described by safe tokens only: its class and, when it has one, its SQLSTATE or errno code; never its message. */
+export interface SafeErrorClassification {
+  readonly errorClass: string;
+  readonly code?: string;
+}
+
+/** An error of an idle pooled connection, safe to log: the pool's application name and the classification. */
+export interface PoolErrorEvent extends SafeErrorClassification {
+  readonly pool: string;
+}
+
+export type PoolErrorSink = (event: PoolErrorEvent) => void;
+
+const SAFE_CODE = /^(?:[0-9A-Z]{5}|E[A-Z0-9_]{2,40})$/;
+
+/**
+ * The safe classification of any thrown value: the constructor name (DatabaseError, Error, AggregateError...) and the code
+ * when it is a SQLSTATE (five characters) or a Node errno token (ECONNREFUSED, ETIMEDOUT...). The message is never read,
+ * because it can carry a host, a user name, a value or SQL text.
+ */
+export function classifyError(e: unknown): SafeErrorClassification {
+  if (typeof e !== "object" || e === null) return { errorClass: typeof e };
+  const ctor = (e as { constructor?: { name?: unknown } }).constructor?.name;
+  const errorClass = typeof ctor === "string" && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(ctor) ? ctor : "Object";
+  const code = (e as { code?: unknown }).code;
+  return typeof code === "string" && SAFE_CODE.test(code) ? { errorClass, code } : { errorClass };
+}
+
+function defaultPoolErrorSink(event: PoolErrorEvent): void {
+  process.stderr.write(`kauro-db pool=${event.pool} idle connection error class=${event.errorClass}${event.code === undefined ? "" : ` code=${event.code}`}\n`);
 }
 
 export interface VerifiedConnection {
@@ -94,8 +133,10 @@ export class KauroPool {
       allowExitOnIdle: true,
       options: `-c idle_in_transaction_session_timeout=${idleTx}`,
     });
-    // an idle client that errors (server restart, network) is dropped by pg; the error must not crash the process
-    this.#pool.on("error", () => undefined);
+    // an idle client that errors (server restart, network) is dropped by pg; the error must not crash the process, and it
+    // must not vanish either: its safe classification goes to the sink (R38)
+    const sink = config.onError ?? defaultPoolErrorSink;
+    this.#pool.on("error", (error: Error) => sink({ pool: config.applicationName, ...classifyError(error) }));
   }
 
   /** The underlying pg pool (tests and diagnostics only; units of work go through `acquire`). */

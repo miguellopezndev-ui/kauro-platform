@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { isDomainFailure, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
-import { PrivilegedRoleError, ROLES, createPool, createUnitOfWorkFactory } from "../src/index.js";
+import { PrivilegedRoleError, createPool, createUnitOfWorkFactory } from "../src/index.js";
+import { ROLES } from "../src/testing/index.js";
 import { clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { constraintOf, event, ids, plan, project, sha, sqlState, stepUpProof, tx, validationReceipt, type PlanFixture } from "./support.js";
 

@@ -2,28 +2,42 @@
  * Request admission (10 "Request envelope": the server validates content type, byte size, JSON syntax, duplicate keys, schema,
  * authenticated subject and authorization before application execution; database queries occur after structural validation).
  *
- * This module is transport-neutral: the HTTP adapter hands it the lowercased headers, the route parameters and the raw body
- * text, and receives either a structurally admitted request or the safe problem to send. It never touches a database and never
- * echoes a value: field errors name fields, problems name codes. Authentication is the transport's asynchronous step between
- * `admitStructure` and `envelopeOf`; a request without a subject is AUTHENTICATION_REQUIRED at the edge.
+ * This module is transport-neutral: the HTTP adapter hands it the lowercased headers, the names of the header fields the
+ * request repeated, the correlation id it resolved once for the request, the route parameters, the raw body bytes and the
+ * keyed hash of the client address, and receives either a structurally admitted request or the safe problem to send. It
+ * never touches a database and never echoes a value: field errors name fields, problems name codes. Authentication is the
+ * transport's asynchronous step between `admitStructure` and `envelopeOf`; a request without a subject is
+ * AUTHENTICATION_REQUIRED at the edge.
  */
-import type { CommandId } from "@kauro/contracts";
+import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type { AgencyId, Clock, CorrelationId, Environment, FieldError, IdGenerator, UserId } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { CommandSpec } from "../ports/command-handler.js";
 import type { SchemaValidator } from "../ports/schema-validator.js";
-import { HEADERS, REQUEST_LIMITS, type AuthenticatedSubject, type CommandEnvelope } from "./envelope.js";
+import { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, type AuthenticatedSubject, type CommandEnvelope } from "./envelope.js";
 import { problemOf, type Problem } from "./problems.js";
 import { requestSchemaId, type RequestSchemaCommand } from "./request-schemas.js";
 import { StrictJsonError, parseStrictJson } from "./strict-json.js";
 
-export interface RawRequest {
-  /** Header names lowercased; a repeated header is refused by the transport before admission. */
+/** What admission needs from the head of a request, before any body byte is read. */
+export interface RequestHead {
+  /** Header names lowercased, one value per field (the transport's single-valued view). */
   readonly headers: Readonly<Record<string, string | undefined>>;
+  /** Lowercased names of the header fields the request carried more than once (the transport's raw header list). */
+  readonly repeatedHeaders: ReadonlyArray<string>;
+  /** The request's correlation id, resolved once by the transport with `correlationIdOf` and used for every answer. */
+  readonly correlationId: CorrelationId;
+}
+
+export interface RawRequest extends RequestHead {
   readonly params: Readonly<Record<string, string | undefined>>;
-  /** The body as text (UTF-8 decoded by the transport); null when the request carried none. */
-  readonly bodyText: string | null;
-  readonly bodyBytes: number;
+  /**
+   * The body bytes exactly as received; null when the request carried none. Admission decodes them as strict UTF-8 (RFC 8259
+   * §8.1: JSON exchanged between systems is UTF-8): an invalid byte sequence is JSON_SYNTAX, never replaced (review R40).
+   */
+  readonly body: Uint8Array | null;
+  /** Keyed SHA-256 of the client address the transport established (08 "Abuse controls"); null when it has none. */
+  readonly clientAddressHash: Sha256Hex | null;
 }
 
 export interface StructuralAdmission<Body> {
@@ -33,6 +47,7 @@ export interface StructuralAdmission<Body> {
   readonly path: Readonly<Record<string, string>>;
   readonly body: Body;
   readonly receivedAt: string;
+  readonly clientAddressHash: Sha256Hex | null;
 }
 
 export type AdmissionOutcome<Body> =
@@ -41,12 +56,35 @@ export type AdmissionOutcome<Body> =
 
 const UUID_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-/** The correlation id of a request: the client's when well-formed, else a fresh server id (10: every request receives one). */
-export function correlationIdOf(headers: RawRequest["headers"], ids: IdGenerator): { readonly id: CorrelationId; readonly invalid: boolean } {
+/** Strict UTF-8: a malformed sequence throws instead of becoming U+FFFD; a byte order mark is kept, so the strict parser refuses it. */
+const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
+/**
+ * The correlation id of a request (10 "Every request receives an opaque correlation ID"): the client's when it is an `id`,
+ * otherwise — absent, or any other value — a fresh server UUIDv7. A malformed client value never refuses the request and is
+ * never echoed (review finding R28): a proxy's own request id or a token with control characters simply does not become the
+ * request's correlation id. A transport calls this once per request and uses the result for the log, the answer and the
+ * durable records alike.
+ */
+export function correlationIdOf(headers: RequestHead["headers"], ids: IdGenerator): CorrelationId {
   const given = headers[HEADERS.correlationId];
-  if (given === undefined || given === "") return { id: ids.next() as CorrelationId, invalid: false };
-  if (!REQUEST_LIMITS.correlationIdPattern.test(given)) return { id: ids.next() as CorrelationId, invalid: true };
-  return { id: given as CorrelationId, invalid: false };
+  if (given !== undefined && REQUEST_LIMITS.correlationIdPattern.test(given)) return given as CorrelationId;
+  return ids.next() as CorrelationId;
+}
+
+/**
+ * The lowercased names of the fields a raw header list (name, value, name, value, ...: Node's `rawHeaders`) carries more
+ * than once, each named once.
+ */
+export function repeatedHeaderNames(rawHeaders: ReadonlyArray<string>): ReadonlyArray<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (let i = 0; i < rawHeaders.length; i += 2) {
+    const name = (rawHeaders[i] ?? "").toLowerCase();
+    if (seen.has(name)) repeated.add(name);
+    seen.add(name);
+  }
+  return [...repeated];
 }
 
 function invalid(reason: DomainFailure["details"]["reason"], fields?: ReadonlyArray<FieldError>): DomainFailure {
@@ -67,45 +105,53 @@ function isJsonContentType(value: string | undefined): boolean {
   return true;
 }
 
-/** The head of the admission order that needs the headers only: the correlation id, then the content type. */
-function headerFailure(headers: RawRequest["headers"], correlation: { readonly invalid: boolean }): DomainFailure | null {
-  if (correlation.invalid) return invalid("CORRELATION_ID_INVALID");
-  if (!isJsonContentType(headers["content-type"])) return invalid("CONTENT_TYPE_UNSUPPORTED");
+/**
+ * The head of the admission order that needs the headers only: a repeated single-valued envelope header (the request's
+ * headers cannot be read unambiguously, so nothing that depends on them is decided — R41), then the content type.
+ */
+function headerFailure(head: RequestHead): DomainFailure | null {
+  if (head.repeatedHeaders.some((name) => SINGLE_VALUED_HEADERS.has(name))) return invalid("HEADER_REPEATED");
+  if (!isJsonContentType(head.headers["content-type"])) return invalid("CONTENT_TYPE_UNSUPPORTED");
   return null;
 }
 
 /**
- * The part of the admission a transport decides from the headers alone — the correlation id, then the content type — run
- * before the body is read, so neither the size nor the bytes of a body can answer a request whose content type already
- * refuses it (10 "Request envelope": content type, byte size, JSON syntax, duplicate keys, schema, in that order). Returns
- * the problem to send, or null to go on reading the body; `admitStructure` repeats both checks, so a transport that skips
- * this step still refuses exactly the same requests.
+ * The part of the admission a transport decides from the head alone — a repeated envelope header, then the content type —
+ * run before the body is read, so neither the size nor the bytes of a body can answer a request whose head already refuses
+ * it (10 "Request envelope": content type, byte size, JSON syntax, duplicate keys, schema, in that order). Returns the
+ * problem to send, or null to go on reading the body; `admitStructure` repeats both checks, so a transport that skips this
+ * step still refuses exactly the same requests.
  */
-export function admitHeaders(headers: RawRequest["headers"], ids: IdGenerator): Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> | null {
-  const correlation = correlationIdOf(headers, ids);
-  const failure = headerFailure(headers, correlation);
-  return failure === null ? null : { kind: "PROBLEM", correlationId: correlation.id, problem: problemOf(failure, correlation.id) };
+export function admitHeaders(head: RequestHead): Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> | null {
+  const failure = headerFailure(head);
+  return failure === null ? null : { kind: "PROBLEM", correlationId: head.correlationId, problem: problemOf(failure, head.correlationId) };
 }
 
 /**
  * Structural admission of one command request, in the order of manual 10. The first failure is the answer; the handler and
  * the database are never reached by a request that fails here.
  */
-export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, validator: SchemaValidator, ids: IdGenerator, clock: Clock): AdmissionOutcome<Body> {
-  const correlation = correlationIdOf(raw.headers, ids);
-  const correlationId = correlation.id;
+export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, validator: SchemaValidator, clock: Clock): AdmissionOutcome<Body> {
+  const correlationId = raw.correlationId;
   const fail = (f: DomainFailure): AdmissionOutcome<Body> => ({ kind: "PROBLEM", correlationId, problem: problemOf(f, correlationId) });
   try {
-    // 0-1. correlation id, content type (the header-only head, also run by the transport before the body is read)
-    const early = headerFailure(raw.headers, correlation);
+    // 0-1. repeated envelope header, content type (the header-only head, also run by the transport before the body is read)
+    const early = headerFailure(raw);
     if (early !== null) throw early;
     // 2. byte size
-    if (raw.bodyBytes > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
-    // 3. JSON syntax, duplicate keys, depth, string length
-    if (raw.bodyText === null) throw invalid("JSON_SYNTAX");
+    if ((raw.body?.byteLength ?? 0) > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
+    // 3. UTF-8, JSON syntax, duplicate keys, depth, string length
+    if (raw.body === null) throw invalid("JSON_SYNTAX");
+    let text: string;
+    try {
+      text = UTF8.decode(raw.body);
+    } catch (e) {
+      if (e instanceof TypeError) throw invalid("JSON_SYNTAX");
+      throw e;
+    }
     let parsed: unknown;
     try {
-      parsed = parseStrictJson(raw.bodyText);
+      parsed = parseStrictJson(text);
     } catch (e) {
       if (e instanceof StrictJsonError) throw invalid(e.reason);
       throw e;
@@ -133,7 +179,7 @@ export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, v
     }
     return {
       kind: "ADMITTED",
-      admission: { correlationId, idempotencyKey: key, agencyId, path, body: outcome.value, receivedAt: clock.now() },
+      admission: { correlationId, idempotencyKey: key, agencyId, path, body: outcome.value, receivedAt: clock.now(), clientAddressHash: raw.clientAddressHash },
     };
   } catch (e) {
     if (e instanceof DomainFailure) return fail(e);
@@ -156,6 +202,7 @@ export function envelopeOf<Body>(command: CommandId, environment: Environment, a
     userId: subject.identity.userId as UserId,
     subject,
     agencyId: admission.agencyId,
+    clientAddressHash: admission.clientAddressHash,
     path: admission.path,
     body: admission.body,
     receivedAt: admission.receivedAt,

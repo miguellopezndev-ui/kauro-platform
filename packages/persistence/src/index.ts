@@ -2,17 +2,29 @@
  * @kauro/persistence — PostgreSQL 17 persistence of the Kauro platform: the ordered SQL migrations (schema, roles, tenant
  * constraints, row-level security, outbox/inbox, journals, leases), the checksummed migration runner, the verified pool
  * factory, the unit of work that binds the tenant context, the repositories, event publisher, journals and lease store that
- * implement the @kauro/domain ports, the SQLSTATE translation, and the temporary cluster helper for real-database tests.
+ * implement the @kauro/domain ports, and the SQLSTATE translation. The temporary cluster, the harness and the interleaving
+ * helpers of the real-database tests are the separate, test-only subpath `@kauro/persistence/testing` (src/testing/index.ts):
+ * nothing here imports it, so no production import graph carries them.
  */
-export { MIGRATIONS_DIR, listMigrations, applyMigrations, applyMigrationsAs, appliedMigrations, MigrationDriftError, MigratorRoleError } from "./migrations/runner.js";
-export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
-export { startTemporaryPostgres, ROLES } from "./testing/temporary-postgres.js";
-export type { TemporaryPostgres, StartOptions, LoginRole } from "./testing/temporary-postgres.js";
-export { start as startHarness, waitForLockWait, barrier, CAPABILITY_PUBLICATION_PATH } from "./testing/harness.js";
-export type { Harness, AgencyFixture, CapabilityPublicationState } from "./testing/harness.js";
+export {
+  MIGRATIONS_DIR,
+  MIGRATION_RUNNER_LOCK,
+  DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS,
+  DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS,
+  DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS,
+  listMigrations,
+  applyMigrations,
+  applyMigrationsAs,
+  appliedMigrations,
+  compareSchema,
+  readSchemaLedger,
+  MigrationDriftError,
+  MigratorRoleError,
+} from "./migrations/runner.js";
+export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection, LedgerEntry, SchemaCompatibility } from "./migrations/runner.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
-export { createPool, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
-export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";
+export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
+export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies } from "./unit-of-work.js";

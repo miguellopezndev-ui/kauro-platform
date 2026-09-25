@@ -173,7 +173,12 @@ export const FAILURE_REASONS = [
   "IDEMPOTENCY_KEY_INVALID",
   "AGENCY_SELECTOR_INVALID",
   "PATH_ID_INVALID",
-  "CORRELATION_ID_INVALID",
+  // HTTP framing at the boundary (review findings R39, R40, R41): a single-valued envelope header sent more than once, a
+  // request the HTTP layer cannot read (undecodable target, parser error, body length not the declared one), a request
+  // that did not arrive completely within the request timeout
+  "HEADER_REPEATED",
+  "REQUEST_MALFORMED",
+  "REQUEST_TIMEOUT",
   // admission (08 "Abuse controls")
   "DRAFT_AGENCY_EXISTS",
   "CREATION_RATE_LIMITED",

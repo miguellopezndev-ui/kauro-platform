@@ -1,7 +1,9 @@
 // S045: a clean checkout has no sibling workspace or prior cache — packages install, build and are consumed through declared
 // dependencies only. This script packs every publishable workspace package (pnpm pack), installs the tarballs into a fresh
-// consumer project in a temporary directory with an empty store, imports each public entry point and runs a smoke call.
-// Nothing from the workspace is reachable from the consumer except through the tarballs.
+// consumer project in a temporary directory with an empty store, imports each public entry point and runs a smoke call, then
+// type-checks every typed entry point with a strict TypeScript that checks all declaration files (skipLibCheck off), so a
+// public .d.ts that names a type of an undeclared dependency fails here. Nothing from the workspace is reachable from the
+// consumer except through the tarballs.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -39,9 +41,21 @@ try {
   }
   // A packed workspace package declares its sibling dependencies by version (pnpm pack rewrites workspace:*); the consumer
   // must resolve them to the tarballs, never to a registry, so every sibling is also an override.
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", dependencies: spec, pnpm: { overrides: spec } }, null, 2));
+  // The consumer runs the workspace's own package manager (root packageManager): a newer global pnpm no longer reads
+  // package.json "pnpm.overrides" and would resolve the siblings from the public registry instead of the tarballs.
+  const rootManifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  if (typeof rootManifest.packageManager !== "string" || !rootManifest.packageManager.startsWith("pnpm@")) throw new Error("the workspace root pins no pnpm packageManager");
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", packageManager: rootManifest.packageManager, dependencies: spec, pnpm: { overrides: spec } }, null, 2));
   writeFileSync(join(consumer, ".npmrc"), `store-dir=${join(work, "store").split("\\").join("/")}\nnode-linker=isolated\n`);
   execFileSync("pnpm", ["install", "--ignore-workspace", "--no-frozen-lockfile"], { cwd: consumer, stdio: "inherit", shell: process.platform === "win32" });
+  // the public entry points: each package's main entry and every typed export subpath (e.g. @kauro/persistence/testing)
+  const typedEntries = [];
+  for (const p of publishable) {
+    for (const [subpath, target] of Object.entries(p.pkg.exports ?? {})) {
+      if (typeof target === "object" && target !== null && typeof target.types === "string") typedEntries.push(subpath === "." ? p.name : p.name + subpath.slice(1));
+    }
+  }
+  if (typedEntries.length === 0) throw new Error("no typed public entry point found");
   const smoke = `
 import { structuredDigest, DOMAINS, canonicalize, CONTRACT_NAMES, COMMANDS, provenance } from "@kauro/contracts";
 import { readFileSync } from "node:fs";
@@ -52,8 +66,9 @@ if (canonicalize({ b: 1, a: [2, 1] }) !== '{"a":[2,1],"b":1}') throw new Error("
 if (CONTRACT_NAMES.length !== Object.keys(schemas.$defs).length) throw new Error("schemas vs types");
 if (COMMANDS.length < 60) throw new Error("commands");
 console.log("clean consumer ok:", CONTRACT_NAMES.length, "contracts,", COMMANDS.length, "commands, provenance", provenance().files["contracts.json"].slice(0, 12));
-// every other publishable package resolves and exposes its public entry point from the tarball alone
-for (const name of ${JSON.stringify(publishable.map((p) => p.name).filter((n) => n !== "@kauro/contracts"))}) {
+// every other public entry point (every package's main entry and every typed subpath) resolves and exposes something
+// from the tarball alone
+for (const name of ${JSON.stringify(typedEntries.filter((n) => n !== "@kauro/contracts"))}) {
   const m = await import(name);
   if (typeof m !== "object" || m === null || Object.keys(m).length === 0) throw new Error(name + " has an empty public entry point");
   console.log("clean consumer ok:", name, Object.keys(m).length, "exports");
@@ -61,6 +76,37 @@ for (const name of ${JSON.stringify(publishable.map((p) => p.name).filter((n) =>
 `;
   writeFileSync(join(consumer, "smoke.mjs"), smoke);
   execFileSync("node", ["smoke.mjs"], { cwd: consumer, stdio: "inherit" });
+  // The published declarations are part of the contract too: a strict TypeScript consumer that checks every declaration file
+  // (skipLibCheck off) must compile against the tarballs alone — every type a public .d.ts names (pg's Pool, PoolClient and
+  // Client included) has to come from a declared dependency, never from something the workspace happened to install.
+  writeFileSync(join(consumer, "typecheck.ts"), typedEntries.map((e, i) => `import * as entry${i} from ${JSON.stringify(e)};`).join("\n") + `\nexport const entries = [${typedEntries.map((_, i) => `entry${i}`).join(", ")}];\n`);
+  writeFileSync(
+    join(consumer, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2023",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          strict: true,
+          exactOptionalPropertyTypes: true,
+          noUncheckedIndexedAccess: true,
+          skipLibCheck: false,
+          noEmit: true,
+          types: ["node"],
+        },
+        files: ["typecheck.ts"],
+      },
+      null,
+      2,
+    ),
+  );
+  const tsVersion = rootManifest.devDependencies?.typescript;
+  const nodeTypesVersion = rootManifest.devDependencies?.["@types/node"];
+  if (!tsVersion || !nodeTypesVersion) throw new Error("the workspace root pins neither typescript nor @types/node");
+  execFileSync("pnpm", ["add", "--ignore-workspace", "--save-dev", "--save-exact", `typescript@${tsVersion}`, `@types/node@${nodeTypesVersion}`], { cwd: consumer, stdio: "inherit", shell: process.platform === "win32" });
+  execFileSync("pnpm", ["exec", "tsc", "-p", "tsconfig.json"], { cwd: consumer, stdio: "inherit", shell: process.platform === "win32" });
+  console.log(`clean consumer ok: ${typedEntries.length} typed entry points (${typedEntries.join(", ")}) type-check from the tarballs alone`);
   // the consumer must not see the workspace: no symlink into the repo, no workspace protocol
   const lock = readFileSync(join(consumer, "pnpm-lock.yaml"), "utf8");
   if (lock.includes("link:") || lock.includes("workspace:")) throw new Error("consumer lockfile references the workspace (link:/workspace:)");

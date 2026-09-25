@@ -10,7 +10,7 @@ export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, pr
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
 export { REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
 export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
-export { HEADERS, REQUEST_LIMITS, isSuccess } from "./api/envelope.js";
+export { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
 export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
 export type { ReadinessFacts } from "./api/projections.js";
@@ -21,8 +21,8 @@ export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js"
 export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_KEYWORDS, ANNOTATION_KEYWORDS } from "./api/json-schema.js";
 export type { ContractSchemaBundle } from "./api/schema-validation.js";
 export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
-export type { RawRequest, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, unauthenticatedProblem } from "./api/admission.js";
+export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
+export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,

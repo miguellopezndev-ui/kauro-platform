@@ -61,6 +61,12 @@ $$;
 
 GRANT USAGE ON SCHEMA kauro TO kauro_app, kauro_control, kauro_assurance, kauro_validator;
 
+-- Readiness (14 "Monitoring and service health": readiness checks the schema compatibility the service's role needs): the
+-- runtime roles read the ledger the migration runner keeps (kauro_meta.schema_migrations, created by the runner before this
+-- file) and nothing else of kauro_meta; they never write it.
+GRANT USAGE ON SCHEMA kauro_meta TO kauro_app, kauro_control;
+GRANT SELECT ON kauro_meta.schema_migrations TO kauro_app, kauro_control;
+
 -- Tenant context: SET LOCAL kauro.agency_id / kauro.user_id (set_config(..., true)) inside the transaction. Missing or empty
 -- settings yield NULL, and every policy compares against NULL as false: no context, no rows (fail closed). An unparsable
 -- value raises instead of matching anything.

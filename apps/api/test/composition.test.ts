@@ -9,7 +9,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { MigratorRoleError, PrivilegedRoleError, ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence";
+import { MigratorRoleError, PrivilegedRoleError } from "@kauro/persistence";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 
 let pg: TemporaryPostgres;
@@ -69,7 +70,7 @@ test("configuration: every variable is validated and a missing or malformed one 
   assert.throws(() => loadConfig(envOf({ KAURO_DB_USER: undefined })), configError("KAURO_DB_USER"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_USER: "Robert'); DROP TABLE" })), (e: unknown) => configError("KAURO_DB_USER")(e) && !(e as Error).message.includes("DROP"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_POOL_MAX: undefined })), configError("KAURO_DB_POOL_MAX"), "07 connection budget: no library default");
-  for (const bad of ["0", "25", "ten", "-1", "2.5"]) assert.throws(() => loadConfig(envOf({ KAURO_DB_POOL_MAX: bad })), configError("KAURO_DB_POOL_MAX"), bad);
+  for (const bad of ["0", "5", "24", "25", "ten", "-1", "2.5"]) assert.throws(() => loadConfig(envOf({ KAURO_DB_POOL_MAX: bad })), configError("KAURO_DB_POOL_MAX"), bad);
   assert.throws(() => loadConfig(envOf({ KAURO_DB_PORT: "70000" })), configError("KAURO_DB_PORT"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_STATEMENT_TIMEOUT_MS: "5" })), configError("KAURO_DB_STATEMENT_TIMEOUT_MS"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "yes" })), configError("KAURO_DB_MIGRATE_ON_START"));
@@ -84,7 +85,7 @@ test("configuration: every variable is validated and a missing or malformed one 
   const config = loadConfig(envOf({ KAURO_DB_HOST: undefined, KAURO_DB_NAME: undefined, KAURO_HTTP_HOST: undefined, KAURO_HTTP_PORT: undefined }));
   assert.deepEqual(config, {
     environment: "LOCAL",
-    http: { host: "127.0.0.1", port: 3000 },
+    http: { host: "127.0.0.1", port: 3000, trustedProxyHops: 0, requestTimeoutMs: 30_000, connectionTimeoutMs: 60_000, shutdownDeadlineMs: 8_000 },
     database: { host: "127.0.0.1", port: pg.port, database: "kauro", user: ROLES.appLogin, poolMax: 2, statementTimeoutMs: 10_000 },
     migrateOnStart: null,
     bearerTokensFile: null,
@@ -109,7 +110,7 @@ test("authentication of this edition: the LOCAL bearer-token file is a closed do
   refused(JSON.stringify({ subjects: [entry, entry] }), "repeats an earlier token");
   refused(JSON.stringify({ subjects: [{ ...entry, token: "short" }] }), "16..512");
   for (const environment of ["SANDBOX", "LIVE"]) {
-    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment }))), configError("KAURO_ENVIRONMENT"), environment);
+    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" }))), configError("KAURO_ENVIRONMENT"), environment);
   }
   assert.throws(() => authenticatorOf(loadConfig(envOf())), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
 });

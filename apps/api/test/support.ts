@@ -48,7 +48,7 @@ import type {
   ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
-import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence";
+import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -410,11 +410,8 @@ export async function rawEvent(c: PoolClient, e: RawEvent): Promise<void> {
 export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
-    environment: "LOCAL",
-    http: { host: "127.0.0.1", port: 3000 },
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: 10_000 },
     migrateOnStart: null,
-    bearerTokensFile: null,
   });
   const holds = new HoldPoints();
   const stats: UnitOfWorkStats = { runs: 0 };
@@ -447,6 +444,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const app = assembleApi({
     environment: "LOCAL",
     unitOfWork: instrumentedFactory(db.unitOfWork, holds, stats),
+    database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     validator,
