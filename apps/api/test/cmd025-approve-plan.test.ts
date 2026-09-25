@@ -4,11 +4,11 @@
 // source or stale receipt requires new review; generic cleanup approval cannot authorize undisclosed CLEAR"). Real route
 // over real plan, receipt, revision and contract rows; the disclosure composer is the test-bound port of this edition.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
-import { approvalHashOf } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
 import { reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
 let w: World;
@@ -20,6 +20,40 @@ before(async () => {
 after(async () => {
   await w.stop();
 });
+
+/**
+ * The approval-hash oracle of this file, written from reference/HASHING_AND_ACCOUNTING_RULES and not from the product (21
+ * "Independent oracles"): SHA-256 over the UTF-8 bytes of the canonical wrapper {domain, payload, version} with the domain
+ * KAURO_PLAN_APPROVAL_V1 (the authority's approval-hash domain as amendment A2 names it), version 1 and exactly the nine preimage members, every key
+ * in code-point order, no whitespace. It uses neither approvalHashOf nor the canonical serializer of @kauro/contracts.
+ */
+function independentApprovalHash(p: Readonly<Record<"approvalId" | "actorId" | "agencyId" | "planHash" | "revisionHash" | "targetContractHash" | "validationReceiptHash" | "disclosuresHash" | "createdAt", string>>): string {
+  const s = (v: string): string => JSON.stringify(v);
+  const payload =
+    `{"actorId":${s(p.actorId)},"agencyId":${s(p.agencyId)},"approvalId":${s(p.approvalId)},"createdAt":${s(p.createdAt)},` +
+    `"disclosuresHash":${s(p.disclosuresHash)},"planHash":${s(p.planHash)},"revisionHash":${s(p.revisionHash)},` +
+    `"targetContractHash":${s(p.targetContractHash)},"validationReceiptHash":${s(p.validationReceiptHash)}}`;
+  return createHash("sha256").update(`{"domain":"KAURO_PLAN_APPROVAL_V1","payload":${payload},"version":1}`, "utf8").digest("hex");
+}
+
+/**
+ * The golden vector the oracle is checked against before it is trusted: the expected hex was derived outside the product with
+ * GNU sha256sum and cross-checked with python3 json + hashlib (derivation recorded in packages/application/test/approval-hash.test.ts).
+ */
+const GOLDEN = {
+  members: {
+    approvalId: "01920000-0000-7000-8000-000000000a01",
+    actorId: "5c3f2a10-6b7d-5e8f-9a0b-1c2d3e4f5a6b",
+    agencyId: "01920000-0000-7000-8000-000000000a02",
+    planHash: "1".repeat(64),
+    revisionHash: "2".repeat(64),
+    targetContractHash: "3".repeat(64),
+    validationReceiptHash: "4".repeat(64),
+    disclosuresHash: "5".repeat(64),
+    createdAt: "2026-09-25T08:30:00.000Z",
+  },
+  hex: "d7e978a907f91024533df149e1430afbb933936eaf9b8eefc74c1edc70b3fb4b",
+} as const;
 
 /** The body an approver sends after reviewing the complete disclosure set the server composes. */
 function approvalBody(plan: PlanFixture, proof: string, overrides: Partial<Record<"expectedVersion" | "planHash" | "validationReceiptHash" | "disclosuresHash", string | number>> = {}) {
@@ -57,27 +91,31 @@ test("OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose recei
   assert.deepEqual(Object.keys(approval).sort(), ["actorMembershipId", "agencyId", "approvalHash", "approvalId", "createdAt", "disclosuresHash", "planHash", "planId", "revisionHash", "targetContractHash", "validationReceiptHash", "version"], "no token, recovery setting or security evidence in the view");
 
   // oracle: the approvals row binds the actor's membership version and step-up proof, the five hashes equal the plan and
-  // receipt, and the approval hash recomputed independently over the named preimage (KAURO_PLAN_APPROVAL_V1) matches
-  const row = await w.row<{ actor_id: string; actor_membership_id: string; actor_membership_version: string; assurance_proof_ref: string; plan_hash: string; revision_hash: string; target_contract_hash: string; validation_receipt_hash: string; disclosures_hash: string; approval_hash: string; withdrawn_at: Date | null; version: string }>("approvals", "approval_id = $1", [approval.approvalId]);
+  // receipt (the disclosures hash the one the test composer computes, CLEAR included), and the approval hash recomputed
+  // independently over the named preimage (KAURO_PLAN_APPROVAL_V1) matches — every member read from the superuser oracle's
+  // row, the oracle function first checked against the golden vector derived outside the product
+  assert.equal(independentApprovalHash(GOLDEN.members), GOLDEN.hex);
+  const row = await w.row<{ approval_id: string; agency_id: string; actor_id: string; actor_membership_id: string; actor_membership_version: string; assurance_proof_ref: string; plan_hash: string; revision_hash: string; target_contract_hash: string; validation_receipt_hash: string; disclosures_hash: string; approval_hash: string; created_at: Date; withdrawn_at: Date | null; version: string }>("approvals", "approval_id = $1", [approval.approvalId]);
   assert.ok(row);
   assert.deepEqual(
-    { actor: row.actor_id, membership: row.actor_membership_id, membershipVersion: row.actor_membership_version, proof: row.assurance_proof_ref, plan: row.plan_hash, revision: row.revision_hash, target: row.target_contract_hash, receipt: row.validation_receipt_hash, version: row.version, withdrawn: row.withdrawn_at },
+    { agency: row.agency_id, actor: row.actor_id, membership: row.actor_membership_id, membershipVersion: row.actor_membership_version, proof: row.assurance_proof_ref, plan: row.plan_hash, revision: row.revision_hash, target: row.target_contract_hash, receipt: row.validation_receipt_hash, disclosures: row.disclosures_hash, version: row.version, withdrawn: row.withdrawn_at },
     // the approver's membership is at version 2: invited (v1), then accepted by the approver (v2)
-    { actor: w.approver.userId, membership: w.memberships.approver, membershipVersion: "2", proof, plan: plan.bodyHash, revision: plan.revisionHash, target: plan.targetContractHash, receipt: plan.receiptHash, version: "1", withdrawn: null },
+    { agency: w.A.agencyId, actor: w.approver.userId, membership: w.memberships.approver, membershipVersion: "2", proof, plan: plan.bodyHash, revision: plan.revisionHash, target: plan.targetContractHash, receipt: plan.receiptHash, disclosures: disclosuresHashOf(plan.bodyHash, plan.receiptHash!, disclosureItemsOf(plan.body, plan.affectedRows)), version: "1", withdrawn: null },
   );
-  const recomputed = approvalHashOf({
-    approvalId: approval.approvalId,
-    actorId: w.approver.userId,
-    agencyId: w.A.agencyId,
+  const recomputed = independentApprovalHash({
+    approvalId: row.approval_id,
+    actorId: row.actor_id,
+    agencyId: row.agency_id,
     planHash: row.plan_hash,
     revisionHash: row.revision_hash,
     targetContractHash: row.target_contract_hash,
     validationReceiptHash: row.validation_receipt_hash,
     disclosuresHash: row.disclosures_hash,
-    createdAt: approval.createdAt,
+    createdAt: row.created_at.toISOString(),
   });
   assert.equal(row.approval_hash, recomputed);
   assert.equal(approval.approvalHash, recomputed);
+  assert.equal(approval.createdAt, row.created_at.toISOString());
   const planRow = await w.row<{ state: string; version: string; approval_id: string | null; validation_receipt_hash: string | null }>("plans", "plan_id = $1", [plan.planId]);
   assert.deepEqual(planRow && { state: planRow.state, version: planRow.version, approval: planRow.approval_id, receipt: planRow.validation_receipt_hash }, { state: "APPROVED", version: "5", approval: approval.approvalId, receipt: plan.receiptHash });
   // events: approval.created.v1 (v1) → NOTIFICATIONS; plan.approved.v1 (v5)
@@ -189,7 +227,7 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   assert.equal(await w.count("approvals"), approvalsBefore);
 });
 
-test("RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT", async () => {
+test("RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the plan VALIDATED with no approval and the same key then approves it once", async () => {
   const plan = await w.approvable(w.A, projectId, "approve-race");
   const url = routes.approvePlan(plan.planId);
   const proofA = await w.stepUp(w.approver);
@@ -218,6 +256,28 @@ test("RACE: two approvers on one version → one 201, one 409; identical retry r
   const conflict = await call(w, { url, token: w.approver.token, key: keyA, body: { ...bodyA, disclosuresHash: sha("other") } });
   assert.equal(outcome(w, conflict), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 1);
+
+  // crash at the intent/commit boundary, before COMMIT: the approval row, the plan transition to APPROVED and both events were
+  // written inside the transaction, then the process dies where the journal entry would complete. Nothing is committed — the
+  // plan is VALIDATED at version 4 with no approval, no event and no journal row — and the same key is then the first
+  // execution of that logical operation, which approves the plan exactly once
+  const fresh = await w.approvable(w.A, projectId, "approve-race-crash");
+  const crashKey = freshKey("cmd025-crash");
+  const crashBody = approvalBody(fresh, await w.stepUp(w.approver));
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
+  const crashed = await call(w, { url: routes.approvePlan(fresh.planId), token: w.approver.token, key: crashKey, body: crashBody });
+  assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
+  assert.deepEqual(asProblem(w, crashed).nextActions, [{ action: "RETRY_SAME_KEY" }]);
+  assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
+  const crashedPlan = await w.row<{ state: string; version: string; approval_id: string | null }>("plans", "plan_id = $1", [fresh.planId]);
+  assert.deepEqual(crashedPlan && [crashedPlan.state, crashedPlan.version, crashedPlan.approval_id], ["VALIDATED", "4", null]);
+  assert.equal(await w.count("approvals", "plan_id = $1", [fresh.planId]), 0);
+  assert.equal(await w.count("domain_events", "aggregate_id = $1 AND event_type = 'plan.approved.v1'", [fresh.planId]), 0);
+  assert.equal(await w.journal(crashKey), null);
+  const retried = completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(fresh.planId), token: w.approver.token, key: crashKey, body: crashBody }), 201);
+  assert.equal(retried.replayed, false);
+  assert.equal(await w.count("approvals", "plan_id = $1", [fresh.planId]), 1);
+  assert.equal(await w.count("domain_events", "aggregate_id = $1 AND event_type = 'plan.approved.v1'", [fresh.planId]), 1);
 });
 
 test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superseded body", async () => {

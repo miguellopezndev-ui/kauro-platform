@@ -26,7 +26,8 @@
 --   KA001 LAST_OWNER_PROTECTED   KA002 VERSION_DISCIPLINE   KA003 EVENT_MISSING   KA004 IMMUTABLE_COLUMN
 --   KA005 LEASE guard (fence / deadline / subject / checkpoint)   KA006 CONTEXT (row not visible inside a trigger)
 --   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION (an unlisted edge, or an aggregate born outside its machine's
---   initial state)
+--   initial state)   KA009 UPSTREAM_UNRESOLVED (request journal, S089)   KA020 LIVE_APPROVAL_UNBOUND (a live approval on a
+--   plan that is not APPROVED under it, 0004)
 
 CREATE SCHEMA IF NOT EXISTS kauro;
 REVOKE ALL ON SCHEMA kauro FROM PUBLIC;

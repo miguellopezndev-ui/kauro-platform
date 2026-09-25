@@ -5,7 +5,9 @@
  * dispatch attempts, each under its own fence). Every state change names the fence the caller holds: a caller fenced out by
  * a later attempt matches no row and receives null, exactly as the lease store does. The database guard refuses a terminal
  * state change, a replaced response artifact or CONSUMED before RESPONSE_STORED (KA007 → PRECONDITION_FAILED); the
- * reservation columns are immutable (KA004 → INTEGRITY_FAILURE / IMMUTABLE_COLUMN). `updated_at` is transaction time
+ * reservation columns are immutable (KA004 → INTEGRITY_FAILURE / IMMUTABLE_COLUMN). A reservation naming an upstream that is
+ * not CONSUMED, unknown or of another tenant scope is refused by the guard request_journal_upstream_resolved (S089; KA009 →
+ * PRECONDITION_FAILED / UPSTREAM_UNRESOLVED), which reads the upstream rows FOR SHARE. `updated_at` is transaction time
  * (trigger touch_updated_at), the port's `now` stamps nothing else on this table and is accepted for interface symmetry.
  */
 import type { MoneyMinorUnits, Sha256Hex, UtcInstant } from "@kauro/contracts";
@@ -55,9 +57,9 @@ export class PgRequestJournal implements RequestJournal {
   async reserve(reservation: RequestReservation): Promise<RequestJournalRecord> {
     const r = await execute<RequestRow>(
       this.db,
-      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, state, usage_state, reserved_cents, cost_grant_id, reserved_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'RESERVED', 'UNKNOWN', $6, $7, $8, $8) RETURNING ${REQUEST_COLUMNS}`,
-      [reservation.requestId, reservation.taskId, reservation.agencyId, reservation.requestHash, reservation.fence, assertMoney(reservation.reservedCents, "reservedCents"), reservation.costGrantId, reservation.reservedAt],
+      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, state, usage_state, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'RESERVED', 'UNKNOWN', $6, $7, $8::uuid[], $9, $9) RETURNING ${REQUEST_COLUMNS}`,
+      [reservation.requestId, reservation.taskId, reservation.agencyId, reservation.requestHash, reservation.fence, assertMoney(reservation.reservedCents, "reservedCents"), reservation.costGrantId, [...reservation.upstreamRequestIds], reservation.reservedAt],
     );
     const row = r.rows[0];
     if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "request reservation returned no row");

@@ -8,8 +8,8 @@ import { test } from "node:test";
 import type { AgencyId, CapabilityId, MembershipId, PlanId } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { B06Collaborators, CommandResult, DisclosureSet, PatchCompilation } from "../src/index.js";
-import { APPROVE_PLAN, ARCHIVE_CLIENT, CREATE_AGENCY, CREATE_CLIENT, CREATE_PROJECT, REVISE_PLAN, WITHDRAW_APPROVAL, approvalHashOf, createB06Handlers } from "../src/index.js";
-import { approvalId, bodyHashOf, clock, envelope, planBodyOf, sha, subject, world, type World } from "./support.js";
+import { APPROVE_PLAN, ARCHIVE_CLIENT, CREATE_AGENCY, CREATE_CLIENT, CREATE_PROJECT, REVISE_PLAN, WITHDRAW_APPROVAL, createB06Handlers } from "../src/index.js";
+import { approvalId, bodyHashOf, clock, envelope, independentApprovalHash, planBodyOf, sha, subject, world, type World } from "./support.js";
 
 const KEY = "0123456789abcdef-key";
 
@@ -295,9 +295,11 @@ test("CMD025 OK: an immutable approval bound to the exact plan/source/target/rec
   const stored = w.store().approvals.get(r.view.approval.approvalId)!;
   assert.equal(stored.actorMembershipVersion, 1);
   assert.equal(stored.assuranceProofRef, w.proofId);
+  // recomputed with the test oracle (not the handler's approvalHashOf), whose correctness the golden vector of
+  // approval-hash.test.ts pins: the handler must compose the preimage from exactly these members
   assert.equal(
     stored.approvalHash,
-    approvalHashOf({
+    independentApprovalHash({
       approvalId: stored.approvalId,
       actorId: w.approver.identity.userId,
       agencyId: w.agencyId,

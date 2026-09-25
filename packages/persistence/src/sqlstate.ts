@@ -14,8 +14,9 @@ export const SQLSTATE = Object.freeze({
   CONTEXT: "KA006",
   JOURNAL: "KA007",
   UNLISTED_TRANSITION: "KA008",
-  // a live approval on a plan that is not APPROVED under it (migration 0004, plans_live_approval_binding); numbered apart
-  // from the KA00x sequence so it cannot collide with codes other branches allocate before integration
+  UPSTREAM_UNRESOLVED: "KA009",
+  // a live approval on a plan that is not APPROVED under it (migration 0004, the deferred constraint triggers
+  // plans_live_approval_binding and approvals_live_approval_binding; decision D-PLAN-4)
   LIVE_APPROVAL_UNBOUND: "KA020",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
@@ -38,6 +39,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA006: { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
   KA007: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
   KA008: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
+  KA009: { code: "PRECONDITION_FAILED", reason: "UPSTREAM_UNRESOLVED" },
   KA020: { code: "INTEGRITY_FAILURE", reason: "LIVE_APPROVAL_UNBOUND" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },

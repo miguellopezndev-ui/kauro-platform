@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ArchiveClientView, EndClientView, ProjectView } from "@kauro/application";
-import { asProblem, call, completed, freshKey, outcome, routes, waitForApiLockWait, world, type World } from "./support.js";
+import { SimulatedCrash, asProblem, call, completed, freshKey, outcome, replayTextOf, rootCause, routes, waitForApiLockWait, world, type World } from "./support.js";
 import type { ClientId, ProjectId } from "@kauro/domain";
 
 let w: World;
@@ -119,30 +119,91 @@ test("DENY: OPERATOR → 403; foreign client → 404; stale expectedVersion → 
   assert.deepEqual(tables.rows, []);
 });
 
-test("RACE: two archive calls with the same expectedVersion → one 200, one 409; identical retry replays", async () => {
+test("RACE: two archive calls with the same expectedVersion → one 200, one 409; identical retry replays; the same key with another expectedVersion or another client → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the client ACTIVE and the same key then archives it; a response lost after COMMIT is recovered by the key", async () => {
+  // registry CMD010-RACE: "Identical retry, conflicting same-key request and crash at the intent/commit boundary of
+  // ArchiveClient" → "Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate
+  // authority" (10 "Idempotency contract"; 07 "Transaction discipline": state, event and outbox commit atomically, and a
+  // response lost after commit is recovered by the same idempotency identity)
   const clientId = await freshClient("Race Me");
   const keyA = freshKey("cmd010-race-a");
   const keyB = freshKey("cmd010-race-b");
+  const bodyA = { expectedVersion: 1 };
   // A locks the client row and holds inside the active-work inspection; B blocks on the row lock (FOR UPDATE, observed in
   // pg_stat_activity); A commits version 2; B reads the row at version 2 and answers STALE_VERSION with the current state
   const hold = w.holds.arm("collaborator");
-  const requestA = call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: { expectedVersion: 1 } });
+  const requestA = call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: bodyA });
   await hold.reached;
   const requestB = call(w, { url: routes.archiveClient(clientId), token: w.owner.token, key: keyB, body: { expectedVersion: 1 } });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; A is released either way so no transaction outlives the test
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<ArchiveClientView>(a, 200);
   assert.equal(winner.data.client.version, 2);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");
   assert.deepEqual(asProblem(w, b).current, { version: 2, state: "ARCHIVED" });
   // oracle: the ARCHIVED transition happened exactly once, one archived event, one journal row (the loser left none)
-  assert.equal((await w.row<{ version: string }>("end_clients", "client_id = $1", [clientId]))?.version, "2");
-  assert.deepEqual((await w.events("end_client", clientId)).map((e) => e.type), ["end_client.created.v1", "end_client.archived.v1"]);
+  const archiveFacts = async (id: string) => {
+    const row = await w.row<{ state: string; version: string }>("end_clients", "client_id = $1", [id]);
+    return { row: row && { state: row.state, version: row.version }, events: (await w.events("end_client", id)).map((e) => e.type) };
+  };
+  const archivedOnce = { row: { state: "ARCHIVED", version: "2" }, events: ["end_client.created.v1", "end_client.archived.v1"] };
+  const untouched = { row: { state: "ACTIVE", version: "1" }, events: ["end_client.created.v1"] };
+  assert.deepEqual(await archiveFacts(clientId), archivedOnce);
   assert.equal(await w.journal(keyB), null);
-  // the identical retry of the winner replays the journaled 200
-  const replay = completed<ArchiveClientView>(await call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: { expectedVersion: 1 } }), 200);
-  assert.equal(replay.replayed, true);
-  assert.deepEqual(replay.data, winner.data);
-  assert.equal((await w.row<{ version: string }>("end_clients", "client_id = $1", [clientId]))?.version, "2");
+  const journalA = await w.journal(keyA);
+  assert.deepEqual(journalA && { state: journalA.state, status: journalA.status, id: journalA.resourceId }, { state: "COMMITTED", status: 200, id: clientId });
+
+  // identical retry: the key and body of the winner replay the journaled 200 byte for byte, with no second effect
+  const replay = await call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: bodyA });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.text, replayTextOf(a));
+  // conflicting same-key requests: another expectedVersion (a body member) and another client (a path id) under the key of
+  // the winner are typed conflicts with no effect — the key names one logical operation, never a second one
+  const otherClient = await freshClient("Race Me Too");
+  const otherBody = await call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: { expectedVersion: 2 } });
+  assert.equal(outcome(w, otherBody), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
+  const otherPath = await call(w, { url: routes.archiveClient(otherClient), token: w.admin.token, key: keyA, body: bodyA });
+  assert.equal(outcome(w, otherPath), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
+  assert.deepEqual(await archiveFacts(clientId), archivedOnce);
+  assert.deepEqual(await archiveFacts(otherClient), untouched);
+  assert.deepEqual(await w.journal(keyA), journalA, "the journal entry of the key is unchanged");
+
+  // crash at the intent/commit boundary, before COMMIT: the intent was reserved, the client row updated and the archived event
+  // appended inside the transaction, then the process dies where the journal entry would complete. Nothing is committed: the
+  // client is ACTIVE at version 1 with no archived event and no journal row, and the same key is then the first execution of
+  // that logical operation (replayed false), which archives the client exactly once
+  const crashKey = freshKey("cmd010-crash");
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
+  const crashed = await call(w, { url: routes.archiveClient(otherClient), token: w.admin.token, key: crashKey, body: { expectedVersion: 1 } });
+  assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
+  assert.deepEqual(asProblem(w, crashed).nextActions, [{ action: "RETRY_SAME_KEY" }]);
+  assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
+  const crashedRow = await w.row<{ state: string; version: string; archived_at: Date | null }>("end_clients", "client_id = $1", [otherClient]);
+  assert.deepEqual(crashedRow && { state: crashedRow.state, version: crashedRow.version, archivedAt: crashedRow.archived_at }, { state: "ACTIVE", version: "1", archivedAt: null });
+  assert.deepEqual(await archiveFacts(otherClient), untouched);
+  assert.equal(await w.journal(crashKey), null);
+  const retried = completed<ArchiveClientView>(await call(w, { url: routes.archiveClient(otherClient), token: w.admin.token, key: crashKey, body: { expectedVersion: 1 } }), 200);
+  assert.equal(retried.replayed, false);
+  assert.deepEqual([retried.data.client.state, retried.data.client.version], ["ARCHIVED", 2]);
+  assert.deepEqual(await archiveFacts(otherClient), archivedOnce);
+
+  // crash after COMMIT, before the answer leaves (a lost response): the archive is durable with its journal entry; the retry
+  // with the same key answers exactly the journaled 200 (replayed) and performs no second transition or event
+  const lostClient = await freshClient("Race Me Lost");
+  const lostKey = freshKey("cmd010-lost");
+  w.holds.arm("after.commit", { fail: new SimulatedCrash("response lost after COMMIT") });
+  const lost = await call(w, { url: routes.archiveClient(lostClient), token: w.admin.token, key: lostKey, body: { expectedVersion: 1 } });
+  assert.equal(outcome(w, lost), "500 INTERNAL_ERROR -");
+  assert.deepEqual(asProblem(w, lost).nextActions, [{ action: "RETRY_SAME_KEY" }]);
+  assert.deepEqual(await archiveFacts(lostClient), archivedOnce);
+  const lostJournal = await w.journal(lostKey);
+  assert.deepEqual(lostJournal && { state: lostJournal.state, status: lostJournal.status, id: lostJournal.resourceId }, { state: "COMMITTED", status: 200, id: lostClient });
+  const recovered = completed<ArchiveClientView>(await call(w, { url: routes.archiveClient(lostClient), token: w.admin.token, key: lostKey, body: { expectedVersion: 1 } }), 200);
+  assert.equal(recovered.replayed, true);
+  assert.deepEqual(recovered.data, lostJournal?.body);
+  assert.deepEqual(await archiveFacts(lostClient), archivedOnce);
 });

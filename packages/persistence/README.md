@@ -44,12 +44,13 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   `commit` stores the 2xx status, body and resource link and returns the entry as stored (the answer of the first execution
   is the journaled record, byte-equal to every replay: D-PORT-2); final entries never change.
 - `src/request-journal` — `PgRequestJournal`: fence-scoped dispatch attempts; a full hash, a positive ceiling and a grant are
-  required; response before consume; terminal states final.
+  required, and every declared upstream must be CONSUMED in the same tenant scope (S089: `PRECONDITION_FAILED /
+  UPSTREAM_UNRESOLVED` otherwise); response before consume; terminal states final.
 - `src/lease-store` — `PgLeaseStore` over `kauro.claim_lease / heartbeat_lease / checkpoint_lease / cancel_lease`; a claim
-  runs under a savepoint so a refusal (`RESUME_WITHOUT_CHECKPOINT`, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`,
+  runs under a savepoint so a refusal (`RESUME_WITHOUT_CHECKPOINT`, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`, `COST_IMMUTABLE`,
   `DEADLINE_PASSED`) is an outcome, not an aborted transaction. The port's `CANCELLED` reason is not produced by this adapter:
   the schema has no cancellation rule that refuses a claim (cancellation is a generation the owner observes).
-- `src/sqlstate` / `src/sql` — the SQLSTATE vocabulary the schema raises (KA001..KA008) and its translation into
+- `src/sqlstate` / `src/sql` — the SQLSTATE vocabulary the schema raises (KA001..KA009) and its translation into
   `DomainFailure`; `ConstraintViolation` for a unique constraint the handler must interpret; `LeaseRefusal` for KA005/KA004
   raised by the lease functions.
 - `src/testing/temporary-postgres` — `startTemporaryPostgres()`: initdb + pg_ctl on a free 127.0.0.1 port, database and

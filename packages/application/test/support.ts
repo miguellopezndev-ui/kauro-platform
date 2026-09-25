@@ -35,6 +35,34 @@ export function sha(s: string): Sha256Hex {
   return createHash("sha256").update(s).digest("hex");
 }
 
+/** The nine members of a KAURO_PLAN_APPROVAL_V1 preimage (reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation"). */
+export interface ApprovalHashMembers {
+  readonly approvalId: string;
+  readonly actorId: string;
+  readonly agencyId: string;
+  readonly planHash: string;
+  readonly revisionHash: string;
+  readonly targetContractHash: string;
+  readonly validationReceiptHash: string;
+  readonly disclosuresHash: string;
+  readonly createdAt: string;
+}
+
+/**
+ * The test oracle for approval hashes, written from the authority text and not from the product (21 "Independent oracles"):
+ * the canonical wrapper {domain, payload, version} is spelled out literally with every key in code-point order, so it uses
+ * neither `approvalHashOf` nor the canonical serializer of @kauro/contracts. Its correctness is pinned by the golden vector in
+ * approval-hash.test.ts, whose expected hex was derived outside the product.
+ */
+export function independentApprovalHash(p: ApprovalHashMembers): Sha256Hex {
+  const s = (v: string): string => JSON.stringify(v);
+  const payload =
+    `{"actorId":${s(p.actorId)},"agencyId":${s(p.agencyId)},"approvalId":${s(p.approvalId)},"createdAt":${s(p.createdAt)},` +
+    `"disclosuresHash":${s(p.disclosuresHash)},"planHash":${s(p.planHash)},"revisionHash":${s(p.revisionHash)},` +
+    `"targetContractHash":${s(p.targetContractHash)},"validationReceiptHash":${s(p.validationReceiptHash)}}`;
+  return createHash("sha256").update(`{"domain":"KAURO_PLAN_APPROVAL_V1","payload":${payload},"version":1}`, "utf8").digest("hex");
+}
+
 export function subject(name: string, opts: { verified?: boolean; state?: "ACTIVE" | "DISABLED" } = {}): AuthenticatedSubject {
   const verified = opts.verified ?? true;
   const identity: IdentityFacts = {

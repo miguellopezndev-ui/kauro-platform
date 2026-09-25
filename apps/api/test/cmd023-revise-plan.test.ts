@@ -192,7 +192,7 @@ test("RACE: two RevisePlan calls with expectedVersion 2 — one 201, one 409 STA
   assert.equal(await w.count("approvals", "plan_id IN ($1, $2)", [plan.planId, winner.data.plan.planId]), 0);
 });
 
-test("RACE: two revisions on one version → one successor; identical retry replays; crash leaves the predecessor unsuperseded", async () => {
+test("RACE: two revisions on one version → one successor; identical retry replays; the same key with another patch → 409 IDEMPOTENCY_CONFLICT; crash leaves the predecessor unsuperseded and the same key then revises it once", async () => {
   const plan = await w.approvable(w.A, projectId, "revise-race");
   const url = routes.revisePlan(plan.planId);
   const keyA = freshKey("cmd023-race-a");
@@ -213,17 +213,28 @@ test("RACE: two revisions on one version → one successor; identical retry repl
   assert.equal(replay.replayed, true);
   assert.deepEqual(replay.data, winner.data);
   assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
+  // the same key with another patch (a different decision artifact) is a typed conflict with no effect
+  const conflict = await call(w, { url, token: w.operator.token, key: keyA, body: patchBody(plan, "Phone", "EDIT_C") });
+  assert.equal(outcome(w, conflict), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
+  assert.equal(await w.count("command_journal", "idempotency_key = $1", [keyA]), 1);
   // crash before COMMIT on a fresh plan: the predecessor stays VALIDATED at its version, no successor row exists
   const fresh = await w.approvable(w.A, projectId, "revise-crash");
   const crashKey = freshKey("cmd023-crash");
+  const crashBody = patchBody(fresh);
   w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
-  const crashed = await call(w, { url: routes.revisePlan(fresh.planId), token: w.operator.token, key: crashKey, body: patchBody(fresh) });
+  const crashed = await call(w, { url: routes.revisePlan(fresh.planId), token: w.operator.token, key: crashKey, body: crashBody });
   assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
+  assert.deepEqual(asProblem(w, crashed).nextActions, [{ action: "RETRY_SAME_KEY" }]);
   assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
   const row = await w.row<{ state: string; version: string; superseded_by_plan_id: string | null }>("plans", "plan_id = $1", [fresh.planId]);
   assert.deepEqual(row && { state: row.state, version: row.version, successor: row.superseded_by_plan_id }, { state: "VALIDATED", version: "4", successor: null });
   assert.equal(await w.count("plans", "supersedes_plan_id = $1", [fresh.planId]), 0);
   assert.equal(await w.journal(crashKey), null);
+  // the same key is then the first execution of that logical operation: one successor, not replayed
+  const retried = completed<RevisePlanView>(await call(w, { url: routes.revisePlan(fresh.planId), token: w.operator.token, key: crashKey, body: crashBody }), 201);
+  assert.equal(retried.replayed, false);
+  assert.equal(await w.count("plans", "supersedes_plan_id = $1", [fresh.planId]), 1);
 });
 
 

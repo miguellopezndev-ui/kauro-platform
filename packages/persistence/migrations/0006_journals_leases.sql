@@ -79,19 +79,64 @@ CREATE TABLE kauro.request_journal (
   reserved_cents           bigint NOT NULL CHECK (reserved_cents > 0),
   actual_cents             bigint CHECK (actual_cents IS NULL OR actual_cents >= 0),
   cost_grant_id            uuid NOT NULL,
+  -- S089 "failed upstream": the dispatch attempts whose consumed responses this request depends on, declared with the
+  -- reservation (an empty list when it depends on none). Guard request_journal_upstream_resolved below; immutable.
+  upstream_request_ids     uuid[] NOT NULL,
   reserved_at              timestamptz NOT NULL,
   updated_at               timestamptz NOT NULL,
   -- one physical attempt per fence of a logical task (07: unique constraints close races in active attempts)
   UNIQUE (task_id, fence),
   CONSTRAINT request_journal_response_before_consume CHECK (state NOT IN ('RESPONSE_STORED', 'CONSUMED') OR response_artifact_hash IS NOT NULL),
   CONSTRAINT request_journal_reconciled_needs_actual CHECK (usage_state <> 'RECONCILED' OR actual_cents IS NOT NULL),
-  CONSTRAINT request_journal_known_needs_actual CHECK (usage_state <> 'KNOWN' OR actual_cents IS NOT NULL)
+  CONSTRAINT request_journal_known_needs_actual CHECK (usage_state <> 'KNOWN' OR actual_cents IS NOT NULL),
+  -- a bounded one-dimensional list (a NULL element, an unknown id and the request itself are refused by the guard below as
+  -- unknown upstreams, before this constraint is evaluated)
+  CONSTRAINT request_journal_upstream_shape CHECK (cardinality(upstream_request_ids) <= 64 AND coalesce(array_ndims(upstream_request_ids), 1) = 1)
 );
 CREATE INDEX request_journal_by_task ON kauro.request_journal (task_id, fence);
 CREATE INDEX request_journal_by_agency ON kauro.request_journal (agency_id, reserved_at) WHERE agency_id IS NOT NULL;
 CREATE TRIGGER request_journal_touch BEFORE UPDATE ON kauro.request_journal FOR EACH ROW EXECUTE FUNCTION kauro.touch_updated_at();
 CREATE TRIGGER request_journal_immutable BEFORE UPDATE ON kauro.request_journal
-  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('request_id,task_id,agency_id,request_hash,fence,reserved_cents,cost_grant_id,reserved_at');
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('request_id,task_id,agency_id,request_hash,fence,reserved_cents,cost_grant_id,upstream_request_ids,reserved_at');
+
+-- S089 "A prompt has short SHA, failed upstream or spending without ceiling" → "Reject runnable materialization until actual
+-- dependencies and grants are resolved". A reservation (RESERVED, the durable runnable intent) can be materialized only when
+-- every upstream it names is an actual dispatch attempt of the same tenant scope whose complete response was stored and
+-- consumed: CONSUMED, which is terminal, so a resolved dependency can never turn into a failed one afterwards. An upstream that
+-- FAILED or was CANCELLED, one that is UNCERTAIN (an ambiguous dispatch is not a resolved result — 21 "Unknown external effects
+-- remain uncertain and reserved"), one still RESERVED, DISPATCHING or RESPONSE_STORED, an unknown id, another tenant's attempt
+-- and a repeated id refuse the reservation with UPSTREAM_UNRESOLVED (KA009). The upstream rows are read FOR SHARE: a concurrent
+-- transition of an upstream (to FAILED or to CONSUMED) is ordered entirely before or after the reservation, never interleaved.
+CREATE OR REPLACE FUNCTION kauro.request_journal_upstream_resolved() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  upstream uuid;
+  upstream_state text;
+  upstream_agency uuid;
+BEGIN
+  -- an absent list is refused by the column constraint (NOT NULL), which PostgreSQL checks after BEFORE triggers
+  IF NEW.upstream_request_ids IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF cardinality(NEW.upstream_request_ids) <> (SELECT count(DISTINCT u) FROM unnest(NEW.upstream_request_ids) AS u) THEN
+    RAISE EXCEPTION 'UPSTREAM_UNRESOLVED: request % names an upstream twice', NEW.request_id USING ERRCODE = 'KA009';
+  END IF;
+  FOREACH upstream IN ARRAY NEW.upstream_request_ids LOOP
+    SELECT r.state, r.agency_id INTO upstream_state, upstream_agency
+      FROM kauro.request_journal r WHERE r.request_id = upstream FOR SHARE;
+    IF NOT FOUND OR upstream_agency IS DISTINCT FROM NEW.agency_id THEN
+      RAISE EXCEPTION 'UPSTREAM_UNRESOLVED: request % depends on an unknown upstream %', NEW.request_id, upstream USING ERRCODE = 'KA009';
+    END IF;
+    IF upstream_state <> 'CONSUMED' THEN
+      RAISE EXCEPTION 'UPSTREAM_UNRESOLVED: request % depends on upstream % in state %', NEW.request_id, upstream, upstream_state USING ERRCODE = 'KA009';
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER request_journal_upstream_resolved BEFORE INSERT ON kauro.request_journal
+  FOR EACH ROW EXECUTE FUNCTION kauro.request_journal_upstream_resolved();
 
 -- terminal states stay terminal; a stored response is never replaced; updatedAt is monotonic (RequestJournal.updatedAt)
 CREATE OR REPLACE FUNCTION kauro.request_journal_guard() RETURNS trigger
@@ -121,20 +166,28 @@ CREATE TABLE kauro.leases (
   expires_at       timestamptz NOT NULL,
   heartbeat_at     timestamptz NOT NULL,
   cancel_version   bigint NOT NULL DEFAULT 0 CHECK (cancel_version >= 0),
-  -- S090: the absolute deadline, the execution subject and the checkpoint identity of the logical operation are preserved
+  -- S090: the absolute deadline (clock), the execution subject, the cost identity and the checkpoint identity of the logical
+  -- operation are preserved
   deadline_at      timestamptz NOT NULL,
   subject_hash     text NOT NULL CHECK (kauro.is_sha256_hex(subject_hash)),
+  -- the funding authority the leased operation spends against: the CostGrant of a MODEL_TASK, the CommercialAuthorization of
+  -- a JOB_ATTEMPT (07 "CommercialAuthorization": consumed by one logical processing job, with technical retries under that
+  -- same entitlement; contract Audit: the logical audit retains its original deadlines and grant across retries; 22 "Preserve
+  -- original deadlines and cost grants"). OUTBOX_DISPATCH and SWEEP spend nothing and carry none. Fixed by the first claim;
+  -- a takeover naming another one is refused (IMMUTABLE_COLUMN).
+  cost_authority_id uuid,
   checkpoint_hash  text CHECK (checkpoint_hash IS NULL OR kauro.is_sha256_hex(checkpoint_hash)),
   created_at       timestamptz NOT NULL,
   updated_at       timestamptz NOT NULL,
   PRIMARY KEY (resource_kind, resource_id),
   -- a renewal never extends past the absolute deadline
-  CONSTRAINT leases_within_deadline CHECK (expires_at <= deadline_at)
+  CONSTRAINT leases_within_deadline CHECK (expires_at <= deadline_at),
+  CONSTRAINT leases_cost_authority_by_kind CHECK ((resource_kind IN ('MODEL_TASK', 'JOB_ATTEMPT')) = (cost_authority_id IS NOT NULL))
 );
 CREATE INDEX leases_expiry ON kauro.leases (expires_at);
 CREATE TRIGGER leases_touch BEFORE UPDATE ON kauro.leases FOR EACH ROW EXECUTE FUNCTION kauro.touch_updated_at();
 CREATE TRIGGER leases_immutable BEFORE UPDATE ON kauro.leases
-  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('resource_kind,resource_id,deadline_at,subject_hash,created_at');
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('resource_kind,resource_id,deadline_at,subject_hash,cost_authority_id,created_at');
 
 -- fence discipline and checkpoint identity (Lease invariant; S090)
 CREATE OR REPLACE FUNCTION kauro.leases_guard() RETURNS trigger
@@ -163,10 +216,11 @@ $$;
 CREATE TRIGGER leases_guard BEFORE UPDATE ON kauro.leases FOR EACH ROW EXECUTE FUNCTION kauro.leases_guard();
 
 -- Atomic claim. Returns the resulting row: the caller compares owner_id with its own id (a different owner means HELD).
--- The first claim fixes deadline and subject; a later claim passes them again and the immutability trigger refuses a change
--- (S090 "resets an absolute deadline" -> KA004 DEADLINE_IMMUTABLE); a resume passes the checkpoint it continues from.
+-- The first claim fixes deadline, subject and cost identity; a later claim passes them again and the immutability trigger
+-- refuses a change (S090 "resets an absolute deadline" -> KA004 DEADLINE_IMMUTABLE; another cost authority -> KA004
+-- COST_IMMUTABLE); a resume passes the checkpoint it continues from.
 CREATE OR REPLACE FUNCTION kauro.claim_lease(
-  p_kind text, p_resource uuid, p_owner uuid, p_ttl_seconds integer, p_deadline timestamptz, p_subject text, p_checkpoint text, p_now timestamptz
+  p_kind text, p_resource uuid, p_owner uuid, p_ttl_seconds integer, p_deadline timestamptz, p_subject text, p_cost_authority uuid, p_checkpoint text, p_now timestamptz
 ) RETURNS kauro.leases
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -181,15 +235,15 @@ BEGIN
   END IF;
   SELECT * INTO cur FROM kauro.leases WHERE resource_kind = p_kind AND resource_id = p_resource FOR UPDATE;
   IF NOT FOUND THEN
-    INSERT INTO kauro.leases (resource_kind, resource_id, owner_id, fence, expires_at, heartbeat_at, cancel_version, deadline_at, subject_hash, checkpoint_hash, created_at, updated_at)
-    VALUES (p_kind, p_resource, p_owner, 1, LEAST(p_now + make_interval(secs => p_ttl_seconds), p_deadline), p_now, 0, p_deadline, p_subject, p_checkpoint, p_now, p_now)
+    INSERT INTO kauro.leases (resource_kind, resource_id, owner_id, fence, expires_at, heartbeat_at, cancel_version, deadline_at, subject_hash, cost_authority_id, checkpoint_hash, created_at, updated_at)
+    VALUES (p_kind, p_resource, p_owner, 1, LEAST(p_now + make_interval(secs => p_ttl_seconds), p_deadline), p_now, 0, p_deadline, p_subject, p_cost_authority, p_checkpoint, p_now, p_now)
     RETURNING * INTO cur;
     RETURN cur;
   END IF;
   IF cur.owner_id = p_owner THEN
     UPDATE kauro.leases
        SET expires_at = LEAST(p_now + make_interval(secs => p_ttl_seconds), deadline_at), heartbeat_at = p_now,
-           deadline_at = p_deadline, subject_hash = p_subject
+           deadline_at = p_deadline, subject_hash = p_subject, cost_authority_id = p_cost_authority
      WHERE resource_kind = p_kind AND resource_id = p_resource
      RETURNING * INTO cur;
     RETURN cur;
@@ -200,7 +254,7 @@ BEGIN
   UPDATE kauro.leases
      SET owner_id = p_owner, fence = fence + 1,
          expires_at = LEAST(p_now + make_interval(secs => p_ttl_seconds), deadline_at), heartbeat_at = p_now,
-         deadline_at = p_deadline, subject_hash = p_subject, checkpoint_hash = p_checkpoint
+         deadline_at = p_deadline, subject_hash = p_subject, cost_authority_id = p_cost_authority, checkpoint_hash = p_checkpoint
    WHERE resource_kind = p_kind AND resource_id = p_resource
    RETURNING * INTO cur;
   RETURN cur;

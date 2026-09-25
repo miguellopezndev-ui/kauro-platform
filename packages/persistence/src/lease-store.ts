@@ -2,7 +2,7 @@
  * Lease store over `pg` (contract Lease: an old live worker cannot publish after another owner advances the fence;
  * 07 "Job and attempt states": a claim creates a monotonically increasing fence and a lease, a renewal cannot change the
  * immutable execution subject; S090: a resume that omits or swaps the stored checkpoint, or resets the absolute deadline, is
- * refused; decision D-LEASE-1). The atomic operations are the SQL functions kauro.claim_lease / heartbeat_lease /
+ * refused, and subject, clock, cost and checkpoint identity are preserved; decision D-LEASE-1). The atomic operations are the SQL functions kauro.claim_lease / heartbeat_lease /
  * checkpoint_lease / cancel_lease, run by kauro_control (SECURITY INVOKER). A claim runs under a savepoint so a refusal
  * (KA005 / KA004 raised by the guard triggers) does not abort the caller's transaction: a sweeper claims many leases in one
  * unit of work and answers each refusal on its own.
@@ -21,10 +21,11 @@ interface LeaseRow {
   cancel_version: string;
   deadline_at: Date;
   subject_hash: string;
+  cost_authority_id: string | null;
   checkpoint_hash: string | null;
 }
 
-const LEASE_COLUMNS = "resource_kind, resource_id, owner_id, fence, expires_at, heartbeat_at, cancel_version, deadline_at, subject_hash, checkpoint_hash";
+const LEASE_COLUMNS = "resource_kind, resource_id, owner_id, fence, expires_at, heartbeat_at, cancel_version, deadline_at, subject_hash, cost_authority_id, checkpoint_hash";
 
 function leaseRecord(r: LeaseRow): LeaseRecord {
   return {
@@ -37,6 +38,7 @@ function leaseRecord(r: LeaseRow): LeaseRecord {
     cancelVersion: int(r.cancel_version),
     deadlineAt: instant(r.deadline_at),
     subjectHash: r.subject_hash,
+    costAuthorityId: r.cost_authority_id,
     checkpointHash: optionalText(r.checkpoint_hash) ?? null,
   };
 }
@@ -52,6 +54,7 @@ function refusalReason(refusal: LeaseRefusal): Extract<ClaimOutcome, { kind: "RE
   const m = refusal.serverMessage;
   if (m.includes("RESUME_WITHOUT_CHECKPOINT") || m.includes("CHECKPOINT_MISMATCH")) return "RESUME_WITHOUT_CHECKPOINT";
   if (m.includes("deadline_at")) return "DEADLINE_IMMUTABLE";
+  if (m.includes("cost_authority_id")) return "COST_IMMUTABLE";
   if (m.includes("subject_hash")) return "SUBJECT_IMMUTABLE";
   if (m.includes("deadline of")) return "DEADLINE_PASSED";
   throw refusal;
@@ -67,8 +70,8 @@ export class PgLeaseStore implements LeaseStore {
     try {
       const r = await execute<LeaseRow>(
         this.db,
-        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [claim.resourceKind, claim.resourceId, claim.ownerId, claim.ttlSeconds, claim.deadlineAt, claim.subjectHash, claim.checkpointHash, now],
+        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [claim.resourceKind, claim.resourceId, claim.ownerId, claim.ttlSeconds, claim.deadlineAt, claim.subjectHash, claim.costAuthorityId, claim.checkpointHash, now],
       );
       rows = r.rows;
       await execute(this.db, "RELEASE SAVEPOINT kauro_claim_lease");
