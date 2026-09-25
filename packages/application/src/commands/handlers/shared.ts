@@ -3,7 +3,9 @@
  * stale-version answer of a compare-and-swap miss, and the version check on a locked row (10 "Concurrency and preconditions":
  * a stale edit returns the current safe version and a code directing the UI to reload or compare).
  */
-import type { ApprovalRecord, ResolvedMembership, VersionedWrite } from "@kauro/domain";
+import type { Sha256Hex } from "@kauro/contracts";
+import { DOMAINS, structuredDigest } from "@kauro/contracts";
+import type { ApprovalRecord, PlanBody, ResolvedMembership, VersionedWrite } from "@kauro/domain";
 import { DomainFailure, StaleVersionFailure } from "@kauro/domain";
 import type { CommandContext } from "../runtime.js";
 
@@ -30,4 +32,13 @@ export function controlsApproval(approval: Pick<ApprovalRecord, "actorMembership
 export function applied<T>(write: VersionedWrite<T>, extra: { readonly successorId?: string } = {}): T {
   if (write.kind === "STALE") throw new StaleVersionFailure(write.currentVersion, write.currentState, extra);
   return write.record;
+}
+
+/**
+ * The Plan bodyHash of a body: the KAURO_PLAN_BODY_V1 digest (reference/HASHING_AND_ACCOUNTING_RULES; the preimage excludes
+ * planId, version and state). A command that relies on a plan's hash recomputes it from the body it read (re-check finding N10:
+ * "the consumer recomputes the relevant preimage"); a collaborator's claim is never taken on trust.
+ */
+export function planBodyDigest(body: PlanBody): Sha256Hex {
+  return structuredDigest(DOMAINS.PLAN_BODY, 1, body);
 }

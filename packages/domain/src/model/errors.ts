@@ -139,6 +139,9 @@ export const FAILURE_REASONS = [
   "INVITATION_CONSUMED",
   "INVITATION_REVOKED",
   "INVITATION_TOKEN_MISMATCH",
+  // the database's half of the invitation rules (migration 0002 KA011): an invitation consumed, revoked or past its deadline,
+  // or an acceptance without a consumed invitation of that role
+  "INVITATION_NOT_OPEN",
   "MEMBER_ALREADY_LIVE",
   "ROLE_NOT_GRANTABLE",
   "OWNER_PROTECTED",
@@ -192,6 +195,8 @@ export const FAILURE_REASONS = [
   // a reply its route's response contract refuses is never sent (10 "Responses and safe errors": a validated DTO)
   "RESPONSE_CONTRACT_VIOLATION",
   "EVENT_MISSING",
+  // a plan body whose KAURO_PLAN_BODY_V1 digest is not the hash recorded or claimed for it (re-check finding N10)
+  "BODY_DIGEST_MISMATCH",
   "VERSION_DISCIPLINE",
   "IMMUTABLE_COLUMN",
   "LIVE_APPROVAL_UNBOUND",
@@ -200,6 +205,9 @@ export const FAILURE_REASONS = [
   "DEADLINE_IMMUTABLE",
   // dispatch materialization (S089: reject runnable materialization until actual dependencies are resolved)
   "UPSTREAM_UNRESOLVED",
+  // provider ingress (15 "Webhooks and reconciliation"; migration 0005 KA012): a recorded event with a conflicting delivery
+  // cannot be applied before it is reconciled
+  "INBOX_BODY_CONFLICT",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

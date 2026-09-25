@@ -13,7 +13,13 @@
 export const REQUEST_SCHEMA_PREFIX = "urn:kauro:api:v1:request:";
 
 const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
-const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]+$" } as const;
+/**
+ * A label: 1..200 characters with no control character, a control character being a code point of Unicode General Category Cc
+ * (C0 U+0000..U+001F, DEL U+007F and C1 U+0080..U+009F) — exactly what kauro.is_label (migration 0001) and the domain's isLabel
+ * refuse, so the closed schema is the whole contract of the field (re-check finding N6).
+ */
+export const LABEL_PATTERN = "^[^\\u0000-\\u001f\\u007f-\\u009f]+$";
+const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const MODE = { type: "string", enum: ["CLEAN", "HUBSPOT", "SALESFORCE"] } as const;

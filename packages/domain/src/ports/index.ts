@@ -12,6 +12,9 @@ export type {
   AgencyRepository,
   NewMembership,
   MembershipRepository,
+  InvitationIssue,
+  InvitationClose,
+  InvitationRepository,
   ProcessingAuthorityRepository,
   NewEndClient,
   EndClientRepository,
@@ -30,3 +33,15 @@ export type {
 } from "./repositories.js";
 export type { LeaseStore, LeaseRecord, LeaseClaim, ClaimOutcome, LeaseResourceKind } from "./lease-store.js";
 export type { RequestJournal, RequestJournalRecord, RequestReservation } from "./request-journal.js";
+export type {
+  InboxDelivery,
+  IngressOutcome,
+  InboxIngress,
+  InboxState,
+  ClaimedInboxRecord,
+  InboxSettlement,
+  InboxConsumerStore,
+  OutboxDelivery,
+  OutboxSettlement,
+  OutboxDispatchStore,
+} from "./inbox-outbox.js";

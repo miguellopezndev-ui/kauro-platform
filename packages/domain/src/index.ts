@@ -22,6 +22,7 @@ export type {
   CapabilityId,
   EventId,
   OutboxId,
+  InboxId,
   CorrelationId,
   CausationId,
   JournalEntryId,

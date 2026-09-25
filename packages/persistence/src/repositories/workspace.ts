@@ -38,7 +38,7 @@ import {
   type VersionedWrite,
 } from "@kauro/domain";
 import { execute, instant, int, optionalInstant, optionalText, text, withOptional, type Queryable } from "../sql.js";
-import { staleOrMissing } from "./tenancy.js";
+import { awaitTransition, staleOrMissing } from "./tenancy.js";
 
 // --- processing authorities -------------------------------------------------------------------------------------------
 
@@ -301,16 +301,21 @@ export class PgDatasetRevisionRepository implements DatasetRevisionRepository {
   }
 
   /**
-   * FOR SHARE conflicts with the row lock any UPDATE takes, so a concurrent expiry or supersession of the revision waits for
-   * this transaction; if it committed first, READ COMMITTED re-evaluates `state = 'SEALED'` on the committed row version and
-   * the revision is not returned (the caller answers SOURCE_EXPIRED).
+   * The revision of the plan's own project with that manifest hash (re-check finding N9), read after its transition lock
+   * (D-TX-2): the identity lookup is stable (a manifest hash, once set, is referenced by the plan's key and never moves), the
+   * lock is taken on that revision, and the state is read in the next statement — an expiry or supersession committed first is
+   * what comes back (the caller answers SOURCE_EXPIRED), one issued later waits for this transaction.
    */
-  async lockSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null> {
-    const r = await execute<RevisionRow>(
+  async lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null> {
+    const found = await execute<{ revision_id: string }>(
       this.db,
-      `SELECT ${REVISION_COLUMNS} FROM kauro.dataset_revisions WHERE agency_id = $1 AND manifest_hash = $2 AND state = 'SEALED' FOR SHARE`,
-      [agencyId, revisionHash],
+      "SELECT revision_id FROM kauro.dataset_revisions WHERE agency_id = $1 AND project_id = $2 AND manifest_hash = $3",
+      [agencyId, projectId, revisionHash],
     );
+    const id = found.rows[0]?.revision_id;
+    if (id === undefined) return null;
+    await awaitTransition(this.db, "kauro.dataset_revisions", id);
+    const r = await execute<RevisionRow>(this.db, `SELECT ${REVISION_COLUMNS} FROM kauro.dataset_revisions WHERE revision_id = $1`, [id]);
     return r.rows[0] ? revisionRecord(r.rows[0]) : null;
   }
 }
@@ -362,16 +367,20 @@ export class PgTargetContractRepository implements TargetContractRepository {
   }
 
   /**
-   * FOR SHARE on the contract relied on: a concurrent supersession waits for this transaction; if it committed first, the
-   * predicate `superseded_at IS NULL` is re-evaluated on the committed row version and the contract is not returned (the
-   * caller answers TARGET_STALE).
+   * The contract of the plan's own project with that body hash (unique per project, re-check findings N4, N9), read after its
+   * transition lock (D-TX-2): a supersession committed first is what comes back (the caller answers TARGET_STALE), one issued
+   * later waits for this transaction. Another project's contract with the same body hash is never this plan's target.
    */
-  async lockCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null> {
-    const r = await execute<ContractRow>(
+  async lockCurrentByHash(agencyId: AgencyId, projectId: ProjectId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null> {
+    const found = await execute<{ contract_id: string }>(
       this.db,
-      `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE agency_id = $1 AND body_hash = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL ORDER BY observed_at DESC LIMIT 1 FOR SHARE`,
-      [agencyId, targetContractHash],
+      "SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND body_hash = $3",
+      [agencyId, projectId, targetContractHash],
     );
+    const id = found.rows[0]?.contract_id;
+    if (id === undefined) return null;
+    await awaitTransition(this.db, "kauro.target_contracts", id);
+    const r = await execute<ContractRow>(this.db, `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1`, [id]);
     return r.rows[0] ? contractRecord(r.rows[0]) : null;
   }
 }
@@ -421,23 +430,24 @@ export class PgCapabilityRepository implements CapabilityRepository {
    * the newest capability of the mode so the handler can name MODE_NOT_OFFERED against a real state; null when none exists.
    */
   async findMode(mode: ServiceMode): Promise<CapabilityRecord | null> {
-    return this.selectMode(mode, "");
+    return this.selectMode(mode);
   }
 
   /**
-   * findMode FOR SHARE (migration 0003 grants the runtime role the lock and nothing else: UPDATE on the immutable key column
-   * under a policy whose WITH CHECK refuses every written row). A control-plane transition of the returned capability waits
-   * for this transaction; if it committed first, the committed row version — its new state — is what comes back.
+   * findMode after the mode's transition lock (D-TX-2; the runtime role holds no lock or write privilege on capabilities): a
+   * control-plane transition of a capability of the mode issued meanwhile waits for this transaction, one committed first — its
+   * new state — is what comes back, and creations arriving after a queued suspension wait behind it (re-check finding N3).
    */
   async lockMode(mode: ServiceMode): Promise<CapabilityRecord | null> {
-    return this.selectMode(mode, " FOR SHARE");
+    await awaitTransition(this.db, "kauro.capabilities", mode);
+    return this.selectMode(mode);
   }
 
-  private async selectMode(mode: ServiceMode, locking: "" | " FOR SHARE"): Promise<CapabilityRecord | null> {
+  private async selectMode(mode: ServiceMode): Promise<CapabilityRecord | null> {
     const r = await execute<CapabilityRow>(
       this.db,
       `SELECT ${CAPABILITY_COLUMNS} FROM kauro.capabilities WHERE kind = 'MODE' AND mode = $1
-       ORDER BY (state IN ('AVAILABLE_LIMITED', 'AVAILABLE')) DESC, created_at DESC, capability_id DESC LIMIT 1${locking}`,
+       ORDER BY (state IN ('AVAILABLE_LIMITED', 'AVAILABLE')) DESC, created_at DESC, capability_id DESC LIMIT 1`,
       [mode],
     );
     return r.rows[0] ? capabilityRecord(r.rows[0]) : null;

@@ -40,7 +40,7 @@ async function waitForLockWait(pid: number): Promise<void> {
   throw new Error(`backend ${pid} never waited on a lock`);
 }
 
-test("two owners removing each other: one transition commits, the other is refused with LAST_OWNER (KA001); one owner remains", async () => {
+test("two owners removing each other: one transition commits, the other is refused — its actor's authority ended with the first commit (KA010); one owner remains", async () => {
   const alice = await person(app, "alice-race");
   const bob = await person(app, "bob-race");
   const ag = await agency(app, alice, "Race Agency");
@@ -58,13 +58,16 @@ test("two owners removing each other: one transition commits, the other is refus
       const n = await c.query("SELECT count(*)::int AS n FROM kauro.memberships WHERE role = 'OWNER' AND state = 'ACTIVE'");
       assert.equal(n.rows[0].n, 2);
     }
-    // T1 (alice) revokes bob: the owner-count trigger takes the agency row lock and sees one owner remaining
+    // T1 (alice) revokes bob: the revocation takes bob's membership transition lock (D-TX-2) and the owner-count trigger the
+    // agency row lock, and sees one owner remaining
     await revoke(c1, ag, alice, bobMembership, 2); // invited v1, accepted v2
-    // T2 (bob) revokes alice: blocks on the agency row lock held by T1
+    // T2 (bob) revokes alice: the membership boundary (re-check finding N11) reads bob's own authority after bob's transition
+    // lock, so T2 waits for T1; once T1 committed, bob is no longer an owner and has no authority to remove anyone. Either way
+    // the invariant is serialized and one valid owner remains (R2-043); the last-owner refusal itself is the next test's race.
     const t2 = revoke(c2, ag, bob, ag.ownerMembershipId, 1);
     await waitForLockWait(pid2);
     await c1.query("COMMIT");
-    await assert.rejects(t2, (e: unknown) => sqlState(e) === "KA001");
+    await assert.rejects(t2, (e: unknown) => sqlState(e) === "KA010");
     await c2.query("ROLLBACK");
   } finally {
     await c1.end();
@@ -79,6 +82,43 @@ test("two owners removing each other: one transition commits, the other is refus
   assert.equal(count.rows[0].active_owner_count, 1);
   const events = await oracle.query("SELECT event_type FROM kauro.domain_events WHERE aggregate_id = $1 ORDER BY sequence", [bobMembership]);
   assert.deepEqual(events.rows.map((e) => e.event_type), ["membership.invited.v1", "membership.accepted.v1", "membership.revoked.v1"]);
+});
+
+test("two owners leaving at once (each revoking their own ownership while reading two active owners): one commits, the other waits on the agency row lock and is refused with LAST_OWNER (KA001); one owner remains", async () => {
+  const gail = await person(app, "gail-leaves");
+  const hugo = await person(app, "hugo-leaves");
+  const ag = await agency(app, gail, "Leaving Agency");
+  const hugoMembership = await member(app, ag, hugo, "OWNER");
+  const c1 = await pg.connect("kauro_app_test");
+  const c2 = await pg.connect("kauro_app_test");
+  try {
+    const pid2 = (await c2.query("SELECT pg_backend_pid() AS pid")).rows[0].pid as number;
+    await c1.query("BEGIN");
+    await c2.query("BEGIN");
+    await bind(c1, { agencyId: ag.agencyId, userId: gail.userId });
+    await bind(c2, { agencyId: ag.agencyId, userId: hugo.userId });
+    for (const c of [c1, c2]) {
+      const n = await c.query("SELECT count(*)::int AS n FROM kauro.memberships WHERE role = 'OWNER' AND state = 'ACTIVE'");
+      assert.equal(n.rows[0].n, 2);
+    }
+    // each actor keeps its own authority to the end: the only shared fact is the owner count on the agency row
+    await revoke(c1, ag, gail, ag.ownerMembershipId, 1);
+    const t2 = revoke(c2, ag, hugo, hugoMembership, 2);
+    await waitForLockWait(pid2);
+    await c1.query("COMMIT");
+    await assert.rejects(t2, (e: unknown) => sqlState(e) === "KA001");
+    await c2.query("ROLLBACK");
+  } finally {
+    await c1.end();
+    await c2.end();
+  }
+  const owners = await oracle.query("SELECT membership_id, state FROM kauro.memberships WHERE agency_id = $1 AND role = 'OWNER' ORDER BY created_at", [ag.agencyId]);
+  assert.deepEqual(owners.rows, [
+    { membership_id: ag.ownerMembershipId, state: "REVOKED" },
+    { membership_id: hugoMembership, state: "ACTIVE" },
+  ]);
+  const count = await oracle.query("SELECT active_owner_count FROM kauro.agencies WHERE agency_id = $1", [ag.agencyId]);
+  assert.equal(count.rows[0].active_owner_count, 1);
 });
 
 test("the sole owner cannot revoke themselves; a non-owner can be revoked; closure authority permits the removal", async () => {

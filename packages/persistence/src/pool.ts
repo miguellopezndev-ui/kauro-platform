@@ -9,8 +9,9 @@
  * context on the request-handler pool (kauro_app) and a TENANT/IDENTITY/ANONYMOUS context on the control pool (kauro_control)
  * (decision D-CTX-1, with the ANONYMOUS context of the review record B06-review/A-pipeline-authorization.md: four contexts,
  * two command roles, no crossing). The two evidence producers — kauro_assurance (the step-up verifier) and kauro_validator
- * (the independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
- * login that belongs to two groups is refused, so a request handler can never also be the producer of the evidence it checks.
+ * (the independent Migration validator) — and the provider-webhook ingress (kauro_ingress, inbox.ts) run no unit of work at
+ * all: their pools serve only their recorders. A login that belongs to two groups is refused, so a request handler can never
+ * also be the producer of the evidence it checks, nor the ingress of the provider events its agency could want to suppress.
  *
  * An error of a pooled connection (server restart, administrator termination, failover, network loss), idle or held by a
  * caller, is neither swallowed nor allowed to end the process (review finding R38; 14 "Monitoring and service health": a
@@ -20,9 +21,9 @@
  */
 import { Pool, type PoolClient } from "pg";
 
-export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator";
+export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress";
 
-export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator"]);
+export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress"]);
 
 export interface PoolConfig {
   readonly host: string;

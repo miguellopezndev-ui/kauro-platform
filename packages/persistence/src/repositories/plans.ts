@@ -6,6 +6,7 @@
  * foreign hash (23503 → INVALID_REQUEST / UNKNOWN_REFERENCE) or a second live approval (23505 approvals_one_live_per_plan)).
  */
 import type { Plan, RowCounts, Sha256Hex, UtcInstant, ValidationReceipt } from "@kauro/contracts";
+import { DOMAINS, structuredDigest } from "@kauro/contracts";
 import {
   DomainFailure,
   type AgencyId,
@@ -80,6 +81,15 @@ function isPlanBody(v: unknown): v is PlanBody {
   return ["revisionHash", "targetContractHash", "policyHash"].every((k) => typeof o[k] === "string") && ["mappings", "identities", "transforms", "relationships"].every((k) => Array.isArray(o[k]));
 }
 
+/**
+ * The Plan bodyHash: the KAURO_PLAN_BODY_V1 digest of the closed body (reference/HASHING_AND_ACCOUNTING_RULES; the preimage
+ * excludes planId, version and state). The repository computes it for every revision it stores, so the stored body_hash is the
+ * digest of the stored body whatever a collaborator claimed (re-check finding N10).
+ */
+export function planBodyHash(body: PlanBody): Sha256Hex {
+  return structuredDigest(DOMAINS.PLAN_BODY, 1, body);
+}
+
 export class PgPlanRepository implements PlanRepository {
   constructor(private readonly db: Queryable) {}
 
@@ -106,7 +116,7 @@ export class PgPlanRepository implements PlanRepository {
       this.db,
       `INSERT INTO kauro.plans (plan_id, agency_id, project_id, version, state, revision_hash, target_contract_hash, policy_hash, body, body_hash, supersedes_plan_id, created_by_membership_id, created_at, updated_at)
        VALUES ($1, $2, $3, 1, 'DRAFT', $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $11) RETURNING ${PLAN_COLUMNS}`,
-      [plan.planId, plan.agencyId, plan.projectId, plan.body.revisionHash, plan.body.targetContractHash, plan.body.policyHash, JSON.stringify(plan.body), plan.bodyHash, plan.supersedesPlanId ?? null, plan.createdByMembershipId, plan.createdAt],
+      [plan.planId, plan.agencyId, plan.projectId, plan.body.revisionHash, plan.body.targetContractHash, plan.body.policyHash, JSON.stringify(plan.body), planBodyHash(plan.body), plan.supersedesPlanId ?? null, plan.createdByMembershipId, plan.createdAt],
     );
     const row = r.rows[0];
     if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "plan insert returned no row");

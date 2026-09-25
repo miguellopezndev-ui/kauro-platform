@@ -301,7 +301,7 @@ test("R9 RACE: a command in flight holds its actor's membership — a revocation
         plan !== null && proof !== null
           ? call(w, { url: routes.approvePlan(plan.planId), token: person.token, key: freshKey(c.name), body: approvalBodyOf(plan, proof) })
           : call(w, { url: routes.createClient(w.A.agencyId), token: person.token, agency: null, key: freshKey(c.name), body: { displayName: c.name, processingAuthorityRef: w.authorityA } });
-      await waitForApiLockWait(w, "kauro.memberships");
+      await waitForApiLockWait(w, "await_transition('kauro.memberships'");
       await changer.query("COMMIT");
     } catch (e) {
       await changer.query("ROLLBACK");
@@ -403,4 +403,109 @@ test("R18 DENY: CMD026 checks the approval controller before version and state �
   const neverApproved = await w.approvable(w.A, projectId, "r18-never");
   assert.equal(outcome(w, await withdraw(w.approver2, 4, neverApproved.planId)), "409 PRECONDITION_FAILED PLAN_NOT_APPROVED");
   assert.equal(outcome(w, await withdraw(w.approver2, 3, neverApproved.planId)), "409 STALE_VERSION -");
+});
+
+test("N1 RACE: a disable issued by the platform while CreateAgency is in flight waits for it and survives — the command's identity sync never writes the security status back; a disable committed first refuses the command", async () => {
+  // Re-check finding N1 (V-R16a): the authorizer read the stored identity without a lock and CreateAgency's sync wrote the
+  // token's ACTIVE over a DISABLED committed meanwhile. Now the authorizer reads the identity after its transition lock
+  // (D-TX-2), so the disable is ordered after the command, and the sync never writes `state` (the request-handler role holds no
+  // privilege on it).
+  const founder = await w.person("n1-founder");
+  const platform = await w.h.pg.connect("postgres");
+  try {
+    await platform.query("SET application_name = 'kauro-test-platform'");
+    const hold = w.holds.arm("journal.reserved");
+    const request = call(w, { url: routes.createAgency(), token: founder.token, agency: null, key: freshKey("n1-race"), body: { displayName: "Race Founder Agency" } });
+    await hold.reached;
+    const disable = platform.query("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [founder.userId]);
+    try {
+      // the platform's disable waits for the in-flight command (it would have committed at once before the fix)
+      await waitForLockWait(w.h.oracle, "kauro-test-platform", "UPDATE kauro.identities");
+    } finally {
+      hold.release();
+    }
+    completed<{ agency: AgencyView; membership: MembershipView }>(await request, 201);
+    assert.equal((await disable).rowCount, 1);
+  } finally {
+    await platform.end();
+  }
+  assert.equal((await w.row<{ state: string }>("identities", "user_id = $1", [founder.userId]))?.state, "DISABLED", "the disable ordered after the command survives it");
+  // once DISABLED, every command of that identity is refused whatever its token says
+  const again = await call(w, { url: routes.createAgency(), token: founder.token, agency: null, body: { displayName: "After the disable" } });
+  assert.equal(outcome(w, again), "403 NOT_AUTHORIZED IDENTITY_DISABLED");
+});
+
+test("N1: the identity a disable restricts cannot lift it — its own runtime session is refused (42501) and every command stays IDENTITY_DISABLED; only the platform re-enables it", async () => {
+  // Re-check finding N1 (V-R16b): identities_self FOR ALL plus the UPDATE grant let the request-handler role re-enable its own
+  // DISABLED row with one UPDATE.
+  const member = await w.person("n1-member");
+  await w.h.addMember(w.A, member.userId, "OPERATOR");
+  await w.h.oracle.query("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [member.userId]);
+  const body = { displayName: "N1 client", processingAuthorityRef: w.authorityA };
+  assert.equal(outcome(w, await call(w, { url: routes.createClient(w.A.agencyId), token: member.token, agency: null, body })), "403 NOT_AUTHORIZED IDENTITY_DISABLED");
+  const session = await w.h.appPool.raw.connect();
+  try {
+    await session.query("BEGIN");
+    await session.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, member.userId]);
+    await assert.rejects(session.query("UPDATE kauro.identities SET state = 'ACTIVE' WHERE user_id = $1", [member.userId]), (e: unknown) => (e as { code?: string }).code === "42501");
+    await session.query("ROLLBACK");
+  } finally {
+    session.release();
+  }
+  assert.equal(outcome(w, await call(w, { url: routes.createClient(w.A.agencyId), token: member.token, agency: null, body })), "403 NOT_AUTHORIZED IDENTITY_DISABLED");
+  await w.h.oracle.query("UPDATE kauro.identities SET state = 'ACTIVE' WHERE user_id = $1", [member.userId]);
+  completed<EndClientView>(await call(w, { url: routes.createClient(w.A.agencyId), token: member.token, agency: null, body }), 201);
+});
+
+test("N3 RACE: a revocation queued behind a member's in-flight command is never overtaken by that member's later commands — the next command waits behind it and is refused NOT_A_MEMBER", async () => {
+  const p = await w.person("n3-member");
+  const membershipId = await w.h.addMember(w.A, p.userId, "OPERATOR");
+  const body = (label: string) => ({ displayName: label, processingAuthorityRef: w.authorityA });
+  const hold = w.holds.arm("journal.commit");
+  const first = call(w, { url: routes.createClient(w.A.agencyId), token: p.token, agency: null, body: body("N3 first") });
+  await hold.reached;
+  const revoker = await ownerTransaction();
+  const revocation = moveMembership(revoker, membershipId, { state: "REVOKED" })
+    .then(() => revoker.query("COMMIT"))
+    .then(
+      () => null,
+      async (e: unknown) => {
+        await revoker.query("ROLLBACK");
+        return e;
+      },
+    )
+    .finally(() => revoker.release());
+  let second: Promise<Reply> | null = null;
+  try {
+    await waitForLockWait(w.h.oracle, HARNESS_APP_POOL, "UPDATE kauro.memberships");
+    // the revocation is queued; the member's next command waits behind it instead of joining the in-flight one
+    second = call(w, { url: routes.createClient(w.A.agencyId), token: p.token, agency: null, body: body("N3 second") });
+    await waitForApiLockWait(w, "await_transition('kauro.memberships'");
+  } finally {
+    hold.release();
+  }
+  completed<EndClientView>(await first, 201);
+  assert.equal(await revocation, null, "the revocation commits after the in-flight command");
+  if (second === null) throw new Error("the later request was never started");
+  assert.equal(outcome(w, await second), "404 NOT_FOUND NOT_A_MEMBER");
+  assert.equal(await w.count("end_clients", "display_name = 'N3 second'"), 0);
+});
+
+test("N11: a VIEWER's own runtime session cannot make itself OWNER in the database — the promotion is refused (KA010) and the VIEWER still cannot archive a client through the route", async () => {
+  // Re-check finding N11 (P7): memberships_tenant FOR ALL let any member's session rewrite its own role.
+  const viewerRow = await w.row<{ version: string }>("memberships", "membership_id = $1", [w.memberships.viewer]);
+  const session = await w.h.pg.connect("kauro_app_test");
+  try {
+    await session.query("BEGIN");
+    await session.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, w.viewer.userId]);
+    await assert.rejects(
+      session.query("UPDATE kauro.memberships SET role = 'OWNER', version = version + 1 WHERE membership_id = $1", [w.memberships.viewer]),
+      (e: unknown) => (e as { code?: string }).code === "KA010",
+    );
+    await session.query("ROLLBACK");
+  } finally {
+    await session.end();
+  }
+  assert.deepEqual(await w.row<{ role: string; version: string }>("memberships", "membership_id = $1", [w.memberships.viewer]).then((r) => r && { role: r.role, version: r.version }), { role: "VIEWER", version: viewerRow?.version });
+  assert.equal(outcome(w, await call(w, { url: routes.archiveClient(w.clientA), token: w.viewer.token, body: { expectedVersion: 1 } })), "403 NOT_AUTHORIZED ROLE_INSUFFICIENT");
 });

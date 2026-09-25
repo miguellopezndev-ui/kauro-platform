@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
 import { reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
 let w: World;
@@ -403,7 +403,7 @@ test("RACE: a source expiry racing ApprovePlan — the sealed revision is held u
     await expireSource(writerB, secondSource);
     const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
     try {
-      await waitForApiLockWait(w, "FROM kauro.dataset_revisions");
+      await waitForApiLockWait(w, "await_transition('kauro.dataset_revisions'");
     } finally {
       await writerB.commit();
     }
@@ -455,7 +455,7 @@ test("RACE: a target-contract supersession racing ApprovePlan — the contract i
     await writerB.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [secondTarget.contract_id]);
     const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
     try {
-      await waitForApiLockWait(w, "FROM kauro.target_contracts");
+      await waitForApiLockWait(w, "await_transition('kauro.target_contracts'");
     } finally {
       await writerB.commit();
     }
@@ -467,6 +467,89 @@ test("RACE: a target-contract supersession racing ApprovePlan — the contract i
   const plan = await w.row<{ state: string; version: string }>("plans", "plan_id = $1", [second.planId]);
   assert.deepEqual(plan && { state: plan.state, version: plan.version }, { state: "VALIDATED", version: "4" });
   assert.equal(await w.journal(key), null);
+});
+
+test("N3 RACE: a source expiry queued behind an in-flight approval is never overtaken — an approval requested after it, of another plan on the same source, waits behind the expiry and is refused 422 SOURCE_EXPIRED", async () => {
+  // Re-check finding N3 ("the same applies to lockSealedByHash ... against B07/B08 writers"): the transition lock of the
+  // revision queues a later approval behind a waiting expiry (decision D-TX-2).
+  const proof = await w.stepUp(w.approver);
+  const source = await w.revision(w.A, projectId, "SEALED");
+  const target = await w.targetContract(w.A, projectId);
+  const planOne = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "n3-source-one" });
+  const planTwo = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "n3-source-two" });
+  const sourceRow = await sourceRowOf(planOne);
+  const writer = await tenantWriter(w, w.A);
+  try {
+    const hold = w.holds.arm("collaborator");
+    const first = call(w, { url: routes.approvePlan(planOne.planId), token: w.approver.token, body: approvalBody(planOne, proof) });
+    await reachedHold(hold, first);
+    const expiry = expireSource(writer, sourceRow);
+    let second: Promise<Reply> | null = null;
+    try {
+      await waitForWriterLockWait(w, writer, "UPDATE kauro.dataset_revisions");
+      second = call(w, { url: routes.approvePlan(planTwo.planId), token: w.approver.token, body: approvalBody(planTwo, proof) });
+      await waitForApiLockWait(w, "await_transition('kauro.dataset_revisions'");
+    } finally {
+      hold.release();
+    }
+    completed<ApprovePlanView>(await first, 201);
+    await expiry;
+    await writer.commit();
+    if (second === null) throw new Error("the later request was never started");
+    assert.equal(outcome(w, await second), "422 SOURCE_EXPIRED -");
+  } finally {
+    await writer.close();
+  }
+  assert.equal(await w.count("approvals", "plan_id = $1", [planTwo.planId]), 0);
+});
+
+test("N4: the target currency is the plan's own project's contract — superseding it refuses the approval 422 TARGET_STALE even while another project of the agency holds a current contract with the same body hash", async () => {
+  // Re-check finding N4 (variant R19 target scope): lockCurrentByHash looked up by agency and hash only.
+  const plan = await w.approvable(w.A, projectId, "n4-target-scope");
+  const proof = await w.stepUp(w.approver);
+  const other = await w.project(w.A, w.clientA);
+  await w.asTenant(w.A, (c) =>
+    c.query(
+      `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, superseded_at, created_at)
+       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', NULL, now())`,
+      [ids.next(), w.A.agencyId, other.projectId, ids.next(), ids.next(), sha("bundle"), plan.targetContractHash, sha("other-authority")],
+    ),
+  );
+  const own = await w.row<{ contract_id: string }>("target_contracts", "body_hash = $1 AND project_id = $2", [plan.targetContractHash, projectId]);
+  assert.ok(own);
+  await w.asTenant(w.A, (c) => c.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [own.contract_id]));
+  const reply = await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, body: approvalBody(plan, proof) });
+  assert.equal(outcome(w, reply), "422 TARGET_STALE -");
+  assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 0);
+});
+
+test("N9: a plan of one project can never be bound to another project's sealed source or confirmed target — the plan itself is refused at insert, so no approval can bind them", async () => {
+  // Re-check finding N9 (probe P4): a VALIDATED plan of P1 naming P2's source and target was approved 201.
+  const p1 = await w.project(w.A, w.clientA);
+  const p2 = await w.project(w.A, w.clientA);
+  const src2 = await w.revision(w.A, p2.projectId);
+  const tgt2 = await w.targetContract(w.A, p2.projectId);
+  const refusedBy = (constraint: string) => (e: unknown): boolean => typeof e === "object" && e !== null && (e as { code?: string }).code === "23503" && (e as { constraint?: string }).constraint === constraint;
+  await assert.rejects(w.plan(w.A, p1.projectId, { revisionHash: src2.revisionHash, targetContractHash: tgt2.targetContractHash, seed: "n9-foreign", state: "VALIDATED" }), refusedBy("plans_source_fk"));
+  const src1 = await w.revision(w.A, p1.projectId);
+  await assert.rejects(w.plan(w.A, p1.projectId, { revisionHash: src1.revisionHash, targetContractHash: tgt2.targetContractHash, seed: "n9-foreign-target", state: "VALIDATED" }), refusedBy("plans_target_fk"));
+  assert.equal(await w.count("plans", "project_id = $1", [p1.projectId]), 0);
+  // the positive neighbour: P1's own source and target approve normally
+  const tgt1 = await w.targetContract(w.A, p1.projectId);
+  const own = await w.plan(w.A, p1.projectId, { revisionHash: src1.revisionHash, targetContractHash: tgt1.targetContractHash, seed: "n9-own", state: "VALIDATED" });
+  completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(own.planId), token: w.approver.token, body: approvalBody(own, await w.stepUp(w.approver)) }), 201);
+});
+
+test("N10: the planHash an approval binds is recomputed from the stored body — a plan whose stored hash is not the digest of its body is refused 422 INTEGRITY_FAILURE BODY_DIGEST_MISMATCH and nothing is approved", async () => {
+  const source = await w.revision(w.A, projectId);
+  const target = await w.targetContract(w.A, projectId);
+  const lying = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "n10-stored", state: "VALIDATED", storedBodyHash: sha("not-the-digest-of-the-body") });
+  assert.notEqual(lying.bodyHash, bodyHashOf(lying.body));
+  const reply = await call(w, { url: routes.approvePlan(lying.planId), token: w.approver.token, body: approvalBody(lying, await w.stepUp(w.approver)) });
+  assert.equal(outcome(w, reply), "422 INTEGRITY_FAILURE BODY_DIGEST_MISMATCH");
+  assert.equal(await w.count("approvals", "plan_id = $1", [lying.planId]), 0);
+  const row = await w.row<{ state: string; version: string }>("plans", "plan_id = $1", [lying.planId]);
+  assert.deepEqual(row && { state: row.state, version: row.version }, { state: "VALIDATED", version: "4" });
 });
 
 export type { Person };

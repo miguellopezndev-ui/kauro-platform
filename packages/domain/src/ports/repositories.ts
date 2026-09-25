@@ -12,6 +12,7 @@ import type {
   CapabilityRecord,
   DatasetRevisionRecord,
   EndClientRecord,
+  InvitationRecord,
   MembershipRecord,
   PlanBody,
   PlanRecord,
@@ -29,6 +30,7 @@ import type {
   CapabilityId,
   ClientId,
   CorrelationId,
+  InvitationId,
   MembershipId,
   PlanId,
   ProcessingAuthorityId,
@@ -55,11 +57,17 @@ export type { AssuranceProof };
 export interface IdentityRepository {
   /**
    * The caller's own stored identity facts (rows of other users are not visible under the self policy); null when the
-   * platform has never synced the identity. The authorizer reads it beside the token's facts: Identity owns the security
-   * status (07 "Aggregate ownership"), so a DISABLED row refuses whatever the token says.
+   * platform has never synced the identity. Read after the identity's transition lock, held until the unit of work ends
+   * (decision D-TX-2): a disable issued while the command runs waits for it, one committed first is read. The authorizer reads
+   * it beside the token's facts: Identity owns the security status (07 "Aggregate ownership"), so a DISABLED row refuses
+   * whatever the token says.
    */
   getOwn(userId: UserId): Promise<IdentityFacts | null>;
-  /** Upserts the caller's own identity facts from the authenticator (08: authentication produces assurance facts). */
+  /**
+   * Records the caller's own identity reference on first sight and keeps the token's verification facts current (08:
+   * authentication produces assurance facts). Never the security status: the stored state is the identity boundary's, and a
+   * sync never re-enables a DISABLED identity (re-check finding N1). Returns the stored facts.
+   */
   syncOwn(facts: IdentityFacts, provider: string, subjectHash: Sha256Hex, now: UtcInstant): Promise<IdentityFacts>;
   /**
    * A step-up proof of the caller (null when not visible or unknown). Reading only: a proof is recorded by the step-up verifier
@@ -82,10 +90,11 @@ export interface AgencyRepository {
   /** SELECT ... FOR UPDATE: serializes concurrent commands on the aggregate for the rest of the unit of work. */
   lock(agencyId: AgencyId): Promise<AgencyRecord | null>;
   /**
-   * SELECT ... FOR SHARE: the agency state a command relies on without changing the agency (CMD011: DRAFT or ACTIVE). A
-   * concurrent transition of the agency (to RESTRICTED, CLOSING, ...) waits until this unit of work ends, or — when it
-   * committed first — is read here; commands that only read the state do not serialize among themselves (07 "Transaction
-   * discipline": preconditions are rechecked under an explicit lock).
+   * The agency state a command relies on without changing the agency (CMD009, CMD011: DRAFT or ACTIVE), read after the
+   * agency's transition lock, held until the unit of work ends (decision D-TX-2): a transition of the agency (to RESTRICTED,
+   * CLOSING, ...) issued meanwhile waits until this unit of work ends, one committed first is read here, and commands arriving
+   * after a queued transition wait behind it (re-check finding N3); commands that only read the state do not serialize among
+   * themselves (07 "Transaction discipline": preconditions are rechecked under an explicit lock).
    */
   lockShared(agencyId: AgencyId): Promise<AgencyRecord | null>;
   /** Inserts a DRAFT agency at version 1 (the caller publishes agency.created.v1 in the same unit of work). */
@@ -111,12 +120,13 @@ export interface MembershipRepository {
   get(membershipId: MembershipId): Promise<MembershipRecord | null>;
   lock(membershipId: MembershipId): Promise<MembershipRecord | null>;
   /**
-   * The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any, read with a share lock held to the
-   * end of the unit of work (SELECT ... FOR SHARE; the authorizer's read). A concurrent suspension, revocation or role change
-   * of that row waits until this unit of work ends; one committed first is what this read returns (a revoked row is no longer
-   * live and is not returned). The authorization fact is therefore closed by a lock like every other invariant of a command
-   * (07 "Agency and membership states": revocation is effective server-side immediately for new commands; 07 "Transaction
-   * discipline"). Only a TENANT context of that agency can take the lock.
+   * The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any, read after the transition lock of
+   * (agency, person), held to the end of the unit of work (decision D-TX-2; the authorizer's read). A suspension, revocation or
+   * role change of that membership issued meanwhile waits until this unit of work ends; one committed first is what this read
+   * returns (a revoked row is no longer live and is not returned); a command arriving after a queued change waits behind it, so
+   * overlapping commands can never starve a revocation (re-check finding N3). The authorization fact is therefore closed by a
+   * lock like every other invariant of a command (07 "Agency and membership states": revocation is effective server-side
+   * immediately for new commands; 07 "Transaction discipline").
    */
   findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null>;
   /** The caller's memberships across agencies (self policy), for context listing. */
@@ -129,6 +139,30 @@ export interface MembershipRepository {
    */
   transition(membershipId: MembershipId, expectedVersion: number, change: Partial<Pick<Membership, "state" | "role" | "acceptedAt">> & { readonly revokedAt?: UtcInstant }, now: UtcInstant): Promise<VersionedWrite<MembershipRecord>>;
   countActiveOwners(agencyId: AgencyId): Promise<number>;
+}
+
+/** Outcome of issuing an invitation: issued, or refused because the membership already has an open one. */
+export type InvitationIssue = { readonly kind: "ISSUED"; readonly invitation: InvitationRecord } | { readonly kind: "OPEN_INVITATION_EXISTS" };
+
+/** Outcome of closing an invitation (consume or revoke): closed now, or already closed (its current record says how). */
+export type InvitationClose = { readonly kind: "CLOSED"; readonly invitation: InvitationRecord } | { readonly kind: "ALREADY_CLOSED"; readonly invitation: InvitationRecord };
+
+/**
+ * Invitation tokens (08 "Invitation, recovery and ownership transfer"; COMMAND_CATALOGUE CMD003 "one expiring invitation with a
+ * hashed single-use token and explicit agency scope", CMD004 "Atomically consume the invitation and activate the intended scoped
+ * membership"). Only the SHA-256 of a token is stored or compared (hashInvitationToken). The database decides who may issue,
+ * consume and revoke: an invitation names an INVITED membership with that membership's role and is issued by the acting
+ * session's own membership with the authority to grant it; only the invited identity consumes it, before its deadline; team
+ * authority revokes it; a closed invitation never reopens (migration 0002). The membership's INVITED -> ACTIVE edge requires a
+ * consumed invitation of that role.
+ */
+export interface InvitationRepository {
+  insert(invitation: InvitationRecord): Promise<InvitationIssue>;
+  get(invitationId: InvitationId): Promise<InvitationRecord | null>;
+  /** The invitation whose stored digest is `tokenHash`, visible to its agency or to the invited identity itself. */
+  findByTokenHash(tokenHash: Sha256Hex): Promise<InvitationRecord | null>;
+  consume(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose>;
+  revoke(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose>;
 }
 
 // --- clients and projects ---------------------------------------------------------------------------------------------
@@ -189,22 +223,23 @@ export interface ProjectRepository {
 export interface DatasetRevisionRepository {
   get(revisionId: RevisionId): Promise<DatasetRevisionRecord | null>;
   /**
-   * The sealed revision whose manifest hash is `revisionHash` in the current agency, read under a share lock held until the
-   * unit of work ends (CMD025 source binding). A concurrent transition of that revision (SEALED -> EXPIRED / SUPERSEDED)
-   * either waits for this unit of work, or committed first and the revision is no longer returned: an approval can never
-   * commit bound to a source that stopped being SEALED while it was in flight (07 "Transaction discipline").
+   * The revision of `projectId` whose manifest hash is `revisionHash` (CMD025 source binding: the plan's own project, re-check
+   * finding N9), read after its transition lock, held until the unit of work ends (decision D-TX-2): a transition of that
+   * revision (SEALED -> EXPIRED / SUPERSEDED) issued meanwhile waits for this unit of work, one committed first is what is
+   * returned, and an approval arriving after a queued transition waits behind it. The caller checks the state is SEALED: an
+   * approval can never commit bound to a source that stopped being SEALED while it was in flight (07 "Transaction discipline").
    */
-  lockSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null>;
+  lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null>;
 }
 
 export interface TargetContractRepository {
   get(contractId: TargetContractId): Promise<TargetContractRecord | null>;
   /**
-   * The confirmed, unsuperseded contract with this body hash in the current agency, read under a share lock held until the
-   * unit of work ends (CMD025 target binding): a concurrent supersession of that contract waits, or committed first and the
-   * contract is no longer returned.
+   * The contract of `projectId` with this body hash (CMD025 target binding: the plan's own project, re-check findings N4, N9),
+   * read after its transition lock, held until the unit of work ends (decision D-TX-2): a confirmation or supersession issued
+   * meanwhile waits, one committed first is what is returned. The caller checks it is confirmed and not superseded.
    */
-  lockCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
+  lockCurrentByHash(agencyId: AgencyId, projectId: ProjectId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
 }
 
 // --- plans and approvals ----------------------------------------------------------------------------------------------
@@ -213,8 +248,8 @@ export interface NewPlanRevision {
   readonly planId: PlanId;
   readonly agencyId: AgencyId;
   readonly projectId: ProjectId;
+  /** The closed body; the repository derives its bodyHash (KAURO_PLAN_BODY_V1 digest), never a caller (re-check finding N10). */
   readonly body: PlanBody;
-  readonly bodyHash: Sha256Hex;
   readonly supersedesPlanId?: PlanId;
   readonly createdByMembershipId: MembershipId;
   readonly createdAt: UtcInstant;
@@ -224,7 +259,11 @@ export interface PlanRepository {
   get(planId: PlanId): Promise<PlanRecord | null>;
   lock(planId: PlanId): Promise<PlanRecord | null>;
   getBody(planId: PlanId): Promise<PlanBody | null>;
-  /** Inserts a DRAFT plan revision at version 1 (state DRAFT; the caller applies compiled_or_edited next). */
+  /**
+   * Inserts a DRAFT plan revision at version 1 (state DRAFT; the caller applies compiled_or_edited next). Its bodyHash is the
+   * KAURO_PLAN_BODY_V1 digest of the body, computed here (reference/HASHING_AND_ACCOUNTING_RULES: the consumer recomputes the
+   * relevant preimage); its source, target and policy columns are the body's own members (the database checks that too).
+   */
   insert(plan: NewPlanRevision): Promise<PlanRecord>;
   /** Applies a listed Plan transition at expectedVersion + 1, carrying the bindings the target state requires. */
   transition(
@@ -274,9 +313,10 @@ export interface CapabilityRepository {
   /** The mode capability for a service mode (CMD011: the requested mode must be offered), null when none is published. */
   findMode(mode: ServiceMode): Promise<CapabilityRecord | null>;
   /**
-   * findMode under a share lock on the returned row, held until the unit of work ends (CMD011 relies on the capability being
-   * offered when the project commits): a concurrent control-plane transition of that capability (e.g. AVAILABLE_LIMITED ->
-   * SUSPENDED) waits for this unit of work, or committed first and its new state is what this call returns.
+   * findMode after the mode's transition lock, held until the unit of work ends (decision D-TX-2; CMD011 relies on the
+   * capability being offered when the project commits): a control-plane transition of a capability of that mode (e.g.
+   * AVAILABLE_LIMITED -> SUSPENDED) issued meanwhile waits for this unit of work, one committed first is what this call
+   * returns, and project creations arriving after a queued transition wait behind it (re-check finding N3).
    */
   lockMode(mode: ServiceMode): Promise<CapabilityRecord | null>;
   list(filter?: { readonly state?: Capability["state"] }): Promise<ReadonlyArray<CapabilityRecord>>;

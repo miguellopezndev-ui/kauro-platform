@@ -30,7 +30,7 @@ import { approvalView, planView } from "../../api/projections.js";
 import type { DisclosureComposer } from "../../ports/plan-services.js";
 import { APPROVE_PLAN, type ApprovePlanBody, type ApprovePlanHandler, type ApprovePlanView } from "../contracts.js";
 import { runCommand, type CommandRuntime } from "../runtime.js";
-import { applied, checkExpectedVersion, requireMembership } from "./shared.js";
+import { applied, checkExpectedVersion, planBodyDigest, requireMembership } from "./shared.js";
 
 /** The preimage of an approval hash (contract Approval; reference/HASHING_AND_ACCOUNTING_RULES: KAURO_PLAN_APPROVAL_V1). */
 export interface ApprovalPreimage {
@@ -77,17 +77,22 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
         if (receipt.planHash !== plan.bodyHash || receipt.revisionHash !== plan.revisionHash || receipt.targetContractHash !== plan.targetContractHash) {
           throw new DomainFailure("PLAN_NOT_VALIDATED", "receipt binds another subject", { reason: "RECEIPT_NOT_CURRENT" });
         }
-        // source: the sealed revision the plan was validated against must still be SEALED (not EXPIRED, SUPERSEDED, DELETED),
-        // read under a share lock kept to COMMIT: a concurrent expiry or supersession waits for this approval (and then sees
-        // it), or committed first and is refused here — never an approval committed over a source that stopped being SEALED
-        const source = await uow.revisions.lockSealedByHash(membership.agencyId, plan.revisionHash);
-        if (!source || source.state !== "SEALED") throw new DomainFailure("SOURCE_EXPIRED", "source revision is no longer sealed");
-        // target: the confirmed, unsuperseded contract with the plan's target hash, under the same share lock discipline
-        const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.targetContractHash);
-        if (!target || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "target contract is not current");
-        // disclosures: the server composes the complete set (every CLEAR included) and the client must have displayed exactly it
+        // the named planHash is the digest of the body this approval authorizes: recomputed from the stored body, never taken
+        // from the column alone (re-check finding N10; reference/HASHING_AND_ACCOUNTING_RULES "the consumer recomputes")
         const body = await uow.plans.getBody(planId);
         if (!body) throw new DomainFailure("INTEGRITY_FAILURE", "locked plan has no body");
+        if (planBodyDigest(body) !== plan.bodyHash) throw new DomainFailure("INTEGRITY_FAILURE", "the stored plan body is not the body its hash names", { reason: "BODY_DIGEST_MISMATCH" });
+        // source: the plan's own project's revision (re-check finding N9) that the plan was validated against must still be
+        // SEALED (not EXPIRED, SUPERSEDED, DELETED), read after its transition lock kept to COMMIT (D-TX-2): an expiry or
+        // supersession issued meanwhile waits for this approval (and then sees it), one committed first is refused here —
+        // never an approval committed over a source that stopped being SEALED
+        const source = await uow.revisions.lockSealedByHash(membership.agencyId, plan.projectId, plan.revisionHash);
+        if (!source || source.state !== "SEALED") throw new DomainFailure("SOURCE_EXPIRED", "source revision is no longer sealed");
+        // target: the plan's own project's contract with the plan's target hash (findings N4, N9), confirmed and unsuperseded,
+        // under the same transition-lock discipline
+        const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.projectId, plan.targetContractHash);
+        if (!target || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "target contract is not current");
+        // disclosures: the server composes the complete set (every CLEAR included) and the client must have displayed exactly it
         const disclosed = await disclosures.compose(uow, plan, body, receipt);
         if (disclosed.disclosuresHash !== envelope.body.disclosuresHash) {
           throw new StaleVersionFailure(plan.version, plan.state, { reason: "DISCLOSURES_INCOMPLETE", mismatch: ["disclosuresHash"] });

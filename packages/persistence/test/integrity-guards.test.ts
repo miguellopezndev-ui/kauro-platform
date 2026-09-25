@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { isDomainFailure, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
+import { isDomainFailure, type ClientId, type InboxId, type MembershipId, type UserId } from "@kauro/domain";
 import { PrivilegedRoleError, createPool, createUnitOfWorkFactory } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
 import { clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
@@ -147,16 +147,22 @@ test("R5/R13: an approval binds its actor, the actor's own membership in this ag
   const p = await plan(app, A, projectA, "VALIDATED", "r5", validator);
   const approverProof = await h.recordStepUp(approver);
   const bobProof = await h.recordStepUp(bob);
-  // (each probe runs in the session of the actor it names, so that the acting-session policy of the "R5 (acting session)"
-  // test cannot be what refuses it: only the key under test can)
+  // Two independent layers refuse a mismatched actor/membership pair. The runtime role's insert policy (acting session and,
+  // since re-check finding N11, an ACTIVE approving membership of the session's own identity) refuses it first; the composite
+  // keys refuse it for any writer, which the probes show as the superuser (it bypasses row security, never a key). Each probe
+  // runs in the session of the actor it names, so the acting-session rule is never what refuses the key probes.
+  const bothLayers = async (session: string, actor: string, membership: string, proof: string, key: string): Promise<void> => {
+    await assert.rejects(tx(app, ctx(A, session), (c) => insertApproval(c, p, ids.next(), actor, membership, proof)), refusedWith("42501"), `policy: ${key}`);
+    await assert.rejects(tx(h.oracle, ctx(A, session), (c) => insertApproval(c, p, ids.next(), actor, membership, proof)), refusedWith("23503", key), `key: ${key}`);
+  };
   // the refuter's F4: a stranger (member of B only) as the actor, A's approver membership, the stranger's proof
-  await assert.rejects(tx(app, ctx(A, bob), (c) => insertApproval(c, p, ids.next(), bob, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
-  // the approver's own membership with somebody else's step-up proof
-  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_proof_fk"));
+  await bothLayers(bob, bob, approverMembership, bobProof, "approvals_actor_membership_fk");
   // another agency's membership named inside agency A, even with the matching actor and proof
-  await assert.rejects(tx(app, ctx(A, bob), (c) => insertApproval(c, p, ids.next(), bob, B.ownerMembershipId, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  await bothLayers(bob, bob, B.ownerMembershipId, bobProof, "approvals_actor_membership_fk");
   // another member's membership of A with the approver as actor
-  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, A.ownerMembershipId, approverProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  await bothLayers(approver, approver, A.ownerMembershipId, approverProof, "approvals_actor_membership_fk");
+  // the approver's own membership with somebody else's step-up proof: the policy admits the pair, the proof key refuses it
+  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_proof_fk"));
   assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.approvals WHERE plan_id = $1", [p.planId])).rows[0].n, 0);
   // the exact binding commits with the plan transition and both events
   const approvalId = ids.next();
@@ -231,31 +237,82 @@ test("R11: a plan names only its own approval — pointing plan Y at plan X's ap
   ]);
 });
 
-test("R6: the request handlers record provider events into the inbox once and can neither read nor rewrite any inbox row; the control plane consumes them", async () => {
+test("R6: the request handlers can neither read nor rewrite any inbox row; the ingress records a provider event once, as a receipt; the control plane consumes it", async () => {
   const inboxId = ids.next();
-  // ingress dedupe without a conflict target: the only unique keys are the fresh inbox id and the inbox identity, and naming
-  // an arbiter would need a read of the table that the ingress role does not have
   const receive = (c: Client, id: string, state = "RECEIVED") =>
     c.query(
       `INSERT INTO kauro.inbox_records (inbox_id, provider, environment, external_event_id, body_hash, state, received_at, updated_at)
        VALUES ($1, 'hubspot', 'LIVE', 'portal-123:evt-1', $2, $3, now(), now()) ON CONFLICT DO NOTHING`,
       [id, sha("body"), state],
     );
-  const first = await tx(app, ctx(A, alice), (c) => receive(c, inboxId));
-  assert.equal(first.rowCount, 1);
-  const duplicate = await tx(app, ctx(B, bob), (c) => receive(c, ids.next()));
-  assert.equal(duplicate.rowCount, 0, "a duplicate delivery is absorbed by the inbox identity");
+  const recorded = await h.inboxIngress.record({ inboxId: inboxId as InboxId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-123:evt-1", bodyHash: sha("body"), receivedAt: clock.now() });
+  assert.deepEqual(recorded, { kind: "RECORDED", inboxId });
+  const duplicate = await h.inboxIngress.record({ inboxId: ids.next() as InboxId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-123:evt-1", bodyHash: sha("body"), receivedAt: clock.now() });
+  assert.deepEqual(duplicate, { kind: "DUPLICATE", inboxId }, "a provider retry of the same event and body is the recorded event");
   // the refuter's F5: under another tenant's context the handler reads the row and rewrites its state
   await assert.rejects(tx(app, ctx(B, bob), (c) => c.query("SELECT external_event_id FROM kauro.inbox_records WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
   await assert.rejects(tx(app, ctx(B, bob), (c) => c.query("UPDATE kauro.inbox_records SET state = 'IGNORED' WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
   await assert.rejects(tx(app, ctx(A, alice), (c) => c.query("UPDATE kauro.inbox_records SET state = 'IGNORED' WHERE inbox_id = $1", [inboxId])), refusedWith("42501"));
-  // ingress records a receipt, never an outcome
-  await assert.rejects(tx(app, ctx(A, alice), (c) => receive(c, ids.next(), "IGNORED")), refusedWith("42501"));
+  // the ingress records a receipt, never an outcome, and settles nothing
+  const ingress = await h.pg.connect("kauro_ingress_test");
+  try {
+    await assert.rejects(receive(ingress, ids.next(), "IGNORED"), refusedWith("42501"));
+    await assert.rejects(ingress.query("UPDATE kauro.inbox_records SET state = 'IGNORED' WHERE inbox_id = $1", [inboxId]), refusedWith("42501"));
+  } finally {
+    await ingress.end();
+  }
   // the consumer (control plane) reads and settles it
   const seen = await control.query("SELECT state FROM kauro.inbox_records WHERE inbox_id = $1", [inboxId]);
   assert.deepEqual(seen.rows, [{ state: "RECEIVED" }]);
   const processing = await control.query("UPDATE kauro.inbox_records SET state = 'PROCESSING' WHERE inbox_id = $1", [inboxId]);
   assert.equal(processing.rowCount, 1);
+});
+
+test("N2: an agency's request handler can no longer pre-insert a provider event id to suppress the genuine delivery — only the ingress records provider events, and a same-id delivery with another body is recorded as a conflict that blocks applying the event", async () => {
+  const squat = (c: Client, bodyHash: string) =>
+    c.query(
+      `INSERT INTO kauro.inbox_records (inbox_id, provider, environment, external_event_id, body_hash, state, received_at, updated_at)
+       VALUES ($1, 'hubspot', 'LIVE', 'portal-777:evt-42', $2, 'RECEIVED', now(), now()) ON CONFLICT DO NOTHING`,
+      [ids.next(), bodyHash],
+    );
+  // the re-checker's V-R6: agency A's runtime role squats the next event id of a portal with a forged body — refused under
+  // every context, so the genuine delivery is the one recorded
+  await assert.rejects(tx(app, ctx(A, alice), (c) => squat(c, sha("forged body"))), refusedWith("42501"));
+  await assert.rejects(tx(app, ctx(B, bob), (c) => squat(c, sha("forged body"))), refusedWith("42501"));
+  await assert.rejects(tx(app, {}, (c) => squat(c, sha("forged body"))), refusedWith("42501"));
+  const genuineId = ids.next() as InboxId;
+  const genuine = await h.inboxIngress.record({ inboxId: genuineId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-777:evt-42", bodyHash: sha("genuine body"), receivedAt: clock.now() });
+  assert.deepEqual(genuine, { kind: "RECORDED", inboxId: genuineId });
+  const stored = await h.oracle.query("SELECT inbox_id, body_hash FROM kauro.inbox_records WHERE external_event_id = 'portal-777:evt-42'");
+  assert.deepEqual(stored.rows, [{ inbox_id: genuineId, body_hash: sha("genuine body") }]);
+  // a later delivery of the same identity with another body is not absorbed as a duplicate: it is recorded as a conflict
+  const other = await h.inboxIngress.record({ inboxId: ids.next() as InboxId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-777:evt-42", bodyHash: sha("other body"), receivedAt: clock.now() });
+  assert.deepEqual(other, { kind: "BODY_CONFLICT", inboxId: genuineId });
+  const conflicts = await h.oracle.query("SELECT body_hash FROM kauro.inbox_body_conflicts WHERE inbox_id = $1", [genuineId]);
+  assert.deepEqual(conflicts.rows, [{ body_hash: sha("other body") }]);
+  // the same conflicting body again is recorded once; the genuine body again is a duplicate, not a conflict
+  assert.deepEqual(await h.inboxIngress.record({ inboxId: ids.next() as InboxId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-777:evt-42", bodyHash: sha("other body"), receivedAt: clock.now() }), { kind: "BODY_CONFLICT", inboxId: genuineId });
+  assert.deepEqual(await h.inboxIngress.record({ inboxId: ids.next() as InboxId, provider: "hubspot", environment: "LIVE", externalEventId: "portal-777:evt-42", bodyHash: sha("genuine body"), receivedAt: clock.now() }), { kind: "DUPLICATE", inboxId: genuineId });
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.inbox_body_conflicts WHERE inbox_id = $1", [genuineId])).rows[0].n, 1);
+  // the consumer claims it, sees the conflict, and cannot apply it before reconciling (KA012); it can reject it
+  const claimed = await h.control.run(h.system(), (uow) => uow.inbox.claim(10, 60));
+  const mine = claimed.find((r) => r.inboxId === genuineId);
+  assert.ok(mine, "the consumer claims the recorded event");
+  assert.equal(mine.conflictingBodies, 1);
+  await assert.rejects(h.control.run(h.system(), (uow) => uow.inbox.settle(genuineId, "APPLIED", clock.now())), (e: unknown) => isDomainFailure(e) && e.code === "PRECONDITION_FAILED" && e.reason === "INBOX_BODY_CONFLICT");
+  assert.equal(await h.control.run(h.system(), (uow) => uow.inbox.settle(genuineId, "REJECTED", clock.now())), true);
+  const settled = await h.oracle.query("SELECT state FROM kauro.inbox_records WHERE inbox_id = $1", [genuineId]);
+  assert.deepEqual(settled.rows, [{ state: "REJECTED" }]);
+  // the ingress's own conflict record must differ from the recorded body (a duplicate is not a conflict)
+  const ingress = await h.pg.connect("kauro_ingress_test");
+  try {
+    await assert.rejects(
+      ingress.query("INSERT INTO kauro.inbox_body_conflicts (conflict_id, inbox_id, body_hash, received_at) VALUES ($1, $2, $3, now())", [ids.next(), genuineId, sha("genuine body")]),
+      refusedWith("KA012"),
+    );
+  } finally {
+    await ingress.end();
+  }
 });
 
 test("R10: active_owner_count is written only by the membership trigger — the runtime role can neither raise it by hand nor forge it at birth, so the last real owner stays protected", async () => {
@@ -423,9 +480,9 @@ test("R20: every aggregate is born in its machine's initial state — a row inse
             (SELECT count(*)::int FROM kauro.memberships WHERE user_id = $2) AS memberships,
             (SELECT count(*)::int FROM kauro.end_clients WHERE agency_id = $3 AND state = 'ARCHIVED') AS archived,
             (SELECT count(*)::int FROM kauro.projects WHERE state <> 'OPEN') AS projects,
-            (SELECT count(*)::int FROM kauro.dataset_revisions WHERE state = 'SEALED') AS sealed,
+            (SELECT count(*)::int FROM kauro.dataset_revisions WHERE manifest_hash = $4) AS sealed,
             (SELECT count(*)::int FROM kauro.capabilities WHERE mode = 'HUBSPOT') AS hubspot`,
-    [agencyId, gina, A.agencyId],
+    [agencyId, gina, A.agencyId, sha("born-sealed-manifest")],
   );
   assert.deepEqual(counts.rows[0], { agencies: 0, memberships: 0, archived: 0, projects: 0, sealed: 0, hubspot: 0 });
   // the positive symmetry: born in the initial state and walked along the listed edges, the same aggregates commit

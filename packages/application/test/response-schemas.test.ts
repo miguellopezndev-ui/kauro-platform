@@ -19,6 +19,7 @@ import {
   CREATE_CLIENT,
   CREATE_PROJECT,
   FORBIDDEN_RESPONSE_FIELDS,
+  LABEL_PATTERN,
   OPERATIONAL_ROUTES,
   PROBLEM_SCHEMA,
   RESPONSE_FIELD_VOCABULARY,
@@ -92,7 +93,7 @@ test("R23: every view member taken from the registry is the registry member, nar
   // the platform vocabulary is the registry's where the registry has the type, and narrower where the platform promises more
   const v = RESPONSE_FIELD_VOCABULARY;
   const shape = (contract: string, field: string) => without(bundle.$defs[contract]!.properties[field]!, "description");
-  assert.deepEqual(v.LABEL, shape("Agency", "displayName"));
+  assert.deepEqual(v.LABEL, { ...shape("Agency", "displayName"), pattern: LABEL_PATTERN }, "the platform label narrows the registry label with the control-character rule of the request schemas (N6)");
   assert.deepEqual(v.UTC, shape("Agency", "createdAt"));
   assert.deepEqual(v.HASH, shape("Plan", "bodyHash"));
   assert.deepEqual(v.COUNT, shape("RowCounts", "physicalSourceRows"));

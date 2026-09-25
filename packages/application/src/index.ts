@@ -8,7 +8,7 @@ export * from "./ports/index.js";
 export type { Problem, NextAction } from "./api/problems.js";
 export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, problemOf, internalProblem, isFailureCode } from "./api/problems.js";
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
-export { REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
+export { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
 export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
 export { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
 export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker } from "./api/views.js";

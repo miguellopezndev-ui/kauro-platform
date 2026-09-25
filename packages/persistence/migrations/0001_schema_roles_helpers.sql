@@ -18,6 +18,11 @@
 --   kauro_validator  the independent Migration validator (registry ValidationReceipt: producer "MC validator", "independently
 --                    checked"; 06 "Migration validation and final states"). It records validation receipts and nothing
 --                    else; the request handlers read receipts but can never mint one.
+--   kauro_ingress    the provider-webhook ingress (COMMAND_CATALOGUE CMD030: authorized role AUTHENTICATED_PROVIDER, "Ingress
+--                    authenticates provider-specific signature, freshness, environment and bounded raw body before event
+--                    acceptance"; 10 "separate ingress/authentication policy from browser APIs"; 08 trust boundary "provider
+--                    webhook to inbox"). It records authenticated provider event references in the inbox and nothing else;
+--                    the request handlers of agency users cannot write the inbox at all (re-check finding N2, 0005).
 -- Login roles are provisioning concerns: CREATE ROLE kauro_api LOGIN IN ROLE kauro_app; they inherit the group grants. A
 -- login is a member of exactly one of these groups (the verified pool refuses any other arrangement).
 -- The migrator (table owner) is a separate role that never serves requests; FORCE ROW LEVEL SECURITY binds it as well.
@@ -26,8 +31,11 @@
 --   KA001 LAST_OWNER_PROTECTED   KA002 VERSION_DISCIPLINE   KA003 EVENT_MISSING   KA004 IMMUTABLE_COLUMN
 --   KA005 LEASE guard (fence / deadline / subject / checkpoint)   KA006 CONTEXT (row not visible inside a trigger)
 --   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION (an unlisted edge, or an aggregate born outside its machine's
---   initial state)   KA009 UPSTREAM_UNRESOLVED (request journal, S089)   KA020 LIVE_APPROVAL_UNBOUND (a live approval on a
---   plan that is not APPROVED under it, 0004)
+--   initial state)   KA009 UPSTREAM_UNRESOLVED (request journal, S089)   KA010 MEMBERSHIP_AUTHORITY (a membership or
+--   invitation write the acting session has no team authority for, 0002)   KA011 INVITATION_NOT_OPEN (an invitation consumed,
+--   revoked or expired, or an acceptance without a consumed invitation, 0002)   KA012 INBOX_BODY_CONFLICT (an inbox record
+--   settled while a delivery of the same event carried another body, 0005)   KA020 LIVE_APPROVAL_UNBOUND (a live approval on
+--   a plan that is not APPROVED under it, or an APPROVED plan whose approval is not live, 0004)
 
 CREATE SCHEMA IF NOT EXISTS kauro;
 REVOKE ALL ON SCHEMA kauro FROM PUBLIC;
@@ -46,9 +54,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'kauro_validator') THEN
     CREATE ROLE kauro_validator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'kauro_ingress') THEN
+    CREATE ROLE kauro_ingress NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+  END IF;
   IF EXISTS (
     SELECT 1 FROM pg_catalog.pg_roles
-    WHERE rolname IN ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator')
+    WHERE rolname IN ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator', 'kauro_ingress')
       AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication)
   ) THEN
     RAISE EXCEPTION 'runtime roles must not be SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or REPLICATION (08 Database isolation)';
@@ -59,7 +70,7 @@ BEGIN
 END
 $$;
 
-GRANT USAGE ON SCHEMA kauro TO kauro_app, kauro_control, kauro_assurance, kauro_validator;
+GRANT USAGE ON SCHEMA kauro TO kauro_app, kauro_control, kauro_assurance, kauro_validator, kauro_ingress;
 
 -- Readiness (14 "Monitoring and service health": readiness checks the schema compatibility the service's role needs): the
 -- runtime roles read the ledger the migration runner keeps (kauro_meta.schema_migrations, created by the runner before this
@@ -93,9 +104,13 @@ CREATE OR REPLACE FUNCTION kauro.is_sha256_hex(v text) RETURNS boolean
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
 $$ SELECT v ~ '^[0-9a-f]{64}$' $$;
 
+-- A control character is a code point of Unicode General Category Cc: U+0000..U+001F (C0), U+007F (DEL) and U+0080..U+009F
+-- (C1). The classes are spelled as code point ranges, not as [[:cntrl:]], whose meaning for non-ASCII characters depends on the
+-- cluster's locale provider: the request schema (@kauro/application LABEL), the domain (isLabel) and this check refuse exactly
+-- the same characters on every cluster (re-check finding N6). U+0000 cannot occur in a text value.
 CREATE OR REPLACE FUNCTION kauro.is_label(v text) RETURNS boolean
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
-$$ SELECT length(v) BETWEEN 1 AND 200 AND v !~ '[[:cntrl:]]' $$;
+$$ SELECT length(v) BETWEEN 1 AND 200 AND v !~ '[\u0001-\u001f\u007f-\u009f]' $$;
 
 CREATE OR REPLACE FUNCTION kauro.is_token(v text) RETURNS boolean
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
@@ -232,3 +247,50 @@ BEGIN
   RETURN NEW;
 END
 $$;
+
+-- --- the transition-lock protocol (decision D-TX-2; re-check findings N1, N3) -----------------------------------------------------
+-- A command relies on facts it does not change: the caller's identity status and membership, the agency's state, the offered
+-- capability of a mode, the sealed source revision and the current target contract (07 "Transaction discipline":
+-- preconditions are rechecked inside the transaction; 10 "Concurrency and preconditions"). Each such fact is a SUBJECT
+-- (a kind and a key). A reader calls kauro.await_transition(kind, key) and only then reads the row in the next statement: the
+-- call takes a shared transaction-level advisory lock on the subject, held to COMMIT. A writer that changes the fact takes the
+-- exclusive lock on the same subject in a BEFORE UPDATE trigger (kauro.take_transition_lock) before its change is applied, so
+--   * a transition issued while a command is in flight waits for that command (the command is ordered before it);
+--   * a transition committed first is what the command's next statement reads (READ COMMITTED: a new snapshot per statement);
+--   * a reader arriving after a transition was queued waits behind it: PostgreSQL's lock manager queues a new shared request
+--     behind a waiting exclusive one, which a row-level FOR SHARE does not do — a share lock is granted beside the current
+--     share lockers even while an UPDATE is waiting, so a stream of overlapping commands could starve a suspension, a
+--     restriction or a revocation indefinitely (N3). The readers therefore take no row lock on these rows at all.
+-- The key is a 64-bit digest of the namespaced subject; two subjects that collide only wait for each other, which is never
+-- incorrect. Lock order, which every command and every writer follows: identity → membership → agency → client → capability;
+-- plan → source revision → target contract.
+CREATE OR REPLACE FUNCTION kauro.transition_key(kind text, subject text) RETURNS bigint
+  LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
+$$ SELECT hashtextextended('kauro.transition:' || kind || ':' || subject, 0) $$;
+
+CREATE OR REPLACE FUNCTION kauro.await_transition(kind text, subject text) RETURNS void
+  LANGUAGE sql VOLATILE STRICT SET search_path = pg_catalog AS
+$$ SELECT pg_advisory_xact_lock_shared(kauro.transition_key(kind, subject)) $$;
+
+-- The writer's half: TG_ARGV[0] is the subject kind, TG_ARGV[1..] the columns whose values (of the row before the change)
+-- form the subject key, joined by ':'. Installed as BEFORE UPDATE OF <the guarded columns> ... WHEN (<they change>).
+CREATE OR REPLACE FUNCTION kauro.take_transition_lock() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  old_j jsonb := to_jsonb(OLD);
+  subject text := '';
+  i integer;
+BEGIN
+  FOR i IN 1 .. TG_NARGS - 1 LOOP
+    IF (old_j ->> TG_ARGV[i]) IS NULL THEN
+      RAISE EXCEPTION 'CONTEXT: % has no value for transition subject column %', TG_TABLE_NAME, TG_ARGV[i] USING ERRCODE = 'KA006';
+    END IF;
+    subject := subject || CASE WHEN i > 1 THEN ':' ELSE '' END || (old_j ->> TG_ARGV[i]);
+  END LOOP;
+  PERFORM pg_advisory_xact_lock(kauro.transition_key(TG_ARGV[0], subject));
+  RETURN NEW;
+END
+$$;
+
+GRANT EXECUTE ON FUNCTION kauro.await_transition(text, text) TO kauro_app;

@@ -13,6 +13,7 @@
  * - event publication with the payload allowlist and the outbox fan-out of EVENT_SUBSCRIPTIONS.
  */
 import type { Agency, Capability, Id, Membership, Sha256Hex, UtcInstant } from "@kauro/contracts";
+import { DOMAINS, structuredDigest } from "@kauro/contracts";
 import type {
   AgencyId,
   AgencyRecord,
@@ -35,6 +36,8 @@ import type {
   IdGenerator,
   IdempotencyIdentity,
   IdentityFacts,
+  InboxConsumerStore,
+  InvitationRepository,
   JournalCommit,
   JournalEntryId,
   LeaseStore,
@@ -47,6 +50,7 @@ import type {
   NewMembership,
   NewPlanRevision,
   NewProject,
+  OutboxDispatchStore,
   OutboxId,
   PlanBody,
   PlanId,
@@ -297,8 +301,11 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       },
       async syncOwn(facts, provider, subjectHash) {
         if (userId() !== facts.userId) throw new DomainFailure("NOT_FOUND", "self policy refused the identity write", { reason: "TENANT_CONTEXT_MISSING" });
-        s.identities.set(facts.userId, { ...facts, provider, subjectHash });
-        return facts;
+        // the stored security status is never the request handler's to write: first sight is ACTIVE, and a DISABLED row stays so
+        const stored = s.identities.get(facts.userId);
+        const record = { ...facts, state: stored?.state ?? ("ACTIVE" as const), provider: stored?.provider ?? provider, subjectHash: stored?.subjectHash ?? subjectHash };
+        s.identities.set(facts.userId, record);
+        return { userId: record.userId, emailVerifiedAt: record.emailVerifiedAt, mfaEnrolledAt: record.mfaEnrolledAt, state: record.state };
       },
       async getOwnProof(id, proofId) {
         const p = s.proofs.get(proofId);
@@ -379,6 +386,13 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         return [...s.memberships.values()].filter((m) => m.agencyId === agencyId && m.role === "OWNER" && m.state === "ACTIVE").length;
       },
     },
+    invitations: {
+      insert: () => notInMemory("InvitationRepository.insert"),
+      get: () => notInMemory("InvitationRepository.get"),
+      findByTokenHash: () => notInMemory("InvitationRepository.findByTokenHash"),
+      consume: () => notInMemory("InvitationRepository.consume"),
+      revoke: () => notInMemory("InvitationRepository.revoke"),
+    } satisfies InvitationRepository,
     processingAuthorities: {
       async get(id: ProcessingAuthorityId) {
         return visible(s.processingAuthorities.get(id));
@@ -484,18 +498,18 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       async get(revisionId: RevisionId) {
         return visible(s.revisions.get(revisionId));
       },
-      async lockSealedByHash(agencyId, revisionHash) {
+      async lockSealedByHash(agencyId, projectId, revisionHash) {
         if (tenantId() !== agencyId) return null;
-        return [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.manifestHash === revisionHash && r.state === "SEALED") ?? null;
+        return [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.projectId === projectId && r.manifestHash === revisionHash) ?? null;
       },
     },
     targetContracts: {
       async get(contractId: TargetContractId) {
         return visible(s.targetContracts.get(contractId));
       },
-      async lockCurrentByHash(agencyId, hash) {
+      async lockCurrentByHash(agencyId, projectId, hash) {
         if (tenantId() !== agencyId) return null;
-        return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.bodyHash === hash && t.confirmedAt !== undefined && t.supersededAt === undefined) ?? null;
+        return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.projectId === projectId && t.bodyHash === hash) ?? null;
       },
     },
     plans: {
@@ -522,7 +536,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
           revisionHash: p.body.revisionHash,
           targetContractHash: p.body.targetContractHash,
           policyHash: p.body.policyHash,
-          bodyHash: p.bodyHash,
+          bodyHash: structuredDigest(DOMAINS.PLAN_BODY, 1, p.body),
           ...(p.supersedesPlanId !== undefined ? { supersedesPlanId: p.supersedesPlanId } : {}),
           createdByMembershipId: p.createdByMembershipId,
           createdAt: p.createdAt,
@@ -622,6 +636,15 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       get: () => notInMemory("RequestJournal.get"),
       listByTask: () => notInMemory("RequestJournal.listByTask"),
     } satisfies RequestJournal,
+    outboxDispatch: {
+      claim: () => notInMemory("OutboxDispatchStore.claim"),
+      delivered: () => notInMemory("OutboxDispatchStore.delivered"),
+      failed: () => notInMemory("OutboxDispatchStore.failed"),
+    } satisfies OutboxDispatchStore,
+    inbox: {
+      claim: () => notInMemory("InboxConsumerStore.claim"),
+      settle: () => notInMemory("InboxConsumerStore.settle"),
+    } satisfies InboxConsumerStore,
   };
   return uow;
 }

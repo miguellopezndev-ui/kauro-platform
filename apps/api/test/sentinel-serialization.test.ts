@@ -37,17 +37,12 @@ before(async () => {
   w = await world();
   projectId = (await w.project(w.A, w.clientA)).projectId;
   for (const role of ["founder", "founder2", "operator", "admin", "approver"] as const) people[role] = await w.person(`${MARK}-${role}`);
-  const operatorMembership = await w.h.addMember(w.A, people.operator.userId, "OPERATOR");
+  await w.h.addMember(w.A, people.operator.userId, "OPERATOR");
   await w.h.addMember(w.A, people.admin.userId, "ADMIN");
   await w.h.addMember(w.A, people.approver.userId, "APPROVER");
-  // an open invitation of agency A: its token hash is team security material no reply may carry
-  await w.asTenant(w.A, (c) =>
-    c.query(
-      `INSERT INTO kauro.membership_invitations (invitation_id, agency_id, membership_id, token_hash, role, invited_by_membership_id, expires_at, created_at)
-       VALUES ($1, $2, $3, $4, 'OPERATOR', $5, now() + interval '1 day', now())`,
-      [ids.next(), w.A.agencyId, operatorMembership, sha(`${MARK}-invitation-token`), w.A.ownerMembershipId],
-    ),
-  );
+  // an open invitation of agency A, issued through the invitation port (every accepted member above also left a consumed one):
+  // its token hash is team security material no reply may carry
+  await w.h.inviteMember(w.A, (await w.person(`${MARK}-invitee`)).userId, "OPERATOR");
 });
 after(async () => {
   await w.stop();

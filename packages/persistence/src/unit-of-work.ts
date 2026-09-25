@@ -39,10 +39,11 @@ import {
 import type { PoolClient } from "pg";
 import { PgCommandJournal } from "./command-journal.js";
 import { PgEventPublisher } from "./event-publisher.js";
+import { PgInboxConsumerStore, PgOutboxDispatchStore } from "./inbox-outbox.js";
 import { PgLeaseStore } from "./lease-store.js";
 import type { KauroPool, RuntimeRole } from "./pool.js";
 import { PgApprovalRepository, PgPlanRepository, PgValidationReceiptRepository } from "./repositories/plans.js";
-import { PgAgencyRepository, PgIdentityRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
+import { PgAgencyRepository, PgIdentityRepository, PgInvitationRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 import { PgCapabilityRepository, PgDatasetRevisionRepository, PgEndClientRepository, PgProcessingAuthorityRepository, PgProjectRepository, PgTargetContractRepository } from "./repositories/workspace.js";
 import { PgRequestJournal } from "./request-journal.js";
 import { execute, isDatabaseError, translateDatabaseError } from "./sql.js";
@@ -82,6 +83,7 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly ids: TrackingIdGenerator;
   readonly agencies: PgAgencyRepository;
   readonly memberships: PgMembershipRepository;
+  readonly invitations: PgInvitationRepository;
   readonly identities: PgIdentityRepository;
   readonly processingAuthorities: PgProcessingAuthorityRepository;
   readonly endClients: PgEndClientRepository;
@@ -97,6 +99,8 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly journal: PgCommandJournal;
   readonly leases: PgLeaseStore;
   readonly requestJournal: PgRequestJournal;
+  readonly outboxDispatch: PgOutboxDispatchStore;
+  readonly inbox: PgInboxConsumerStore;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
 
@@ -110,6 +114,7 @@ export class PgUnitOfWork implements UnitOfWork {
     this.ids = ids;
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
+    this.invitations = new PgInvitationRepository(client);
     this.identities = new PgIdentityRepository(client);
     this.processingAuthorities = new PgProcessingAuthorityRepository(client);
     this.endClients = new PgEndClientRepository(client);
@@ -125,6 +130,8 @@ export class PgUnitOfWork implements UnitOfWork {
     this.journal = new PgCommandJournal(client, ids, clock);
     this.leases = new PgLeaseStore(client);
     this.requestJournal = new PgRequestJournal(client);
+    this.outboxDispatch = new PgOutboxDispatchStore(client);
+    this.inbox = new PgInboxConsumerStore(client);
   }
 
   get userId(): UserId | null {

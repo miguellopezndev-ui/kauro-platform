@@ -22,6 +22,7 @@ import type {
   DatasetRevisionRepository,
   EndClientRepository,
   IdentityRepository,
+  InvitationRepository,
   MembershipRepository,
   PlanRepository,
   ProcessingAuthorityRepository,
@@ -31,6 +32,7 @@ import type {
   ValidationReceiptRepository,
 } from "./repositories.js";
 import type { RequestJournal } from "./request-journal.js";
+import type { InboxConsumerStore, OutboxDispatchStore } from "./inbox-outbox.js";
 
 export type IsolationLevel = "READ_COMMITTED" | "REPEATABLE_READ" | "SERIALIZABLE";
 
@@ -47,6 +49,7 @@ export interface UnitOfWork {
   readonly context: ExecutionContext;
   readonly agencies: AgencyRepository;
   readonly memberships: MembershipRepository;
+  readonly invitations: InvitationRepository;
   readonly identities: IdentityRepository;
   readonly processingAuthorities: ProcessingAuthorityRepository;
   readonly endClients: EndClientRepository;
@@ -62,6 +65,10 @@ export interface UnitOfWork {
   readonly journal: CommandJournal;
   readonly leases: LeaseStore;
   readonly requestJournal: RequestJournal;
+  /** The outbox dispatcher's store (control plane, SYSTEM context under kauro_control; re-check finding N20). */
+  readonly outboxDispatch: OutboxDispatchStore;
+  /** The inbox consumer's store (control plane, SYSTEM context under kauro_control; re-check findings N2, N20). */
+  readonly inbox: InboxConsumerStore;
   /**
    * The id generator of this unit of work (07 "Database representation": server-generated UUIDv7). Every aggregate id a
    * command mints comes from here, which is what lets `adoptTenant` prove the adopted id was minted inside this unit of work.

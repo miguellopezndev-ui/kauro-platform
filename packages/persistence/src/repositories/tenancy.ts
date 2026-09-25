@@ -18,6 +18,11 @@ import {
   type AssuranceProofId,
   type IdentityFacts,
   type IdentityRepository,
+  type InvitationClose,
+  type InvitationId,
+  type InvitationIssue,
+  type InvitationRecord,
+  type InvitationRepository,
   type MembershipId,
   type MembershipRecord,
   type MembershipRepository,
@@ -30,7 +35,7 @@ import {
   type VersionedWrite,
   type IdGenerator,
 } from "@kauro/domain";
-import { execute, instant, int, optionalInstant, optionalText, text, withOptional, type Queryable } from "../sql.js";
+import { ConstraintViolation, execute, instant, int, optionalInstant, optionalText, text, withOptional, type Queryable } from "../sql.js";
 
 // --- identities ----------------------------------------------------------------------------------------------------------
 
@@ -59,25 +64,63 @@ interface ProofRow {
   expires_at: Date;
 }
 
+/**
+ * Takes the shared transition lock of a subject (decision D-TX-2, migration 0001 kauro.await_transition), held to COMMIT. The
+ * caller reads the guarded row in its NEXT statement, which runs on a snapshot taken after the lock was granted: a transition
+ * committed first is what it reads, one issued later waits for this unit of work, and a reader arriving after a queued
+ * transition waits behind it (re-check finding N3). The kind is the guarded table's name, so a wait is visible by table in
+ * pg_stat_activity.
+ */
+export async function awaitTransition(db: Queryable, kind: "kauro.identities" | "kauro.memberships" | "kauro.agencies" | "kauro.capabilities" | "kauro.dataset_revisions" | "kauro.target_contracts", subject: string): Promise<void> {
+  await execute(db, `SELECT kauro.await_transition('${kind}', $1)`, [subject]);
+}
+
 export class PgIdentityRepository implements IdentityRepository {
   constructor(private readonly db: Queryable) {}
 
+  /**
+   * The caller's stored identity facts, read after the identity's transition lock (D-TX-2): a disable committed first is read
+   * here, and one issued while this unit of work runs waits for it (re-check finding N1).
+   */
   async getOwn(userId: UserId): Promise<IdentityFacts | null> {
+    await awaitTransition(this.db, "kauro.identities", userId);
     const r = await execute<IdentityRow>(this.db, "SELECT user_id, state, email_verified_at, mfa_enrolled_at FROM kauro.identities WHERE user_id = $1", [userId]);
     return r.rows[0] ? identityFacts(r.rows[0]) : null;
   }
 
+  /**
+   * Records the identity reference on first sight and keeps the token's verification facts current; never the security status
+   * (re-check finding N1: the request-handler role holds no privilege on `state`, and a sync never re-enables a DISABLED row).
+   * It never waits on the identity row: the command already holds the identity's shared transition lock (getOwn), and a
+   * platform disable that holds the row while it waits for that lock must not wait on the command in turn. So the reference is
+   * inserted only when no committed row exists (an insert waits only on another first sight, never on a disable), and the
+   * verification facts are refreshed only when the row is free (SKIP LOCKED): they are copies of the token's facts, which the
+   * authorizer decides by (D-ASSUR-2), and the next sync refreshes them.
+   */
   async syncOwn(facts: IdentityFacts, provider: string, subjectHash: Sha256Hex, now: UtcInstant): Promise<IdentityFacts> {
-    const r = await execute<IdentityRow>(
+    const known = await execute(this.db, "SELECT 1 FROM kauro.identities WHERE user_id = $1", [facts.userId]);
+    if (known.rowCount === 0) {
+      await execute(
+        this.db,
+        `INSERT INTO kauro.identities (user_id, provider, subject_hash, email_verified_at, mfa_enrolled_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [facts.userId, provider, subjectHash, facts.emailVerifiedAt, facts.mfaEnrolledAt, now],
+      );
+    }
+    await execute(
       this.db,
-      `INSERT INTO kauro.identities (user_id, provider, subject_hash, state, email_verified_at, mfa_enrolled_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
-       ON CONFLICT (user_id) DO UPDATE SET state = EXCLUDED.state, email_verified_at = EXCLUDED.email_verified_at, mfa_enrolled_at = EXCLUDED.mfa_enrolled_at
-       RETURNING user_id, state, email_verified_at, mfa_enrolled_at`,
-      [facts.userId, provider, subjectHash, facts.state, facts.emailVerifiedAt, facts.mfaEnrolledAt, now],
+      `UPDATE kauro.identities SET email_verified_at = $2, mfa_enrolled_at = $3
+        WHERE user_id = (
+          SELECT i.user_id FROM kauro.identities i
+           WHERE i.user_id = $1 AND (i.email_verified_at IS DISTINCT FROM $2 OR i.mfa_enrolled_at IS DISTINCT FROM $3)
+           FOR NO KEY UPDATE SKIP LOCKED
+        )`,
+      [facts.userId, facts.emailVerifiedAt, facts.mfaEnrolledAt],
     );
+    const r = await execute<IdentityRow>(this.db, "SELECT user_id, state, email_verified_at, mfa_enrolled_at FROM kauro.identities WHERE user_id = $1", [facts.userId]);
     const row = r.rows[0];
-    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "identity sync returned no row");
+    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "identity sync left no visible row");
     return identityFacts(row);
   }
 
@@ -149,8 +192,14 @@ export class PgAgencyRepository implements AgencyRepository {
     return r.rows[0] ? agencyRecord(r.rows[0]) : null;
   }
 
+  /**
+   * The agency state a command relies on without changing the agency (CMD009, CMD011: DRAFT or ACTIVE), read after the agency's
+   * transition lock (D-TX-2): a restriction or closure issued meanwhile waits for this unit of work, one committed first is read
+   * here, and commands arriving after a queued transition wait behind it (re-check finding N3). No row lock is taken.
+   */
   async lockShared(agencyId: AgencyId): Promise<AgencyRecord | null> {
-    const r = await execute<AgencyRow>(this.db, `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies WHERE agency_id = $1 FOR SHARE`, [agencyId]);
+    await awaitTransition(this.db, "kauro.agencies", agencyId);
+    const r = await execute<AgencyRow>(this.db, `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies WHERE agency_id = $1`, [agencyId]);
     return r.rows[0] ? agencyRecord(r.rows[0]) : null;
   }
 
@@ -249,14 +298,16 @@ export class PgMembershipRepository implements MembershipRepository {
   }
 
   /**
-   * FOR SHARE: the membership is held until the unit of work ends, so a concurrent suspension, revocation or role change
-   * (an UPDATE of the row) waits for this command, and one that committed first is re-read here — a row that is no longer
-   * live fails the predicate on the re-read and is not returned (READ COMMITTED re-evaluates a locked row's WHERE clause).
+   * The caller's live membership, read after the transition lock of (agency, person) (D-TX-2), held until the unit of work
+   * ends: a suspension, revocation or role change issued meanwhile waits for this command, one committed first is what this
+   * read returns (a row that is no longer live is not returned), and a command arriving after a queued change waits behind it,
+   * so a stream of overlapping commands can never starve a revocation (re-check finding N3). No row lock is taken.
    */
   async findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null> {
+    await awaitTransition(this.db, "kauro.memberships", `${agencyId}:${userId}`);
     const r = await execute<MembershipRow>(
       this.db,
-      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED') FOR SHARE`,
+      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED')`,
       [agencyId, userId],
     );
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;
@@ -304,6 +355,108 @@ export class PgMembershipRepository implements MembershipRepository {
   async countActiveOwners(agencyId: AgencyId): Promise<number> {
     const r = await execute<{ n: string }>(this.db, "SELECT count(*)::text AS n FROM kauro.memberships WHERE agency_id = $1 AND role = 'OWNER' AND state = 'ACTIVE'", [agencyId]);
     return int(text(r.rows[0]?.n));
+  }
+}
+
+// --- invitations ---------------------------------------------------------------------------------------------------------
+
+interface InvitationRow {
+  invitation_id: string;
+  agency_id: string;
+  membership_id: string;
+  token_hash: string;
+  role: Membership["role"];
+  invited_by_membership_id: string;
+  expires_at: Date;
+  consumed_at: Date | null;
+  revoked_at: Date | null;
+  created_at: Date;
+}
+
+const INVITATION_COLUMNS = "invitation_id, agency_id, membership_id, token_hash, role, invited_by_membership_id, expires_at, consumed_at, revoked_at, created_at";
+
+function invitationRecord(r: InvitationRow): InvitationRecord {
+  const base = {
+    invitationId: r.invitation_id as InvitationId,
+    agencyId: r.agency_id as AgencyId,
+    membershipId: r.membership_id as MembershipId,
+    tokenHash: r.token_hash,
+    role: r.role,
+    invitedByMembershipId: r.invited_by_membership_id as MembershipId,
+    expiresAt: instant(r.expires_at),
+    createdAt: instant(r.created_at),
+  };
+  const a = withOptional(base, "consumedAt", optionalInstant(r.consumed_at));
+  return withOptional(a, "revokedAt", optionalInstant(r.revoked_at));
+}
+
+/**
+ * Invitation tokens (08 "Invitation, recovery and ownership transfer": one-use, time-limited opaque tokens; stored token
+ * material is hashed — only the digest of @kauro/domain hashInvitationToken is ever stored or compared). The database decides
+ * who may issue, consume and revoke (migration 0002 kauro.enforce_invitation_rules, re-check finding N19): this adapter writes
+ * under the unit of work's context and reports each outcome as a value, so a handler answers a closed invitation or a second
+ * open one precisely instead of by a constraint name.
+ */
+export class PgInvitationRepository implements InvitationRepository {
+  constructor(private readonly db: Queryable) {}
+
+  /**
+   * Issues an invitation under a savepoint: a second open invitation of the same membership (the partial unique index, which a
+   * concurrent issuer waits on) is an outcome, OPEN_INVITATION_EXISTS, and the unit of work continues.
+   */
+  async insert(invitation: InvitationRecord): Promise<InvitationIssue> {
+    await execute(this.db, "SAVEPOINT kauro_invitation_insert");
+    try {
+      const r = await execute<InvitationRow>(
+        this.db,
+        `INSERT INTO kauro.membership_invitations (invitation_id, agency_id, membership_id, token_hash, role, invited_by_membership_id, expires_at, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${INVITATION_COLUMNS}`,
+        [invitation.invitationId, invitation.agencyId, invitation.membershipId, invitation.tokenHash, invitation.role, invitation.invitedByMembershipId, invitation.expiresAt, invitation.createdAt],
+      );
+      await execute(this.db, "RELEASE SAVEPOINT kauro_invitation_insert");
+      const row = r.rows[0];
+      if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "invitation insert returned no row");
+      return { kind: "ISSUED", invitation: invitationRecord(row) };
+    } catch (e) {
+      // one open invitation per membership (08: changing the role after sending invalidates or reissues the invite)
+      if (e instanceof ConstraintViolation && e.constraint === "membership_invitations_one_per_membership") {
+        await execute(this.db, "ROLLBACK TO SAVEPOINT kauro_invitation_insert");
+        return { kind: "OPEN_INVITATION_EXISTS" };
+      }
+      throw e;
+    }
+  }
+
+  async get(invitationId: InvitationId): Promise<InvitationRecord | null> {
+    const r = await execute<InvitationRow>(this.db, `SELECT ${INVITATION_COLUMNS} FROM kauro.membership_invitations WHERE invitation_id = $1`, [invitationId]);
+    return r.rows[0] ? invitationRecord(r.rows[0]) : null;
+  }
+
+  async findByTokenHash(tokenHash: Sha256Hex): Promise<InvitationRecord | null> {
+    const r = await execute<InvitationRow>(this.db, `SELECT ${INVITATION_COLUMNS} FROM kauro.membership_invitations WHERE token_hash = $1`, [tokenHash]);
+    return r.rows[0] ? invitationRecord(r.rows[0]) : null;
+  }
+
+  async consume(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose> {
+    return this.close(invitationId, "consumed_at", now);
+  }
+
+  async revoke(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose> {
+    return this.close(invitationId, "revoked_at", now);
+  }
+
+  /** Closes an open invitation once; a concurrent closer waits on the row and then finds it closed (ALREADY_CLOSED). */
+  private async close(invitationId: InvitationId, column: "consumed_at" | "revoked_at", now: UtcInstant): Promise<InvitationClose> {
+    const r = await execute<InvitationRow>(
+      this.db,
+      `UPDATE kauro.membership_invitations SET ${column} = $2 WHERE invitation_id = $1 AND consumed_at IS NULL AND revoked_at IS NULL RETURNING ${INVITATION_COLUMNS}`,
+      [invitationId, now],
+    );
+    const row = r.rows[0];
+    if (row) return { kind: "CLOSED", invitation: invitationRecord(row) };
+    const current = await this.get(invitationId);
+    if (!current) throw new DomainFailure("NOT_FOUND", "invitation is not visible in this context");
+    return { kind: "ALREADY_CLOSED", invitation: current };
   }
 }
 

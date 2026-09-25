@@ -22,6 +22,7 @@
  */
 import type { ContractName } from "@kauro/contracts";
 import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
+import { LABEL_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 
 export const RESPONSE_SCHEMA_PREFIX = "urn:kauro:api:v1:response:";
@@ -47,8 +48,11 @@ const VERSION = Object.freeze({ type: "integer", minimum: 1, maximum: Number.MAX
 const HASH = Object.freeze({ type: "string", pattern: "^[0-9a-f]{64}$" });
 /** "UTC instants include Z"; the calendar assertion is the validator's `date-time` format (10 "Schema format execution"). */
 const UTC = Object.freeze({ type: "string", format: "date-time", pattern: "Z$" });
-/** The registry `label` shape (FIELD_CONTRACTS: labels are untrusted text, bounded). */
-const LABEL = Object.freeze({ type: "string", minLength: 1, maxLength: 200 });
+/**
+ * The registry `label` shape (FIELD_CONTRACTS: labels are untrusted text, bounded), with the control-character rule of the
+ * request schemas and kauro.is_label: a label the api could not have admitted is never answered either (re-check finding N6).
+ */
+const LABEL = Object.freeze({ type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN });
 /** A non-negative exact count. */
 const COUNT = Object.freeze({ type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 
@@ -95,6 +99,8 @@ const registry = (required: boolean, narrow?: JsonSchema, from?: readonly [Contr
 const platform = (required: boolean, schema: JsonSchema, description: string): PlatformMember => ({ kind: "platform", required, schema, description });
 const ref = (name: string): JsonSchema => ({ $ref: `#/$defs/${name}` });
 const NARROW_ID = Object.freeze({ pattern: UUID_PATTERN });
+/** A registry label narrowed by the platform's control-character rule (the request schemas and kauro.is_label; N6). */
+const NARROW_LABEL = Object.freeze({ pattern: LABEL_PATTERN });
 
 /**
  * Every DTO definition of the served routes. Order is the order of the OpenAPI components. A view is closed: a member not
@@ -112,7 +118,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
     members: {
       agencyId: registry(true, NARROW_ID),
       version: registry(true),
-      displayName: registry(true),
+      displayName: registry(true, NARROW_LABEL),
       state: registry(true),
       termsVersion: registry(false),
       privacyAgreementVersion: registry(false),
@@ -132,7 +138,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       role: registry(true),
       state: registry(true),
       version: registry(true),
-      assurancePolicy: registry(true),
+      assurancePolicy: registry(true, NARROW_LABEL),
       acceptedAt: registry(false),
     },
   },
@@ -145,7 +151,7 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       clientId: registry(true, NARROW_ID),
       agencyId: registry(true, NARROW_ID),
       version: platform(true, VERSION, "Concurrency version of the client (design D-AGG-2, open question Q3: the registry contract has no version although CMD010 names expectedVersion)."),
-      displayName: registry(true),
+      displayName: registry(true, NARROW_LABEL),
       state: registry(true),
       processingAuthorityRef: registry(true, NARROW_ID),
       createdAt: registry(true),

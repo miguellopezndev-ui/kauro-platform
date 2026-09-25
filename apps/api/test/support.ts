@@ -359,7 +359,7 @@ export interface World {
   /** A target contract as B08's observation/confirmation leaves it: confirmed and current (default) or superseded. */
   targetContract(agency: AgencyFixture, projectId: ProjectId, opts?: { readonly superseded?: boolean }): Promise<{ contractId: string; targetContractHash: Sha256Hex }>;
   /** A plan revision at VALIDATION_REQUIRED (v2) or VALIDATED (v4, receipt bound), whose subjects name the given hashes. */
-  plan(agency: AgencyFixture, projectId: ProjectId, subjects: { readonly revisionHash: Sha256Hex; readonly targetContractHash: Sha256Hex; readonly seed: string; readonly state?: "VALIDATION_REQUIRED" | "VALIDATED"; readonly intent?: "SET" | "CLEAR" }): Promise<PlanFixture>;
+  plan(agency: AgencyFixture, projectId: ProjectId, subjects: { readonly revisionHash: Sha256Hex; readonly targetContractHash: Sha256Hex; readonly seed: string; readonly state?: "VALIDATION_REQUIRED" | "VALIDATED"; readonly intent?: "SET" | "CLEAR"; readonly storedBodyHash?: Sha256Hex }): Promise<PlanFixture>;
   /** A complete approvable subject: sealed revision, confirmed target contract and a VALIDATED plan naming both. */
   approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR"): Promise<PlanFixture>;
   /** A step-up proof of the person: fresh (issued now) or stale (issued twenty minutes ago). */
@@ -584,7 +584,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       const state = subjects.state ?? "VALIDATED";
       const planId = ids.next() as PlanId;
       const body = planBodyOf(subjects.revisionHash, subjects.targetContractHash, subjects.seed, subjects.intent ?? "SET");
-      const bodyHash = bodyHashOf(body);
+      // a fixture may store a hash that is NOT the digest of its body (the database cannot recompute it; re-check finding N10)
+      const bodyHash = subjects.storedBodyHash ?? bodyHashOf(body);
       const affectedRows = 120;
       let receiptHash: Sha256Hex | null = null;
       let version = 1;

@@ -782,7 +782,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Safe agency label, not a unique legal identity."
+            "description": "Safe agency label, not a unique legal identity.",
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "state": {
             "type": "string",
@@ -943,6 +944,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
             "description": "The reason the withdrawal named (CMD026 field reasonCode, registry type label)."
           }
         }
@@ -1164,7 +1166,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD001"
@@ -1231,7 +1233,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "processingAuthorityRef": {
             "type": "string",
@@ -1290,7 +1292,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "targetInstanceRef": {
             "type": "string",
@@ -1339,7 +1341,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Safe label."
+            "description": "Safe label.",
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "state": {
             "type": "string",
@@ -1440,7 +1443,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "description": "Required authentication strength."
+            "description": "Required authentication strength.",
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "acceptedAt": {
             "type": "string",
@@ -1654,6 +1658,7 @@
               "INVITATION_CONSUMED",
               "INVITATION_REVOKED",
               "INVITATION_TOKEN_MISMATCH",
+              "INVITATION_NOT_OPEN",
               "MEMBER_ALREADY_LIVE",
               "ROLE_NOT_GRANTABLE",
               "OWNER_PROTECTED",
@@ -1696,13 +1701,15 @@
               "PLAN_SERVICES_UNAVAILABLE",
               "RESPONSE_CONTRACT_VIOLATION",
               "EVENT_MISSING",
+              "BODY_DIGEST_MISMATCH",
               "VERSION_DISCIPLINE",
               "IMMUTABLE_COLUMN",
               "LIVE_APPROVAL_UNBOUND",
               "LEASE_FENCED",
               "RESUME_WITHOUT_CHECKPOINT",
               "DEADLINE_IMMUTABLE",
-              "UPSTREAM_UNRESOLVED"
+              "UPSTREAM_UNRESOLVED",
+              "INBOX_BODY_CONFLICT"
             ]
           },
           "correlationId": {
@@ -1881,6 +1888,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
             "description": "Declared purpose, an untrusted label."
           },
           "targetInstanceRef": {
@@ -2117,7 +2125,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200,
-            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD026"

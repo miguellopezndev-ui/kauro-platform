@@ -15,6 +15,12 @@ export const SQLSTATE = Object.freeze({
   JOURNAL: "KA007",
   UNLISTED_TRANSITION: "KA008",
   UPSTREAM_UNRESOLVED: "KA009",
+  // a membership or invitation write without the acting session's team authority (migration 0002, re-check finding N11)
+  MEMBERSHIP_AUTHORITY: "KA010",
+  // an invitation consumed, revoked or expired, or an acceptance without a consumed invitation (0002, finding N19)
+  INVITATION_NOT_OPEN: "KA011",
+  // an inbox record settled while a delivery of the same event carried another body (0005, finding N2)
+  INBOX_BODY_CONFLICT: "KA012",
   // a live approval on a plan that is not APPROVED under it (migration 0004, the deferred constraint triggers
   // plans_live_approval_binding and approvals_live_approval_binding; decision D-PLAN-4)
   LIVE_APPROVAL_UNBOUND: "KA020",
@@ -40,6 +46,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA007: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
   KA008: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
   KA009: { code: "PRECONDITION_FAILED", reason: "UPSTREAM_UNRESOLVED" },
+  KA010: { code: "NOT_AUTHORIZED", reason: "ROLE_INSUFFICIENT" },
+  KA011: { code: "PRECONDITION_FAILED", reason: "INVITATION_NOT_OPEN" },
+  KA012: { code: "PRECONDITION_FAILED", reason: "INBOX_BODY_CONFLICT" },
   KA020: { code: "INTEGRITY_FAILURE", reason: "LIVE_APPROVAL_UNBOUND" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
@@ -48,6 +57,18 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   "40P01": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "55P03": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "57014": { code: "CAPACITY_UNAVAILABLE", retryable: true },
+});
+
+/**
+ * The request fields whose label CHECK constraints the migrations name (re-check finding N6): the request schema refuses
+ * exactly what kauro.is_label refuses, so these can only fire when a writer bypassed the schema; when one does, the refusal still
+ * names the field instead of answering a reasonless 400 (10 "frontend control flow uses the code and typed fields").
+ */
+export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.freeze({
+  agencies_display_name_label: "displayName",
+  end_clients_display_name_label: "displayName",
+  projects_purpose_label: "purpose",
+  approvals_withdraw_reason_label: "reasonCode",
 });
 
 /**
@@ -62,6 +83,9 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
     // plans_supersedes_once (lost revision race) are decided by the handler, which re-reads the current row and answers
     // with the replayed result or STALE_VERSION carrying the current safe version.
     return null;
+  }
+  if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint !== undefined && LABEL_CONSTRAINT_FIELDS[constraint] !== undefined) {
+    return new DomainFailure("INVALID_REQUEST", `database refused the write (${sqlState} ${constraint})`, { reason: "SCHEMA_VIOLATION", fields: [{ field: LABEL_CONSTRAINT_FIELDS[constraint] as string, code: "FORMAT" }] });
   }
   const m = MAP[sqlState];
   if (!m) return null;

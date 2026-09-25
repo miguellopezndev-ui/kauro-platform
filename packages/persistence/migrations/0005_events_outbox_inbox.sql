@@ -160,6 +160,66 @@ CREATE TRIGGER inbox_records_touch BEFORE UPDATE ON kauro.inbox_records FOR EACH
 CREATE TRIGGER inbox_records_immutable BEFORE UPDATE ON kauro.inbox_records
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('inbox_id,provider,environment,external_event_id,body_hash,received_at');
 
+-- A delivery that reuses a recorded event identity with another body is not a duplicate (15 "deduplicates by provider,
+-- environment and event ID" deduplicates the SAME event; re-check finding N2): the ingress records it here instead of absorbing
+-- it, and the recorded event cannot be settled APPLIED while such a conflict exists — the consumer reconciles it with the
+-- provider (07 "Provider webhooks can arrive duplicated, late or out of order"; 10 "Unknown statuses are not coerced to success
+-- or failure"). Append-only; one row per distinct conflicting body.
+CREATE TABLE kauro.inbox_body_conflicts (
+  conflict_id  uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(conflict_id)),
+  inbox_id     uuid NOT NULL REFERENCES kauro.inbox_records (inbox_id),
+  body_hash    text NOT NULL CHECK (kauro.is_sha256_hex(body_hash)),
+  received_at  timestamptz NOT NULL,
+  UNIQUE (inbox_id, body_hash)
+);
+CREATE TRIGGER inbox_body_conflicts_append_only BEFORE UPDATE OR DELETE ON kauro.inbox_body_conflicts
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+
+CREATE OR REPLACE FUNCTION kauro.inbox_conflict_differs() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  recorded text;
+BEGIN
+  SELECT r.body_hash INTO recorded FROM kauro.inbox_records r WHERE r.inbox_id = NEW.inbox_id;
+  IF recorded IS NULL THEN
+    RAISE EXCEPTION 'CONTEXT: inbox record % is not visible', NEW.inbox_id USING ERRCODE = 'KA006';
+  END IF;
+  IF recorded = NEW.body_hash THEN
+    RAISE EXCEPTION 'INBOX_BODY_CONFLICT: a delivery with the recorded body of % is a duplicate, not a conflict', NEW.inbox_id USING ERRCODE = 'KA012';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER inbox_body_conflicts_differ BEFORE INSERT ON kauro.inbox_body_conflicts
+  FOR EACH ROW EXECUTE FUNCTION kauro.inbox_conflict_differs();
+
+CREATE OR REPLACE FUNCTION kauro.inbox_apply_without_conflict() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF EXISTS (SELECT 1 FROM kauro.inbox_body_conflicts c WHERE c.inbox_id = NEW.inbox_id) THEN
+    RAISE EXCEPTION 'INBOX_BODY_CONFLICT: inbox record % has deliveries with another body; reconcile before applying it', NEW.inbox_id USING ERRCODE = 'KA012';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER inbox_records_apply_without_conflict BEFORE UPDATE OF state ON kauro.inbox_records
+  FOR EACH ROW WHEN (NEW.state = 'APPLIED' AND OLD.state IS DISTINCT FROM 'APPLIED') EXECUTE FUNCTION kauro.inbox_apply_without_conflict();
+
+-- a settled record stays settled (an old delivery may add history, never roll the consumer's decision back)
+CREATE OR REPLACE FUNCTION kauro.inbox_records_guard() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF OLD.state IN ('APPLIED', 'IGNORED', 'REJECTED') AND NEW.state IS DISTINCT FROM OLD.state THEN
+    RAISE EXCEPTION 'JOURNAL: inbox record % is settled (%)', OLD.inbox_id, OLD.state USING ERRCODE = 'KA007';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER inbox_records_guard BEFORE UPDATE ON kauro.inbox_records FOR EACH ROW EXECUTE FUNCTION kauro.inbox_records_guard();
+
 -- --- event-per-version: a new aggregate version cannot commit without its domain event (deferred to commit) ------------------------
 CREATE CONSTRAINT TRIGGER agencies_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.agencies
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('agency', 'agency_id');
@@ -199,18 +259,28 @@ CREATE POLICY outbox_records_control ON kauro.outbox_records FOR ALL TO kauro_co
 
 ALTER TABLE kauro.inbox_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.inbox_records FORCE ROW LEVEL SECURITY;
--- Provider ingress (an api webhook route: 10 "POST /payments/webhooks/{provider} ... durable inbox handling") records the
--- authenticated event reference once, as RECEIVED, and learns only whether it was new (15 "Webhooks and reconciliation":
--- "stores a minimized immutable event reference in the inbox and deduplicates by provider, environment and event ID" — an
--- INSERT ... ON CONFLICT DO NOTHING without a conflict target, since naming an arbiter needs a read of the table; the fresh
--- inbox id and the inbox identity are its only unique keys). Reading, processing and settling inbox rows is the consumer's
--- work (07 "consumers deduplicate by their own durable inbox identity and verify state before an effect"), i.e. the control
--- plane. The request handlers therefore can neither read nor rewrite any inbox row: under no tenant context can one agency's
--- handler see which provider events exist or suppress another's before its consumer runs (08 trust boundary "provider
--- webhook to inbox").
-CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR INSERT TO kauro_app
+-- Provider ingress (10 "POST /payments/webhooks/{provider} accepts provider events under signature and environment
+-- verification. It has a separate ingress/authentication policy from browser APIs"; COMMAND_CATALOGUE CMD030 authorized role
+-- AUTHENTICATED_PROVIDER) records the authenticated event reference once, as RECEIVED (15 "Webhooks and reconciliation":
+-- "stores a minimized immutable event reference in the inbox and deduplicates by provider, environment and event ID"). It runs
+-- as its own runtime group, kauro_ingress: it inserts RECEIVED references, reads only the dedupe identity and the body hash
+-- (to tell a duplicate from a conflicting body) and records conflicts, and nothing else. Reading, processing and settling inbox
+-- rows is the consumer's work (07 "consumers deduplicate by their own durable inbox identity and verify state before an
+-- effect"), i.e. the control plane. The request handlers of agency users (kauro_app) hold no privilege on the inbox at all:
+-- under no tenant context can an agency's handler see which provider events exist, pre-insert an event id with a forged body
+-- and so suppress the genuine delivery (re-check finding N2), or rewrite one (review R6) — 08 trust boundary "provider webhook
+-- to inbox".
+CREATE POLICY inbox_records_ingress ON kauro.inbox_records FOR INSERT TO kauro_ingress
   WITH CHECK (state = 'RECEIVED' AND applied_at IS NULL AND result_event_id IS NULL);
+CREATE POLICY inbox_records_ingress_dedupe ON kauro.inbox_records FOR SELECT TO kauro_ingress USING (true);
 CREATE POLICY inbox_records_control ON kauro.inbox_records FOR ALL TO kauro_control USING (true) WITH CHECK (true);
+
+ALTER TABLE kauro.inbox_body_conflicts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.inbox_body_conflicts FORCE ROW LEVEL SECURITY;
+CREATE POLICY inbox_body_conflicts_ingress ON kauro.inbox_body_conflicts FOR INSERT TO kauro_ingress WITH CHECK (true);
+-- the ingress names the conflict identity as its ON CONFLICT arbiter, which PostgreSQL admits only with SELECT on those columns
+CREATE POLICY inbox_body_conflicts_ingress_dedupe ON kauro.inbox_body_conflicts FOR SELECT TO kauro_ingress USING (true);
+CREATE POLICY inbox_body_conflicts_control ON kauro.inbox_body_conflicts FOR SELECT TO kauro_control USING (true);
 
 -- --- grants -----------------------------------------------------------------------------------------------------------------------
 GRANT SELECT ON kauro.event_types TO kauro_app, kauro_control;
@@ -219,5 +289,9 @@ GRANT SELECT ON kauro.domain_events TO kauro_control;
 GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_app;
 GRANT SELECT, INSERT ON kauro.outbox_records TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.outbox_records TO kauro_control;
-GRANT INSERT ON kauro.inbox_records TO kauro_app;
+GRANT INSERT (inbox_id, provider, environment, external_event_id, body_hash, state, received_at, updated_at) ON kauro.inbox_records TO kauro_ingress;
+GRANT SELECT (inbox_id, provider, environment, external_event_id, body_hash) ON kauro.inbox_records TO kauro_ingress;
+GRANT INSERT ON kauro.inbox_body_conflicts TO kauro_ingress;
+GRANT SELECT (inbox_id, body_hash) ON kauro.inbox_body_conflicts TO kauro_ingress;
 GRANT SELECT, INSERT, UPDATE ON kauro.inbox_records TO kauro_control;
+GRANT SELECT ON kauro.inbox_body_conflicts TO kauro_control;

@@ -33,6 +33,19 @@ CREATE TABLE kauro.plans (
   -- binding targets for the approval foreign keys below: an approval can only name this plan with this exact body/source/target
   UNIQUE (agency_id, plan_id, body_hash, revision_hash, target_contract_hash),
   FOREIGN KEY (agency_id, project_id) REFERENCES kauro.projects (agency_id, project_id),
+  -- the plan's source and target are its own project's (re-check finding N9; CMD025 "exact plan/source/target/disclosures";
+  -- 07 "APPROVED requires ... exact source/target/plan bindings", "Composite foreign keys ... prevent a project ... from
+  -- referencing another agency's revision"): a sealed revision of this project with that manifest hash, and a target contract of
+  -- this project with that body hash. A plan of one project can never name another project's source or target, so an approval —
+  -- keyed on the plan's own columns — can never bind them either.
+  CONSTRAINT plans_source_fk FOREIGN KEY (agency_id, project_id, revision_hash) REFERENCES kauro.dataset_revisions (agency_id, project_id, manifest_hash),
+  CONSTRAINT plans_target_fk FOREIGN KEY (agency_id, project_id, target_contract_hash) REFERENCES kauro.target_contracts (agency_id, project_id, body_hash),
+  -- the subject columns are the body's own members (reference/HASHING_AND_ACCOUNTING_RULES: the Plan bodyHash preimage contains
+  -- revisionHash, targetContractHash and policyHash), so the keys above bind what the body says (re-check finding N10, open
+  -- question Q9's "no CHECK ties them"); the body digest itself is recomputed by the application from the stored body
+  CONSTRAINT plans_body_names_subjects CHECK (
+    body ->> 'revisionHash' = revision_hash AND body ->> 'targetContractHash' = target_contract_hash AND body ->> 'policyHash' = policy_hash
+  ),
   FOREIGN KEY (agency_id, supersedes_plan_id) REFERENCES kauro.plans (agency_id, plan_id),
   -- the successor link is checked at commit: RevisePlan compare-and-swaps the predecessor first (the serialization point of
   -- S051) and inserts the successor afterwards in the same transaction
@@ -157,7 +170,7 @@ CREATE TABLE kauro.approvals (
   withdrawn_at                timestamptz,
   withdrawn_by_membership_id  uuid,
   -- CMD026 reasonCode is a registry `label` (decision D-API-1); it is stored here and never copied into an event payload
-  withdraw_reason_code        text CHECK (withdraw_reason_code IS NULL OR kauro.is_label(withdraw_reason_code)),
+  withdraw_reason_code        text CONSTRAINT approvals_withdraw_reason_label CHECK (withdraw_reason_code IS NULL OR kauro.is_label(withdraw_reason_code)),
   updated_at                  timestamptz NOT NULL,
   UNIQUE (agency_id, approval_id),
   UNIQUE (agency_id, approval_hash),
@@ -213,12 +226,15 @@ CREATE TRIGGER approvals_withdraw_once BEFORE UPDATE ON kauro.approvals FOR EACH
 ALTER TABLE kauro.plans ADD CONSTRAINT plans_approval_fk
   FOREIGN KEY (agency_id, approval_id, plan_id) REFERENCES kauro.approvals (agency_id, approval_id, plan_id) DEFERRABLE INITIALLY DEFERRED;
 
--- A live (not withdrawn) approval exists only on the APPROVED plan that names it. Leaving APPROVED — withdraw_approval
--- (APPROVED -> WITHDRAWN) or new_plan_revision (APPROVED -> SUPERSEDED, effect "Pause affected future work pending new
--- approval") — withdraws the approval in the same transaction, as its own recorded authority event
--- (reference/HASHING_AND_ACCOUNTING_RULES: "Withdrawal is a separately recorded authority event checked during consequential
--- commands"); a superseded or withdrawn plan can never keep live execution authority. Checked at COMMIT (deferred), so the
--- approval and the plan can be written in either order inside the command (decision D-PLAN-4).
+-- A live (not withdrawn) approval exists only on the APPROVED plan that names it, and an APPROVED plan always names a live
+-- approval of itself: the two facts are one. Leaving APPROVED — withdraw_approval (APPROVED -> WITHDRAWN) or new_plan_revision
+-- (APPROVED -> SUPERSEDED, effect "Pause affected future work pending new approval") — withdraws the approval in the same
+-- transaction, as its own recorded authority event (reference/HASHING_AND_ACCOUNTING_RULES: "Withdrawal is a separately recorded
+-- authority event checked during consequential commands"); and ending an approval moves its plan out of APPROVED in the same
+-- transaction (re-check finding N5: a withdrawal written alone would leave a plan APPROVED under no authority, which could then
+-- be neither revised nor withdrawn). A superseded or withdrawn plan can never keep live execution authority, and an approved one
+-- never loses it silently. Checked at COMMIT (deferred), so the approval and the plan can be written in either order inside the
+-- command (decision D-PLAN-4).
 CREATE OR REPLACE FUNCTION kauro.live_approval_binds_approved_plan() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -231,6 +247,17 @@ BEGIN
        AND (p.state <> 'APPROVED' OR p.approval_id IS DISTINCT FROM a.approval_id)
   ) THEN
     RAISE EXCEPTION 'LIVE_APPROVAL_UNBOUND: plan % keeps a live approval it is not APPROVED under', NEW.plan_id USING ERRCODE = 'KA020';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+      FROM kauro.plans p
+     WHERE p.agency_id = NEW.agency_id AND p.plan_id = NEW.plan_id AND p.state = 'APPROVED'
+       AND NOT EXISTS (
+         SELECT 1 FROM kauro.approvals a
+          WHERE a.agency_id = p.agency_id AND a.approval_id = p.approval_id AND a.plan_id = p.plan_id AND a.withdrawn_at IS NULL
+       )
+  ) THEN
+    RAISE EXCEPTION 'LIVE_APPROVAL_UNBOUND: plan % is APPROVED under an approval that is not live', NEW.plan_id USING ERRCODE = 'KA020';
   END IF;
   RETURN NULL;
 END
@@ -261,11 +288,22 @@ ALTER TABLE kauro.approvals FORCE ROW LEVEL SECURITY;
 -- 08 "A service account ... cannot act as a human owner by putting an owner ID in a request"; 07 "Transaction discipline":
 -- application checks improve messages but cannot be the sole protection): the actor of a new approval is the session's user,
 -- and the withdrawer recorded on it is a membership of the session's user in this agency. The keys above bind the actor to its
--- own membership and proof (R5); these policies bind all of it to the acting session.
+-- own membership and proof (R5); these policies bind all of it to the acting session. Since the re-check (finding N11: the
+-- database carries the role boundary of the authority aggregates) they also bind the authority: the approving membership is
+-- ACTIVE with an approving role (07 "APPROVED requires a permitted agency actor"; D-AUTHZ-1: AGENCY_APPROVER is OWNER or
+-- APPROVER), and the withdrawing membership is ACTIVE and controls the approval — its approving actor's own membership or an
+-- OWNER (D-AUTHZ-3).
 CREATE POLICY approvals_tenant_read ON kauro.approvals FOR SELECT TO kauro_app
   USING (agency_id = kauro.current_agency_id());
 CREATE POLICY approvals_act ON kauro.approvals FOR INSERT TO kauro_app
-  WITH CHECK (agency_id = kauro.current_agency_id() AND actor_id = kauro.current_user_id());
+  WITH CHECK (
+    agency_id = kauro.current_agency_id() AND actor_id = kauro.current_user_id()
+    AND EXISTS (
+      SELECT 1 FROM kauro.memberships m
+      WHERE m.agency_id = approvals.agency_id AND m.membership_id = approvals.actor_membership_id AND m.user_id = kauro.current_user_id()
+        AND m.state = 'ACTIVE' AND m.role IN ('OWNER', 'APPROVER')
+    )
+  );
 CREATE POLICY approvals_withdraw ON kauro.approvals FOR UPDATE TO kauro_app
   USING (agency_id = kauro.current_agency_id())
   WITH CHECK (
@@ -273,7 +311,8 @@ CREATE POLICY approvals_withdraw ON kauro.approvals FOR UPDATE TO kauro_app
     AND (withdrawn_by_membership_id IS NULL OR EXISTS (
       SELECT 1 FROM kauro.memberships m
       WHERE m.agency_id = approvals.agency_id AND m.membership_id = approvals.withdrawn_by_membership_id
-        AND m.user_id = kauro.current_user_id()
+        AND m.user_id = kauro.current_user_id() AND m.state = 'ACTIVE'
+        AND (m.role = 'OWNER' OR m.membership_id = approvals.actor_membership_id)
     ))
   );
 

@@ -4,7 +4,7 @@
  *
  * startTemporaryPostgres() runs initdb into a fresh directory, starts the server on a free 127.0.0.1 port, creates the
  * database and the roles the platform expects, applies the migrations as the owner role, creates one login role per runtime
- * group (request handlers, control plane, step-up verifier, validator), and returns connection factories. stop() shuts the server down and removes the
+ * group (request handlers, control plane, step-up verifier, validator, provider ingress), and returns connection factories. stop() shuts the server down and removes the
  * directory. Binaries: env PGBIN first, then C:\Tools\pgsql17\bin on Windows, /usr/lib/postgresql/17/bin on Linux.
  */
 import { spawnSync } from "node:child_process";
@@ -21,15 +21,17 @@ export const ROLES = Object.freeze({
   control: "kauro_control",
   assurance: "kauro_assurance",
   validator: "kauro_validator",
+  ingress: "kauro_ingress",
   appLogin: "kauro_app_test",
   controlLogin: "kauro_control_test",
   assuranceLogin: "kauro_assurance_test",
   validatorLogin: "kauro_validator_test",
+  ingressLogin: "kauro_ingress_test",
   superuser: "postgres",
   database: "kauro",
 });
 
-export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test";
+export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test" | "kauro_ingress_test";
 
 export interface TemporaryPostgres {
   readonly port: number;
@@ -127,6 +129,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
         await su2.query(`CREATE ROLE ${ROLES.controlLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.control}`);
         await su2.query(`CREATE ROLE ${ROLES.assuranceLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.assurance}`);
         await su2.query(`CREATE ROLE ${ROLES.validatorLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.validator}`);
+        await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}`);
       } finally {
         await su2.end();
       }

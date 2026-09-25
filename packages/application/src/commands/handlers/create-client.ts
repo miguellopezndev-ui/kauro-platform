@@ -3,7 +3,8 @@
  * clients creates a scoped client workspace"; catalogue: "Create one scoped workspace with stable identity separate from its
  * display name. Duplicate labels are not merged by inference; a foreign authority reference rejects.").
  *
- * Order: authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → reserve → lock agency (DRAFT or ACTIVE, D-CMD-2) → record the end-client
+ * Order: authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → reserve → the agency after its transition lock (DRAFT or ACTIVE, D-CMD-2;
+ * D-TX-2) → record the end-client
  * processing authority under the evidence reference the agency names (catalogue precondition "... records the end-client
  * processing authority"): a reference new to the platform is recorded now, in this unit of work, by this membership; one this
  * agency already recorded is bound again; one another agency recorded is refused (INVALID_REQUEST / UNKNOWN_REFERENCE — "a
@@ -25,7 +26,10 @@ export function createClientHandler(runtime: CommandRuntime): CreateClientHandle
       runCommand<CreateClientBody, EndClientView>(CREATE_CLIENT, runtime, envelope, async (uow, ctx) => {
         const membership = requireMembership(ctx);
         const agencyId = envelope.path["agencyId"] as AgencyId;
-        const agency = await uow.agencies.lock(agencyId);
+        // the agency state this command relies on, read after the agency's transition lock (D-TX-2): a restriction or closure
+        // issued meanwhile waits for this client, one committed first refuses it (re-check finding N3); no row lock serializes
+        // client creations of one agency any more
+        const agency = await uow.agencies.lockShared(agencyId);
         if (!agency) throw new DomainFailure("NOT_FOUND", "agency not visible");
         if (!AGENCY_OPEN_STATES.has(agency.state)) {
           throw new DomainFailure("PRECONDITION_FAILED", "agency does not accept new clients", { reason: "AGENCY_NOT_OPEN", currentState: agency.state, currentVersion: agency.version });

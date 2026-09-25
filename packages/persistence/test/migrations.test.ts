@@ -59,9 +59,9 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
   try {
     const roles = await su.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; rolcreaterole: boolean }>(
       `SELECT rolname, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname IN
-         ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator', 'kauro_app_test', 'kauro_control_test', 'kauro_assurance_test', 'kauro_validator_test')`,
+         ('kauro_app', 'kauro_control', 'kauro_assurance', 'kauro_validator', 'kauro_ingress', 'kauro_app_test', 'kauro_control_test', 'kauro_assurance_test', 'kauro_validator_test', 'kauro_ingress_test')`,
     );
-    assert.equal(roles.rows.length, 8);
+    assert.equal(roles.rows.length, 10);
     for (const r of roles.rows) {
       assert.equal(r.rolsuper, false, r.rolname);
       assert.equal(r.rolbypassrls, false, r.rolname);

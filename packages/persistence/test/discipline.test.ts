@@ -9,7 +9,7 @@ import type { Client } from "pg";
 import type { AgencyId, MembershipId, NewPlanRevision, PlanBody, PlanId, ProjectId } from "@kauro/domain";
 import { ConstraintViolation, PgPlanRepository } from "../src/index.js";
 import { startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/testing/index.js";
-import { agency, bind, clock, constraintOf, endClient, event, ids, offeredCapability, person, plan, processingAuthority, project, sha, sqlState, stepUpProof, tx, type AgencyFixture, type Person } from "./support.js";
+import { agency, bind, clock, constraintOf, endClient, event, ids, offeredCapability, person, plan, planBody, processingAuthority, project, sealedSource, sha, sqlState, stepUpProof, targetContract, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;
 let app: Client;
@@ -111,9 +111,10 @@ test("S051: two revisions racing on one plan version through the plan adapter â€
   const p = await plan(app, A, projectId, "VALIDATION_REQUIRED", "race");
   assert.equal(p.version, 2);
   const ctx = { agencyId: A.agencyId, userId: owner.userId };
-  const successorOf = (planId: string, seed: string): NewPlanRevision => {
+  // the repository derives the body hash from the body (re-check finding N10); the label only names the successor in the test
+  const successorOf = (planId: string, _label: string): NewPlanRevision => {
     const body: PlanBody = { revisionHash: p.revisionHash, targetContractHash: p.targetContractHash, policyHash: sha("policy"), mappings: [], identities: [], transforms: [], relationships: [] };
-    return { planId: planId as PlanId, agencyId: A.agencyId as AgencyId, projectId: projectId as ProjectId, body, bodyHash: sha(seed), supersedesPlanId: p.planId as PlanId, createdByMembershipId: A.ownerMembershipId as MembershipId, createdAt: clock.now() };
+    return { planId: planId as PlanId, agencyId: A.agencyId as AgencyId, projectId: projectId as ProjectId, body, supersedesPlanId: p.planId as PlanId, createdByMembershipId: A.ownerMembershipId as MembershipId, createdAt: clock.now() };
   };
   const successor1 = ids.next();
   const successor2 = ids.next();
@@ -223,13 +224,15 @@ test("an approval binds exact plan/source/target/receipt hashes; a foreign or st
 test("outbox records commit with their event under the tenant policy and can only name events of the bound tenant", async () => {
   const other = await person(app, "other-outbox");
   const B = await agency(app, other, "Other Agency");
+  // the plan names a sealed source and a confirmed target of its own project (plans_source_fk, plans_target_fk)
+  const source = await sealedSource(app, A, projectId, "outbox");
+  const target = await targetContract(app, A, projectId, "outbox");
   const eventId = await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
-    // a second agency event needs a version bump of the agency (v2) â€” use the listed DRAFT -> CLOSING? No: use a synthetic
-    // aggregate version on a fresh approval-less event: plan.created for a new plan is simplest
+    // plan.created for a new plan is the simplest fresh event of this agency
     const planId = ids.next();
     await c.query(
-      "INSERT INTO kauro.plans (plan_id, agency_id, project_id, revision_hash, target_contract_hash, policy_hash, body, body_hash, created_by_membership_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, '{}', $7, $8, now(), now())",
-      [planId, A.agencyId, projectId, sha("r"), sha("t"), sha("p"), sha("b-" + planId), A.ownerMembershipId],
+      "INSERT INTO kauro.plans (plan_id, agency_id, project_id, revision_hash, target_contract_hash, policy_hash, body, body_hash, created_by_membership_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, now(), now())",
+      [planId, A.agencyId, projectId, source.manifestHash, target.bodyHash, sha("p"), JSON.stringify(planBody(source.manifestHash, target.bodyHash, sha("p"))), sha("b-" + planId), A.ownerMembershipId],
     );
     const id = await event(c, { aggregateKind: "plan", aggregateId: planId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "plan.created.v1", actorUserId: owner.userId, payload: { planId, agencyId: A.agencyId, projectId, bodyHash: sha("b-" + planId) } });
     await c.query("INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, next_attempt_at, created_at, updated_at) VALUES ($1, $2, 'EXECUTION_CONTROL', now(), now(), now())", [ids.next(), id]);

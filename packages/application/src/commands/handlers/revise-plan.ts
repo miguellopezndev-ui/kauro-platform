@@ -29,7 +29,7 @@ import type { ArtifactResolver, PatchCompilation, PlanPatchCompiler } from "../.
 import type { CommercialConsequenceInspector } from "../../ports/work-inspectors.js";
 import { REVISE_PLAN, type RevisePlanBody, type RevisePlanHandler, type RevisePlanView } from "../contracts.js";
 import { runCommand, type CommandRuntime } from "../runtime.js";
-import { applied, checkExpectedVersion, controlsApproval, requireMembership } from "./shared.js";
+import { applied, checkExpectedVersion, controlsApproval, planBodyDigest, requireMembership } from "./shared.js";
 
 /** The reason recorded on an approval that a new plan revision withdrew (a machine token the server chooses). */
 export const SUPERSESSION_WITHDRAW_REASON = "PLAN_SUPERSEDED";
@@ -87,12 +87,24 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
         }
         const currentBody = await uow.plans.getBody(planId);
         if (!currentBody) throw new DomainFailure("INTEGRITY_FAILURE", "locked plan has no body");
+        // the stored body is the one the predecessor's hash names (the consumer recomputes the preimage)
+        if (planBodyDigest(currentBody) !== predecessor.bodyHash) throw new DomainFailure("INTEGRITY_FAILURE", "the stored plan body is not the body its hash names", { reason: "BODY_DIGEST_MISMATCH" });
         const compilation = await compiler.apply(currentBody, patch);
         if (compilation.kind === "REJECTED") {
           const reason = COMPILER_REASON[compilation.reason];
           throw new DomainFailure("INVALID_REQUEST", "typed patch rejected", { reason, fields: [{ field: "decisionPatchArtifactRef", code: reason }] });
         }
-        if (compilation.bodyHash === predecessor.bodyHash) {
+        // re-check finding N10 (reference/HASHING_AND_ACCOUNTING_RULES "the consumer recomputes the relevant preimage"): the
+        // successor's hash is the KAURO_PLAN_BODY_V1 digest of the compiled body, computed here; a compiler that claims another
+        // hash is an integrity failure, never a stored hash that describes other content (S051 "no approval of unseen new content")
+        const successorHash = planBodyDigest(compilation.body);
+        if (compilation.bodyHash !== successorHash) throw new DomainFailure("INTEGRITY_FAILURE", "the compiled body's digest differs from the hash the compiler claimed", { reason: "BODY_DIGEST_MISMATCH" });
+        // a typed patch edits decisions, never the plan's subject (design §8 step 8: the successor keeps the predecessor's
+        // revision, target and policy hashes; CMD023 "Create a new plan revision" of this plan, not a plan of another source)
+        if (compilation.body.revisionHash !== predecessor.revisionHash || compilation.body.targetContractHash !== predecessor.targetContractHash || compilation.body.policyHash !== predecessor.policyHash) {
+          throw new DomainFailure("INVALID_REQUEST", "the typed patch would change the plan's source, target or policy", { reason: "PATCH_EFFECT_NOT_PERMITTED", fields: [{ field: "decisionPatchArtifactRef", code: "PATCH_EFFECT_NOT_PERMITTED" }] });
+        }
+        if (successorHash === predecessor.bodyHash) {
           throw new DomainFailure("PRECONDITION_FAILED", "the patch changes nothing", { reason: "NO_SEMANTIC_CHANGE", currentState: predecessor.state, currentVersion: predecessor.version });
         }
         const successorId = uow.ids.next() as PlanId;
@@ -107,11 +119,11 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
           agencyId: membership.agencyId,
           projectId: predecessor.projectId,
           body: compilation.body,
-          bodyHash: compilation.bodyHash,
           supersedesPlanId: planId,
           createdByMembershipId: membership.membershipId,
           createdAt: ctx.now,
         });
+        if (draft.bodyHash !== successorHash) throw new DomainFailure("INTEGRITY_FAILURE", "the stored successor hash is not the digest of its body", { reason: "BODY_DIGEST_MISMATCH" });
         const successor = applied(await uow.plans.transition(successorId, draft.version, { state: "VALIDATION_REQUIRED" }, ctx.now));
         const invalidated = {
           ...(predecessor.validationReceiptHash !== undefined ? { validationReceiptHash: predecessor.validationReceiptHash } : {}),
@@ -157,7 +169,7 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
-          payload: { planId: successorId, agencyId: membership.agencyId, projectId: predecessor.projectId, bodyHash: compilation.bodyHash, supersedesPlanId: planId, createdByMembershipId: membership.membershipId },
+          payload: { planId: successorId, agencyId: membership.agencyId, projectId: predecessor.projectId, bodyHash: successorHash, supersedesPlanId: planId, createdByMembershipId: membership.membershipId },
         });
         await uow.events.publish({
           aggregateKind: "plan",
@@ -168,7 +180,7 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
-          payload: { planId: successorId, agencyId: membership.agencyId, bodyHash: compilation.bodyHash },
+          payload: { planId: successorId, agencyId: membership.agencyId, bodyHash: successorHash },
         });
         return {
           status: 201,

@@ -40,6 +40,20 @@ CREATE TRIGGER capabilities_transition BEFORE UPDATE OF state ON kauro.capabilit
 -- reached only through the listed edges, each recording its gate's evidence
 CREATE TRIGGER capabilities_initial_state BEFORE INSERT ON kauro.capabilities
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Capability');
+-- CMD011 relies on the offered capability of the requested mode when the project commits (catalogue precondition "the
+-- requested mode is offered"): a MODE capability's state is a transition subject keyed by its mode (D-TX-2), so a suspension —
+-- or a new version becoming offered — issued while a project creation is in flight waits for it, and creations arriving after
+-- it wait behind it (re-check finding N3). A capability of another kind is its own subject.
+CREATE OR REPLACE FUNCTION kauro.capabilities_transition_lock() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  PERFORM pg_advisory_xact_lock(kauro.transition_key('kauro.capabilities', coalesce(OLD.mode, OLD.capability_id::text)));
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER capabilities_transition_lock BEFORE UPDATE OF state ON kauro.capabilities
+  FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.capabilities_transition_lock();
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Capability', 'DESIGN');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -79,7 +93,7 @@ CREATE TABLE kauro.end_clients (
   client_id                  uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(client_id)),
   agency_id                  uuid NOT NULL REFERENCES kauro.agencies (agency_id),
   version                    bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
-  display_name               text NOT NULL CHECK (kauro.is_label(display_name)),
+  display_name               text NOT NULL CONSTRAINT end_clients_display_name_label CHECK (kauro.is_label(display_name)),
   state                      text NOT NULL DEFAULT 'ACTIVE' CHECK (state IN ('ACTIVE', 'ARCHIVED')),
   processing_authority_ref   uuid NOT NULL,
   created_by_membership_id   uuid NOT NULL,
@@ -115,7 +129,7 @@ CREATE TABLE kauro.projects (
   version                    bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
   state                      text NOT NULL DEFAULT 'OPEN' CHECK (state IN ('OPEN', 'CLOSED', 'DELETION_REQUESTED', 'DELETED')),
   mode                       text NOT NULL CHECK (mode IN ('CLEAN', 'HUBSPOT', 'SALESFORCE')),
-  purpose                    text NOT NULL CHECK (kauro.is_label(purpose)),
+  purpose                    text NOT NULL CONSTRAINT projects_purpose_label CHECK (kauro.is_label(purpose)),
   target_instance_ref        uuid,
   capability_id              uuid NOT NULL REFERENCES kauro.capabilities (capability_id),
   capability_version         text NOT NULL,
@@ -162,6 +176,10 @@ CREATE TABLE kauro.dataset_revisions (
   created_at              timestamptz NOT NULL,
   updated_at              timestamptz NOT NULL,
   UNIQUE (agency_id, revision_id),
+  -- binding target of plans_source_fk (0004): a plan's source is a revision of the plan's own project (re-check finding N9;
+  -- 07 "Composite foreign keys ... prevent a project in one agency from referencing another agency's revision"; TenantScope
+  -- projectId "Project scope when the operation is project-bound"). A DRAFT revision has no manifest yet (NULLs are distinct).
+  CONSTRAINT dataset_revisions_project_manifest UNIQUE (agency_id, project_id, manifest_hash),
   FOREIGN KEY (agency_id, project_id) REFERENCES kauro.projects (agency_id, project_id),
   FOREIGN KEY (agency_id, supersedes_revision_id) REFERENCES kauro.dataset_revisions (agency_id, revision_id),
   -- a sealed subject carries its manifest and projection digests and its seal instant (EXPIRED can also follow REJECTED)
@@ -180,6 +198,11 @@ CREATE TRIGGER dataset_revisions_transition BEFORE UPDATE OF state ON kauro.data
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('DatasetRevision');
 CREATE TRIGGER dataset_revisions_initial_state BEFORE INSERT ON kauro.dataset_revisions
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('DatasetRevision');
+-- CMD025 relies on the plan's source still being SEALED when the approval commits: a revision's state is a transition subject
+-- (D-TX-2), so an expiry or supersession issued while an approval is in flight waits for it, one committed first is read, and
+-- approvals arriving after a queued transition wait behind it (R15; re-check finding N3)
+CREATE TRIGGER dataset_revisions_transition_lock BEFORE UPDATE OF state ON kauro.dataset_revisions
+  FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.take_transition_lock('kauro.dataset_revisions', 'revision_id');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('DatasetRevision', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -227,23 +250,26 @@ CREATE TABLE kauro.target_contracts (
   superseded_at            timestamptz,
   created_at               timestamptz NOT NULL,
   UNIQUE (agency_id, contract_id),
+  -- one observed body per project (its bodyHash preimage carries observedAt, so a re-observation is another body), and the
+  -- binding target of plans_target_fk (0004): a plan's target is a contract of the plan's own project (re-check findings N4, N9)
+  CONSTRAINT target_contracts_project_body UNIQUE (agency_id, project_id, body_hash),
   FOREIGN KEY (agency_id, project_id) REFERENCES kauro.projects (agency_id, project_id)
 );
-CREATE INDEX target_contracts_by_hash ON kauro.target_contracts (agency_id, body_hash);
 CREATE TRIGGER target_contracts_immutable BEFORE UPDATE ON kauro.target_contracts
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('contract_id,agency_id,project_id,mode,instance_id,importer_profile_id,importer_version,objects,schema_bundle_digest,body_hash,observed_at,authority_evidence_hash,capability_version,created_at');
+-- CMD025 relies on the plan's target contract being confirmed and current: its confirmation and supersession are a transition
+-- subject (D-TX-2), under the same discipline as the source revision
+CREATE TRIGGER target_contracts_transition_lock BEFORE UPDATE OF confirmed_at, superseded_at ON kauro.target_contracts
+  FOR EACH ROW WHEN (OLD.confirmed_at IS DISTINCT FROM NEW.confirmed_at OR OLD.superseded_at IS DISTINCT FROM NEW.superseded_at)
+  EXECUTE FUNCTION kauro.take_transition_lock('kauro.target_contracts', 'contract_id');
 
 -- --- row-level security ------------------------------------------------------------------------------------------------------
 ALTER TABLE kauro.capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.capabilities FORCE ROW LEVEL SECURITY;
+-- The request handlers read capabilities and hold no write or lock privilege on them: CMD011 orders itself with a capability
+-- transition through the transition lock of the mode (D-TX-2), not through a row lock (the FOR SHARE of review R25 let later
+-- readers overtake a queued suspension, re-check finding N3, and needed an UPDATE privilege on the key column).
 CREATE POLICY capabilities_read ON kauro.capabilities FOR SELECT TO kauro_app USING (true);
--- CMD011 relies on the requested mode being offered when the project commits, so it reads the capability under a share
--- lock (07 "Transaction discipline": preconditions are rechecked under explicit locks; a control-plane suspension either
--- waits for the project or is seen). PostgreSQL admits SELECT ... FOR SHARE only with the UPDATE privilege on some column
--- and a passing UPDATE policy; this policy passes every row for the lock and refuses every row an UPDATE would write
--- (WITH CHECK false), and the privilege below covers only the immutable key: the runtime role can lock a capability and can
--- never change one.
-CREATE POLICY capabilities_app_share_lock ON kauro.capabilities FOR UPDATE TO kauro_app USING (true) WITH CHECK (false);
 CREATE POLICY capabilities_control ON kauro.capabilities FOR ALL TO kauro_control USING (true) WITH CHECK (true);
 
 ALTER TABLE kauro.processing_authorities ENABLE ROW LEVEL SECURITY;
@@ -273,8 +299,6 @@ CREATE POLICY target_contracts_tenant ON kauro.target_contracts FOR ALL TO kauro
 
 -- --- grants ---------------------------------------------------------------------------------------------------------------------
 GRANT SELECT ON kauro.capabilities TO kauro_app;
--- lock-only (see capabilities_app_share_lock): the immutable key column, never a state or evidence column
-GRANT UPDATE (capability_id) ON kauro.capabilities TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.capabilities TO kauro_control;
 GRANT SELECT, INSERT ON kauro.processing_authorities TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.end_clients, kauro.projects, kauro.dataset_revisions, kauro.target_contracts TO kauro_app;

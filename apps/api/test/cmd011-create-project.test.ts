@@ -241,7 +241,7 @@ test("RACE: identical retry replays; conflicting same key → 409; a crash befor
   assert.equal(await w.count("projects", "NOT EXISTS (SELECT 1 FROM kauro.dataset_revisions r WHERE r.revision_id = projects.current_revision_id)"), 0, "every project has its current revision");
 });
 
-test("RACE: a capability suspension racing CreateProject — the capability is held under a share lock to COMMIT: a suspension that comes second waits for the project; one committed first refuses it 422 CAPABILITY_UNAVAILABLE", async () => {
+test("RACE: a capability suspension racing CreateProject — the project holds the mode's transition lock to COMMIT: a suspension that comes second waits for the project; one committed first refuses it 422 CAPABILITY_UNAVAILABLE", async () => {
   // 07 "Transaction discipline" ("Preconditions are rechecked inside the relevant transaction"; "Multi-row invariants use
   // explicit locking"); catalogue CMD011 precondition "the requested mode is offered". Review findings R15/R25. SALESFORCE
   // capabilities of their own revisions, so the suspensions (terminal in this version) touch no other test's mode.
@@ -249,7 +249,7 @@ test("RACE: a capability suspension racing CreateProject — the capability is h
   const body = () => ({ mode: "SALESFORCE", purpose: "Race the suspension", targetInstanceRef: ids.next() });
 
   // (a) the project first: it holds at the journal commit with every lock taken; the control plane's suspension of the
-  // capability it relies on is observed waiting on its share lock; the project commits on an offered capability; the
+  // capability it relies on is observed waiting on the mode's transition lock (D-TX-2); the project commits on an offered capability; the
   // suspension commits after it and every later request is refused
   const first = await w.h.offeredCapability("SALESFORCE", "AVAILABLE_LIMITED", { version: "R2-RACE-SECOND" });
   const writerA = await controlWriter(w);
@@ -273,8 +273,7 @@ test("RACE: a capability suspension racing CreateProject — the capability is h
   assert.equal((await w.row<{ state: string }>("capabilities", "capability_id = $1", [first]))?.state, "SUSPENDED");
   assert.equal(outcome(w, await call(w, { url, token: w.operator.token, body: body() })), "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED");
 
-  // (b) the suspension first: it holds the capability's row lock uncommitted; the project is observed waiting for its share
-  // lock; the suspension commits; the project reads the committed SUSPENDED row: 422, no project, no revision, no journal row
+  // (b) the suspension first: it holds the mode's transition lock uncommitted; the project is observed waiting for it; the suspension commits; the project reads the committed SUSPENDED row: 422, no project, no revision, no journal row
   const second = await w.h.offeredCapability("SALESFORCE", "AVAILABLE_LIMITED", { version: "R2-RACE-FIRST" });
   const projectsBefore = await w.count("projects");
   const revisionsBefore = await w.count("dataset_revisions");
@@ -284,7 +283,7 @@ test("RACE: a capability suspension racing CreateProject — the capability is h
     await writerB.query("UPDATE kauro.capabilities SET state = 'SUSPENDED' WHERE capability_id = $1", [second]);
     const request = call(w, { url, token: w.operator.token, key, body: body() });
     try {
-      await waitForApiLockWait(w, "FROM kauro.capabilities");
+      await waitForApiLockWait(w, "await_transition('kauro.capabilities'");
     } finally {
       await writerB.commit();
     }
@@ -295,7 +294,7 @@ test("RACE: a capability suspension racing CreateProject — the capability is h
   assert.equal(await w.count("projects"), projectsBefore);
   assert.equal(await w.count("dataset_revisions"), revisionsBefore);
   assert.equal(await w.journal(key), null);
-  // the runtime role holds the capability lock and nothing else: it can change no capability column
+  // the runtime role holds no write or lock privilege on capabilities (D-TX-2): it can change no capability column
   await assert.rejects(
     w.asTenant(w.A, (c) => c.query("UPDATE kauro.capabilities SET capability_id = capability_id WHERE capability_id = $1", [w.cleanCapabilityId])),
     (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "42501",
@@ -307,7 +306,7 @@ test("RACE: a capability suspension racing CreateProject — the capability is h
   assert.equal((await w.row<{ state: string }>("capabilities", "capability_id = $1", [w.cleanCapabilityId]))?.state, "AVAILABLE_LIMITED");
 });
 
-test("RACE: an agency transition racing CreateProject — the agency is held under a share lock to COMMIT: a closure that comes second waits for the project; one committed first refuses it 409 AGENCY_NOT_OPEN", async () => {
+test("RACE: an agency transition racing CreateProject — the project holds the agency's transition lock to COMMIT: a closure that comes second waits for the project; one committed first refuses it 409 AGENCY_NOT_OPEN", async () => {
   // D-CMD-2 (client and project creation need a DRAFT or ACTIVE agency) rechecked under an explicit lock (07 "Transaction
   // discipline"; registry Agency edge owner_abandons_setup DRAFT -> CLOSING, effect of CLOSING "revokes new work"). Review
   // finding R15. Agencies of their own, because a CLOSING agency does not come back; their owners create the projects (OWNER
@@ -324,7 +323,7 @@ test("RACE: an agency transition racing CreateProject — the agency is held und
   };
   const body = { mode: "CLEAN", purpose: "Race the closure" };
 
-  // (a) the project first: held at the journal commit; the closure is observed waiting on the agency's share lock; the
+  // (a) the project first: held at the journal commit; the closure is observed waiting on the agency's transition lock; the
   // project commits while the agency is still DRAFT; the closure commits after it; a later project is refused
   const c = await agencyWithClient("closing-second");
   const writerA = await tenantWriter(w, c.agency);
@@ -347,7 +346,7 @@ test("RACE: an agency transition racing CreateProject — the agency is held und
   assert.equal((await w.row<{ state: string }>("agencies", "agency_id = $1", [c.agency.agencyId]))?.state, "CLOSING");
   assert.equal(outcome(w, await call(w, { url: routes.createProject(c.clientId), token: c.owner.token, agency: c.agency.agencyId, body })), "409 PRECONDITION_FAILED AGENCY_NOT_OPEN");
 
-  // (b) the closure first: it holds the agency row lock uncommitted; the project is observed waiting for its share lock; the
+  // (b) the closure first: it holds the agency's transition lock uncommitted; the project is observed waiting for it; the
   // closure commits; the project reads CLOSING: 409 with the current state, and no project, revision or journal row exists
   const d = await agencyWithClient("closing-first");
   const key = freshKey("cmd011-race-closure-first");
@@ -356,7 +355,7 @@ test("RACE: an agency transition racing CreateProject — the agency is held und
     await close(writerB, d.agency);
     const request = call(w, { url: routes.createProject(d.clientId), token: d.owner.token, agency: d.agency.agencyId, key, body });
     try {
-      await waitForApiLockWait(w, "FROM kauro.agencies");
+      await waitForApiLockWait(w, "await_transition('kauro.agencies'");
     } finally {
       await writerB.commit();
     }
@@ -369,4 +368,74 @@ test("RACE: an agency transition racing CreateProject — the agency is held und
   assert.equal(await w.count("projects", "agency_id = $1", [d.agency.agencyId]), 0);
   assert.equal(await w.count("dataset_revisions", "agency_id = $1", [d.agency.agencyId]), 0);
   assert.equal(await w.journal(key), null);
+});
+
+test("N3 RACE: a capability suspension queued behind an in-flight project is never overtaken — a project requested after it waits behind the suspension and is refused 422 CAPABILITY_UNAVAILABLE", async () => {
+  // Re-check finding N3: with the row-level FOR SHARE of review R25 a later reader was granted its share lock beside the
+  // in-flight one while the suspension waited, so a stream of overlapping creations could starve the suspension. The
+  // transition lock queues a later reader behind the waiting writer (PostgreSQL's lock manager; decision D-TX-2).
+  const cap = await w.h.offeredCapability("SALESFORCE", "AVAILABLE_LIMITED", { version: "R2-QUEUE" });
+  const otherClient = await w.h.endClient(w.A, w.authorityA, "Queue client");
+  const body = () => ({ mode: "SALESFORCE", purpose: "Queue jump", targetInstanceRef: ids.next() });
+  const secondKey = freshKey("n3-queue-second");
+  const writer = await controlWriter(w);
+  try {
+    const hold = w.holds.arm("journal.commit");
+    const first = call(w, { url: routes.createProject(w.clientA), token: w.operator.token, body: body() });
+    await reachedHold(hold, first);
+    const suspension = writer.query("UPDATE kauro.capabilities SET state = 'SUSPENDED' WHERE capability_id = $1", [cap]);
+    let second: Promise<Reply> | null = null;
+    try {
+      await waitForWriterLockWait(w, writer, "UPDATE kauro.capabilities");
+      // the suspension is queued; a project requested now, for another client, waits behind it (it is not admitted)
+      second = call(w, { url: routes.createProject(otherClient), token: w.operator.token, key: secondKey, body: body() });
+      await waitForApiLockWait(w, "await_transition('kauro.capabilities'");
+    } finally {
+      hold.release();
+    }
+    completed<ProjectView>(await first, 201);
+    await suspension;
+    await writer.commit();
+    if (second === null) throw new Error("the later request was never started");
+    assert.equal(outcome(w, await second), "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED");
+  } finally {
+    await writer.close();
+  }
+  assert.equal(await w.count("projects", "client_id = $1", [otherClient]), 0);
+  assert.equal(await w.journal(secondKey), null);
+});
+
+test("N3 RACE: an agency closure queued behind an in-flight project is never overtaken — a project requested after it waits behind the closure and is refused 409 AGENCY_NOT_OPEN", async () => {
+  const owner = await w.person("n3-closure-queue");
+  const agency = await w.h.createAgency(owner.userId, "Queue agency");
+  const authority = await w.h.processingAuthority(agency);
+  const clientOne = await w.h.endClient(agency, authority, "Queue client one");
+  const clientTwo = await w.h.endClient(agency, authority, "Queue client two");
+  const body = { mode: "CLEAN", purpose: "Queue behind the closure" };
+  const writer = await tenantWriter(w, agency);
+  try {
+    const hold = w.holds.arm("journal.commit");
+    const first = call(w, { url: routes.createProject(clientOne), token: owner.token, agency: agency.agencyId, body });
+    await reachedHold(hold, first);
+    const closure = (async () => {
+      await writer.query("UPDATE kauro.agencies SET state = 'CLOSING', version = version + 1 WHERE agency_id = $1", [agency.agencyId]);
+      await rawEvent(writer.client, { aggregateKind: "agency", aggregateId: agency.agencyId, aggregateVersion: 2, agencyId: agency.agencyId, eventType: "agency.closing.v1", actorUserId: owner.userId, payload: { agencyId: agency.agencyId } });
+    })();
+    let second: Promise<Reply> | null = null;
+    try {
+      await waitForWriterLockWait(w, writer, "UPDATE kauro.agencies");
+      second = call(w, { url: routes.createProject(clientTwo), token: owner.token, agency: agency.agencyId, body });
+      await waitForApiLockWait(w, "await_transition('kauro.agencies'");
+    } finally {
+      hold.release();
+    }
+    completed<ProjectView>(await first, 201);
+    await closure;
+    await writer.commit();
+    if (second === null) throw new Error("the later request was never started");
+    assert.equal(outcome(w, await second), "409 PRECONDITION_FAILED AGENCY_NOT_OPEN");
+  } finally {
+    await writer.close();
+  }
+  assert.equal(await w.count("projects", "client_id = $1", [clientTwo]), 0);
 });

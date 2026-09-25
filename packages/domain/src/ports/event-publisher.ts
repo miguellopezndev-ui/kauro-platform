@@ -1,7 +1,7 @@
 /**
  * Event publisher port (07 "Outbox, inbox and event ordering"): appends a domain event and its outbox records inside the
- * current unit of work. Publishing is not delivery — the outbox dispatcher (control plane, later package) delivers at least
- * once and consumers deduplicate by their own inbox identity.
+ * current unit of work. Publishing is not delivery — the outbox dispatcher (control plane) claims the records through the
+ * OutboxDispatchStore port and delivers at least once; consumers deduplicate by their own inbox identity (inbox-outbox.ts).
  */
 import type { DomainEventRecord, NewDomainEvent } from "../model/events.js";
 import type { EventId, OutboxId } from "../model/ids.js";

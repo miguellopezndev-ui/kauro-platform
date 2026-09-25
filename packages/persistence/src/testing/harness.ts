@@ -16,7 +16,9 @@ import type { Client, PoolClient } from "pg";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   createIdGenerator,
+  hashInvitationToken,
   identityUserId,
+  mintInvitationToken,
   toUtcInstant,
   type AgencyId,
   type AssuranceMethod,
@@ -27,6 +29,7 @@ import {
   type CorrelationId,
   type IdGenerator,
   type IdentityContext,
+  type InvitationId,
   type MembershipId,
   type MembershipRole,
   type ProcessingAuthorityId,
@@ -38,6 +41,7 @@ import {
   type ValidationReceiptRecord,
 } from "@kauro/domain";
 import { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "../evidence.js";
+import { PgInboxIngress } from "../inbox-outbox.js";
 import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
 import { createUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
@@ -72,6 +76,10 @@ export interface Harness {
   readonly assurancePool: KauroPool;
   /** Validator pool (login role in kauro_validator): the only writer of validation receipts. */
   readonly validatorPool: KauroPool;
+  /** Provider-ingress pool (login role in kauro_ingress): the only writer of inbox records (re-check finding N2). */
+  readonly ingressPool: KauroPool;
+  /** The inbox ingress over the ingress pool (CMD030's recorder; package B09 binds it to the webhook route). */
+  readonly inboxIngress: PgInboxIngress;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
@@ -87,6 +95,12 @@ export interface Harness {
    * v2, membership.accepted.v1). A membership is never born ACTIVE except the founding owner (migration 0002).
    */
   addMember(agency: AgencyFixture, userId: UserId, role: MembershipRole): Promise<MembershipId>;
+  /**
+   * An invitation not yet accepted (CMD003 as its handler will write it): the owner inserts the INVITED membership (v1,
+   * membership.invited.v1) and issues the hashed single-use invitation of the same role through the invitation port, expiring in
+   * seven days. addMember is this plus the intended identity's consumption and acceptance.
+   */
+  inviteMember(agency: AgencyFixture, userId: UserId, role: MembershipRole): Promise<{ readonly membershipId: MembershipId; readonly invitationId: InvitationId; readonly tokenHash: Sha256Hex }>;
   /**
    * A step-up proof recorded by the step-up verifier (kauro_assurance; 08 "Authentication and assurance"), issued at `issuedAt`
    * (default now) and valid for fifteen minutes. The request-handler role cannot write proofs.
@@ -148,6 +162,8 @@ export async function start(): Promise<Harness> {
   const controlPool = createPool({ ...base, user: ROLES.controlLogin, applicationName: "kauro-test-control" });
   const assurancePool = createPool({ ...base, max: 2, user: ROLES.assuranceLogin, applicationName: "kauro-test-assurance" });
   const validatorPool = createPool({ ...base, max: 2, user: ROLES.validatorLogin, applicationName: "kauro-test-validator" });
+  const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
+  const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
   const proofs = new PgAssuranceProofRecorder(assurancePool);
@@ -185,6 +201,8 @@ export async function start(): Promise<Harness> {
     control,
     assurancePool,
     validatorPool,
+    ingressPool,
+    inboxIngress,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
@@ -222,15 +240,26 @@ export async function start(): Promise<Harness> {
       });
     },
 
-    async addMember(agency, userId, role) {
-      const membershipId = await app.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
+    async inviteMember(agency, userId, role) {
+      return app.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
         const id = uow.ids.next() as MembershipId;
-        const invited = await uow.memberships.insert({ membershipId: id, agencyId: agency.agencyId, userId, role, state: "INVITED", assurancePolicy: "MFA_REQUIRED", createdAt: clock.now() });
+        const invitationId = uow.ids.next() as InvitationId;
+        const tokenHash = hashInvitationToken(mintInvitationToken((n) => new Uint8Array(randomBytes(n))));
+        const now = clock.now();
+        const invited = await uow.memberships.insert({ membershipId: id, agencyId: agency.agencyId, userId, role, state: "INVITED", assurancePolicy: "MFA_REQUIRED", createdAt: now });
         await uow.events.publish({ aggregateKind: "membership", aggregateId: id, aggregateVersion: invited.version, agencyId: agency.agencyId, eventType: "membership.invited.v1", actor: { kind: "USER", userId: agency.ownerUserId }, causationId: correlation() as unknown as CausationId, correlationId: uow.context.correlationId, payload: { membershipId: id, agencyId: agency.agencyId, role, invitedByMembershipId: agency.ownerMembershipId } });
-        return id;
+        const issued = await uow.invitations.insert({ invitationId, agencyId: agency.agencyId, membershipId: id, tokenHash, role, invitedByMembershipId: agency.ownerMembershipId, expiresAt: toUtcInstant(Date.parse(now) + 7 * 86_400_000), createdAt: now });
+        if (issued.kind !== "ISSUED") throw new Error(`membership ${id} already had an open invitation`);
+        return { membershipId: id, invitationId, tokenHash };
       });
+    },
+
+    async addMember(agency, userId, role) {
+      const { membershipId, invitationId } = await h.inviteMember(agency, userId, role);
       await app.run(h.tenant(agency.agencyId, userId), async (uow) => {
         const now = clock.now();
+        const consumed = await uow.invitations.consume(invitationId, now);
+        if (consumed.kind !== "CLOSED") throw new Error(`invitation ${invitationId} was already closed`);
         const accepted = await uow.memberships.transition(membershipId, 1, { state: "ACTIVE", acceptedAt: now }, now);
         if (accepted.kind !== "APPLIED") throw new Error(`membership ${membershipId} did not accept its invitation: ${JSON.stringify(accepted)}`);
         await uow.events.publish({ aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: accepted.record.version, agencyId: agency.agencyId, eventType: "membership.accepted.v1", actor: { kind: "USER", userId }, causationId: correlation() as unknown as CausationId, correlationId: uow.context.correlationId, payload: { membershipId, agencyId: agency.agencyId, userId, role } });
@@ -349,6 +378,7 @@ export async function start(): Promise<Harness> {
       await controlPool.end();
       await assurancePool.end();
       await validatorPool.end();
+      await ingressPool.end();
       await pg.stop();
     },
   };

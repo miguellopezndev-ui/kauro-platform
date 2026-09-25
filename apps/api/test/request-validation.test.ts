@@ -269,3 +269,29 @@ test("an unexpected exception is 500 INTERNAL_ERROR with only the correlation id
   assert.equal(retried.replayed, false);
   assert.equal(retried.data.displayName, "Boom client");
 });
+
+test("N6: every label member refuses exactly the Unicode control characters (C0, DEL and C1) at the closed schema — 400 SCHEMA_VIOLATION naming the field — before any unit of work; the database refuses the same characters, and other non-ASCII text is a label", async () => {
+  // Re-check finding N6 (variant R17 label boundary): the request LABEL admitted C1 characters that kauro.is_label refuses, so
+  // "Stop\u0085now" reached the CHECK and came back as a reasonless, fieldless 400.
+  const plan = await w.approvable(w.A, projectId, "n6-labels");
+  completed(await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, body: approvalBodyOf(plan, await w.stepUp(w.approver)) }), 201);
+  const members: ReadonlyArray<{ readonly field: string; readonly call: (label: string) => Call }> = [
+    { field: "displayName", call: (label) => ({ url: routes.createAgency(), token: w.owner.token, agency: null, body: { displayName: label } }) },
+    { field: "displayName", call: (label) => ({ url: routes.createClient(w.A.agencyId), token: w.operator.token, agency: null, body: { displayName: label, processingAuthorityRef: w.authorityA } }) },
+    { field: "purpose", call: (label) => ({ url: routes.createProject(w.clientA), token: w.operator.token, body: { mode: "CLEAN", purpose: label } }) },
+    { field: "reasonCode", call: (label) => ({ url: routes.withdrawApproval(plan.planId), token: w.approver.token, body: { expectedVersion: 5, reasonCode: label } }) },
+  ];
+  for (const member of members) {
+    for (const control of ["\u0001", "\u001f", "\u007f", "\u0080", "\u0085", "\u009f"]) {
+      const reply = await refusedAtTheBoundary(`${member.field} with U+${control.codePointAt(0)?.toString(16).padStart(4, "0")}`, () => call(w, member.call(`Stop${control}now`)));
+      assert.equal(outcome(w, reply), "400 INVALID_REQUEST SCHEMA_VIOLATION");
+      assert.deepEqual(asProblem(w, reply).errors, [{ field: member.field, code: "FORMAT" }]);
+    }
+  }
+  // the database refuses exactly these characters too (kauro.is_label by code point, whatever the cluster's locale)
+  for (const control of ["\u0001", "\u007f", "\u0085", "\u009f"]) assert.equal((await w.h.oracle.query<{ ok: boolean }>("SELECT kauro.is_label($1) AS ok", [`Stop${control}now`])).rows[0]?.ok, false);
+  // the positive neighbour: non-ASCII text that is not a control character is a label, stored and answered verbatim
+  const reason = "Cliente pidió parar — 顧客 \u00a0ok";
+  const withdrawn = completed<{ approval: { withdrawReasonCode?: string } }>(await call(w, members[3]!.call(reason)), 200);
+  assert.equal(withdrawn.data.approval.withdrawReasonCode, reason);
+});
