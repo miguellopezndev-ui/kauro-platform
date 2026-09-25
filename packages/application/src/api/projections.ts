@@ -121,6 +121,7 @@ export function planView(p: PlanRecord): PlanView {
 export function approvalView(a: ApprovalRecord): ApprovalView {
   return {
     approvalId: a.approvalId,
+    actorId: a.actorId,
     agencyId: a.agencyId,
     planId: a.planId,
     version: a.version,

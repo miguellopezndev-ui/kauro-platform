@@ -23,9 +23,19 @@
  *  - requests and idle sockets are bounded by the request and connection timeouts (R36);
  *  - once shutdown begins every answer carries Connection: close and new requests on open connections are 503 problems, so
  *    close() completes when the in-flight requests do, not when keep-alive sockets time out (R35).
+ *
+ * Replies: every route declares the replies it may send (`config.responses`, api/response-contract of @kauro/application) —
+ * a route without a declaration refuses to register. Every reply, from a route, a hook, the not-found handler or the error
+ * handler, is checked against that declaration by the same closed validator before it is serialized (10 "Synchronous success
+ * returns a validated DTO"; "TypeScript types alone are insufficient runtime validation"). Fastify's response serializer is not
+ * given the schemas: a serializer with other schema semantics would silently drop what a 2020-12 closed schema refuses (10
+ * "Version and validation"), so the reply is validated as is and serialized by JSON.stringify. A reply the declaration refuses
+ * is never sent: its violation (schema, status, field paths — never a value) goes to the internal-error sink under the
+ * correlation id and the client receives INTEGRITY_FAILURE. The registered routes and their declarations are the route
+ * inventory tools/openapi.mjs checks the OpenAPI document against.
  */
 import { createHmac, randomBytes } from "node:crypto";
-import type { IncomingMessage } from "node:http";
+import { STATUS_CODES, type IncomingMessage } from "node:http";
 import { isIPv4, isIPv6, type Socket } from "node:net";
 import Fastify, { LogController, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
@@ -38,10 +48,27 @@ import type {
   CompletedResponse,
   Problem,
   RawRequest,
+  RouteResponses,
   SchemaValidator,
   UnauthenticatedRequest,
 } from "@kauro/application";
-import { HEADERS, REQUEST_LIMITS, admitHeaders, admitStructure, correlationIdOf, envelopeOf, internalProblem, problemOf, repeatedHeaderNames } from "@kauro/application";
+import {
+  HEADERS,
+  REQUEST_LIMITS,
+  ResponseContractViolation,
+  UNROUTED_RESPONSES,
+  admitHeaders,
+  admitStructure,
+  checkReply,
+  commandRouteResponses,
+  correlationIdOf,
+  envelopeOf,
+  internalProblem,
+  isServedCommand,
+  problemOf,
+  repeatedHeaderNames,
+  responseIntegrityProblem,
+} from "@kauro/application";
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { Authenticator } from "./authenticator.js";
@@ -59,6 +86,30 @@ export const DEFAULT_HTTP_LIMITS: HttpLimits = Object.freeze({ requestTimeoutMs:
 
 /** Fastify's pino logger: off, on (stdout), or on with a caller-owned line sink (tests read the lines). */
 export type ApiLogger = boolean | { readonly level?: "fatal" | "error" | "warn" | "info" | "debug" | "trace"; readonly stream: { write(line: string): void } };
+
+declare module "fastify" {
+  interface FastifyContextConfig {
+    /** The replies this route may send; every route declares them (api/response-contract of @kauro/application). */
+    responses?: RouteResponses;
+  }
+}
+
+/** One registered route and the replies it declares: what the OpenAPI checker compares the document with. */
+export interface RouteInventoryEntry {
+  readonly method: string;
+  /** The Fastify path (`/api/v1/plans/:planId/approve`). */
+  readonly url: string;
+  readonly responses: RouteResponses;
+}
+
+const INVENTORIES = new WeakMap<FastifyInstance, RouteInventoryEntry[]>();
+
+/** The routes registered on a server built by createApiServer, in registration order, with their declared replies. */
+export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInventoryEntry> {
+  const inventory = INVENTORIES.get(app);
+  if (!inventory) throw new Error("the route inventory is recorded by createApiServer; this instance was not built by it");
+  return [...inventory];
+}
 
 export interface ApiServerOptions {
   readonly environment: Environment;
@@ -158,6 +209,75 @@ function frameworkReason(error: unknown): FailureReason | null {
   }
 }
 
+function headerText(value: string | number | ReadonlyArray<string> | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) ? value.join(", ") : String(value);
+}
+
+/**
+ * Records every route with its declared replies, and refuses to register a route that declares none: a route whose replies
+ * are not declared could not be documented, checked or validated.
+ */
+function recordRouteInventory(app: FastifyInstance): void {
+  const inventory: RouteInventoryEntry[] = [];
+  INVENTORIES.set(app, inventory);
+  app.addHook("onRoute", (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    const responses = route.config?.responses;
+    if (responses === undefined) {
+      throw new Error(
+        `route ${methods.join(",")} ${route.url} declares no response contract: pass config.responses — commandRouteResponses(<command>, <name>) for a registry command, or declare the route in OPERATIONAL_ROUTES and pass operationalRouteResponses(<operationId>) (@kauro/application api/response-schemas, api/response-contract); then run pnpm run openapi:generate`,
+      );
+    }
+    for (const method of methods) inventory.push({ method: String(method).toUpperCase(), url: route.url, responses });
+  });
+}
+
+/**
+ * The send guard: every object reply is checked against its route's declared replies before serialization (preSerialization
+ * runs for route handlers, hooks, the not-found handler and the error handler alike), and a reply whose body never reached
+ * that check — a string, buffer or stream sent directly — is refused when it is sent (onSend). A refused reply is replaced by
+ * INTEGRITY_FAILURE; its violation goes to the sink under the request's correlation id. The one answer written without a
+ * Fastify reply — the problem of an error below HTTP (clientErrorHandler) — is checked against the same contract before it
+ * is written.
+ */
+function installResponseGuard(app: FastifyInstance, options: ApiServerOptions, sink: (correlationId: string, error: unknown) => void): void {
+  const checked = new WeakSet<FastifyReply>();
+
+  const refuse = (request: FastifyRequest, reply: FastifyReply, violation: ResponseContractViolation): Problem => {
+    // the request's correlation id: the request id, resolved once (E-CORR-1), which every answer's header and problem carry
+    const correlationId = request.id;
+    sink(correlationId, violation);
+    const problem = responseIntegrityProblem(correlationId);
+    // the replacement is built from constants and a correlation id the admission produced; it is checked like any reply, and a
+    // refusal here is a defect of this module that must not be answered with an unchecked body
+    checkReply(options.validator, UNROUTED_RESPONSES, problem.status, HEADERS.problemContentType, problem);
+    reply.code(problem.status).header(HEADERS.correlationId, correlationId).header("content-type", `${HEADERS.problemContentType}; charset=utf-8`);
+    return problem;
+  };
+
+  app.addHook("preSerialization", async (request, reply, payload: unknown) => {
+    checked.add(reply);
+    const responses = request.routeOptions.config.responses ?? UNROUTED_RESPONSES;
+    try {
+      checkReply(options.validator, responses, reply.statusCode, headerText(reply.getHeader("content-type")), payload);
+      return payload;
+    } catch (e) {
+      // a check that cannot run (a declared schema the validator does not know) refuses the reply the same way
+      const violation = e instanceof ResponseContractViolation ? e : new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the response check could not run", [], { cause: e });
+      return refuse(request, reply, violation);
+    }
+  });
+
+  app.addHook("onSend", async (request, reply, payload: unknown) => {
+    if (checked.has(reply)) return payload;
+    const responses = request.routeOptions.config.responses ?? UNROUTED_RESPONSES;
+    checked.add(reply);
+    const violation = new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the reply was sent without passing the response check (not a JSON object body)");
+    return JSON.stringify(refuse(request, reply, violation));
+  });
+}
+
 export function createApiServer(options: ApiServerOptions): FastifyInstance {
   const sink = options.onInternalError ?? defaultInternalErrorSink;
   const limits = options.limits ?? DEFAULT_HTTP_LIMITS;
@@ -215,18 +335,29 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
       }
       const correlationId = options.ids.next() as CorrelationId;
       const reason: FailureReason = error.code === "ERR_HTTP_REQUEST_TIMEOUT" ? "REQUEST_TIMEOUT" : "REQUEST_MALFORMED";
-      const problem = problemFor(reason, correlationId);
+      let problem = problemFor(reason, correlationId);
+      try {
+        // the send guard's rule holds below HTTP as well: a reply its contract refuses is never written (R23)
+        checkReply(options.validator, UNROUTED_RESPONSES, problem.status, HEADERS.problemContentType, problem);
+      } catch (violation) {
+        sink(correlationId, violation);
+        problem = responseIntegrityProblem(correlationId);
+      }
       app.log.info({ correlationId, errorCode: error.code, reason }, "request refused below HTTP: answered with a problem and closed");
       const body = JSON.stringify(problem);
       if (socket.writable) {
         socket.write(
-          `HTTP/1.1 ${problem.status} Bad Request\r\nContent-Type: ${HEADERS.problemContentType}; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\n` +
+          `HTTP/1.1 ${problem.status} ${STATUS_CODES[problem.status] ?? "Error"}\r\nContent-Type: ${HEADERS.problemContentType}; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(body)}\r\n` +
             `X-Correlation-Id: ${correlationId}\r\nConnection: close\r\n\r\n${body}`,
         );
       }
       socket.destroy(error);
     },
   });
+
+  // every route declares the replies it may send, and every reply is checked against that declaration before it is sent (R23)
+  recordRouteInventory(app);
+  installResponseGuard(app, options, sink);
 
   // every body reaches the route as bytes; admission decides content type, size, UTF-8, syntax and schema in the order of manual 10
   app.removeAllContentTypeParsers();
@@ -267,9 +398,12 @@ function registerCommand<Body, View>(
   hashAddress: (ip: string | undefined) => Sha256Hex | null,
 ): void {
   const spec = handler.spec;
+  if (!isServedCommand(spec.id)) throw new Error(`${spec.id} has a handler but no declared response contract (COMMAND_RESPONSES of @kauro/application)`);
   app.route<{ Params: Record<string, string>; Body: Buffer | undefined; Reply: CommandReply<View> }>({
     method: spec.method,
     url: fastifyPath(spec.path),
+    // the operation id is the registry command name (commands.json), as the OpenAPI document names it
+    config: { responses: commandRouteResponses(spec.id, spec.name) },
     // manual 10 decides the content type before the byte size: the head is admitted before the body is read, so the parser's
     // body limit cannot answer first for a request whose head already refuses it
     onRequest: async (request, reply) => {

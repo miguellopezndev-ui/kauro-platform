@@ -1,8 +1,10 @@
 /**
  * The SchemaValidator adapter over the strict compiler (api/json-schema): closed over exactly the registry contract names,
- * the request schema ids of this package and the Problem schema (S093: "compile only reviewed application-owned schemas").
- * The contract bundle is the generated `@kauro/contracts/schemas.json`; the transport reads that file once at start-up and
- * hands the parsed object here, so this module needs no file system access.
+ * the request schema ids of this package, the response schema ids of this package (api/response-schemas: the COMPLETED
+ * envelope of every served command, the ACCEPTED envelope, the declared replies of the operational routes) and the Problem
+ * schema (S093: "compile only reviewed application-owned schemas"). The contract bundle is the generated
+ * `@kauro/contracts/schemas.json`; the transport reads that file once at start-up and hands the parsed object here, so this
+ * module needs no file system access.
  */
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
@@ -10,6 +12,7 @@ import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports
 import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
+import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -74,8 +77,13 @@ export const PROBLEM_SCHEMA = Object.freeze({
   },
 } as const);
 
-/** Builds the closed validator: every registry contract, every request schema and the Problem schema, nothing else. */
-export function createSchemaValidator(bundle: ContractSchemaBundle): SchemaValidator {
+/**
+ * Builds the closed validator: every registry contract, every request schema, every response schema and the Problem schema,
+ * nothing else. The response views are compiled as definitions beside the registry's (`#/$defs/<View>`), derived from that
+ * same bundle (api/response-schemas); `operational` is the list of operational routes whose replies are declared (the
+ * application-owned OPERATIONAL_ROUTES unless a caller names the list explicitly).
+ */
+export function createSchemaValidator(bundle: ContractSchemaBundle, operational: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): SchemaValidator {
   const roots: Record<string, unknown> = {};
   for (const name of CONTRACT_NAMES) {
     const def = bundle.$defs[name];
@@ -83,8 +91,10 @@ export function createSchemaValidator(bundle: ContractSchemaBundle): SchemaValid
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  const responses = buildResponseSchemas(bundle, operational);
+  Object.assign(roots, responses.roots);
   roots["Problem"] = PROBLEM_SCHEMA;
-  const compiled: CompiledSchemaSet = compileSchemaBundle({ defs: bundle.$defs, roots });
+  const compiled: CompiledSchemaSet = compileSchemaBundle({ defs: { ...bundle.$defs, ...responses.defs }, roots });
   const known = compiled.ids as ReadonlyArray<KnownSchemaId>;
   return {
     knownSchemaIds: known,

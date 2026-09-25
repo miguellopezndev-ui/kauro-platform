@@ -189,6 +189,8 @@ export const FAILURE_REASONS = [
   "LAST_OWNER_PROTECTED",
   // integrity (database discipline, persistence migrations, deployment completeness)
   "PLAN_SERVICES_UNAVAILABLE",
+  // a reply its route's response contract refuses is never sent (10 "Responses and safe errors": a validated DTO)
+  "RESPONSE_CONTRACT_VIOLATION",
   "EVENT_MISSING",
   "VERSION_DISCIPLINE",
   "IMMUTABLE_COLUMN",

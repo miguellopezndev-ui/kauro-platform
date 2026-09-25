@@ -4,16 +4,18 @@
  * schema compiled as code).
  *
  * The port is closed by construction: a validator can be asked for a schema only by a KnownSchemaId — a registry contract name
- * (urn:kauro:r2:contracts#/$defs/<Name>) or a request/response schema of this package. There is no `compile(schema)` entry;
- * an adapter that receives an unknown id fails with INTEGRITY_FAILURE before touching any input (S093). Calendar format
- * assertions (date-time with at most three fractional digits, real Gregorian instants) must be enabled and tested by the
- * adapter; a regex or a missing format package must not create silent acceptance (10 "Schema format execution").
+ * (urn:kauro:r2:contracts#/$defs/<Name>), a request or response schema of this package, or the Problem document. There is no
+ * `compile(schema)` entry; an adapter that receives an unknown id fails with INTEGRITY_FAILURE before touching any input
+ * (S093). Calendar format assertions (date-time with at most three fractional digits, real Gregorian instants) must be enabled
+ * and tested by the adapter; a regex or a missing format package must not create silent acceptance (10 "Schema format
+ * execution").
  */
 import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
+import type { ResponseSchemaId } from "../api/response-schemas.js";
 
-export type KnownSchemaId = ContractName | RequestSchemaId | "Problem";
+export type KnownSchemaId = ContractName | RequestSchemaId | ResponseSchemaId | "Problem";
 
 export type ValidationOutcome<T> =
   | { readonly kind: "VALID"; readonly value: T }

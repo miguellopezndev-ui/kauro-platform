@@ -7,8 +7,8 @@
  * handlers and the server over a unit-of-work factory, `startApi` runs both, and `bootstrap` adds the authenticator of the
  * environment, listens and offers the bounded `shutdown` (`main.ts` is the process entry).
  */
-export { createApiServer, fastifyPath, classifyInternalError, clientNetworkOf, DEFAULT_HTTP_LIMITS } from "./server.js";
-export type { ApiServerOptions, ApiLogger, CommandReply, HttpLimits } from "./server.js";
+export { createApiServer, fastifyPath, classifyInternalError, clientNetworkOf, routeInventoryOf, DEFAULT_HTTP_LIMITS } from "./server.js";
+export type { ApiServerOptions, ApiLogger, CommandReply, HttpLimits, RouteInventoryEntry } from "./server.js";
 export { HEALTH_ROUTES, HEALTH_PATHS, LIVENESS_RESPONSE_SCHEMA, READINESS_RESPONSE_SCHEMA, readinessOf, registerHealthRoutes } from "./health.js";
 export type { DatabaseReadiness, HealthOptions, LivenessResponse, ProbeResponse, ProbeRoute, ProbeSchema, ReadinessResponse } from "./health.js";
 export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError } from "./authenticator.js";
