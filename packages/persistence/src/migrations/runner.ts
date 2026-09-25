@@ -19,6 +19,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
+import type { KauroPool } from "../pool.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -196,6 +197,66 @@ async function applyUnderRunnerLock(client: Client, files: ReadonlyArray<Migrati
     applied.push(f);
   }
   return { applied, skipped };
+}
+
+// --- schema compatibility (readiness) -------------------------------------------------------------------------------------
+
+/** One row of the ledger as the runtime roles read it (0001 grants them SELECT on kauro_meta.schema_migrations, nothing else). */
+export interface LedgerEntry {
+  readonly version: number;
+  readonly checksum: string;
+}
+
+/**
+ * How a database's ledger relates to the migrations this code ships (14 "Monitoring and service health": readiness checks the
+ * schema compatibility the service's role needs; 14 "Deployment and rollback": schema compatibility is verified before
+ * traffic shifts; 07 "Restoration and migration": expand, compatible backfill and later contract).
+ *   COMPATIBLE — every shipped migration is recorded with the same checksum. Versions beyond the shipped set are tolerated:
+ *                under expand/contract a newer release's migrations stay compatible with the release still serving.
+ *   DRIFTED    — a shipped version is recorded under another checksum (the database is not the schema this code knows).
+ *   BEHIND     — a shipped version is not recorded (the code expects objects the database may not have).
+ */
+export type SchemaCompatibility =
+  | { readonly kind: "COMPATIBLE"; readonly codeVersion: number; readonly databaseVersion: number }
+  | { readonly kind: "DRIFTED"; readonly codeVersion: number; readonly databaseVersion: number; readonly drifted: ReadonlyArray<number> }
+  | { readonly kind: "BEHIND"; readonly codeVersion: number; readonly databaseVersion: number; readonly missing: ReadonlyArray<number> };
+
+export function compareSchema(ledger: ReadonlyArray<LedgerEntry>, shipped: ReadonlyArray<MigrationFile>): SchemaCompatibility {
+  const recorded = new Map(ledger.map((l) => [l.version, l.checksum]));
+  const codeVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
+  const databaseVersion = ledger.reduce((max, l) => Math.max(max, l.version), 0);
+  const drifted = shipped.filter((f) => recorded.has(f.version) && recorded.get(f.version) !== f.checksum).map((f) => f.version);
+  if (drifted.length > 0) return { kind: "DRIFTED", codeVersion, databaseVersion, drifted };
+  const missing = shipped.filter((f) => !recorded.has(f.version)).map((f) => f.version);
+  if (missing.length > 0) return { kind: "BEHIND", codeVersion, databaseVersion, missing };
+  return { kind: "COMPATIBLE", codeVersion, databaseVersion };
+}
+
+/**
+ * Reads the ledger over a verified runtime connection of `pool` in a read-only transaction bounded by `statementTimeoutMs`.
+ * Throws whatever prevented the read (no connection, a refused or timed-out statement); the caller classifies it.
+ */
+export async function readSchemaLedger(pool: KauroPool, statementTimeoutMs: number): Promise<ReadonlyArray<LedgerEntry>> {
+  const { client } = await pool.acquire();
+  let destroy: Error | undefined;
+  try {
+    await client.query("BEGIN READ ONLY");
+    try {
+      await client.query(`SET LOCAL statement_timeout = '${millis(statementTimeoutMs, statementTimeoutMs)}ms'`);
+      const r = await client.query<{ version: number; checksum: string }>("SELECT version, checksum FROM kauro_meta.schema_migrations ORDER BY version");
+      await client.query("COMMIT");
+      return r.rows.map((row) => ({ version: row.version, checksum: row.checksum }));
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+      }
+      throw e;
+    }
+  } finally {
+    client.release(destroy);
+  }
 }
 
 export async function appliedMigrations(client: Client): Promise<ReadonlyArray<AppliedMigration>> {

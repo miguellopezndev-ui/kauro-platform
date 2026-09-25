@@ -16,13 +16,15 @@ export {
   applyMigrations,
   applyMigrationsAs,
   appliedMigrations,
+  compareSchema,
+  readSchemaLedger,
   MigrationDriftError,
   MigratorRoleError,
 } from "./migrations/runner.js";
-export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
+export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection, LedgerEntry, SchemaCompatibility } from "./migrations/runner.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
-export { createPool, KauroPool, PrivilegedRoleError } from "./pool.js";
-export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";
+export { createPool, classifyError, KauroPool, PrivilegedRoleError } from "./pool.js";
+export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
