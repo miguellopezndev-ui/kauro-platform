@@ -4,8 +4,10 @@
  * secrets; dispatch is at least once and consumers deduplicate). The publisher writes inside the caller's unit of work: the
  * allowlist is asserted in code (decision D-EVT-2), the id and time are minted by the ports, the payload digest is the
  * canonical SHA-256, and the outbox rows come from the code-owned subscription table. Ordering: `sequence` (identity column)
- * is the global append order and (aggregate_kind, aggregate_id, aggregate_version) is unique — a second event for the same
- * aggregate version is INTEGRITY_FAILURE, which is how the event-per-version rule stays one-to-one.
+ * is the global append order and (agency_id, aggregate_kind, aggregate_id, aggregate_version) is unique — a second event for
+ * the same aggregate version is INTEGRITY_FAILURE, which is how the event-per-version rule stays one-to-one. The database binds
+ * the named aggregate to the event's agency and version (kauro.domain_events_bind_aggregate): an event naming an aggregate the
+ * unit of work cannot see is NOT_FOUND / TENANT_CONTEXT_MISSING, one ahead of the aggregate's version is VERSION_DISCIPLINE.
  */
 import {
   DomainFailure,
@@ -108,7 +110,7 @@ export class PgEventPublisher implements EventPublisher {
       );
       inserted = r.rows[0];
     } catch (e) {
-      if (e instanceof ConstraintViolation && e.constraint === "domain_events_aggregate_kind_aggregate_id_aggregate_version_key") {
+      if (e instanceof ConstraintViolation && e.constraint === "domain_events_one_per_aggregate_version") {
         throw new DomainFailure("INTEGRITY_FAILURE", `${event.aggregateKind} ${event.aggregateId} already has an event for version ${event.aggregateVersion}`, { reason: "VERSION_DISCIPLINE" });
       }
       throw e;

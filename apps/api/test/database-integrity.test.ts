@@ -22,6 +22,22 @@ function sqlStateOf(e: unknown): string | undefined {
   return typeof e === "object" && e !== null && "code" in e ? String((e as { code: unknown }).code) : undefined;
 }
 
+test("R3: agency A's runtime role cannot occupy the next version of B's client; B's owner then archives it through CMD010 (200, version 2)", async () => {
+  // the refuter's F7: under A's tenant context, an end_client.archived.v1 event naming B's client at version 2
+  await assert.rejects(
+    w.asTenant(w.A, (c) =>
+      rawEvent(c, { aggregateKind: "end_client", aggregateId: w.clientB, aggregateVersion: 2, agencyId: w.A.agencyId, eventType: "end_client.archived.v1", actorUserId: w.owner.userId, payload: { clientId: w.clientB } }),
+    ),
+    (e: unknown) => sqlStateOf(e) === "KA006",
+  );
+  assert.equal(await w.count("domain_events", "aggregate_id = $1", [w.clientB]), 1, "only B's own created event names B's client");
+  const archived = completed<ArchiveClientView>(await call(w, { url: routes.archiveClient(w.clientB), token: w.stranger.token, agency: w.B.agencyId, key: freshKey("r3-archive"), body: { expectedVersion: 1 } }), 200);
+  assert.deepEqual({ state: archived.data.client.state, version: archived.data.client.version }, { state: "ARCHIVED", version: 2 });
+  const events = await w.events("end_client", w.clientB);
+  assert.deepEqual(events.map((e) => [e.version, e.type]), [[1, "end_client.created.v1"], [2, "end_client.archived.v1"]]);
+  assert.equal(w.internalErrors.length, 0);
+});
+
 test("R14/R30: the request-handler role cannot mint the evidence CMD025 checks — a step-up proof or a VALID receipt — while the verifier's proof and the validator's receipt admit the approval", async () => {
   const plan = await w.approvable(w.A, projectId, "r14-r30-route");
   await assert.rejects(

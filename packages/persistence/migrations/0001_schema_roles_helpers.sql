@@ -126,7 +126,9 @@ END
 $$;
 
 -- Event-per-version (07 "Transaction discipline"): deferred to commit, a new aggregate version without its domain event
--- cannot commit. TG_ARGV[0] is the aggregate kind; the id column is TG_ARGV[1].
+-- cannot commit. TG_ARGV[0] is the aggregate kind; the id column is TG_ARGV[1]. The event must carry the aggregate's own
+-- agency scope (08 "Database isolation": uniqueness and identity include scope) — an event of another tenant naming the same
+-- aggregate id and version never satisfies this rule.
 CREATE OR REPLACE FUNCTION kauro.require_event_for_version() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -134,10 +136,11 @@ DECLARE
   row_j jsonb := to_jsonb(NEW);
   agg_id uuid := (row_j ->> TG_ARGV[1])::uuid;
   agg_version bigint := (row_j ->> 'version')::bigint;
+  agg_agency uuid := (row_j ->> 'agency_id')::uuid;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM kauro.domain_events e
-    WHERE e.aggregate_kind = TG_ARGV[0] AND e.aggregate_id = agg_id AND e.aggregate_version = agg_version
+    WHERE e.agency_id = agg_agency AND e.aggregate_kind = TG_ARGV[0] AND e.aggregate_id = agg_id AND e.aggregate_version = agg_version
   ) THEN
     RAISE EXCEPTION 'EVENT_MISSING: % % version % has no domain event in this transaction', TG_ARGV[0], agg_id, agg_version USING ERRCODE = 'KA003';
   END IF;

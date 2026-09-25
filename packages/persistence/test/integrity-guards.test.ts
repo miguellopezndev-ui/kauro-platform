@@ -58,6 +58,47 @@ function ctx(agency: AgencyFixture, userId: string): { readonly agencyId: string
   return { agencyId: agency.agencyId, userId };
 }
 
+test("R3: an event names an aggregate of its own agency — agency A's runtime role can neither occupy B's next client version nor tell B's ids from unknown ones, and B's own event still commits", async () => {
+  const eventAsA = (aggregateId: string, aggregateVersion: number, agencyId: string = A.agencyId) =>
+    tx(app, ctx(A, alice), (c) => event(c, { aggregateKind: "end_client", aggregateId, aggregateVersion, agencyId, eventType: "end_client.archived.v1", actorUserId: alice, payload: {} }));
+  // the refuter's F7: A appends end_client.archived.v1 for B's client at version 2 under A's own agency id
+  await assert.rejects(eventAsA(clientB, 2), refusedWith("KA006"), "B's aggregate is not an aggregate of A");
+  // an id nobody has is refused the same way: the event table is no existence oracle
+  await assert.rejects(eventAsA(ids.next(), 2), refusedWith("KA006"), "an unknown id is refused exactly like a foreign one");
+  // naming B's agency as well changes nothing: B's client is invisible in A's context (and the tenant policy would refuse
+  // the row after it)
+  await assert.rejects(eventAsA(clientB, 2, B.agencyId), refusedWith("KA006"));
+  // an event cannot run ahead of its own aggregate (A's client is at version 1)
+  await assert.rejects(eventAsA(clientA, 2), refusedWith("KA002"));
+  // the control plane appends no aggregate event at all (it writes no aggregate)
+  await assert.rejects(
+    control.query(
+      `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
+       VALUES ($1, 'end_client', $2, 2, $3, 'end_client.archived.v1', 'SYSTEM', NULL, $4, $5, '{}'::jsonb, $6, '1', now())`,
+      [ids.next(), clientB, B.agencyId, ids.next(), ids.next(), sha("{}")],
+    ),
+    refusedWith("42501"),
+  );
+  // B archives its own client: version 2 and its event commit
+  await tx(app, ctx(B, bob), async (c) => {
+    const r = await c.query("UPDATE kauro.end_clients SET state = 'ARCHIVED', archived_at = now(), version = 2 WHERE client_id = $1 AND version = 1", [clientB]);
+    assert.equal(r.rowCount, 1);
+    await event(c, { aggregateKind: "end_client", aggregateId: clientB, aggregateVersion: 2, agencyId: B.agencyId, eventType: "end_client.archived.v1", actorUserId: bob, payload: { clientId: clientB, agencyId: B.agencyId, openProjects: 0 } });
+  });
+  // one event per aggregate version, under the tenant-scoped identity
+  await assert.rejects(
+    tx(app, ctx(B, bob), (c) => event(c, { aggregateKind: "end_client", aggregateId: clientB, aggregateVersion: 2, agencyId: B.agencyId, eventType: "end_client.archived.v1", actorUserId: bob, payload: {} })),
+    refusedWith("23505", "domain_events_one_per_aggregate_version"),
+  );
+  const events = await h.oracle.query("SELECT aggregate_version, event_type, agency_id FROM kauro.domain_events WHERE aggregate_id = $1 ORDER BY aggregate_version", [clientB]);
+  assert.deepEqual(events.rows, [
+    { aggregate_version: "1", event_type: "end_client.created.v1", agency_id: B.agencyId },
+    { aggregate_version: "2", event_type: "end_client.archived.v1", agency_id: B.agencyId },
+  ]);
+  const stateB = await h.oracle.query("SELECT state, version FROM kauro.end_clients WHERE client_id = $1", [clientB]);
+  assert.deepEqual(stateB.rows[0], { state: "ARCHIVED", version: "2" });
+});
+
 test("R14: step-up proofs are written only by the step-up verifier — the request handlers cannot mint one, not even their own; the verifier writes only for the identity it binds and reads nothing", async () => {
   const insertProof = (c: Client, userId: string) =>
     c.query(
