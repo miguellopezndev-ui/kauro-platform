@@ -24,8 +24,10 @@ migrations, Next.js for the web surfaces.
 
 ```
 pnpm install
-pnpm run verify          # generate + build + typecheck + test + architecture gate + clean-consume
+pnpm run verify          # generate + build + typecheck + test + architecture gate + openapi + clean-consume
 pnpm run arch            # architecture gate alone
+pnpm run openapi         # apps/api/openapi.json is the generated document and matches the registered routes (after build)
+pnpm run openapi:generate  # regenerate apps/api/openapi.json from the registry and the application schemas
 pnpm run clean-consume   # S045: every publishable package installs and works from its tarball alone
 ```
 

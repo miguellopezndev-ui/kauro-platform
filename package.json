@@ -16,7 +16,9 @@
     "generate": "pnpm --filter @kauro/contracts run generate",
     "arch": "node tools/architecture-gate.mjs",
     "clean-consume": "node tools/clean-consume.mjs",
-    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run clean-consume"
+    "openapi": "node tools/openapi.mjs check",
+    "openapi:generate": "node tools/openapi.mjs generate",
+    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run openapi && pnpm run clean-consume"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

@@ -20,7 +20,18 @@ handed to `onInternalError`).
 
 Fastify's built-in JSON parser and Ajv are not used for command bodies: the body reaches the route as text and is validated by
 the dependency-free strict validator of `@kauro/application` compiled from `@kauro/contracts/schemas.json`, the request
-schemas and the Problem schema — nothing else can be compiled (S093).
+schemas, the response schemas and the Problem schema — nothing else can be compiled (S093).
+
+Every route declares the replies it may send (`config.responses`: `commandRouteResponses` for a registry command,
+`operationalRouteResponses` for a route of `OPERATIONAL_ROUTES`); a route without a declaration refuses to register. Every
+reply — from a route, a hook, the not-found handler or the error handler — is checked against that declaration by the same
+closed validator before it is serialized (status, content type, closed schema; a problem's status equals the HTTP status).
+A reply the declaration refuses is never sent: the violation (schema, status, field paths, never a value) goes to
+`onInternalError` under the correlation id and the client receives `422 INTEGRITY_FAILURE / RESPONSE_CONTRACT_VIOLATION`.
+Fastify's response serializer is not given the schemas (a serializer with other schema semantics would silently drop what a
+closed 2020-12 schema refuses). `routeInventoryOf(app)` lists the registered routes with their declarations; `openapi.json`
+is the OpenAPI 3.1 document generated from the registry by `tools/openapi.mjs`, and `pnpm run openapi` (part of `verify`)
+fails when it is stale or disagrees with those routes.
 
 The composition root binds the PostgreSQL adapters: `loadConfig` reads and validates the environment (`KAURO_ENVIRONMENT`,
 `KAURO_DB_*` with a required `KAURO_DB_POOL_MAX`, `KAURO_DB_MIGRATE_ON_START` with its own `KAURO_DB_MIGRATOR_USER`,
@@ -32,4 +43,5 @@ until the Identity Platform verifier is bound (design §12c, I-INT-3).
 
 Tests (`test/`) run the real server, composed by the real composition root, against a PostgreSQL 17 cluster each test file
 starts itself: the OK/DENY/RACE triads of the seven commands, idempotency (S052), the schema boundary (S093), request
-validation (R2-058, R2-059, the admission order) and the deployment path — see `docs/design/B06-case-map.md`.
+validation (R2-058, R2-059, the admission order), the response contract and the sentinel serialization of the seven routes,
+and the deployment path — see `docs/design/B06-case-map.md`.
