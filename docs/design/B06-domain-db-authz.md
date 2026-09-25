@@ -827,21 +827,32 @@ Decisions the integration made:
 
 ## 13. Verification performed on `b06/integration`
 
-`pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) passes on Windows 11 (Node 24.14.1,
-PostgreSQL 17.6 from `C:\Tools\pgsql17\bin`) and on Linux (Ubuntu 24.04 under WSL as the unprivileged user `miguel`, a fresh
-clone of the branch, `pnpm install --frozen-lockfile`, Node 24.21.0, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11):
-216 tests — contracts 12, domain 53, application 44, authorization 9, persistence 56, api 39, tools 3. Every persistence and
+After the independent review was integrated (§12d), `pnpm run verify` (generate, build, typecheck, test, architecture gate,
+OpenAPI check, clean-consume) passes on Windows 11 (Node 24.14.1, PostgreSQL 17.6 from `C:\Tools\pgsql17\bin`) and on Linux
+(Ubuntu 24.04 under WSL as the unprivileged user `miguel`, a fresh clone of the branch, `pnpm install --frozen-lockfile`,
+Node 24.21.0, pnpm 10.16.1, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11): 312 tests, 0 failures — contracts 12,
+domain 53, application 55, authorization 11, persistence 83, api 86, tools 12 (before the review: 216). Every persistence and
 api test file starts its own PostgreSQL 17 cluster (initdb/pg_ctl on a free 127.0.0.1 port, the seven migrations applied as
-`kauro_owner`, runtime login roles in `kauro_app` and `kauro_control`); nothing fakes the database. The architecture gate
-reports 6 packages, 13 edges and no violation; clean-consume installs the five publishable packages from their tarballs alone.
+`kauro_owner`, one login role in each runtime group: `kauro_app`, `kauro_control`, `kauro_assurance`, `kauro_validator`);
+nothing fakes the database. The architecture gate reports 6 packages, 13 edges and no violation; the OpenAPI check finds the
+committed document to be the generated one and to match the nine registered routes (the seven commands and the two probes);
+clean-consume installs the publishable packages from their tarballs alone and type-checks their ten typed entry points.
 
-The persistence tests are the review of the SQL: application and idempotent re-application, drift refusal, role/RLS/ownership
-facts, enum CHECK lists equal to the registry, listed-transition seed equal to the registry machines, event-type seed equal to
-the domain, fail-closed context, cross-tenant invisibility, composite FK refusal, pool reuse after commit/rollback/exception,
-concurrent contexts, self policies, duplicate labels, version discipline (KA002), event-per-version at commit (KA003),
-unlisted edges (KA008), immutable columns (KA004), archive without deletion, S051 race, approval bindings and uniqueness,
-withdrawal once, outbox tenant policy and control delivery, journal digest/replay/conflict/concurrent duplicate,
-identity-owned CreateAgency reservations, S089 structural checks, S090 lease guard, R2-043 deterministic last-owner race, and
-the `pg` adapters of every port. The api tests are the review of the commands: the OK/DENY/RACE triads of the seven commands,
-S051 and S052 at the command level, the HTTP half of S093, R2-058, R2-059, the admission order of manual 10, the correlation
-id, the opaque internal error, the route inventory and the deployment path (`bootstrap` on a real cluster, over a socket).
+The persistence tests are the review of the SQL: application and idempotent re-application, drift refusal, the serialized and
+bounded runner, role/RLS/ownership facts, enum CHECK lists equal to the registry, listed-transition and initial-state seeds
+equal to the registry machines, event-type seed equal to the domain, fail-closed context, cross-tenant invisibility, composite
+FK refusal, pool reuse after commit/rollback/exception, pool errors idle and in use, concurrent contexts, self policies,
+duplicate labels, version discipline (KA002), event-per-version at commit (KA003), unlisted edges and birth states (KA008),
+immutable columns (KA004), the integrity guards as the runtime role that would break them (event binding, control-plane
+journal columns, approval bindings and the acting session, the ingress-only inbox, the owner counter's single writer, the
+evidence producers, VALID receipts of the plan itself), the three streams of security facts, archive without deletion, S051
+through the plan adapter, approval bindings and uniqueness, withdrawal once, outbox tenant policy and control delivery, S052
+through the journal adapter and the concurrent duplicate, identity-owned CreateAgency reservations, S089 (structure and failed
+upstream), S090 (subject, clock, cost and checkpoint identity), R2-043 deterministic last-owner race, the readiness ledger, the
+published surface, and the `pg` adapters of every port. The api tests are the review of the commands: the OK/DENY/RACE triads
+of the seven commands with every denial's durable fact, S051 and S052 at the command level, the HTTP half of S093, R2-058,
+R2-059, the pipeline order and its authorization, the share-locked preconditions under concurrent writers, the admission order
+of manual 10, the correlation id, the transport's framing and client address, the response contract and sentinel
+serialization, the opaque internal error, the route inventory, and the deployment path and its operation (`bootstrap` on a
+real cluster over a socket: limits, drain, probes, outages, the migrator's secret). The revert proofs of the review were
+re-run on the merged tree (§12d.3).
