@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AuthenticatedSubject } from "@kauro/application";
+import { isCalendarDateTime } from "@kauro/application";
 import { identityUserId } from "@kauro/domain";
 
 export interface Authenticator {
@@ -72,11 +73,11 @@ export class BearerTokenFileError extends Error {
   }
 }
 
-const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
-
 function instantOrNull(value: unknown, where: string): UtcInstant | null {
   if (value === null) return null;
-  if (typeof value !== "string" || !INSTANT.test(value) || Number.isNaN(Date.parse(value))) throw new BearerTokenFileError(`${where} must be a UTC instant or null`);
+  // the utc primitive (10 "Schema format execution"): a real Gregorian instant with at most millisecond precision and Z —
+  // Date.parse would roll 2026-02-30 over to March, so the calendar check of the contract validator decides
+  if (typeof value !== "string" || !isCalendarDateTime(value)) throw new BearerTokenFileError(`${where} must be a UTC instant or null`);
   return value as UtcInstant;
 }
 
