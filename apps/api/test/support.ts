@@ -346,8 +346,11 @@ export interface World {
   readonly cleanCapabilityId: CapabilityId;
   /** HUBSPOT at DESIGN: specified, not implemented, not offered (a test publishes it through the listed edges, D-CAP-2). */
   readonly hubspotCapabilityId: CapabilityId;
-  /** Registers a person for authentication (token → subject); the identity row is synced by the harness unless `sync: false`. */
-  person(name: string, opts?: { readonly verified?: boolean; readonly sync?: boolean }): Promise<Person>;
+  /**
+   * Registers a person for authentication (token → subject); the identity row is synced by the harness unless `sync: false`.
+   * `state` is the identity state the token's facts carry (ACTIVE by default); the synced row is always ACTIVE.
+   */
+  person(name: string, opts?: { readonly verified?: boolean; readonly sync?: boolean; readonly state?: "ACTIVE" | "DISABLED" }): Promise<Person>;
   /** An OPEN CLEAN project with its DRAFT revision, written through the ports under the owner's context. */
   project(agency: AgencyFixture, clientId: ClientId): Promise<{ projectId: ProjectId; revisionId: RevisionId }>;
   /** A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. */
@@ -380,6 +383,8 @@ export interface World {
 export interface WorldOptions {
   /** Replaces or extends the collaborators before the server is built. */
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
+  /** The clock the api (authorizer, handlers) runs on; the fixture clock by default. */
+  readonly clock?: Clock;
 }
 
 export interface RawEvent {
@@ -443,14 +448,14 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     validator,
-    clock,
+    clock: options.clock ?? clock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
   });
   await app.ready();
 
-  const person = async (name: string, opts: { readonly verified?: boolean; readonly sync?: boolean } = {}): Promise<Person> => {
-    const p = personOf(name, { ...(opts.verified !== undefined ? { verified: opts.verified } : {}) });
+  const person = async (name: string, opts: { readonly verified?: boolean; readonly sync?: boolean; readonly state?: "ACTIVE" | "DISABLED" } = {}): Promise<Person> => {
+    const p = personOf(name, { ...(opts.verified !== undefined ? { verified: opts.verified } : {}), ...(opts.state !== undefined ? { state: opts.state } : {}) });
     tokens.set(p.token, p.subject);
     if (opts.sync !== false) await h.person(name, opts.verified ?? true);
     return p;
