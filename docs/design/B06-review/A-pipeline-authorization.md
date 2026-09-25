@@ -325,7 +325,7 @@ context runs on the request-handler pool only, sees no row, and writes nothing b
 ## Verification
 
 `pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) in the worktree on Windows 11, Node
-24.14.1, PostgreSQL 17 from `C:Toolspgsql17in`, every persistence and api test file on a cluster it starts itself: exit 0.
+24.14.1, PostgreSQL 17 from `C:\Tools\pgsql17\bin`, every persistence and api test file on a cluster it starts itself: exit 0.
 
 | package | tests | pass | fail |
 |---|---|---|---|

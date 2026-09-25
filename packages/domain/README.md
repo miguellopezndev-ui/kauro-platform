@@ -16,13 +16,15 @@ cannot be the sole protection").
   D-VER-1).
 - `model/errors` — the typed error contract: `FailureCode` (manual 10 codes + three platform codes), `FailureReason`,
   `FAILURE_HTTP_STATUS`, `FAILURE_TITLES`, `RETRYABLE_FAILURE_CODES`, the `DomainFailure` family and `describeFailure`
-  (the wire-safe projection; 10 "Responses and safe errors").
+  (the wire-safe projection; 10 "Responses and safe errors"); the closed field-code vocabulary of `FieldError`, the typed-patch
+  codes included (`TypedPatchFieldCode`, D-API-2).
 - `model/roles` — command role → membership role table (`roleSatisfies`), capability sets per role (D-AUTHZ-1/2).
 - `model/state-machines` — listed-transition guards over the registry machines plus the two platform machines the registry
   lacks (EndClient D-AGG-2, Project D-AGG-1) under the registry's unlisted-transition policy (`transition`, `statesOf`,
   `eventsOf`).
-- `model/events` — registered event types, per-type payload allowlists, code-owned outbox subscriptions, `AggregateEvent`
-  (an event minus request provenance) and `withProvenance`.
+- `model/events` — registered event types (the DatasetRevision lifecycle included, D-INIT-1), per-type payload allowlists
+  (never a label: the CMD026 reason stays off the payloads, D-API-1), code-owned outbox subscriptions, `AggregateEvent` (an
+  event minus request provenance) and `withProvenance`.
 - `model/tenant` — execution contexts (TENANT / IDENTITY / SYSTEM / ANONYMOUS — the last only records the denial of an
   unauthenticated command), actors and the security-fact actor, identity facts, `TenantScope` checks
   (`assertInScope`: foreign and nonexistent look alike).
@@ -41,8 +43,11 @@ cannot be the sole protection").
   order, D-AUTHZ-1..4) the `@kauro/authorization` adapter runs inside the unit of work.
 - `model/aggregates` — aggregate records (registry contracts plus concurrency and lineage columns, `InvitationRecord`).
 - `model/idempotency` — idempotency identity and the command request digest.
-- `ports/*` — clock, id generator, unit of work with tenant context, event publisher, command journal, repositories,
-  lease store, request journal.
+- `ports/*` — clock, id generator, unit of work with tenant context, event publisher, command journal, repositories (the
+  authorizer's membership read share-locked, D-PIPE-1; the preconditions a command relies on read under share locks, D-TX-1;
+  the processing authority recorded by CMD009, D-CLIENT-1; no step-up proof written by the request handlers, D-EVID-1),
+  lease store (the cost identity of a leased operation, S090) and request journal (a reservation declares its upstreams,
+  S089).
 
 ## Decisions recorded by the implementation (beside the design register)
 

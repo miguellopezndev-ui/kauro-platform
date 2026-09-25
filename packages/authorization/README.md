@@ -22,4 +22,5 @@ caller's own identity stream; an unauthenticated command leaves an anonymous fac
 `docs/design/B06-review/A-pipeline-authorization.md`.
 
 Tests use the in-memory ports of `@kauro/application` (pure decision logic); the same decisions against real PostgreSQL rows
-and policies are the integration mandate (`docs/design/B06-case-map.md`).
+and policies run through the api routes (`apps/api/test/pipeline-authorization.test.ts` and the command files;
+`docs/design/B06-case-map.md`).
