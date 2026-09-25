@@ -257,8 +257,25 @@ CREATE POLICY validation_receipts_validator ON kauro.validation_receipts FOR INS
 
 ALTER TABLE kauro.approvals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.approvals FORCE ROW LEVEL SECURITY;
-CREATE POLICY approvals_tenant ON kauro.approvals FOR ALL TO kauro_app
-  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
+-- An approval is the act of the session's own identity, and so is its withdrawal (07 "PlanApproval records actor identity";
+-- 08 "A service account ... cannot act as a human owner by putting an owner ID in a request"; 07 "Transaction discipline":
+-- application checks improve messages but cannot be the sole protection): the actor of a new approval is the session's user,
+-- and the withdrawer recorded on it is a membership of the session's user in this agency. The keys above bind the actor to its
+-- own membership and proof (R5); these policies bind all of it to the acting session.
+CREATE POLICY approvals_tenant_read ON kauro.approvals FOR SELECT TO kauro_app
+  USING (agency_id = kauro.current_agency_id());
+CREATE POLICY approvals_act ON kauro.approvals FOR INSERT TO kauro_app
+  WITH CHECK (agency_id = kauro.current_agency_id() AND actor_id = kauro.current_user_id());
+CREATE POLICY approvals_withdraw ON kauro.approvals FOR UPDATE TO kauro_app
+  USING (agency_id = kauro.current_agency_id())
+  WITH CHECK (
+    agency_id = kauro.current_agency_id()
+    AND (withdrawn_by_membership_id IS NULL OR EXISTS (
+      SELECT 1 FROM kauro.memberships m
+      WHERE m.agency_id = approvals.agency_id AND m.membership_id = approvals.withdrawn_by_membership_id
+        AND m.user_id = kauro.current_user_id()
+    ))
+  );
 
 -- --- grants -------------------------------------------------------------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE ON kauro.plans, kauro.approvals TO kauro_app;

@@ -147,12 +147,14 @@ test("R5/R13: an approval binds its actor, the actor's own membership in this ag
   const p = await plan(app, A, projectA, "VALIDATED", "r5", validator);
   const approverProof = await h.recordStepUp(approver);
   const bobProof = await h.recordStepUp(bob);
+  // (each probe runs in the session of the actor it names, so that the acting-session policy of the "R5 (acting session)"
+  // test cannot be what refuses it: only the key under test can)
   // the refuter's F4: a stranger (member of B only) as the actor, A's approver membership, the stranger's proof
-  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), bob, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  await assert.rejects(tx(app, ctx(A, bob), (c) => insertApproval(c, p, ids.next(), bob, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
   // the approver's own membership with somebody else's step-up proof
   await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, approverMembership, bobProof)), refusedWith("23503", "approvals_actor_proof_fk"));
   // another agency's membership named inside agency A, even with the matching actor and proof
-  await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), bob, B.ownerMembershipId, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
+  await assert.rejects(tx(app, ctx(A, bob), (c) => insertApproval(c, p, ids.next(), bob, B.ownerMembershipId, bobProof)), refusedWith("23503", "approvals_actor_membership_fk"));
   // another member's membership of A with the approver as actor
   await assert.rejects(tx(app, ctx(A, approver), (c) => insertApproval(c, p, ids.next(), approver, A.ownerMembershipId, approverProof)), refusedWith("23503", "approvals_actor_membership_fk"));
   assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.approvals WHERE plan_id = $1", [p.planId])).rows[0].n, 0);
@@ -164,6 +166,45 @@ test("R5/R13: an approval binds its actor, the actor's own membership in this ag
   });
   const row = await h.oracle.query("SELECT actor_id, actor_membership_id, assurance_proof_ref FROM kauro.approvals WHERE approval_id = $1", [approvalId]);
   assert.deepEqual(row.rows[0], { actor_id: approver, actor_membership_id: approverMembership, assurance_proof_ref: approverProof });
+});
+
+/** CMD026's writes for plan `p` (APPROVED v5): the approval withdrawn by `byMembership` (v2) and the plan WITHDRAWN (v6), with their events. */
+async function withdraw(c: Client, p: PlanFixture, approvalId: string, byMembership: string, actor: string): Promise<void> {
+  await c.query(
+    "UPDATE kauro.approvals SET withdrawn_at = now(), withdrawn_by_membership_id = $2, withdraw_reason_code = 'Customer asked us to stop', version = 2 WHERE approval_id = $1",
+    [approvalId, byMembership],
+  );
+  await event(c, { aggregateKind: "approval", aggregateId: approvalId, aggregateVersion: 2, agencyId: A.agencyId, eventType: "approval.withdrawn.v1", actorUserId: actor, payload: { approvalId, agencyId: A.agencyId, planId: p.planId, withdrawnByMembershipId: byMembership } });
+  await c.query("UPDATE kauro.plans SET state = 'WITHDRAWN', version = 6 WHERE plan_id = $1 AND version = 5", [p.planId]);
+  await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 6, agencyId: A.agencyId, eventType: "plan.withdrawn.v1", actorUserId: actor, payload: { planId: p.planId, agencyId: A.agencyId, approvalId } });
+}
+
+test("R5 (acting session): an approval and its withdrawal are acts of the session's own identity — nobody records an approval in the approver's name, even with the approver's membership and fresh proof, nor a withdrawal under another member's membership; the approver's own session and the owner's own membership can", async () => {
+  const p = await plan(app, A, projectA, "VALIDATED", "r5-session", validator);
+  const approverProof = await h.recordStepUp(approver);
+  // alice (the owner of A) writes the whole approval in the approver's name — the row, its event, the plan APPROVED and its
+  // event: every key binds, only the acting session is somebody else
+  const forged = ids.next();
+  await assert.rejects(
+    tx(app, ctx(A, alice), async (c) => {
+      await insertApproval(c, p, forged, approver, approverMembership, approverProof);
+      await approve(c, p, forged);
+    }),
+    refusedWith("42501"),
+  );
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.approvals WHERE plan_id = $1", [p.planId])).rows[0].n, 0);
+  // the approver's own session records the same approval
+  const approvalId = ids.next();
+  await tx(app, ctx(A, approver), async (c) => {
+    await insertApproval(c, p, approvalId, approver, approverMembership, approverProof);
+    await approve(c, p, approvalId);
+  });
+  // alice records the withdrawal but names the approver's membership as the withdrawer: refused
+  await assert.rejects(tx(app, ctx(A, alice), (c) => withdraw(c, p, approvalId, approverMembership, alice)), refusedWith("42501"));
+  // alice withdraws under her own membership (an OWNER controls every approval of the agency, D-AUTHZ-3)
+  await tx(app, ctx(A, alice), (c) => withdraw(c, p, approvalId, A.ownerMembershipId, alice));
+  const row = await h.oracle.query("SELECT actor_id, withdrawn_by_membership_id, version FROM kauro.approvals WHERE approval_id = $1", [approvalId]);
+  assert.deepEqual(row.rows[0], { actor_id: approver, withdrawn_by_membership_id: A.ownerMembershipId, version: "2" });
 });
 
 test("R11: a plan names only its own approval — pointing plan Y at plan X's approval is refused at COMMIT and Y stays VALIDATED", async () => {
