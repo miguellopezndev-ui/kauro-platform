@@ -21,6 +21,47 @@ export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js"
 export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_KEYWORDS, ANNOTATION_KEYWORDS } from "./api/json-schema.js";
 export type { ContractSchemaBundle } from "./api/schema-validation.js";
 export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
+export type {
+  ResponseSchemaId,
+  CommandResponseSchemaId,
+  AcceptedResponseSchemaId,
+  OperationalResponseSchemaId,
+  ServedCommandId,
+  JsonSchema,
+  ViewDefinition,
+  OperationalRoute,
+  OperationalResponse,
+  RegistryBundle,
+  ResponseSchemaSet,
+} from "./api/response-schemas.js";
+export {
+  RESPONSE_SCHEMA_PREFIX,
+  RESPONSE_FIELD_VOCABULARY,
+  VIEW_DEFINITIONS,
+  COMMAND_RESPONSES,
+  SERVED_COMMAND_IDS,
+  ACCEPTED_RESPONSE_SCHEMA,
+  ACCEPTED_RESPONSE_SCHEMA_ID,
+  OPERATIONAL_ROUTES,
+  FORBIDDEN_RESPONSE_FIELDS,
+  buildResponseSchemas,
+  commandResponseSchemaId,
+  operationalResponseSchemaId,
+  declaredMembers,
+  openObjects,
+} from "./api/response-schemas.js";
+export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
+export {
+  PROBLEM_RESPONSE,
+  UNROUTED_RESPONSES,
+  ResponseContractViolation,
+  checkReply,
+  commandRouteResponses,
+  operationalRouteResponses,
+  isServedCommand,
+  mediaTypeOf,
+  responseIntegrityProblem,
+} from "./api/response-contract.js";
 export type { RawRequest, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
 export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, unauthenticatedProblem } from "./api/admission.js";
 export type {

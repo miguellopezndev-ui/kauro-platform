@@ -3,6 +3,8 @@
  * reference/FIELD_CONTRACTS.md "Internal records are not automatically safe browser DTOs. Responses must select only
  * authorized fields"). Every view is a hand-picked selection from a domain record plus the version the edit commands need
  * and the permitted actions the caller may take (07 "The handoff to UI includes every state, safe field, permitted action").
+ * These interfaces are the compile-time shape; the wire contract is the closed schema of each view in api/response-schemas,
+ * which every reply is validated against before it is sent (10 "TypeScript types alone are insufficient runtime validation").
  */
 import type { Agency, Approval, EndClient, Membership, Plan, UtcInstant } from "@kauro/contracts";
 import type { AgencyCapability, ProjectState, ServiceMode } from "@kauro/domain";
@@ -87,8 +89,15 @@ export interface PlanView {
   readonly createdAt: UtcInstant;
 }
 
+/**
+ * Every member of the registry Approval contract, so a consumer recomputes `approvalHash` from the DTO alone
+ * (reference/HASHING_AND_ACCOUNTING_RULES: KAURO_PLAN_APPROVAL_V1 over approvalId, actorId, agencyId, planHash, revisionHash,
+ * targetContractHash, validationReceiptHash, disclosuresHash and createdAt; "the consumer recomputes the relevant preimage").
+ */
 export interface ApprovalView {
   readonly approvalId: string;
+  /** The approving person's identity reference (registry Approval.actorId, "Authenticated actor with approval capability"). */
+  readonly actorId: string;
   readonly agencyId: string;
   readonly planId: string;
   readonly version: number;

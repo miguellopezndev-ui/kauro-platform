@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { EndClientView, KnownSchemaId, ProjectView } from "@kauro/application";
-import { REQUEST_SCHEMA_IDS, requestSchemaId } from "@kauro/application";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, commandResponseSchemaId, operationalResponseSchemaId, requestSchemaId } from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import { asProblem, call, completed, effectCounts, ids, outcome, routes, sha, world, type World } from "./support.js";
@@ -80,8 +80,11 @@ function targetContract(objects: ReadonlyArray<Record<string, unknown>>, extra: 
   };
 }
 
-test("the validator the api composes is closed: exactly the contract names, the request schema ids and Problem; it has no compile entry, and an unknown schema id is INTEGRITY_FAILURE before the input is read", async () => {
-  const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, "Problem"].sort();
+test("the validator the api composes is closed: exactly the contract names, the request schema ids, the response schema ids and Problem; it has no compile entry, and an unknown schema id is INTEGRITY_FAILURE before the input is read", async () => {
+  // the response schema ids: the COMPLETED envelope of each served command, the ACCEPTED envelope and the declared replies of
+  // the operational routes — application-owned schemas like the request ones (api/response-schemas)
+  const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID, ...OPERATIONAL_ROUTES.flatMap((r) => Object.keys(r.responses).map((s) => operationalResponseSchemaId(r.operationId, s)))];
+  const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(Object.keys(w.validator).sort(), ["knownSchemaIds", "validate"], "validate and the closed id list: nothing compiles or registers a schema");

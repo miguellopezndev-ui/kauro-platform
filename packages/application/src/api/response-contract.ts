@@ -1,0 +1,113 @@
+/**
+ * The response contract of a route and its runtime check (10 "Responses and safe errors": "Synchronous success returns a
+ * validated DTO and version"; 10 "Version and validation": "TypeScript types alone are insufficient runtime validation"; 07
+ * "Command outcomes and error taxonomy": an unexpected failure "is recorded with an opaque correlation ID and safe technical
+ * classification", and integrity failure is its own outcome).
+ *
+ * Every route declares the replies it may send: its success statuses with their schema, and the Problem document for every
+ * status >= 400 it does not declare otherwise. The transport checks each reply against that declaration with the same strict
+ * validator that admits requests, before a byte is sent. A reply the declaration refuses — an undeclared status, another
+ * content type, a member the closed schema does not name, a value outside its shape, a problem whose status differs from the
+ * HTTP status — is never sent: the transport hands a ResponseContractViolation (schema, status and field paths; never a value)
+ * to the internal-error sink under the correlation id and answers INTEGRITY_FAILURE instead.
+ */
+import type { FieldError } from "@kauro/domain";
+import { DomainFailure } from "@kauro/domain";
+import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
+import { HEADERS } from "./envelope.js";
+import { problemOf, type Problem } from "./problems.js";
+import {
+  COMMAND_RESPONSES,
+  OPERATIONAL_ROUTES,
+  commandResponseSchemaId,
+  operationalResponseSchemaId,
+  type OperationalRoute,
+  type ServedCommandId,
+} from "./response-schemas.js";
+
+export interface DeclaredResponse {
+  readonly contentType: string;
+  readonly schemaId: KnownSchemaId;
+}
+
+/** What a route may answer: its declared replies by status, and the Problem document for every other status >= 400. */
+export interface RouteResponses {
+  readonly operationId: string;
+  readonly declared: Readonly<Record<string, DeclaredResponse>>;
+  readonly problem: DeclaredResponse;
+}
+
+export const PROBLEM_RESPONSE: DeclaredResponse = Object.freeze({ contentType: HEADERS.problemContentType, schemaId: "Problem" });
+
+/**
+ * The contract of replies sent outside any declared route (unknown routes and methods, framework errors before routing):
+ * problems only; a success there is a violation.
+ */
+export const UNROUTED_RESPONSES: RouteResponses = Object.freeze({ operationId: "unrouted", declared: Object.freeze({}), problem: PROBLEM_RESPONSE });
+
+/** The declared replies of a served command route: its COMPLETED status and schema, problems otherwise. */
+export function commandRouteResponses(command: ServedCommandId, operationId: string): RouteResponses {
+  const success = COMMAND_RESPONSES[command];
+  return Object.freeze({
+    operationId,
+    declared: Object.freeze({ [String(success.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId: commandResponseSchemaId(command) }) }),
+    problem: PROBLEM_RESPONSE,
+  });
+}
+
+/** The declared replies of an operational route of OPERATIONAL_ROUTES (or of the given list), for its `config.responses`. */
+export function operationalRouteResponses(operationId: string, routes: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): RouteResponses {
+  const route = routes.find((r) => r.operationId === operationId);
+  if (!route) throw new DomainFailure("INTEGRITY_FAILURE", `no operational route ${operationId} is declared`);
+  const declared: Record<string, DeclaredResponse> = {};
+  for (const [status, response] of Object.entries(route.responses)) declared[status] = Object.freeze({ contentType: response.contentType, schemaId: operationalResponseSchemaId(operationId, status) });
+  return Object.freeze({ operationId, declared: Object.freeze(declared), problem: PROBLEM_RESPONSE });
+}
+
+export function isServedCommand(id: string): id is ServedCommandId {
+  return Object.prototype.hasOwnProperty.call(COMMAND_RESPONSES, id);
+}
+
+/** A reply its route's contract refuses. Names the schema, the status and the offending paths and codes, never a value. */
+export class ResponseContractViolation extends Error {
+  readonly operationId: string;
+  readonly status: number;
+  readonly schemaId: string | null;
+  readonly fields: ReadonlyArray<FieldError>;
+  constructor(operationId: string, status: number, schemaId: string | null, problem: string, fields: ReadonlyArray<FieldError> = [], options?: { readonly cause?: unknown }) {
+    super(`response of ${operationId} with status ${status} violates ${schemaId ?? "its route contract"}: ${problem}${fields.length > 0 ? ` [${fields.map((f) => `${f.field || "(root)"} ${f.code}`).join(", ")}]` : ""}`, options);
+    this.name = "ResponseContractViolation";
+    this.operationId = operationId;
+    this.status = status;
+    this.schemaId = schemaId;
+    this.fields = fields;
+  }
+}
+
+/** The media type of a Content-Type header value, lowercased, without parameters. */
+export function mediaTypeOf(contentType: string | undefined): string {
+  return (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * Checks one reply against its route's contract and throws ResponseContractViolation when the contract refuses it. The body
+ * is the object the transport is about to serialize; it is validated as is (no coercion, no default, no removal).
+ */
+export function checkReply(validator: SchemaValidator, responses: RouteResponses, status: number, contentType: string | undefined, body: unknown): void {
+  const declared = responses.declared[String(status)];
+  const expected = declared ?? (status >= 400 && status <= 599 ? responses.problem : null);
+  if (expected === null) throw new ResponseContractViolation(responses.operationId, status, null, `status ${status} is not declared`);
+  if (mediaTypeOf(contentType) !== expected.contentType) {
+    throw new ResponseContractViolation(responses.operationId, status, expected.schemaId, `content type ${mediaTypeOf(contentType) || "(none)"} is not ${expected.contentType}`);
+  }
+  const outcome = validator.validate(expected.schemaId, body);
+  if (outcome.kind === "INVALID") throw new ResponseContractViolation(responses.operationId, status, expected.schemaId, "the body does not satisfy the schema", outcome.fields);
+  if (expected.schemaId === "Problem" && (body as Problem).status !== status) {
+    throw new ResponseContractViolation(responses.operationId, status, "Problem", `the problem states status ${(body as Problem).status}`);
+  }
+}
+
+/** The problem sent in place of a reply its contract refused: INTEGRITY_FAILURE, nonretryable, only the correlation id. */
+export function responseIntegrityProblem(correlationId: string): Problem {
+  return problemOf(new DomainFailure("INTEGRITY_FAILURE", "response contract violation", { reason: "RESPONSE_CONTRACT_VIOLATION" }), correlationId);
+}

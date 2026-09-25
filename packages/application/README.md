@@ -8,6 +8,13 @@ The application layer of the Kauro platform: the contracts of the public command
 - `api/problems` — the safe problem contract: stable codes, HTTP statuses, next actions, `problemOf`.
 - `api/request-schemas` — closed JSON Schema 2020-12 request bodies (exactly the registry fields).
 - `api/views` — safe DTO views (AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView).
+- `api/response-schemas` — the closed JSON Schema 2020-12 wire contract of every view, derived from the registry contract
+  bundle where a contract exists (every registry member selected or withheld with a reason, required stays required, narrowing
+  only adds keywords), the COMPLETED envelope of each served command, the ACCEPTED envelope, the operational routes
+  (`OPERATIONAL_ROUTES`) and the member names no response may declare (`FORBIDDEN_RESPONSE_FIELDS`).
+- `api/response-contract` — what each route may answer (`commandRouteResponses`, `operationalRouteResponses`) and
+  `checkReply`, the check every reply passes before it is sent (a refusal is a `ResponseContractViolation`, answered
+  INTEGRITY_FAILURE by the transport).
 - `ports/*` — authorizer, assurance verifier, abuse limiter, schema validator (closed over known schema ids), plan services
   (artifact resolver, patch compiler, disclosure composer), work inspectors, command handler/bus.
 - `commands/runtime` — `runCommand`: one unit of work per command (journal reserve → authorization → locked preconditions →

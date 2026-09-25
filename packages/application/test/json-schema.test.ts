@@ -7,15 +7,17 @@ import { test } from "node:test";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import type { ContractSchemaBundle } from "../src/index.js";
-import { PROBLEM_SCHEMA, REQUEST_SCHEMA_IDS, SchemaCompileError, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, problemOf } from "../src/index.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, PROBLEM_SCHEMA, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, problemOf } from "../src/index.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 7 request schemas and Problem, and nothing else", () => {
-  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + 1);
+test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas and Problem, and nothing else", () => {
+  const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID];
+  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + responseIds.length + 1);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);
   for (const id of REQUEST_SCHEMA_IDS) assert.ok(validator.knownSchemaIds.includes(id), id);
+  for (const id of responseIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   assert.ok(validator.knownSchemaIds.includes("Problem"));
   assert.throws(() => validator.validate("customer-target-metadata" as never, {}), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");
 });
