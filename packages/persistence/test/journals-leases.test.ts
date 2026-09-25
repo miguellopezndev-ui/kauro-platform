@@ -8,9 +8,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { commandRequestDigest } from "@kauro/domain";
-import { startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
-import { agency, bind, constraintOf, ids, person, sha, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
+import { commandRequestDigest, type AgencyId, type IdempotencyIdentity, type UserId } from "@kauro/domain";
+import { PgCommandJournal, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/index.js";
+import { agency, bind, clock, constraintOf, ids, person, sha, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;
 let app: Client;
@@ -44,82 +44,92 @@ function reserve(c: Client, agencyId: string | null, key: string, digest: string
   );
 }
 
-test("S052: the journal stores the request digest and the response; a replay reads it back; a different digest under the same key is a conflict the identity index makes unique", async () => {
+test("S052: through the command journal adapter the same digest replays the stored response and a different digest under the same key is CONFLICT with no second row; the identity index makes the key unique, a committed entry is final, the same key in another agency is another identity", async () => {
+  // S052 "One idempotency key carries different payloads" → "Conflict; identical replay recovers the original durable result"
+  // (10 "Idempotency contract"). The subject is the product's PgCommandJournal on the runtime role under the tenant context;
+  // the database facts beneath it (the identity index, the final entry) are asserted as raw statements after it.
+  const ctx = { agencyId: A.agencyId, userId: owner.userId };
   const digest = commandRequestDigest({ operation: "CMD009", aggregate: { agencyId: A.agencyId }, body: { displayName: "Client", processingAuthorityRef: ids.next() } });
   const other = commandRequestDigest({ operation: "CMD009", aggregate: { agencyId: A.agencyId }, body: { displayName: "Different", processingAuthorityRef: ids.next() } });
+  const journal = (c: Client) => new PgCommandJournal(c, ids, clock);
+  const identity = (agencyId: string): IdempotencyIdentity => ({ environment: "LOCAL", actor: { kind: "USER", userId: owner.userId as UserId }, agencyId: agencyId as AgencyId, operation: "CMD009", key: KEY });
   const clientId = ids.next();
-  await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
-    const r = await reserve(c, A.agencyId, KEY, digest);
-    await c.query(
-      "UPDATE kauro.command_journal SET state = 'COMMITTED', response_status = 201, response_body = $2, resource_kind = 'end_client', resource_id = $3, committed_at = now() WHERE entry_id = $1",
-      [r.rows[0].entry_id, JSON.stringify({ clientId }), clientId],
-    );
+  // the first request reserves the identity and commits its response
+  const committed = await tx(app, ctx, async (c) => {
+    const r = await journal(c).reserve(identity(A.agencyId), digest, ids.next());
+    assert.equal(r.kind, "RESERVED");
+    if (r.kind !== "RESERVED") throw new Error("the first reservation must reserve");
+    return journal(c).commit(r.entryId, { responseStatus: 201, responseBody: { clientId }, resourceKind: "end_client", resourceId: clientId });
   });
-  // replay: the handler finds the committed entry by identity and compares digests
-  await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
-    const found = await c.query("SELECT request_digest, state, response_status, response_body FROM kauro.command_journal WHERE operation = 'CMD009' AND idempotency_key = $1", [KEY]);
-    assert.equal(found.rows.length, 1);
-    assert.equal(found.rows[0].request_digest, digest);
-    assert.equal(found.rows[0].state, "COMMITTED");
-    assert.deepEqual(found.rows[0].response_body, { clientId });
-    assert.notEqual(found.rows[0].request_digest, other, "a different payload under the same key is IDEMPOTENCY_CONFLICT");
-  });
-  // the same identity cannot be reserved twice (a second reservation with the other digest fails on the identity index)
+  // identical replay: the same digest under the same key reads back the original durable result
+  const replay = await tx(app, ctx, (c) => journal(c).reserve(identity(A.agencyId), digest, ids.next()));
+  assert.equal(replay.kind, "REPLAY");
+  if (replay.kind === "REPLAY") assert.deepEqual([replay.entry.entryId, replay.entry.responseStatus, replay.entry.responseBody], [committed.entryId, 201, { clientId }]);
+  // conflict: another digest under the same key is CONFLICT naming the stored entry; nothing is inserted or changed
+  const conflict = await tx(app, ctx, (c) => journal(c).reserve(identity(A.agencyId), other, ids.next()));
+  assert.equal(conflict.kind, "CONFLICT");
+  if (conflict.kind === "CONFLICT") assert.deepEqual([conflict.entry.entryId, conflict.entry.requestDigest, conflict.entry.state], [committed.entryId, digest, "COMMITTED"]);
+  const rows = await oracle.query("SELECT request_digest, state, response_body FROM kauro.command_journal WHERE agency_id = $1 AND idempotency_key = $2", [A.agencyId, KEY]);
+  assert.deepEqual(rows.rows, [{ request_digest: digest, state: "COMMITTED", response_body: { clientId } }]);
+  // beneath the adapter: the same identity cannot be inserted twice (the identity index, not the adapter, closes the race)
   await assert.rejects(
-    tx(app, { agencyId: A.agencyId, userId: owner.userId }, (c) => reserve(c, A.agencyId, KEY, other)),
+    tx(app, ctx, (c) => reserve(c, A.agencyId, KEY, other)),
     (e: unknown) => sqlState(e) === "23505" && constraintOf(e) === "command_journal_identity",
   );
   // a committed entry is final: the stored response cannot be rewritten (10: deleting a cache cannot make an effect repeatable)
   await assert.rejects(
-    tx(app, { agencyId: A.agencyId, userId: owner.userId }, (c) => c.query("UPDATE kauro.command_journal SET response_body = '{}' WHERE idempotency_key = $1", [KEY])),
+    tx(app, ctx, (c) => c.query("UPDATE kauro.command_journal SET response_body = '{}' WHERE idempotency_key = $1", [KEY])),
     (e: unknown) => sqlState(e) === "KA007",
   );
   // the same key in another agency is another identity (10: identity includes agency)
   const otherPerson = await person(app, "other-journal");
   const B = await agency(app, otherPerson, "Other Journal Agency");
-  await tx(app, { agencyId: B.agencyId, userId: owner.userId }, async (c) => {
-    await c.query(
-      `INSERT INTO kauro.command_journal (entry_id, environment, actor_kind, actor_id, agency_id, operation, idempotency_key, request_digest, correlation_id, reserved_at, updated_at)
-       VALUES ($1, 'LOCAL', 'USER', $2, $3, 'CMD009', $4, $5, $6, now(), now())`,
-      [ids.next(), owner.userId, B.agencyId, KEY, digest, ids.next()],
-    );
-  });
+  const elsewhere = await tx(app, { agencyId: B.agencyId, userId: owner.userId }, (c) => journal(c).reserve(identity(B.agencyId), digest, ids.next()));
+  assert.equal(elsewhere.kind, "RESERVED");
 });
 
 test("a concurrent duplicate blocks on the identity until the first transaction commits, then sees the committed entry; after a rollback it proceeds as first", async () => {
-  const key = "k_concurrent_dup_01";
   const digest = sha("same request");
+  const ctx = { agencyId: A.agencyId, userId: owner.userId };
   const c1 = await pg.connect("kauro_app_test");
   const c2 = await pg.connect("kauro_app_test");
   try {
-    const pid2 = (await c2.query("SELECT pg_backend_pid() AS pid")).rows[0].pid as number;
-    await c1.query("BEGIN");
-    await c2.query("BEGIN");
-    await bind(c1, { agencyId: A.agencyId, userId: owner.userId });
-    await bind(c2, { agencyId: A.agencyId, userId: owner.userId });
-    await reserve(c1, A.agencyId, key, digest);
-    const second = reserve(c2, A.agencyId, key, digest);
-    for (let i = 0; i < 200; i++) {
-      const w = await oracle.query("SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [pid2]);
-      if (w.rows[0]?.wait_event_type === "Lock") break;
-      await new Promise((r) => setTimeout(r, 25));
+    await c2.query("SET application_name = 'kauro-test-duplicate'");
+    // both orders of the interleaving: the first reservation commits, then (another key) the first reservation rolls back
+    for (const ending of ["COMMIT", "ROLLBACK"] as const) {
+      const key = `k_concurrent_dup_${ending}`;
+      await c1.query("BEGIN");
+      await c2.query("BEGIN");
+      await bind(c1, ctx);
+      await bind(c2, ctx);
+      const first = await reserve(c1, A.agencyId, key, digest);
+      const second = reserve(c2, A.agencyId, key, digest).then(
+        (r) => ({ inserted: r.rows.map((x: { entry_id: string }) => x.entry_id) }),
+        (e: unknown) => ({ refused: sqlState(e), constraint: constraintOf(e) }),
+      );
+      // the duplicate is observed waiting on the identity index; if it never waits, waitForLockWait throws and the test fails
+      await waitForLockWait(oracle, "kauro-test-duplicate", "INSERT INTO kauro.command_journal");
+      await c1.query(ending);
+      if (ending === "COMMIT") {
+        // the first transaction committed: the waiting duplicate sees its entry and is refused on the identity index — the
+        // adapter reads that committed row and answers REPLAY or CONFLICT (adapters-journals-outbox.test.ts)
+        assert.deepEqual(await second, { refused: "23505", constraint: "command_journal_identity" });
+        await c2.query("ROLLBACK");
+        const kept = await oracle.query("SELECT entry_id FROM kauro.command_journal WHERE idempotency_key = $1", [key]);
+        assert.deepEqual(kept.rows, [{ entry_id: first.rows[0].entry_id }]);
+      } else {
+        // the first transaction died before COMMIT: the waiting duplicate proceeds and becomes the first request
+        const proceeded = await second;
+        assert.ok("inserted" in proceeded && proceeded.inserted.length === 1);
+        await c2.query("COMMIT");
+        const kept = await oracle.query("SELECT entry_id FROM kauro.command_journal WHERE idempotency_key = $1", [key]);
+        assert.deepEqual(kept.rows, [{ entry_id: proceeded.inserted[0] }]);
+      }
     }
-    // first request rolls back (crash before commit): the duplicate proceeds as the first request
-    await c1.query("ROLLBACK");
-    const r2 = await second;
-    assert.equal(r2.rowCount, 1);
-    await c2.query("COMMIT");
-    // now the committed identity exists: a later duplicate reservation is refused and the handler replays the entry
-    await c1.query("BEGIN");
-    await bind(c1, { agencyId: A.agencyId, userId: owner.userId });
-    await assert.rejects(reserve(c1, A.agencyId, key, digest), (e: unknown) => sqlState(e) === "23505");
-    await c1.query("ROLLBACK");
   } finally {
     await c1.end();
     await c2.end();
   }
-  const rows = await oracle.query("SELECT count(*)::int AS n FROM kauro.command_journal WHERE idempotency_key = $1", [key]);
-  assert.equal(rows.rows[0].n, 1);
 });
 
 test("CreateAgency reservations (no tenant) are visible to the identity that reserved them and to no other identity", async () => {

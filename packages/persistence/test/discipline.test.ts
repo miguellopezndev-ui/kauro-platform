@@ -6,8 +6,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { startTemporaryPostgres, type TemporaryPostgres } from "../src/index.js";
-import { agency, bind, constraintOf, endClient, event, ids, offeredCapability, person, plan, processingAuthority, project, sha, sqlState, stepUpProof, tx, type AgencyFixture, type Person } from "./support.js";
+import type { AgencyId, MembershipId, NewPlanRevision, PlanBody, PlanId, ProjectId } from "@kauro/domain";
+import { ConstraintViolation, PgPlanRepository, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/index.js";
+import { agency, bind, clock, constraintOf, endClient, event, ids, offeredCapability, person, plan, processingAuthority, project, sha, sqlState, stepUpProof, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;
 let app: Client;
@@ -95,45 +96,63 @@ test("unlisted transitions and immutable columns are refused; archiving (CMD010)
   });
 });
 
-test("S051: two edits racing on one plan version — one revision is created, the loser reads a stale version conflict", async () => {
+test("S051: two revisions racing on one plan version through the plan adapter — one compare-and-swap applies, the loser waits on the row lock and reads STALE with the current version; a second successor of the same predecessor is refused by plans_supersedes_once", async () => {
+  // S051 "Two edits/approvals race on one aggregate version" → "One valid transition and a clear stale-version conflict"
+  // (07 "Transaction discipline": compare-and-swap on the expected version, unique constraints close races; design §5 "one
+  // revision supersedes a predecessor: CAS on the predecessor version + plans_supersedes_once"). The subject is the product's
+  // PgPlanRepository (transition = the CAS, insert = the successor) on two real connections of the runtime role.
   const p = await plan(app, A, projectId, "VALIDATION_REQUIRED", "race");
-  const c1 = await pg.connect("kauro_app_test");
-  const c2 = await pg.connect("kauro_app_test");
+  assert.equal(p.version, 2);
+  const ctx = { agencyId: A.agencyId, userId: owner.userId };
+  const successorOf = (planId: string, seed: string): NewPlanRevision => {
+    const body: PlanBody = { revisionHash: p.revisionHash, targetContractHash: p.targetContractHash, policyHash: sha("policy"), mappings: [], identities: [], transforms: [], relationships: [] };
+    return { planId: planId as PlanId, agencyId: A.agencyId as AgencyId, projectId: projectId as ProjectId, body, bodyHash: sha(seed), supersedesPlanId: p.planId as PlanId, createdByMembershipId: A.ownerMembershipId as MembershipId, createdAt: clock.now() };
+  };
   const successor1 = ids.next();
   const successor2 = ids.next();
+  const c1 = await pg.connect("kauro_app_test");
+  const c2 = await pg.connect("kauro_app_test");
   try {
+    await c2.query("SET application_name = 'kauro-test-s051-loser'");
     await c1.query("BEGIN");
     await c2.query("BEGIN");
-    await bind(c1, { agencyId: A.agencyId, userId: owner.userId });
-    await bind(c2, { agencyId: A.agencyId, userId: owner.userId });
-    // both read version 2 (VALIDATION_REQUIRED) and both intend expectedVersion = 2
-    const revise = async (c: Client, successor: string): Promise<number> => {
-      const r = await c.query(
-        "UPDATE kauro.plans SET state = 'SUPERSEDED', superseded_by_plan_id = $2, version = version + 1 WHERE plan_id = $1 AND version = 2 RETURNING version",
-        [p.planId, successor],
-      );
-      return r.rowCount ?? 0;
-    };
-    const first = await revise(c1, successor1); // holds the row lock
-    assert.equal(first, 1);
-    const second = revise(c2, successor2); // blocks on the row lock, re-evaluates after commit
-    await c1.query(
-      "INSERT INTO kauro.plans (plan_id, agency_id, project_id, revision_hash, target_contract_hash, policy_hash, body, body_hash, supersedes_plan_id, created_by_membership_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, '{\"mappings\":[1]}', $7, $8, $9, now(), now())",
-      [successor1, A.agencyId, projectId, p.revisionHash, p.targetContractHash, sha("policy"), sha("body-2"), p.planId, A.ownerMembershipId],
-    );
+    await bind(c1, ctx);
+    await bind(c2, ctx);
+    const plansA = new PgPlanRepository(c1);
+    const plansB = new PgPlanRepository(c2);
+    // A: the CAS on version 2 applies (SUPERSEDED v3 naming its successor) and holds the row lock
+    const a = await plansA.transition(p.planId as PlanId, 2, { state: "SUPERSEDED", supersededByPlanId: successor1 as PlanId }, clock.now());
+    assert.equal(a.kind, "APPLIED");
+    if (a.kind === "APPLIED") assert.deepEqual([a.record.version, a.record.state, a.record.supersededByPlanId], [3, "SUPERSEDED", successor1]);
+    // B: the same CAS on version 2 blocks on the row lock (observed; a wait that never happens fails the test here)
+    const b = plansB.transition(p.planId as PlanId, 2, { state: "SUPERSEDED", supersededByPlanId: successor2 as PlanId }, clock.now());
+    await waitForLockWait(oracle, "kauro-test-s051-loser", "UPDATE kauro.plans");
+    // A inserts the successor through the adapter, publishes the events of both versions and commits
+    await plansA.insert(successorOf(successor1, "body-2"));
     await event(c1, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 3, agencyId: A.agencyId, eventType: "plan.superseded.v1", actorUserId: owner.userId, payload: { planId: p.planId, agencyId: A.agencyId, successorPlanId: successor1 } });
     await event(c1, { aggregateKind: "plan", aggregateId: successor1, aggregateVersion: 1, agencyId: A.agencyId, eventType: "plan.created.v1", actorUserId: owner.userId, payload: { planId: successor1, agencyId: A.agencyId, projectId, bodyHash: sha("body-2"), supersedesPlanId: p.planId } });
     await c1.query("COMMIT");
-    assert.equal(await second, 0, "the loser's compare-and-swap matches no row");
-    const current = await c2.query("SELECT version, state, superseded_by_plan_id FROM kauro.plans WHERE plan_id = $1", [p.planId]);
-    assert.deepEqual(current.rows[0], { version: "3", state: "SUPERSEDED", superseded_by_plan_id: successor1 });
+    // B re-evaluates its predicate against the committed row: nothing applies, and the answer is the current safe version
+    assert.deepEqual(await b, { kind: "STALE", currentVersion: 3, currentState: "SUPERSEDED" });
     await c2.query("ROLLBACK");
   } finally {
     await c1.end();
     await c2.end();
   }
-  const plans = await oracle.query("SELECT count(*)::int AS n FROM kauro.plans WHERE supersedes_plan_id = $1", [p.planId]);
-  assert.equal(plans.rows[0].n, 1);
+  // plans_supersedes_once: even a writer that skipped the CAS cannot attach a second successor to the predecessor. The insert
+  // is refused at the statement (23505 on the index), with the event of its version present so that nothing but the index
+  // could refuse the transaction.
+  await assert.rejects(
+    tx(app, ctx, async (c) => {
+      await new PgPlanRepository(c).insert(successorOf(successor2, "body-3"));
+      await event(c, { aggregateKind: "plan", aggregateId: successor2, aggregateVersion: 1, agencyId: A.agencyId, eventType: "plan.created.v1", actorUserId: owner.userId, payload: { planId: successor2, agencyId: A.agencyId, projectId, bodyHash: sha("body-3"), supersedesPlanId: p.planId } });
+    }),
+    (e: unknown) => e instanceof ConstraintViolation && e.sqlState === "23505" && e.constraint === "plans_supersedes_once",
+  );
+  const lineage = await oracle.query("SELECT plan_id FROM kauro.plans WHERE supersedes_plan_id = $1", [p.planId]);
+  assert.deepEqual(lineage.rows, [{ plan_id: successor1 }]);
+  const predecessor = await oracle.query("SELECT version, state, superseded_by_plan_id FROM kauro.plans WHERE plan_id = $1", [p.planId]);
+  assert.deepEqual(predecessor.rows[0], { version: "3", state: "SUPERSEDED", superseded_by_plan_id: successor1 });
 });
 
 test("an approval binds exact plan/source/target/receipt hashes; a foreign or stale hash cannot be recorded; one live approval per plan", async () => {
