@@ -215,6 +215,13 @@ CREATE TRIGGER target_contracts_immutable BEFORE UPDATE ON kauro.target_contract
 ALTER TABLE kauro.capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.capabilities FORCE ROW LEVEL SECURITY;
 CREATE POLICY capabilities_read ON kauro.capabilities FOR SELECT TO kauro_app USING (true);
+-- CMD011 relies on the requested mode being offered when the project commits, so it reads the capability under a share
+-- lock (07 "Transaction discipline": preconditions are rechecked under explicit locks; a control-plane suspension either
+-- waits for the project or is seen). PostgreSQL admits SELECT ... FOR SHARE only with the UPDATE privilege on some column
+-- and a passing UPDATE policy; this policy passes every row for the lock and refuses every row an UPDATE would write
+-- (WITH CHECK false), and the privilege below covers only the immutable key: the runtime role can lock a capability and can
+-- never change one.
+CREATE POLICY capabilities_app_share_lock ON kauro.capabilities FOR UPDATE TO kauro_app USING (true) WITH CHECK (false);
 CREATE POLICY capabilities_control ON kauro.capabilities FOR ALL TO kauro_control USING (true) WITH CHECK (true);
 
 ALTER TABLE kauro.processing_authorities ENABLE ROW LEVEL SECURITY;
@@ -244,6 +251,8 @@ CREATE POLICY target_contracts_tenant ON kauro.target_contracts FOR ALL TO kauro
 
 -- --- grants ---------------------------------------------------------------------------------------------------------------------
 GRANT SELECT ON kauro.capabilities TO kauro_app;
+-- lock-only (see capabilities_app_share_lock): the immutable key column, never a state or evidence column
+GRANT UPDATE (capability_id) ON kauro.capabilities TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.capabilities TO kauro_control;
 GRANT SELECT, INSERT ON kauro.processing_authorities TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.end_clients, kauro.projects, kauro.dataset_revisions, kauro.target_contracts TO kauro_app;

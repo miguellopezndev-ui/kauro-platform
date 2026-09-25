@@ -8,7 +8,8 @@ import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import { approvalHashOf } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { asProblem, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { asProblem, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type World } from "./support.js";
+import { reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
 let w: World;
 let projectId: ProjectId;
@@ -245,6 +246,139 @@ test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superse
   assert.equal(outcome(w, successorApproval), "422 PLAN_NOT_VALIDATED -");
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 1);
   assert.equal(await w.count("approvals", "plan_id = $1", [revised.data.plan.planId]), 0);
+});
+
+/** The dataset_revisions row a plan fixture's source hash names (superuser oracle). */
+async function sourceRowOf(plan: PlanFixture): Promise<{ revision_id: string; version: string }> {
+  const row = await w.row<{ revision_id: string; version: string }>("dataset_revisions", "manifest_hash = $1", [plan.revisionHash]);
+  if (!row) throw new Error("the plan fixture has no source revision row");
+  return row;
+}
+
+/** The target_contracts row a plan fixture's target hash names (superuser oracle). */
+async function targetRowOf(plan: PlanFixture): Promise<{ contract_id: string }> {
+  const row = await w.row<{ contract_id: string }>("target_contracts", "body_hash = $1", [plan.targetContractHash]);
+  if (!row) throw new Error("the plan fixture has no target contract row");
+  return row;
+}
+
+/**
+ * B07's retention_expires edge (SEALED -> EXPIRED), written inside the writer's open transaction. B06 registers no revision
+ * lifecycle event beyond creation (B07 registers its own), so the new version is recorded with the registered revision event
+ * the database requires for every version (D-EVT-1).
+ */
+async function expireSource(writer: HeldTransaction, revision: { revision_id: string; version: string }): Promise<void> {
+  await writer.query("UPDATE kauro.dataset_revisions SET state = 'EXPIRED', version = version + 1 WHERE revision_id = $1", [revision.revision_id]);
+  await rawEvent(writer.client, { aggregateKind: "dataset_revision", aggregateId: revision.revision_id, aggregateVersion: Number(revision.version) + 1, agencyId: w.A.agencyId, eventType: "dataset_revision.created.v1", actorUserId: w.A.ownerUserId, payload: { revisionId: revision.revision_id, agencyId: w.A.agencyId, state: "EXPIRED" } });
+}
+
+test("RACE: a source expiry racing ApprovePlan — the sealed revision is held under a share lock to COMMIT: an expiry that comes second waits and then reads the approval; an expiry committed first is refused 422 SOURCE_EXPIRED", async () => {
+  // 07 "Transaction discipline": "Multi-row invariants use explicit locking"; catalogue CMD025 failure: "Any changed effect,
+  // expired source or stale receipt requires new review". Review findings R15/R19.
+  const proof = await w.stepUp(w.approver);
+
+  // (a) the approval first: A holds inside the disclosure composer (after the source and target were read); B07's expiry of
+  // that source is observed waiting on A's share lock, so it cannot commit while A decides; A commits 201; the expiry then
+  // commits ordered after A and reads the approval its own edge effect ("Revoke reads/execution") has to reach
+  const first = await w.approvable(w.A, projectId, "race-expiry-second");
+  const firstSource = await sourceRowOf(first);
+  const writerA = await tenantWriter(w, w.A);
+  try {
+    const hold = w.holds.arm("collaborator");
+    const request = call(w, { url: routes.approvePlan(first.planId), token: w.approver.token, body: approvalBody(first, proof) });
+    await reachedHold(hold, request);
+    const expiry = expireSource(writerA, firstSource);
+    try {
+      await waitForWriterLockWait(w, writerA, "UPDATE kauro.dataset_revisions");
+    } finally {
+      hold.release();
+    }
+    const approved = completed<ApprovePlanView>(await request, 201);
+    await expiry;
+    const seen = await writerA.query<{ approval_id: string }>("SELECT approval_id FROM kauro.approvals WHERE revision_hash = $1 AND withdrawn_at IS NULL", [first.revisionHash]);
+    assert.deepEqual(seen.rows.map((r) => r.approval_id), [approved.data.approval.approvalId], "the expiry is serialized after the approval and sees it");
+    await writerA.commit();
+  } finally {
+    await writerA.close();
+  }
+  assert.equal((await w.row<{ state: string }>("dataset_revisions", "revision_id = $1", [firstSource.revision_id]))?.state, "EXPIRED");
+
+  // (b) the expiry first: it holds its row lock uncommitted; the approval is observed waiting on it for its share lock; the
+  // expiry commits; the approval re-reads the committed revision, which is no longer SEALED: 422 SOURCE_EXPIRED, nothing
+  // committed — no approval, the plan still VALIDATED v4, no journal row
+  const second = await w.approvable(w.A, projectId, "race-expiry-first");
+  const secondSource = await sourceRowOf(second);
+  const approvalsBefore = await w.count("approvals");
+  const key = freshKey("cmd025-race-expiry-first");
+  const writerB = await tenantWriter(w, w.A);
+  try {
+    await expireSource(writerB, secondSource);
+    const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
+    try {
+      await waitForApiLockWait(w, "FROM kauro.dataset_revisions");
+    } finally {
+      await writerB.commit();
+    }
+    assert.equal(outcome(w, await request), "422 SOURCE_EXPIRED -");
+  } finally {
+    await writerB.close();
+  }
+  assert.equal(await w.count("approvals"), approvalsBefore);
+  const plan = await w.row<{ state: string; version: string; approval_id: string | null }>("plans", "plan_id = $1", [second.planId]);
+  assert.deepEqual(plan && { state: plan.state, version: plan.version, approval: plan.approval_id }, { state: "VALIDATED", version: "4", approval: null });
+  assert.equal(await w.journal(key), null);
+});
+
+test("RACE: a target-contract supersession racing ApprovePlan — the contract is held under a share lock to COMMIT: a supersession that comes second waits and then reads the approval; one committed first is refused 422 TARGET_STALE", async () => {
+  // Review findings R15/R19 (target half): CMD025 binds the exact target; B08's supersession of the contract must be ordered
+  // against the approval, never interleaved between the check and the approval's COMMIT.
+  const proof = await w.stepUp(w.approver);
+
+  // (a) the approval first; the supersession waits on its share lock and, ordered after it, reads the approval
+  const first = await w.approvable(w.A, projectId, "race-target-second");
+  const firstTarget = await targetRowOf(first);
+  const writerA = await tenantWriter(w, w.A);
+  try {
+    const hold = w.holds.arm("collaborator");
+    const request = call(w, { url: routes.approvePlan(first.planId), token: w.approver.token, body: approvalBody(first, proof) });
+    await reachedHold(hold, request);
+    const supersession = writerA.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [firstTarget.contract_id]);
+    try {
+      await waitForWriterLockWait(w, writerA, "UPDATE kauro.target_contracts");
+    } finally {
+      hold.release();
+    }
+    const approved = completed<ApprovePlanView>(await request, 201);
+    await supersession;
+    const seen = await writerA.query<{ approval_id: string }>("SELECT approval_id FROM kauro.approvals WHERE target_contract_hash = $1 AND withdrawn_at IS NULL", [first.targetContractHash]);
+    assert.deepEqual(seen.rows.map((r) => r.approval_id), [approved.data.approval.approvalId], "the supersession is serialized after the approval and sees it");
+    await writerA.commit();
+  } finally {
+    await writerA.close();
+  }
+
+  // (b) the supersession first: the approval waits on the contract's row lock, then reads it superseded: 422 TARGET_STALE
+  const second = await w.approvable(w.A, projectId, "race-target-first");
+  const secondTarget = await targetRowOf(second);
+  const approvalsBefore = await w.count("approvals");
+  const key = freshKey("cmd025-race-target-first");
+  const writerB = await tenantWriter(w, w.A);
+  try {
+    await writerB.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [secondTarget.contract_id]);
+    const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
+    try {
+      await waitForApiLockWait(w, "FROM kauro.target_contracts");
+    } finally {
+      await writerB.commit();
+    }
+    assert.equal(outcome(w, await request), "422 TARGET_STALE -");
+  } finally {
+    await writerB.close();
+  }
+  assert.equal(await w.count("approvals"), approvalsBefore);
+  const plan = await w.row<{ state: string; version: string }>("plans", "plan_id = $1", [second.planId]);
+  assert.deepEqual(plan && { state: plan.state, version: plan.version }, { state: "VALIDATED", version: "4" });
+  assert.equal(await w.journal(key), null);
 });
 
 export type { Person };

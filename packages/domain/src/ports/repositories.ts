@@ -75,6 +75,13 @@ export interface AgencyRepository {
   get(agencyId: AgencyId): Promise<AgencyRecord | null>;
   /** SELECT ... FOR UPDATE: serializes concurrent commands on the aggregate for the rest of the unit of work. */
   lock(agencyId: AgencyId): Promise<AgencyRecord | null>;
+  /**
+   * SELECT ... FOR SHARE: the agency state a command relies on without changing the agency (CMD011: DRAFT or ACTIVE). A
+   * concurrent transition of the agency (to RESTRICTED, CLOSING, ...) waits until this unit of work ends, or — when it
+   * committed first — is read here; commands that only read the state do not serialize among themselves (07 "Transaction
+   * discipline": preconditions are rechecked under an explicit lock).
+   */
+  lockShared(agencyId: AgencyId): Promise<AgencyRecord | null>;
   /** Inserts a DRAFT agency at version 1 (the caller publishes agency.created.v1 in the same unit of work). */
   insert(agency: NewAgency): Promise<AgencyRecord>;
   /** Applies a listed transition (state and the columns it carries) at expectedVersion + 1. */
@@ -162,14 +169,23 @@ export interface ProjectRepository {
 
 export interface DatasetRevisionRepository {
   get(revisionId: RevisionId): Promise<DatasetRevisionRecord | null>;
-  /** The sealed revision whose manifest hash is `revisionHash`, if it exists in the current agency (CMD025 source binding). */
-  findSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null>;
+  /**
+   * The sealed revision whose manifest hash is `revisionHash` in the current agency, read under a share lock held until the
+   * unit of work ends (CMD025 source binding). A concurrent transition of that revision (SEALED -> EXPIRED / SUPERSEDED)
+   * either waits for this unit of work, or committed first and the revision is no longer returned: an approval can never
+   * commit bound to a source that stopped being SEALED while it was in flight (07 "Transaction discipline").
+   */
+  lockSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null>;
 }
 
 export interface TargetContractRepository {
   get(contractId: TargetContractId): Promise<TargetContractRecord | null>;
-  /** The confirmed, unsuperseded contract with this body hash in the current agency (CMD025 target binding). */
-  findCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
+  /**
+   * The confirmed, unsuperseded contract with this body hash in the current agency, read under a share lock held until the
+   * unit of work ends (CMD025 target binding): a concurrent supersession of that contract waits, or committed first and the
+   * contract is no longer returned.
+   */
+  lockCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
 }
 
 // --- plans and approvals ----------------------------------------------------------------------------------------------
@@ -238,6 +254,12 @@ export interface CapabilityRepository {
   get(capabilityId: CapabilityId): Promise<CapabilityRecord | null>;
   /** The mode capability for a service mode (CMD011: the requested mode must be offered), null when none is published. */
   findMode(mode: ServiceMode): Promise<CapabilityRecord | null>;
+  /**
+   * findMode under a share lock on the returned row, held until the unit of work ends (CMD011 relies on the capability being
+   * offered when the project commits): a concurrent control-plane transition of that capability (e.g. AVAILABLE_LIMITED ->
+   * SUSPENDED) waits for this unit of work, or committed first and its new state is what this call returns.
+   */
+  lockMode(mode: ServiceMode): Promise<CapabilityRecord | null>;
   list(filter?: { readonly state?: Capability["state"] }): Promise<ReadonlyArray<CapabilityRecord>>;
 }
 

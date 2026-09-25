@@ -186,6 +186,12 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
   const notInMemory = (what: string): never => {
     throw new Error(`${what} is not part of the in-memory ports: the B06 handlers never call it; the real adapter is tested against PostgreSQL`);
   };
+  /** The offered capability of a mode, else any capability of the mode (the lock variants lock nothing here: no concurrency). */
+  const modeOf = (mode: ServiceMode): CapabilityRecord | null => {
+    const offered = [...s.capabilities.values()].filter((c) => c.kind === "MODE" && c.mode === mode && (c.state === "AVAILABLE" || c.state === "AVAILABLE_LIMITED"));
+    if (offered.length > 1) throw new DomainFailure("INTEGRITY_FAILURE", "one offered capability per mode");
+    return offered[0] ?? [...s.capabilities.values()].find((c) => c.kind === "MODE" && c.mode === mode) ?? null;
+  };
 
   const events: EventPublisher = {
     appended,
@@ -307,6 +313,9 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         return visible(s.agencies.get(agencyId));
       },
       async lock(agencyId) {
+        return visible(s.agencies.get(agencyId));
+      },
+      async lockShared(agencyId) {
         return visible(s.agencies.get(agencyId));
       },
       async insert(a: NewAgency) {
@@ -472,18 +481,18 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       async get(revisionId: RevisionId) {
         return visible(s.revisions.get(revisionId));
       },
-      async findSealedByHash(agencyId, revisionHash) {
+      async lockSealedByHash(agencyId, revisionHash) {
         if (tenantId() !== agencyId) return null;
-        return [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.manifestHash === revisionHash && r.sealedAt !== undefined) ?? null;
+        return [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.manifestHash === revisionHash && r.state === "SEALED") ?? null;
       },
     },
     targetContracts: {
       async get(contractId: TargetContractId) {
         return visible(s.targetContracts.get(contractId));
       },
-      async findCurrentByHash(agencyId, hash) {
+      async lockCurrentByHash(agencyId, hash) {
         if (tenantId() !== agencyId) return null;
-        return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.bodyHash === hash && t.supersededAt === undefined) ?? null;
+        return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.bodyHash === hash && t.confirmedAt !== undefined && t.supersededAt === undefined) ?? null;
       },
     },
     plans: {
@@ -575,9 +584,10 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         return s.capabilities.get(capabilityId) ?? null;
       },
       async findMode(mode: ServiceMode) {
-        const offered = [...s.capabilities.values()].filter((c) => c.kind === "MODE" && c.mode === mode && (c.state === "AVAILABLE" || c.state === "AVAILABLE_LIMITED"));
-        if (offered.length > 1) throw new DomainFailure("INTEGRITY_FAILURE", "one offered capability per mode");
-        return offered[0] ?? [...s.capabilities.values()].find((c) => c.kind === "MODE" && c.mode === mode) ?? null;
+        return modeOf(mode);
+      },
+      async lockMode(mode: ServiceMode) {
+        return modeOf(mode);
       },
       async list(filter?: { readonly state?: Capability["state"] }) {
         return [...s.capabilities.values()].filter((c) => filter?.state === undefined || c.state === filter.state);
