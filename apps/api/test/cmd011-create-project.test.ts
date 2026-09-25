@@ -158,8 +158,12 @@ test("RACE: identical retry replays; conflicting same key → 409; a crash befor
   const requestA = call(w, { url, token: w.operator.token, key, body });
   await hold.reached;
   const requestB = call(w, { url, token: w.operator.token, key, body });
-  await waitForApiLockWait(w, "command_journal");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "command_journal");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const first = completed<ProjectView>(a, 201);
   const second = completed<ProjectView>(b, 201);

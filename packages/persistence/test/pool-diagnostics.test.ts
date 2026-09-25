@@ -4,7 +4,9 @@
 // configured the same classification is written to stderr. Real PostgreSQL 17: the server itself terminates the backend.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { classifyError, createPool, type PoolErrorEvent } from "../src/index.js";
+import { identityUserId, isDomainFailure } from "@kauro/domain";
+import { classifyError, createPool, createUnitOfWorkFactory, type PoolErrorEvent } from "../src/index.js";
+import { clock, correlation } from "../src/testing/harness.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
 let pg: TemporaryPostgres;
@@ -66,7 +68,7 @@ test("R38: an idle connection the server terminates reaches the pool's error sin
     await terminateIdleConnection(pool, "kauro-pool-sink");
     const event = await within(delivered, 10_000, "the pool error sink");
     // 57P01 admin_shutdown: "terminating connection due to administrator command"
-    assert.deepEqual(event, { pool: "kauro-pool-sink", errorClass: "DatabaseError", code: "57P01" });
+    assert.deepEqual(event, { pool: "kauro-pool-sink", connection: "IDLE", errorClass: "DatabaseError", code: "57P01" });
     const text = JSON.stringify(events);
     for (const secret of [PASSWORD, ROLES.appLogin, "127.0.0.1", String(pg.port), "terminating", "administrator"]) assert.ok(!text.includes(secret), `the event carries no ${secret}`);
     // the pool dropped the dead connection and serves the next acquire with a fresh one
@@ -107,4 +109,50 @@ test("R38: without a configured sink the classification is written to stderr, on
   assert.deepEqual(classifyError(Object.assign(new Error("connect ECONNREFUSED 10.0.0.7:5432"), { code: "ECONNREFUSED" })), { errorClass: "Error", code: "ECONNREFUSED" });
   assert.deepEqual(classifyError(Object.assign(new Error("password authentication failed for user kauro_api"), { code: "not a code" })), { errorClass: "Error" });
   assert.deepEqual(classifyError("a string"), { errorClass: "string" });
+});
+
+test("R38: a connection the server terminates while a unit of work holds it fails that unit of work and reaches the sink as an in-use connection error — no error event is left unhandled, and the pool then serves a fresh connection", async () => {
+  // the lost connection of a request in flight (a failover, an administrator termination): pg emits `error` on the checked-out
+  // client, where pg-pool's idle listener is detached; with no listener of its own the process would raise an uncaught error
+  let deliver: (event: PoolErrorEvent) => void = () => undefined;
+  const delivered = new Promise<PoolErrorEvent>((resolve) => {
+    deliver = resolve;
+  });
+  const events: PoolErrorEvent[] = [];
+  const pool = createPool({
+    host: "127.0.0.1",
+    port: pg.port,
+    database: ROLES.database,
+    user: ROLES.appLogin,
+    password: PASSWORD,
+    max: 1,
+    applicationName: "kauro-pool-in-use",
+    onError: (event) => {
+      events.push(event);
+      deliver(event);
+    },
+  });
+  const oracle = await pg.connect("postgres");
+  const unitOfWork = createUnitOfWorkFactory(pool, { clock });
+  const userId = identityUserId("test", "r38-in-use");
+  try {
+    const outcome = unitOfWork.run({ kind: "IDENTITY", userId, correlationId: correlation() }, async (uow) => {
+      // the unit of work holds its connection, idle inside its transaction, when the server terminates the backend
+      const r = await oracle.query<{ terminated: boolean }>("SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity WHERE application_name = $1", ["kauro-pool-in-use"]);
+      assert.deepEqual(r.rows.map((x) => x.terminated), [true], "exactly the unit of work's backend is terminated");
+      await within(delivered, 10_000, "the in-use connection error");
+      // the next statement of the unit of work fails: the transaction is gone with its connection
+      await uow.identities.getOwn(userId);
+      assert.fail("a statement on a terminated connection cannot succeed");
+    });
+    await assert.rejects(outcome, (e: unknown) => isDomainFailure(e) && e.code === "INTERNAL_ERROR", "the unit of work answers the loss, never a success");
+    assert.deepEqual(events[0], { pool: "kauro-pool-in-use", connection: "IN_USE", errorClass: "DatabaseError", code: "57P01" });
+    const text = JSON.stringify(events);
+    for (const secret of [PASSWORD, ROLES.appLogin, "127.0.0.1", String(pg.port), "terminating", "administrator"]) assert.ok(!text.includes(secret), `the events carry no ${secret}`);
+    // the lost connection was destroyed, not pooled: the next unit of work runs on a fresh one
+    assert.equal(await unitOfWork.run({ kind: "IDENTITY", userId, correlationId: correlation() }, async (uow) => (await uow.identities.getOwn(userId)) === null), true);
+  } finally {
+    await oracle.end();
+    await pool.end();
+  }
 });

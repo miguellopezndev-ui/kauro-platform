@@ -21,7 +21,8 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
 - `src/pool` — `createPool(config)`: a `pg` pool with a mandatory connection ceiling (07 "Connection budget") whose every
   physical connection is verified once on first use: not SUPERUSER, not BYPASSRLS, not CREATEROLE/CREATEDB, not the database
   owner, member of exactly one runtime group (`kauro_app`, `kauro_control`, `kauro_assurance` or `kauro_validator`). A
-  privileged login, or one in two groups, is destroyed, never pooled. An error of an idle connection reaches `config.onError`
+  privileged login, or one in two groups, is destroyed, never pooled. An error a connection raises — idle in the pool, or held by
+  a unit of work (the holder's next statement then fails, and the release destroys the connection) — reaches `config.onError`
   (default: one stderr line) as the pool name, the error class and the SQLSTATE or errno code (`classifyError`), never the
   message or a connection parameter.
 - `src/unit-of-work` — `createUnitOfWorkFactory(pool, {clock})`: `run(context, work, options)` opens one transaction at the

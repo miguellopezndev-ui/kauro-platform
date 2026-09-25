@@ -219,8 +219,12 @@ test("concurrent duplicate: two in-flight identical requests → exactly one eff
   const requestA = call(w, request);
   await hold.reached;
   const requestB = call(w, request);
-  await waitForApiLockWait(w, "command_journal");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "command_journal");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const first = completed<{ approval: { approvalId: string } }>(a, 201);
   assert.equal(first.replayed, false);
@@ -244,8 +248,12 @@ test("concurrent duplicate: two in-flight identical requests → exactly one eff
   const dying = call(w, retry);
   await holdFirst.reached;
   const duplicate = call(w, retry);
-  await waitForApiLockWait(w, "command_journal");
-  holdFirst.abort(new SimulatedCrash("after the reservation, before COMMIT"));
+  try {
+    await waitForApiLockWait(w, "command_journal");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    holdFirst.abort(new SimulatedCrash("after the reservation, before COMMIT"));
+  }
   const [died, proceeded] = await Promise.all([dying, duplicate]);
   assert.equal(outcome(w, died), "500 INTERNAL_ERROR -");
   const winner = completed<{ approval: { approvalId: string } }>(proceeded, 201);

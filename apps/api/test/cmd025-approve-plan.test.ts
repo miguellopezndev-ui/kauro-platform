@@ -240,8 +240,12 @@ test("RACE: two approvers on one version → one 201, one 409; identical retry r
   const requestA = call(w, { url, token: w.approver.token, key: keyA, body: bodyA });
   await hold.reached;
   const requestB = call(w, { url, token: w.approver2.token, key: freshKey("cmd025-race-b"), body: approvalBody(plan, proofB) });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<ApprovePlanView>(a, 201);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");
@@ -289,8 +293,12 @@ test("RACE: two ApprovePlan calls — one 201, one 409; no approval of a superse
   const requestA = call(w, { url, token: w.approver.token, body: approvalBody(plan, await w.stepUp(w.approver)) });
   await hold.reached;
   const requestB = call(w, { url, token: w.owner.token, body: approvalBody(plan, await w.stepUp(w.owner)) });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const approved = completed<ApprovePlanView>(a, 201);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");

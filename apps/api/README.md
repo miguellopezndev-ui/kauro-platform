@@ -65,7 +65,7 @@ The composition root binds the PostgreSQL adapters: `loadConfig` reads and valid
 the environment and listens (`main.ts` is the process entry). `KAURO_DB_MIGRATOR_PASSWORD` is consumed by `bootstrap`: it is
 removed from the environment before anything runs, used for the migration connection only and never part of the retained
 configuration; without `KAURO_DB_MIGRATE_ON_START=true` it refuses the start. The cause of every `CAPACITY_UNAVAILABLE` answer
-and of every not-ready probe, and every idle-connection error of the pool, reach a sink by correlation id as safe tokens
+and of every not-ready probe, and every error a pooled connection raises (idle, or held by a request in flight), reach a sink by correlation id as safe tokens
 (class and SQLSTATE/errno, never a message or a credential). `createBearerTokenAuthenticator` binds opaque bearer tokens to
 subjects for LOCAL and tests; SANDBOX and LIVE refuse to start until the Identity Platform verifier is bound (design §12c,
 I-INT-3). The transport and operability decisions are recorded in `docs/design/B06-review/E-transport-operability.md`.

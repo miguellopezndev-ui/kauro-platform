@@ -170,8 +170,12 @@ test("RACE: two RevisePlan calls with expectedVersion 2 — one 201, one 409 STA
   const requestA = call(w, { url, token: w.operator.token, key: freshKey("s051-a"), body: patchBody(plan, "Phone", "EDIT_A") });
   await hold.reached;
   const requestB = call(w, { url, token: w.owner.token, key: freshKey("s051-b"), body: patchBody(plan, "Phone", "EDIT_B") });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<RevisePlanView>(a, 201);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");
@@ -201,8 +205,12 @@ test("RACE: two revisions on one version → one successor; identical retry repl
   const requestA = call(w, { url, token: w.operator.token, key: keyA, body: bodyA });
   await hold.reached;
   const requestB = call(w, { url, token: w.operator.token, key: freshKey("cmd023-race-b"), body: patchBody(plan, "Phone", "EDIT_B") });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<RevisePlanView>(a, 201);
   assert.equal(outcome(w, b), "409 STALE_VERSION -");

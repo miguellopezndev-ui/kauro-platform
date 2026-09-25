@@ -15,7 +15,8 @@
  *
  * Operational facts go to sinks that name safe tokens only (14 "Monitoring and service health": a database outage is visible
  * without exposing credentials; review R38): an unexpected exception, the cause of every CAPACITY_UNAVAILABLE answer and of
- * every NOT_READY probe — by correlation id — and every error of an idle pooled connection. By default each is one stderr line.
+ * every NOT_READY probe — by correlation id — and every error of a pooled connection, idle or held by a request. By default
+ * each is one stderr line.
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
@@ -61,7 +62,7 @@ export interface DatabaseDependencies {
   readonly random?: RandomBytes;
   /** The migrator's password (KAURO_DB_MIGRATOR_PASSWORD): used for the migration connection only, never retained (R44). */
   readonly migratorPassword?: string;
-  /** Receives every idle-connection error of the runtime pool (R38); default: one stderr line. */
+  /** Receives every error a connection of the runtime pool raises, idle or held (R38); default: one stderr line. */
   readonly onPoolError?: PoolErrorSink;
 }
 

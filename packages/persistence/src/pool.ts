@@ -12,10 +12,11 @@
  * (the independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
  * login that belongs to two groups is refused, so a request handler can never also be the producer of the evidence it checks.
  *
- * An error of an idle pooled connection (server restart, administrator termination, network loss) is not swallowed (review
- * finding R38; 14 "Monitoring and service health": a database outage is visible without exposing credentials): pg drops the
- * connection, and the pool hands a safe classification — pool name, error class, SQLSTATE or errno code, never the message
- * or a connection parameter — to the configured sink, by default one line on stderr.
+ * An error of a pooled connection (server restart, administrator termination, failover, network loss), idle or held by a
+ * caller, is neither swallowed nor allowed to end the process (review finding R38; 14 "Monitoring and service health": a
+ * database outage is visible without exposing credentials): the connection is dropped, and the pool hands a safe
+ * classification — pool name, the connection's state, error class, SQLSTATE or errno code, never the message or a connection
+ * parameter — to the configured sink, by default one line on stderr.
  */
 import { Pool, type PoolClient } from "pg";
 
@@ -39,7 +40,10 @@ export interface PoolConfig {
   readonly idleTimeoutMs?: number;
   /** Time to wait for a free connection before failing (the caller answers CAPACITY_UNAVAILABLE). Default 5 s. */
   readonly connectionTimeoutMs?: number;
-  /** Receives the safe classification of every idle-connection error; default: one line on stderr naming only the pool, the class and the code. */
+  /**
+   * Receives the safe classification of every error a pooled connection raises, idle or held by a caller; default: one line on
+   * stderr naming only the pool, the connection's state, the class and the code.
+   */
   readonly onError?: PoolErrorSink;
 }
 
@@ -49,9 +53,13 @@ export interface SafeErrorClassification {
   readonly code?: string;
 }
 
-/** An error of an idle pooled connection, safe to log: the pool's application name and the classification. */
+/**
+ * An error a pooled connection raised, safe to log: the pool's application name, whether the connection was idle in the pool or
+ * held by a caller (a unit of work, a recorder, a readiness read), and the classification.
+ */
 export interface PoolErrorEvent extends SafeErrorClassification {
   readonly pool: string;
+  readonly connection: "IDLE" | "IN_USE";
 }
 
 export type PoolErrorSink = (event: PoolErrorEvent) => void;
@@ -72,7 +80,7 @@ export function classifyError(e: unknown): SafeErrorClassification {
 }
 
 function defaultPoolErrorSink(event: PoolErrorEvent): void {
-  process.stderr.write(`kauro-db pool=${event.pool} idle connection error class=${event.errorClass}${event.code === undefined ? "" : ` code=${event.code}`}\n`);
+  process.stderr.write(`kauro-db pool=${event.pool} ${event.connection === "IDLE" ? "idle" : "in-use"} connection error class=${event.errorClass}${event.code === undefined ? "" : ` code=${event.code}`}\n`);
 }
 
 export interface VerifiedConnection {
@@ -112,6 +120,7 @@ function isRuntimeRole(value: string): value is RuntimeRole {
 export class KauroPool {
   readonly #pool: Pool;
   readonly #verified = new WeakMap<PoolClient, VerifiedConnection>();
+  readonly #sink: PoolErrorSink;
   readonly config: PoolConfig;
 
   constructor(config: PoolConfig) {
@@ -135,8 +144,8 @@ export class KauroPool {
     });
     // an idle client that errors (server restart, network) is dropped by pg; the error must not crash the process, and it
     // must not vanish either: its safe classification goes to the sink (R38)
-    const sink = config.onError ?? defaultPoolErrorSink;
-    this.#pool.on("error", (error: Error) => sink({ pool: config.applicationName, ...classifyError(error) }));
+    this.#sink = config.onError ?? defaultPoolErrorSink;
+    this.#pool.on("error", (error: Error) => this.#sink({ pool: config.applicationName, connection: "IDLE", ...classifyError(error) }));
   }
 
   /** The underlying pg pool (tests and diagnostics only; units of work go through `acquire`). */
@@ -149,7 +158,7 @@ export class KauroPool {
    * not the database owner, member of exactly one runtime group. A privileged connection is destroyed, never pooled.
    */
   async acquire(): Promise<{ readonly client: PoolClient; readonly connection: VerifiedConnection }> {
-    const client = await this.#pool.connect();
+    const client = this.#listenWhileHeld(await this.#pool.connect());
     const known = this.#verified.get(client);
     if (known) return { client, connection: known };
     let row: VerifyRow;
@@ -178,6 +187,30 @@ export class KauroPool {
     const connection: VerifiedConnection = { role, loginRole: row.login_role };
     this.#verified.set(client, connection);
     return { client, connection };
+  }
+
+  /**
+   * While a caller holds a connection, pg-pool's idle error listener is detached, so an error the connection raises then — the
+   * server terminated the backend, a failover, the network dropped — would be an unhandled `error` event and end the process
+   * with every request in flight. The pool listens for the whole checkout instead: the error reaches the sink as an in-use
+   * connection error (R38: a database outage is visible, without credentials), the holder's next statement fails on its own
+   * (a connection that raised an error is no longer queryable, so its unit of work answers the failure), and the release
+   * destroys the connection rather than returning it to the pool.
+   */
+  #listenWhileHeld(client: PoolClient): PoolClient {
+    let lost: Error | undefined;
+    const onError = (error: Error): void => {
+      lost ??= error;
+      this.#sink({ pool: this.config.applicationName, connection: "IN_USE", ...classifyError(error) });
+    };
+    client.on("error", onError);
+    // pg-pool hands out a fresh single-use release with every checkout; this one detaches the listener first
+    const release = client.release;
+    client.release = (destroy?: Error | boolean): void => {
+      client.removeListener("error", onError);
+      release(destroy === undefined || destroy === false ? lost ?? destroy : destroy);
+    };
+    return client;
   }
 
   get totalCount(): number {

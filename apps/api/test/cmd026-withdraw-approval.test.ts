@@ -269,8 +269,12 @@ test("RACE: two withdrawals → one 200, one 409; identical retry replays; a wit
   const requestA = call(w, { url, token: w.approver.token, key: keyA, body: bodyA });
   await hold.reached;
   const requestB = call(w, { url, token: w.owner.token, key: keyB, body: { expectedVersion: 5, reasonCode: "OWNER_DECISION" } });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<WithdrawApprovalView>(a, 200);
   assert.equal(winner.data.plan.state, "WITHDRAWN");

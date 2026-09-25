@@ -127,8 +127,12 @@ test("RACE: identical retry replays the same agency; same key with another displ
   const requestA = call(w, { url: routes.createAgency(), token: racer.token, agency: null, key, body });
   await hold.reached;
   const requestB = call(w, { url: routes.createAgency(), token: racer.token, agency: null, key, body });
-  await waitForApiLockWait(w, "command_journal");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "command_journal");
+  } finally {
+    // a wait that never happens fails the test above; the held request is let go either way, so no transaction outlives it
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const first = completed<View>(a, 201);
   const second = completed<View>(b, 201);
