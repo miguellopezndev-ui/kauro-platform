@@ -51,6 +51,53 @@ test("OK: an OPERATOR creates a client; two clients may share a label and keep d
   assert.deepEqual(journal?.body, first.data);
 });
 
+test("OK (deployment path): CreateClient records the end-client processing authority in its own unit of work — an agency created through the route creates its first client with nothing recorded beforehand; its reference binds a second workspace; another agency cannot record or use it", async () => {
+  // Catalogue CMD009 precondition "Active agency membership permits client creation and records the end-client processing
+  // authority"; playbook FLOW01 step 1 "Add the end-client workspace with its processing authority"; failure "a foreign
+  // authority reference rejects". Review finding R22: no fixture writes a processing authority here — the product path alone
+  // (CreateAgency, then CreateClient) must be able to create a client, as a deployment of this edition must.
+  const founder = await w.person("r22-founder");
+  const agency = completed<{ agency: { agencyId: string }; membership: { membershipId: string } }>(await call(w, { url: routes.createAgency(), token: founder.token, agency: null, body: { displayName: "Founded Agency" } }), 201).data;
+  const agencyId = agency.agency.agencyId;
+  const evidenceRef = ids.next();
+  assert.equal(await w.count("processing_authorities", "processing_authority_id = $1", [evidenceRef]), 0, "nothing recorded the reference beforehand");
+  const url = routes.createClient(agencyId);
+
+  // a crash before COMMIT records nothing: neither the authority nor the client
+  const crashKey = freshKey("cmd009-r22-crash");
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
+  assert.equal(outcome(w, await call(w, { url, token: founder.token, agency: null, key: crashKey, body: { displayName: "Crashed Workspace", processingAuthorityRef: evidenceRef } })), "500 INTERNAL_ERROR -");
+  assert.equal(await w.count("processing_authorities", "processing_authority_id = $1", [evidenceRef]), 0);
+  assert.equal(await w.count("end_clients", "agency_id = $1", [agencyId]), 0);
+
+  const key = freshKey("cmd009-r22");
+  const created = completed<EndClientView>(await call(w, { url, token: founder.token, agency: null, key, body: { displayName: "First Workspace", processingAuthorityRef: evidenceRef } }), 201);
+  assert.equal(created.data.processingAuthorityRef, evidenceRef);
+  // oracle: the authority is recorded for this agency by the member who created the client, in the same transaction as the
+  // client that binds it (the composite key (agency_id, processing_authority_ref) holds)
+  const authority = await w.row<{ agency_id: string; recorded_by_membership_id: string; recorded_at: Date }>("processing_authorities", "processing_authority_id = $1", [evidenceRef]);
+  assert.deepEqual(authority && { agency: authority.agency_id, by: authority.recorded_by_membership_id }, { agency: agencyId, by: agency.membership.membershipId });
+  assert.equal(authority?.recorded_at.toISOString(), created.data.createdAt);
+  const client = await w.row<{ agency_id: string; processing_authority_ref: string }>("end_clients", "client_id = $1", [created.data.clientId]);
+  assert.deepEqual(client && { agency: client.agency_id, authority: client.processing_authority_ref }, { agency: agencyId, authority: evidenceRef });
+  assert.deepEqual((await w.events("end_client", created.data.clientId))[0]?.payload, { clientId: created.data.clientId, agencyId, processingAuthorityRef: evidenceRef, createdByMembershipId: agency.membership.membershipId });
+  assert.equal((await w.journal(key))?.status, 201);
+
+  // the same agency binds the same recorded authority to another workspace: one authority record, two clients
+  const second = completed<EndClientView>(await call(w, { url, token: founder.token, agency: null, body: { displayName: "Second Workspace", processingAuthorityRef: evidenceRef } }), 201);
+  assert.notEqual(second.data.clientId, created.data.clientId);
+  assert.equal(await w.count("processing_authorities", "processing_authority_id = $1", [evidenceRef]), 1);
+  assert.equal(await w.count("end_clients", "processing_authority_ref = $1", [evidenceRef]), 2);
+
+  // another agency naming that reference is refused, with the answer an unknown reference gets; nothing is recorded for it
+  const clientsOfB = await w.count("end_clients", "agency_id = $1", [w.B.agencyId]);
+  const foreign = await call(w, { url: routes.createClient(w.B.agencyId), token: w.stranger.token, agency: null, body: { displayName: "Borrowed Authority", processingAuthorityRef: evidenceRef } });
+  assert.equal(outcome(w, foreign), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
+  assert.deepEqual(asProblem(w, foreign).errors, [{ field: "processingAuthorityRef", code: "UNKNOWN_REFERENCE" }]);
+  assert.equal(await w.count("end_clients", "agency_id = $1", [w.B.agencyId]), clientsOfB);
+  assert.equal((await w.row<{ agency_id: string }>("processing_authorities", "processing_authority_id = $1", [evidenceRef]))?.agency_id, agencyId);
+});
+
 test("DENY: member of another agency → 404; VIEWER → 403 ROLE_INSUFFICIENT; processingAuthorityRef of another agency → 400 UNKNOWN_REFERENCE", async () => {
   const url = routes.createClient(w.A.agencyId);
   const clientsBefore = await w.count("end_clients");

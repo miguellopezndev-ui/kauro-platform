@@ -5,7 +5,7 @@
  */
 import type { AbuseLimiter } from "../../ports/assurance-and-admission.js";
 import type { ArtifactResolver, DisclosureComposer, PlanPatchCompiler } from "../../ports/plan-services.js";
-import type { ActiveWorkInspector, ExternalActionInspector } from "../../ports/work-inspectors.js";
+import type { ActiveWorkInspector, CommercialConsequenceInspector, ExternalActionInspector } from "../../ports/work-inspectors.js";
 import type {
   ApprovePlanHandler,
   ArchiveClientHandler,
@@ -31,6 +31,7 @@ export interface B06Collaborators {
   readonly patchCompiler: PlanPatchCompiler;
   readonly disclosures: DisclosureComposer;
   readonly externalActions: ExternalActionInspector;
+  readonly commercialConsequences: CommercialConsequenceInspector;
 }
 
 export interface B06Handlers {
@@ -49,7 +50,7 @@ export function createB06Handlers(runtime: CommandRuntime, collaborators: B06Col
     CMD009: createClientHandler(runtime),
     CMD010: archiveClientHandler(runtime, collaborators.activeWork),
     CMD011: createProjectHandler(runtime),
-    CMD023: revisePlanHandler(runtime, collaborators.artifacts, collaborators.patchCompiler),
+    CMD023: revisePlanHandler(runtime, collaborators.artifacts, collaborators.patchCompiler, collaborators.commercialConsequences),
     CMD025: approvePlanHandler(runtime, collaborators.disclosures),
     CMD026: withdrawApprovalHandler(runtime, collaborators.externalActions),
   });

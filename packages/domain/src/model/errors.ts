@@ -131,6 +131,8 @@ export const FAILURE_REASONS = [
   "PLAN_SUPERSEDED",
   "PLAN_WITHDRAWN",
   "NO_SEMANTIC_CHANGE",
+  // Plan edge APPROVED -new_plan_revision-> SUPERSEDED, guard "Commercial/execution consequences are reconciled"
+  "CONSEQUENCES_UNRECONCILED",
   // membership, invitation and ownership (07 "Agency and membership states"; 08 "Invitation, recovery and ownership transfer")
   "INVITATION_EXPIRED",
   "INVITATION_NOT_EXPIRED",
@@ -185,16 +187,24 @@ export const FAILURE_REASONS = [
   "EVENT_MISSING",
   "VERSION_DISCIPLINE",
   "IMMUTABLE_COLUMN",
+  "LIVE_APPROVAL_UNBOUND",
   "LEASE_FENCED",
   "RESUME_WITHOUT_CHECKPOINT",
   "DEADLINE_IMMUTABLE",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
+/**
+ * The field code of a typed-patch rejection (CMD023): the reference resolved, the patch it names was refused by the compiler,
+ * and the field says why with the same token as the problem reason (10 "frontend control flow uses the code and typed
+ * fields" — a field never contradicts the reason).
+ */
+export type TypedPatchFieldCode = "PATCH_UNKNOWN_CANDIDATE" | "PATCH_UNKNOWN_FIELD" | "PATCH_EFFECT_NOT_PERMITTED" | "PATCH_MALFORMED";
+
 export interface FieldError {
   /** Field name of the request body (no customer value is ever echoed). */
   readonly field: string;
-  readonly code: "REQUIRED" | "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE" | "UNKNOWN_REFERENCE" | "ENUM";
+  readonly code: "REQUIRED" | "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE" | "UNKNOWN_REFERENCE" | "ENUM" | TypedPatchFieldCode;
 }
 
 export interface FailureDetails {

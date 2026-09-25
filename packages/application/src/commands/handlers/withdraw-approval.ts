@@ -7,10 +7,12 @@
  * Order: authorize (OWNER/APPROVER) → reserve → lock plan (NOT_FOUND) → the caller controls the plan's approval — its
  * approving actor or an OWNER (else NOT_AUTHORIZED / NOT_APPROVAL_CONTROLLER, before any version or state answer; a plan that
  * never carried an approval has no controller to check) → expectedVersion → state APPROVED (else PRECONDITION_FAILED /
- * PLAN_NOT_APPROVED) → that approval is live (an APPROVED plan without one is an integrity failure) → completed external actions identified →
- * approval withdrawn once (withdrawn_at/by/reason, version 2) → plan WITHDRAWN (version + 1) → approval.withdrawn.v1 +
- * plan.withdrawn.v1 (NOTIFICATIONS + EXECUTION_CONTROL route active work through cancellation/reconciliation) → journal 200
+ * PLAN_NOT_APPROVED) → that approval is live (an APPROVED plan without one is an integrity failure) → completed external
+ * actions identified → approval withdrawn once (withdrawn_at/by/reason, version 2) → plan WITHDRAWN (version + 1) →
+ * approval.withdrawn.v1 + plan.withdrawn.v1 (NOTIFICATIONS + EXECUTION_CONTROL route active work through
+ * cancellation/reconciliation; the reason is a label and stays on the approval row, D-API-1) → journal 200
  * {approval, plan, completedExternalActions}. The approval row and the receipts stay; nothing promises a rollback.
+ * The controller rule (D-AUTHZ-3) is the one RevisePlan applies to an APPROVED predecessor (`controlsApproval`, D-PLAN-4).
  */
 import type { PlanId } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
@@ -18,7 +20,7 @@ import { approvalView, planView } from "../../api/projections.js";
 import type { ExternalActionInspector } from "../../ports/work-inspectors.js";
 import { WITHDRAW_APPROVAL, type WithdrawApprovalBody, type WithdrawApprovalHandler, type WithdrawApprovalView } from "../contracts.js";
 import { runCommand, type CommandRuntime } from "../runtime.js";
-import { applied, checkExpectedVersion, requireMembership } from "./shared.js";
+import { applied, checkExpectedVersion, controlsApproval, requireMembership } from "./shared.js";
 
 export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: ExternalActionInspector): WithdrawApprovalHandler {
   return {
@@ -35,7 +37,7 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
         // puts nobody's control at stake, and its version and state answer.
         const controlled = plan.approvalId !== undefined ? await uow.approvals.get(plan.approvalId) : null;
         if (plan.approvalId !== undefined && (!controlled || controlled.planId !== planId)) throw new DomainFailure("INTEGRITY_FAILURE", "the plan's approval is not visible");
-        if (controlled && controlled.actorMembershipId !== membership.membershipId && membership.role !== "OWNER") {
+        if (controlled && !controlsApproval(controlled, membership)) {
           throw new DomainFailure("NOT_AUTHORIZED", "caller does not control this approval", { reason: "NOT_APPROVAL_CONTROLLER" });
         }
         checkExpectedVersion(plan, envelope.body.expectedVersion, plan.supersededByPlanId !== undefined ? { successorId: plan.supersededByPlanId } : {});
@@ -63,11 +65,11 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
+          // the reason is a label (decision D-API-1): recorded on the approval row, never carried by an event payload
           payload: {
             approvalId: approval.approvalId,
             agencyId: membership.agencyId,
             planId,
-            reasonCode: envelope.body.reasonCode,
             withdrawnByMembershipId: membership.membershipId,
             completedExternalActions: completed.map((a) => a.referenceId),
           },
@@ -81,7 +83,7 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
-          payload: { planId, agencyId: membership.agencyId, approvalId: approval.approvalId, reasonCode: envelope.body.reasonCode },
+          payload: { planId, agencyId: membership.agencyId, approvalId: approval.approvalId },
         });
         return {
           status: 200,

@@ -330,12 +330,12 @@ test("outbox ordering by aggregate version: events of one aggregate are appended
     const plan = await uow.plans.transition(planId, p.version + 1, { state: "WITHDRAWN" }, clock.now());
     assert.equal(plan.kind, "APPLIED");
     const actor = { kind: "USER", userId: owner } as const;
-    const e = await uow.events.publish({ aggregateKind: "approval", aggregateId: created, aggregateVersion: 2, agencyId: A.agencyId, eventType: "approval.withdrawn.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { approvalId: created, agencyId: A.agencyId, planId, reasonCode: "SCOPE_CHANGED", withdrawnByMembershipId: A.ownerMembershipId } });
+    const e = await uow.events.publish({ aggregateKind: "approval", aggregateId: created, aggregateVersion: 2, agencyId: A.agencyId, eventType: "approval.withdrawn.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { approvalId: created, agencyId: A.agencyId, planId, withdrawnByMembershipId: A.ownerMembershipId } });
     assert.deepEqual(e.outbox.map((o) => o.consumer).sort(), ["EXECUTION_CONTROL", "NOTIFICATIONS"]);
     await uow.events.publish({ aggregateKind: "plan", aggregateId: planId, aggregateVersion: p.version + 2, agencyId: A.agencyId, eventType: "plan.withdrawn.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { planId, agencyId: A.agencyId, approvalId: created } });
     // a label in a payload never reaches the outbox
     await assert.rejects(
-      uow.events.publish({ aggregateKind: "plan", aggregateId: planId, aggregateVersion: p.version + 3, agencyId: A.agencyId, eventType: "plan.withdrawn.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { planId, reasonCode: "customer said no" } }),
+      uow.events.publish({ aggregateKind: "plan", aggregateId: planId, aggregateVersion: p.version + 3, agencyId: A.agencyId, eventType: "plan.withdrawn.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { planId, approvalId: "customer said no" } }),
       (e: unknown) => failure(e).code === "INTEGRITY_FAILURE",
     );
     assert.equal(await uow.approvals.findLiveByPlan(planId), null);

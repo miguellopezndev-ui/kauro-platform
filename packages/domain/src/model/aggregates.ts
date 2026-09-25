@@ -58,11 +58,13 @@ export interface InvitationRecord {
 }
 
 /** Agency evidence of authority to provide an end client's data (EndClient.processingAuthorityRef; 02 §2). */
+/**
+ * The end-client processing authority an agency recorded (CMD009 "records the end-client processing authority"): the
+ * agency's evidence reference (the id EndClient.processingAuthorityRef names), who recorded it and when (decision D-CLIENT-1).
+ */
 export interface ProcessingAuthorityRecord {
   readonly processingAuthorityId: ProcessingAuthorityId;
   readonly agencyId: AgencyId;
-  readonly kind: "CLIENT_AUTHORIZATION" | "DATA_PROCESSING_AGREEMENT" | "OWN_DATA";
-  readonly evidenceHash: Sha256Hex;
   readonly recordedByMembershipId: MembershipId;
   readonly recordedAt: UtcInstant;
 }

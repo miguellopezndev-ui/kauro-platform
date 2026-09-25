@@ -45,20 +45,16 @@ import { staleOrMissing } from "./tenancy.js";
 interface AuthorityRow {
   processing_authority_id: string;
   agency_id: string;
-  kind: ProcessingAuthorityRecord["kind"];
-  evidence_hash: string;
   recorded_by_membership_id: string;
   recorded_at: Date;
 }
 
-const AUTHORITY_COLUMNS = "processing_authority_id, agency_id, kind, evidence_hash, recorded_by_membership_id, recorded_at";
+const AUTHORITY_COLUMNS = "processing_authority_id, agency_id, recorded_by_membership_id, recorded_at";
 
 function authorityRecord(r: AuthorityRow): ProcessingAuthorityRecord {
   return {
     processingAuthorityId: r.processing_authority_id as ProcessingAuthorityId,
     agencyId: r.agency_id as AgencyId,
-    kind: r.kind,
-    evidenceHash: r.evidence_hash,
     recordedByMembershipId: r.recorded_by_membership_id as MembershipId,
     recordedAt: instant(r.recorded_at),
   };
@@ -72,15 +68,22 @@ export class PgProcessingAuthorityRepository implements ProcessingAuthorityRepos
     return r.rows[0] ? authorityRecord(r.rows[0]) : null;
   }
 
-  async insert(record: ProcessingAuthorityRecord): Promise<ProcessingAuthorityRecord> {
+  /**
+   * INSERT ... ON CONFLICT DO NOTHING on the primary key: a reference already recorded (by this agency or another) inserts
+   * nothing and raises nothing, and a concurrent uncommitted recording of the same reference is waited for. The follow-up read
+   * runs under the tenant policy: this agency's earlier record is returned, another agency's is invisible (null).
+   */
+  async record(record: ProcessingAuthorityRecord): Promise<{ readonly kind: "RECORDED" | "EXISTING"; readonly record: ProcessingAuthorityRecord } | null> {
     const r = await execute<AuthorityRow>(
       this.db,
-      `INSERT INTO kauro.processing_authorities (${AUTHORITY_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${AUTHORITY_COLUMNS}`,
-      [record.processingAuthorityId, record.agencyId, record.kind, record.evidenceHash, record.recordedByMembershipId, record.recordedAt],
+      `INSERT INTO kauro.processing_authorities (${AUTHORITY_COLUMNS}) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (processing_authority_id) DO NOTHING RETURNING ${AUTHORITY_COLUMNS}`,
+      [record.processingAuthorityId, record.agencyId, record.recordedByMembershipId, record.recordedAt],
     );
     const row = r.rows[0];
-    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "processing authority insert returned no row");
-    return authorityRecord(row);
+    if (row) return { kind: "RECORDED", record: authorityRecord(row) };
+    const existing = await this.get(record.processingAuthorityId);
+    return existing === null ? null : { kind: "EXISTING", record: existing };
   }
 }
 
@@ -297,10 +300,15 @@ export class PgDatasetRevisionRepository implements DatasetRevisionRepository {
     return r.rows[0] ? revisionRecord(r.rows[0]) : null;
   }
 
-  async findSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null> {
+  /**
+   * FOR SHARE conflicts with the row lock any UPDATE takes, so a concurrent expiry or supersession of the revision waits for
+   * this transaction; if it committed first, READ COMMITTED re-evaluates `state = 'SEALED'` on the committed row version and
+   * the revision is not returned (the caller answers SOURCE_EXPIRED).
+   */
+  async lockSealedByHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null> {
     const r = await execute<RevisionRow>(
       this.db,
-      `SELECT ${REVISION_COLUMNS} FROM kauro.dataset_revisions WHERE agency_id = $1 AND manifest_hash = $2 AND state = 'SEALED'`,
+      `SELECT ${REVISION_COLUMNS} FROM kauro.dataset_revisions WHERE agency_id = $1 AND manifest_hash = $2 AND state = 'SEALED' FOR SHARE`,
       [agencyId, revisionHash],
     );
     return r.rows[0] ? revisionRecord(r.rows[0]) : null;
@@ -353,10 +361,15 @@ export class PgTargetContractRepository implements TargetContractRepository {
     return r.rows[0] ? contractRecord(r.rows[0]) : null;
   }
 
-  async findCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null> {
+  /**
+   * FOR SHARE on the contract relied on: a concurrent supersession waits for this transaction; if it committed first, the
+   * predicate `superseded_at IS NULL` is re-evaluated on the committed row version and the contract is not returned (the
+   * caller answers TARGET_STALE).
+   */
+  async lockCurrentByHash(agencyId: AgencyId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null> {
     const r = await execute<ContractRow>(
       this.db,
-      `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE agency_id = $1 AND body_hash = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL ORDER BY observed_at DESC LIMIT 1`,
+      `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE agency_id = $1 AND body_hash = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL ORDER BY observed_at DESC LIMIT 1 FOR SHARE`,
       [agencyId, targetContractHash],
     );
     return r.rows[0] ? contractRecord(r.rows[0]) : null;
@@ -408,10 +421,23 @@ export class PgCapabilityRepository implements CapabilityRepository {
    * the newest capability of the mode so the handler can name MODE_NOT_OFFERED against a real state; null when none exists.
    */
   async findMode(mode: ServiceMode): Promise<CapabilityRecord | null> {
+    return this.selectMode(mode, "");
+  }
+
+  /**
+   * findMode FOR SHARE (migration 0003 grants the runtime role the lock and nothing else: UPDATE on the immutable key column
+   * under a policy whose WITH CHECK refuses every written row). A control-plane transition of the returned capability waits
+   * for this transaction; if it committed first, the committed row version — its new state — is what comes back.
+   */
+  async lockMode(mode: ServiceMode): Promise<CapabilityRecord | null> {
+    return this.selectMode(mode, " FOR SHARE");
+  }
+
+  private async selectMode(mode: ServiceMode, locking: "" | " FOR SHARE"): Promise<CapabilityRecord | null> {
     const r = await execute<CapabilityRow>(
       this.db,
       `SELECT ${CAPABILITY_COLUMNS} FROM kauro.capabilities WHERE kind = 'MODE' AND mode = $1
-       ORDER BY (state IN ('AVAILABLE_LIMITED', 'AVAILABLE')) DESC, created_at DESC, capability_id DESC LIMIT 1`,
+       ORDER BY (state IN ('AVAILABLE_LIMITED', 'AVAILABLE')) DESC, created_at DESC, capability_id DESC LIMIT 1${locking}`,
       [mode],
     );
     return r.rows[0] ? capabilityRecord(r.rows[0]) : null;

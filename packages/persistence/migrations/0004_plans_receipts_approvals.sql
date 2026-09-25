@@ -156,7 +156,8 @@ CREATE TABLE kauro.approvals (
   created_at                  timestamptz NOT NULL,
   withdrawn_at                timestamptz,
   withdrawn_by_membership_id  uuid,
-  withdraw_reason_code        text CHECK (withdraw_reason_code IS NULL OR kauro.is_token(withdraw_reason_code)),
+  -- CMD026 reasonCode is a registry `label` (decision D-API-1); it is stored here and never copied into an event payload
+  withdraw_reason_code        text CHECK (withdraw_reason_code IS NULL OR kauro.is_label(withdraw_reason_code)),
   updated_at                  timestamptz NOT NULL,
   UNIQUE (agency_id, approval_id),
   UNIQUE (agency_id, approval_hash),
@@ -211,6 +212,33 @@ CREATE TRIGGER approvals_withdraw_once BEFORE UPDATE ON kauro.approvals FOR EACH
 -- commit and the approval and the plan transition can be written in either order.
 ALTER TABLE kauro.plans ADD CONSTRAINT plans_approval_fk
   FOREIGN KEY (agency_id, approval_id, plan_id) REFERENCES kauro.approvals (agency_id, approval_id, plan_id) DEFERRABLE INITIALLY DEFERRED;
+
+-- A live (not withdrawn) approval exists only on the APPROVED plan that names it. Leaving APPROVED — withdraw_approval
+-- (APPROVED -> WITHDRAWN) or new_plan_revision (APPROVED -> SUPERSEDED, effect "Pause affected future work pending new
+-- approval") — withdraws the approval in the same transaction, as its own recorded authority event
+-- (reference/HASHING_AND_ACCOUNTING_RULES: "Withdrawal is a separately recorded authority event checked during consequential
+-- commands"); a superseded or withdrawn plan can never keep live execution authority. Checked at COMMIT (deferred), so the
+-- approval and the plan can be written in either order inside the command (decision D-PLAN-4).
+CREATE OR REPLACE FUNCTION kauro.live_approval_binds_approved_plan() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM kauro.approvals a
+      JOIN kauro.plans p ON p.agency_id = a.agency_id AND p.plan_id = a.plan_id
+     WHERE a.agency_id = NEW.agency_id AND a.plan_id = NEW.plan_id AND a.withdrawn_at IS NULL
+       AND (p.state <> 'APPROVED' OR p.approval_id IS DISTINCT FROM a.approval_id)
+  ) THEN
+    RAISE EXCEPTION 'LIVE_APPROVAL_UNBOUND: plan % keeps a live approval it is not APPROVED under', NEW.plan_id USING ERRCODE = 'KA020';
+  END IF;
+  RETURN NULL;
+END
+$$;
+CREATE CONSTRAINT TRIGGER plans_live_approval_binding AFTER UPDATE OF state, approval_id ON kauro.plans
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.live_approval_binds_approved_plan();
+CREATE CONSTRAINT TRIGGER approvals_live_approval_binding AFTER INSERT OR UPDATE OF withdrawn_at ON kauro.approvals
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.live_approval_binds_approved_plan();
 
 -- --- row-level security ---------------------------------------------------------------------------------------------------------
 ALTER TABLE kauro.plans ENABLE ROW LEVEL SECURITY;

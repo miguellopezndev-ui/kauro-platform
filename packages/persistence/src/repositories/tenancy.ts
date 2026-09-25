@@ -149,6 +149,11 @@ export class PgAgencyRepository implements AgencyRepository {
     return r.rows[0] ? agencyRecord(r.rows[0]) : null;
   }
 
+  async lockShared(agencyId: AgencyId): Promise<AgencyRecord | null> {
+    const r = await execute<AgencyRow>(this.db, `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies WHERE agency_id = $1 FOR SHARE`, [agencyId]);
+    return r.rows[0] ? agencyRecord(r.rows[0]) : null;
+  }
+
   async insert(agency: NewAgency): Promise<AgencyRecord> {
     const r = await execute<AgencyRow>(
       this.db,

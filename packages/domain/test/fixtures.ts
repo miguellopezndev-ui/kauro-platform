@@ -109,8 +109,6 @@ export function authority(agencyId: AgencyId, recordedBy: MembershipId): Process
   return {
     processingAuthorityId: id() as ProcessingAuthorityId,
     agencyId,
-    kind: "DATA_PROCESSING_AGREEMENT",
-    evidenceHash: createHash("sha256").update("dpa").digest("hex"),
     recordedByMembershipId: recordedBy,
     recordedAt: NOW,
   };

@@ -3,9 +3,12 @@
  * clients creates a scoped client workspace"; catalogue: "Create one scoped workspace with stable identity separate from its
  * display name. Duplicate labels are not merged by inference; a foreign authority reference rejects.").
  *
- * Order: authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → reserve → lock agency (DRAFT or ACTIVE, D-CMD-2) → processing authority
- * visible under RLS (absent, foreign or nonexistent alike → INVALID_REQUEST / UNKNOWN_REFERENCE; the composite foreign key
- * is the second line of defence) → INSERT end_clients (ACTIVE v1) → end_client.created.v1 → journal 201 EndClientView.
+ * Order: authorize (OWNER/ADMIN/OPERATOR, ACTIVE) → reserve → lock agency (DRAFT or ACTIVE, D-CMD-2) → record the end-client
+ * processing authority under the evidence reference the agency names (catalogue precondition "... records the end-client
+ * processing authority"): a reference new to the platform is recorded now, in this unit of work, by this membership; one this
+ * agency already recorded is bound again; one another agency recorded is refused (INVALID_REQUEST / UNKNOWN_REFERENCE — "a
+ * foreign authority reference rejects"; the composite foreign key is the second line of defence) → INSERT end_clients
+ * (ACTIVE v1) → end_client.created.v1 → journal 201 EndClientView. Decision D-CLIENT-1.
  */
 import type { AgencyId, ClientId, ProcessingAuthorityId } from "@kauro/domain";
 import { AGENCY_OPEN_STATES, DomainFailure } from "@kauro/domain";
@@ -28,8 +31,8 @@ export function createClientHandler(runtime: CommandRuntime): CreateClientHandle
           throw new DomainFailure("PRECONDITION_FAILED", "agency does not accept new clients", { reason: "AGENCY_NOT_OPEN", currentState: agency.state, currentVersion: agency.version });
         }
         const authorityRef = envelope.body.processingAuthorityRef as ProcessingAuthorityId;
-        const authority = await uow.processingAuthorities.get(authorityRef);
-        if (!authority || authority.agencyId !== agencyId) {
+        const recorded = await uow.processingAuthorities.record({ processingAuthorityId: authorityRef, agencyId, recordedByMembershipId: membership.membershipId, recordedAt: ctx.now });
+        if (recorded === null || recorded.record.agencyId !== agencyId) {
           throw new DomainFailure("INVALID_REQUEST", "processing authority not visible", { reason: "UNKNOWN_REFERENCE", fields: [{ field: "processingAuthorityRef", code: "UNKNOWN_REFERENCE" }] });
         }
         const clientId = uow.ids.next() as ClientId;

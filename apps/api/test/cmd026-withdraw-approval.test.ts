@@ -141,11 +141,11 @@ test("OK: the approving actor withdraws; approval carries withdrawn_at/by/reason
   // route active work through cancellation/reconciliation under its own state machine.
   const approvalEvents = await w.events("approval", approval.approvalId);
   assert.deepEqual(approvalEvents.map((e) => [e.version, e.type]), [[1, "approval.created.v1"], [2, "approval.withdrawn.v1"]]);
-  assert.deepEqual(approvalEvents[1]?.payload, { approvalId: approval.approvalId, agencyId: w.A.agencyId, planId: plan.planId, reasonCode: "SCOPE_CHANGED", withdrawnByMembershipId: w.memberships.approver, completedExternalActions: [stage.referenceId] });
+  assert.deepEqual(approvalEvents[1]?.payload, { approvalId: approval.approvalId, agencyId: w.A.agencyId, planId: plan.planId, withdrawnByMembershipId: w.memberships.approver, completedExternalActions: [stage.referenceId] });
   assert.deepEqual(await w.outbox(approvalEvents[1]!.eventId), ["EXECUTION_CONTROL", "NOTIFICATIONS"]);
   const planEvents = await w.events("plan", plan.planId);
   assert.deepEqual(planEvents.map((e) => [e.version, e.type]).slice(-2), [[5, "plan.approved.v1"], [6, "plan.withdrawn.v1"]]);
-  assert.deepEqual(planEvents.at(-1)?.payload, { planId: plan.planId, agencyId: w.A.agencyId, approvalId: approval.approvalId, reasonCode: "SCOPE_CHANGED" });
+  assert.deepEqual(planEvents.at(-1)?.payload, { planId: plan.planId, agencyId: w.A.agencyId, approvalId: approval.approvalId });
   assert.deepEqual(await w.outbox(planEvents.at(-1)!.eventId), ["EXECUTION_CONTROL"]);
   assert.equal(await w.count("outbox_records", "event_id IN ($1, $2) AND state = 'PENDING'", [approvalEvents[1]!.eventId, planEvents.at(-1)!.eventId]), 3);
   const journal = await w.journal(key);
@@ -217,10 +217,17 @@ test("DENY: VIEWER → 403; another APPROVER → 403 NOT_APPROVAL_CONTROLLER; fo
   assert.equal(outcome(w, stale), "409 STALE_VERSION -");
   assert.deepEqual(asProblem(w, stale).current, { version: 5, state: "APPROVED" });
   assert.deepEqual(asProblem(w, stale).nextActions.map((n) => n.action), ["RELOAD", "COMPARE_VERSIONS"]);
-  // a reason that is not an uppercase token never reaches the database
-  const lowercase = await call(w, { url, token: w.approver.token, body: { expectedVersion: 5, reasonCode: "scope changed" } });
-  assert.equal(outcome(w, lowercase), "400 INVALID_REQUEST SCHEMA_VIOLATION");
-  assert.deepEqual(asProblem(w, lowercase).errors, [{ field: "reasonCode", code: "FORMAT" }]);
+  // a reason that is not a label (registry type of CMD026 reasonCode, D-API-1) never reaches the database: a control
+  // character, an empty string, more than 200 characters
+  const controlCharacter = await call(w, { url, token: w.approver.token, body: { expectedVersion: 5, reasonCode: "scope\u0000changed" } });
+  assert.equal(outcome(w, controlCharacter), "400 INVALID_REQUEST SCHEMA_VIOLATION");
+  assert.deepEqual(asProblem(w, controlCharacter).errors, [{ field: "reasonCode", code: "FORMAT" }]);
+  const empty = await call(w, { url, token: w.approver.token, body: { expectedVersion: 5, reasonCode: "" } });
+  assert.equal(outcome(w, empty), "400 INVALID_REQUEST SCHEMA_VIOLATION");
+  assert.ok(asProblem(w, empty).errors?.some((e) => e.field === "reasonCode" && e.code === "RANGE"));
+  const tooLong = await call(w, { url, token: w.approver.token, body: { expectedVersion: 5, reasonCode: "x".repeat(201) } });
+  assert.equal(outcome(w, tooLong), "400 INVALID_REQUEST SCHEMA_VIOLATION");
+  assert.deepEqual(asProblem(w, tooLong).errors, [{ field: "reasonCode", code: "RANGE" }]);
 
   // oracle: no committed state — the approval is live at version 1, the plan APPROVED at version 5, no row added or deleted in
   // any table except the durable denial facts (security_events), no event, no outbox row, no journal row
@@ -324,4 +331,19 @@ test("RACE: two withdrawals → one 200, one 409; identical retry replays; a wit
   const final = await w.row<ApprovalRow>("approvals", "approval_id = $1", [approval.approvalId]);
   assert.deepEqual(final && [final.version, final.withdrawn_by_membership_id, final.withdraw_reason_code], ["2", w.memberships.approver, "SCOPE_CHANGED"]);
   assert.deepEqual(await withdrawalEvents(), { approval: 1, plan: 1 });
+});
+
+
+test("OK (reason label): the withdrawal reason is the registry's label — 'Customer asked us to stop' is accepted, stored and answered verbatim, and never copied into an event payload", async () => {
+  // registry commands.json CMD026 fields: reasonCode type "label"; reference/FIELD_CONTRACTS types every reasonCode as a
+  // label. Review findings R17/R27 (before: 400 SCHEMA_VIOLATION for this body). Labels may carry customer information
+  // (FIELD_CONTRACTS "Common rules"), so the reason stays on the approval row and in the tenant's own answer; the events carry
+  // references only (D-EVT-2).
+  const { plan, approval } = await approvedPlan("withdraw-label");
+  const reasonCode = "Customer asked us to stop";
+  const withdrawn = completed<WithdrawApprovalView>(await call(w, { url: routes.withdrawApproval(plan.planId), token: w.approver.token, body: { expectedVersion: 5, reasonCode } }), 200);
+  assert.equal(withdrawn.data.approval.withdrawReasonCode, reasonCode);
+  assert.equal((await w.row<ApprovalRow>("approvals", "approval_id = $1", [approval.approvalId]))?.withdraw_reason_code, reasonCode);
+  const payloads = [...(await w.events("approval", approval.approvalId)), ...(await w.events("plan", plan.planId))].map((e) => JSON.stringify(e.payload));
+  assert.equal(payloads.filter((p) => p.includes("Customer") || p.includes("reasonCode")).length, 0, "no event payload carries the reason");
 });

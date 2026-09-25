@@ -101,9 +101,10 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "plan.validated.v1": ["planId", "agencyId", "bodyHash", "validationReceiptHash"],
   "plan.superseded.v1": ["planId", "agencyId", "successorPlanId", "invalidatedApprovalId", "invalidatedReceiptHash"],
   "plan.approved.v1": ["planId", "agencyId", "approvalId", "approvalHash"],
-  "plan.withdrawn.v1": ["planId", "agencyId", "approvalId", "reasonCode"],
+  "plan.withdrawn.v1": ["planId", "agencyId", "approvalId"],
   "approval.created.v1": ["approvalId", "agencyId", "planId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "actorMembershipId", "approvalHash"],
-  "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "reasonCode", "withdrawnByMembershipId", "completedExternalActions"],
+  // the withdrawal reason is a label (CMD026 reasonCode, decision D-API-1): it stays on the approval row, never in a payload
+  "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "withdrawnByMembershipId", "completedExternalActions", "supersededByPlanId"],
 });
 
 /** Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. */

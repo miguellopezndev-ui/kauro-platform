@@ -1,16 +1,23 @@
 /**
  * CMD025 ApprovePlan — POST /api/v1/plans/{planId}/approve — AGENCY_APPROVER (design §8, D-PLAN-2, D-PLAN-3; Plan machine edge
  * `agency_approval` VALIDATED → APPROVED "Authorized actor, current assurance and exact disclosed effects match. Create
- * immutable Approval"; 10 "Approval commands name sourceRevisionHash, planHash and targetContractHash"; catalogue failure
- * "Any changed effect, expired source or stale receipt requires new review; generic cleanup approval cannot authorize
- * undisclosed CLEAR").
+ * immutable Approval"; catalogue failure "Any changed effect, expired source or stale receipt requires new review; generic
+ * cleanup approval cannot authorize undisclosed CLEAR").
+ *
+ * Manual 10 "Concurrency and preconditions" says "Approval commands name sourceRevisionHash, planHash and
+ * targetContractHash"; the catalogue's CMD025 fields name planHash but neither source nor target hash. This edition follows
+ * the catalogue (the request schema is exactly its fields) and binds source and target through the plan the approver names:
+ * planHash is the Plan bodyHash, whose preimage contains revisionHash and targetContractHash (reference/HASHING_AND_ACCOUNTING_
+ * RULES), the plan row's source and target columns are immutable, the approval's composite foreign key binds them to that
+ * row, and expectedVersion pins the version displayed. The conflict is open question Q9 of the B06 review record
+ * (docs/design/B06-review/C-handler-semantics.md, R32).
  *
  * Order: authorize → reserve → the fresh step-up (ASSURANCE_REQUIRED; its ALLOW fact commits with the approval) → lock plan (NOT_FOUND) → expectedVersion →
  * state VALIDATED (else PLAN_NOT_VALIDATED, or PRECONDITION_FAILED for SUPERSEDED / WITHDRAWN / APPROVED) → planHash equals
  * the plan body hash (else STALE_VERSION mismatch [planHash]) → the named receipt is the plan's current receipt, exists, is
  * VALID with no blocking codes and binds this body/source/target (else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or
  * RECEIPT_BLOCKING) → the source revision is SEALED (else SOURCE_EXPIRED) → the target contract is confirmed and current
- * (else TARGET_STALE) → the server-composed disclosure set hashes to the echoed disclosuresHash (else STALE_VERSION mismatch
+ * (else TARGET_STALE); both read under share locks held to COMMIT (plan → source → target is the lock order) → the server-composed disclosure set hashes to the echoed disclosuresHash (else STALE_VERSION mismatch
  * [disclosuresHash]: an approval displayed without the CLEAR set cannot authorize it) → INSERT approval (v1, actor membership
  * version, proof, five hashes, KAURO_PLAN_APPROVAL_V1 approval hash) → plan APPROVED (version + 1) → approval.created.v1 +
  * plan.approved.v1 → journal 201 {approval, plan}. The database re-checks the bindings as foreign keys.
@@ -70,11 +77,13 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
         if (receipt.planHash !== plan.bodyHash || receipt.revisionHash !== plan.revisionHash || receipt.targetContractHash !== plan.targetContractHash) {
           throw new DomainFailure("PLAN_NOT_VALIDATED", "receipt binds another subject", { reason: "RECEIPT_NOT_CURRENT" });
         }
-        // source: the sealed revision the plan was validated against must still be SEALED (not EXPIRED, SUPERSEDED, DELETED)
-        const source = await uow.revisions.findSealedByHash(membership.agencyId, plan.revisionHash);
+        // source: the sealed revision the plan was validated against must still be SEALED (not EXPIRED, SUPERSEDED, DELETED),
+        // read under a share lock kept to COMMIT: a concurrent expiry or supersession waits for this approval (and then sees
+        // it), or committed first and is refused here — never an approval committed over a source that stopped being SEALED
+        const source = await uow.revisions.lockSealedByHash(membership.agencyId, plan.revisionHash);
         if (!source || source.state !== "SEALED") throw new DomainFailure("SOURCE_EXPIRED", "source revision is no longer sealed");
-        // target: the confirmed, unsuperseded contract with the plan's target hash
-        const target = await uow.targetContracts.findCurrentByHash(membership.agencyId, plan.targetContractHash);
+        // target: the confirmed, unsuperseded contract with the plan's target hash, under the same share lock discipline
+        const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.targetContractHash);
         if (!target || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "target contract is not current");
         // disclosures: the server composes the complete set (every CLEAR included) and the client must have displayed exactly it
         const body = await uow.plans.getBody(planId);

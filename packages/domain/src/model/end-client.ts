@@ -34,7 +34,10 @@ export interface CreateEndClientInput {
 export interface CreateEndClientContext {
   readonly agency: AgencyRecord;
   readonly actor: MembershipRecord;
-  /** The authority the caller referenced, read under the tenant context (null when foreign or nonexistent). */
+  /**
+   * The processing authority CMD009 recorded — or found recorded by this agency — for the reference the caller named (null
+   * when another agency recorded that reference: foreign references reject; decision D-CLIENT-1).
+   */
   readonly processingAuthority: ProcessingAuthorityRecord | null;
 }
 
