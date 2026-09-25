@@ -165,6 +165,48 @@ test("R11: a plan names only its own approval — pointing plan Y at plan X's ap
   ]);
 });
 
+test("R10: active_owner_count is written only by the membership trigger — the runtime role can neither raise it by hand nor forge it at birth, so the last real owner stays protected", async () => {
+  const carol = await h.person("carol-guards");
+  const X = await h.createAgency(carol, "Guards X");
+  const revokeOnlyOwner = async (c: Client): Promise<void> => {
+    await c.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE membership_id = $1", [X.ownerMembershipId]);
+    await event(c, { aggregateKind: "membership", aggregateId: X.ownerMembershipId, aggregateVersion: 2, agencyId: X.agencyId, eventType: "membership.revoked.v1", actorUserId: carol, payload: { membershipId: X.ownerMembershipId, agencyId: X.agencyId, byMembershipId: X.ownerMembershipId, reasonCode: "PROBE" } });
+  };
+  // the review's PROBE-3: raise the counter without a version, then revoke the only owner
+  await assert.rejects(
+    tx(app, ctx(X, carol), async (c) => {
+      await c.query("UPDATE kauro.agencies SET active_owner_count = active_owner_count + 1 WHERE agency_id = $1", [X.agencyId]);
+      await revokeOnlyOwner(c);
+    }),
+    refusedWith("KA004"),
+  );
+  // with a version bump and its event the counter is still not writable
+  await assert.rejects(
+    tx(app, ctx(X, carol), async (c) => {
+      await c.query("UPDATE kauro.agencies SET active_owner_count = 7, version = version + 1 WHERE agency_id = $1", [X.agencyId]);
+    }),
+    refusedWith("KA004"),
+  );
+  // an agency born with a forged counter
+  const dave = await h.person("dave-guards");
+  const forged = ids.next();
+  await assert.rejects(
+    tx(app, { agencyId: forged, userId: dave }, (c) =>
+      c.query("INSERT INTO kauro.agencies (agency_id, display_name, created_by_user_id, active_owner_count, created_at, updated_at) VALUES ($1, 'Forged', $2, 5, now(), now())", [forged, dave]),
+    ),
+    refusedWith("KA004"),
+  );
+  // without the forgery, removing the only owner is the last-owner refusal
+  await assert.rejects(tx(app, ctx(X, carol), revokeOnlyOwner), refusedWith("KA001"));
+  // the legitimate path still counts: a second owner accepted through the Membership machine
+  const erin = await h.person("erin-guards");
+  await h.addMember(X, erin, "OWNER");
+  const count = await h.oracle.query("SELECT active_owner_count, version FROM kauro.agencies WHERE agency_id = $1", [X.agencyId]);
+  assert.deepEqual(count.rows[0], { active_owner_count: 2, version: "1" });
+  const owners = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.memberships WHERE agency_id = $1 AND role = 'OWNER' AND state = 'ACTIVE'", [X.agencyId]);
+  assert.equal(owners.rows[0].n, 2);
+});
+
 test("R14: step-up proofs are written only by the step-up verifier — the request handlers cannot mint one, not even their own; the verifier writes only for the identity it binds and reads nothing", async () => {
   const insertProof = (c: Client, userId: string) =>
     c.query(

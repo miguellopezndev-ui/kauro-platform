@@ -83,6 +83,29 @@ CREATE TRIGGER agencies_transition BEFORE UPDATE OF state ON kauro.agencies
 CREATE TRIGGER agencies_initial_state BEFORE INSERT ON kauro.agencies
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Agency');
 
+-- active_owner_count is written only by kauro.maintain_active_owner_count (D-OWN-1; R2-043; 07 "Application checks improve
+-- messages but cannot be the sole protection"). An agency is born with no active owner — the founding owner's membership
+-- insert counts it — and no statement a role sends can write the counter: only the UPDATE the membership trigger issues,
+-- which runs one trigger level below the statement that changed the membership (pg_trigger_depth() >= 2, a level no client
+-- can reach), may change it. The counter is exempt from the version rule for that reason alone; without this guard the runtime
+-- role could raise it by hand and then remove the last real owner while the check still counted a phantom one.
+CREATE OR REPLACE FUNCTION kauro.guard_active_owner_count() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.active_owner_count <> 0 THEN
+      RAISE EXCEPTION 'IMMUTABLE_COLUMN: agency % is born with no active owner; the membership trigger counts owners', NEW.agency_id USING ERRCODE = 'KA004';
+    END IF;
+  ELSIF NEW.active_owner_count IS DISTINCT FROM OLD.active_owner_count AND pg_trigger_depth() < 2 THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: agencies.active_owner_count of % is maintained by the membership trigger only', OLD.agency_id USING ERRCODE = 'KA004';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER agencies_owner_count_guard BEFORE INSERT OR UPDATE ON kauro.agencies
+  FOR EACH ROW EXECUTE FUNCTION kauro.guard_active_owner_count();
+
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Agency', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Agency', 'DRAFT', 'ACTIVE'),
