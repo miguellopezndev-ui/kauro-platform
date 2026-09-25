@@ -28,8 +28,12 @@ export const REQUEST_LIMITS = Object.freeze({
   /** Parser bounds (10: bounded depth and string lengths; the reverse proxy is not the only guard). */
   maxDepth: 16,
   maxStringLength: 40_000,
-  /** Correlation ids are opaque tokens the platform echoes; a bound keeps them out of log-injection and header-size games. */
-  correlationIdPattern: /^[A-Za-z0-9._:-]{1,128}$/,
+  /**
+   * A client-supplied correlation id is echoed only when it is an `id` (lowercase RFC 9562 UUID, the request-schema id
+   * shape): the registry types DomainEvent.correlationId as `id`, and the command journal, the domain events and the security
+   * events store it as a uuid. Anything else is CORRELATION_ID_INVALID; an absent one is minted by the server (I-INT-4).
+   */
+  correlationIdPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
 });
 
 /**

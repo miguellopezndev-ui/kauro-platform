@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { ContractSchemaBundle, RawRequest } from "../src/index.js";
-import { ARCHIVE_CLIENT, CREATE_AGENCY, CREATE_CLIENT, CREATE_PROJECT, admitStructure, createSchemaValidator, envelopeOf, fixedClock, sequentialIds } from "../src/index.js";
+import { ARCHIVE_CLIENT, CREATE_AGENCY, CREATE_CLIENT, CREATE_PROJECT, admitHeaders, admitStructure, createSchemaValidator, envelopeOf, fixedClock, sequentialIds } from "../src/index.js";
 import { subject } from "./support.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
@@ -15,6 +15,7 @@ const ids = sequentialIds(clock);
 const KEY = "0123456789abcdef-key";
 const CLIENT = "018f0000-0000-7000-8000-000000000010";
 const AGENCY = "018f0000-0000-7000-8000-000000000020";
+const CORRELATION = "018f0000-0000-7000-8000-0000000000c1";
 
 function raw(overrides: Partial<RawRequest> & { headers?: Record<string, string | undefined> } = {}, body: unknown = { mode: "CLEAN", purpose: "Import" }): RawRequest {
   const text = JSON.stringify(body);
@@ -49,14 +50,29 @@ test("the order of manual 10: content type, size, syntax, duplicate keys, schema
   assert.equal(reasonOf(admitStructure(CREATE_PROJECT, raw({ headers: { "x-kauro-agency": "acme" } }), validator, ids, clock)), "400 INVALID_REQUEST AGENCY_SELECTOR_INVALID");
 });
 
+test("the header-only head of the order (correlation id, then content type) is decided before a body exists; everything else waits for the body", () => {
+  const headers = (h: Record<string, string | undefined>) => ({ "content-type": "application/json", ...h });
+  const problem = (h: Record<string, string | undefined>) => {
+    const r = admitHeaders(headers(h), ids);
+    return r === null ? "ADMITTED" : `${r.problem.status} ${r.problem.code} ${r.problem.reason ?? "-"}`;
+  };
+  assert.equal(problem({ "content-type": "text/plain" }), "400 INVALID_REQUEST CONTENT_TYPE_UNSUPPORTED");
+  assert.equal(problem({ "content-type": undefined }), "400 INVALID_REQUEST CONTENT_TYPE_UNSUPPORTED");
+  assert.equal(problem({ "content-type": "text/plain", "x-correlation-id": "not an id" }), "400 INVALID_REQUEST CORRELATION_ID_INVALID");
+  const echoed = admitHeaders(headers({ "content-type": "text/plain", "x-correlation-id": CORRELATION }), ids);
+  assert.equal(echoed?.problem.correlationId, CORRELATION);
+  // the key, the selector and the body are not header-only decisions of this step
+  assert.equal(problem({ "idempotency-key": undefined, "x-kauro-agency": undefined }), "ADMITTED");
+});
+
 test("an admitted request carries the validated body, the path ids and the selector of its scope; the envelope binds the subject", () => {
-  const header = admitStructure(CREATE_PROJECT, raw({ headers: { "x-correlation-id": "client-corr-1" } }), validator, ids, clock);
+  const header = admitStructure(CREATE_PROJECT, raw({ headers: { "x-correlation-id": CORRELATION } }), validator, ids, clock);
   assert.equal(header.kind, "ADMITTED");
   if (header.kind === "ADMITTED") {
     assert.equal(header.admission.agencyId, AGENCY);
     assert.deepEqual(header.admission.path, { clientId: CLIENT });
     assert.deepEqual(header.admission.body, { mode: "CLEAN", purpose: "Import" });
-    assert.equal(header.admission.correlationId, "client-corr-1");
+    assert.equal(header.admission.correlationId, CORRELATION);
     assert.equal(header.admission.idempotencyKey, KEY);
     const s = subject("someone");
     const env = envelopeOf("CMD011", "LOCAL", header.admission, s);
@@ -74,6 +90,11 @@ test("an admitted request carries the validated body, the path ids and the selec
 
 test("a malformed client correlation id is refused, a missing one is generated and echoed, a charset parameter is accepted only as utf-8", () => {
   assert.equal(reasonOf(admitStructure(ARCHIVE_CLIENT, raw({ headers: { "x-correlation-id": "bad value with spaces" } }, { expectedVersion: 1 }), validator, ids, clock)), "400 INVALID_REQUEST CORRELATION_ID_INVALID");
+  // a correlation id is an `id` (registry DomainEvent.correlationId; stored as a uuid by the journal, events and security
+  // events): an opaque token of another shape, or an uppercase UUID, is refused rather than failing at the first insert
+  for (const token of ["client-corr-1", CORRELATION.toUpperCase(), `${CORRELATION}-1`]) {
+    assert.equal(reasonOf(admitStructure(ARCHIVE_CLIENT, raw({ headers: { "x-correlation-id": token } }, { expectedVersion: 1 }), validator, ids, clock)), "400 INVALID_REQUEST CORRELATION_ID_INVALID", token);
+  }
   const generated = admitStructure(ARCHIVE_CLIENT, raw({}, { expectedVersion: 1 }), validator, ids, clock);
   assert.equal(generated.kind, "ADMITTED");
   if (generated.kind === "ADMITTED") assert.match(generated.admission.correlationId, /^[0-9a-f-]{36}$/);

@@ -22,7 +22,7 @@ import type {
   RawRequest,
   SchemaValidator,
 } from "@kauro/application";
-import { HEADERS, REQUEST_LIMITS, admitStructure, correlationIdOf, envelopeOf, internalProblem, problemOf, unauthenticatedProblem } from "@kauro/application";
+import { HEADERS, REQUEST_LIMITS, admitHeaders, admitStructure, correlationIdOf, envelopeOf, internalProblem, problemOf, unauthenticatedProblem } from "@kauro/application";
 import type { Clock, Environment, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { Authenticator } from "./authenticator.js";
@@ -106,6 +106,13 @@ function registerCommand<Body, View>(app: FastifyInstance, options: ApiServerOpt
   app.route<{ Params: Record<string, string>; Body: string | undefined; Reply: CommandReply<View> }>({
     method: spec.method,
     url: fastifyPath(spec.path),
+    // manual 10 decides the content type before the byte size: the headers are admitted before the body is read, so the
+    // parser's body limit cannot answer first for a request whose content type already refuses it
+    onRequest: async (request, reply) => {
+      const early = admitHeaders(singleValued(request.headers), options.ids);
+      if (early !== null) return sendProblem(reply, early.problem);
+      return undefined;
+    },
     handler: async (request, reply) => {
       const headers = singleValued(request.headers);
       const bodyText = typeof request.body === "string" ? request.body : null;

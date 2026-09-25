@@ -22,7 +22,7 @@ export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_
 export type { ContractSchemaBundle } from "./api/schema-validation.js";
 export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
 export type { RawRequest, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitStructure, envelopeOf, correlationIdOf, unauthenticatedProblem } from "./api/admission.js";
+export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,

@@ -67,6 +67,26 @@ function isJsonContentType(value: string | undefined): boolean {
   return true;
 }
 
+/** The head of the admission order that needs the headers only: the correlation id, then the content type. */
+function headerFailure(headers: RawRequest["headers"], correlation: { readonly invalid: boolean }): DomainFailure | null {
+  if (correlation.invalid) return invalid("CORRELATION_ID_INVALID");
+  if (!isJsonContentType(headers["content-type"])) return invalid("CONTENT_TYPE_UNSUPPORTED");
+  return null;
+}
+
+/**
+ * The part of the admission a transport decides from the headers alone — the correlation id, then the content type — run
+ * before the body is read, so neither the size nor the bytes of a body can answer a request whose content type already
+ * refuses it (10 "Request envelope": content type, byte size, JSON syntax, duplicate keys, schema, in that order). Returns
+ * the problem to send, or null to go on reading the body; `admitStructure` repeats both checks, so a transport that skips
+ * this step still refuses exactly the same requests.
+ */
+export function admitHeaders(headers: RawRequest["headers"], ids: IdGenerator): Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> | null {
+  const correlation = correlationIdOf(headers, ids);
+  const failure = headerFailure(headers, correlation);
+  return failure === null ? null : { kind: "PROBLEM", correlationId: correlation.id, problem: problemOf(failure, correlation.id) };
+}
+
 /**
  * Structural admission of one command request, in the order of manual 10. The first failure is the answer; the handler and
  * the database are never reached by a request that fails here.
@@ -76,9 +96,9 @@ export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, v
   const correlationId = correlation.id;
   const fail = (f: DomainFailure): AdmissionOutcome<Body> => ({ kind: "PROBLEM", correlationId, problem: problemOf(f, correlationId) });
   try {
-    if (correlation.invalid) throw invalid("CORRELATION_ID_INVALID");
-    // 1. content type
-    if (!isJsonContentType(raw.headers["content-type"])) throw invalid("CONTENT_TYPE_UNSUPPORTED");
+    // 0-1. correlation id, content type (the header-only head, also run by the transport before the body is read)
+    const early = headerFailure(raw.headers, correlation);
+    if (early !== null) throw early;
     // 2. byte size
     if (raw.bodyBytes > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
     // 3. JSON syntax, duplicate keys, depth, string length
