@@ -171,7 +171,8 @@ export async function start(): Promise<Harness> {
     async processingAuthority(agency) {
       return app.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
         const id = uow.ids.next() as ProcessingAuthorityId;
-        await uow.processingAuthorities.insert({ processingAuthorityId: id, agencyId: agency.agencyId, kind: "CLIENT_AUTHORIZATION", evidenceHash: sha("dpa-" + id), recordedByMembershipId: agency.ownerMembershipId, recordedAt: clock.now() });
+        const recorded = await uow.processingAuthorities.record({ processingAuthorityId: id, agencyId: agency.agencyId, recordedByMembershipId: agency.ownerMembershipId, recordedAt: clock.now() });
+        if (recorded?.kind !== "RECORDED") throw new Error("the processing authority fixture was not recorded");
         return id;
       });
     },

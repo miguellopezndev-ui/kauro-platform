@@ -45,20 +45,16 @@ import { staleOrMissing } from "./tenancy.js";
 interface AuthorityRow {
   processing_authority_id: string;
   agency_id: string;
-  kind: ProcessingAuthorityRecord["kind"];
-  evidence_hash: string;
   recorded_by_membership_id: string;
   recorded_at: Date;
 }
 
-const AUTHORITY_COLUMNS = "processing_authority_id, agency_id, kind, evidence_hash, recorded_by_membership_id, recorded_at";
+const AUTHORITY_COLUMNS = "processing_authority_id, agency_id, recorded_by_membership_id, recorded_at";
 
 function authorityRecord(r: AuthorityRow): ProcessingAuthorityRecord {
   return {
     processingAuthorityId: r.processing_authority_id as ProcessingAuthorityId,
     agencyId: r.agency_id as AgencyId,
-    kind: r.kind,
-    evidenceHash: r.evidence_hash,
     recordedByMembershipId: r.recorded_by_membership_id as MembershipId,
     recordedAt: instant(r.recorded_at),
   };
@@ -72,15 +68,22 @@ export class PgProcessingAuthorityRepository implements ProcessingAuthorityRepos
     return r.rows[0] ? authorityRecord(r.rows[0]) : null;
   }
 
-  async insert(record: ProcessingAuthorityRecord): Promise<ProcessingAuthorityRecord> {
+  /**
+   * INSERT ... ON CONFLICT DO NOTHING on the primary key: a reference already recorded (by this agency or another) inserts
+   * nothing and raises nothing, and a concurrent uncommitted recording of the same reference is waited for. The follow-up read
+   * runs under the tenant policy: this agency's earlier record is returned, another agency's is invisible (null).
+   */
+  async record(record: ProcessingAuthorityRecord): Promise<{ readonly kind: "RECORDED" | "EXISTING"; readonly record: ProcessingAuthorityRecord } | null> {
     const r = await execute<AuthorityRow>(
       this.db,
-      `INSERT INTO kauro.processing_authorities (${AUTHORITY_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${AUTHORITY_COLUMNS}`,
-      [record.processingAuthorityId, record.agencyId, record.kind, record.evidenceHash, record.recordedByMembershipId, record.recordedAt],
+      `INSERT INTO kauro.processing_authorities (${AUTHORITY_COLUMNS}) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (processing_authority_id) DO NOTHING RETURNING ${AUTHORITY_COLUMNS}`,
+      [record.processingAuthorityId, record.agencyId, record.recordedByMembershipId, record.recordedAt],
     );
     const row = r.rows[0];
-    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "processing authority insert returned no row");
-    return authorityRecord(row);
+    if (row) return { kind: "RECORDED", record: authorityRecord(row) };
+    const existing = await this.get(record.processingAuthorityId);
+    return existing === null ? null : { kind: "EXISTING", record: existing };
   }
 }
 

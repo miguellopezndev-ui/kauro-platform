@@ -48,13 +48,19 @@ INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Capability', 'AVAILABLE', 'SUSPENDED');
 
 -- --- processing authorities --------------------------------------------------------------------------------------------------
--- Agency evidence of authority to provide an end client's data (EndClient.processingAuthorityRef; 02 §2 "confirms authority
--- to process the end client's data"). A client can only reference an authority record of its own agency (composite FK).
+-- The end-client processing authority an agency records when it creates a client workspace (CMD009 precondition "Active
+-- agency membership permits client creation and records the end-client processing authority"; contract EndClient
+-- processingAuthorityRef "Agency evidence of authority to provide this client's data"; 02 "confirms authority to process the
+-- end client's data"; playbook FLOW01 "Add the end-client workspace with its processing authority"). A row is that record:
+-- the agency, the membership that recorded it and when, under the evidence reference the agency names. The platform does not
+-- mint that reference in this edition (no evidence-artifact store exists yet), so it carries no v7 check (D-ID-1, external
+-- references), and its identity is global: a reference another agency recorded cannot be recorded again (the primary key),
+-- which is how "a foreign authority reference rejects" holds. The registry has no ProcessingAuthority contract; the legal role
+-- chain (19 "The DPA identifies the actual chain of roles") belongs to the evidence, not to this row (decision D-CLIENT-1,
+-- open question Q10). A client can only reference an authority record of its own agency (composite FK).
 CREATE TABLE kauro.processing_authorities (
-  processing_authority_id    uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(processing_authority_id)),
+  processing_authority_id    uuid PRIMARY KEY,
   agency_id                  uuid NOT NULL REFERENCES kauro.agencies (agency_id),
-  kind                       text NOT NULL CHECK (kind IN ('CLIENT_AUTHORIZATION', 'DATA_PROCESSING_AGREEMENT', 'OWN_DATA')),
-  evidence_hash              text NOT NULL CHECK (kauro.is_sha256_hex(evidence_hash)),
   recorded_by_membership_id  uuid NOT NULL,
   recorded_at                timestamptz NOT NULL,
   UNIQUE (agency_id, processing_authority_id),

@@ -386,10 +386,16 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       async get(id: ProcessingAuthorityId) {
         return visible(s.processingAuthorities.get(id));
       },
-      async insert(r) {
+      async record(r) {
         checkWrite(r.agencyId);
+        // the identity of a reference is global (primary key); another agency's record is invisible, this agency's is reused
+        const existing = s.processingAuthorities.get(r.processingAuthorityId);
+        if (existing !== undefined) {
+          const mine = visible(existing);
+          return mine === null ? null : { kind: "EXISTING" as const, record: mine };
+        }
         s.processingAuthorities.set(r.processingAuthorityId, r);
-        return r;
+        return { kind: "RECORDED" as const, record: r };
       },
     },
     endClients: {

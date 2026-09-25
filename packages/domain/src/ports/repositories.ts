@@ -122,7 +122,13 @@ export interface MembershipRepository {
 
 export interface ProcessingAuthorityRepository {
   get(processingAuthorityId: ProcessingAuthorityId): Promise<ProcessingAuthorityRecord | null>;
-  insert(record: ProcessingAuthorityRecord): Promise<ProcessingAuthorityRecord>;
+  /**
+   * Records the agency's processing authority under the evidence reference it names (CMD009), unless the reference is
+   * already recorded: returns the current agency's record — RECORDED now, or EXISTING from an earlier client of the same
+   * agency — or null when another agency recorded the reference (its row is invisible under RLS and the primary key refuses a
+   * second one: "a foreign authority reference rejects"). Concurrent recordings of one reference serialize on the key.
+   */
+  record(record: ProcessingAuthorityRecord): Promise<{ readonly kind: "RECORDED" | "EXISTING"; readonly record: ProcessingAuthorityRecord } | null>;
 }
 
 export interface NewEndClient {

@@ -141,9 +141,9 @@ export function world(): World {
   const strangerMembershipId = member(store, otherAgencyId, stranger.identity.userId, "OWNER", now);
 
   const authorityId = ids.next() as ProcessingAuthorityId;
-  store.processingAuthorities.set(authorityId, { processingAuthorityId: authorityId, agencyId, kind: "CLIENT_AUTHORIZATION", evidenceHash: sha("evidence"), recordedByMembershipId: ownerMembershipId, recordedAt: now });
+  store.processingAuthorities.set(authorityId, { processingAuthorityId: authorityId, agencyId, recordedByMembershipId: ownerMembershipId, recordedAt: now });
   const foreignAuthorityId = ids.next() as ProcessingAuthorityId;
-  store.processingAuthorities.set(foreignAuthorityId, { processingAuthorityId: foreignAuthorityId, agencyId: otherAgencyId, kind: "OWN_DATA", evidenceHash: sha("foreign"), recordedByMembershipId: strangerMembershipId, recordedAt: now });
+  store.processingAuthorities.set(foreignAuthorityId, { processingAuthorityId: foreignAuthorityId, agencyId: otherAgencyId, recordedByMembershipId: strangerMembershipId, recordedAt: now });
 
   const clientId = ids.next() as ClientId;
   store.endClients.set(clientId, { clientId, agencyId, version: 1, displayName: "Client A", state: "ACTIVE", processingAuthorityRef: authorityId, createdByMembershipId: ownerMembershipId, createdAt: now, updatedAt: now });

@@ -128,9 +128,9 @@ export async function processingAuthority(app: Client, ag: AgencyFixture): Promi
   const id = ids.next();
   await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
     await c.query(
-      `INSERT INTO kauro.processing_authorities (processing_authority_id, agency_id, kind, evidence_hash, recorded_by_membership_id, recorded_at)
-       VALUES ($1, $2, 'CLIENT_AUTHORIZATION', $3, $4, now())`,
-      [id, ag.agencyId, sha("dpa-" + id), ag.ownerMembershipId],
+      `INSERT INTO kauro.processing_authorities (processing_authority_id, agency_id, recorded_by_membership_id, recorded_at)
+       VALUES ($1, $2, $3, now())`,
+      [id, ag.agencyId, ag.ownerMembershipId],
     );
   });
   return id;
