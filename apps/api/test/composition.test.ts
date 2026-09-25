@@ -64,6 +64,23 @@ function configError(variable: string): (e: unknown) => boolean {
   return (e) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
 }
 
+/** Asserts that bootstrap refuses `env`. An api that starts anyway is closed before the assertion fails, so a regression is
+ * reported as a failure of the test instead of an open server that keeps the test process from exiting. */
+async function assertRefusedStart(env: Record<string, string | undefined>, refusal: (e: unknown) => boolean): Promise<void> {
+  let started: Awaited<ReturnType<typeof bootstrap>> | undefined;
+  try {
+    await assert.rejects(
+      bootstrap(env, { logger: false }).then((api) => {
+        started = api;
+        return api;
+      }),
+      refusal,
+    );
+  } finally {
+    await started?.close();
+  }
+}
+
 test("configuration: every variable is validated and a missing or malformed one refuses the start by name, never by value; the pool ceiling is a required input", () => {
   assert.throws(() => loadConfig({}), configError("KAURO_ENVIRONMENT"));
   assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: "PRODUCTION" })), configError("KAURO_ENVIRONMENT"));
@@ -156,11 +173,11 @@ test("bootstrap on a real cluster: migrations on start as the owner (idempotent)
   }
 
   // a runtime login that is privileged (the object owner has CREATEROLE) or belongs to another runtime group refuses the start
-  await assert.rejects(bootstrap(envOf({ KAURO_DB_USER: ROLES.owner, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }), { logger: false }), (e: unknown) => e instanceof PrivilegedRoleError);
-  await assert.rejects(bootstrap(envOf({ KAURO_DB_USER: ROLES.controlLogin, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }), { logger: false }), (e: unknown) => e instanceof Error && e.message.includes("member of kauro_app"));
+  await assertRefusedStart(envOf({ KAURO_DB_USER: ROLES.owner, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }), (e: unknown) => e instanceof PrivilegedRoleError);
+  await assertRefusedStart(envOf({ KAURO_DB_USER: ROLES.controlLogin, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }), (e: unknown) => e instanceof Error && e.message.includes("member of kauro_app"));
   // a superuser migrator is refused before it applies anything
-  await assert.rejects(
-    bootstrap(envOf({ KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.superuser, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }), { logger: false }),
+  await assertRefusedStart(
+    envOf({ KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.superuser, KAURO_HTTP_PORT: String(await freePort()), KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile() }),
     (e: unknown) => e instanceof MigratorRoleError && e.message.includes("SUPERUSER"),
   );
 });

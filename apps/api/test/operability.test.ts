@@ -81,6 +81,23 @@ async function envOf(cluster: TemporaryPostgres, overrides: Record<string, strin
 }
 
 /** Fails loudly when `promise` has not settled within `ms`: a bounded wait, never a synchronization point. */
+/** Asserts that bootstrap refuses `env`. An api that starts anyway is closed before the assertion fails, so a regression is
+ * reported as a failure of the test instead of an open server that keeps the test process from exiting. */
+async function assertRefusedStart(env: Record<string, string | undefined>, refusal: (e: unknown) => boolean): Promise<void> {
+  let started: BootstrappedApi | undefined;
+  try {
+    await assert.rejects(
+      bootstrap(env, { logger: false }).then((api) => {
+        started = api;
+        return api;
+      }),
+      refusal,
+    );
+  } finally {
+    await started?.close();
+  }
+}
+
 async function within<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const guard = new Promise<never>((_resolve, reject) => {
@@ -235,7 +252,7 @@ test("configuration of the operating limits: the api pool stays inside the four-
 
 test("R44/N7: bootstrap never holds the owner's credential in an environment — it refuses KAURO_DB_MIGRATOR_PASSWORD by name before anything opens; LOCAL migrations on start read the password from a file, and it is no part of the configuration the running process keeps", async () => {
   const refused = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET });
-  await assert.rejects(bootstrap(refused, { logger: false }), (e: unknown) => configError("KAURO_DB_MIGRATOR_PASSWORD")(e) && !(e as Error).message.includes(MIGRATOR_SECRET));
+  await assertRefusedStart(refused, (e: unknown) => configError("KAURO_DB_MIGRATOR_PASSWORD")(e) && !(e as Error).message.includes(MIGRATOR_SECRET));
   const env = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile(), KAURO_DB_PASSWORD: RUNTIME_SECRET });
   const given = JSON.stringify(env);
   const api = await bootstrap(env, { logger: false });
@@ -251,7 +268,7 @@ test("R44/N7: bootstrap never holds the owner's credential in an environment —
   }
   // an unreadable password file refuses the start by variable and error class
   const missing = await envOf(pg, { KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD_FILE: join(dir, "no-such-secret") });
-  await assert.rejects(bootstrap(missing, { logger: false }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
+  await assertRefusedStart(missing, configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
 });
 
 test("N7: a serving process (node dist/src/main.js) given the owner's password in its environment exits 1 before it listens, naming the variable and never the value; the one-shot job (node dist/src/migrate.js) migrates a fresh database, exits 0, and a second run applies nothing", async () => {
@@ -440,7 +457,7 @@ test("R37: with migrations on start, a database host that accepts and never answ
   try {
     const env = await envOf(pg, { KAURO_DB_PORT: String(silentPort), KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_CONNECT_TIMEOUT_MS: "300" });
     const started = Date.now();
-    await within(assert.rejects(bootstrap(env, { logger: false }), (e: unknown) => e instanceof Error && /timeout/i.test(e.message)), 10_000, "bootstrap against a silent database host");
+    await within(assertRefusedStart(env, (e: unknown) => e instanceof Error && /timeout/i.test(e.message)), 10_000, "bootstrap against a silent database host");
     // the configured 300 ms bound the wait, not the runner's 5 s default: the variable reaches the migrator connection
     assert.ok(Date.now() - started < 3_000, `refused after ${Date.now() - started} ms`);
   } finally {
