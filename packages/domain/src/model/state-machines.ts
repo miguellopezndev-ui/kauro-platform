@@ -13,6 +13,7 @@
  */
 import { STATE_MACHINES, type StateMachine, type StateTransition } from "@kauro/contracts";
 import { PreconditionFailure } from "./errors.js";
+import { SOURCE_LIFECYCLE_STATE_MACHINES } from "./source/machines.js";
 
 export type RegistryMachineName =
   | "Agency"
@@ -28,7 +29,8 @@ export type RegistryMachineName =
   | "TaxDocument"
   | "CommissionLine";
 
-export type PlatformMachineName = "EndClient" | "Project";
+/** EndClient and Project are B06's (D-AGG-1, D-AGG-2); UploadSession, StoredObject and SourceFile are B07's (D-UP-1, D-OBJ-1, D-FILE-1). */
+export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile";
 
 export type MachineName = RegistryMachineName | PlatformMachineName;
 
@@ -66,7 +68,10 @@ export const PLATFORM_STATE_MACHINES: ReadonlyArray<StateMachine> = Object.freez
 ]);
 
 export function machine(name: MachineName): StateMachine {
-  const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name);
+  const m =
+    STATE_MACHINES.find((x) => x.contract === name) ??
+    PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ??
+    SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name);
   if (!m) throw new TypeError(`state machine ${name} is not in the registry`);
   return m;
 }

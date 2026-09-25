@@ -59,6 +59,30 @@ export const EVENT_TYPES = [
   "plan.withdrawn.v1",
   "approval.created.v1",
   "approval.withdrawn.v1",
+  // Source lifecycle (B07): upload sessions (platform machine UploadSession, D-UP-1)
+  "upload_session.reserved.v1",
+  "upload_session.session_issued.v1",
+  "upload_session.completion_reported.v1",
+  "upload_session.completion_observed.v1",
+  "upload_session.completion_not_observed.v1",
+  "upload_session.admitted.v1",
+  "upload_session.rejected.v1",
+  "upload_session.cancelled.v1",
+  "upload_session.expired.v1",
+  "upload_session.provider_cancellation_recorded.v1",
+  // Source lifecycle (B07): dataset revisions (registry DatasetRevision machine)
+  "dataset_revision.uploading.v1",
+  "dataset_revision.inspecting.v1",
+  "dataset_revision.selection_changed.v1",
+  "dataset_revision.ready_to_seal.v1",
+  "dataset_revision.rejected.v1",
+  "dataset_revision.sealed.v1",
+  "dataset_revision.superseded.v1",
+  "dataset_revision.cancelled.v1",
+  "dataset_revision.expired.v1",
+  "dataset_revision.deleted.v1",
+  "project.current_revision_changed.v1",
+  "retention_record.created.v1",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -68,7 +92,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here.
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "retention_record"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -111,10 +135,40 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "approval.created.v1": ["approvalId", "agencyId", "planId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "actorMembershipId", "approvalHash"],
   // the withdrawal reason is a label (CMD026 reasonCode, decision D-API-1): it stays on the approval row, never in a payload
   "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "withdrawnByMembershipId", "completedExternalActions", "supersededByPlanId"],
+  // B07 (docs/design/B07-upload-source-lifecycle.md §9): ids, digests, tokens and byte/row counts only — never a display name,
+  // a worksheet name, a header label, a provider session reference, an object name or a generation string
+  "upload_session.reserved.v1": ["uploadId", "agencyId", "projectId", "revisionId", "reservedBytes", "declaredFormat", "requestedByMembershipId", "state"],
+  "upload_session.session_issued.v1": ["uploadId", "agencyId", "revisionId", "sessionAttempt", "providerSessionDigest"],
+  "upload_session.completion_reported.v1": ["uploadId", "agencyId", "revisionId", "completionClaimDigest", "reportedByMembershipId"],
+  "upload_session.completion_observed.v1": ["uploadId", "agencyId", "revisionId", "observedBytes", "claimConsistent"],
+  "upload_session.completion_not_observed.v1": ["uploadId", "agencyId", "revisionId"],
+  "upload_session.admitted.v1": ["uploadId", "agencyId", "revisionId", "fileId", "inspectionReceiptHash", "observedBytes", "scanState", "detectedFormat"],
+  "upload_session.rejected.v1": ["uploadId", "agencyId", "revisionId", "inspectionReceiptHash", "rejectionClass", "scanState"],
+  "upload_session.cancelled.v1": ["uploadId", "agencyId", "revisionId", "cancelledByMembershipId", "reasonCode", "providerCancellationState", "releasedBytes"],
+  "upload_session.expired.v1": ["uploadId", "agencyId", "revisionId", "reasonCode", "releasedBytes", "providerCancellationState"],
+  "upload_session.provider_cancellation_recorded.v1": ["uploadId", "agencyId", "revisionId", "providerCancellationState"],
+  "dataset_revision.uploading.v1": ["revisionId", "agencyId", "projectId", "firstUploadId", "state"],
+  "dataset_revision.inspecting.v1": ["revisionId", "agencyId", "projectId", "previousState", "state", "selectionHash"],
+  "dataset_revision.selection_changed.v1": ["revisionId", "agencyId", "selectionManifestId", "selectionHash", "previousState", "state", "includedFileCount", "includedTableCount", "reusedFileIds"],
+  "dataset_revision.ready_to_seal.v1": ["revisionId", "agencyId", "selectionHash", "evaluationHash", "physicalSourceRows", "logicalSourceRecords", "billableSourceUnits", "associationEdges"],
+  "dataset_revision.rejected.v1": ["revisionId", "agencyId", "selectionHash", "evaluationHash", "reasonCode"],
+  "dataset_revision.sealed.v1": ["revisionId", "agencyId", "projectId", "manifestHash", "projectionHash", "selectionHash", "evaluationHash", "physicalSourceRows", "logicalSourceRecords", "billableSourceUnits", "associationEdges", "fileCount", "sealedBytes", "retentionId"],
+  "dataset_revision.superseded.v1": ["revisionId", "agencyId", "projectId", "successorRevisionId", "manifestHash", "affectedPlanIds", "affectedApprovalIds", "affectedCommercialAuthorizationIds"],
+  "dataset_revision.cancelled.v1": ["revisionId", "agencyId", "projectId", "previousState", "reasonCode", "successorRevisionId", "cancelledUploadIds"],
+  "dataset_revision.expired.v1": ["revisionId", "agencyId", "projectId", "previousState", "reasonCode"],
+  "dataset_revision.deleted.v1": ["revisionId", "agencyId", "projectId", "deletedObjectCount", "residualObjectCount", "tombstoneHash"],
+  "project.current_revision_changed.v1": ["projectId", "agencyId", "currentRevisionId", "previousRevisionId", "changedByMembershipId"],
+  "retention_record.created.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass", "anchorEvidenceHash", "policyVersion"],
 });
 
-/** Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL"] as const;
+/**
+ * Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. The B07
+ * consumers are control-plane pipelines of the source lifecycle (design §9): UPLOAD_INSPECTION observes and inspects a reported
+ * completion, STORAGE_LIFECYCLE cancels provider sessions and deletes quarantined, late and unsealed objects, SELECTION_EVALUATION
+ * counts a bound selection, AUTHORITY_JOURNAL writes the tombstones that must survive a database restore (14 "Minimal durable
+ * facts outside the primary restore boundary").
+ */
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "STORAGE_LIFECYCLE", "SELECTION_EVALUATION", "AUTHORITY_JOURNAL"] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -125,6 +179,27 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "approval.withdrawn.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "plan.withdrawn.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "plan.superseded.v1", consumer: "EXECUTION_CONTROL" },
+  // B07 source lifecycle
+  { eventType: "upload_session.completion_reported.v1", consumer: "UPLOAD_INSPECTION" },
+  { eventType: "upload_session.cancelled.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "upload_session.cancelled.v1", consumer: "AUTHORITY_JOURNAL" },
+  { eventType: "upload_session.expired.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "upload_session.expired.v1", consumer: "AUTHORITY_JOURNAL" },
+  { eventType: "upload_session.rejected.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "upload_session.rejected.v1", consumer: "AUTHORITY_JOURNAL" },
+  { eventType: "upload_session.rejected.v1", consumer: "NOTIFICATIONS" },
+  { eventType: "dataset_revision.selection_changed.v1", consumer: "SELECTION_EVALUATION" },
+  { eventType: "dataset_revision.ready_to_seal.v1", consumer: "NOTIFICATIONS" },
+  { eventType: "dataset_revision.rejected.v1", consumer: "NOTIFICATIONS" },
+  { eventType: "dataset_revision.rejected.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "dataset_revision.sealed.v1", consumer: "NOTIFICATIONS" },
+  { eventType: "dataset_revision.superseded.v1", consumer: "EXECUTION_CONTROL" },
+  { eventType: "dataset_revision.superseded.v1", consumer: "AUTHORITY_JOURNAL" },
+  { eventType: "dataset_revision.cancelled.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "dataset_revision.cancelled.v1", consumer: "AUTHORITY_JOURNAL" },
+  { eventType: "dataset_revision.expired.v1", consumer: "STORAGE_LIFECYCLE" },
+  { eventType: "dataset_revision.expired.v1", consumer: "EXECUTION_CONTROL" },
+  { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

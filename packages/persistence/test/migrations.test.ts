@@ -22,7 +22,8 @@ after(async () => {
 
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
-  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md)
+  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md); B07 numbers its
+  // own files from 0009 (the integrator renumbers the second of B07 and B09 to merge)
   assert.deepEqual(files.map((f) => f.file), [
     "0001_schema_roles_helpers.sql",
     "0002_identity_agencies_memberships.sql",
@@ -32,7 +33,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0006_journals_leases.sql",
     "0007_security_events.sql",
     "0008_aggregate_kind_registry.sql",
+    "0009_source_uploads_registry.sql",
+    "0010_source_inspection_inventory.sql",
+    "0011_source_selection_seal.sql",
+    "0012_source_retention_events.sql",
   ]);
+  assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
   const owner = await pg.connect("kauro_owner");
   try {
@@ -158,7 +164,8 @@ test("the listed-transition seed equals the registry machines for every machine 
       assert.deepEqual(r.rows.map((x) => x.edge), expected, name);
     }
     const others = await su.query<{ machine: string }>("SELECT DISTINCT machine FROM kauro.state_transitions ORDER BY 1");
-    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"]);
+    // B07 adds the platform machines SourceFile, StoredObject and UploadSession (their edges: source-migrations.test.ts)
+    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "SourceFile", "StoredObject", "UploadSession"]);
   } finally {
     await su.end();
   }

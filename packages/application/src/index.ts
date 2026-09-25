@@ -118,5 +118,7 @@ export {
   approvalHashOf,
   LAUNCH_ASSURANCE_POLICY,
 } from "./commands/handlers/index.js";
+// B07 source lifecycle (docs/design/B07-upload-source-lifecycle.md)
+export * from "./sources/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
