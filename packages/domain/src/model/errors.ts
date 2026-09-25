@@ -194,10 +194,17 @@ export const FAILURE_REASONS = [
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
+/**
+ * The field code of a typed-patch rejection (CMD023): the reference resolved, the patch it names was refused by the compiler,
+ * and the field says why with the same token as the problem reason (10 "frontend control flow uses the code and typed
+ * fields" — a field never contradicts the reason).
+ */
+export type TypedPatchFieldCode = "PATCH_UNKNOWN_CANDIDATE" | "PATCH_UNKNOWN_FIELD" | "PATCH_EFFECT_NOT_PERMITTED" | "PATCH_MALFORMED";
+
 export interface FieldError {
   /** Field name of the request body (no customer value is ever echoed). */
   readonly field: string;
-  readonly code: "REQUIRED" | "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE" | "UNKNOWN_REFERENCE" | "ENUM";
+  readonly code: "REQUIRED" | "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE" | "UNKNOWN_REFERENCE" | "ENUM" | TypedPatchFieldCode;
 }
 
 export interface FailureDetails {

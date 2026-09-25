@@ -22,7 +22,7 @@
  * event (reference/HASHING_AND_ACCOUNTING_RULES: "Withdrawal is a separately recorded authority event"), so no live approval
  * ever remains on a SUPERSEDED plan (the database refuses it at COMMIT, SQLSTATE KA020). Decision D-PLAN-4.
  */
-import type { ArtifactRef, FailureReason, PlanId } from "@kauro/domain";
+import type { ArtifactRef, FailureReason, PlanId, TypedPatchFieldCode } from "@kauro/domain";
 import { DomainFailure, findTransition } from "@kauro/domain";
 import { planView } from "../../api/projections.js";
 import type { ArtifactResolver, PatchCompilation, PlanPatchCompiler } from "../../ports/plan-services.js";
@@ -34,7 +34,8 @@ import { applied, checkExpectedVersion, controlsApproval, requireMembership } fr
 /** The reason recorded on an approval that a new plan revision withdrew (a machine token the server chooses). */
 export const SUPERSESSION_WITHDRAW_REASON = "PLAN_SUPERSEDED";
 
-const COMPILER_REASON: Readonly<Record<Extract<PatchCompilation, { kind: "REJECTED" }>["reason"], FailureReason>> = Object.freeze({
+/** Compiler rejection → problem reason, which is also the field code on decisionPatchArtifactRef (the reference resolved). */
+const COMPILER_REASON: Readonly<Record<Extract<PatchCompilation, { kind: "REJECTED" }>["reason"], FailureReason & TypedPatchFieldCode>> = Object.freeze({
   UNKNOWN_CANDIDATE: "PATCH_UNKNOWN_CANDIDATE",
   UNKNOWN_FIELD: "PATCH_UNKNOWN_FIELD",
   EFFECT_NOT_PERMITTED: "PATCH_EFFECT_NOT_PERMITTED",
@@ -88,7 +89,8 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
         if (!currentBody) throw new DomainFailure("INTEGRITY_FAILURE", "locked plan has no body");
         const compilation = await compiler.apply(currentBody, patch);
         if (compilation.kind === "REJECTED") {
-          throw new DomainFailure("INVALID_REQUEST", "typed patch rejected", { reason: COMPILER_REASON[compilation.reason], fields: [{ field: "decisionPatchArtifactRef", code: "UNKNOWN_REFERENCE" }] });
+          const reason = COMPILER_REASON[compilation.reason];
+          throw new DomainFailure("INVALID_REQUEST", "typed patch rejected", { reason, fields: [{ field: "decisionPatchArtifactRef", code: reason }] });
         }
         if (compilation.bodyHash === predecessor.bodyHash) {
           throw new DomainFailure("PRECONDITION_FAILED", "the patch changes nothing", { reason: "NO_SEMANTIC_CHANGE", currentState: predecessor.state, currentVersion: predecessor.version });

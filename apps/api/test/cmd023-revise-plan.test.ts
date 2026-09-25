@@ -40,6 +40,16 @@ before(async () => {
   w = await world({
     collaborators: (base) => ({
       ...base,
+      // the edition-bound test compiler, plus a candidate name that makes it answer a chosen rejection (a real compiler's
+      // UNKNOWN_FIELD and EFFECT_NOT_PERMITTED need decision evidence this fixture does not model)
+      patchCompiler: {
+        async apply(current, patch) {
+          const candidate = (patch.document as { readonly candidate?: unknown }).candidate;
+          const forced = typeof candidate === "string" && candidate.startsWith("reject:") ? candidate.slice("reject:".length) : null;
+          if (forced === "UNKNOWN_CANDIDATE" || forced === "UNKNOWN_FIELD" || forced === "EFFECT_NOT_PERMITTED" || forced === "MALFORMED_PATCH") return { kind: "REJECTED", reason: forced };
+          return base.patchCompiler.apply(current, patch);
+        },
+      },
       commercialConsequences: {
         async unreconciledForPlan(uow, planId) {
           return [...(unreconciled.get(planId) ?? []), ...(await base.commercialConsequences.unreconciledForPlan(uow, planId))];
@@ -122,7 +132,7 @@ test("DENY: APPROVER → 403; foreign plan → 404; expectedVersion of a superse
   // a patch naming a candidate the plan does not have: the compiler refuses, nothing is written
   const unknownCandidate = await call(w, { url, token: w.operator.token, body: patchBody(plan, "Fax") });
   assert.equal(outcome(w, unknownCandidate), "400 INVALID_REQUEST PATCH_UNKNOWN_CANDIDATE");
-  assert.deepEqual(asProblem(w, unknownCandidate).errors, [{ field: "decisionPatchArtifactRef", code: "UNKNOWN_REFERENCE" }]);
+  assert.deepEqual(asProblem(w, unknownCandidate).errors, [{ field: "decisionPatchArtifactRef", code: "PATCH_UNKNOWN_CANDIDATE" }]);
   // an artifact of another agency (or none at all) is unknown, never revealed
   const foreignArtifact = await call(w, { url, token: w.operator.token, body: { expectedVersion: plan.version, decisionPatchArtifactRef: w.plans.registerPatch(w.B.agencyId, { candidate: "Phone", reasonCode: "X" }) } });
   assert.equal(outcome(w, foreignArtifact), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
@@ -326,3 +336,28 @@ test("RACE: RevisePlan of an APPROVED plan and WithdrawApproval serialize on the
   assert.equal((await w.row<{ withdraw_reason_code: string }>("approvals", "approval_id = $1", [approval.approvalId]))?.withdraw_reason_code, "PLAN_SUPERSEDED");
 });
 
+
+test("DENY (typed patch): each compiler rejection answers its own reason and the same code on the field; only a reference that does not resolve is UNKNOWN_REFERENCE", async () => {
+  // 10 "Responses and safe errors": "frontend control flow uses the code and typed fields"; CMD023 precondition "The typed
+  // patch names existing candidates/fields and permitted effects". Review finding R31: before, every compiler rejection
+  // carried {decisionPatchArtifactRef, UNKNOWN_REFERENCE} although the reference had resolved.
+  const plan = await w.approvable(w.A, projectId, "revise-patch-codes");
+  const url = routes.revisePlan(plan.planId);
+  const plansBefore = await w.count("plans");
+  const cases = [
+    ["UNKNOWN_CANDIDATE", "PATCH_UNKNOWN_CANDIDATE"],
+    ["UNKNOWN_FIELD", "PATCH_UNKNOWN_FIELD"],
+    ["EFFECT_NOT_PERMITTED", "PATCH_EFFECT_NOT_PERMITTED"],
+    ["MALFORMED_PATCH", "PATCH_MALFORMED"],
+  ] as const;
+  for (const [compilerReason, reason] of cases) {
+    const refused = await call(w, { url, token: w.operator.token, body: patchBody(plan, `reject:${compilerReason}`) });
+    assert.equal(outcome(w, refused), `400 INVALID_REQUEST ${reason}`, compilerReason);
+    assert.deepEqual(asProblem(w, refused).errors, [{ field: "decisionPatchArtifactRef", code: reason }], compilerReason);
+  }
+  // the reference itself does not resolve (another agency's artifact): that, and only that, is UNKNOWN_REFERENCE
+  const unresolved = await call(w, { url, token: w.operator.token, body: { expectedVersion: plan.version, decisionPatchArtifactRef: w.plans.registerPatch(w.B.agencyId, { candidate: "Phone", reasonCode: "X" }) } });
+  assert.equal(outcome(w, unresolved), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
+  assert.deepEqual(asProblem(w, unresolved).errors, [{ field: "decisionPatchArtifactRef", code: "UNKNOWN_REFERENCE" }]);
+  assert.equal(await w.count("plans"), plansBefore);
+});

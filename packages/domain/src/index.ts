@@ -34,7 +34,7 @@ export type {
 } from "./model/ids.js";
 export { isUuidV7, isUuidV5, isUuid, encodeUuidV7, uuidV7Timestamp, identityUserId, IDENTITY_NAMESPACE } from "./model/ids.js";
 
-export type { FailureCode, FailureReason, FieldError, FailureDetails, FailureContract } from "./model/errors.js";
+export type { FailureCode, FailureReason, FieldError, FailureDetails, FailureContract, TypedPatchFieldCode } from "./model/errors.js";
 export {
   FAILURE_CODES,
   AUTHORITY_FAILURE_CODES,

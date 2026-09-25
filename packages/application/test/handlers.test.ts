@@ -250,6 +250,7 @@ test("CMD023 DENY: unknown patch â†’ 400 UNKNOWN_REFERENCE; compiler rejection â
   const rejected = problem(await rejecting.CMD023.execute(envelope(REVISE_PLAN, w.operator, { key: KEY + "r", agencyId: w.agencyId, path: { planId: w.planId }, body: { expectedVersion: 4, decisionPatchArtifactRef: "018f0000-0000-7000-8000-0000000000aa" } })));
   assert.equal(rejected.code, "INVALID_REQUEST");
   assert.equal(rejected.reason, "PATCH_UNKNOWN_CANDIDATE");
+  assert.deepEqual(rejected.errors, [{ field: "decisionPatchArtifactRef", code: "PATCH_UNKNOWN_CANDIDATE" }], "the field code is the compiler reason, never UNKNOWN_REFERENCE for a resolved reference");
   const same = createB06Handlers(w.runtime, collaborators(w, { patchCompiler: { apply: async (current) => ({ kind: "COMPILED", body: current, bodyHash: bodyHashOf(current) }) } }));
   const unchanged = problem(await same.CMD023.execute(envelope(REVISE_PLAN, w.operator, { key: KEY + "n", agencyId: w.agencyId, path: { planId: w.planId }, body: { expectedVersion: 4, decisionPatchArtifactRef: "018f0000-0000-7000-8000-0000000000aa" } })));
   assert.equal(unchanged.code, "PRECONDITION_FAILED");
