@@ -6,8 +6,20 @@
  * helpers of the real-database tests are the separate, test-only subpath `@kauro/persistence/testing` (src/testing/index.ts):
  * nothing here imports it, so no production import graph carries them.
  */
-export { MIGRATIONS_DIR, listMigrations, applyMigrations, applyMigrationsAs, appliedMigrations, MigrationDriftError, MigratorRoleError } from "./migrations/runner.js";
-export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
+export {
+  MIGRATIONS_DIR,
+  MIGRATION_RUNNER_LOCK,
+  DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS,
+  DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS,
+  DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS,
+  listMigrations,
+  applyMigrations,
+  applyMigrationsAs,
+  appliedMigrations,
+  MigrationDriftError,
+  MigratorRoleError,
+} from "./migrations/runner.js";
+export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection } from "./migrations/runner.js";
 export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
 export { createPool, KauroPool, PrivilegedRoleError } from "./pool.js";
 export type { PoolConfig, RuntimeRole, VerifiedConnection } from "./pool.js";
