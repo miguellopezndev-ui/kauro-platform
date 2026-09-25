@@ -333,7 +333,10 @@ export interface World {
   readonly authorityB: ProcessingAuthorityId;
   readonly clientB: ClientId;
   readonly unverified: Person;
+  /** CLEAN, published by the control plane through the listed edges to AVAILABLE_LIMITED (offered). */
   readonly cleanCapabilityId: CapabilityId;
+  /** HUBSPOT at DESIGN: specified, not implemented, not offered (a test publishes it through the listed edges, D-CAP-2). */
+  readonly hubspotCapabilityId: CapabilityId;
   /** Registers a person for authentication (token → subject); the identity row is synced by the harness unless `sync: false`. */
   person(name: string, opts?: { readonly verified?: boolean; readonly sync?: boolean }): Promise<Person>;
   /** An OPEN CLEAN project with its DRAFT revision, written through the ports under the owner's context. */
@@ -485,7 +488,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const authorityB = await h.processingAuthority(B);
   const clientB = await h.endClient(B, authorityB, "Client B");
   const cleanCapabilityId = (await h.offeredCapability("CLEAN")) as CapabilityId;
-  await h.offeredCapability("HUBSPOT", "DESIGN");
+  const hubspotCapabilityId = (await h.offeredCapability("HUBSPOT", "DESIGN")) as CapabilityId;
 
   const oracle = h.oracle;
   const w: World = {
@@ -515,6 +518,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     clientB,
     unverified,
     cleanCapabilityId,
+    hubspotCapabilityId,
     person,
 
     async project(agency, clientId) {

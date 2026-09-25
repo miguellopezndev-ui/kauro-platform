@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ArchiveClientView, EndClientView, ProjectView } from "@kauro/application";
 import type { ClientId } from "@kauro/domain";
-import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, rawEvent, rootCause, routes, waitForApiLockWait, world, type World } from "./support.js";
+import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type World } from "./support.js";
 
 let w: World;
 before(async () => {
@@ -85,8 +85,38 @@ test("DENY: foreign/wrong role → 404/403; HUBSPOT with no offered capability �
   const unknownMode = await call(w, { url, token: w.operator.token, body: { mode: "SALESFORCE", purpose: "Import", targetInstanceRef: ids.next() } });
   assert.equal(outcome(w, unknownMode), "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED", "a mode with no capability row at all");
 
-  // once HUBSPOT is offered (control-plane publication), a CRM project must still declare its target instance (D-CMD-4)
-  await w.h.offeredCapability("HUBSPOT", "AVAILABLE_LIMITED");
+  // publication is the capability's own lifecycle (D-CAP-2; registry machine Capability, initial DESIGN): the database refuses
+  // the shortcuts — an unlisted edge DESIGN -> AVAILABLE_LIMITED (KA008) and a second HUBSPOT row for the same revision
+  // (capabilities_mode_version) — so the control plane moves the existing row along the listed edges, citing each gate's
+  // evidence. Implemented and internally qualified are still not offered ("Requested, implemented and qualified are different
+  // states"): the mode stays refused until AVAILABLE_LIMITED.
+  const control = await w.h.pg.connect("kauro_control_test");
+  try {
+    await assert.rejects(
+      control.query("UPDATE kauro.capabilities SET state = 'AVAILABLE_LIMITED', qualification_evidence_hashes = $2::jsonb WHERE capability_id = $1", [w.hubspotCapabilityId, JSON.stringify([sha("shortcut")])]),
+      (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "KA008",
+    );
+    await assert.rejects(
+      control.query(
+        `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
+         VALUES ($1, 'R2-INITIAL', 'MODE', 'HUBSPOT', 'AVAILABLE_LIMITED', $2, $3::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+        [ids.next(), sha("profile-HUBSPOT"), JSON.stringify([sha("shortcut")])],
+      ),
+      (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "23505" && (e as { constraint?: string }).constraint === "capabilities_mode_version",
+    );
+  } finally {
+    await control.end();
+  }
+  const hubspotBody = { mode: "HUBSPOT", purpose: "Import", targetInstanceRef: ids.next() };
+  for (const state of ["IMPLEMENTED_UNACCEPTED", "QUALIFIED_INTERNAL"] as const) {
+    await w.h.publishCapability(w.hubspotCapabilityId, state);
+    assert.equal(outcome(w, await call(w, { url, token: w.operator.token, body: hubspotBody })), "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED", `HUBSPOT ${state} is not offered`);
+  }
+  await w.h.publishCapability(w.hubspotCapabilityId, "AVAILABLE_LIMITED");
+  const published = await w.row<{ state: string; version: string; qualification_evidence_hashes: string[]; valid_from: Date | null }>("capabilities", "capability_id = $1", [w.hubspotCapabilityId]);
+  assert.deepEqual(published && { state: published.state, version: published.version, evidence: published.qualification_evidence_hashes.length, activated: published.valid_from !== null }, { state: "AVAILABLE_LIMITED", version: "R2-INITIAL", evidence: 2, activated: true });
+  assert.equal(await w.count("capabilities", "mode = 'HUBSPOT'"), 1, "one HUBSPOT capability row: the publication moved it");
+  // once HUBSPOT is offered, a CRM project must still declare its target instance (D-CMD-4)
   const noTarget = await call(w, { url, token: w.operator.token, body: { mode: "HUBSPOT", purpose: "Import" } });
   assert.equal(outcome(w, noTarget), "400 INVALID_REQUEST TARGET_INSTANCE_REQUIRED");
   assert.deepEqual(asProblem(w, noTarget).errors, [{ field: "targetInstanceRef", code: "REQUIRED" }]);

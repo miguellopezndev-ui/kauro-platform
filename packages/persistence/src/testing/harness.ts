@@ -70,10 +70,40 @@ export interface Harness {
   addMember(agency: AgencyFixture, userId: UserId, role: MembershipRole): Promise<MembershipId>;
   processingAuthority(agency: AgencyFixture): Promise<ProcessingAuthorityId>;
   endClient(agency: AgencyFixture, authority: ProcessingAuthorityId, displayName?: string): Promise<ClientId>;
-  /** Publishes a MODE capability as the control plane (a CMD058 fixture; no port exists for it in B06). */
-  offeredCapability(mode: "CLEAN" | "HUBSPOT" | "SALESFORCE", state?: string): Promise<string>;
+  /**
+   * A MODE capability as the control plane records it (a CMD058 fixture; no port exists for it in B06): the row of the given
+   * revision is born DESIGN — the initial state of the registry Capability machine — and reaches `state` only through
+   * publishCapability, one listed edge at a time. Nothing is inserted directly in a qualified or offered state (D-CAP-2).
+   */
+  offeredCapability(mode: "CLEAN" | "HUBSPOT" | "SALESFORCE", state?: CapabilityPublicationState, options?: { readonly version?: string }): Promise<string>;
+  /**
+   * Publishes an existing capability as the control plane: walks the listed edges of the Capability machine from the row's
+   * current state to `state` in one control-plane transaction, recording each gate's evidence with its edge (D-CAP-2).
+   */
+  publishCapability(capabilityId: string, state: Exclude<CapabilityPublicationState, "DESIGN">): Promise<void>;
   stop(): Promise<void>;
 }
+
+/**
+ * The forward path of the registry Capability machine (02 "Capability publication contract"; registry state_transitions
+ * "Capability"): DESIGN -implementation_observed-> IMPLEMENTED_UNACCEPTED -internal_qualification_accepted-> QUALIFIED_INTERNAL
+ * -limited_production_gates_accepted-> AVAILABLE_LIMITED -operating_maturity_accepted-> AVAILABLE. SUSPENDED is terminal in
+ * this version and is not a publication.
+ */
+export const CAPABILITY_PUBLICATION_PATH = ["DESIGN", "IMPLEMENTED_UNACCEPTED", "QUALIFIED_INTERNAL", "AVAILABLE_LIMITED", "AVAILABLE"] as const;
+export type CapabilityPublicationState = (typeof CAPABILITY_PUBLICATION_PATH)[number];
+
+/**
+ * The evidence a listed edge's guard names, recorded with the edge: QUALIFIED_INTERNAL "Required exact-subject semantic/
+ * privacy/resource evidence passes"; AVAILABLE_LIMITED "Business, payment, fiscal, delivery, support and production acceptance
+ * hold"; AVAILABLE "Actual customer/recurrence/support coverage meets the defined maturity gate". IMPLEMENTED_UNACCEPTED
+ * ("Exact code/contract exists") cites no acceptance evidence: it permits local review but no sale.
+ */
+const EDGE_EVIDENCE: Readonly<Partial<Record<CapabilityPublicationState, string>>> = Object.freeze({
+  QUALIFIED_INTERNAL: "internal-qualification",
+  AVAILABLE_LIMITED: "limited-production-acceptance",
+  AVAILABLE: "operating-maturity",
+});
 
 export async function start(): Promise<Harness> {
   const pg = await startTemporaryPostgres();
@@ -155,15 +185,48 @@ export async function start(): Promise<Harness> {
       });
     },
 
-    async offeredCapability(mode, state = "AVAILABLE_LIMITED") {
+    async offeredCapability(mode, state = "AVAILABLE_LIMITED", options = {}) {
       const id = ids.next();
-      const evidence = state === "DESIGN" || state === "IMPLEMENTED_UNACCEPTED" ? [] : [sha("evidence-" + mode)];
       await controlClient.query(
         `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-         VALUES ($1, 'R2-INITIAL', 'MODE', $2, $3, $4, $5, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
-        [id, mode, state, sha("profile-" + mode), JSON.stringify(evidence)],
+         VALUES ($1, $2, 'MODE', $3, 'DESIGN', $4, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+        [id, options.version ?? "R2-INITIAL", mode, sha("profile-" + mode)],
       );
+      if (state !== "DESIGN") await h.publishCapability(id, state);
       return id;
+    },
+
+    async publishCapability(capabilityId, state) {
+      await controlClient.query("BEGIN");
+      try {
+        const current = await controlClient.query<{ state: CapabilityPublicationState; mode: string; version: string }>(
+          "SELECT state, mode, version FROM kauro.capabilities WHERE capability_id = $1 FOR UPDATE",
+          [capabilityId],
+        );
+        const row = current.rows[0];
+        if (!row) throw new Error(`capability ${capabilityId} does not exist`);
+        const from = CAPABILITY_PUBLICATION_PATH.indexOf(row.state);
+        const to = CAPABILITY_PUBLICATION_PATH.indexOf(state);
+        if (from < 0 || to <= from) throw new Error(`capability ${capabilityId} is ${row.state}; ${state} is not ahead of it on the publication path`);
+        for (let step = from + 1; step <= to; step++) {
+          const previous = CAPABILITY_PUBLICATION_PATH[step - 1] as CapabilityPublicationState;
+          const next = CAPABILITY_PUBLICATION_PATH[step] as CapabilityPublicationState;
+          const evidence = EDGE_EVIDENCE[next];
+          const moved = await controlClient.query(
+            `UPDATE kauro.capabilities
+                SET state = $3,
+                    qualification_evidence_hashes = CASE WHEN $4::text IS NULL THEN qualification_evidence_hashes ELSE qualification_evidence_hashes || to_jsonb($4::text) END,
+                    valid_from = CASE WHEN $3 = 'AVAILABLE_LIMITED' THEN now() ELSE valid_from END
+              WHERE capability_id = $1 AND state = $2`,
+            [capabilityId, previous, next, evidence === undefined ? null : sha(`${evidence}-${row.mode}-${row.version}`)],
+          );
+          if (moved.rowCount !== 1) throw new Error(`capability ${capabilityId} did not move ${previous} -> ${next}`);
+        }
+        await controlClient.query("COMMIT");
+      } catch (e) {
+        await controlClient.query("ROLLBACK");
+        throw e;
+      }
     },
 
     async stop() {
