@@ -54,8 +54,9 @@ export interface ReadAuthorizationRequest {
 export interface Authorizer {
   /**
    * Access, steps 1–7: subject, identity status (the token's facts and the stored identity row), agency selector, live
-   * membership (read with a share lock held to the end of the unit of work, so a concurrent suspension, revocation or role
-   * change of it serializes with the command), ACTIVE, role. NOT_FOUND, not NOT_AUTHORIZED, when the caller holds no live
+   * membership (read after its transition lock, held to the end of the unit of work — decision D-TX-2 — so a concurrent
+   * suspension, revocation or role change of it serializes with the command, and a command arriving after a queued one waits
+   * behind it), ACTIVE, role. NOT_FOUND, not NOT_AUTHORIZED, when the caller holds no live
    * membership in the selected agency (08: foreign and nonexistent resources look the same). Writes nothing; the runtime
    * records every DENY as a durable security fact.
    */

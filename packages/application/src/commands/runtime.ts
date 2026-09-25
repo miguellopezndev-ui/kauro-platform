@@ -3,7 +3,7 @@
  * order of 10 "Request envelope" (authenticated subject, then authorization, then application execution) and 10 "Idempotency
  * contract" (review record docs/design/B06-review/A-pipeline-authorization.md, R1/R8, R7/R12):
  *
- *   1–7  access (`Authorizer.authorize`): identity status, live membership (share-locked until COMMIT), ACTIVE, role. Nothing
+ *   1–7  access (`Authorizer.authorize`): identity status, live membership (read after its transition lock, held to COMMIT; D-TX-2), ACTIVE, role. Nothing
  *        tenant-scoped has been written or probed before it, so a nonexistent and a foreign agency answer the same NOT_FOUND
  *        (08 "Browser, API and cache isolation"; D-AUTHZ-4) — the journal row, whose agency is a foreign key, comes after;
  *        journal reserve: the intent row. A concurrent duplicate waits on the identity index here; a journaled replay, a
@@ -181,8 +181,8 @@ export async function runCommand<Body, View>(
 
   try {
     const completed = await runtime.unitOfWork.run(context, async (uow): Promise<CommandOutcome<View> | ReplayedResult<View>> => {
-      // 1–7. who may act here, decided before anything tenant-scoped is written: the membership row stays share-locked until
-      //      this unit of work ends, so a concurrent suspension, revocation or role change is ordered before or after it
+      // 1–7. who may act here, decided before anything tenant-scoped is written: the membership's transition lock is held until
+      //      this unit of work ends (D-TX-2), so a concurrent suspension, revocation or role change is ordered before or after it
       const access = await runtime.authorizer.authorize(uow, request);
       if (access.kind === "DENY") throw new AuthorizationDenied(spec.id as CommandId, access);
       // intent row: a concurrent duplicate waits on the identity index here (10 "Idempotency contract"); whatever the journal

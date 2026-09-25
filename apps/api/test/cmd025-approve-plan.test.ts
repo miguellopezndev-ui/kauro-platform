@@ -362,13 +362,13 @@ async function expireSource(writer: HeldTransaction, revision: { revision_id: st
   await rawEvent(writer.client, { aggregateKind: "dataset_revision", aggregateId: revision.revision_id, aggregateVersion: Number(revision.version) + 1, agencyId: w.A.agencyId, eventType: "dataset_revision.created.v1", actorUserId: w.A.ownerUserId, payload: { revisionId: revision.revision_id, agencyId: w.A.agencyId, state: "EXPIRED" } });
 }
 
-test("RACE: a source expiry racing ApprovePlan — the sealed revision is held under a share lock to COMMIT: an expiry that comes second waits and then reads the approval; an expiry committed first is refused 422 SOURCE_EXPIRED", async () => {
+test("RACE: a source expiry racing ApprovePlan — the approval holds the sealed revision's transition lock to COMMIT: an expiry that comes second waits and then reads the approval; an expiry committed first is refused 422 SOURCE_EXPIRED", async () => {
   // 07 "Transaction discipline": "Multi-row invariants use explicit locking"; catalogue CMD025 failure: "Any changed effect,
   // expired source or stale receipt requires new review". Review findings R15/R19.
   const proof = await w.stepUp(w.approver);
 
   // (a) the approval first: A holds inside the disclosure composer (after the source and target were read); B07's expiry of
-  // that source is observed waiting on A's share lock, so it cannot commit while A decides; A commits 201; the expiry then
+  // that source is observed waiting on A's transition lock (D-TX-2), so it cannot commit while A decides; A commits 201; the expiry then
   // commits ordered after A and reads the approval its own edge effect ("Revoke reads/execution") has to reach
   const first = await w.approvable(w.A, projectId, "race-expiry-second");
   const firstSource = await sourceRowOf(first);
@@ -393,7 +393,7 @@ test("RACE: a source expiry racing ApprovePlan — the sealed revision is held u
   }
   assert.equal((await w.row<{ state: string }>("dataset_revisions", "revision_id = $1", [firstSource.revision_id]))?.state, "EXPIRED");
 
-  // (b) the expiry first: it holds its row lock uncommitted; the approval is observed waiting on it for its share lock; the
+  // (b) the expiry first: it holds the transition lock uncommitted; the approval is observed waiting for it; the
   // expiry commits; the approval re-reads the committed revision, which is no longer SEALED: 422 SOURCE_EXPIRED, nothing
   // committed — no approval, the plan still VALIDATED v4, no journal row
   const second = await w.approvable(w.A, projectId, "race-expiry-first");
@@ -419,12 +419,12 @@ test("RACE: a source expiry racing ApprovePlan — the sealed revision is held u
   assert.equal(await w.journal(key), null);
 });
 
-test("RACE: a target-contract supersession racing ApprovePlan — the contract is held under a share lock to COMMIT: a supersession that comes second waits and then reads the approval; one committed first is refused 422 TARGET_STALE", async () => {
+test("RACE: a target-contract supersession racing ApprovePlan — the approval holds the contract's transition lock to COMMIT: a supersession that comes second waits and then reads the approval; one committed first is refused 422 TARGET_STALE", async () => {
   // Review findings R15/R19 (target half): CMD025 binds the exact target; B08's supersession of the contract must be ordered
   // against the approval, never interleaved between the check and the approval's COMMIT.
   const proof = await w.stepUp(w.approver);
 
-  // (a) the approval first; the supersession waits on its share lock and, ordered after it, reads the approval
+  // (a) the approval first; the supersession waits on its transition lock (D-TX-2) and, ordered after it, reads the approval
   const first = await w.approvable(w.A, projectId, "race-target-second");
   const firstTarget = await targetRowOf(first);
   const writerA = await tenantWriter(w, w.A);

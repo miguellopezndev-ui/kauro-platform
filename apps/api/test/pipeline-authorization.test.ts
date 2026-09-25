@@ -3,7 +3,7 @@
 // R26). One order holds for every tenant-scoped command (10 "Request envelope": authenticated subject, then authorization,
 // then application execution; 10 "Idempotency contract"; 08 "Browser, API and cache isolation": foreign and nonexistent
 // resources produce equivalent safe visibility, errors do not disclose that an agency exists; D-AUTHZ-4):
-//   1–7  subject, identity status (token facts and the stored identity row), live membership (share-locked to the end of the
+//   1–7  subject, identity status (token facts and the stored identity row), live membership (read after its transition lock, held to the end of the
 //        unit of work), ACTIVE, role — before anything tenant-scoped is written or probed;
 //        the journal reservation — a replay, a conflict or a pending entry is answered only to a caller authorized here;
 //   8    the step-up a new execution needs (a replay performs no effect and needs none);

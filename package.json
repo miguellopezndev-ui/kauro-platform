@@ -20,7 +20,8 @@
     "openapi:generate": "node tools/openapi.mjs generate",
     "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run openapi && pnpm run matrix && pnpm run clean-consume",
     "matrix": "node tools/matrix.mjs check",
-    "matrix:generate": "node tools/matrix.mjs generate"
+    "matrix:generate": "node tools/matrix.mjs generate",
+    "evidence": "node tools/evidence.mjs run"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

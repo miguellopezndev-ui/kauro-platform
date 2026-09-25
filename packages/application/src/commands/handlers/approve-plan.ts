@@ -17,7 +17,7 @@
  * the plan body hash (else STALE_VERSION mismatch [planHash]) → the named receipt is the plan's current receipt, exists, is
  * VALID with no blocking codes and binds this body/source/target (else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or
  * RECEIPT_BLOCKING) → the source revision is SEALED (else SOURCE_EXPIRED) → the target contract is confirmed and current
- * (else TARGET_STALE); both read under share locks held to COMMIT (plan → source → target is the lock order) → the server-composed disclosure set hashes to the echoed disclosuresHash (else STALE_VERSION mismatch
+ * (else TARGET_STALE); both read after their transition locks, held to COMMIT (plan → source → target is the lock order, D-TX-2) → the server-composed disclosure set hashes to the echoed disclosuresHash (else STALE_VERSION mismatch
  * [disclosuresHash]: an approval displayed without the CLEAR set cannot authorize it) → INSERT approval (v1, actor membership
  * version, proof, five hashes, KAURO_PLAN_APPROVAL_V1 approval hash) → plan APPROVED (version + 1) → approval.created.v1 +
  * plan.approved.v1 → journal 201 {approval, plan}. The database re-checks the bindings as foreign keys.

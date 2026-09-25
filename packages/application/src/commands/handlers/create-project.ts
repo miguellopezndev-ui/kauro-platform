@@ -4,18 +4,20 @@
  * mode is offered and target scope is declared without claiming qualification"; failure "An unavailable mode returns
  * CAPABILITY_UNAVAILABLE before quoting or charging").
  *
- * Order: authorize → reserve → share-lock the agency, lock the client (NOT_FOUND / CLIENT_ARCHIVED) → agency DRAFT or ACTIVE
- * (AGENCY_NOT_OPEN) → mode capability offered, read under a share lock (AVAILABLE_LIMITED or AVAILABLE, else
+ * Order: authorize → reserve → the agency after its transition lock, lock the client (NOT_FOUND / CLIENT_ARCHIVED) → agency DRAFT or ACTIVE
+ * (AGENCY_NOT_OPEN) → mode capability offered, read after its transition lock (AVAILABLE_LIMITED or AVAILABLE, else
  * CAPABILITY_UNAVAILABLE / MODE_NOT_OFFERED — no quote, no charge exists yet) → CRM modes declare a targetInstanceRef
  * (INVALID_REQUEST / TARGET_INSTANCE_REQUIRED; the declaration claims no qualification) → INSERT project (OPEN v1, capability id + version snapshot) with its DRAFT revision (deferred FK pair) →
  * project.created.v1 + dataset_revision.created.v1 → journal 201 ProjectView with readiness blockers computed from facts.
  *
  * Locks (07 "Transaction discipline": preconditions are rechecked inside the transaction; multi-row invariants use explicit
- * locking): the agency (FOR SHARE), the client (FOR UPDATE) and the capability (FOR SHARE) are held to COMMIT, in that order
- * (parent before child; the platform-wide capability last). A concurrent agency transition (RESTRICTED, CLOSING) or capability
- * suspension either waits until this project committed or committed first and is refused here: a project is never admitted
- * on an agency or a capability that stopped admitting new work while the command was in flight. Share locks keep concurrent
- * project creations of one agency (or one mode, across agencies) from serializing on each other.
+ * locking; decision D-TX-2): the agency's transition lock (shared), the client (FOR UPDATE) and the mode capability's transition
+ * lock (shared) are held to COMMIT, in that order (parent before child; the platform-wide capability last). A concurrent agency
+ * transition (RESTRICTED, CLOSING) or capability suspension takes the exclusive transition lock: it either waits until this
+ * project committed or committed first and is refused here, and a project requested after a queued transition waits behind it
+ * (re-check finding N3: the lock queue is first in, first out, where row share locks let later readers overtake a waiting
+ * writer). A project is never admitted on an agency or a capability that stopped admitting new work while the command was in
+ * flight; shared transition locks keep concurrent project creations of one agency (or one mode) from serializing on each other.
  */
 import type { ClientId, ProjectId, RevisionId, TargetInstanceRef } from "@kauro/domain";
 import { AGENCY_OPEN_STATES, DomainFailure, isOffered } from "@kauro/domain";
