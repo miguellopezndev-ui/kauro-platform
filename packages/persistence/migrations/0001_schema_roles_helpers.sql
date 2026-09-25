@@ -16,7 +16,7 @@
 -- SQLSTATE vocabulary raised by this schema (adapters map them to the failure taxonomy of @kauro/domain):
 --   KA001 LAST_OWNER_PROTECTED   KA002 VERSION_DISCIPLINE   KA003 EVENT_MISSING   KA004 IMMUTABLE_COLUMN
 --   KA005 LEASE guard (fence / deadline / subject / checkpoint)   KA006 CONTEXT (row not visible inside a trigger)
---   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION
+--   KA007 JOURNAL terminal state   KA008 UNLISTED_TRANSITION   KA009 UPSTREAM_UNRESOLVED (request journal, S089)
 
 CREATE SCHEMA IF NOT EXISTS kauro;
 REVOKE ALL ON SCHEMA kauro FROM PUBLIC;

@@ -2,9 +2,10 @@
 // - 10 "Idempotency contract" / S052: one key with different payloads is a conflict the handler answers from the stored
 //   digest; an identical replay reads the stored result; a concurrent duplicate blocks on the identity index until the first
 //   transaction ends and then sees its committed row (or proceeds when it rolled back).
-// - S089 (structural half): a dispatch intent with a short SHA, no funded reservation or no grant cannot be materialized.
-// - S090: a resume that omits or swaps the stored checkpoint, or resets the absolute deadline, is refused; subject, clock
-//   and fence identity are preserved; a fenced-out owner cannot heartbeat or checkpoint.
+// - S089: a dispatch intent with a short SHA, no funded reservation, no grant, or an upstream that is not resolved (failed,
+//   cancelled, uncertain, unconsumed, unknown or foreign) cannot be materialized.
+// - S090: a resume that omits or swaps the stored checkpoint, or resets the absolute deadline, is refused; subject, clock,
+//   cost and checkpoint identity are preserved across a takeover; a fenced-out owner cannot heartbeat or checkpoint.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -152,49 +153,129 @@ test("CreateAgency reservations (no tenant) are visible to the identity that res
   });
 });
 
-test("S089: a request journal entry cannot be materialized with a short SHA, without a positive reservation or without a grant; the valid control commits", async () => {
+test("S089: a request journal entry cannot be materialized with a short SHA, without a positive reservation, without a grant or with an upstream that is not resolved (failed, cancelled, uncertain, unconsumed, unknown, of another scope, repeated or itself); the valid controls commit", async () => {
   const taskId = ids.next();
-  const insert = (hash: string, reserved: number, grant: string | null, fence = 1) =>
+  const insert = (hash: string, reserved: number, grant: string | null, fence = 1, upstream: ReadonlyArray<string> = [], requestId = ids.next(), agencyId: string | null = A.agencyId, task = taskId) =>
     control.query(
-      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, reserved_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
-      [ids.next(), taskId, A.agencyId, hash, fence, reserved, grant],
+      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::uuid[], now(), now())`,
+      [requestId, task, agencyId, hash, fence, reserved, grant, [...upstream]],
     );
+  const unresolved = (e: unknown) => sqlState(e) === "KA009";
   await assert.rejects(insert("abc1234", 150, ids.next()), (e: unknown) => sqlState(e) === "23514", "short SHA");
   await assert.rejects(insert(sha("request"), 0, ids.next()), (e: unknown) => sqlState(e) === "23514", "no reserved ceiling");
   await assert.rejects(insert(sha("request"), 150, null), (e: unknown) => sqlState(e) === "23502", "no grant");
+  await assert.rejects(
+    control.query(
+      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, reserved_at, updated_at)
+       VALUES ($1, $2, $3, $4, 1, 150, $5, now(), now())`,
+      [ids.next(), taskId, A.agencyId, sha("request"), ids.next()],
+    ),
+    (e: unknown) => sqlState(e) === "23502",
+    "the upstream list is declared, never defaulted",
+  );
   await insert(sha("request"), 150, ids.next());
   await assert.rejects(insert(sha("request-2"), 150, ids.next(), 1), (e: unknown) => sqlState(e) === "23505", "one attempt per fence");
   await insert(sha("request-2"), 150, ids.next(), 2);
-  // response before consume; terminal states stay terminal; the reservation is immutable
   const req = (await oracle.query("SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = 1", [taskId])).rows[0].request_id as string;
+  const pending = (await oracle.query("SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = 2", [taskId])).rows[0].request_id as string;
+  // failed upstream: a downstream task is not materialized on this attempt while it is RESERVED, DISPATCHING or RESPONSE_STORED;
+  // meanwhile the lifecycle rules hold (response before consume; terminal states stay terminal; the reservation is immutable)
+  const downstreamTask = ids.next();
+  const downstream = (upstream: ReadonlyArray<string>, requestId = ids.next()) => insert(sha("downstream"), 90, ids.next(), 1, upstream, requestId, A.agencyId, downstreamTask);
+  await assert.rejects(downstream([req]), unresolved, "upstream RESERVED");
   await assert.rejects(control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = $1", [req]), (e: unknown) => sqlState(e) === "KA007");
   await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [req]);
+  await assert.rejects(downstream([req]), unresolved, "upstream DISPATCHING");
   await control.query("UPDATE kauro.request_journal SET state = 'RESPONSE_STORED', response_artifact_hash = $2, usage_state = 'KNOWN', actual_cents = 120 WHERE request_id = $1", [req, sha("response")]);
+  await assert.rejects(downstream([req]), unresolved, "upstream RESPONSE_STORED but not consumed");
   await control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = $1", [req]);
   await assert.rejects(control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [req]), (e: unknown) => sqlState(e) === "KA007");
   await assert.rejects(control.query("UPDATE kauro.request_journal SET reserved_cents = 1 WHERE request_id = $1", [req]), (e: unknown) => sqlState(e) === "KA004");
-  // request handlers only read their tenant's cost rows
+  // upstream attempts that failed, were cancelled or are uncertain never resolve
+  const otherTask = ids.next();
+  const failed = ids.next();
+  await insert(sha("failed"), 50, ids.next(), 1, [], failed, A.agencyId, otherTask);
+  await control.query("UPDATE kauro.request_journal SET state = 'FAILED' WHERE request_id = $1", [failed]);
+  const cancelled = ids.next();
+  await insert(sha("cancelled"), 50, ids.next(), 2, [], cancelled, A.agencyId, otherTask);
+  await control.query("UPDATE kauro.request_journal SET state = 'CANCELLED' WHERE request_id = $1", [cancelled]);
+  const uncertain = ids.next();
+  await insert(sha("uncertain"), 50, ids.next(), 3, [], uncertain, A.agencyId, otherTask);
+  await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [uncertain]);
+  await control.query("UPDATE kauro.request_journal SET state = 'UNCERTAIN' WHERE request_id = $1", [uncertain]);
+  // a consumed attempt outside the tenant scope (a tenant-less control-plane attempt) is not a dependency of agency A
+  const outside = ids.next();
+  await insert(sha("outside"), 50, ids.next(), 1, [], outside, null, ids.next());
+  await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [outside]);
+  await control.query("UPDATE kauro.request_journal SET state = 'RESPONSE_STORED', response_artifact_hash = $2, usage_state = 'KNOWN', actual_cents = 10 WHERE request_id = $1", [outside, sha("outside response")]);
+  await control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = $1", [outside]);
+  const refusals: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+    ["FAILED", [req, failed]],
+    ["CANCELLED", [cancelled]],
+    ["UNCERTAIN", [uncertain]],
+    ["RESERVED", [req, pending]],
+    ["unknown", [ids.next()]],
+    ["repeated", [req, req]],
+    ["another scope", [outside]],
+  ];
+  for (const [label, upstream] of refusals) await assert.rejects(downstream(upstream), unresolved, label);
+  const self = ids.next();
+  await assert.rejects(downstream([self], self), unresolved, "a request cannot depend on itself");
+  // the list is bounded: 65 distinct consumed upstreams (walked through the lifecycle) exceed request_journal_upstream_shape
+  const many = Array.from({ length: 65 }, () => ids.next());
+  await control.query(
+    `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
+     SELECT u, u, $2, encode(sha256(convert_to(u::text, 'UTF8')), 'hex'), 1, 10, $3, ARRAY[]::uuid[], now(), now() FROM unnest($1::uuid[]) AS u`,
+    [many, A.agencyId, ids.next()],
+  );
+  await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = ANY ($1::uuid[])", [many]);
+  await control.query("UPDATE kauro.request_journal SET state = 'RESPONSE_STORED', response_artifact_hash = encode(sha256(convert_to(request_id::text || ':r', 'UTF8')), 'hex'), usage_state = 'KNOWN', actual_cents = 1 WHERE request_id = ANY ($1::uuid[])", [many]);
+  await control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = ANY ($1::uuid[])", [many]);
+  await assert.rejects(downstream(many), (e: unknown) => sqlState(e) === "23514" && constraintOf(e) === "request_journal_upstream_shape", "more than 64 upstreams");
+  await assert.rejects(
+    control.query(
+      `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
+       VALUES ($1, $2, $3, $4, 1, 90, $5, ARRAY[$6::uuid, NULL], now(), now())`,
+      [ids.next(), downstreamTask, A.agencyId, sha("downstream"), ids.next(), req],
+    ),
+    unresolved,
+    "a NULL element is not an upstream",
+  );
+  const refused = await oracle.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE task_id = $1", [downstreamTask]);
+  assert.equal(refused.rows[0].n, 0, "no refused downstream intent was materialized");
+  // valid controls: a downstream naming only the consumed upstream, and one naming none, are materialized; the list is immutable
+  const materialized = ids.next();
+  await downstream([req], materialized);
+  await insert(sha("independent"), 40, ids.next(), 1, [], ids.next(), A.agencyId, ids.next());
+  const stored = await oracle.query("SELECT upstream_request_ids FROM kauro.request_journal WHERE request_id = $1", [materialized]);
+  assert.deepEqual(stored.rows[0].upstream_request_ids, [req]);
+  await assert.rejects(control.query("UPDATE kauro.request_journal SET upstream_request_ids = ARRAY[]::uuid[] WHERE request_id = $1", [materialized]), (e: unknown) => sqlState(e) === "KA004");
+  // request handlers only read the cost rows of their tenant and cannot write them
   await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
-    const n = await c.query("SELECT count(*)::int AS n FROM kauro.request_journal");
-    assert.equal(n.rows[0].n, 2);
+    const n = await c.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE task_id = ANY ($1::uuid[])", [[taskId, downstreamTask]]);
+    assert.equal(n.rows[0].n, 3);
+    const outsideRows = await c.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE request_id = $1", [outside]);
+    assert.equal(outsideRows.rows[0].n, 0);
     await assert.rejects(c.query("UPDATE kauro.request_journal SET state = 'FAILED' WHERE request_id = $1", [req]), (e: unknown) => sqlState(e) === "42501");
   });
 });
 
-test("S090: a lease preserves subject, deadline and checkpoint identity across a takeover; a resume without the checkpoint or with a reset deadline is refused", async () => {
+test("S090: a lease preserves subject, deadline, cost and checkpoint identity across a takeover; a resume without the checkpoint, with a reset deadline, another subject or another cost authority is refused", async () => {
   const resource = ids.next();
   const subject = sha("subject");
+  const cost = ids.next();
   const deadline = new Date(Date.now() + 3_600_000);
   const owner1 = ids.next();
   const owner2 = ids.next();
   const t0 = new Date();
-  const claim = (who: string, at: Date, checkpoint: string | null, dl: Date = deadline, subj: string = subject) =>
-    control.query("SELECT * FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, 120, $3, $4, $5, $6)", [resource, who, dl, subj, checkpoint, at]);
+  const claim = (who: string, at: Date, checkpoint: string | null, dl: Date = deadline, subj: string = subject, costAuthority: string | null = cost) =>
+    control.query("SELECT * FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, 120, $3, $4, $5, $6, $7)", [resource, who, dl, subj, costAuthority, checkpoint, at]);
   const first = (await claim(owner1, t0, null)).rows[0];
   assert.equal(first.owner_id, owner1);
   assert.equal(first.fence, "1");
   assert.equal(first.checkpoint_hash, null);
+  assert.equal(first.cost_authority_id, cost);
   // a live lease is HELD: the claimer gets the current holder back
   const held = (await claim(owner2, new Date(t0.getTime() + 1000), null)).rows[0];
   assert.equal(held.owner_id, owner1);
@@ -210,12 +291,15 @@ test("S090: a lease preserves subject, deadline and checkpoint identity across a
   await assert.rejects(claim(owner2, late, sha("other checkpoint")), (e: unknown) => sqlState(e) === "KA005", "checkpoint mismatch");
   await assert.rejects(claim(owner2, late, cp, new Date(deadline.getTime() + 60_000)), (e: unknown) => sqlState(e) === "KA004", "deadline reset");
   await assert.rejects(claim(owner2, late, cp, deadline, sha("another subject")), (e: unknown) => sqlState(e) === "KA004", "subject swap");
+  await assert.rejects(claim(owner2, late, cp, deadline, subject, ids.next()), (e: unknown) => sqlState(e) === "KA004" && String((e as Error).message).includes("cost_authority_id"), "cost authority swap");
+  await assert.rejects(claim(owner2, late, cp, deadline, subject, null), (e: unknown) => sqlState(e) === "KA004" && String((e as Error).message).includes("cost_authority_id"), "cost authority dropped");
   const resumed = (await claim(owner2, late, cp)).rows[0];
   assert.equal(resumed.owner_id, owner2);
   assert.equal(resumed.fence, "2");
   assert.equal(resumed.checkpoint_hash, cp);
   assert.equal(new Date(resumed.deadline_at).getTime(), deadline.getTime());
   assert.equal(resumed.subject_hash, subject);
+  assert.equal(resumed.cost_authority_id, cost);
   // the old owner is fenced out: its heartbeat renews nothing
   const stale = await control.query("SELECT (kauro.heartbeat_lease('JOB_ATTEMPT', $1, $2, 1, 120, $3)).fence AS f", [resource, owner1, new Date(late.getTime() + 1000)]);
   assert.equal(stale.rows[0].f, null);
@@ -224,11 +308,16 @@ test("S090: a lease preserves subject, deadline and checkpoint identity across a
   // a claim or renewal never extends past the deadline; a claim after the deadline is refused
   const shortResource = ids.next();
   const shortDeadline = new Date(t0.getTime() + 60_000);
-  const capped = await control.query("SELECT * FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, 120, $3, $4, NULL, $5)", [shortResource, owner1, shortDeadline, subject, t0]);
+  const capped = await control.query("SELECT * FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, 120, $3, $4, $5, NULL, $6)", [shortResource, owner1, shortDeadline, subject, cost, t0]);
   assert.equal(new Date(capped.rows[0].expires_at).getTime(), shortDeadline.getTime());
   const renewed = await control.query("SELECT * FROM kauro.heartbeat_lease('JOB_ATTEMPT', $1, $2, 1, 120, $3)", [shortResource, owner1, new Date(t0.getTime() + 30_000)]);
   assert.equal(new Date(renewed.rows[0].expires_at).getTime(), shortDeadline.getTime());
   await assert.rejects(claim(owner1, new Date(deadline.getTime() + 1), cp), (e: unknown) => sqlState(e) === "KA005");
+  // the cost identity follows the kind: a job attempt or model task names its funding authority, a dispatch or sweep none
+  await assert.rejects(control.query("SELECT * FROM kauro.claim_lease('MODEL_TASK', $1, $2, 120, $3, $4, NULL, NULL, $5)", [ids.next(), owner1, deadline, subject, t0]), (e: unknown) => sqlState(e) === "23514");
+  await assert.rejects(control.query("SELECT * FROM kauro.claim_lease('SWEEP', $1, $2, 120, $3, $4, $5, NULL, $6)", [ids.next(), owner1, deadline, subject, cost, t0]), (e: unknown) => sqlState(e) === "23514");
+  // the column cannot be rewritten directly either
+  await assert.rejects(control.query("UPDATE kauro.leases SET cost_authority_id = $2 WHERE resource_id = $1", [resource, ids.next()]), (e: unknown) => sqlState(e) === "KA004");
   // cancellation advances a monotonic generation the owner must observe
   const cancelled = await control.query("SELECT * FROM kauro.cancel_lease('JOB_ATTEMPT', $1)", [resource]);
   assert.equal(cancelled.rows[0].cancel_version, "1");

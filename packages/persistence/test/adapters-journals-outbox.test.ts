@@ -199,7 +199,7 @@ test("S089 (structural): the request journal refuses a short hash, a zero ceilin
   const task = (await mint()) as TaskId;
   const grant = await mint();
   const reserve = (requestId: RequestId, fence: number, requestHash: string, reservedCents: string) =>
-    h.control.run(h.system(), (uow) => uow.requestJournal.reserve({ requestId, taskId: task, agencyId: A.agencyId, requestHash, fence, reservedCents, costGrantId: grant, reservedAt: clock.now() }));
+    h.control.run(h.system(), (uow) => uow.requestJournal.reserve({ requestId, taskId: task, agencyId: A.agencyId, requestHash, fence, reservedCents, costGrantId: grant, upstreamRequestIds: [], reservedAt: clock.now() }));
   await assert.rejects(reserve((await mint()) as RequestId, 1, "abc1234", "150"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "short SHA");
   await assert.rejects(reserve((await mint()) as RequestId, 1, sha("request"), "0"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "no reserved ceiling");
   await assert.rejects(reserve((await mint()) as RequestId, 1, sha("request"), "-5"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "negative ceiling");
@@ -250,6 +250,89 @@ test("S089 (structural): the request journal refuses a short hash, a zero ceilin
     assert.equal(await uow.requestJournal.get(requestId), null);
     assert.deepEqual(await uow.requestJournal.listByTask(task), []);
   });
+});
+
+test("S089 failed upstream through the adapter: a dispatch intent naming an upstream that failed, was cancelled, is uncertain, is not yet consumed, is unknown or belongs to another agency is refused UPSTREAM_UNRESOLVED and materializes nothing; naming consumed upstreams it is RESERVED; an upstream that fails or is consumed concurrently is ordered before the reservation", async () => {
+  // S089 "A prompt has short SHA, failed upstream or spending without ceiling" → "Reject runnable materialization until actual
+  // dependencies and grants are resolved". The runnable materialization is the RESERVED dispatch intent of the control plane
+  // (design §10); its dependencies are the upstream attempts whose consumed responses it builds on.
+  const now = () => clock.now();
+  type UpstreamState = "RESERVED" | "RESPONSE_STORED" | "CONSUMED" | "FAILED" | "CANCELLED" | "UNCERTAIN";
+  /** An upstream attempt of its own task, walked to `state` through the adapter's fenced transitions. */
+  const upstream = (state: UpstreamState, agencyId: AgencyFixture["agencyId"] = A.agencyId): Promise<RequestId> =>
+    h.control.run(h.system(), async (uow) => {
+      const requestId = uow.ids.next() as RequestId;
+      await uow.requestJournal.reserve({ requestId, taskId: uow.ids.next() as TaskId, agencyId, requestHash: sha(`upstream-${requestId}`), fence: 1, reservedCents: "40", costGrantId: uow.ids.next(), upstreamRequestIds: [], reservedAt: now() });
+      if (state === "RESERVED") return requestId;
+      if (state === "FAILED") return (await uow.requestJournal.markFailed(requestId, 1, now()))?.state === "FAILED" ? requestId : Promise.reject(new Error("FAILED fixture"));
+      if (state === "CANCELLED") return (await uow.requestJournal.markCancelled(requestId, 1, now()))?.state === "CANCELLED" ? requestId : Promise.reject(new Error("CANCELLED fixture"));
+      await uow.requestJournal.markDispatching(requestId, 1, null, now());
+      if (state === "UNCERTAIN") return (await uow.requestJournal.markUncertain(requestId, 1, now()))?.state === "UNCERTAIN" ? requestId : Promise.reject(new Error("UNCERTAIN fixture"));
+      await uow.requestJournal.storeResponse(requestId, 1, sha(`response-${requestId}`), { usageState: "KNOWN", actualCents: "35" }, now());
+      if (state === "RESPONSE_STORED") return requestId;
+      return (await uow.requestJournal.markConsumed(requestId, 1, now()))?.state === "CONSUMED" ? requestId : Promise.reject(new Error("CONSUMED fixture"));
+    });
+  const attemptedTasks: TaskId[] = [];
+  /** The dependent dispatch intent: a fresh task whose first attempt names the given upstream attempts. */
+  const materialize = (upstreamRequestIds: ReadonlyArray<RequestId>) =>
+    h.control.run(h.system(), (uow) => {
+      const taskId = uow.ids.next() as TaskId;
+      attemptedTasks.push(taskId);
+      return uow.requestJournal.reserve({ requestId: uow.ids.next() as RequestId, taskId, agencyId: A.agencyId, requestHash: sha(`dependent-${taskId}`), fence: 1, reservedCents: "90", costGrantId: uow.ids.next(), upstreamRequestIds, reservedAt: now() });
+    });
+  const unresolved = (e: unknown) => failure(e).code === "PRECONDITION_FAILED" && failure(e).reason === "UPSTREAM_UNRESOLVED";
+
+  const consumed = await upstream("CONSUMED");
+  const consumedToo = await upstream("CONSUMED");
+  const foreignAgency = await h.createAgency(await h.person("foreign-dispatch"), "Foreign Dispatch Agency");
+  const cases: ReadonlyArray<readonly [string, ReadonlyArray<RequestId>]> = [
+    ["FAILED", [consumed, await upstream("FAILED")]],
+    ["CANCELLED", [await upstream("CANCELLED")]],
+    ["UNCERTAIN", [await upstream("UNCERTAIN")]],
+    ["RESERVED", [await upstream("RESERVED")]],
+    ["RESPONSE_STORED", [consumedToo, await upstream("RESPONSE_STORED")]],
+    ["unknown", [(await h.control.run(h.system(), async (uow) => uow.ids.next())) as RequestId]],
+    ["another agency", [await upstream("CONSUMED", foreignAgency.agencyId)]],
+    ["repeated", [consumed, consumed]],
+  ];
+  for (const [label, upstreamRequestIds] of cases) await assert.rejects(materialize(upstreamRequestIds), unresolved, label);
+  const refusedTasks = [...attemptedTasks];
+  const refusedRows = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE task_id = ANY ($1::uuid[])", [refusedTasks]);
+  assert.equal(refusedRows.rows[0].n, 0, "no refused intent was materialized");
+
+  // the valid control: every upstream CONSUMED — the intent is RESERVED and names exactly its upstreams
+  const reserved = await materialize([consumed, consumedToo]);
+  assert.deepEqual([reserved.state, reserved.fence], ["RESERVED", 1]);
+  const named = await h.oracle.query("SELECT upstream_request_ids FROM kauro.request_journal WHERE request_id = $1", [reserved.requestId]);
+  assert.deepEqual(named.rows[0].upstream_request_ids, [consumed, consumedToo]);
+
+  // concurrency: while an upstream transition is uncommitted, the dependent reservation waits on the upstream row (FOR SHARE,
+  // observed in pg_stat_activity) and is decided by the committed outcome — refused when the upstream failed, reserved when it
+  // was consumed; a failed upstream never becomes a dependency by interleaving
+  for (const ending of ["FAILED", "CONSUMED"] as const) {
+    const up = await upstream("RESPONSE_STORED");
+    const transitioned = barrier();
+    const release = barrier();
+    const upstreamTx = h.control.run(h.system(), async (uow) => {
+      const r = ending === "FAILED" ? await uow.requestJournal.markFailed(up, 1, now()) : await uow.requestJournal.markConsumed(up, 1, now());
+      assert.equal(r?.state, ending);
+      transitioned.open();
+      await release.wait;
+    });
+    await transitioned.wait;
+    const dependent = materialize([up]).then(
+      (record) => record.state,
+      (e: unknown) => (unresolved(e) ? "UPSTREAM_UNRESOLVED" : `unexpected ${String(e)}`),
+    );
+    try {
+      await waitForLockWait(h.oracle, "kauro-test-control", "INSERT INTO kauro.request_journal");
+    } finally {
+      // a wait that never happens fails the test above; the held upstream transaction is released either way
+      release.open();
+      await upstreamTx;
+    }
+    assert.equal(await dependent, ending === "FAILED" ? "UPSTREAM_UNRESOLVED" : "RESERVED", ending);
+  }
 });
 
 test("outbox ordering by aggregate version: events of one aggregate are appended in version order, their outbox rows follow the same sequence, and a duplicate version or a label payload is refused", async () => {

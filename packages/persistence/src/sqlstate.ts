@@ -14,6 +14,7 @@ export const SQLSTATE = Object.freeze({
   CONTEXT: "KA006",
   JOURNAL: "KA007",
   UNLISTED_TRANSITION: "KA008",
+  UPSTREAM_UNRESOLVED: "KA009",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -35,6 +36,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA006: { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
   KA007: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
   KA008: { code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
+  KA009: { code: "PRECONDITION_FAILED", reason: "UPSTREAM_UNRESOLVED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },

@@ -131,8 +131,12 @@ test("RACE: two archive calls with the same expectedVersion → one 200, one 409
   const requestA = call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key: keyA, body: bodyA });
   await hold.reached;
   const requestB = call(w, { url: routes.archiveClient(clientId), token: w.owner.token, key: keyB, body: { expectedVersion: 1 } });
-  await waitForApiLockWait(w, "FOR UPDATE");
-  hold.release();
+  try {
+    await waitForApiLockWait(w, "FOR UPDATE");
+  } finally {
+    // a wait that never happens fails the test above; A is released either way so no transaction outlives the test
+    hold.release();
+  }
   const [a, b] = await Promise.all([requestA, requestB]);
   const winner = completed<ArchiveClientView>(a, 200);
   assert.equal(winner.data.client.version, 2);

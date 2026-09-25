@@ -188,6 +188,8 @@ export const FAILURE_REASONS = [
   "LEASE_FENCED",
   "RESUME_WITHOUT_CHECKPOINT",
   "DEADLINE_IMMUTABLE",
+  // dispatch materialization (S089: reject runnable materialization until actual dependencies are resolved)
+  "UPSTREAM_UNRESOLVED",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

@@ -1,8 +1,9 @@
 // Lease fencing through the LeaseStore adapter on real PostgreSQL 17 (contract Lease: an old live worker cannot publish
 // after another owner advances the fence; 07 "Job and attempt states": a claim creates a monotonically increasing fence;
 // a renewal cannot change the immutable execution subject; S090: reject a restart that lacks the checkpoint or resets the
-// absolute deadline; preserve subject, clock, cost and checkpoint identity; 21 "Concurrency and crash matrix": stale lease
-// renewal). The store runs under the control plane (kauro_control); request handlers have no access to leases at all.
+// absolute deadline; preserve subject, clock, cost and checkpoint identity — the cost identity being the funding authority
+// the operation spends against, 07 "CommercialAuthorization" and contract Audit; 21 "Concurrency and crash matrix": stale
+// lease renewal). The store runs under the control plane (kauro_control); request handlers have no access to leases at all.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { isDomainFailure, toUtcInstant, type DomainFailure, type LeaseOwnerId, type ResourceId, type UserId } from "@kauro/domain";
@@ -28,15 +29,17 @@ function failure(e: unknown): DomainFailure {
 
 const at = (base: number, offsetMs: number) => toUtcInstant(base + offsetMs);
 
-test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes, a valid takeover that advances the fence and fences the old owner out", async () => {
+test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes (no or another checkpoint, reset deadline, another subject, another cost authority), a valid takeover that keeps subject, clock, cost and checkpoint identity, advances the fence and fences the old owner out", async () => {
   const resource = ids.next() as ResourceId;
   const subject = sha("subject");
+  // the cost identity of the leased job attempt: the CommercialAuthorization its technical retries run under
+  const cost = ids.next();
   const t0 = Date.now();
   const deadline = at(t0, 3_600_000);
   const owner1 = ids.next() as LeaseOwnerId;
   const owner2 = ids.next() as LeaseOwnerId;
-  const claim = (ownerId: LeaseOwnerId, now: string, checkpointHash: string | null, deadlineAt = deadline, subjectHash = subject) =>
-    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "JOB_ATTEMPT", resourceId: resource, ownerId, ttlSeconds: 120, deadlineAt, subjectHash, checkpointHash }, now));
+  const claim = (ownerId: LeaseOwnerId, now: string, checkpointHash: string | null, deadlineAt = deadline, subjectHash = subject, costAuthorityId: string | null = cost) =>
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "JOB_ATTEMPT", resourceId: resource, ownerId, ttlSeconds: 120, deadlineAt, subjectHash, costAuthorityId, checkpointHash }, now));
 
   const first = await claim(owner1, at(t0, 0), null);
   assert.equal(first.kind, "CLAIMED");
@@ -44,6 +47,7 @@ test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused
     assert.equal(first.lease.fence, 1);
     assert.equal(first.lease.checkpointHash, null);
     assert.equal(first.lease.deadlineAt, deadline);
+    assert.equal(first.lease.costAuthorityId, cost);
     assert.equal(first.lease.expiresAt, at(t0, 120_000));
   }
   const held = await claim(owner2, at(t0, 1_000), null);
@@ -66,6 +70,12 @@ test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused
   assert.deepEqual(await claim(owner2, late, sha("other checkpoint")), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" });
   assert.deepEqual(await claim(owner2, late, checkpoint, at(t0, 7_200_000)), { kind: "REFUSED", reason: "DEADLINE_IMMUTABLE" });
   assert.deepEqual(await claim(owner2, late, checkpoint, deadline, sha("another subject")), { kind: "REFUSED", reason: "SUBJECT_IMMUTABLE" });
+  // a restart under a fresh grant or entitlement would reset what the operation already spent: the cost identity is kept
+  assert.deepEqual(await claim(owner2, late, checkpoint, deadline, subject, ids.next()), { kind: "REFUSED", reason: "COST_IMMUTABLE" });
+  assert.deepEqual(await claim(owner2, late, checkpoint, deadline, subject, null), { kind: "REFUSED", reason: "COST_IMMUTABLE" });
+  // every refusal left the lease exactly as the first owner holds it
+  const untouched = await h.oracle.query("SELECT owner_id, fence, deadline_at, subject_hash, cost_authority_id, checkpoint_hash FROM kauro.leases WHERE resource_kind = 'JOB_ATTEMPT' AND resource_id = $1", [resource]);
+  assert.deepEqual(untouched.rows.map((r) => [r.owner_id, Number(r.fence), new Date(r.deadline_at).toISOString(), r.subject_hash, r.cost_authority_id, r.checkpoint_hash]), [[owner1, 1, deadline, subject, cost, checkpoint]]);
   const resumed = await claim(owner2, late, checkpoint);
   assert.equal(resumed.kind, "CLAIMED");
   if (resumed.kind === "CLAIMED") {
@@ -74,6 +84,7 @@ test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused
     assert.equal(resumed.lease.checkpointHash, checkpoint);
     assert.equal(resumed.lease.deadlineAt, deadline);
     assert.equal(resumed.lease.subjectHash, subject);
+    assert.equal(resumed.lease.costAuthorityId, cost);
   }
   await h.control.run(h.system(), async (uow) => {
     assert.equal(await uow.leases.heartbeat("JOB_ATTEMPT", resource, owner1, 1, 120, at(t0, 201_000)), null, "the old owner is fenced out");
@@ -91,9 +102,15 @@ test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused
   assert.deepEqual(await claim(owner1, at(t0, 3_600_001), checkpoint), { kind: "REFUSED", reason: "DEADLINE_PASSED" });
   const shortResource = ids.next() as ResourceId;
   const shortDeadline = at(t0, 60_000);
-  const capped = await h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "SWEEP", resourceId: shortResource, ownerId: owner1, ttlSeconds: 120, deadlineAt: shortDeadline, subjectHash: subject, checkpointHash: null }, at(t0, 0)));
+  const capped = await h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "SWEEP", resourceId: shortResource, ownerId: owner1, ttlSeconds: 120, deadlineAt: shortDeadline, subjectHash: subject, costAuthorityId: null, checkpointHash: null }, at(t0, 0)));
   assert.equal(capped.kind, "CLAIMED");
-  if (capped.kind === "CLAIMED") assert.equal(capped.lease.expiresAt, shortDeadline);
+  if (capped.kind === "CLAIMED") assert.deepEqual([capped.lease.expiresAt, capped.lease.costAuthorityId], [shortDeadline, null]);
+  // an operation that spends must name its cost identity, and one that spends nothing names none (leases_cost_authority_by_kind)
+  const spending = { resourceKind: "MODEL_TASK", resourceId: ids.next() as ResourceId, ownerId: owner1, ttlSeconds: 120, deadlineAt: deadline, subjectHash: subject, checkpointHash: null } as const;
+  await assert.rejects(h.control.run(h.system(), (uow) => uow.leases.claim({ ...spending, costAuthorityId: null }, at(t0, 0))), (e: unknown) => failure(e).code === "INVALID_REQUEST");
+  await assert.rejects(h.control.run(h.system(), (uow) => uow.leases.claim({ ...spending, resourceKind: "OUTBOX_DISPATCH", costAuthorityId: ids.next() }, at(t0, 0))), (e: unknown) => failure(e).code === "INVALID_REQUEST");
+  const grantBound = await h.control.run(h.system(), (uow) => uow.leases.claim({ ...spending, costAuthorityId: cost }, at(t0, 0)));
+  assert.equal(grantBound.kind === "CLAIMED" && grantBound.lease.costAuthorityId, cost);
 });
 
 test("a refused claim does not abort the unit of work: a sweeper claims several leases in one transaction and answers each refusal on its own", async () => {
@@ -104,16 +121,16 @@ test("a refused claim does not abort the unit of work: a sweeper claims several 
   const first = ids.next() as LeaseOwnerId;
   const sweeper = ids.next() as LeaseOwnerId;
   await h.control.run(h.system(), async (uow) => {
-    const c = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: first, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), checkpointHash: null }, at(t0, 0));
+    const c = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: first, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), costAuthorityId: null, checkpointHash: null }, at(t0, 0));
     assert.equal(c.kind, "CLAIMED");
     const stored = await uow.leases.checkpoint("OUTBOX_DISPATCH", held, first, 1, sha("cp"), at(t0, 1));
     assert.equal(stored?.checkpointHash, sha("cp"));
   });
   const outcomes = await h.control.run(h.system(), async (uow) => {
     const late = at(t0, 300_000);
-    const refused = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), checkpointHash: null }, late);
-    const claimed = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: free, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s2"), checkpointHash: null }, late);
-    const resumed = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), checkpointHash: sha("cp") }, late);
+    const refused = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), costAuthorityId: null, checkpointHash: null }, late);
+    const claimed = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: free, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s2"), costAuthorityId: null, checkpointHash: null }, late);
+    const resumed = await uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: held, ownerId: sweeper, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("s"), costAuthorityId: null, checkpointHash: sha("cp") }, late);
     return { refused: refused.kind, claimed: claimed.kind, resumed: resumed.kind, resumedFence: resumed.kind === "CLAIMED" ? resumed.lease.fence : null };
   });
   assert.deepEqual(outcomes, { refused: "REFUSED", claimed: "CLAIMED", resumed: "CLAIMED", resumedFence: 2 });
@@ -127,7 +144,7 @@ test("request handlers have no access to leases (kauro_app has no policy and no 
     (e: unknown) => failure(e).code === "NOT_FOUND" && failure(e).details.reason === "TENANT_CONTEXT_MISSING",
   );
   await assert.rejects(
-    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "SWEEP", resourceId: ids.next() as ResourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 0, deadlineAt: at(Date.now(), 60_000), subjectHash: sha("s"), checkpointHash: null }, toUtcInstant(Date.now()))),
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "SWEEP", resourceId: ids.next() as ResourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 0, deadlineAt: at(Date.now(), 60_000), subjectHash: sha("s"), costAuthorityId: null, checkpointHash: null }, toUtcInstant(Date.now()))),
     (e: unknown) => failure(e).code === "INVALID_REQUEST",
   );
 });
