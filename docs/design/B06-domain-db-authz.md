@@ -1027,12 +1027,12 @@ killed runs of the `055d317` test were stopped with `pg_ctl stop -m immediate` a
 
 ## 13. Verification performed on `b06/integration`
 
-After the re-check was resolved (§12d.5), `pnpm run verify` (generate, build, typecheck, test, architecture gate, OpenAPI
-check, matrix check, clean-consume) passes on Windows 11 (Node 24.14.1, pnpm 10.16.1, PostgreSQL 17.6 from
-`C:\Tools\pgsql17\bin`) and on Linux (Ubuntu 24.04 under WSL as the unprivileged user `miguel`, a fresh clone of the branch,
-`pnpm install --frozen-lockfile`, Node 24.21.0, pnpm 10.16.1, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11): 371
-tests, 0 failures — contracts 12, domain 53, application 55, authorization 11, persistence 98, api 118, tools 24 (after the
-review: 312; before it: 216). One api test reads the serving process's initial environment block from `/proc/<pid>/environ`
+After the re-check (§12d.5) and the residual re-check (§12d.6) were resolved, `pnpm run verify` (generate, build, typecheck,
+test, architecture gate, OpenAPI check, matrix check, clean-consume) passes on `e172179` on Windows 11 (Node 24.14.1, pnpm
+10.16.1, PostgreSQL 17.6 from `C:\Tools\pgsql17\bin`) and on Linux (Ubuntu 24.04 under WSL as the unprivileged user `miguel`,
+a fresh clone of the branch, `pnpm install --frozen-lockfile`, Node 24.21.0, pnpm 10.16.1, `PGBIN=/usr/lib/postgresql/17/bin`,
+PostgreSQL 17.11): 372 tests, 0 failures — contracts 12, domain 53, application 55, authorization 11, persistence 99, api 118,
+tools 24 (after the re-check: 371; after the review: 312; before it: 216). One api test reads the serving process's initial environment block from `/proc/<pid>/environ`
 and runs on Linux, the deployment OS, only: Windows reports it skipped with that reason, Linux passes it. Every persistence
 and api test file starts its own PostgreSQL 17 cluster (initdb/pg_ctl on a free 127.0.0.1 port, the seven migrations applied
 as `kauro_owner`, one login role in each runtime group: `kauro_app`, `kauro_control`, `kauro_assurance`, `kauro_validator`,
@@ -1044,7 +1044,8 @@ commands and 5 reads with their catalogues, every applicability citation resolve
 packages from their tarballs alone and type-checks their ten typed entry points. `pnpm run evidence` wrote the bundle of the
 candidate commit `0cce2f02f8b0` on each platform (`docs/evidence/b06/0cce2f02f8b0-windows/` and `-linux/`, D-EVIDENCE-1),
 committed after it: every suite's JUnit report and every cited test of the 29 cases with its outcome — 371 tests, every step
-exit 0, 29/29 cases with every cited test PASSED on both platforms.
+exit 0, 29/29 cases with every cited test PASSED on both platforms. The residual re-check changed no test the case map cites
+(the N20 test keeps its name) and added one persistence test; the bundles stay those of `0cce2f02f8b0`.
 
 The persistence tests are the review of the SQL: application and idempotent re-application, drift refusal, the serialized and
 bounded runner, role/RLS/ownership facts, enum CHECK lists equal to the registry, listed-transition and initial-state seeds
@@ -1074,7 +1075,9 @@ INVITED members, the outcome catalogue of every route and every failure site, th
 cursors, permitted actions, the private cache policy, the framework-error request log, and the one-shot migration job with the
 serving process's refusal of the owner's credential (api); the matrix, the OpenAPI catalogues, the case map's citations, its
 bookkeeping (one PARTIAL criterion, the gate records, the answered verification clauses) and the evidence bundle (tools).
-Every re-check fix was proven by a revert (§12d.5).
+Every re-check fix was proven by a revert (§12d.5). The residual re-check added the order between a conflicting provider
+delivery and the consumer's APPLIED settlement, in three interleavings fixed by lock-wait observation, and made the concurrent
+dispatcher test fail instead of hanging when its claim waits (persistence; §12d.6).
 
 ## 14. Owner boundary and next dependency
 
