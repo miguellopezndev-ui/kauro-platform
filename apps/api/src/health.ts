@@ -11,7 +11,11 @@
  * unreachable, the schema is behind or drifted, or the process is draining. The answer names states, never an error text,
  * a host or a role; the cause of a NOT_READY answer is handed to the diagnostics sink by correlation id.
  *
- * HEALTH_ROUTES and the response schemas are exported for the route inventory and the OpenAPI document.
+ * HEALTH_ROUTES and the response schemas are exported for the route inventory and the OpenAPI document. Each entry has the
+ * shape of an operational route of @kauro/application's response contract (operationId, method, path, summary, authority,
+ * and the replies by status with a description, a content type and a closed schema written in the strict validator's
+ * vocabulary, so the same validator compiles it): connecting the probes to the OpenAPI checker is moving these entries into
+ * the application's list of operational routes.
  */
 import type { FastifyInstance } from "fastify";
 import type { SchemaCompatibility } from "@kauro/persistence";
@@ -37,20 +41,17 @@ export interface ReadinessResponse {
   readonly schemaVersion: { readonly code: number; readonly database: number | null };
 }
 
-const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
+/** A closed JSON Schema 2020-12 object in the keyword vocabulary of @kauro/application's strict validator. */
+export type ProbeSchema = Readonly<Record<string, unknown>>;
 
-export const LIVENESS_RESPONSE_SCHEMA = Object.freeze({
-  $schema: JSON_SCHEMA_DIALECT,
-  $id: "urn:kauro:api:health:response:Liveness",
+export const LIVENESS_RESPONSE_SCHEMA: ProbeSchema = Object.freeze({
   type: "object",
   additionalProperties: false,
   required: ["status"],
   properties: { status: { type: "string", enum: ["LIVE"] } },
 });
 
-export const READINESS_RESPONSE_SCHEMA = Object.freeze({
-  $schema: JSON_SCHEMA_DIALECT,
-  $id: "urn:kauro:api:health:response:Readiness",
+export const READINESS_RESPONSE_SCHEMA: ProbeSchema = Object.freeze({
   type: "object",
   additionalProperties: false,
   required: ["status", "checks", "schemaVersion"],
@@ -78,24 +79,51 @@ export const READINESS_RESPONSE_SCHEMA = Object.freeze({
   },
 });
 
-/** The probe routes, their operation ids and response shapes (the route inventory and the OpenAPI document read this). */
-export const HEALTH_ROUTES = Object.freeze([
+/** One declared reply of a probe route. */
+export interface ProbeResponse {
+  readonly description: string;
+  readonly contentType: string;
+  readonly schema: ProbeSchema;
+}
+
+/** A probe route: what the route inventory and the OpenAPI document need (an operational route of the response contract). */
+export interface ProbeRoute {
+  readonly operationId: "getLiveness" | "getReadiness";
+  readonly method: "GET";
+  readonly path: "/livez" | "/readyz";
+  readonly summary: string;
+  /** The manual sections that require the route. */
+  readonly authority: string;
+  /** Declared replies by HTTP status. */
+  readonly responses: Readonly<Record<string, ProbeResponse>>;
+}
+
+const JSON_CONTENT_TYPE = "application/json";
+
+/** The probe routes, their operation ids and replies (the route inventory and the OpenAPI document read this). */
+export const HEALTH_ROUTES: ReadonlyArray<ProbeRoute> = Object.freeze([
   Object.freeze({
+    operationId: "getLiveness",
     method: "GET",
     path: "/livez",
-    operationId: "getLiveness",
-    responses: Object.freeze({ 200: Object.freeze({ contentType: "application/json", schema: LIVENESS_RESPONSE_SCHEMA }) }),
-  }),
-  Object.freeze({
-    method: "GET",
-    path: "/readyz",
-    operationId: "getReadiness",
+    summary: "Liveness of the api process",
+    authority: '14 "Monitoring and service health"',
     responses: Object.freeze({
-      200: Object.freeze({ contentType: "application/json", schema: READINESS_RESPONSE_SCHEMA }),
-      503: Object.freeze({ contentType: "application/json", schema: READINESS_RESPONSE_SCHEMA }),
+      "200": Object.freeze({ description: "The process is live; nothing else is checked.", contentType: JSON_CONTENT_TYPE, schema: LIVENESS_RESPONSE_SCHEMA }),
     }),
   }),
-] as const);
+  Object.freeze({
+    operationId: "getReadiness",
+    method: "GET",
+    path: "/readyz",
+    summary: "Readiness: a verified database connection and a schema compatible with this build",
+    authority: '14 "Monitoring and service health"; 14 "Deployment and rollback"',
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "Ready: the database is reachable and records every migration this build ships, unchanged.", contentType: JSON_CONTENT_TYPE, schema: READINESS_RESPONSE_SCHEMA }),
+      "503": Object.freeze({ description: "Not ready: the process is draining, the database is unreachable, or its schema is behind or drifted.", contentType: JSON_CONTENT_TYPE, schema: READINESS_RESPONSE_SCHEMA }),
+    }),
+  }),
+]);
 
 export const HEALTH_PATHS: ReadonlySet<string> = new Set(HEALTH_ROUTES.map((r) => r.path));
 
@@ -130,13 +158,13 @@ export function readinessOf(draining: boolean, codeSchemaVersion: number, report
 export function registerHealthRoutes(app: FastifyInstance, options: HealthOptions): void {
   app.get("/livez", async (_request, reply) => {
     const body: LivenessResponse = { status: "LIVE" };
-    return reply.code(200).type("application/json").send(body);
+    return reply.code(200).type(JSON_CONTENT_TYPE).send(body);
   });
   app.get("/readyz", async (request, reply) => {
     // a draining process reports it without opening a database connection
     const report = options.draining() ? null : await options.readiness();
     const body = readinessOf(options.draining(), options.codeSchemaVersion, report);
     if (body.status === "NOT_READY") options.onNotReady(request.id, body, report !== null && report.database === "UNAVAILABLE" ? report.cause : undefined);
-    return reply.code(body.status === "READY" ? 200 : 503).type("application/json").send(body);
+    return reply.code(body.status === "READY" ? 200 : 503).type(JSON_CONTENT_TYPE).send(body);
   });
 }

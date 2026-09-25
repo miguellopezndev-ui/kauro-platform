@@ -261,10 +261,13 @@ test("R34: the client address reaches the creation limiter as a keyed hash of it
     // twenty creations per client address per hour (design I-ADM-1): identities 0..19 from one client behind the proxy
     for (const p of people.slice(0, 20)) assert.equal((await create(p.token, "198.51.100.7")).statusCode, 201, p.name);
     const limited = await create(people[20]!.token, "198.51.100.7");
+    assert.equal(limited.statusCode, 429, "the twenty-first identity from one client address is limited");
     assert.equal(outcome(w, toReply(limited)), "429 ADMISSION_LIMITED CREATION_RATE_LIMITED");
     assert.ok((JSON.parse(limited.body) as { retryAfterSeconds?: number }).retryAfterSeconds! > 0);
     // a spoofed entry in front of the proxy's own is not trusted: the proxy-reported client is still 198.51.100.7
-    assert.equal(outcome(w, toReply(await create(people[21]!.token, "192.0.2.1, 198.51.100.7"))), "429 ADMISSION_LIMITED CREATION_RATE_LIMITED");
+    const spoofed = await create(people[21]!.token, "192.0.2.1, 198.51.100.7");
+    assert.equal(spoofed.statusCode, 429, "a forged leading X-Forwarded-For entry does not open a new window");
+    assert.equal(outcome(w, toReply(spoofed)), "429 ADMISSION_LIMITED CREATION_RATE_LIMITED");
     // another client behind the same proxy is another window
     assert.equal((await create(people[22]!.token, "198.51.100.8")).statusCode, 201);
   } finally {

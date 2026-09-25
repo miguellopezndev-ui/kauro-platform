@@ -8,6 +8,7 @@ import { connect, createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
+import { compileSchemaBundle } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 import type { PoolErrorEvent } from "@kauro/persistence";
 import { classifyError, listMigrations } from "@kauro/persistence";
@@ -16,8 +17,6 @@ import {
   API_APPLICATION_NAME,
   ConfigError,
   HEALTH_ROUTES,
-  LIVENESS_RESPONSE_SCHEMA,
-  READINESS_RESPONSE_SCHEMA,
   bootstrap,
   loadConfig,
   writeNotReady,
@@ -126,21 +125,20 @@ function partialRequest(port: number, firstPart: string): Promise<{ finish(rest:
   });
 }
 
-/** A minimal check of a body against the closed response schemas health.ts exports (type, enum, required, closed objects). */
-function conforms(schema: Record<string, unknown>, value: unknown, at = "$"): void {
-  const types = schema["type"] === undefined ? [] : Array.isArray(schema["type"]) ? (schema["type"] as string[]) : [schema["type"] as string];
-  const typeOf = value === null ? "null" : Number.isInteger(value) ? "integer" : typeof value === "object" ? "object" : typeof value;
-  assert.ok(types.length === 0 || types.includes(typeOf) || (typeOf === "integer" && types.includes("number")), `${at}: ${typeOf} is not ${types.join("|")}`);
-  if (Array.isArray(schema["enum"])) assert.ok((schema["enum"] as unknown[]).includes(value), `${at}: ${String(value)} is not in the enum`);
-  if (typeOf === "object") {
-    const props = (schema["properties"] ?? {}) as Record<string, Record<string, unknown>>;
-    for (const key of (schema["required"] ?? []) as string[]) assert.ok(key in (value as object), `${at}.${key} is required`);
-    for (const [key, member] of Object.entries(value as Record<string, unknown>)) {
-      const sub = props[key];
-      assert.ok(sub !== undefined || schema["additionalProperties"] !== false, `${at}.${key} is not allowed`);
-      if (sub) conforms(sub, member, `${at}.${key}`);
-    }
-  }
+/**
+ * The probes' declared replies compiled by the strict validator of @kauro/application (the one that admits requests and the
+ * one the OpenAPI checker compiles operational routes with): a reply conforms when the schema its route declares for that
+ * status accepts it, closed objects and enums included. Compiling also proves every probe schema uses only keywords the
+ * validator enforces.
+ */
+const probeReplies = compileSchemaBundle({
+  defs: {},
+  roots: Object.fromEntries(HEALTH_ROUTES.flatMap((route) => Object.entries(route.responses).map(([status, reply]) => [`${route.operationId}:${status}`, reply.schema]))),
+});
+
+function conforms(operationId: string, status: number, body: unknown): void {
+  assert.ok(probeReplies.has(`${operationId}:${status}`), `${operationId} declares no ${status} reply`);
+  assert.deepEqual(probeReplies.validate(`${operationId}:${status}`, body), [], `${operationId} ${status}: ${JSON.stringify(body)}`);
 }
 
 test("configuration of the operating limits: the api pool stays inside the four-connection budget (R43), the proxy hop count is explicit outside LOCAL (R34), request, socket and shutdown deadlines are bounded (R35, R36), the migrator's limits are read with migrations on start (R37), and its password is never configuration (R44)", async () => {
@@ -259,7 +257,7 @@ test("R35: shutdown drains — the in-flight command is answered with Connection
     const lateProbeAnswer = await within(lateProbe.finish("\r\n"), 15_000, "a readiness probe during the drain");
     assert.match(lateProbeAnswer, /^HTTP\/1\.1 503 /);
     const probeBody = JSON.parse(lateProbeAnswer.slice(lateProbeAnswer.indexOf("\r\n\r\n") + 4)) as ReadinessResponse;
-    conforms(READINESS_RESPONSE_SCHEMA, probeBody);
+    conforms("getReadiness", 503, probeBody);
     assert.deepEqual(probeBody.checks, { process: "DRAINING", database: "NOT_CHECKED", schema: "NOT_CHECKED" });
     await oracle.query("ROLLBACK");
     locked = false;
@@ -361,11 +359,11 @@ test("R42 and R38: /livez and /readyz outside /api/v1 — readiness verifies a c
     }
     const live = await probe("/livez");
     assert.equal(live.status, 200);
-    conforms(LIVENESS_RESPONSE_SCHEMA, live.body);
+    conforms("getLiveness", 200, live.body);
     assert.deepEqual(live.body, { status: "LIVE" });
     const ready = await probe("/readyz");
     assert.equal(ready.status, 200);
-    conforms(READINESS_RESPONSE_SCHEMA, ready.body);
+    conforms("getReadiness", 200, ready.body);
     assert.deepEqual(ready.body, { status: "READY", checks: { process: "SERVING", database: "AVAILABLE", schema: "COMPATIBLE" }, schemaVersion: { code, database: code } });
     assert.match(ready.contentType ?? "", /^application\/json/);
     // drifted: a shipped version recorded under another checksum
@@ -373,7 +371,7 @@ test("R42 and R38: /livez and /readyz outside /api/v1 — readiness verifies a c
     await oracle.query("UPDATE kauro_meta.schema_migrations SET checksum = repeat('0', 64) WHERE version = $1", [code]);
     const drifted = await probe("/readyz");
     assert.equal(drifted.status, 503);
-    conforms(READINESS_RESPONSE_SCHEMA, drifted.body);
+    conforms("getReadiness", 503, drifted.body);
     assert.deepEqual((drifted.body as ReadinessResponse).checks, { process: "SERVING", database: "AVAILABLE", schema: "DRIFTED" });
     assert.equal(notReady.at(-1)?.correlationId, drifted.correlationId, "the NOT_READY answer is logged under its correlation id");
     await oracle.query("UPDATE kauro_meta.schema_migrations SET checksum = $2 WHERE version = $1", [code, original.rows[0]?.checksum]);
@@ -382,12 +380,14 @@ test("R42 and R38: /livez and /readyz outside /api/v1 — readiness verifies a c
     const behind = await probe("/readyz");
     assert.equal(behind.status, 503);
     assert.deepEqual(behind.body, { status: "NOT_READY", checks: { process: "SERVING", database: "AVAILABLE", schema: "BEHIND" }, schemaVersion: { code, database: code - 1 } });
+    conforms("getReadiness", 503, behind.body);
     await oracle.query("INSERT INTO kauro_meta.schema_migrations (version, name, checksum) VALUES ($1, $2, $3)", [code, removed.rows[0]?.name, removed.rows[0]?.checksum]);
     // a newer expand migration of the next release: this release stays ready
     await oracle.query("INSERT INTO kauro_meta.schema_migrations (version, name, checksum) VALUES ($1, 'next_release_expand', repeat('b', 64))", [code + 1]);
     const ahead = await probe("/readyz");
     assert.equal(ahead.status, 200);
     assert.deepEqual((ahead.body as ReadinessResponse).schemaVersion, { code, database: code + 1 });
+    conforms("getReadiness", 200, ahead.body);
     await oracle.query("DELETE FROM kauro_meta.schema_migrations WHERE version = $1", [code + 1]);
 
     // an idle pooled connection exists; then the database goes away
@@ -414,6 +414,10 @@ test("R42 and R38: /livez and /readyz outside /api/v1 — readiness verifies a c
     const down = await probe("/readyz");
     assert.equal(down.status, 503);
     assert.deepEqual(down.body, { status: "NOT_READY", checks: { process: "SERVING", database: "UNAVAILABLE", schema: "NOT_CHECKED" }, schemaVersion: { code, database: null } });
+    conforms("getReadiness", 503, down.body);
+    // the declared replies are closed: a member the schema does not name is refused, as is a state outside its enum
+    assert.deepEqual(probeReplies.validate("getReadiness:503", { ...(down.body as object), detail: "connect ECONNREFUSED" }), [{ field: "detail", code: "UNKNOWN_FIELD" }]);
+    assert.notDeepEqual(probeReplies.validate("getLiveness:200", { status: "DEGRADED" }), []);
     assert.equal(notReady.at(-1)?.correlationId, down.correlationId);
     assert.ok(notReady.at(-1)?.cause instanceof Error);
     assert.equal((await probe("/livez")).status, 200);
