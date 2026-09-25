@@ -56,11 +56,11 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
+          // the reason is a label (decision D-API-1): recorded on the approval row, never carried by an event payload
           payload: {
             approvalId: approval.approvalId,
             agencyId: membership.agencyId,
             planId,
-            reasonCode: envelope.body.reasonCode,
             withdrawnByMembershipId: membership.membershipId,
             completedExternalActions: completed.map((a) => a.referenceId),
           },
@@ -74,7 +74,7 @@ export function withdrawApprovalHandler(runtime: CommandRuntime, inspector: Exte
           actor,
           causationId: ctx.causationId,
           correlationId: envelope.correlationId,
-          payload: { planId, agencyId: membership.agencyId, approvalId: approval.approvalId, reasonCode: envelope.body.reasonCode },
+          payload: { planId, agencyId: membership.agencyId, approvalId: approval.approvalId },
         });
         return {
           status: 200,

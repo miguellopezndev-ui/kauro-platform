@@ -121,7 +121,8 @@ CREATE TABLE kauro.approvals (
   created_at                  timestamptz NOT NULL,
   withdrawn_at                timestamptz,
   withdrawn_by_membership_id  uuid,
-  withdraw_reason_code        text CHECK (withdraw_reason_code IS NULL OR kauro.is_token(withdraw_reason_code)),
+  -- CMD026 reasonCode is a registry `label` (decision D-API-1); it is stored here and never copied into an event payload
+  withdraw_reason_code        text CHECK (withdraw_reason_code IS NULL OR kauro.is_label(withdraw_reason_code)),
   updated_at                  timestamptz NOT NULL,
   UNIQUE (agency_id, approval_id),
   UNIQUE (agency_id, approval_hash),

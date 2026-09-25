@@ -5,7 +5,9 @@
  *
  * Property names are exactly the registry field names of each command (a test proves it against commands.json). Scalar shapes
  * follow the field vocabulary of @kauro/contracts: id = lowercase RFC 9562 UUID, label = 1..200 characters without control
- * characters, version = positive safe integer, hash = lowercase SHA-256 hex. These are wire input contracts only: server-owned
+ * characters, version = positive safe integer, hash = lowercase SHA-256 hex. CMD026 reasonCode is typed `label` by the
+ * registry and reference/FIELD_CONTRACTS (every reasonCode field of the catalogue is a label), so it is a label here too
+ * (decision D-API-1). These are wire input contracts only: server-owned
  * state, hashes derived from bytes, tenant membership and qualification flags are never request members.
  */
 export const REQUEST_SCHEMA_PREFIX = "urn:kauro:api:v1:request:";
@@ -14,7 +16,6 @@ const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}
 const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]+$" } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
-const REASON_CODE = { type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" } as const;
 const MODE = { type: "string", enum: ["CLEAN", "HUBSPOT", "SALESFORCE"] } as const;
 
 export interface RequestSchema {
@@ -57,7 +58,7 @@ export const REQUEST_SCHEMAS = Object.freeze({
     assuranceProofRef: ID,
   }),
   /** WithdrawApproval. */
-  CMD026: schema("CMD026", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: REASON_CODE }),
+  CMD026: schema("CMD026", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: LABEL }),
 } as const);
 
 export type RequestSchemaCommand = keyof typeof REQUEST_SCHEMAS;
