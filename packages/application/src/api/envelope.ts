@@ -29,12 +29,21 @@ export const REQUEST_LIMITS = Object.freeze({
   maxDepth: 16,
   maxStringLength: 40_000,
   /**
-   * A client-supplied correlation id is echoed only when it is an `id` (lowercase RFC 9562 UUID, the request-schema id
+   * A client-supplied correlation id is adopted only when it is an `id` (lowercase RFC 9562 UUID, the request-schema id
    * shape): the registry types DomainEvent.correlationId as `id`, and the command journal, the domain events and the security
-   * events store it as a uuid. Anything else is CORRELATION_ID_INVALID; an absent one is minted by the server (I-INT-4).
+   * events store it as a uuid. Any other value — a proxy's own request id, an uppercase UUID, a token with spaces — is
+   * ignored, never refused and never echoed: the server mints a UUIDv7 instead, exactly as for an absent header (10
+   * "Every request receives an opaque correlation ID"; review finding R28, which supersedes the refusal of I-INT-4).
    */
   correlationIdPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
 });
+
+/**
+ * Envelope header fields that carry one value and are refused when a request repeats them (review finding R41). Node keeps
+ * the first Content-Type and Authorization and joins the others, so a repetition would otherwise be decided silently — a
+ * second bearer token could even pick the acting subject. The transport reports repetitions from its raw header list.
+ */
+export const SINGLE_VALUED_HEADERS: ReadonlySet<string> = new Set(["authorization", "content-type", HEADERS.correlationId, HEADERS.idempotencyKey, HEADERS.agency]);
 
 /**
  * What authentication established about the caller (08 "Identity is not permission": authentication produces an identity
@@ -58,6 +67,12 @@ export interface CommandEnvelope<Body> {
   readonly subject: AuthenticatedSubject;
   /** Agency selector: from the path or the header; null only for commands without a tenant (CMD001). */
   readonly agencyId: AgencyId | null;
+  /**
+   * Keyed SHA-256 of the client address the transport established (08 "Abuse controls": rate limiting combines IP,
+   * verified identity, agency and operation; review finding R34). The address itself never enters the application; null
+   * only when the transport has no client address (an in-process caller).
+   */
+  readonly clientAddressHash: Sha256Hex | null;
   /** Path-bound aggregate ids in route order; validated as ids before use. */
   readonly path: Readonly<Record<string, string>>;
   /** The body after structural validation against the closed request schema; never a raw parse result. */

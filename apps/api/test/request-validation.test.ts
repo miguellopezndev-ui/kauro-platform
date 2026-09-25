@@ -185,13 +185,15 @@ test("the correlation id is echoed when supplied, generated otherwise, and prese
   assert.equal(generated.status, 400);
   assert.match(String(generated.headers["x-correlation-id"]), /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(asProblem(w, generated).correlationId, generated.headers["x-correlation-id"]);
-  // not an id: refused and never echoed — an opaque token of another shape could not be recorded (the journal, the events and
+  // not an id: never refused and never echoed (R28; 10 "Every request receives an opaque correlation ID") — the request goes on
+  // under a server-minted UUIDv7, since an opaque token of another shape could not be recorded (the journal, the events and
   // the security events store a uuid) and a header value is no place for log injection
   for (const token of ["client-abc.123", "abc def\\u0000<script>", supplied.toUpperCase()]) {
-    const refused = await refusedAtTheBoundary(token, () => call(w, { url: routes.createAgency(), body: { displayName: "Acme Two" }, headers: { "x-correlation-id": token }, agency: null }));
-    assert.equal(outcome(w, refused), "400 INVALID_REQUEST CORRELATION_ID_INVALID", token);
-    assert.match(String(refused.headers["x-correlation-id"]), /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    assert.ok(!refused.text.includes("script") && !refused.text.includes("client-abc"), token);
+    const proceeded = await call(w, { url: routes.createAgency(), body: { displayName: "Acme Two" }, headers: { "x-correlation-id": token }, agency: null });
+    assert.equal(outcome(w, proceeded), "429 ADMISSION_LIMITED DRAFT_AGENCY_EXISTS", token);
+    assert.match(String(proceeded.headers["x-correlation-id"]), /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.equal(asProblem(w, proceeded).correlationId, proceeded.headers["x-correlation-id"]);
+    assert.ok(!proceeded.text.includes("script") && !proceeded.text.includes("client-abc") && !proceeded.text.includes(supplied.toUpperCase()), token);
   }
   // a success carries it too, and so do the durable records of the operation: the journal entry and the event
   const traced = ids.next();

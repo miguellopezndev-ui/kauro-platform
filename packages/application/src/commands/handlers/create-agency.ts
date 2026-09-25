@@ -23,7 +23,10 @@ export function createAgencyHandler(runtime: CommandRuntime, limiter: AbuseLimit
     spec: CREATE_AGENCY,
     execute: (envelope) =>
       runCommand<CreateAgencyBody, CreateAgencyView>(CREATE_AGENCY, runtime, envelope, async (uow, ctx) => {
-        const admission = await limiter.admit(CREATE_AGENCY.id, { userId: envelope.userId, agencyId: null }, ctx.now);
+        // 08 "Abuse controls": the limit combines the verified identity and the client address (keyed hash from the transport),
+        // so rotating identities from one address does not reopen it (review finding R34)
+        const subject = { userId: envelope.userId, agencyId: null, ...(envelope.clientAddressHash !== null ? { clientAddressHash: envelope.clientAddressHash } : {}) };
+        const admission = await limiter.admit(CREATE_AGENCY.id, subject, ctx.now);
         if (admission.kind === "LIMITED") {
           throw new DomainFailure("ADMISSION_LIMITED", "agency creation not admitted", {
             reason: admission.reason,
