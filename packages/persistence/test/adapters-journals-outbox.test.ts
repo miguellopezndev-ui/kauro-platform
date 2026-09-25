@@ -2,7 +2,8 @@
 // - 10 "Idempotency contract" (S052): same key + same digest → the stored response replays; same key + another digest →
 //   IDEMPOTENCY_CONFLICT with no effect; a concurrent duplicate waits for the first transaction and then replays; a
 //   rejected command leaves no row; a response lost after commit is recovered by the key.
-// - Registry RequestJournal / S089 structural half: no dispatch intent without a full hash, a positive ceiling and a grant;
+// - Registry RequestJournal / S089: no dispatch intent without a full hash, a positive ceiling and a grant reference, and none
+//   on an upstream that is not resolved (not CONSUMED, unknown or foreign), including under a concurrent upstream transition;
 //   response before consume; terminal states final; fence-scoped updates.
 // - 07 "Outbox, inbox and event ordering": the outbox commits with the event; sequence order equals aggregate-version
 //   order inside an aggregate; one event per aggregate version; payloads are allowlisted.

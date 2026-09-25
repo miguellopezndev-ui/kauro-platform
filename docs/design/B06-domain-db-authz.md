@@ -54,8 +54,8 @@ What this branch delivers, and what it does not:
 | D-AGG-1 | Project (no registry contract) has states OPEN, CLOSED, DELETION_REQUESTED, DELETED with listed edges OPEN→CLOSED, OPEN→DELETION_REQUESTED, CLOSED→DELETION_REQUESTED, DELETION_REQUESTED→DELETED. B06 creates OPEN projects only. | 07 "Aggregate ownership" names Project; 07 "Package and import states" puts closure distinctions on delivery; 10 deletion-requests route. |
 | D-AGG-2 | EndClient carries a `version` (the registry contract has none) because CMD010 names `expectedVersion`; its only listed edge is ACTIVE→ARCHIVED. The `EndClientView` DTO exposes the version. | CMD010 field list; 10 "Resource reads return a version or ETag where edits are supported." |
 | D-ERR-1..3 | Three platform failure codes beside the seventeen of manual 10: PRECONDITION_FAILED (409, an aggregate is not in a state the listed transition allows), ADMISSION_LIMITED (429, abuse/capacity admission refused), INTERNAL_ERROR (500, opaque by correlation id). | 10 "Stable codes include ..." (the list is not closed); 07 "Authentication, authorization, stale version, invalid input ... are distinct." |
-| D-LEASE-1 | Leases carry the immutable subject (`subject_hash`), the absolute `deadline_at` and the `checkpoint_hash` of the leased operation. A takeover advances the fence by one; a resume must present the stored checkpoint; deadline and subject never change; a renewal never extends past the deadline. | Contract Lease; 07 "A lease renewal cannot change the immutable execution subject"; S090. |
-| D-S089/S090/S093 | See §10: the registry assigns these three cases to B06/G-DOMAIN although their subjects (mandate materialization, RESUME semantics, schema compilation) are owned by manuals 22 and 10. B06 demonstrates their domain/database half and names the boundary honestly. | 21 "NOT_APPLICABLE requires a reason; it is not a way to avoid a promised feature." |
+| D-LEASE-1 | Leases carry the immutable subject (`subject_hash`), the absolute `deadline_at`, the cost identity (`cost_authority_id`: the funding authority the leased operation spends against — the CostGrant of a MODEL_TASK, the CommercialAuthorization of a JOB_ATTEMPT; none for OUTBOX_DISPATCH and SWEEP) and the `checkpoint_hash` of the leased operation. A takeover advances the fence by one; a resume must present the stored checkpoint; deadline, subject and cost identity never change; a renewal never extends past the deadline. | Contract Lease; 07 "A lease renewal cannot change the immutable execution subject"; 07 "CommercialAuthorization" (consumed by one logical processing job, with technical retries under that same entitlement); contract Audit ("retains its original deadlines and grant across retries"); 22 "Preserve original deadlines and cost grants"; S090 "preserve original subject, clock, cost and checkpoint identity". |
+| D-S089/S090/S093 | See §10: the registry assigns these three cases to B06/G-DOMAIN although their subjects (mandate materialization, RESUME semantics, schema compilation) are owned by manuals 22 and 10. B06 implements and demonstrates every half its own contracts can carry (S089: full hash, positive ceiling, grant reference and resolved upstreams; S090: subject, clock, cost and checkpoint identity) and names the halves other packages own, with their registry cases (case map: S089 and S093 PARTIAL). | 21 "NOT_APPLICABLE requires a reason; it is not a way to avoid a promised feature"; prompts/B06 "If a case is not applicable, explain the precise contract/environment reason ... do not mark skipped work PASS". |
 
 ## 2. Topology and packages (07 "Platform topology")
 
@@ -117,8 +117,8 @@ order (`end_clients (agency_id, created_at, client_id)`; `projects (agency_id, c
 | `outbox_records` | OutboxRecord | v7 PK; FK domain_events; `(event_id, consumer)` unique; state enum; attempts never decrease; DELIVERED is final | tenant through the event; `kauro_control` all |
 | `inbox_records` | InboxRecord | v7 PK; **`(provider, environment, external_event_id)` unique**; `body_hash`; APPLIED ⇔ `applied_at` | ingress (all) and control |
 | `command_journal` | idempotency record (10) | v7 PK; **identity unique index `(environment, actor_kind, actor_id, coalesce(agency_id, nil), operation, idempotency_key)`**; digest; COMMITTED needs status+body+resource+time; final entries never change | tenant, or identity-owned when `agency_id IS NULL`; `kauro_control` read |
-| `request_journal` | RequestJournal | v7 PK; full `request_hash`; `fence ≥ 1`; `reserved_cents > 0`; `cost_grant_id NOT NULL`; `(task_id, fence)` unique; response before consume; terminal states final; reservation immutable | `kauro_control` all; tenant read |
-| `leases` | Lease (+ subject, deadline, checkpoint) | PK `(resource_kind, resource_id)`; `fence ≥ 1`; `expires_at ≤ deadline_at`; deadline/subject immutable; fence/checkpoint guard | `kauro_control` all |
+| `request_journal` | RequestJournal (+ upstreams) | v7 PK; full `request_hash`; `fence ≥ 1`; `reserved_cents > 0`; `cost_grant_id NOT NULL`; `upstream_request_ids` declared (≤ 64), every one a CONSUMED attempt of the same scope at reservation (guard `request_journal_upstream_resolved`, KA009); `(task_id, fence)` unique; response before consume; terminal states final; reservation immutable | `kauro_control` all; tenant read |
+| `leases` | Lease (+ subject, deadline, cost identity, checkpoint) | PK `(resource_kind, resource_id)`; `fence ≥ 1`; `expires_at ≤ deadline_at`; `cost_authority_id` present exactly for MODEL_TASK and JOB_ATTEMPT; deadline/subject/cost identity immutable; fence/checkpoint guard | `kauro_control` all |
 | `security_events` | security facts (08) | v7 PK; actor/action/outcome/reason/policy/assurance/correlation/time; append-only | tenant or identity-owned insert; tenant read; control all |
 | `state_transitions` | listed edges (reference/TRANSITIONS) | PK `(machine, from, to)`; seeded per machine; trigger `enforce_listed_transition` on every aggregate with a machine | read |
 
@@ -439,23 +439,33 @@ with B10/B16. Every payload key is allowlisted (`EVENT_PAYLOAD_ALLOWLIST`), sche
 
 - **S089** "A prompt has short SHA, failed upstream or spending without ceiling → reject runnable materialization until
   actual dependencies and grants are resolved." Manual 22 states it for mandates; in the product the runnable materialization
-  is a dispatch intent (`request_journal`). B06 makes the structural half impossible to violate: `request_hash` must be a full
-  SHA-256 (a short SHA is a CHECK violation), `reserved_cents > 0` (no spend without a ceiling), `cost_grant_id NOT NULL`
-  (grants resolved), one attempt per `(task_id, fence)`, response stored before consumption, terminal states final,
-  reservation immutable. The behavioural half (upstream task failure blocks dispatch) is the intelligence orchestrator (B08),
-  which consumes the `RequestJournal` port.
+  is a dispatch intent (`request_journal`, state RESERVED). B06 makes it impossible to materialize one with a short SHA
+  (`request_hash` must be a full SHA-256, CHECK), without a ceiling (`reserved_cents > 0`), without a grant reference
+  (`cost_grant_id NOT NULL`) or on an unresolved upstream: the intent declares `upstream_request_ids`, and the guard
+  `request_journal_upstream_resolved` (BEFORE INSERT, reading each upstream FOR SHARE) refuses it with KA009 → PRECONDITION_FAILED
+  / UPSTREAM_UNRESOLVED unless every upstream is a CONSUMED attempt of the same tenant scope — CONSUMED is terminal, so a
+  resolved dependency can never turn into a failed one, and an upstream failing concurrently is ordered before the reservation.
+  One attempt per `(task_id, fence)`, response stored before consumption, terminal states final, reservation and upstream list
+  immutable. Not in B06 (case map, PARTIAL): that `cost_grant_id` names an actual funded CostGrant with room under its ceiling —
+  CostGrant is not a B06 contract; grant admission is S041 and IC-12 (B03) and R2-044 (B08) — and the public commands that
+  materialize provider work, CMD020 StartAudit (B03) and CMD036 ExecuteProject (B08). Tests `journals-leases` (database) and
+  `adapters-journals-outbox` (the `RequestJournal` port, with the concurrent interleavings).
 - **S090** "RESUME lacks a checkpoint or resets an absolute deadline → reject restart; preserve original subject, clock, cost
   and checkpoint identity." Rendered on `leases`: `claim_lease` refuses a takeover that omits the stored checkpoint
-  (RESUME_WITHOUT_CHECKPOINT) or names another one (CHECKPOINT_MISMATCH), refuses a changed `deadline_at` or `subject_hash`
-  (IMMUTABLE_COLUMN), never extends a lease past the deadline, refuses claims after the deadline, advances the fence by exactly
-  one per takeover and fences out the previous owner's heartbeats and checkpoints. Cost identity lives in `request_journal`
-  (immutable reservation). Test `journals-leases` walks the full interleaving.
+  (RESUME_WITHOUT_CHECKPOINT) or names another one (CHECKPOINT_MISMATCH), refuses a changed `deadline_at` (clock),
+  `subject_hash` or `cost_authority_id` (IMMUTABLE_COLUMN; the adapter answers DEADLINE_IMMUTABLE, SUBJECT_IMMUTABLE,
+  COST_IMMUTABLE), never extends a lease past the deadline, refuses claims after the deadline, advances the fence by exactly one
+  per takeover and fences out the previous owner's heartbeats and checkpoints. The cost identity is the funding authority the
+  leased operation spends against (D-LEASE-1), so a takeover continues under the same grant or entitlement and cannot reset what
+  the operation already spent. No command of the catalogue performs a resume (a takeover is a worker's claim); the `LeaseStore`
+  port is the boundary. Tests `journals-leases` and `adapters-leases` walk the full interleaving.
 - **S093** "Customer target metadata is compiled as a trusted JSON Schema → reject the boundary; compile only reviewed
   application-owned schemas." The `SchemaValidator` port is closed over `KnownSchemaId` (registry contract names + the request
   schema ids + Problem); there is no compile-from-value entry; `target_contracts.objects` is JSONB *data* validated against the
   application-owned TargetContract schema and stamped with `schema_bundle_digest`. Test `schema-boundary` proves the closed set
   and that TargetContract types metadata as data; the HTTP half is `apps/api/test/schema-boundary.test.ts`, on the routes B06
-  serves and the validator instance the api composes (the target-contract route is CMD018, package B17 — case map).
+  serves and the validator instance the api composes. The command that carries customer target metadata into a transaction is
+  CMD018 CreateTargetContract, whose cases belong to package B17; B06 serves none of it, so S093 is PARTIAL in the case map.
 
 ## 11. Open questions for the authority
 
@@ -465,7 +475,7 @@ with B10/B16. Every payload key is allowlisted (`EVENT_PAYLOAD_ALLOWLIST`), sche
 | Q2 | Creation abuse limits for CreateAgency (rate per identity, per address). | one DRAFT per identity structurally; rate values with the AbuseLimiter adapter. |
 | Q3 | EndClient has no `version` field in the registry although CMD010 names `expectedVersion`. | column + DTO version (D-AGG-2); propose adding `version` to the contract. |
 | Q4 | Project has no registry contract or state machine. | D-AGG-1; propose a Project contract. |
-| Q5 | S089/S090 are worded for mandate materialization (manual 22) but routed to B06/G-DOMAIN. | domain/database half demonstrated here; the behavioural half named for B08/B11 (§10). |
+| Q5 | S089/S090 are worded for mandate materialization (manual 22) but routed to B06/G-DOMAIN, whose contracts (prompts/B06) do not include RequestJournal or CostGrant. | S089 on `request_journal` (full hash, ceiling, grant reference, resolved upstreams) and S090 on `leases` (subject, clock, cost and checkpoint identity) are implemented and demonstrated here; the actual-grant half of S089 is routed to S041/IC-12 (B03) and R2-044 (B08) (§10; case map: S089 PARTIAL). |
 | Q6 | Whether an APPROVER other than the approving actor may withdraw an approval. | actor or OWNER (D-AUTHZ-3). |
 | Q7 | Whether client/project creation should require an ACTIVE agency. | DRAFT or ACTIVE (D-CMD-2). |
 | Q8 | Whether a cancelled logical operation (cancel_version > 0) must refuse new lease claims, or only be observed by the holder. | observed only; the `CANCELLED` claim refusal is not produced (D-LEASE-2). |
@@ -496,7 +506,7 @@ Decisions the implementation had to add:
 | D-UOW-1 | After `COMMIT` the adapter checks the command tag: PostgreSQL answers `ROLLBACK` (no error) when the transaction block was aborted earlier, which would let a handler that swallowed a refusal "succeed" with nothing persisted. Such a unit of work is `INTEGRITY_FAILURE`. | 07 "Transaction discipline" (a successful command commits state, event and outbox atomically — or nothing); 10 "An unexpected 500 does not automatically mean a command did not commit" (the converse must hold too). |
 | D-UOW-2 | Error translation: `DomainFailure` passes through; a database refusal becomes the SQLSTATE-table failure (`57014` query_canceled added as `CAPACITY_UNAVAILABLE`, retryable); an unmapped unique violation is `ConstraintViolation` (INTEGRITY_FAILURE carrying the constraint name for the handler); anything else is `INTERNAL_ERROR` naming only the correlation id, with the original error as server-side `cause`. `40001`/`40P01` re-run the work in a fresh transaction up to `maxRetries` (default 0 at READ COMMITTED, 2 above). | 10 "Responses and safe errors"; 07 "Command outcomes" (resource saturation is distinct and retryable); 07 "bounded serializable retries". |
 | D-JOURNAL-1 | Reservation is `INSERT ... ON CONFLICT (identity index expression) DO NOTHING RETURNING`: a concurrent duplicate blocks on the identity index until the first transaction ends, then reads the committed row (REPLAY / CONFLICT / PENDING) or proceeds as first after a rollback — no savepoint, no second round trip in the common case. A FAILED entry with the same digest replays as FAILED. `commit` accepts only 2xx outcomes. | 10 "Idempotency contract" (a concurrent duplicate receives the same durable result); D-IDEM-2. |
-| D-LEASE-2 | `claim` runs under a savepoint so a refusal is an outcome (`RESUME_WITHOUT_CHECKPOINT` also covers a checkpoint mismatch, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`, `DEADLINE_PASSED`) and the control-plane unit of work continues. The port's `CANCELLED` reason is not produced: the schema has no rule that refuses a claim because of cancellation (cancellation is a generation the owner observes). Open question Q8 for the authority. | 07 "Job and attempt states"; S090; 07 "Outbox" (the sweeper repairs abandoned leases in bounded batches). |
+| D-LEASE-2 | `claim` runs under a savepoint so a refusal is an outcome (`RESUME_WITHOUT_CHECKPOINT` also covers a checkpoint mismatch, `DEADLINE_IMMUTABLE`, `SUBJECT_IMMUTABLE`, `COST_IMMUTABLE`, `DEADLINE_PASSED`) and the control-plane unit of work continues. The port's `CANCELLED` reason is not produced: the schema has no rule that refuses a claim because of cancellation (cancellation is a generation the owner observes). Open question Q8 for the authority. | 07 "Job and attempt states"; S090; 07 "Outbox" (the sweeper repairs abandoned leases in bounded batches). |
 | D-CAP-1 | `CapabilityRepository.findMode` returns the offered capability of the mode when one is published (at most one by index), otherwise the newest capability of the mode, so the handler names `MODE_NOT_OFFERED` against a real state. | CMD011 precondition; 02 "Capability publication contract". |
 ## 12b. Implementation notes — branch `b06/application-api` (steps (2)–(4) of §12)
 
