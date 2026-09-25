@@ -6,8 +6,8 @@
  * authorizer, the handlers and the server over a unit-of-work factory, `startApi` runs both, and `bootstrap` adds the
  * authenticator of the environment and listens (`main.ts` is the process entry).
  */
-export { createApiServer, fastifyPath, classifyInternalError } from "./server.js";
-export type { ApiServerOptions, CommandReply } from "./server.js";
+export { createApiServer, fastifyPath, classifyInternalError, routeInventoryOf } from "./server.js";
+export type { ApiServerOptions, CommandReply, RouteInventoryEntry } from "./server.js";
 export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError } from "./authenticator.js";
 export type { Authenticator, SubjectFacts, BearerTokenEntry } from "./authenticator.js";
 export { loadContractSchemas } from "./schemas.js";
