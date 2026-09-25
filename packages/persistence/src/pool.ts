@@ -6,8 +6,9 @@
  * serve a single statement; that is what makes the RLS policies the authority rather than a convention).
  *
  * The pool knows which runtime group its login role belongs to (kauro_app or kauro_control). The unit-of-work factory uses
- * that fact to refuse a SYSTEM context on the request-handler pool and a TENANT/IDENTITY context on the control pool
- * (decision D-CTX-1: three contexts, two roles, no crossing).
+ * that fact to refuse a SYSTEM context on the request-handler pool and a TENANT/IDENTITY/ANONYMOUS context on the control
+ * pool (decision D-CTX-1, with the ANONYMOUS context of the review record B06-review/A-pipeline-authorization.md: four
+ * contexts, two roles, no crossing).
  */
 import { Pool, type PoolClient } from "pg";
 

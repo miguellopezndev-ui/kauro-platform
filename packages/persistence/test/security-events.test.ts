@@ -8,7 +8,7 @@
 // An agency's runtime role reads its own stream only.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { CausationId, UserId } from "@kauro/domain";
+import { isDomainFailure, type CausationId, type CorrelationId, type ExecutionContext, type SecurityEvent, type UserId } from "@kauro/domain";
 import { clock, ids, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
 let h: Harness;
@@ -128,4 +128,35 @@ test("R2: an agency's runtime role reads its own stream only — never another a
   assert.ok(visible.every((x) => x.agency_id === B.agencyId), "only B's stream");
   const namingB = await h.oracle.query<{ n: string }>("SELECT count(*)::text AS n FROM kauro.security_events WHERE agency_id IS NULL AND requested_agency_id = $1", [B.agencyId]);
   assert.ok(Number(namingB.rows[0]?.n) >= 2, "the oracle sees the facts that name B, which B's role cannot");
+});
+
+test("R26: the ANONYMOUS context runs on the request-handler pool only, sees no row, and writes nothing but its anonymous fact", async () => {
+  const anonymous = (): ExecutionContext => ({ kind: "ANONYMOUS", correlationId: ids.next() as CorrelationId });
+  const fact = (over: Partial<SecurityEvent>): SecurityEvent => ({
+    agencyId: null,
+    requestedAgencyId: A.agencyId,
+    actor: { kind: "ANONYMOUS" },
+    action: "CMD009",
+    outcome: "DENY",
+    reasonCode: "SUBJECT_UNAUTHENTICATED",
+    policyVersion: "B06-1",
+    assuranceClass: "NONE",
+    correlationId: ids.next() as CorrelationId,
+    occurredAt: clock.now(),
+    ...over,
+  });
+  // no crossing: the control pool refuses it before any statement (D-CTX-1)
+  await assert.rejects(h.control.run(anonymous(), async () => null), (e: unknown) => isDomainFailure(e) && e.code === "INTEGRITY_FAILURE");
+  // nothing is visible: no agency, no membership, no identity
+  await h.app.run(anonymous(), async (uow) => {
+    assert.equal(uow.userId, null);
+    assert.equal(await uow.agencies.get(A.agencyId), null);
+    assert.equal(await uow.memberships.get(A.ownerMembershipId), null);
+    assert.equal(await uow.identities.getOwn(alice), null);
+    await uow.securityEvents.append(fact({}));
+  });
+  // and it cannot write a fact in anyone's name or into any stream (each refusal aborts its own unit of work)
+  const refused = (e: unknown): boolean => isDomainFailure(e) && e.code === "NOT_FOUND" && e.details.reason === "TENANT_CONTEXT_MISSING";
+  await assert.rejects(h.app.run(anonymous(), (uow) => uow.securityEvents.append(fact({ actor: { kind: "USER", userId: alice } }))), refused);
+  await assert.rejects(h.app.run(anonymous(), (uow) => uow.securityEvents.append(fact({ agencyId: A.agencyId, requestedAgencyId: null }))), refused);
 });
