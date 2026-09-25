@@ -11,11 +11,14 @@ The application layer of the Kauro platform: the contracts of the public command
 - `ports/*` — authorizer, assurance verifier, abuse limiter, schema validator (closed over known schema ids), plan services
   (artifact resolver, patch compiler, disclosure composer), work inspectors, command handler/bus.
 - `commands/runtime` — `runCommand`: one unit of work per command (journal reserve → authorization → locked preconditions →
-  state + events → journal commit), replay / conflict answers, DomainFailure → CONFLICT / REJECTED / UNAVAILABLE, and the
-  durable security event of every authorization denial (recorded in its own transaction after the rollback).
+  state + events → journal commit, whose stored record is the answer: D-PORT-2), replay / conflict answers, DomainFailure →
+  CONFLICT / REJECTED / UNAVAILABLE, and the durable security event of every authorization denial (recorded in its own
+  transaction after the rollback).
 - `commands/handlers/*` — the seven handlers (`createB06Handlers(runtime, collaborators)`), each following design §8 step by step.
-- `api/admission` — the transport-neutral admission pipeline of manual 10 (content type, size, strict JSON, closed schema,
-  headers, path ids, agency selector) producing the `CommandEnvelope`.
+- `api/admission` — the transport-neutral admission pipeline of manual 10 (correlation id, content type, size, strict JSON,
+  closed schema, headers, path ids, agency selector) producing the `CommandEnvelope`; `admitHeaders` is its header-only head
+  (correlation id, content type) that a transport runs before it reads the body (I-INT-5). A client correlation id must be an
+  `id` (I-INT-4).
 - `api/strict-json`, `api/json-schema`, `api/schema-validation` — the RFC 8259 parser with duplicate-key/depth/length bounds
   and the dependency-free JSON Schema 2020-12 validator over the closed keyword vocabulary of the contract bundle (unknown
   keywords, foreign `$ref`s and unasserted formats are refused at compile time; `date-time` is a real Gregorian instant).

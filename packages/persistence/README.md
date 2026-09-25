@@ -32,7 +32,8 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   `INTEGRITY_FAILURE / VERSION_DISCIPLINE`.
 - `src/command-journal` — `PgCommandJournal`: reservation by `INSERT ... ON CONFLICT (identity) DO NOTHING`, so a concurrent
   duplicate waits for the first transaction and then replays (same digest), conflicts (other digest) or proceeds (rollback);
-  `commit` stores the 2xx status, body and resource link; final entries never change.
+  `commit` stores the 2xx status, body and resource link and returns the entry as stored (the answer of the first execution
+  is the journaled record, byte-equal to every replay: D-PORT-2); final entries never change.
 - `src/request-journal` — `PgRequestJournal`: fence-scoped dispatch attempts; a full hash, a positive ceiling and a grant are
   required; response before consume; terminal states final.
 - `src/lease-store` — `PgLeaseStore` over `kauro.claim_lease / heartbeat_lease / checkpoint_lease / cancel_lease`; a claim
@@ -46,7 +47,12 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   roles, migrations applied, login roles for `kauro_app` / `kauro_control`; `stop()` removes everything. Binaries from
   `PGBIN`, else `C:\Tools\pgsql17\bin` (Windows) or `/usr/lib/postgresql/17/bin` (Linux).
 
-Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. `test/harness.ts` builds the two
-verified pools and unit-of-work factories on a fresh cluster and writes every fixture through the adapters under a real
-context. `migrations`, `tenant-isolation`, `discipline`, `last-owner` and `journals-leases` review the SQL directly;
-`adapters-unit-of-work`, `adapters-tenant-isolation`, `adapters-journals-outbox` and `adapters-leases` review the adapters.
+- `src/testing/harness` — `startHarness()`: the two verified pools and unit-of-work factories on a fresh cluster, the
+  superuser oracle, and fixtures written through the adapters under a real context; capabilities are born DESIGN and
+  published through the listed Capability edges with each gate's evidence (`offeredCapability`, `publishCapability`: D-CAP-2);
+  `waitForLockWait` and `barrier` fix interleavings. Exported for the entrypoints' acceptance tests, never wired into a
+  deployment.
+
+Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. `migrations`, `tenant-isolation`,
+`discipline`, `last-owner` and `journals-leases` review the SQL directly; `adapters-unit-of-work`, `adapters-tenant-isolation`,
+`adapters-journals-outbox` and `adapters-leases` review the adapters.

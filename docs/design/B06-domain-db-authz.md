@@ -243,7 +243,7 @@ agency per identity (`ADMISSION_LIMITED / DRAFT_AGENCY_EXISTS`).
 
 ## 7. API envelope, safe errors, request schemas (10)
 
-Envelope: `X-Correlation-Id` (opaque, generated when absent, echoed), `Idempotency-Key` (required on every command,
+Envelope: `X-Correlation-Id` (an `id`, generated when absent, echoed when supplied as one — I-INT-4), `Idempotency-Key` (required on every command,
 `^[A-Za-z0-9_-]{16,128}$`), `X-Kauro-Agency` (D-SCOPE-1), `Content-Type: application/json`, body ≤ 1 MiB, parser depth ≤ 16,
 strings ≤ 40 000 characters, pages 25 default / 100 maximum (R2 policy `api`). Validation order: content type, size, JSON
 syntax, duplicate keys, closed schema (Ajv strict, `coerceTypes: false`, `removeAdditional: false`, `useDefaults: false`,
@@ -454,7 +454,8 @@ with B10/B16. Every payload key is allowlisted (`EVENT_PAYLOAD_ALLOWLIST`), sche
   application-owned schemas." The `SchemaValidator` port is closed over `KnownSchemaId` (registry contract names + the request
   schema ids + Problem); there is no compile-from-value entry; `target_contracts.objects` is JSONB *data* validated against the
   application-owned TargetContract schema and stamped with `schema_bundle_digest`. Test `schema-boundary` proves the closed set
-  and that TargetContract types metadata as data; the Ajv strict configuration on live HTTP input is the api package's test.
+  and that TargetContract types metadata as data; the HTTP half is `apps/api/test/schema-boundary.test.ts`, on the routes B06
+  serves and the validator instance the api composes (the target-contract route is CMD018, package B17 — case map).
 
 ## 11. Open questions for the authority
 
@@ -510,15 +511,44 @@ Recorded where the implementation had to decide something this document left ope
 | I-ADM-1 | The admission limiter is process-local (sliding windows per identity and per client address hash; interim values five creations per identity per hour, twenty per address per hour). A fleet-wide counter is an operations concern behind the same port. | 08 "Abuse controls"; open question Q2. |
 | I-AUTH-1 | `apps/api` authenticates through an `Authenticator` port; the shipped implementation binds opaque bearer tokens to subjects for LOCAL and tests. The Identity Platform verifier (issuer, audience, signature, email and MFA claims) is not in this branch. | 08 "Authentication and assurance". |
 
-## 13. Verification performed on this branch
+## 12c. Integration record — branch `b06/integration` (steps (4)–(5) of §12)
 
-`pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) passes: 57 tests — contracts 12,
-domain 11, application 8, persistence 26 (every persistence test starts its own PostgreSQL 17.6 cluster via initdb/pg_ctl on
-a free 127.0.0.1 port, applies the seven migrations as `kauro_owner`, and exercises the runtime login roles). The persistence
-tests are the review of the SQL: application and idempotent re-application, drift refusal, role/RLS/ownership facts, enum
-CHECK lists equal to the registry, listed-transition seed equal to the registry machines, event-type seed equal to the domain,
-fail-closed context, cross-tenant invisibility, composite FK refusal, pool reuse after commit/rollback/exception, concurrent
-contexts, self policies, duplicate labels, version discipline (KA002), event-per-version at commit (KA003), unlisted edges
-(KA008), immutable columns (KA004), archive without deletion, S051 race, approval bindings and uniqueness, withdrawal once,
-outbox tenant policy and control delivery, journal digest/replay/conflict/concurrent duplicate, identity-owned CreateAgency
-reservations, S089 structural checks, S090 lease guard, R2-043 deterministic last-owner race.
+`b06/integration` merges `b06/design`, `b06/persistence`, `b06/domain` and `b06/application-api`, applies D-PORT-1 across the
+handlers, the authorizer and the in-memory ports, and adds the composition root of `apps/api` (`config`, `composition`,
+`edition`, `bootstrap`, `main`), the real-database acceptance fixture `apps/api/test/support.ts` and the files that
+demonstrate the 29 cases through the HTTP routes (`docs/design/B06-case-map.md`). The persistence harness moved from
+`packages/persistence/test/harness.ts` to `src/testing/harness.ts` and is exported beside `startTemporaryPostgres` for the
+entrypoint's tests; it is never wired into a deployment. Decisions and corrections the integration made:
+
+| id | decision | why (authority) |
+|---|---|---|
+| I-INT-1 | The composition root runs in two steps. `openDatabase(config)`: pending migrations as the owner role over a dedicated connection (`applyMigrationsAs`, which refuses a SUPERUSER or BYPASSRLS migrator every time), then the runtime pool with the configured ceiling, one connection verified at once — a privileged login or a member of `kauro_control` refuses the start instead of the first request. `assembleApi(assembly)`: the authorizer, the admission limiter, the seven handlers over the edition's collaborators and the Fastify server. Configuration comes from the environment only (`loadConfig`): every variable is validated, a refusal names the variable and never its value, `KAURO_DB_POOL_MAX` has no default, the migrator must differ from the runtime login. | 14 "Deployment and rollback" (explicit environment configuration; refuse to start when an input is missing); 07 "Restoration and migration" (migration roles are separate from runtime); 08 "Database isolation"; 07 "Connection budget and operating limits". |
+| I-INT-2 | The plan-side collaborators are not bound in this edition: in a deployment CMD023 and CMD025 answer INTEGRITY_FAILURE / PLAN_SERVICES_UNAVAILABLE inside the unit of work (rolled back, no journal row). The retained-work inspector counts open projects; the external-action inspector reports none, because no ImportStage or PackageVersion aggregate exists yet. The acceptance tests bind deterministic implementations of ArtifactResolver, PlanPatchCompiler and DisclosureComposer, and for CMD026 an ExternalActionInspector that adds the completed stages a test registers — ports of `@kauro/application`, never fakes of the database. | 07 "Command outcomes and error taxonomy" (integrity failure is distinct and nonretryable until the implementation changes); 07 "Acceptance obligations" ("a downstream team must not fill a missing domain rule with a local guess"); 21 "Gate aliases and scoped closures". |
+| I-INT-3 | Authentication of this edition: LOCAL reads a closed bearer-token file (provider facts per token; its instants must be real calendar instants — the contract validator's `isCalendarDateTime`, because `Date.parse` rolls 2026-02-30 into March); SANDBOX and LIVE refuse to start, since the Identity Platform verifier is not bound. | 08 "Authentication and assurance"; 10 "Schema format execution" (2026-02-30 is the rejection control); 14 "Deployment and rollback". |
+| I-INT-4 | A client-supplied correlation id is echoed only when it is an `id` (lowercase RFC 9562 UUID, the request-schema id shape); anything else is INVALID_REQUEST / CORRELATION_ID_INVALID and an absent one is minted. Before, any `[A-Za-z0-9._:-]{1,128}` token was admitted and every command carrying one failed with 500 at its first insert, since the journal, the events and the security events store a uuid — found when the in-memory api tests were ported to the real database. | Registry contract DomainEvent `correlationId: id` ("Safe operation trace"); reference/FIELD_CONTRACTS "Application IDs are opaque server identities"; 10 "Every request receives an opaque correlation ID". |
+| I-INT-5 | The header-only head of the admission — the correlation id, then the content type (`admitHeaders`) — runs in a route `onRequest` hook before the body is read; `admitStructure` repeats it. Before, an oversized body of an unsupported type was answered BODY_TOO_LARGE by the parser's body limit instead of CONTENT_TYPE_UNSUPPORTED. | 10 "Request envelope" (content type, byte size, JSON syntax, duplicate keys, schema, authenticated subject, authorization); §7 validation order. |
+| D-PORT-2 | `CommandJournal.commit` returns the committed entry as stored (`RETURNING`), and the runtime answers the first execution with the journaled body, decoded exactly as a replay decodes it. The first answer, a concurrent duplicate's answer and the recovery of a lost response are byte-equal except `replayed`; before, jsonb's key normalization made them equal only as JSON values. | 10 "Idempotency contract" ("A concurrent duplicate receives the same durable operation reference or final result"; "A response lost after commit is recovered by the same key"); S052 "identical replay recovers the original durable result". |
+| D-CAP-2 | A capability becomes offered through its own lifecycle, not by a new row: a Capability row is born DESIGN for its revision and reaches an offered state only by the listed edges DESIGN → IMPLEMENTED_UNACCEPTED → QUALIFIED_INTERNAL → AVAILABLE_LIMITED (→ AVAILABLE), each edge recording the evidence its guard names (QUALIFIED_INTERNAL onward cite evidence hashes; AVAILABLE_LIMITED sets `valid_from`). A new version — a new row, `(mode, version)` being unique — is the vehicle for a changed profile or envelope (CMD058 "Create a prospective version") and for the requalification after SUSPENDED, never a shortcut to an offered state. The harness follows this (`offeredCapability` inserts DESIGN and walks the edges; `publishCapability` walks an existing row); the database refuses a skipped edge (KA008) and a second row of the same mode and revision. | Registry `state_transitions` "Capability" (initial DESIGN, unlisted transitions rejected) and reference/TRANSITIONS_AND_EVENT_EFFECTS "Capability" (guards and effects per edge; "New version and requalification are required to restore sale eligibility"); registry contract Capability ("Requested, implemented and qualified are different states"; `version` "Capability revision"; `qualificationEvidenceHashes`; `validFrom` "Activation after acceptance"); 02 "Capability publication contract"; CMD058 ChangeCapability. |
+| I-VIEW-1 | ApprovalView carries `withdrawnByMembershipId` beside `withdrawnAt` and `withdrawReasonCode`, so the CMD026 answer states when, by whom and why (the approving actor's membership is already in the view; no token or security evidence is added). | CMD026 (withdrawal is an authority event of its own); 07 "Audit and plan states" (PlanApproval records the actor's identity and membership); 10 "Responses and safe errors" (safe projections). |
+| I-TEST-1 | Command-level acceptance tests live in `apps/api/test/`: through the real route (Fastify `inject`), the real composition root and a real PostgreSQL 17, with the superuser oracle reading every table and deterministic hold points inside the unit of work (the second request of a race is observed waiting on its lock in `pg_stat_activity`). The in-memory api tests of `e24d4f7` were replaced by real-database ones; every assertion was carried over (case map). | 07 "Acceptance obligations" (real PostgreSQL for tenant constraints, transactions, migrations and concurrency); 21 "Independent oracles", "Concurrency and crash matrix"; 10 "Contract tests and compatibility". |
+
+## 13. Verification performed on `b06/integration`
+
+`pnpm run verify` (generate, build, typecheck, test, architecture gate, clean-consume) passes on Windows 11 (Node 24.14.1,
+PostgreSQL 17.6 from `C:\Tools\pgsql17\bin`) and on Linux (Ubuntu 24.04 under WSL as the unprivileged user `miguel`, a fresh
+clone of the branch, `pnpm install --frozen-lockfile`, Node 24.21.0, `PGBIN=/usr/lib/postgresql/17/bin`, PostgreSQL 17.11):
+216 tests — contracts 12, domain 53, application 44, authorization 9, persistence 56, api 39, tools 3. Every persistence and
+api test file starts its own PostgreSQL 17 cluster (initdb/pg_ctl on a free 127.0.0.1 port, the seven migrations applied as
+`kauro_owner`, runtime login roles in `kauro_app` and `kauro_control`); nothing fakes the database. The architecture gate
+reports 6 packages, 13 edges and no violation; clean-consume installs the five publishable packages from their tarballs alone.
+
+The persistence tests are the review of the SQL: application and idempotent re-application, drift refusal, role/RLS/ownership
+facts, enum CHECK lists equal to the registry, listed-transition seed equal to the registry machines, event-type seed equal to
+the domain, fail-closed context, cross-tenant invisibility, composite FK refusal, pool reuse after commit/rollback/exception,
+concurrent contexts, self policies, duplicate labels, version discipline (KA002), event-per-version at commit (KA003),
+unlisted edges (KA008), immutable columns (KA004), archive without deletion, S051 race, approval bindings and uniqueness,
+withdrawal once, outbox tenant policy and control delivery, journal digest/replay/conflict/concurrent duplicate,
+identity-owned CreateAgency reservations, S089 structural checks, S090 lease guard, R2-043 deterministic last-owner race, and
+the `pg` adapters of every port. The api tests are the review of the commands: the OK/DENY/RACE triads of the seven commands,
+S051 and S052 at the command level, the HTTP half of S093, R2-058, R2-059, the admission order of manual 10, the correlation
+id, the opaque internal error, the route inventory and the deployment path (`bootstrap` on a real cluster, over a socket).
