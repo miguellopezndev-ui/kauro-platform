@@ -252,10 +252,15 @@ export class PgMembershipRepository implements MembershipRepository {
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;
   }
 
+  /**
+   * FOR SHARE: the membership is held until the unit of work ends, so a concurrent suspension, revocation or role change
+   * (an UPDATE of the row) waits for this command, and one that committed first is re-read here — a row that is no longer
+   * live fails the predicate on the re-read and is not returned (READ COMMITTED re-evaluates a locked row's WHERE clause).
+   */
   async findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null> {
     const r = await execute<MembershipRow>(
       this.db,
-      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED')`,
+      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED') FOR SHARE`,
       [agencyId, userId],
     );
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;

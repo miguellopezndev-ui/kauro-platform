@@ -97,7 +97,14 @@ export interface NewMembership {
 export interface MembershipRepository {
   get(membershipId: MembershipId): Promise<MembershipRecord | null>;
   lock(membershipId: MembershipId): Promise<MembershipRecord | null>;
-  /** The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any. */
+  /**
+   * The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any, read with a share lock held to the
+   * end of the unit of work (SELECT ... FOR SHARE; the authorizer's read). A concurrent suspension, revocation or role change
+   * of that row waits until this unit of work ends; one committed first is what this read returns (a revoked row is no longer
+   * live and is not returned). The authorization fact is therefore closed by a lock like every other invariant of a command
+   * (07 "Agency and membership states": revocation is effective server-side immediately for new commands; 07 "Transaction
+   * discipline"). Only a TENANT context of that agency can take the lock.
+   */
   findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null>;
   /** The caller's memberships across agencies (self policy), for context listing. */
   listOwn(userId: UserId): Promise<ReadonlyArray<MembershipRecord>>;
