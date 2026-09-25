@@ -11,5 +11,5 @@
  */
 export { startTemporaryPostgres, ROLES } from "./temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions, LoginRole } from "./temporary-postgres.js";
-export { start as startHarness, waitForLockWait, barrier, CAPABILITY_PUBLICATION_PATH } from "./harness.js";
-export type { Harness, AgencyFixture, CapabilityPublicationState } from "./harness.js";
+export { start as startHarness, waitForLockWait, settlesOrWaits, backendPid, barrier, CAPABILITY_PUBLICATION_PATH } from "./harness.js";
+export type { Harness, AgencyFixture, CapabilityPublicationState, LockObservation } from "./harness.js";

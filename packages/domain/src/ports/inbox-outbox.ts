@@ -71,7 +71,9 @@ export interface InboxConsumerStore {
   claim(limit: number, staleClaimSeconds: number): Promise<ReadonlyArray<ClaimedInboxRecord>>;
   /**
    * Settles a PROCESSING record. APPLIED is refused while a conflicting body is recorded (PRECONDITION_FAILED /
-   * INBOX_BODY_CONFLICT). Returns false when the record is no longer PROCESSING (another consumer settled it).
+   * INBOX_BODY_CONFLICT), including one whose delivery was in flight when the settlement began: the two are ordered, so no
+   * conflict commits beside an APPLIED decision that did not see it. Returns false when the record is no longer PROCESSING
+   * (another consumer settled it).
    */
   settle(inboxId: InboxId, outcome: InboxSettlement, now: UtcInstant, resultEventId?: EventId): Promise<boolean>;
 }

@@ -26,7 +26,7 @@ function* files(dir: string, extension: string): Generator<string> {
   }
 }
 
-const TEST_HELPERS = ["startTemporaryPostgres", "ROLES", "startHarness", "waitForLockWait", "barrier", "CAPABILITY_PUBLICATION_PATH"] as const;
+const TEST_HELPERS = ["startTemporaryPostgres", "ROLES", "startHarness", "waitForLockWait", "settlesOrWaits", "backendPid", "barrier", "CAPABILITY_PUBLICATION_PATH"] as const;
 
 test("R46: the production entry point exports no test helper; the test-only subpath @kauro/persistence/testing does", () => {
   for (const name of TEST_HELPERS) {

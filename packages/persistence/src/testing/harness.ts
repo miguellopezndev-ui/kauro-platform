@@ -402,6 +402,46 @@ export async function waitForLockWait(oracle: Client, applicationName: string, q
   throw new Error(`no backend of ${applicationName} waited on a lock while running ${queryFragment}`);
 }
 
+/** What an operation did while another transaction held what it might need (settlesOrWaits). */
+export type LockObservation<T> =
+  | { readonly kind: "SETTLED"; readonly outcome: PromiseSettledResult<T> }
+  | { readonly kind: "WAITING"; readonly pending: Promise<PromiseSettledResult<T>> };
+
+/**
+ * Observes `operation`, running on the backend `pid`, while another transaction holds what it might need, and reports which
+ * happened first: the operation SETTLED (fulfilled or rejected) without being blocked, or its backend is WAITING on a lock
+ * (pg_stat_activity). While the holder stays open exactly one of the two must happen — an operation that cannot wait finishes,
+ * one that must wait blocks until the holder ends — so the observation fixes the interleaving deterministically (21
+ * "Concurrency and crash matrix"). It is bounded all the same: if neither is observed within `limitMs` it throws, naming
+ * `what`, instead of hanging the test. A WAITING operation keeps running; the caller ends the holder and awaits `pending`,
+ * which never rejects (it carries the outcome).
+ */
+export async function settlesOrWaits<T>(oracle: Client, pid: number, operation: Promise<T>, what: string, limitMs = 10_000): Promise<LockObservation<T>> {
+  let outcome: PromiseSettledResult<T> | undefined;
+  const pending = operation.then(
+    (value): PromiseSettledResult<T> => (outcome = { status: "fulfilled", value }),
+    (reason: unknown): PromiseSettledResult<T> => (outcome = { status: "rejected", reason }),
+  );
+  const deadline = Date.now() + limitMs;
+  for (;;) {
+    if (outcome) return { kind: "SETTLED", outcome };
+    const r = await oracle.query<{ waiting: boolean }>("SELECT wait_event_type IS NOT DISTINCT FROM 'Lock' AS waiting FROM pg_stat_activity WHERE pid = $1", [pid]);
+    // a backend seen blocked cannot have finished meanwhile; one that finished while the oracle looked is SETTLED
+    if (outcome) return { kind: "SETTLED", outcome };
+    if (r.rows[0]?.waiting === true) return { kind: "WAITING", pending };
+    if (Date.now() > deadline) throw new Error(`${what} neither finished nor waited on a lock within ${limitMs} ms`);
+    await new Promise((res) => setTimeout(res, 10));
+  }
+}
+
+/** The backend process id of a connected client (the pid pg_stat_activity reports for it). */
+export async function backendPid(client: Pick<Client, "query">): Promise<number> {
+  const r = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+  const pid = r.rows[0]?.pid;
+  if (pid === undefined) throw new Error("pg_backend_pid() returned no row");
+  return pid;
+}
+
 /** A one-shot barrier two units of work use to fix their interleaving. */
 export function barrier(): { readonly wait: Promise<void>; open(): void } {
   let open: () => void = () => undefined;

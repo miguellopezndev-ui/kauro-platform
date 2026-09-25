@@ -165,6 +165,18 @@ CREATE TRIGGER inbox_records_immutable BEFORE UPDATE ON kauro.inbox_records
 -- it, and the recorded event cannot be settled APPLIED while such a conflict exists — the consumer reconciles it with the
 -- provider (07 "Provider webhooks can arrive duplicated, late or out of order"; 10 "Unknown statuses are not coerced to success
 -- or failure"). Append-only; one row per distinct conflicting body.
+--
+-- The conflicting delivery and the consumer's APPLIED settlement are serialized on the record (residual re-check of this
+-- guard): each checks the other through a row the other has not committed, so without an order a conflict written while the
+-- settlement is in flight, or a settlement written while the conflict is in flight, commits beside it and the record ends
+-- APPLIED with a conflict the decision never saw. The order is the transition-lock protocol of D-TX-2 (0001) on the subject
+-- ('kauro.inbox_records', inbox_id), which needs no privilege the ingress does not hold: a conflicting delivery takes the
+-- shared lock before it is recorded, and the move to APPLIED takes the exclusive lock and only then re-checks the conflicts, in
+-- a statement of its own. So a settlement that meets a conflict in flight waits for it and then sees it (KA012); a conflict
+-- that meets a settlement in flight waits for the decision and is recorded against the settled record (history for
+-- reconciliation, never absorbed); conflicting deliveries never wait for each other. The re-check sees what committed while it
+-- waited only under READ COMMITTED (a new snapshot per statement); a REPEATABLE READ or SERIALIZABLE settlement would re-check
+-- its older snapshot, so the move to APPLIED is refused under them (0A000) before it waits.
 CREATE TABLE kauro.inbox_body_conflicts (
   conflict_id  uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(conflict_id)),
   inbox_id     uuid NOT NULL REFERENCES kauro.inbox_records (inbox_id),
@@ -181,6 +193,8 @@ $$
 DECLARE
   recorded text;
 BEGIN
+  -- ordered against an APPLIED settlement of the record in flight (the shared half of the record's transition lock)
+  PERFORM pg_advisory_xact_lock_shared(kauro.transition_key('kauro.inbox_records', NEW.inbox_id::text));
   SELECT r.body_hash INTO recorded FROM kauro.inbox_records r WHERE r.inbox_id = NEW.inbox_id;
   IF recorded IS NULL THEN
     RAISE EXCEPTION 'CONTEXT: inbox record % is not visible', NEW.inbox_id USING ERRCODE = 'KA006';
@@ -198,6 +212,12 @@ CREATE OR REPLACE FUNCTION kauro.inbox_apply_without_conflict() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
+  IF current_setting('transaction_isolation') <> 'read committed' THEN
+    RAISE EXCEPTION 'INBOX_APPLY_ISOLATION: inbox record % is applied under READ COMMITTED only, so that its conflict re-check reads what committed while it waited', NEW.inbox_id USING ERRCODE = '0A000';
+  END IF;
+  -- the exclusive half of the record's transition lock: a conflicting delivery in flight commits (or rolls back) first, and the
+  -- next statement reads it with a new snapshot
+  PERFORM pg_advisory_xact_lock(kauro.transition_key('kauro.inbox_records', NEW.inbox_id::text));
   IF EXISTS (SELECT 1 FROM kauro.inbox_body_conflicts c WHERE c.inbox_id = NEW.inbox_id) THEN
     RAISE EXCEPTION 'INBOX_BODY_CONFLICT: inbox record % has deliveries with another body; reconcile before applying it', NEW.inbox_id USING ERRCODE = 'KA012';
   END IF;

@@ -6,10 +6,14 @@
  *   the evidence recorders: the request handlers of agency users hold no privilege on the inbox (migration 0005), so no tenant
  *   code path can pre-insert an event id and suppress the genuine delivery. A delivery whose identity is already recorded is a
  *   DUPLICATE when its body hash is the recorded one and a BODY_CONFLICT otherwise: the conflict is recorded (append-only) and
- *   the event cannot be applied until reconciled — a different body is never absorbed as a duplicate.
+ *   the event cannot be applied until reconciled — a different body is never absorbed as a duplicate. The database orders a
+ *   conflict and an APPLIED settlement of the same record (0005, the record's transition lock): neither commits beside the
+ *   other unseen.
  * - PgInboxConsumerStore and PgOutboxDispatchStore run inside a control-plane unit of work (SYSTEM context, kauro_control):
  *   claims use FOR UPDATE SKIP LOCKED so concurrent workers take disjoint records; an outbox settlement names the attempt it
- *   claimed, so a claim that expired and was taken again by another dispatcher settles nothing (FENCED).
+ *   claimed, so a claim that expired and was taken again by another dispatcher settles nothing (FENCED). An inbox record is
+ *   settled APPLIED only under READ COMMITTED (the unit of work's default): the database refuses it under a snapshot isolation
+ *   (0A000), whose conflict re-check could not see a conflict committed while it waited.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {

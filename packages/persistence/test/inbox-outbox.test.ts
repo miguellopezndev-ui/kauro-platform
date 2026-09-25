@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { isDomainFailure, toUtcInstant, type InboxId, type OutboxId, type UnitOfWork, type UserId } from "@kauro/domain";
-import { PgOutboxDispatchStore } from "../src/index.js";
-import { clock, ids, sha, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { PgInboxConsumerStore, PgOutboxDispatchStore } from "../src/index.js";
+import { backendPid, clock, ids, settlesOrWaits, sha, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { bind, sqlState, tx } from "./support.js";
 
 let h: Harness;
@@ -70,13 +70,22 @@ test("N20: two dispatchers claiming at once take disjoint records (SKIP LOCKED),
   const t0 = Date.now() + 60_000;
   const c1 = await h.pg.connect("kauro_control_test");
   const c2 = await h.pg.connect("kauro_control_test");
+  let waiting: Promise<unknown> | undefined;
   try {
     await c1.query("BEGIN");
     await c2.query("BEGIN");
     const first = await new PgOutboxDispatchStore(c1).claim("NOTIFICATIONS", 2, at(t0), 30);
-    const secondClaim = await new PgOutboxDispatchStore(c2).claim("NOTIFICATIONS", 100, at(t0), 30);
-    const firstIds = new Set(first.map((d) => d.outboxId));
     assert.equal(first.length, 2);
+    // the first dispatcher's transaction stays open, holding its two records: the second claim must pass them by. A claim that
+    // locks without SKIP LOCKED blocks on them for as long as the first holds them, so the observation, not the claim, decides
+    const observed = await settlesOrWaits(h.oracle, await backendPid(c2), new PgOutboxDispatchStore(c2).claim("NOTIFICATIONS", 100, at(t0), 30), "the second dispatcher's claim");
+    if (observed.kind === "WAITING") {
+      waiting = observed.pending;
+      assert.fail("the second dispatcher waited on the records the first one holds instead of skipping them: a concurrent claim must lock FOR UPDATE SKIP LOCKED");
+    }
+    if (observed.outcome.status === "rejected") throw observed.outcome.reason;
+    const secondClaim = observed.outcome.value;
+    const firstIds = new Set(first.map((d) => d.outboxId));
     assert.equal(secondClaim.some((d) => firstIds.has(d.outboxId)), false, "the second dispatcher skipped the rows the first holds");
     const mineInSecond = secondClaim.filter((d) => agencies.some((a) => a.agencyId === d.event.agencyId)).length;
     const mineInFirst = first.filter((d) => agencies.some((a) => a.agencyId === d.event.agencyId)).length;
@@ -84,6 +93,10 @@ test("N20: two dispatchers claiming at once take disjoint records (SKIP LOCKED),
     await c1.query("COMMIT");
     await c2.query("COMMIT");
   } finally {
+    // a claim left waiting is let go by ending the first transaction, and awaited, before either connection closes
+    await c1.query("ROLLBACK");
+    await waiting;
+    await c2.query("ROLLBACK");
     await c1.end();
     await c2.end();
   }
@@ -130,5 +143,77 @@ test("N20: the consumer claims recorded provider events once (PROCESSING), settl
     await ingress.query("ROLLBACK");
   } finally {
     await ingress.end();
+  }
+});
+
+test("N2/D-ING-1 race: a conflicting delivery and the consumer's APPLIED settlement serialize on the inbox record — a settlement that meets a conflict in flight waits for it and is refused (KA012), a conflict that meets a settlement in flight waits for it and is recorded against the settled record, and no snapshot-isolated settlement applies a record", async () => {
+  const deliver = async (externalEventId: string): Promise<InboxId> => {
+    const r = await h.inboxIngress.record({ inboxId: ids.next() as InboxId, provider: "stripe", environment: "LIVE", externalEventId, bodyHash: sha(`genuine-${externalEventId}`), receivedAt: clock.now() });
+    assert.equal(r.kind, "RECORDED");
+    return r.inboxId;
+  };
+  const conflictFirst = await deliver("evt-race-conflict-first");
+  const settlementFirst = await deliver("evt-race-settlement-first");
+  const snapshotIsolated = await deliver("evt-race-repeatable-read");
+  const claimed = (await control((uow) => uow.inbox.claim(100, 3_600))).map((r) => r.inboxId);
+  for (const id of [conflictFirst, settlementFirst, snapshotIsolated]) assert.ok(claimed.includes(id), "the consumer claims each recorded event (PROCESSING)");
+  // the conflicting delivery's write exactly as PgInboxIngress performs it, on a connection of the ingress group, held open
+  const recordConflict = (c: Client, inboxId: InboxId): Promise<unknown> =>
+    c.query("INSERT INTO kauro.inbox_body_conflicts (conflict_id, inbox_id, body_hash, received_at) VALUES ($1, $2, $3, now()) ON CONFLICT (inbox_id, body_hash) DO NOTHING", [ids.next(), inboxId, sha(`another-${inboxId}`)]);
+  const endState = async (inboxId: InboxId): Promise<{ state: string; conflicts: number } | undefined> =>
+    (await h.oracle.query<{ state: string; conflicts: number }>("SELECT r.state, (SELECT count(*)::int FROM kauro.inbox_body_conflicts c WHERE c.inbox_id = r.inbox_id) AS conflicts FROM kauro.inbox_records r WHERE r.inbox_id = $1", [inboxId])).rows[0];
+  const ingress = await h.pg.connect("kauro_ingress_test");
+  const consumer = await h.pg.connect("kauro_control_test");
+  try {
+    const ingressPid = await backendPid(ingress);
+    const consumerPid = await backendPid(consumer);
+
+    // (1) the conflicting delivery's transaction is open, its conflict written, when the consumer settles the record APPLIED:
+    // the settlement must wait for it and then see the conflict it would otherwise decide beside
+    await ingress.query("BEGIN");
+    await recordConflict(ingress, conflictFirst);
+    await consumer.query("BEGIN");
+    const settling = await settlesOrWaits(h.oracle, consumerPid, new PgInboxConsumerStore(consumer).settle(conflictFirst, "APPLIED", clock.now()), "the APPLIED settlement");
+    await ingress.query("COMMIT");
+    const settled = settling.kind === "WAITING" ? await settling.pending : settling.outcome;
+    await consumer.query(settled.status === "fulfilled" ? "COMMIT" : "ROLLBACK");
+    const afterConflictFirst = await endState(conflictFirst);
+    assert.equal(settling.kind, "WAITING", `the APPLIED settlement did not wait for the conflicting delivery in flight: the record ends ${afterConflictFirst?.state} with ${afterConflictFirst?.conflicts} body conflict(s)`);
+    assert.ok(settled.status === "rejected" && isDomainFailure(settled.reason) && settled.reason.code === "PRECONDITION_FAILED" && settled.reason.reason === "INBOX_BODY_CONFLICT", "once the conflict committed, the settlement's re-check under the record's lock refuses APPLIED (KA012)");
+    assert.deepEqual(afterConflictFirst, { state: "PROCESSING", conflicts: 1 });
+
+    // (2) the settlement is in flight (APPLIED written, not committed) when a conflicting delivery arrives: the delivery waits for
+    // the decision and is then recorded against the settled record — history for reconciliation, never absorbed, never a
+    // conflict the settlement could not see
+    await consumer.query("BEGIN");
+    assert.equal(await new PgInboxConsumerStore(consumer).settle(settlementFirst, "APPLIED", clock.now()), true);
+    await ingress.query("BEGIN");
+    const recording = await settlesOrWaits(h.oracle, ingressPid, recordConflict(ingress, settlementFirst), "the conflicting delivery");
+    await consumer.query("COMMIT");
+    const recorded = recording.kind === "WAITING" ? await recording.pending : recording.outcome;
+    await ingress.query(recorded.status === "fulfilled" ? "COMMIT" : "ROLLBACK");
+    const afterSettlementFirst = await endState(settlementFirst);
+    assert.equal(recording.kind, "WAITING", `the conflicting delivery did not wait for the APPLIED settlement in flight: it was recorded beside a decision it could not block, and the record ends ${afterSettlementFirst?.state} with ${afterSettlementFirst?.conflicts} body conflict(s)`);
+    assert.equal(recorded.status, "fulfilled", "a delivery that arrives once the record is settled is still recorded as a conflict");
+    assert.deepEqual(afterSettlementFirst, { state: "APPLIED", conflicts: 1 });
+
+    // (3) the re-check reads what committed while the settlement waited, which only READ COMMITTED's per-statement snapshot
+    // shows; a REPEATABLE READ (or SERIALIZABLE) settlement would re-check its older snapshot, so it is refused before it waits
+    await ingress.query("BEGIN");
+    await recordConflict(ingress, snapshotIsolated);
+    await consumer.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
+    const isolated = await settlesOrWaits(h.oracle, consumerPid, new PgInboxConsumerStore(consumer).settle(snapshotIsolated, "APPLIED", clock.now()), "the REPEATABLE READ settlement");
+    await ingress.query("COMMIT");
+    const isolatedOutcome = isolated.kind === "WAITING" ? await isolated.pending : isolated.outcome;
+    await consumer.query(isolatedOutcome.status === "fulfilled" ? "COMMIT" : "ROLLBACK");
+    const afterIsolated = await endState(snapshotIsolated);
+    assert.ok(isolatedOutcome.status === "rejected" && sqlState(isolatedOutcome.reason) === "0A000", `a REPEATABLE READ settlement was not refused: the record ends ${afterIsolated?.state} with ${afterIsolated?.conflicts} body conflict(s)`);
+    assert.equal(isolated.kind, "SETTLED", "the snapshot-isolated settlement is refused before it waits");
+    assert.deepEqual(afterIsolated, { state: "PROCESSING", conflicts: 1 });
+  } finally {
+    // whichever side was left waiting is let go by the other's ROLLBACK (each is queued behind its connection's statement)
+    await Promise.allSettled([ingress.query("ROLLBACK"), consumer.query("ROLLBACK")]);
+    await ingress.end();
+    await consumer.end();
   }
 });
