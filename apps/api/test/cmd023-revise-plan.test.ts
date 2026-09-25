@@ -110,7 +110,7 @@ test("DENY: APPROVER → 403; foreign plan → 404; expectedVersion of a superse
   assert.equal(await w.count("plans", "supersedes_plan_id = $1", [plan.planId]), 1);
   assert.equal(await w.count("command_journal"), journalBefore + 1, "only the successful revision journaled");
   const denials = (await w.securityEvents("CMD023")).slice(denialsBefore);
-  assert.deepEqual(denials.map((d) => d.reason), ["ROLE_INSUFFICIENT", "ROLE_INSUFFICIENT"]);
+  assert.deepEqual(denials.map((d) => d.reason), ["ROLE_INSUFFICIENT", "ROLE_INSUFFICIENT", "NOT_A_MEMBER"]);
 });
 
 test("RACE: two RevisePlan calls with expectedVersion 2 — one 201, one 409 STALE_VERSION carrying successorId", async () => {

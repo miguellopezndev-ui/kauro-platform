@@ -23,6 +23,7 @@ import {
   type MembershipRepository,
   type NewAgency,
   type NewMembership,
+  type SecurityActor,
   type SecurityEvent,
   type SecurityEventRepository,
   type UserId,
@@ -242,10 +243,15 @@ export class PgMembershipRepository implements MembershipRepository {
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;
   }
 
+  /**
+   * FOR SHARE: the membership is held until the unit of work ends, so a concurrent suspension, revocation or role change
+   * (an UPDATE of the row) waits for this command, and one that committed first is re-read here — a row that is no longer
+   * live fails the predicate on the re-read and is not returned (READ COMMITTED re-evaluates a locked row's WHERE clause).
+   */
   async findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null> {
     const r = await execute<MembershipRow>(
       this.db,
-      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED')`,
+      `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE agency_id = $1 AND user_id = $2 AND state IN ('INVITED', 'ACTIVE', 'SUSPENDED') FOR SHARE`,
       [agencyId, userId],
     );
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;
@@ -309,6 +315,15 @@ export function actorColumns(actor: ActorRef): { readonly kind: "USER" | "SERVIC
   }
 }
 
+function securityActorColumns(actor: SecurityActor): { readonly kind: "USER" | "SERVICE" | "SYSTEM" | "ANONYMOUS"; readonly id: string | null } {
+  return actor.kind === "ANONYMOUS" ? { kind: "ANONYMOUS", id: null } : actorColumns(actor);
+}
+
+/**
+ * Appends a security fact. Which stream it may enter is the policy's decision (migration 0007): an agency's stream only for a
+ * caller holding a live membership there, the caller's own identity stream, or the anonymous denial — anything else is refused
+ * by WITH CHECK, whatever the application asked.
+ */
 export class PgSecurityEventRepository implements SecurityEventRepository {
   constructor(
     private readonly db: Queryable,
@@ -316,12 +331,12 @@ export class PgSecurityEventRepository implements SecurityEventRepository {
   ) {}
 
   async append(event: SecurityEvent): Promise<void> {
-    const actor = actorColumns(event.actor);
+    const actor = securityActorColumns(event.actor);
     await execute(
       this.db,
-      `INSERT INTO kauro.security_events (security_event_id, agency_id, actor_kind, actor_id, action, outcome, reason_code, policy_version, assurance_class, correlation_id, occurred_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [this.ids.next(), event.agencyId, actor.kind, actor.id, event.action, event.outcome, event.reasonCode, event.policyVersion, event.assuranceClass, event.correlationId, event.occurredAt],
+      `INSERT INTO kauro.security_events (security_event_id, agency_id, requested_agency_id, actor_kind, actor_id, action, outcome, reason_code, policy_version, assurance_class, correlation_id, occurred_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [this.ids.next(), event.agencyId, event.requestedAgencyId, actor.kind, actor.id, event.action, event.outcome, event.reasonCode, event.policyVersion, event.assuranceClass, event.correlationId, event.occurredAt],
     );
   }
 }

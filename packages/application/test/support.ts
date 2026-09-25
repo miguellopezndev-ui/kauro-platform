@@ -55,9 +55,12 @@ export const allowingAuthorizer: Authorizer = {
     return {
       kind: "ALLOW",
       membership: { membershipId: m.membershipId, agencyId: m.agencyId, userId: m.userId, role: m.role, version: m.version, assurancePolicy: m.assurancePolicy },
-      assuranceClass: request.assuranceProofRef !== undefined ? "STEP_UP" : "SESSION",
+      assuranceClass: "SESSION",
       policyVersion: AUTHORIZATION_POLICY_VERSION,
     };
+  },
+  async assure(_uow, request, access) {
+    return request.assuranceProofRef !== undefined ? { ...access, assuranceClass: "STEP_UP" } : access;
   },
 };
 

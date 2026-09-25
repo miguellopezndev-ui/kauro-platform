@@ -14,7 +14,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { B06Collaborators, CommandRuntime, SchemaValidator } from "@kauro/application";
-import { createB06Handlers } from "@kauro/application";
+import { createB06Handlers, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, Environment, IdGenerator, RandomBytes, UnitOfWorkFactory } from "@kauro/domain";
 import { createIdGenerator, toUtcInstant } from "@kauro/domain";
@@ -118,6 +118,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     environment: assembly.environment,
     handlers: createB06Handlers(runtime, collaborators),
     authenticator: assembly.authenticator,
+    refuseUnauthenticated: (command, request) => refuseUnauthenticated(runtime, command, request),
     validator: assembly.validator ?? loadContractSchemas(),
     clock,
     ids,

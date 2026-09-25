@@ -2,10 +2,11 @@
  * CMD001 CreateAgency — POST /api/v1/agencies — VERIFIED_USER (design §8; 10 "POST /agencies creates a draft agency under an
  * authenticated verified identity"; 07 Agency machine initial DRAFT).
  *
- * Context IDENTITY; identity-owned journal row (agency ∅). Order: reserve → identity verified (authorizer, D-ASSUR-2) →
- * AbuseLimiter.admit (ADMISSION_LIMITED) → own identity row synced → mint agencyId/membershipId → adoptTenant (D-CTX-2) →
+ * Context IDENTITY; identity-owned journal row (agency ∅). Order: identity ACTIVE and verified (authorizer, D-ASSUR-2: the
+ * token's facts and the stored identity row) → reserve → AbuseLimiter.admit (ADMISSION_LIMITED) → own identity row synced → mint agencyId/membershipId → adoptTenant (D-CTX-2) →
  * INSERT agency (DRAFT v1; a second DRAFT per creator fails agencies_one_draft_per_creator → ADMISSION_LIMITED /
- * DRAFT_AGENCY_EXISTS in the adapter) → INSERT OWNER membership (ACTIVE v1, launch assurance policy) → agency.created.v1 +
+ * DRAFT_AGENCY_EXISTS in the adapter) → INSERT OWNER membership (ACTIVE v1, launch assurance policy) → the ALLOW fact of the
+ * owner grant (OWNERSHIP_GRANTED, the new agency's stream) → agency.created.v1 +
  * membership.created.v1 → journal 201. No contract, billing or capability is activated: the state stays DRAFT.
  */
 import type { AgencyId, MembershipId } from "@kauro/domain";
@@ -13,7 +14,7 @@ import { DomainFailure } from "@kauro/domain";
 import { agencyView, membershipView } from "../../api/projections.js";
 import type { AbuseLimiter } from "../../ports/assurance-and-admission.js";
 import { CREATE_AGENCY, type CreateAgencyBody, type CreateAgencyHandler, type CreateAgencyView } from "../contracts.js";
-import { runCommand, type CommandRuntime } from "../runtime.js";
+import { ALLOW_REASONS, runCommand, type CommandRuntime } from "../runtime.js";
 
 /** The launch policy of manual 08: agency data access requires verified email and enrolled MFA. */
 export const LAUNCH_ASSURANCE_POLICY = "MFA_REQUIRED";
@@ -47,6 +48,20 @@ export function createAgencyHandler(runtime: CommandRuntime, limiter: AbuseLimit
           createdAt: ctx.now,
         });
         const actor = { kind: "USER", userId: envelope.userId } as const;
+        // the ownership this command creates is an access grant: a durable ALLOW fact of the new agency's stream, committed with
+        // the agency or not at all (08 "Audit events and retention": access grants and ownership changes are durable facts)
+        await uow.securityEvents.append({
+          agencyId,
+          requestedAgencyId: null,
+          actor,
+          action: CREATE_AGENCY.id,
+          outcome: "ALLOW",
+          reasonCode: ALLOW_REASONS.OWNERSHIP_GRANTED,
+          policyVersion: ctx.decision.policyVersion,
+          assuranceClass: ctx.decision.assuranceClass,
+          correlationId: envelope.correlationId,
+          occurredAt: ctx.now,
+        });
         await uow.events.publish({
           aggregateKind: "agency",
           aggregateId: agencyId,

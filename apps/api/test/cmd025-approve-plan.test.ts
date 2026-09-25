@@ -160,7 +160,7 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   const denials = (await w.securityEvents("CMD025")).slice(denialsBefore);
   assert.deepEqual(
     denials.map((d) => `${d.reason}:${d.assuranceClass}`).sort(),
-    ["ROLE_INSUFFICIENT:SESSION", "ROLE_INSUFFICIENT:SESSION", "ROLE_INSUFFICIENT:SESSION", "STEP_UP_MISSING:STEP_UP", "STEP_UP_NOT_OWNED:STEP_UP", "STEP_UP_NOT_OWNED:STEP_UP", "STEP_UP_STALE:STEP_UP"],
+    ["NOT_A_MEMBER:SESSION", "ROLE_INSUFFICIENT:SESSION", "ROLE_INSUFFICIENT:SESSION", "ROLE_INSUFFICIENT:SESSION", "STEP_UP_MISSING:STEP_UP", "STEP_UP_NOT_OWNED:STEP_UP", "STEP_UP_NOT_OWNED:STEP_UP", "STEP_UP_STALE:STEP_UP"],
   );
 
   // the database independently refuses an approval with a stale hash (23503): the bindings are foreign keys, not only checks

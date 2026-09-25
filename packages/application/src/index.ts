@@ -46,8 +46,8 @@ export type {
   B06CommandId,
 } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS } from "./commands/contracts.js";
-export type { CommandRuntime, CommandContext, CommandOutcome } from "./commands/runtime.js";
-export { runCommand, contextOf, identityOf } from "./commands/runtime.js";
+export type { CommandRuntime, CommandContext, CommandOutcome, UnauthenticatedRequest } from "./commands/runtime.js";
+export { runCommand, contextOf, identityOf, refuseUnauthenticated, ALLOW_REASONS } from "./commands/runtime.js";
 export type { B06Collaborators, B06Handlers, ApprovalPreimage } from "./commands/handlers/index.js";
 export {
   createB06Handlers,

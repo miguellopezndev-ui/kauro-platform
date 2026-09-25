@@ -108,7 +108,13 @@ test("DENY: unverified identity → 403 NOT_AUTHORIZED IDENTITY_UNVERIFIED; unau
   for (const key of [unverifiedKey, anonymousKey, secondKey]) assert.equal(await w.journal(key), null, `no journal row for ${key}`);
   assert.equal(await w.count("command_journal"), journalBefore);
   const denials = (await w.securityEvents("CMD001")).slice(denialsBefore);
-  assert.deepEqual(denials.map((d) => [d.outcome, d.reason, d.agencyId, d.actorId, d.policyVersion]), [["DENY", "IDENTITY_UNVERIFIED", null, w.unverified.userId, "B06-1"]]);
+  // the unverified identity's denial is its own identity-stream fact; each unauthenticated request leaves an anonymous one
+  // (no actor, no agency; review record B06-review/A-pipeline-authorization.md, R26)
+  assert.deepEqual(denials.map((d) => [d.outcome, d.reason, d.agencyId, d.actorId, d.policyVersion]), [
+    ["DENY", "IDENTITY_UNVERIFIED", null, w.unverified.userId, "B06-1"],
+    ["DENY", "SUBJECT_UNAUTHENTICATED", null, null, "B06-1"],
+    ["DENY", "SUBJECT_UNAUTHENTICATED", null, null, "B06-1"],
+  ]);
 });
 
 test("RACE: identical retry replays the same agency; same key with another displayName → 409 IDEMPOTENCY_CONFLICT; crash before COMMIT leaves nothing; response lost after COMMIT is recovered by the key", async () => {

@@ -4,7 +4,7 @@
  * mode is offered and target scope is declared without claiming qualification"; failure "An unavailable mode returns
  * CAPABILITY_UNAVAILABLE before quoting or charging").
  *
- * Order: reserve → authorize → lock client (NOT_FOUND / CLIENT_ARCHIVED) → agency DRAFT or ACTIVE (AGENCY_NOT_OPEN) → mode
+ * Order: authorize → reserve → lock client (NOT_FOUND / CLIENT_ARCHIVED) → agency DRAFT or ACTIVE (AGENCY_NOT_OPEN) → mode
  * capability offered (AVAILABLE_LIMITED or AVAILABLE, else CAPABILITY_UNAVAILABLE / MODE_NOT_OFFERED — no quote, no charge
  * exists yet) → CRM modes declare a targetInstanceRef (INVALID_REQUEST / TARGET_INSTANCE_REQUIRED; the declaration claims no
  * qualification) → INSERT project (OPEN v1, capability id + version snapshot) with its DRAFT revision (deferred FK pair) →

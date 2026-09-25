@@ -21,8 +21,9 @@ import type {
   Problem,
   RawRequest,
   SchemaValidator,
+  UnauthenticatedRequest,
 } from "@kauro/application";
-import { HEADERS, REQUEST_LIMITS, admitHeaders, admitStructure, correlationIdOf, envelopeOf, internalProblem, problemOf, unauthenticatedProblem } from "@kauro/application";
+import { HEADERS, REQUEST_LIMITS, admitHeaders, admitStructure, correlationIdOf, envelopeOf, internalProblem, problemOf } from "@kauro/application";
 import type { Clock, Environment, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { Authenticator } from "./authenticator.js";
@@ -31,6 +32,12 @@ export interface ApiServerOptions {
   readonly environment: Environment;
   readonly handlers: B06Handlers;
   readonly authenticator: Authenticator;
+  /**
+   * Answers a structurally admitted command request that carried no authenticated subject: records the durable anonymous
+   * DENY fact and returns the problem (AUTHENTICATION_REQUIRED, or the failure that kept the fact from being recorded).
+   * The composition root binds the runtime's `refuseUnauthenticated`.
+   */
+  readonly refuseUnauthenticated: (command: CommandId, request: UnauthenticatedRequest) => Promise<Problem>;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -125,7 +132,18 @@ function registerCommand<Body, View>(app: FastifyInstance, options: ApiServerOpt
       const admission = admitStructure(spec, raw, options.validator, options.ids, options.clock);
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
       const subject = await options.authenticator.authenticate(headers);
-      if (!subject) return sendProblem(reply, unauthenticatedProblem(admission.admission.correlationId));
+      if (!subject) {
+        // the refusal of an unauthenticated consequential command is a durable fact before it is an answer (08 "Audit events")
+        const correlationId = admission.admission.correlationId;
+        let refusal: Problem;
+        try {
+          refusal = await options.refuseUnauthenticated(spec.id as CommandId, { correlationId, agencyId: admission.admission.agencyId });
+        } catch (error) {
+          sink(correlationId, error);
+          return sendProblem(reply, internalProblem(correlationId));
+        }
+        return sendProblem(reply, refusal);
+      }
       const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
       let result: CommandResult<View>;
       try {

@@ -177,7 +177,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
   };
 
   const tenantId = (): AgencyId | null => (context.kind === "TENANT" ? context.agencyId : null);
-  const userId = (): UserId | null => (context.kind === "SYSTEM" ? null : context.userId);
+  const userId = (): UserId | null => (context.kind === "TENANT" || context.kind === "IDENTITY" ? context.userId : null);
   /** A tenant-owned row is visible only under its own tenant context (RLS USING); a write outside it fails (WITH CHECK). */
   const visible = <T extends { readonly agencyId: AgencyId }>(row: T | undefined): T | null => (row !== undefined && tenantId() !== null && row.agencyId === tenantId() ? row : null);
   const checkWrite = (agencyId: AgencyId): void => {

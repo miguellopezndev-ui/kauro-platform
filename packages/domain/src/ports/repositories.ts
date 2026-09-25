@@ -41,7 +41,7 @@ import type {
 } from "../model/ids.js";
 import type { AssuranceProof } from "../model/identity.js";
 import type { MembershipRole } from "../model/roles.js";
-import type { ActorRef, IdentityFacts } from "../model/tenant.js";
+import type { IdentityFacts, SecurityActor } from "../model/tenant.js";
 
 /** Outcome of a compare-and-swap write on a versioned aggregate. */
 export type VersionedWrite<T> =
@@ -53,7 +53,11 @@ export type VersionedWrite<T> =
 export type { AssuranceProof };
 
 export interface IdentityRepository {
-  /** The caller's own identity facts (rows of other users are not visible under the self policy). */
+  /**
+   * The caller's own stored identity facts (rows of other users are not visible under the self policy); null when the
+   * platform has never synced the identity. The authorizer reads it beside the token's facts: Identity owns the security
+   * status (07 "Aggregate ownership"), so a DISABLED row refuses whatever the token says.
+   */
   getOwn(userId: UserId): Promise<IdentityFacts | null>;
   /** Upserts the caller's own identity facts from the authenticator (08: authentication produces assurance facts). */
   syncOwn(facts: IdentityFacts, provider: string, subjectHash: Sha256Hex, now: UtcInstant): Promise<IdentityFacts>;
@@ -99,7 +103,14 @@ export interface NewMembership {
 export interface MembershipRepository {
   get(membershipId: MembershipId): Promise<MembershipRecord | null>;
   lock(membershipId: MembershipId): Promise<MembershipRecord | null>;
-  /** The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any. */
+  /**
+   * The live (INVITED/ACTIVE/SUSPENDED) membership of a user in the current agency, if any, read with a share lock held to the
+   * end of the unit of work (SELECT ... FOR SHARE; the authorizer's read). A concurrent suspension, revocation or role change
+   * of that row waits until this unit of work ends; one committed first is what this read returns (a revoked row is no longer
+   * live and is not returned). The authorization fact is therefore closed by a lock like every other invariant of a command
+   * (07 "Agency and membership states": revocation is effective server-side immediately for new commands; 07 "Transaction
+   * discipline"). Only a TENANT context of that agency can take the lock.
+   */
   findLive(agencyId: AgencyId, userId: UserId): Promise<MembershipRecord | null>;
   /** The caller's memberships across agencies (self policy), for context listing. */
   listOwn(userId: UserId): Promise<ReadonlyArray<MembershipRecord>>;
@@ -243,10 +254,17 @@ export interface CapabilityRepository {
   list(filter?: { readonly state?: Capability["state"] }): Promise<ReadonlyArray<CapabilityRecord>>;
 }
 
-/** 08 "Audit events and retention": actor, scope, action, outcome, policy version, assurance class, correlation and time. */
+/**
+ * 08 "Audit events and retention": actor, scope, action, outcome, policy version, assurance class, correlation and time. The
+ * scope is one of: an agency's stream (`agencyId`; only a caller holding a live membership there may write it), the actor's
+ * own identity stream (`agencyId` null, naming the agency the request selected in `requestedAgencyId`, if any), or no
+ * stream at all for the anonymous denial of a request without an authenticated subject (migration 0007).
+ */
 export interface SecurityEvent {
   readonly agencyId: AgencyId | null;
-  readonly actor: ActorRef;
+  /** The agency selector of a request whose fact belongs to no agency stream; a name, never a reference. Null when `agencyId` is set. */
+  readonly requestedAgencyId: AgencyId | null;
+  readonly actor: SecurityActor;
   readonly action: string;
   readonly outcome: "ALLOW" | "DENY";
   readonly reasonCode: string | null;

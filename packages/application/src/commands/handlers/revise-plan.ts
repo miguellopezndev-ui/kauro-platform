@@ -5,7 +5,7 @@
  * on the successor "Freeze this version's body hash; do not inherit old validation"; catalogue failure "A stale UI cannot edit
  * or approve the previous version as if current").
  *
- * Order: reserve → authorize → lock predecessor (NOT_FOUND) → expectedVersion (STALE_VERSION carrying successorId when the
+ * Order: authorize → reserve → lock predecessor (NOT_FOUND) → expectedVersion (STALE_VERSION carrying successorId when the
  * plan was already superseded) → listed edge (SUPERSEDED / WITHDRAWN / VALIDATING → PRECONDITION_FAILED) → resolve the typed
  * patch (UNKNOWN_REFERENCE) → compile it (rejections are INVALID_REQUEST with the compiler reason) → a body with the same hash
  * is NO_SEMANTIC_CHANGE → CAS predecessor to SUPERSEDED naming the successor → INSERT successor (DRAFT v1) → successor to

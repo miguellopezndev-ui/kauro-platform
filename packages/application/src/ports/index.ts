@@ -1,4 +1,4 @@
-export type { Authorizer, AuthorizationRequest, AuthorizationDecision } from "./authorizer.js";
+export type { Authorizer, AuthorizationRequest, AuthorizationDecision, AllowDecision } from "./authorizer.js";
 export { AUTHORIZATION_POLICY_VERSION } from "./authorizer.js";
 export type { AssuranceVerifier, AssuranceOutcome, AbuseLimiter, Admission, AdmissionSubject } from "./assurance-and-admission.js";
 export { STEP_UP_FRESHNESS_SECONDS } from "./assurance-and-admission.js";

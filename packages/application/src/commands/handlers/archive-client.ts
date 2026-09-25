@@ -3,7 +3,7 @@
  * stops new projects but does not delete active paid work implicitly"; catalogue failure "Archiving cannot become an implicit
  * deletion or refund").
  *
- * Order: reserve → authorize (OWNER/ADMIN) → lock client (invisible → NOT_FOUND) → expectedVersion (miss → STALE_VERSION with
+ * Order: authorize (OWNER/ADMIN) → reserve → lock client (invisible → NOT_FOUND) → expectedVersion (miss → STALE_VERSION with
  * the current safe version/state) → state ACTIVE (the only listed edge is ACTIVE→ARCHIVED; ARCHIVED → PRECONDITION_FAILED /
  * CLIENT_ARCHIVED) → ActiveWorkInspector.inspectClient (the retained work the caller reviewed) → archive (version + 1) →
  * end_client.archived.v1 → journal 200 {client, retainedActiveWork}. Projects, revisions, approvals and receipts are untouched;

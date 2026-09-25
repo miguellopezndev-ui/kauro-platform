@@ -5,7 +5,8 @@
  * tenant context is set transaction-locally and cleared on pool return; a request without valid context fails closed).
  *
  * `run(context, work)`:
- *   1. acquires a verified connection (pool.ts) and refuses a context the connection's role may not serve (D-CTX-1);
+ *   1. acquires a verified connection (pool.ts) and refuses a context the connection's role may not serve (D-CTX-1; SYSTEM runs
+ *      under kauro_control, TENANT, IDENTITY and ANONYMOUS under kauro_app);
  *   2. BEGIN at the requested isolation, SET LOCAL statement_timeout, then binds the context with set_config(..., true) —
  *      the settings die with the transaction, so the connection returns to the pool with no context (verified by test);
  *   3. hands the repositories, publisher, journals and lease store — all on that one connection — to `work`;
@@ -127,7 +128,7 @@ export class PgUnitOfWork implements UnitOfWork {
   }
 
   get userId(): UserId | null {
-    return this.context.kind === "SYSTEM" ? null : this.context.userId;
+    return this.context.kind === "TENANT" || this.context.kind === "IDENTITY" ? this.context.userId : null;
   }
 
   get resolvedMembershipId(): MembershipId | null {
@@ -154,9 +155,10 @@ export class PgUnitOfWork implements UnitOfWork {
   }
 }
 
+/** TENANT binds agency and user, IDENTITY the user only; SYSTEM and ANONYMOUS bind neither (every policy then matches nothing). */
 async function bindContext(client: PoolClient, context: ExecutionContext): Promise<void> {
   const agencyId = context.kind === "TENANT" ? context.agencyId : "";
-  const userId = context.kind === "SYSTEM" ? "" : context.userId;
+  const userId = context.kind === "TENANT" || context.kind === "IDENTITY" ? context.userId : "";
   await execute(client, "SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agencyId, userId]);
 }
 

@@ -237,6 +237,8 @@ test("DENY: VIEWER → 403; another APPROVER → 403 NOT_APPROVAL_CONTROLLER; fo
       ["ROLE_INSUFFICIENT", w.A.agencyId, w.admin.userId],
       ["MEMBERSHIP_SUSPENDED", w.A.agencyId, w.suspended.userId],
       ["NOT_APPROVAL_CONTROLLER", w.A.agencyId, w.approver2.userId],
+      // the stranger's probe of A is the stranger's own fact, never A's (review R2, R26)
+      ["NOT_A_MEMBER", null, w.stranger.userId],
     ]),
   );
   assert.ok(denials.every((d) => d.outcome === "DENY" && d.policyVersion === "B06-1" && d.assuranceClass === "SESSION"));

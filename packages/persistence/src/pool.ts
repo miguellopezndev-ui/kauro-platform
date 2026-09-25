@@ -6,9 +6,10 @@
  * serve a single statement; that is what makes the RLS policies the authority rather than a convention).
  *
  * The pool knows which runtime group its login role belongs to. The unit-of-work factory uses that fact to refuse a SYSTEM
- * context on the request-handler pool and a TENANT/IDENTITY context on the control pool (decision D-CTX-1: three contexts, two
- * command roles, no crossing). The two evidence producers — kauro_assurance (the step-up verifier) and kauro_validator (the
- * independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
+ * context on the request-handler pool (kauro_app) and a TENANT/IDENTITY/ANONYMOUS context on the control pool (kauro_control)
+ * (decision D-CTX-1, with the ANONYMOUS context of the review record B06-review/A-pipeline-authorization.md: four contexts,
+ * two command roles, no crossing). The two evidence producers — kauro_assurance (the step-up verifier) and kauro_validator
+ * (the independent Migration validator) — run no unit of work at all: their pools serve only the recorders of evidence.ts. A
  * login that belongs to two groups is refused, so a request handler can never also be the producer of the evidence it checks.
  */
 import { Pool, type PoolClient } from "pg";

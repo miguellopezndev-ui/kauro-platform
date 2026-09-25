@@ -23,7 +23,8 @@ cannot be the sole protection").
   `eventsOf`).
 - `model/events` — registered event types, per-type payload allowlists, code-owned outbox subscriptions, `AggregateEvent`
   (an event minus request provenance) and `withProvenance`.
-- `model/tenant` — execution contexts (TENANT / IDENTITY / SYSTEM), actors, identity facts, `TenantScope` checks
+- `model/tenant` — execution contexts (TENANT / IDENTITY / SYSTEM / ANONYMOUS — the last only records the denial of an
+  unauthenticated command), actors and the security-fact actor, identity facts, `TenantScope` checks
   (`assertInScope`: foreign and nonexistent look alike).
 - `model/identity` — Identity aggregate (`registerIdentity`, `syncIdentity`, `assertVerifiedIdentity`) and step-up assurance
   (`evaluateStepUp`, `assertFreshStepUp`; 08 "Authentication and assurance", D-ASSUR-1/2).

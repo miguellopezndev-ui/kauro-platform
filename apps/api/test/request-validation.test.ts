@@ -34,6 +34,20 @@ async function refusedAtTheBoundary<T>(what: string, refused: () => Promise<T>):
   return out;
 }
 
+/**
+ * Runs a structurally admitted request that carries no authenticated subject: exactly one unit of work opens — the ANONYMOUS
+ * one that records the refusal as a durable fact (review record B06-review/A-pipeline-authorization.md, R26) — and the only
+ * row it adds is that fact.
+ */
+async function refusedUnauthenticated<T>(what: string, refused: () => Promise<T>): Promise<T> {
+  const counts = await effectCounts(w);
+  const runs = w.stats.runs;
+  const out = await refused();
+  assert.equal(w.stats.runs, runs + 1, `${what}: one unit of work, the one recording the anonymous refusal`);
+  assert.deepEqual(await effectCounts(w), { ...counts, security_events: counts.security_events + 1 }, `${what}: only the anonymous refusal fact`);
+  return out;
+}
+
 test("R2-059: POST /clients/{id}/projects with verified=true and agencyOwner=true is 400 INVALID_REQUEST UNKNOWN_FIELD before any transaction; a valid neighbour body creates the project", async () => {
   const url = routes.createProject(w.clientA);
   const res = await refusedAtTheBoundary("verified + agencyOwner", () => call(w, { url, token: w.operator.token, body: { mode: "CLEAN", purpose: "Import", verified: true, agencyOwner: true } }));
@@ -125,13 +139,14 @@ test("R2-058: a string \"false\" where a boolean is expected is INVALID_REQUEST 
   assert.equal(approved.data.plan.state, "APPROVED");
 });
 
-test("manual-10 admission order: content type, size, syntax and duplicate keys, schema, idempotency key, path id, agency selector, then the authenticated subject — each answers its reason, the first failure wins, and no unit of work opens", async () => {
+test("manual-10 admission order: content type, size, syntax and duplicate keys, schema, idempotency key, path id, agency selector, then the authenticated subject — each answers its reason, the first failure wins, and no unit of work opens (an unauthenticated refusal opens only the one that records it)", async () => {
   const url = routes.createProject(w.clientA);
   const valid = { mode: "CLEAN", purpose: "x" };
   const reason = async (what: string, c: Call): Promise<string> => {
     const res = await refusedAtTheBoundary(what, () => call(w, c));
     return outcome(w, res);
   };
+  const unauthenticated = async (what: string, c: Call): Promise<string> => outcome(w, await refusedUnauthenticated(what, () => call(w, c)));
   // each check on its own
   assert.equal(await reason("text/plain", { url, contentType: "text/plain", rawBody: "mode=CLEAN" }), "400 INVALID_REQUEST CONTENT_TYPE_UNSUPPORTED");
   assert.equal(await reason("no content type", { url, contentType: null, rawBody: '{"mode":"CLEAN","purpose":"x"}' }), "400 INVALID_REQUEST CONTENT_TYPE_UNSUPPORTED");
@@ -149,8 +164,8 @@ test("manual-10 admission order: content type, size, syntax and duplicate keys, 
   assert.equal(await reason("path id", { url: "/api/v1/clients/not-an-id/projects", body: valid }), "400 INVALID_REQUEST PATH_ID_INVALID");
   assert.equal(await reason("no agency selector", { url, body: valid, agency: null }), "400 INVALID_REQUEST AGENCY_SELECTOR_INVALID");
   assert.equal(await reason("malformed agency selector", { url, body: valid, agency: "agency-a" }), "400 INVALID_REQUEST AGENCY_SELECTOR_INVALID");
-  assert.equal(await reason("no bearer token", { url, body: valid, token: null }), "401 AUTHENTICATION_REQUIRED -");
-  assert.equal(await reason("unknown bearer token", { url, body: valid, token: "unknown-token-0123456789" }), "401 AUTHENTICATION_REQUIRED -");
+  assert.equal(await unauthenticated("no bearer token", { url, body: valid, token: null }), "401 AUTHENTICATION_REQUIRED -");
+  assert.equal(await unauthenticated("unknown bearer token", { url, body: valid, token: "unknown-token-0123456789" }), "401 AUTHENTICATION_REQUIRED -");
 
   // several failures at once: the earliest check answers (content type > size > syntax > duplicate key > schema > key > path >
   // agency selector > authentication > authorization)
@@ -166,7 +181,7 @@ test("manual-10 admission order: content type, size, syntax and duplicate keys, 
   // authentication happens after structural validation: a malformed body without a token is 400, a valid one is 401
   // (REAUTHENTICATE); and before authorization: a non-member's malformed body is 400 at the boundary, his valid body is 404
   assert.equal(await reason("malformed body, no token", { url: routes.createAgency(), agency: null, body: { displayName: 42 }, token: null }), "400 INVALID_REQUEST SCHEMA_VIOLATION");
-  const anonymous = await refusedAtTheBoundary("valid body, no token", () => call(w, { url: routes.createAgency(), agency: null, body: { displayName: "Acme Two" }, token: null }));
+  const anonymous = await refusedUnauthenticated("valid body, no token", () => call(w, { url: routes.createAgency(), agency: null, body: { displayName: "Acme Two" }, token: null }));
   assert.equal(outcome(w, anonymous), "401 AUTHENTICATION_REQUIRED -");
   assert.deepEqual(asProblem(w, anonymous).nextActions, [{ action: "REAUTHENTICATE" }]);
   assert.equal(await reason("non-member, malformed body", { url, token: w.stranger.token, body: { mode: "CLEAN" } }), "400 INVALID_REQUEST SCHEMA_VIOLATION");

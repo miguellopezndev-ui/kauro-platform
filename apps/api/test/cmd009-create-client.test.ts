@@ -89,6 +89,9 @@ test("DENY: member of another agency → 404; VIEWER → 403 ROLE_INSUFFICIENT; 
       ["ROLE_INSUFFICIENT", w.A.agencyId, w.viewer.userId],
       ["ROLE_INSUFFICIENT", w.A.agencyId, w.approver.userId],
       ["ROLE_INSUFFICIENT", w.A.agencyId, w.viewer.userId],
+      // a non-member's probe is a fact of the prober's own identity stream, never of the probed agency's (review R2, R26)
+      ["NOT_A_MEMBER", null, w.stranger.userId],
+      ["NOT_A_MEMBER", null, w.operator.userId],
     ]),
   );
   assert.ok(denials.every((d) => d.outcome === "DENY" && d.policyVersion === "B06-1" && d.assuranceClass === "SESSION"));
