@@ -16,18 +16,18 @@
  *  - the order, capture and policy queries the request side answers from (a quote's orders for ALREADY_PAID, a project's latest
  *    completed capture for a refund request, the ACTIVE standing refund policies an owner's review lists).
  */
-import type { Id, Sha256Hex } from "@kauro/contracts";
-import type { CaptureId, PaymentOrderId, PaymentOrderState, ProjectId, QuoteId, QuoteRecord, RefundPolicyId } from "@kauro/domain";
+import type { Capability, Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { AgencyState, ApprovalId, CapabilityId, CaptureId, PaymentOrderId, PaymentOrderState, PlanRecord, ProjectId, QuoteId, QuoteRecord, RefundPolicyId } from "@kauro/domain";
 import { execute, instant, type Queryable } from "../sql.js";
 
 /** The purchased subject as PurchasedSubjectReader answers it (the application port's shape, structurally). */
 export interface PurchasedSubjectRow {
-  readonly agencyState: "DRAFT" | "ACTIVE" | "RESTRICTED" | "CLOSING" | "CLOSED";
-  readonly plan: { readonly state: string; readonly approvalId?: Id; readonly bodyHash: Sha256Hex } | null;
-  readonly approval: { readonly approvalHash: Sha256Hex; readonly withdrawnAt?: string } | null;
+  readonly agencyState: AgencyState;
+  readonly plan: Pick<PlanRecord, "state" | "approvalId" | "bodyHash"> | null;
+  readonly approval: { readonly approvalHash: Sha256Hex; readonly withdrawnAt?: UtcInstant } | null;
   readonly revision: { readonly state: string } | null;
   readonly target: { readonly confirmed: boolean; readonly superseded: boolean } | null;
-  readonly capability: { readonly capabilityId: Id; readonly capabilityVersion: string; readonly state: string } | null;
+  readonly capability: { readonly capabilityId: CapabilityId; readonly capabilityVersion: string; readonly state: Capability["state"] } | null;
 }
 
 /** The commerce transition subjects the request side reads after their shared half (design §6.2, D-TX-B1). */
@@ -46,7 +46,7 @@ export class PgCommerceRequestReads {
    */
   async subjectOf(quote: Pick<QuoteRecord, "agencyId" | "projectId" | "planId" | "approvalId" | "mode" | "revisionHash" | "targetContractHash">): Promise<PurchasedSubjectRow | null> {
     await this.await("kauro.agencies", quote.agencyId);
-    const agency = await execute<{ state: PurchasedSubjectRow["agencyState"] }>(this.db, "SELECT state FROM kauro.agencies WHERE agency_id = $1", [quote.agencyId]);
+    const agency = await execute<{ state: AgencyState }>(this.db, "SELECT state FROM kauro.agencies WHERE agency_id = $1", [quote.agencyId]);
     const agencyRow = agency.rows[0];
     if (!agencyRow) return null;
     const project = await execute<{ capability_id: string; capability_version: string }>(
@@ -58,14 +58,14 @@ export class PgCommerceRequestReads {
     if (!projectRow) return null;
     // the capability's transition subject is its mode (B06 D-CAP-2: a suspension of the mode's offer takes the exclusive half)
     await this.await("kauro.capabilities", quote.mode);
-    const capability = await execute<{ state: string }>(this.db, "SELECT state FROM kauro.capabilities WHERE capability_id = $1", [projectRow.capability_id]);
+    const capability = await execute<{ state: Capability["state"] }>(this.db, "SELECT state FROM kauro.capabilities WHERE capability_id = $1", [projectRow.capability_id]);
     await this.await("kauro.approvals", quote.approvalId);
     const approval = await execute<{ approval_hash: string; withdrawn_at: Date | null }>(
       this.db,
       "SELECT approval_hash, withdrawn_at FROM kauro.approvals WHERE agency_id = $1 AND approval_id = $2",
       [quote.agencyId, quote.approvalId],
     );
-    const plan = await execute<{ state: string; approval_id: string | null; body_hash: string }>(
+    const plan = await execute<{ state: PlanRecord["state"]; approval_id: string | null; body_hash: string }>(
       this.db,
       "SELECT state, approval_id, body_hash FROM kauro.plans WHERE agency_id = $1 AND plan_id = $2",
       [quote.agencyId, quote.planId],
@@ -105,11 +105,11 @@ export class PgCommerceRequestReads {
     const capabilityRow = capability.rows[0];
     return {
       agencyState: agencyRow.state,
-      plan: planRow ? { state: planRow.state, ...(planRow.approval_id !== null ? { approvalId: planRow.approval_id as Id } : {}), bodyHash: planRow.body_hash } : null,
+      plan: planRow ? { state: planRow.state, ...(planRow.approval_id !== null ? { approvalId: planRow.approval_id as ApprovalId } : {}), bodyHash: planRow.body_hash } : null,
       approval: approvalRow ? { approvalHash: approvalRow.approval_hash, ...(approvalRow.withdrawn_at !== null ? { withdrawnAt: instant(approvalRow.withdrawn_at) } : {}) } : null,
       revision,
       target,
-      capability: capabilityRow ? { capabilityId: projectRow.capability_id as Id, capabilityVersion: projectRow.capability_version, state: capabilityRow.state } : null,
+      capability: capabilityRow ? { capabilityId: projectRow.capability_id as CapabilityId, capabilityVersion: projectRow.capability_version, state: capabilityRow.state } : null,
     };
   }
 
