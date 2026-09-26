@@ -246,6 +246,15 @@ function plusSeconds(instant: string, seconds: number): Promise<string> {
   return oracle<{ t: string }>(`SELECT ${exactSql("$1::timestamptz + make_interval(secs => $2)")} AS t`, [instant, seconds]).then((r) => r.t);
 }
 
+/**
+ * What a blocked backend waits for: the states of the backends holding what it needs (pg_blocking_pids). A reservation that waits
+ * on the other unit of work's row lock is blocked by exactly that transaction, idle while the test holds it open.
+ */
+async function blockersOf(pid: number): Promise<ReadonlyArray<string>> {
+  const r = await h.oracle.query<{ state: string }>("SELECT a.state FROM pg_stat_activity a WHERE a.pid = ANY (pg_blocking_pids($1)) ORDER BY a.pid", [pid]);
+  return r.rows.map((x) => x.state);
+}
+
 // --- the source lifecycle through the adapters -----------------------------------------------------------------------------------
 
 interface Reserved {
@@ -456,6 +465,54 @@ async function admitVia(s: SourceStore, emit: Emit, t: Tenant, up: Reserved, cla
   await emit("upload_session", up.uploadId, admittedUpload.version, "upload_session.admitted.v1", { uploadId: up.uploadId, agencyId: t.ag.agencyId, revisionId: up.revisionId, fileId, inspectionReceiptHash: receiptHash, observedBytes: bytes, scanState: "COVERED_CLEAN", detectedFormat: "CSV" });
   await s.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: up.projectId, revisionId: up.revisionId, uploadId: up.uploadId, kind: "INPUT_ADMITTED", sourceEvidenceHash: receiptHash });
   return { ...up, fileId, tableId, acceptedObjectId, acceptedGeneration, sha256, bytes, receiptHash, structureHash, parserProfileHash };
+}
+
+/** CMD015 (or CMD012 on a replaced revision): the tombstone, its event and INTAKE_CANCELLED anchor; no provider-cancellation column. */
+async function cancelVia(s: SourceStore, emit: Emit, t: Tenant, up: Reserved, expectedVersion: number, reason = "CANCELLED_BY_REQUESTER"): Promise<UploadSessionRecord> {
+  const cancelled = applied(await s.uploads.transition(up.uploadId, expectedVersion, { event: "cancel_upload", byMembershipId: t.ag.ownerMembershipId, reason }), "cancel_upload");
+  await emit("upload_session", up.uploadId, cancelled.version, "upload_session.cancelled.v1", { uploadId: up.uploadId, agencyId: t.ag.agencyId, revisionId: up.revisionId, cancelledByMembershipId: t.ag.ownerMembershipId, reasonCode: reason, providerCancellationState: cancelled.providerCancellationState });
+  await s.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: up.projectId, revisionId: up.revisionId, uploadId: up.uploadId, kind: "INTAKE_CANCELLED", sourceEvidenceHash: null });
+  return cancelled;
+}
+
+/** An operations change of the agency's concurrent-session limit (the control plane's column; D-UP-3). */
+async function setSessionLimit(t: Tenant, limit: number): Promise<void> {
+  await rawTx(h.controlPool, t.ag.agencyId, "", (c) =>
+    c.query("INSERT INTO kauro.upload_capacity (agency_id, active_sessions, session_limit, updated_at) VALUES ($1, 0, $2, now()) ON CONFLICT (agency_id) DO UPDATE SET session_limit = EXCLUDED.session_limit, updated_at = now()", [t.ag.agencyId, limit]),
+  );
+}
+
+/** A rejecting receipt of an attempt (a structure refusal: nothing scanned, nothing promoted). */
+function rejectingReceipt(t: Tenant, up: Reserved, fence: number, startedAt: string, completedAt: string, generation: string, bytes: number) {
+  return {
+    receiptId: ids.next() as InspectionReceiptId,
+    agencyId: t.ag.agencyId,
+    uploadId: up.uploadId,
+    revisionId: up.revisionId,
+    receiptHash: inspectionReceiptHashOf({ uploadId: up.uploadId, inspectionFence: fence, observedGeneration: generation, observedBytes: bytes, outcome: "REJECTED", rejectionClass: "CORRUPT_STRUCTURE" }),
+    inspectionFence: fence,
+    quarantineObjectId: up.objectId,
+    observedGeneration: generation,
+    observedBytes: bytes,
+    completionClaimDigest: textDigest(`contract-fake-completion-${up.uploadId}`),
+    claimConsistent: true,
+    declaredFormat: "CSV",
+    detectedFormat: "CSV",
+    structureStatus: "STRUCTURE_INVALID",
+    scanState: "NOT_SCANNED",
+    semanticStatus: "SEMANTIC_NOT_YET_PROFILED",
+    expectedParts: 0,
+    expectedBytes: 0,
+    scannedParts: 0,
+    scannedBytes: 0,
+    coverage: [],
+    problems: [{ code: "CSV_UNTERMINATED_QUOTE" }],
+    inspectorVersion: "data-plane-0.1.0",
+    outcome: "REJECTED",
+    rejectionClass: "CORRUPT_STRUCTURE",
+    startedAt,
+    completedAt,
+  } as const;
 }
 
 /** A fresh project whose revision holds one file admitted entirely through the adapters (the revision stays UPLOADING). */
@@ -702,4 +759,189 @@ test("the upload lifecycle through every UploadSessionRepository, SessionSecretR
     [reserved.uploadId],
   );
   assert.deepEqual(chain, { ok: true });
+});
+
+test("R2-052 through UploadSessionRepository.insert: two reservations that each fit alone serialize on the revision row (the wait observed in pg_stat_activity) and the loser is PRECONDITION_FAILED REVISION_QUOTA_EXCEEDED; the exact fit commits, the fifty-first file is REVISION_FILE_LIMIT and a file above 2e9 bytes is FILE_TOO_LARGE", async () => {
+  const t = await tenant("r2-052");
+  // concurrency is not the subject: operations raise the agency's session limit so only the byte and file envelope decides
+  await setSessionLimit(t, 64);
+  const p = await project(t);
+  const firstIn = barrier();
+  const proceed = barrier();
+  // neither writer takes the revision row itself (lockRevision false): the insert's own trigger serializes them on it, and the
+  // ledger CHECK decides on the committed total — the database's decision, whatever a handler read (R2-052, D-UP-2)
+  const a = h.app.runSource(asOwner(t), async (uow) => {
+    await reserveVia(uow.sources, emitOf(uow, t), t, p, 1.5 * GB, { first: true, lockRevision: false });
+    firstIn.open();
+    await proceed.wait;
+    // while the second waits, this unit of work reserves another 2e9 (1.5e9 + 2e9 = 3.5e9 fits) and commits
+    await reserveVia(uow.sources, emitOf(uow, t), t, p, 2 * GB, { lockRevision: false });
+  });
+  await firstIn.wait;
+  // the second reservation, checked alone, fits (0 + 2e9 <= 5e9 in its snapshot)
+  const b = h.app.runSource(asOwner(t), async (uow) => {
+    assert.equal((await uow.sources.uploads.quota(p.revisionId)).reservedBytes, 0, "the second writer's own read cannot see the first reservation");
+    return reserveVia(uow.sources, emitOf(uow, t), t, p, 2 * GB, { lockRevision: false });
+  });
+  try {
+    const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
+    // the second reservation's insert takes the revision row in its trigger (FOR NO KEY UPDATE, D-LOCK-1), which the first holds
+    assert.deepEqual(await blockersOf(pid), ["idle in transaction"], "the second reservation waits for the first unit of work");
+  } finally {
+    proceed.open();
+  }
+  await a;
+  // 3.5e9 + 2e9 = 5.5e9 > 5e9: the typed loser, refused by the ledger CHECK on the committed total, not by a read
+  await assert.rejects(b, refused("PRECONDITION_FAILED", "REVISION_QUOTA_EXCEEDED", "23514"));
+  await h.app.runSource(asOwner(t), async (uow) => {
+    assert.deepEqual(await uow.sources.uploads.quota(p.revisionId), { revisionId: p.revisionId, reservedBytes: 3.5 * GB, fileCount: 2 });
+    assert.equal((await uow.sources.uploads.listByRevision(p.revisionId, { limit: 10 })).length, 2);
+  });
+  // the exact fit commits (5e9); one byte more is refused
+  await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 1.5 * GB));
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.quota(p.revisionId)), { revisionId: p.revisionId, reservedBytes: 5 * GB, fileCount: 3 });
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 1)), refused("PRECONDITION_FAILED", "REVISION_QUOTA_EXCEEDED", "23514"));
+  // the per-file envelope, wherever the file goes
+  const other = await project(t);
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, other, 2 * GB + 1, { first: true })), refused("PRECONDITION_FAILED", "FILE_TOO_LARGE", "23514"));
+  // the file envelope: fifty files commit, the fifty-first is refused
+  await h.app.runSource(asOwner(t), async (uow) => {
+    for (let i = 0; i < 50; i++) await reserveVia(uow.sources, emitOf(uow, t), t, other, 1, { first: i === 0 });
+  });
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.quota(other.revisionId)), { revisionId: other.revisionId, reservedBytes: 50, fileCount: 50 });
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, other, 1)), refused("PRECONDITION_FAILED", "REVISION_FILE_LIMIT", "23514"));
+  assert.deepEqual(await oracle("SELECT reserved_bytes::text AS bytes, file_count FROM kauro.revision_quota WHERE revision_id = $1", [p.revisionId]), { bytes: "5000000000", file_count: 3 });
+});
+
+test("the capacity race through UploadSessionRepository.insert: two reservations for the agency's last session slot serialize on its capacity ledger (the wait observed in pg_stat_activity) and the loser is ADMISSION_LIMITED UPLOAD_CONCURRENCY_LIMITED; a tombstoned upload frees its slot and its bytes exactly once", async () => {
+  const t = await tenant("capacity");
+  const [p1, p2, p3] = [await project(t), await project(t), await project(t)];
+  const first = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p1, 10, { first: true }));
+  const holding = barrier();
+  const release = barrier();
+  // one slot left: two reservations on different revisions each see a free slot and serialize on the agency's capacity row
+  const a = h.app.runSource(asOwner(t), async (uow) => {
+    await reserveVia(uow.sources, emitOf(uow, t), t, p2, 10, { first: true });
+    holding.open();
+    await release.wait;
+  });
+  await holding.wait;
+  const b = h.app.runSource(asOwner(t), async (uow) => {
+    assert.deepEqual(await uow.sources.uploads.capacity(t.ag.agencyId), { agencyId: t.ag.agencyId, activeSessions: 1, sessionLimit: 2 }, "the loser read a free slot");
+    return reserveVia(uow.sources, emitOf(uow, t), t, p3, 10, { first: true });
+  });
+  try {
+    const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
+    // different revisions: the only row both reservations update is the agency's capacity ledger
+    assert.deepEqual(await blockersOf(pid), ["idle in transaction"], "the second reservation waits for the first unit of work");
+  } finally {
+    release.open();
+  }
+  await a;
+  await assert.rejects(b, (e: unknown) => {
+    refused("ADMISSION_LIMITED", "UPLOAD_CONCURRENCY_LIMITED", "23514")(e);
+    assert.equal(failure(e).retryable, true, "a slot frees when a live session ends");
+    return true;
+  });
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.capacity(t.ag.agencyId)), { agencyId: t.ag.agencyId, activeSessions: 2, sessionLimit: 2 });
+  // cancelling the first releases its slot and its bytes exactly once
+  await h.app.runSource(asOwner(t), (uow) => cancelVia(uow.sources, emitOf(uow, t), t, first, 1));
+  await h.app.runSource(asOwner(t), async (uow) => {
+    assert.equal((await uow.sources.uploads.capacity(t.ag.agencyId)).activeSessions, 1);
+    assert.deepEqual(await uow.sources.uploads.quota(p1.revisionId), { revisionId: p1.revisionId, reservedBytes: 0, fileCount: 0 });
+  });
+  // the freed slot is usable exactly once more
+  await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p3, 10, { first: true }));
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p1, 10)), refused("ADMISSION_LIMITED", "UPLOAD_CONCURRENCY_LIMITED", "23514"));
+  assert.deepEqual(await oracle("SELECT active_sessions, session_limit FROM kauro.upload_capacity WHERE agency_id = $1", [t.ag.agencyId]), { active_sessions: 2, session_limit: 2 });
+});
+
+test("D-PAIR-1 through UploadSessionRepository.insert: a request handler reserves only as the acting person through their own live OWNER, ADMIN or OPERATOR membership — another member's membership, a pair of one member's membership with another person and a VIEWER's own membership are refused, and nothing of them commits", async () => {
+  const t = await tenant("pair");
+  await setSessionLimit(t, 8);
+  const p = await project(t);
+  const operatorUser = await h.person(`b07-adapters-pair-operator-${tenants}`);
+  const operator: Requester = { membershipId: await h.addMember(t.ag, operatorUser, "OPERATOR"), userId: operatorUser };
+  const viewerUser = await h.person(`b07-adapters-pair-viewer-${tenants}`);
+  const viewer: Requester = { membershipId: await h.addMember(t.ag, viewerUser, "VIEWER"), userId: viewerUser };
+  const owner: Requester = { membershipId: t.ag.ownerMembershipId, userId: t.ag.ownerUserId };
+  const as = (who: Requester): TenantContext => h.tenant(t.ag.agencyId, who.userId);
+  // the operator, acting as themselves through their own membership: committed
+  const own = await h.app.runSource(as(operator), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { first: true, requester: operator }));
+  assert.deepEqual([own.record.requestedByMembershipId, own.record.requestedByUserId], [operator.membershipId, operator.userId]);
+  // the owner naming the operator (membership and person): not the acting person
+  await assert.rejects(h.app.runSource(as(owner), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { requester: operator })), refused("NOT_FOUND", "TENANT_CONTEXT_MISSING", "42501"));
+  // the owner as the person, but through the operator's membership: not their own membership
+  await assert.rejects(h.app.runSource(as(owner), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { requester: { membershipId: operator.membershipId, userId: owner.userId } })), refused("NOT_FOUND", "TENANT_CONTEXT_MISSING", "42501"));
+  // a VIEWER through their own live membership: not an operator role (CMD013 is AGENCY_OPERATOR)
+  await assert.rejects(h.app.runSource(as(viewer), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { requester: viewer })), refused("NOT_FOUND", "TENANT_CONTEXT_MISSING", "42501"));
+  // the owner as themselves: committed
+  await h.app.runSource(as(owner), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { requester: owner }));
+  assert.deepEqual(
+    await oracle<{ uploads: string; objects: string }>(
+      "SELECT (SELECT string_agg(requested_by_membership_id::text, ',' ORDER BY created_at) FROM kauro.upload_sessions WHERE revision_id = $1) AS uploads, (SELECT count(*)::text FROM kauro.stored_objects WHERE revision_id = $1) AS objects",
+      [p.revisionId],
+    ),
+    { uploads: `${operator.membershipId},${owner.membershipId}`, objects: "2" },
+    "no refused reservation left an upload or an intent behind",
+  );
+});
+
+test("compare-and-swap and fences: a stale version answers STALE with the current version and state and writes nothing; a session issue or an inspection outcome of an attempt that no longer holds its fence is FENCE_DISCIPLINE; claimInspectionAttempt returns the database's claim instant exactly, and a receipt of an earlier attempt or one not starting at its claim is refused", async () => {
+  const t = await tenant("fences");
+  const p = await project(t);
+  const generation = "1700000000000077";
+  const bytes = 777;
+  const up = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 1_000, { first: true }));
+  // a retry resumed under a new fence (D-RUN-2): the abandoned attempt can no longer issue a session
+  assert.equal(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.claimSessionAttempt(up.uploadId)), 2);
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => issueVia(uow.sources, emitOf(uow, t), t, up, 1, 1)), refused("PRECONDITION_FAILED", "FENCE_DISCIPLINE"));
+  const issued = await h.app.runSource(asOwner(t), (uow) => issueVia(uow.sources, emitOf(uow, t), t, up, 2, 1));
+  assert.deepEqual([issued.state, issued.version, issued.sessionAttempt], ["UPLOADING", 2, 2]);
+  // a stale expectation: STALE with the current version and state, nothing written
+  const stale = await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.transition(up.uploadId, 1, { event: "cancel_upload", byMembershipId: t.ag.ownerMembershipId, reason: "CANCELLED_BY_REQUESTER" }));
+  assert.deepEqual(stale, { kind: "STALE", currentVersion: 2, currentState: "UPLOADING" });
+  assert.equal(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.claimSessionAttempt(up.uploadId)), null, "no issuance fence once the session is issued");
+  const revision = await h.app.runSource(asOwner(t), (uow) => uow.sources.revisions.get(p.revisionId));
+  assert.ok(revision);
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.revisions.transition(p.revisionId, revision.version - 1, { event: "upload_reserved", firstUploadId: up.uploadId })), { kind: "STALE", currentVersion: revision.version, currentState: "UPLOADING" });
+  await h.app.runSource(asOwner(t), (uow) => reportVia(uow.sources, emitOf(uow, t), t, up, generation, bytes));
+  // attempt 1 claims and observes; attempt 2 (a retried inspection) claims again, at its own server instant
+  const claim1 = await h.control.runSource(asControl(t), (uow) => claimAndObserveVia(uow.sources, emitOf(uow, t), t, up, generation, bytes));
+  const claim2 = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const c = await uow.sources.uploads.claimInspectionAttempt(up.uploadId);
+    assert.deepEqual(c, { inspectionFence: 2, claimedAt: now });
+    return c as { readonly inspectionFence: number; readonly claimedAt: string };
+  });
+  assert.ok(claim2.claimedAt > claim1.claimedAt);
+  assert.equal((await oracle<{ t: string; fence: number; version: string }>(`SELECT ${exactSql("inspection_claimed_at")} AS t, inspection_fence AS fence, version::text AS version FROM kauro.upload_sessions WHERE upload_id = $1`, [up.uploadId])).t, claim2.claimedAt);
+  // the stale attempt attaches no receipt (KA071); the current one only from its own claim instant (KA072, D-INSP-4)
+  await assert.rejects(
+    h.control.runSource(asControl(t), async (uow) => uow.sources.inspections.append(rejectingReceipt(t, up, 1, claim1.claimedAt, await uow.serverInstant(), generation, bytes))),
+    refused("PRECONDITION_FAILED", "FENCE_DISCIPLINE", "KA071"),
+  );
+  await assert.rejects(
+    h.control.runSource(asControl(t), async (uow) => uow.sources.inspections.append(rejectingReceipt(t, up, 2, claim1.claimedAt, await uow.serverInstant(), generation, bytes))),
+    refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"),
+  );
+  // the outcome of the stale attempt is FENCE_DISCIPLINE; the current attempt rejects the upload
+  const rejected = await h.control.runSource(asControl(t), async (uow) => {
+    const receipt = rejectingReceipt(t, up, 2, claim2.claimedAt, await uow.serverInstant(), generation, bytes);
+    assert.ok(await uow.sources.revisions.lock(p.revisionId));
+    await uow.sources.inspections.append(receipt);
+    const current = await uow.sources.uploads.lock(up.uploadId);
+    assert.ok(current);
+    await assert.rejects(uow.sources.uploads.transition(up.uploadId, current.version, { event: "inspection_rejected", receiptHash: receipt.receiptHash, rejectionClass: "CORRUPT_STRUCTURE", inspectionFence: 1 }), refused("PRECONDITION_FAILED", "FENCE_DISCIPLINE"));
+    const w = applied(await uow.sources.uploads.transition(up.uploadId, current.version, { event: "inspection_rejected", receiptHash: receipt.receiptHash, rejectionClass: "CORRUPT_STRUCTURE", inspectionFence: 2 }), "inspection_rejected");
+    await emitOf(uow, t)("upload_session", up.uploadId, w.version, "upload_session.rejected.v1", { uploadId: up.uploadId, agencyId: t.ag.agencyId, revisionId: p.revisionId, inspectionReceiptHash: receipt.receiptHash, rejectionClass: "CORRUPT_STRUCTURE", scanState: "NOT_SCANNED" });
+    await uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, uploadId: up.uploadId, kind: "INTAKE_REJECTED", sourceEvidenceHash: receipt.receiptHash });
+    assert.equal(await uow.sources.uploads.claimInspectionAttempt(up.uploadId), null, "a decided upload yields no attempt");
+    return w;
+  });
+  assert.deepEqual([rejected.state, rejected.terminalReason, rejected.inspectionFence, rejected.version], ["REJECTED", "CORRUPT_STRUCTURE", 2, 5]);
+  // a retried anchor of the same subject and kind returns the stored one and never moves it
+  const retried = await h.control.runSource(asControl(t), (uow) => uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, uploadId: up.uploadId, kind: "INTAKE_REJECTED", sourceEvidenceHash: null }));
+  assert.equal(retried.occurredAt, rejected.rejectedAt);
+  assert.deepEqual(await oracle("SELECT count(*)::int AS n FROM kauro.retention_anchors WHERE upload_id = $1 AND anchor_kind = 'INTAKE_REJECTED'", [up.uploadId]), { n: 1 });
 });
