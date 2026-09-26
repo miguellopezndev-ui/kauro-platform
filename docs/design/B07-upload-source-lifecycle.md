@@ -807,6 +807,73 @@ clean-consume: every publishable package installs and works from its tarball alo
 VERIFY EXIT 0
 ```
 
+### 16.2 Verification of `b07/stage-1`
+
+`b07/stage-1` is the design head `ef284df` with the three stage-1 branches merged in the order of §15 — `b07/persistence`
+(`f30be87`, merge `816fed5`), `b07/data-plane` (`32ee7eb`, merge `5cf868d`), `b07/provider-fakes` (`f5bd9d0`, merge `df6c20b`) —
+and the integrator's commits after them. The first two merged cleanly. The third conflicted only in the two design documents,
+where two mandates wrote next to each other: the decisions register after D-ISO-1 (B07-DATA-PLANE's D-DP-1..6 beside
+B07-PROVIDER-FAKES' revised D-RESTORE-1, D-RESTORE-2 and D-FAKE-1) and the R2-051 rows of the case map (B07-PERSISTENCE's adapter
+rows beside the three SIMULATED rows that replaced the SPECIFIED provider-fake citation). Both were resolved by keeping both sides,
+with the revised rows replacing the ones they revise. `pnpm-lock.yaml` merged without conflict. It gains only the
+`packages/data-plane` importer (workspace links, no external dependency), and `pnpm install --frozen-lockfile` accepts it
+unchanged. No migration, `runtime-boundary.json` entry or dependency changed. The merged tree passed `pnpm run verify` on Windows
+before any integrator change (persistence 159/0, data-plane 11/0, api 117 passed and 1 skipped, tools 27/0).
+
+The integrator then made these changes:
+
+- D-STAGE1-1: the fixture's provider and parser tokens, the check that each fake has one owner, and the stage-1 composition test.
+- The closure of the final re-check's residuals (§18.2), with each fix's revert proof re-run on the merged tree.
+- The case map's rows: B07-DATA-PLANE's rows reclassified as EXECUTED_LOCAL or SIMULATED, and the new rows.
+- The case map's status table, which `tools/test/b07-case-map.test.mjs` checks against the sections.
+- The `@kauro/data-plane` suite in `tools/evidence.mjs`: the evidence test now requires a suite for every workspace package that
+  has tests.
+- The README's package table.
+
+`pnpm run verify` at `15cc1a7`, after `pnpm install --frozen-lockfile`:
+
+- **Windows 11** (Node 24, pnpm 10.16.1, `C:\Tools\pgsql17\bin`): exit 0.
+  - Tests: contracts 12/12, domain 64/64, application 73/73, persistence 159/159, authorization 11/11, data-plane 12/12, api 117
+    passed and 1 skipped (B06's Linux-only test, unchanged), tools 29/29.
+  - Checks: architecture gate 7 packages and 16 edges with no violation; OpenAPI 14 registered and 14 planned operations; matrix
+    18 machines; clean-consume 13 typed entry points, among them `@kauro/application/testing`, `@kauro/data-plane` and
+    `@kauro/data-plane/testing`.
+  - No `postgres.exe` of this run was left. A cluster seen running afterwards had been started by another workflow's run in its
+    own worktree, and this run did not touch it.
+- **Linux** (WSL Ubuntu 24.04 as `miguel`, a fresh clone checked out at `b07/stage-1`, `PGBIN=/usr/lib/postgresql/17/bin`):
+  exit 0.
+  - Tests: the same counts, except api 118/118 (the Linux-only test runs).
+  - No `postgres` process was left, and the clone was removed.
+
+```
+architecture gate: 7 package(s), 16 edge(s), no violation
+openapi: the document is the generated one and matches the 14 registered routes (14 operations, every operationId present, response schemas equal to the ones the routes validate with, every problem status documenting exactly its route's outcome catalogue, no forbidden field); 14 planned operations, none registered or served
+matrix: the document is the generated one (18 machines, 185 edges and initial states each owned, 7 commands and 5 reads with their catalogues, every applicability citation resolved)
+clean consumer ok: @kauro/application/testing 19 exports
+clean consumer ok: @kauro/data-plane 24 exports
+clean consumer ok: @kauro/data-plane/testing 6 exports
+clean consumer ok: @kauro/persistence 69 exports
+clean consumer ok: @kauro/persistence/testing 32 exports
+clean consumer ok: 13 typed entry points (...) type-check from the tarballs alone
+clean-consume: every publishable package installs and works from its tarball alone
+VERIFY EXIT 0
+```
+
+**For the stage-2 mandates** (from `b07/stage-1`):
+
+- **B07-COMMANDS** writes the SPECIFIED (B07-COMMANDS) rows of the case map. Its `cmd014-complete-upload.test.ts` "DENY" title is
+  now also cited under R2-051, for the late CompleteUpload.
+- **B07-CONTROL** writes the SPECIFIED (B07-CONTROL) rows, including the revised R2-051 title (FINAL-N3). That test asserts the late
+  completion at the source store; it does not assert the 409.
+- CONTROL's AUTHORITY_JOURNAL appends FILE_ADMISSION_REVOKED only for a file in ADMISSION_REVOKED (D-RESTORE-2).
+- CONTROL's RETENTION sweeper expires a REJECTED revision without re-explaining its reason (D-PERS-3).
+- `apps/control` needs its own suite in `tools/evidence.mjs`: the evidence test requires one for every workspace package that has
+  tests.
+- Neither mandate creates a fake. `tools/test/b07-stage-one.test.mjs` refuses a second implementation of any provider port
+  anywhere in the tree.
+- When a stage-2 mandate writes a cited test, the integrator of `b07/integration` moves that row from SPECIFIED to EXECUTED_LOCAL
+  or SIMULATED and updates the status table.
+
 ## 17. Integration obligations (B07 and B09 on main)
 
 B07 and B09 were designed in parallel on the same base (`ac44af6`). Neither references the other's tables; they touch through
