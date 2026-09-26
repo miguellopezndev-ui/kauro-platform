@@ -4,10 +4,11 @@
  *
  * 1. Two-phase commands (D-RUN-2). ReserveUpload must create a provider session. The command catalogue's shared contract says
  *    external calls occur through recoverable intent/journal boundaries and 07 forbids holding a transaction across an external
- *    call, so the command runs as: unit of work 1 (journal reserve, authorize, lock, write the intent, attach the journal entry to
- *    it, commit with the entry still RESERVED) -> one bounded provider call outside any transaction -> unit of work 2 (re-authorize,
- *    fence check, record the result, journal commit). A retry with the same key finds the entry PENDING and resumes after the
- *    grace (PENDING_RESUME_GRACE_SECONDS) under a new fence; a younger PENDING entry answers OPERATION_PENDING.
+ *    call, so the command runs as B06's pipeline (D-PIPE-1: authenticate, access decision, journal reserve, execute) split in two:
+ *    unit of work 1 (access decision, journal reserve, lock, write the intent, attach the journal entry to it, commit with the
+ *    entry still RESERVED) -> one bounded provider call outside any transaction -> unit of work 2 (access decision again, fence
+ *    check, record the result, journal commit). A retry with the same key finds the entry PENDING and resumes after the grace
+ *    (PENDING_RESUME_GRACE_SECONDS) under a new fence; a younger PENDING entry answers OPERATION_PENDING.
  * 2. ACCEPTED outcomes (D-RUN-1). CompleteUpload journals a 202 body; a replay answers the same 202.
  * 3. Control-plane consumers (D-CTRL-2). Every B07 effect outside a request — observation, inspection, promotion, evaluation,
  *    cancellation of provider sessions, deletion, tombstones, deadlines — is an outbox consumer or a sweeper that runs in SYSTEM

@@ -134,7 +134,32 @@ export interface StoredObjectRecord {
   readonly deletedAt?: UtcInstant;
   readonly deletionResult?: DeletionResult;
   readonly deletionAttempts: number;
+  /**
+   * What the provider still holds after the deletion (09 "Soft delete, versioning and holds": the actual residual expiry, never a
+   * claim that the object vanished; D-OBJ-2). Present exactly when the object is DELETED; `until` is absent when the location
+   * retains no deleted generation. LOCATION_POLICY: the location's latest retention read-back applied to this deletion (the
+   * database enforces the formula); PROVIDER_REPORTED: the expiry the provider reported for a generation inventory found
+   * already soft-deleted.
+   */
+  readonly providerResidual?: { readonly basis: "LOCATION_POLICY" | "PROVIDER_REPORTED"; readonly until?: UtcInstant };
   readonly createdAt: UtcInstant;
+}
+
+/**
+ * The effective soft-delete retention and object versioning read back from a storage location (table
+ * kauro.storage_location_policies, append-only; 09 "the effective setting is verified after provisioning"; D-OBJ-2).
+ */
+export interface StorageLocationPolicyRecord {
+  readonly observationId: string;
+  readonly provider: string;
+  readonly locationRef: string;
+  readonly softDeleteRetentionSeconds: number;
+  readonly objectVersioning: boolean;
+  /** SHA-256 of the adapter's raw read-back; the document stays in the adapter's evidence store. */
+  readonly evidenceHash: Sha256Hex;
+  /** 21 "Evidence classes": a contract fake's read-back is SIMULATED, never EXECUTED_PROVIDER. */
+  readonly evidenceClass: "EXECUTED_PROVIDER" | "SIMULATED";
+  readonly observedAt: UtcInstant;
 }
 
 // --- inspection -----------------------------------------------------------------------------------------------------------
@@ -222,8 +247,14 @@ export interface SourceFileRecord extends Omit<FileManifest, "fileId" | "storage
   readonly state: "ADMITTED" | "ADMISSION_REVOKED";
   readonly admittedAt: UtcInstant;
   readonly revokedAt?: UtcInstant;
-  readonly revocationReason?: string;
+  readonly revocationReason?: AdmissionRevocationReason;
 }
+
+/**
+ * Why an admission was revoked (D-FILE-1): the unsealed intake window closed (refused while a sealed revision retains the file,
+ * D-RET-1), or the accepted generation is gone or not the admitted one any more (inventory; never restored).
+ */
+export type AdmissionRevocationReason = "INTAKE_EXPIRED" | "GENERATION_MISSING" | "GENERATION_CHANGED";
 
 export type TableVisibility = "VISIBLE" | "HIDDEN" | "VERY_HIDDEN";
 export type FormulaCacheState = "NOT_APPLICABLE" | "ALL_PRESENT" | "SOME_MISSING" | "ERROR_VALUES" | "EXTERNAL_DEPENDENCY";
@@ -336,6 +367,8 @@ export interface SourceRevisionRecord extends DatasetRevisionRecord {
   readonly createdByMembershipId?: MembershipId;
   readonly selectionManifestId?: SelectionManifestId;
   readonly selectionHash?: Sha256Hex;
+  /** KAURO_SOURCE_INVENTORY_V1 digest of the settled inventory the bound selection was made against (D-SEL-3). */
+  readonly inventoryHash?: Sha256Hex;
   readonly selectedAt?: UtcInstant;
   readonly evaluationId?: EvaluationId;
   readonly evaluationHash?: Sha256Hex;
@@ -439,7 +472,11 @@ export interface RetentionAnchorRecord {
   readonly evidenceHash: Sha256Hex;
 }
 
-/** RetentionRecord + tenancy, revision, anchor and version (table kauro.retention_records). */
+/**
+ * RetentionRecord + tenancy, revision, anchor, version and expiry (table kauro.retention_records; platform machine RetentionRecord,
+ * D-RET-2). The hard deadline never moves (policy retention.extendHardCap = false); a record expires no earlier than its
+ * effective deadline.
+ */
 export interface RetentionRecordRow extends Omit<RetentionRecord, "retentionId" | "scope"> {
   readonly retentionId: RetentionId;
   readonly agencyId: AgencyId;
@@ -448,6 +485,8 @@ export interface RetentionRecordRow extends Omit<RetentionRecord, "retentionId" 
   readonly revisionId?: RevisionId;
   readonly anchorId: RetentionAnchorId;
   readonly version: number;
+  /** When the retention sweeper took ACTIVE -> EXPIRED (effective_deadline_reached). */
+  readonly expiredAt?: UtcInstant;
 }
 
 /** A part the preflight expects the scanner to cover, as recorded (re-exported for receipts). */

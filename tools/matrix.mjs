@@ -12,8 +12,9 @@
 //
 // Sources (nothing in the document is written by hand except the owner table below, which the check keeps complete): the
 // registry's state_transitions.json (via @kauro/contracts STATE_MACHINES, provenance-verified) and commands.json/cases.json, the
-// platform machines of @kauro/domain (EndClient, Project), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and
-// their outcome catalogues of @kauro/application, the transition seeds of the migrations, the events each handler publishes (read
+// platform machines of @kauro/domain (EndClient, Project; since B07 the source-lifecycle machines UploadSession, StoredObject,
+// SourceFile, RetentionRecord), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and their outcome catalogues of
+// @kauro/application (and the specified B07 commands and routes with theirs), the transition seeds of the migrations, the events each handler publishes (read
 // from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -32,6 +33,9 @@ function load(rel) {
 // not registered one yet. `initial` rows name who creates the aggregate in its initial state.
 
 const B06_EVENTS_NOTE = "no event type registered: the owning package registers it with the edge";
+
+/** The B07 decision that fixes each source-lifecycle platform machine (docs/design/B07-upload-source-lifecycle.md). */
+const SOURCE_MACHINE_DECISIONS = { UploadSession: "D-UP-1", StoredObject: "D-OBJ-1", SourceFile: "D-FILE-1", RetentionRecord: "D-RET-2" };
 
 export const EDGE_OWNERS = {
   Agency: {
@@ -53,19 +57,51 @@ export const EDGE_OWNERS = {
     authorized_revocation: { command: "CMD006", event: "membership.revoked.v1" },
   },
   DatasetRevision: {
-    "(initial DRAFT)": { command: "CMD011", event: "dataset_revision.created.v1", note: "CMD012 CreateRevision (B07) creates every later revision" },
-    upload_reserved: { command: "CMD013", event: "dataset_revision.uploading.v1" },
-    all_uploads_completed: { command: "CMD014", event: "dataset_revision.inspecting.v1" },
-    previously_admitted_inputs_selected: { command: "CMD016", event: "dataset_revision.inspecting.v1" },
-    all_selected_inputs_admitted: { owner: "B07", why: "the inspection's admission of every selected input", event: "dataset_revision.ready_to_seal.v1" },
-    fatal_input_rejection: { owner: "B07", why: "the inspection's refusal of a selected input", event: "dataset_revision.rejected.v1" },
-    selection_changes: { command: "CMD016", event: "dataset_revision.inspecting.v1" },
+    "(initial DRAFT)": { command: "CMD011", event: "dataset_revision.created.v1", note: "CMD012 CreateRevision (B07) creates every later revision, with explicit lineage (D-REV-1)" },
+    upload_reserved: { command: "CMD013", event: "dataset_revision.uploading.v1", note: "the first reservation, in its intent unit of work (D-RUN-2)" },
+    all_uploads_completed: { command: "CMD014", event: "dataset_revision.inspecting.v1", note: "taken asynchronously by CMD014's continuation, the UPLOAD_INSPECTION consumer (control plane), once no reservation, session or unobserved completion of the revision remains (D-RUN-1)" },
+    previously_admitted_inputs_selected: { command: "CMD016", event: "dataset_revision.selection_changed.v1", note: "a selection that reuses admitted files of the project binds on a DRAFT revision" },
+    all_selected_inputs_admitted: { owner: "B07", why: "the SELECTION_EVALUATION consumer (control plane) records a complete evaluation of the bound selection and binds its counts", event: "dataset_revision.ready_to_seal.v1" },
+    fatal_input_rejection: { owner: "B07", why: "the SELECTION_EVALUATION consumer (control plane) records an ADMISSION_FAILED evaluation of the bound selection (no silent removal)", event: "dataset_revision.rejected.v1" },
+    selection_changes: { command: "CMD016", event: "dataset_revision.selection_changed.v1" },
     seal_command: { command: "CMD017", event: "dataset_revision.sealed.v1" },
     new_revision_explicitly_supersedes: { command: "CMD012", event: "dataset_revision.superseded.v1" },
-    cancel_revision: { owner: "B07", why: "source lifecycle cancellation; no registry command names it (CMD015 CancelUpload cancels an upload)", event: "dataset_revision.cancelled.v1" },
-    retention_expires: { owner: "B07", why: "the retention deadline derived from immutable anchors", event: "dataset_revision.expired.v1" },
+    cancel_revision: { command: "CMD012", event: "dataset_revision.cancelled.v1", note: "CreateRevision cancels the mutable predecessor it replaces, with its uploads in flight (D-REV-2)" },
+    retention_expires: { owner: "B07", why: "the retention sweeper (control plane): SEALED -> EXPIRED once no governing record is ACTIVE with a later effective deadline (D-RET-2); REJECTED -> EXPIRED once every intake window closed (D-RET-1)", event: "dataset_revision.expired.v1" },
     managed_cleanup_verified: { owner: "B16", why: "verified managed deletion", event: "dataset_revision.deleted.v1" },
     retention_cleanup_verified: { owner: "B16", why: "verified retention cleanup", event: "dataset_revision.deleted.v1" },
+  },
+  UploadSession: {
+    "(initial RESERVED)": { command: "CMD013", event: "upload_session.reserved.v1", note: "the intent unit of work: quota, slot, quarantine intent and initiation anchor" },
+    session_issued: { command: "CMD013", event: "upload_session.session_issued.v1", note: "the completion unit of work after the provider call, by the attempt holding the issuance fence (D-RUN-2)" },
+    completion_reported: { command: "CMD014", event: "upload_session.completion_reported.v1" },
+    completion_not_observed: { owner: "B07", why: "the UPLOAD_INSPECTION consumer (control plane) observes no complete object for the claim; the claim is cleared and the session stays usable until the deadline", event: "upload_session.completion_not_observed.v1" },
+    inspection_admitted: { owner: "B07", why: "the UPLOAD_INSPECTION consumer (control plane): observation, inspection, scan coverage, promotion and a receipt of the current attempt (S053, S054)", event: "upload_session.admitted.v1" },
+    inspection_rejected: { owner: "B07", why: "the UPLOAD_INSPECTION consumer (control plane) records a rejecting receipt of the current attempt (D-INSP-3)", event: "upload_session.rejected.v1" },
+    cancel_upload: { command: "CMD015", event: "upload_session.cancelled.v1", note: "also CMD012 when it cancels a mutable predecessor's uploads" },
+    reservation_expired: { owner: "B07", why: "the upload-deadline sweeper (control plane) at the application deadline, never earlier (R2-051)", event: "upload_session.expired.v1" },
+    intake_deadline_reached: { owner: "B07", why: "the upload-deadline sweeper (control plane): an admitted file no sealed revision retains leaves with its intake window (D-RET-1)", event: "upload_session.expired.v1" },
+  },
+  StoredObject: {
+    "(initial INTENDED)": { owner: "B07", why: "CMD013 registers the quarantine intent before any provider write; the control plane registers promotions and residuals found by stat or inventory (D-OBJ-1)", event: null },
+    provider_object_observed: { owner: "B07", why: "a provider stat or inventory observed the generation (control plane)", event: null },
+    bytes_verified: { owner: "B07", why: "the server recomputed SHA-256 over the complete generation (control plane)", event: null },
+    deletion_requested: { owner: "B07", why: "the STORAGE_LIFECYCLE consumer (control plane): a tombstoned upload, a late or orphan residual, an expired intake; the deletion package (B16) requests the rest", event: null },
+    deletion_confirmed: { owner: "B07", why: "the provider confirmed the deletion or the absence of the exact generation, with the residual the location read-back implies (D-OBJ-2)", event: null },
+    deletion_failed: { owner: "B07", why: "a provider failure or a generation precondition failure is recorded, never a deletion (09 Early deletion: PARTIAL)", event: null },
+    deletion_retried: { owner: "B07", why: "the deletion-retry sweeper (control plane)", event: null },
+  },
+  SourceFile: {
+    "(initial ADMITTED)": { owner: "B07", why: "the UPLOAD_INSPECTION consumer admits a file only while its upload is VERIFYING under the current attempt (control plane)", event: null },
+    admission_revoked: { owner: "B07", why: "the upload-deadline sweeper (INTAKE_EXPIRED, refused while a sealed revision retains the file) or object inventory (GENERATION_MISSING, GENERATION_CHANGED) (D-FILE-1)", event: null },
+  },
+  RetentionRecord: {
+    "(initial ACTIVE)": { command: "CMD017", event: "retention_record.created.v1", note: "the UNPAID record anchored on the seal: hard deadline fourteen days after it (D-RET-2); later packages create the paid classes" },
+    effective_deadline_reached: { owner: "B07", why: "the retention sweeper (control plane), never before the effective deadline", event: "retention_record.expired.v1" },
+    early_deletion_requested: { command: "CMD042", event: null },
+    cleanup_started: { owner: "B16", why: "managed deletion of expired data", event: null },
+    cleanup_verified: { owner: "B16", why: "verified managed deletion", event: null },
+    cleanup_verified_with_residuals: { owner: "B16", why: "verified managed deletion with recorded provider residuals", event: null },
   },
   Audit: {
     "(initial QUEUED)": { command: "CMD020", event: null },
@@ -282,8 +318,13 @@ export async function loadMatrixSources() {
     tests[file] = [...readFileSync(join(testDir, file), "utf8").matchAll(/^test\(\s*"((?:[^"\\]|\\.)*)"/gm)].map((m) => JSON.parse(`"${m[1]}"`));
   }
   return {
-    machines: [...contracts.STATE_MACHINES, ...domain.PLATFORM_STATE_MACHINES],
+    machines: [...contracts.STATE_MACHINES, ...domain.PLATFORM_STATE_MACHINES, ...domain.SOURCE_LIFECYCLE_STATE_MACHINES],
     registryMachines: new Set(contracts.STATE_MACHINES.map((m) => m.contract)),
+    sourceMachines: new Set(domain.SOURCE_LIFECYCLE_STATE_MACHINES.map((m) => m.contract)),
+    sourceSpecs: application.B07_COMMANDS,
+    sourceOutcomes: application.SOURCE_COMMAND_OUTCOMES,
+    sourceRoutes: application.SOURCE_ROUTES,
+    sourceRouteOutcomes: application.SOURCE_ROUTE_OUTCOMES,
     commands,
     eventTypes: new Set(domain.EVENT_TYPES),
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
@@ -341,6 +382,9 @@ export function checkSources(s, owners = EDGE_OWNERS, applicability = APPLICABIL
     }
   }
   for (const id of s.served) if (!(id in applicability)) failures.push(`${id} is served but has no applicability row`);
+  // the specified source-lifecycle commands and routes (B07): each has its closed outcome catalogue before it is served
+  for (const id of Object.keys(s.sourceSpecs)) if (!s.sourceOutcomes[id]) failures.push(`${id} is specified but has no outcome catalogue`);
+  for (const id of Object.keys(s.sourceRoutes)) if (!s.sourceRouteOutcomes[id]) failures.push(`the source route ${id} has no outcome catalogue`);
   return failures;
 }
 
@@ -351,13 +395,15 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# B06 state, command and event matrix");
+  line("# State, command and event matrix (B06 served, B07 specified)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
-  line("`commands.json` and `cases.json` (provenance-verified, `@kauro/contracts`), the platform machines EndClient and Project and");
-  line("the event registry of `@kauro/domain` (`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome");
-  line("catalogues of `@kauro/application` (`B06_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the transition");
+  line("`commands.json` and `cases.json` (provenance-verified, `@kauro/contracts`), the platform machines of `@kauro/domain` (EndClient");
+  line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07) and its event registry");
+  line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
+  line("(`B06_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard) and the specified B07 commands and routes with theirs");
+  line("(`B07_COMMANDS`, `SOURCE_COMMAND_OUTCOMES`, `SOURCE_ROUTES`, `SOURCE_ROUTE_OUTCOMES`; served by mandate B07-COMMANDS), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
@@ -368,18 +414,23 @@ export function generateMatrix(s) {
   line("## 1. Every edge of every machine");
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
-  line("edge, the owning package and why. `B06` says what this package serves: **route** — a served command performs it;");
-  line("**database** — the B06 schema stores the aggregate and seeds the edge in `kauro.state_transitions` (every other edge is");
-  line("refused, SQLSTATE KA008), so the owning package's writer is admitted and checked; **—** — the aggregate is not stored by B06.");
+  line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008–0011 of B07) stores the aggregate and seeds the edge in");
+  line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
+  line("checked; **—** — the aggregate is not stored yet.");
   line();
   for (const m of s.machines) {
     const table = EDGE_OWNERS[m.contract];
-    const kind = s.registryMachines.has(m.contract) ? "registry machine" : "platform machine (decisions D-AGG-1, D-AGG-2)";
+    const kind = s.registryMachines.has(m.contract)
+      ? "registry machine"
+      : s.sourceMachines.has(m.contract)
+        ? `platform machine of the source lifecycle (B07 decision ${SOURCE_MACHINE_DECISIONS[m.contract]})`
+        : "platform machine (decisions D-AGG-1, D-AGG-2)";
     line(`### ${m.contract}`);
     line();
     line(`${kind}; initial ${m.initial}; terminal ${m.terminal.join(", ")}; unlisted edges: ${m.unlistedTransition}.`);
     line();
-    line("| From | Event | To | Performed by | Event type | B06 |");
+    line("| From | Event | To | Performed by | Event type | Stored |");
     line("| --- | --- | --- | --- | --- | --- |");
     const rows = [{ from: "—", event: `(initial ${m.initial})`, to: m.initial }, ...m.transitions.map((t) => ({ from: t.from, event: t.event, to: t.to }))];
     const stored = [...s.seeded].some((k) => k.startsWith(`${m.contract}:`));
@@ -410,6 +461,35 @@ export function generateMatrix(s) {
     line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
   }
   line();
+  line("## 2a. The specified source-lifecycle commands and routes (B07)");
+  line();
+  line("Specified by `docs/design/B07-upload-source-lifecycle.md` with their closed outcome catalogues; served by mandate B07-COMMANDS,");
+  line("when they join the served commands above (the api's send guard, the OpenAPI document and sections 3 and 4 then cover them).");
+  line();
+  line("| Command | Route | Role | Scope | Step-up | Edges | Success |");
+  line("| --- | --- | --- | --- | --- | --- | --- |");
+  for (const [id, spec] of Object.entries(s.sourceSpecs)) {
+    const edges = [];
+    for (const [machine, table] of Object.entries(EDGE_OWNERS)) for (const [event, o] of Object.entries(table)) if (o.command === id) edges.push(`${machine} ${event}`);
+    const success = id === "CMD014" ? "202 ACCEPTED (B06 envelope)" : id === "CMD012" || id === "CMD013" ? "201 COMPLETED" : "200 COMPLETED";
+    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${success} |`);
+  }
+  line();
+  line("| Route | Operation | Role | Success view | Authority |");
+  line("| --- | --- | --- | --- | --- |");
+  for (const [id, route] of Object.entries(s.sourceRoutes)) line(`| ${route.method} ${cell(route.path)} | ${id} | ${route.role} | ${route.status} ${route.view} | ${cell(route.authority)} |`);
+  line();
+  for (const [id, outcomes] of [...Object.entries(s.sourceOutcomes), ...Object.entries(s.sourceRouteOutcomes)]) {
+    const title = s.sourceSpecs[id] ? `${id} ${s.sourceSpecs[id].name}` : id;
+    line(`### ${title} (specified)`);
+    line();
+    line("| Status | Code | Reason | Field codes | current | Layer | Meaning |");
+    line("| --- | --- | --- | --- | --- | --- | --- |");
+    for (const [status, entries] of s.outcomesByStatus(outcomes)) {
+      for (const e of entries) line(`| ${status} | ${e.code} | ${e.reason ?? "—"} | ${e.fieldCodes ? e.fieldCodes.join(", ") : "—"} | ${e.current ? e.current.toLowerCase() : "—"} | ${e.layer} | ${cell(e.meaning)} |`);
+    }
+    line();
+  }
   line("## 3. Error catalogue");
   line();
   line("Every problem a served command may answer (`COMMAND_OUTCOMES`). The api's send guard refuses any other problem on the route");

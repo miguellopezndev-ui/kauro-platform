@@ -5,9 +5,20 @@
  * events, OK/DENY/RACE — is specified in docs/design/B07-upload-source-lifecycle.md §8; handlers implementing these contracts
  * belong to mandate B07-COMMANDS.
  */
-import type { UtcInstant } from "@kauro/contracts";
+import type { CommandResult } from "../api/envelope.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
-import type { JournaledSessionPlaceholder, ProtectedSessionView, RevisionImpactView, RevisionQuotaView, SourceRevisionView, UploadView } from "./views.js";
+import type { SourceRouteId } from "./outcomes.js";
+import type {
+  JournaledSessionPlaceholder,
+  ProjectRevisionPointerView,
+  ProtectedSessionView,
+  RetentionView,
+  RevisionImpactView,
+  RevisionQuotaView,
+  RevisionSummaryView,
+  SourceRevisionView,
+  UploadView,
+} from "./views.js";
 
 function spec<Body>(s: CommandSpec<Body>): CommandSpec<Body> {
   return Object.freeze(s);
@@ -25,8 +36,8 @@ export interface CreateRevisionView {
   /** The new mutable revision (DRAFT, version 1). */
   readonly revision: SourceRevisionView;
   /** The predecessor after the command: SUPERSEDED (it was SEALED), CANCELLED (it was mutable) or unchanged (already terminal). */
-  readonly predecessor: { readonly revisionId: string; readonly version: number; readonly state: string };
-  readonly project: { readonly projectId: string; readonly version: number; readonly currentRevisionId: string };
+  readonly predecessor: RevisionSummaryView;
+  readonly project: ProjectRevisionPointerView;
   /** Authority that no longer applies to the new bytes (identified, never transferred; CMD012 failure clause). */
   readonly invalidated: RevisionImpactView;
   /** Live uploads of a cancelled mutable predecessor, cancelled in the same transaction. */
@@ -58,7 +69,7 @@ export interface ReserveUploadBody {
 }
 export interface ReserveUploadView {
   readonly upload: UploadView;
-  readonly revision: { readonly revisionId: string; readonly version: number; readonly state: string };
+  readonly revision: RevisionSummaryView;
   readonly quota: RevisionQuotaView;
   /**
    * Journaled as the placeholder; the transport hydrates it for the requester only (D-SESSION-2). A replay by the requester while
@@ -88,16 +99,12 @@ export interface CompleteUploadBody {
   readonly providerCompletionRef: string;
 }
 /**
- * CompleteUpload answers 202 ACCEPTED (completion remains asynchronous): the operation is the upload's verification, its id is
- * the upload id and its status is GET /api/v1/uploads/{uploadId}. The journal stores this body with status 202 (D-RUN-1).
+ * CompleteUpload answers 202 with B06's ACCEPTED envelope (completion remains asynchronous; D-RUN-1): the operation is the
+ * upload's verification — operationId = the upload id, state = VERIFYING, statusPath = /api/v1/uploads/{uploadId}, pollAfterSeconds
+ * = COMPLETION_POLL_AFTER_SECONDS (D-SAPI-3). The journal stores exactly this answer with status 202 and a replay answers it again;
+ * progress is read at the status path (UploadView). No view rides on the 202: the envelope is closed (B06 D-RESP-1).
  */
-export interface CompleteUploadAccepted {
-  readonly operationId: string;
-  readonly state: "VERIFYING";
-  readonly statusPath: string;
-  readonly pollAfterSeconds: number;
-  readonly upload: UploadView;
-}
+export type CompleteUploadAccepted = Omit<Extract<CommandResult<never>, { readonly kind: "ACCEPTED" }>, "kind" | "status"> & { readonly state: "VERIFYING" };
 export const COMPLETE_UPLOAD: CommandSpec<CompleteUploadBody> = spec<CompleteUploadBody>({
   id: "CMD014",
   name: "CompleteUpload",
@@ -111,7 +118,8 @@ export const COMPLETE_UPLOAD: CommandSpec<CompleteUploadBody> = spec<CompleteUpl
   authorityHashFields: [],
   fields: ["providerCompletionRef"],
 });
-export type CompleteUploadHandler = CommandHandler<CompleteUploadBody, CompleteUploadAccepted>;
+/** A handler whose only success is the ACCEPTED answer (its CommandResult never carries a COMPLETED view). */
+export type CompleteUploadHandler = CommandHandler<CompleteUploadBody, never>;
 
 // --- CMD015 CancelUpload --------------------------------------------------------------------------------------------------
 
@@ -121,7 +129,7 @@ export interface CancelUploadBody {
 }
 export interface CancelUploadView {
   readonly upload: UploadView;
-  readonly revision: { readonly revisionId: string; readonly version: number; readonly state: string };
+  readonly revision: RevisionSummaryView;
   /** Bytes returned to the revision envelope by this cancellation (exactly once). */
   readonly releasedBytes: number;
 }
@@ -183,7 +191,8 @@ export interface SealRevisionView {
   readonly revision: SourceRevisionView;
   readonly manifestHash: string;
   readonly projectionHash: string;
-  readonly retention: { readonly retentionId: string; readonly class: "UNPAID"; readonly hardDeadline: UtcInstant; readonly effectiveDeadline: UtcInstant };
+  /** The UNPAID record anchored on the seal: hard deadline fourteen days from the seal (D-RET-2). */
+  readonly retention: RetentionView;
 }
 export const SEAL_REVISION: CommandSpec<SealRevisionBody> = spec<SealRevisionBody>({
   id: "CMD017",
@@ -219,23 +228,36 @@ export interface B07Handlers {
   readonly CMD017: SealRevisionHandler;
 }
 
-// --- auxiliary routes (not catalogue commands; design §8.7, decisions D-SEL-2 and D-API-1) ----------------------------------
+// --- auxiliary routes (not catalogue commands; design §8.7, decisions D-SEL-2 and D-SAPI-1) ----------------------------------
+
+/** An auxiliary route of the source lifecycle: not a catalogue command (no command journal entry), scope AGENCY_HEADER. */
+export interface SourceRouteSpec {
+  readonly method: "GET" | "POST";
+  readonly path: string;
+  /** Registry role vocabulary (B06 D-AUTHZ-1): AGENCY_READER is any live ACTIVE membership. */
+  readonly role: "AGENCY_READER" | "AGENCY_OPERATOR";
+  /** The success status and the view it carries (response schemas: sources/response-views.ts). */
+  readonly status: 200 | 201;
+  readonly view: string;
+  readonly authority: string;
+}
 
 /**
  * Routes the source lifecycle exposes beside the six commands. The reads are the safe projections manual 10 names ("GET returns
- * safe progress", "GET /revisions/{revisionId}/inspection"); the intake stores an immutable selection document and changes no
- * aggregate. Reads require a live ACTIVE membership in the selected agency (any role, D-API-1); the session read and the intake
- * follow the command's own role.
+ * safe progress", "GET /revisions/{revisionId}/inspection", the bounded preview); the intake stores an immutable selection document
+ * and changes no aggregate. Reads require a live ACTIVE membership in the selected agency (any role, D-SAPI-1); the session read
+ * and the intake follow the command's own role.
  */
-export const SOURCE_ROUTES = Object.freeze({
-  selectionManifestIntake: { method: "POST", path: "/api/v1/revisions/{revisionId}/selection-manifests", role: "AGENCY_OPERATOR" },
-  getSelectionManifest: { method: "GET", path: "/api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId}", role: "AGENCY_READER" },
-  getRevision: { method: "GET", path: "/api/v1/revisions/{revisionId}", role: "AGENCY_READER" },
-  getInspection: { method: "GET", path: "/api/v1/revisions/{revisionId}/inspection", role: "AGENCY_READER" },
-  listUploads: { method: "GET", path: "/api/v1/revisions/{revisionId}/uploads", role: "AGENCY_READER" },
-  getUpload: { method: "GET", path: "/api/v1/uploads/{uploadId}", role: "AGENCY_READER" },
-  getUploadSession: { method: "GET", path: "/api/v1/uploads/{uploadId}/session", role: "AGENCY_OPERATOR" },
-} as const);
+export const SOURCE_ROUTES: Readonly<Record<SourceRouteId, SourceRouteSpec>> = Object.freeze({
+  SubmitSelectionManifest: { method: "POST", path: "/api/v1/revisions/{revisionId}/selection-manifests", role: "AGENCY_OPERATOR", status: 201, view: "SelectionManifestIntakeView", authority: "10 \"Upload and target routes\" (selection edits require the revision version: the version is compared by CMD016); D-SEL-2" },
+  GetSelectionManifest: { method: "GET", path: "/api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId}", role: "AGENCY_READER", status: 200, view: "SelectionManifestView", authority: "D-SEL-1" },
+  GetRevision: { method: "GET", path: "/api/v1/revisions/{revisionId}", role: "AGENCY_READER", status: 200, view: "SourceRevisionView", authority: "10 \"Client and project routes\"; 09 \"Notifications and customer action\" (dataAvailableUntil)" },
+  GetInspection: { method: "GET", path: "/api/v1/revisions/{revisionId}/inspection", role: "AGENCY_READER", status: 200, view: "InspectionView", authority: "10 \"Upload and target routes\" (files, detected worksheets, parser choices and structured problems)" },
+  ListUploads: { method: "GET", path: "/api/v1/revisions/{revisionId}/uploads", role: "AGENCY_READER", status: 200, view: "UploadPage", authority: "10 \"Upload and target routes\" (safe progress); 10 \"Pagination, search and exports\"" },
+  GetUpload: { method: "GET", path: "/api/v1/uploads/{uploadId}", role: "AGENCY_READER", status: 200, view: "UploadView", authority: "10 \"Upload and target routes\" (GET returns safe progress without exposing the session URI to unrelated readers)" },
+  GetUploadSession: { method: "GET", path: "/api/v1/uploads/{uploadId}/session", role: "AGENCY_OPERATOR", status: 200, view: "ProtectedSessionView", authority: "10 \"Upload and target routes\" (the provider session through the protected response only); 09 \"Resumable session security\"; D-SESSION-2" },
+  PreviewTable: { method: "GET", path: "/api/v1/revisions/{revisionId}/tables/{tableId}/preview", role: "AGENCY_READER", status: 200, view: "TablePreviewView", authority: "10 \"Upload and target routes\" (a bounded authorized sample with safe display escaping and no shared caching); D-SAPI-7" },
+});
 
 export interface SelectionManifestIntakeView {
   readonly selectionManifestId: string;

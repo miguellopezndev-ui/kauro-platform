@@ -90,6 +90,18 @@ export interface ObjectStoragePort {
   delete(location: StorageLocation, objectName: string, generation: string): Promise<"DELETED" | "ALREADY_ABSENT" | "PRECONDITION_FAILED">;
   /** Provider inventory of a prefix (09: periodic inventory detects objects missing from the registry). */
   list(location: StorageLocation, prefix: string, page?: string): Promise<{ readonly objects: ReadonlyArray<{ readonly objectName: string; readonly generation: string; readonly bytes: number }>; readonly next?: string }>;
+  /**
+   * The location's effective soft-delete retention and object versioning, read back from the provider (09 "Soft delete, versioning
+   * and holds": customer-data buckets disable both unless a disclosed design is approved, and the effective setting is verified
+   * after provisioning; D-OBJ-2). The control plane records every read-back (kauro.storage_location_policies); a deletion at a
+   * location never read back cannot be recorded.
+   */
+  readRetentionPolicy(location: StorageLocation): Promise<{ readonly softDeleteRetentionSeconds: number; readonly objectVersioning: boolean; readonly evidenceHash: Sha256Hex; readonly observedAt: UtcInstant }>;
+  /**
+   * Generations of a prefix the provider still holds soft-deleted, with the expiry the provider reports for each (09: inventory
+   * pre-existing soft-deleted generations and record their actual expiry rather than claiming they vanished).
+   */
+  listSoftDeleted(location: StorageLocation, prefix: string, page?: string): Promise<{ readonly objects: ReadonlyArray<{ readonly objectName: string; readonly generation: string; readonly softDeletedAt: UtcInstant; readonly expiresAt: UtcInstant }>; readonly next?: string }>;
   /** Parses a browser-forwarded completion reference (CMD014) into a claim; MALFORMED when it is not this provider's completion. */
   parseCompletionClaim(ref: string): { readonly kind: "CLAIM"; readonly claim: CompletionClaim } | { readonly kind: "MALFORMED" };
 }

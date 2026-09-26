@@ -108,7 +108,7 @@ test("S051: two revisions racing on one plan version through the plan adapter â€
   // (07 "Transaction discipline": compare-and-swap on the expected version, unique constraints close races; design Â§5 "one
   // revision supersedes a predecessor: CAS on the predecessor version + plans_supersedes_once"). The subject is the product's
   // PgPlanRepository (transition = the CAS, insert = the successor) on two real connections of the runtime role.
-  const p = await plan(app, A, projectId, "VALIDATION_REQUIRED", "race");
+  const p = await plan({ app, control }, A, projectId, "VALIDATION_REQUIRED", "race");
   assert.equal(p.version, 2);
   const ctx = { agencyId: A.agencyId, userId: owner.userId };
   // the repository derives the body hash from the body (re-check finding N10); the label only names the successor in the test
@@ -164,7 +164,7 @@ test("S051: two revisions racing on one plan version through the plan adapter â€
 });
 
 test("an approval binds exact plan/source/target/receipt hashes; a foreign or stale hash cannot be recorded; one live approval per plan", async () => {
-  const p = await plan(app, A, projectId, "VALIDATED", "approve", validator);
+  const p = await plan({ app, control }, A, projectId, "VALIDATED", "approve", validator);
   const proof = await stepUpProof(assurance, owner);
   const insertApproval = (c: Client, id: string, overrides: Partial<Record<"planHash" | "receiptHash" | "revisionHash", string>>) =>
     c.query(
@@ -225,7 +225,7 @@ test("outbox records commit with their event under the tenant policy and can onl
   const other = await person(app, "other-outbox");
   const B = await agency(app, other, "Other Agency");
   // the plan names a sealed source and a confirmed target of its own project (plans_source_fk, plans_target_fk)
-  const source = await sealedSource(app, A, projectId, "outbox");
+  const source = await sealedSource({ app, control }, A, projectId, "outbox");
   const target = await targetContract(app, A, projectId, "outbox");
   const eventId = await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
     // plan.created for a new plan is the simplest fresh event of this agency

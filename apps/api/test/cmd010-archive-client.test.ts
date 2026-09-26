@@ -31,7 +31,8 @@ test("OK: an ADMIN archives an ACTIVE client; CreateProject on it is then refuse
     plans: await w.count("plans", "project_id = $1", [project.data.projectId]),
     receipts: await w.count("validation_receipts", "plan_id = $1", [plan.planId]),
   };
-  assert.deepEqual(before, { projects: 1, revisions: 2, plans: 1, receipts: 1 });
+  // the plan chain seals the project's own first revision (@kauro/persistence/testing sealSourceRevision): one revision
+  assert.deepEqual(before, { projects: 1, revisions: 1, plans: 1, receipts: 1 });
 
   const key = freshKey("cmd010-ok");
   const archived = completed<ArchiveClientView>(await call(w, { url: routes.archiveClient(clientId), token: w.admin.token, key, body: { expectedVersion: 1 } }), 200);

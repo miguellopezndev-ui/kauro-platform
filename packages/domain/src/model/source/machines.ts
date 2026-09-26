@@ -1,12 +1,14 @@
 /**
  * Platform state machines of the source lifecycle (B07). The registry defines DatasetRevision's machine (used as is: registry
- * state_transitions.json, seeded by migration 0003) but gives the UploadSession contract a state enum without a machine, and has
- * no contract for the object registry or the admitted-file lifecycle. These machines are declared here in the registry's own
- * shape and unlisted-transition policy (decisions D-UP-1, D-OBJ-1, D-FILE-1 in docs/design/B07-upload-source-lifecycle.md) so the
- * same `transition` guard applies; migrations 0008 and 0009 seed exactly these edges and the persistence test proves it.
+ * state_transitions.json, seeded by migration 0003) but gives the UploadSession and RetentionRecord contracts a state enum
+ * without a machine, and has no contract for the object registry or the admitted-file lifecycle. These machines are declared
+ * here in the registry's own shape and unlisted-transition policy (decisions D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2 in
+ * docs/design/B07-upload-source-lifecycle.md) so the same `transition` guard applies; the B07 migrations seed exactly these
+ * initial states and edges (kauro.state_machines, kauro.state_transitions; decision D-INIT-1 of B06) and the persistence test
+ * proves it.
  *
  * Kept apart from B06's PLATFORM_STATE_MACHINES (EndClient, Project) so neither package rewrites the other's list;
- * `machine()` consults both.
+ * `machine()` and the state/command/event matrix (tools/matrix.mjs) consult both.
  */
 import type { StateMachine } from "@kauro/contracts";
 
@@ -136,6 +138,53 @@ export const SOURCE_LIFECYCLE_STATE_MACHINES: ReadonlyArray<StateMachine> = Obje
         to: "ADMISSION_REVOKED",
         guard: "The accepted generation is missing, differs from the admitted one, or its intake expired unsealed.",
         effect: "The file can no longer enter a selection or a seal; a replacement is a new upload and generation.",
+      },
+    ],
+    unlistedTransition: UNLISTED,
+  },
+  {
+    // RetentionRecord contract: "The effective deadline is a minimum of named anchors; retries do not extend it." A record is
+    // born ACTIVE by the event that owns its hard deadline (SealRevision for the UNPAID class, D-RET-2); B07 moves it to EXPIRED
+    // with the revision's retention_expires edge; the managed deletion that follows (DELETING, DELETED, DELETED_WITH_RESIDUALS)
+    // is the deletion package's (G-DELETE, B16), whose edges are seeded here so the machine is complete and fails closed.
+    contract: "RetentionRecord",
+    initial: "ACTIVE",
+    terminal: ["DELETED", "DELETED_WITH_RESIDUALS"],
+    transitions: [
+      {
+        from: "ACTIVE",
+        event: "effective_deadline_reached",
+        to: "EXPIRED",
+        guard: "Server time reached the effective deadline (the minimum of the soft and hard deadlines of the record's immutable anchors).",
+        effect: "Revoke reads and execution of the governed data in the same transaction as the revision's retention_expires; schedule deletion.",
+      },
+      {
+        from: "ACTIVE",
+        event: "early_deletion_requested",
+        to: "DELETING",
+        guard: "An authorized deletion request covers the record's scope (CMD042 RequestDeletion).",
+        effect: "Tombstone authority before deleting raw and derived artifacts; the hard deadline never moves.",
+      },
+      {
+        from: "EXPIRED",
+        event: "cleanup_started",
+        to: "DELETING",
+        guard: "The deletion inventory of the scope is enumerated (registered generations and provider inventory of the owned prefixes).",
+        effect: "Delete under generation preconditions and record each result.",
+      },
+      {
+        from: "DELETING",
+        event: "cleanup_verified",
+        to: "DELETED",
+        guard: "Every active generation of the scope is deleted or verified absent and no provider residual remains.",
+        effect: "The deletion receipt is complete for the managed scope.",
+      },
+      {
+        from: "DELETING",
+        event: "cleanup_verified_with_residuals",
+        to: "DELETED_WITH_RESIDUALS",
+        guard: "Every active generation is deleted or absent; observed provider residuals (soft-deleted generations) remain until their recorded expiry.",
+        effect: "The receipt names each residual class and its expiry instead of claiming erasure.",
       },
     ],
     unlistedTransition: UNLISTED,

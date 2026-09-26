@@ -70,20 +70,20 @@ export const RESPONSE_FIELD_VOCABULARY = Object.freeze({ ID, VERSION, HASH, UTC,
  * A member taken from the registry, optionally narrowed by keywords the registry member lacks: from the view's own contract
  * (same name), or — `from` — from the named member of another contract (a reference such as a project's capability version).
  */
-interface DerivedMember {
+export interface DerivedMember {
   readonly kind: "registry";
   readonly required: boolean;
   readonly narrow?: JsonSchema;
   readonly from?: readonly [ContractName, string];
 }
 /** A member the registry has no contract for; its schema is platform vocabulary and its rationale is recorded. */
-interface PlatformMember {
+export interface PlatformMember {
   readonly kind: "platform";
   readonly required: boolean;
   readonly schema: JsonSchema;
   readonly description: string;
 }
-type ViewMember = DerivedMember | PlatformMember;
+export type ViewMember = DerivedMember | PlatformMember;
 
 export interface ViewDefinition {
   readonly name: string;
@@ -112,6 +112,12 @@ const RESOURCE_ACTIONS_DESCRIPTION =
   "The served commands the caller may issue on this resource, derived server-side from the caller's role, the resource's state and, for an approval, its control (07 \"The handoff to UI includes every state, safe field, permitted action\"); informative, never authority (re-check finding N16).";
 /** An opaque list cursor (api/cursor): integrity-protected and bound to the caller, the scope, the filter and the order. */
 const CURSOR = Object.freeze({ type: "string", pattern: CURSOR_PATTERN, maxLength: 600 });
+
+/**
+ * The member constructors and narrowing keywords of a view definition, exported so a later package declares its views exactly as
+ * these are declared (the B07 source lifecycle, @kauro/application sources/response-views) and builds them with viewSchema.
+ */
+export const VIEW_MEMBER_KIT = Object.freeze({ registry, platform, ref, NARROW_ID, NARROW_LABEL, CURSOR, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION });
 
 /**
  * Every DTO definition of the served routes. Order is the order of the OpenAPI components. A view is closed: a member not
@@ -744,7 +750,7 @@ export function openObjects(schema: unknown, at = ""): ReadonlyArray<string> {
   return out;
 }
 
-function viewSchema(bundle: RegistryBundle, view: ViewDefinition): JsonSchema {
+export function viewSchema(bundle: RegistryBundle, view: ViewDefinition): JsonSchema {
   const contract = view.contract === null ? null : registryContract(bundle, view.contract);
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];

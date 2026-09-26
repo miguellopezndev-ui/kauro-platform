@@ -35,6 +35,9 @@ export type {
   ServedCommandId,
   JsonSchema,
   ViewDefinition,
+  ViewMember,
+  DerivedMember,
+  PlatformMember,
   OperationalRoute,
   OperationalResponse,
   RegistryBundle,
@@ -46,6 +49,8 @@ export {
   RESPONSE_SCHEMA_PREFIX,
   RESPONSE_FIELD_VOCABULARY,
   VIEW_DEFINITIONS,
+  VIEW_MEMBER_KIT,
+  viewSchema,
   COMMAND_RESPONSES,
   SERVED_COMMAND_IDS,
   READ_RESPONSES,
@@ -65,7 +70,7 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, OUTCOME_BLOCKS, problemOutcome, closedCatalogue, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,

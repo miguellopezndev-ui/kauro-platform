@@ -13,6 +13,8 @@ import { event, ids, invite, plan, planBody, project, sealedSource, sha, sqlStat
 
 let h: Harness;
 let app: Client;
+// the control plane seals sources through the B07 lifecycle (its inspection and evaluation writes; support.ts sealedSource)
+let control: Client;
 let validator: Client;
 let assurance: Client;
 let owner: UserId;
@@ -30,6 +32,7 @@ let projectB: string;
 before(async () => {
   h = await start();
   app = await h.pg.connect("kauro_app_test");
+  control = await h.pg.connect("kauro_control_test");
   validator = await h.pg.connect("kauro_validator_test");
   assurance = await h.pg.connect("kauro_assurance_test");
   owner = await h.person("owner-recheck");
@@ -47,6 +50,7 @@ before(async () => {
 });
 after(async () => {
   await app.end();
+  await control.end();
   await validator.end();
   await assurance.end();
   await h.stop();
@@ -92,7 +96,7 @@ test("N1: the request-handler role holds no privilege on an identity's security 
 });
 
 test("N5: ending an approval moves its plan out of APPROVED in the same transaction — a withdrawal written alone, leaving the plan APPROVED under no live authority, is refused at COMMIT (KA020)", async () => {
-  const p = await plan(app, A, projectA, "VALIDATED", "n5", validator);
+  const p = await plan({ app, control }, A, projectA, "VALIDATED", "n5", validator);
   const proof = await stepUpProof(assurance, { userId: approver });
   const approvalId = ids.next();
   await tx(app, ctx(approver), async (c) => {
@@ -143,9 +147,9 @@ test("N6: a label refuses exactly the Unicode control characters (C0, DEL and C1
 });
 
 test("N9: a plan's source and target are a sealed revision and a target contract of its own project — naming another project's is refused at insert, whatever the hashes; the plan's subject columns are its body's members", async () => {
-  const sourceB = await sealedSource(app, A, projectB, "n9-b");
+  const sourceB = await sealedSource({ app, control }, A, projectB, "n9-b");
   const targetB = await targetContract(app, A, projectB, "n9-b");
-  const sourceA = await sealedSource(app, A, projectA, "n9-a");
+  const sourceA = await sealedSource({ app, control }, A, projectA, "n9-a");
   const targetA = await targetContract(app, A, projectA, "n9-a");
   const insertPlan = (projectId: string, revisionHash: string, targetContractHash: string, body = planBody(revisionHash, targetContractHash, sha("policy"))) =>
     tx(app, ctx(owner), async (c) => {
@@ -240,7 +244,7 @@ test("N11: the agency's state and agreements are the OWNER's decisions, and an a
   await moveAgency(owner);
   // an approval by an ACTIVE member whose role does not approve (the ADMIN, with a fresh proof of itself): refused by the
   // insert policy; the APPROVER's own approval commits
-  const p: PlanFixture & { receiptHash?: string } = await plan(app, A, projectA, "VALIDATED", "n11-approval", validator);
+  const p: PlanFixture & { receiptHash?: string } = await plan({ app, control }, A, projectA, "VALIDATED", "n11-approval", validator);
   const approveAs = (sessionUser: string, membershipId: string, proof: string) =>
     tx(app, ctx(sessionUser), async (c) => {
       const approvalId = ids.next();

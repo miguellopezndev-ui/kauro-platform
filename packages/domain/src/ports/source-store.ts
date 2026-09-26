@@ -8,18 +8,25 @@
  * `SourceUnitOfWork` is the B06 UnitOfWork plus `sources`. The factory gains `runSource` instead of changing `run`, so the B06
  * handlers and adapters compile untouched; at integration `sources` folds into UnitOfWork (one member, design §13).
  *
- * Database refusals surface as typed failures (sqlstate translation, mandate B07-PERSISTENCE): the quota CHECKs are
- * PRECONDITION_FAILED / REVISION_QUOTA_EXCEEDED or REVISION_FILE_LIMIT, the capacity CHECK is ADMISSION_LIMITED /
- * UPLOAD_CONCURRENCY_LIMITED, KA009 is INTEGRITY_FAILURE / QUOTA_LEDGER, KA010 is PRECONDITION_FAILED / FENCE_DISCIPLINE, KA011
- * is INTEGRITY_FAILURE / LIFECYCLE_BINDING_MISSING, dataset_revisions_one_mutable_per_project is PRECONDITION_FAILED /
- * REVISION_NOT_MUTABLE.
+ * Database refusals surface as typed failures (sqlstate translation, mandate B07-PERSISTENCE; the B07 range KA070..KA072 is
+ * decision D-SQL-1): the quota CHECKs are PRECONDITION_FAILED / REVISION_QUOTA_EXCEEDED or REVISION_FILE_LIMIT, the per-file CHECK
+ * is PRECONDITION_FAILED / FILE_TOO_LARGE, the capacity CHECK is ADMISSION_LIMITED / UPLOAD_CONCURRENCY_LIMITED, KA070 is
+ * INTEGRITY_FAILURE / QUOTA_LEDGER, KA071 is PRECONDITION_FAILED / FENCE_DISCIPLINE, KA072 is INTEGRITY_FAILURE /
+ * LIFECYCLE_BINDING_MISSING (a handler that checked its preconditions first never meets it), dataset_revisions_one_mutable_per_project
+ * and dataset_revisions_supersedes_once are PRECONDITION_FAILED / REVISION_NOT_MUTABLE and PREDECESSOR_NOT_CURRENT.
+ *
+ * Lock order (decision D-LOCK-1, design §5): project row → revision row (FOR NO KEY UPDATE, the lock every revision transition
+ * takes first) → revision transition lock (the guard's, then B06's trigger) → upload rows → quota ledgers (revision, then agency
+ * capacity) → object registry rows → a file's transition lock. A reservation takes the revision row itself (the BEFORE INSERT
+ * trigger), so every writer of a revision's intake is ordered on that row.
  */
 import type { Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { ProjectRecord } from "../model/aggregates.js";
 import type { AgencyId, ApprovalId, JournalEntryId, MembershipId, PlanId, ProjectId, RevisionId, UserId } from "../model/ids.js";
 import type { RevisionInventory } from "../model/source/digests.js";
-import type { EvaluationId, SelectionManifestId, SourceFileId, SourceTableId, StoredObjectId, UploadId } from "../model/source/ids.js";
+import type { EvaluationId, RetentionId, SelectionManifestId, SourceFileId, SourceTableId, StoredObjectId, UploadId } from "../model/source/ids.js";
 import type {
+  AdmissionRevocationReason,
   CompletionClaim,
   DataClass,
   DeclaredFormat,
@@ -39,6 +46,7 @@ import type {
   SourcePopulations,
   SourceRevisionRecord,
   SourceTableRecord,
+  StorageLocationPolicyRecord,
   StorageZone,
   StoredObjectRecord,
   UploadCapacity,
@@ -86,7 +94,7 @@ export type UploadTransition =
 
 export interface UploadSessionRepository {
   get(uploadId: UploadId): Promise<UploadSessionRecord | null>;
-  /** SELECT ... FOR UPDATE (lock order: project, revision, upload — design §5). */
+  /** SELECT ... FOR UPDATE (lock order D-LOCK-1: project, revision, upload). */
   lock(uploadId: UploadId): Promise<UploadSessionRecord | null>;
   /**
    * Inserts a RESERVED upload at version 1. The quota trigger adds its bytes, file and slot to the ledgers under their row locks;
@@ -147,7 +155,10 @@ export interface NewStoredObject {
 
 export interface StoredObjectRepository {
   get(objectId: StoredObjectId): Promise<StoredObjectRecord | null>;
-  /** Registers an intent (INTENDED) before any provider write, or an observed residual (PRESENT, late). */
+  /**
+   * Registers an intent (INTENDED) before any provider write. Every row is born INTENDED (B06 D-INIT-1): an object found by a stat
+   * or by inventory (a late or orphan residual) is registered and then observed in the same unit of work (`register` + `observe`).
+   */
   register(object: NewStoredObject): Promise<StoredObjectRecord>;
   /** INTENDED -> PRESENT with generation and length (set once); `late` marks an object observed after acceptance was tombstoned. */
   observe(objectId: StoredObjectId, observed: { readonly generation: string; readonly bytes: number; readonly observedAt: UtcInstant; readonly late: boolean }): Promise<StoredObjectRecord>;
@@ -155,9 +166,23 @@ export interface StoredObjectRepository {
   verify(objectId: StoredObjectId, sha256: Sha256Hex, verifiedAt: UtcInstant): Promise<StoredObjectRecord>;
   /** -> DELETION_REQUESTED for each object (a VERIFIED object retained by a sealed revision is refused, design §7.4). */
   requestDeletion(objectIds: ReadonlyArray<StoredObjectId>, reason: string, at: UtcInstant): Promise<number>;
-  /** Records the provider result: DELETED / ALREADY_ABSENT -> DELETED; PRECONDITION_FAILED / PROVIDER_ERROR -> DELETION_FAILED. */
+  /**
+   * Records the provider result: DELETED / ALREADY_ABSENT -> DELETED with the provider residual (D-OBJ-2: the adapter writes
+   * basis LOCATION_POLICY and the residual the location's latest read-back at or before `at` implies — the database refuses any
+   * other value and refuses a deletion at a location never read back); PRECONDITION_FAILED / PROVIDER_ERROR -> DELETION_FAILED.
+   */
   recordDeletion(objectId: StoredObjectId, result: DeletionResult, at: UtcInstant): Promise<StoredObjectRecord>;
+  /**
+   * Records a generation that provider inventory found already soft-deleted (09: record the actual expiry rather than claiming it
+   * vanished): registered, requested and DELETED (ALREADY_ABSENT) in one unit of work, with the expiry the provider reported
+   * (basis PROVIDER_REPORTED).
+   */
+  recordProviderResidual(object: NewStoredObject & { readonly generation: string; readonly softDeletedAt: UtcInstant; readonly providerExpiresAt: UtcInstant }): Promise<StoredObjectRecord>;
   retryDeletion(objectId: StoredObjectId, at: UtcInstant): Promise<StoredObjectRecord>;
+  /** Appends a retention read-back of a location (control plane; append-only). */
+  recordLocationPolicy(observation: StorageLocationPolicyRecord): Promise<void>;
+  /** The latest read-back of a location at or before an instant, or null when it was never read back. */
+  locationPolicyAt(provider: string, locationRef: string, at: UtcInstant): Promise<StorageLocationPolicyRecord | null>;
   /** The deletion inventory of a scope: every registered object with its zone, class, state and result (raw/derived/residual). */
   inventory(scope: { readonly projectId: ProjectId; readonly revisionId?: RevisionId; readonly uploadId?: UploadId }): Promise<ReadonlyArray<StoredObjectRecord>>;
   findByName(provider: string, locationRef: string, objectName: string): Promise<ReadonlyArray<StoredObjectRecord>>;
@@ -168,7 +193,7 @@ export interface StoredObjectRepository {
 // --- inspection, files, inventory ------------------------------------------------------------------------------------------------
 
 export interface InspectionReceiptRepository {
-  /** Appends the receipt of the current attempt of a VERIFYING upload (a stale attempt is refused by the database, KA010). */
+  /** Appends the receipt of the current attempt of a VERIFYING upload (a stale attempt is refused by the database, KA071). */
   append(receipt: InspectionReceiptRecord): Promise<void>;
   getByHash(receiptHash: Sha256Hex): Promise<InspectionReceiptRecord | null>;
   forUpload(uploadId: UploadId): Promise<ReadonlyArray<InspectionReceiptRecord>>;
@@ -188,8 +213,11 @@ export interface SourceFileRepository {
   listReusable(projectId: ProjectId): Promise<ReadonlyArray<SourceFileRecord>>;
   tables(fileId: SourceFileId): Promise<ReadonlyArray<SourceTableRecord>>;
   columns(tableId: SourceTableId): Promise<ReadonlyArray<SourceColumnRecord>>;
-  /** ADMITTED -> ADMISSION_REVOKED (the accepted generation was lost or its unsealed intake expired). */
-  revokeAdmission(fileId: SourceFileId, reason: string, at: UtcInstant): Promise<SourceFileRecord>;
+  /**
+   * ADMITTED -> ADMISSION_REVOKED (the accepted generation was lost or its unsealed intake expired). Takes the file's transition
+   * lock first; an INTAKE_EXPIRED revocation of a file a SEALED or SUPERSEDED revision includes is refused (KA072, D-RET-1).
+   */
+  revokeAdmission(fileId: SourceFileId, reason: AdmissionRevocationReason, at: UtcInstant): Promise<SourceFileRecord>;
   /** Sealed revisions whose manifest includes the file (they retain its accepted generation). */
   sealedBy(fileId: SourceFileId): Promise<ReadonlyArray<RevisionId>>;
 }
@@ -211,6 +239,8 @@ export interface SelectionEvaluationRepository {
 export interface SelectionBinding {
   readonly selectionManifestId: SelectionManifestId;
   readonly selectionHash: Sha256Hex;
+  /** The settled inventory the manifest was made against; must equal the manifest's own inventoryHash (D-SEL-3). */
+  readonly inventoryHash: Sha256Hex;
   readonly selectedAt: UtcInstant;
 }
 
@@ -232,18 +262,21 @@ export type RevisionTransition =
 
 export interface SourceRevisionRepository {
   get(revisionId: RevisionId): Promise<SourceRevisionRecord | null>;
-  /** SELECT ... FOR UPDATE. */
+  /**
+   * SELECT ... FOR NO KEY UPDATE: the revision row lock every revision transition takes before its transition lock (D-LOCK-1). A
+   * command that changes the revision or its intake takes it first (CMD012 on the predecessor, CMD013 before its reservation,
+   * CMD015 when it may complete the upload set, CMD016, CMD017), so two first reservations of a DRAFT revision serialize here
+   * instead of deadlocking on the transition lock.
+   */
   lock(revisionId: RevisionId): Promise<SourceRevisionRecord | null>;
-  /** SELECT ... FOR SHARE: CompleteUpload holds it so a concurrent seal waits (design §5). */
-  lockShared(revisionId: RevisionId): Promise<SourceRevisionRecord | null>;
   /** Inserts the successor DRAFT revision at version 1 with its explicit lineage (CMD012). */
   insertSuccessor(revision: { readonly revisionId: RevisionId; readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly supersedesRevisionId: RevisionId; readonly createdByMembershipId: MembershipId; readonly createdAt: UtcInstant }): Promise<SourceRevisionRecord>;
   /** Applies a listed DatasetRevision edge (or the in-place selection rebind) at expectedVersion + 1. */
   transition(revisionId: RevisionId, expectedVersion: number, change: RevisionTransition, now: UtcInstant): Promise<VersionedWrite<SourceRevisionRecord>>;
   /** The revision's own uploads, files and detected tables in inventory-hash order. */
   inventory(revisionId: RevisionId): Promise<RevisionInventory>;
-  /** Control-plane discovery: mutable revisions whose intake window closed without a seal (design §7.6). */
-  findIntakeClosed(now: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly revisionId: RevisionId; readonly agencyId: AgencyId }>>;
+  /** Control-plane discovery: SEALED revisions with no ACTIVE record ahead, and REJECTED ones whose intake windows closed (§7.5). */
+  findRetentionDue(now: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly revisionId: RevisionId; readonly agencyId: AgencyId }>>;
 }
 
 export interface SealedFileEntry {
@@ -280,6 +313,15 @@ export interface RetentionRepository {
   /** Inserts an ACTIVE record at version 1 (the caller publishes retention_record.created.v1). */
   insertRecord(record: RetentionRecordRow): Promise<RetentionRecordRow>;
   recordFor(revisionId: RevisionId, retentionClass: RetentionRecordRow["class"]): Promise<RetentionRecordRow | null>;
+  /** Every record governing the revision (the earliest applicable deadline of each governs it, D-RET-2). */
+  recordsFor(revisionId: RevisionId): Promise<ReadonlyArray<RetentionRecordRow>>;
+  /**
+   * ACTIVE -> EXPIRED at expectedVersion + 1 (effective_deadline_reached; control plane, retention_record.expired.v1). The database
+   * refuses an expiry before the effective deadline; the hard deadline never moves.
+   */
+  expireRecord(retentionId: RetentionId, expectedVersion: number, expiredAt: UtcInstant): Promise<VersionedWrite<RetentionRecordRow>>;
+  /** Control-plane discovery: ACTIVE records whose effective deadline has passed. */
+  findDue(now: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly retentionId: RetentionId; readonly agencyId: AgencyId; readonly revisionId?: RevisionId }>>;
 }
 
 /** The two-phase command journal operations (D-RUN-2) over the B06 command_journal table. */

@@ -2,9 +2,33 @@
 // @kauro/contracts COMMANDS), and the selection manifest document schema under the strict compiler every request goes through:
 // closed objects, no coercion, no defaults, only the keyword vocabulary the validator enforces (R2-058, R2-059, S093).
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
-import { B07_COMMANDS, REQUEST_SCHEMA_PREFIX, SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS, SOURCE_REQUEST_SCHEMA_IDS, SOURCE_ROUTES, compileSchemaBundle } from "../src/index.js";
+import { DomainFailure, FAILURE_REASONS } from "@kauro/domain";
+import {
+  B07_COMMANDS,
+  PROBLEM_STATUS,
+  REQUEST_SCHEMA_PREFIX,
+  SELECTION_MANIFEST_SCHEMA,
+  SELECTION_MANIFEST_SCHEMA_ID,
+  SESSION_URL_MEMBER,
+  SESSION_URL_VIEW,
+  SOURCE_COMMAND_OUTCOMES,
+  SOURCE_COMMAND_RESPONSES,
+  SOURCE_REQUEST_SCHEMAS,
+  SOURCE_REQUEST_SCHEMA_IDS,
+  SOURCE_ROUTES,
+  SOURCE_ROUTE_OUTCOMES,
+  SOURCE_VIEW_DEFINITIONS,
+  buildResponseSchemas,
+  buildSourceViewSchemas,
+  compileSchemaBundle,
+  declaredMembers,
+  type ContractSchemaBundle,
+  type JsonSchema,
+  type ViewDefinition,
+} from "../src/index.js";
 
 const IN_SCOPE = ["CMD012", "CMD013", "CMD014", "CMD015", "CMD016", "CMD017"] as const;
 
@@ -103,9 +127,122 @@ test("the B07 schemas compile under the strict validator; unknown members, coerc
 test("the auxiliary routes read with any live membership and write with the operator role; the session read is the operator's own", () => {
   for (const [name, route] of Object.entries(SOURCE_ROUTES)) {
     assert.ok(route.path.startsWith("/api/v1/"), name);
-    if (route.method === "GET" && name !== "getUploadSession") assert.equal(route.role, "AGENCY_READER", name);
+    if (route.method === "GET" && name !== "GetUploadSession") assert.equal(route.role, "AGENCY_READER", name);
   }
-  assert.equal(SOURCE_ROUTES.selectionManifestIntake.method, "POST");
-  assert.equal(SOURCE_ROUTES.selectionManifestIntake.role, "AGENCY_OPERATOR");
-  assert.equal(SOURCE_ROUTES.getUploadSession.role, "AGENCY_OPERATOR");
+  assert.equal(SOURCE_ROUTES.SubmitSelectionManifest.method, "POST");
+  assert.equal(SOURCE_ROUTES.SubmitSelectionManifest.role, "AGENCY_OPERATOR");
+  assert.equal(SOURCE_ROUTES.GetUploadSession.role, "AGENCY_OPERATOR");
+  assert.deepEqual(Object.keys(SOURCE_ROUTE_OUTCOMES).sort(), Object.keys(SOURCE_ROUTES).sort(), "every auxiliary route has its closed outcome catalogue");
+});
+
+const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle & { $defs: Record<string, { properties: Record<string, Record<string, unknown>>; required?: string[] }> };
+
+function sourceSchemas(): { readonly all: Record<string, JsonSchema>; readonly source: Readonly<Record<string, JsonSchema>> } {
+  const b06 = buildResponseSchemas(bundle);
+  const source = buildSourceViewSchemas(bundle, new Set(Object.keys(b06.defs)));
+  return { all: { ...b06.defs, ...source }, source };
+}
+
+test("the B07 response views build from the registry bundle exactly as B06's do: registry members derived and narrowed only by added keywords, every registry member selected or withheld with a reason, closed, no forbidden member", () => {
+  const { source } = sourceSchemas();
+  assert.deepEqual(Object.keys(source).sort(), SOURCE_VIEW_DEFINITIONS.map((v) => v.name).sort());
+  let derived = 0;
+  for (const view of SOURCE_VIEW_DEFINITIONS) {
+    const built = source[view.name] as { properties: Record<string, Record<string, unknown>>; required: string[]; additionalProperties: boolean };
+    assert.equal(built.additionalProperties, false, `${view.name} is closed`);
+    assert.deepEqual(Object.keys(built.properties), Object.keys(view.members), `${view.name} declares exactly its members`);
+    for (const [name, member] of Object.entries(view.members)) {
+      assert.equal(built.required.includes(name), member.required, `${view.name}.${name} required`);
+      if (member.kind !== "registry") continue;
+      derived += 1;
+      const [contract, field] = member.from ?? [view.contract as string, name];
+      assert.deepEqual(built.properties[name], { ...bundle.$defs[contract]!.properties[field]!, ...(member.narrow ?? {}) }, `${view.name}.${name} is ${contract}.${field}`);
+    }
+    if (view.contract !== null) {
+      const registryMembers = Object.keys(bundle.$defs[view.contract]!.properties).sort();
+      const covered = [...Object.keys(view.members).filter((m) => registryMembers.includes(m)), ...Object.keys(view.withheld)].sort();
+      assert.deepEqual(covered, registryMembers, `${view.name}: every ${view.contract} member is selected or withheld`);
+    }
+  }
+  assert.ok(derived >= 25, `${derived} members derived from the registry`);
+  // the registry contracts the source lifecycle projects: the bearer reference and every provider generation stay off the wire
+  const withheldOf = (name: string) => Object.keys(SOURCE_VIEW_DEFINITIONS.find((v) => v.name === name)!.withheld).sort();
+  assert.deepEqual(withheldOf("UploadView"), ["observedGeneration", "providerSessionSecretRef"]);
+  assert.deepEqual(withheldOf("InspectionFileView"), ["providerGeneration", "storageRef"]);
+  // the session URL is carried by ProtectedSessionView and by no other view
+  for (const [name, schema] of Object.entries(source)) {
+    const carries = declaredMembers(schema).some((m) => m.name === SESSION_URL_MEMBER);
+    assert.equal(carries, name === SESSION_URL_VIEW, `${name} and the session URL`);
+  }
+  // a view that tried to carry it elsewhere is refused at build time, as is a forbidden member
+  const upload = SOURCE_VIEW_DEFINITIONS.find((v) => v.name === "UploadView")!;
+  const withMember = (name: string): ViewDefinition => ({ ...upload, members: { ...upload.members, [name]: { kind: "platform", required: false, schema: { type: "string" }, description: "a leak" } } });
+  const b06Names = new Set(Object.keys(buildResponseSchemas(bundle).defs));
+  const refusal = (views: ReadonlyArray<ViewDefinition>) => {
+    try {
+      buildSourceViewSchemas(bundle, b06Names, views);
+    } catch (e) {
+      assert.ok(e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE", String(e));
+      return e.message;
+    }
+    return assert.fail("the build did not refuse");
+  };
+  assert.match(refusal([withMember(SESSION_URL_MEMBER)]), /carries the session URL outside ProtectedSessionView/);
+  assert.match(refusal([withMember("sessionUri")]), /declares the forbidden member sessionUri/);
+  assert.match(refusal([{ ...upload, name: "RevisionSummary" }]), /is defined twice/);
+});
+
+test("every B07 view and command reply compiles under the strict validator, and samples of the protected session, an upload and a preview validate while a leaking member is refused", () => {
+  const { all } = sourceSchemas();
+  const roots: Record<string, unknown> = {};
+  for (const name of SOURCE_VIEW_DEFINITIONS.map((v) => v.name)) roots[`urn:kauro:test:${name}`] = { $ref: `#/$defs/${name}` };
+  const compiled = compileSchemaBundle({ defs: { ...bundle.$defs, ...all }, roots });
+  const id = "0190c7a2-0000-7000-8000-00000000000a";
+  const t = "2026-09-25T12:00:00Z";
+  assert.deepEqual(compiled.validate("urn:kauro:test:ProtectedSessionView", { delivery: "PROTECTED_RESPONSE", uploadUrl: "https://storage.example/upload/session", method: "PUT", chunkMultipleBytes: 262144, applicationExpiresAt: t }), []);
+  assert.deepEqual(compiled.validate("urn:kauro:test:ProtectedSessionView", { delivery: "UNAVAILABLE", unavailableReason: "NOT_REQUESTER" }), []);
+  assert.ok(compiled.validate("urn:kauro:test:ProtectedSessionView", { delivery: "PROTECTED_RESPONSE", uploadUrl: "http://plain.example/session" }).length > 0, "a session URL is https");
+  const upload = {
+    uploadId: id, revisionId: id, version: 3, state: "VERIFYING", reservedBytes: 1024, applicationExpiresAt: t, providerCancellationState: "NOT_REQUESTED",
+    agencyId: id, projectId: id, displayName: "contacts export.csv", declaredFormat: "CSV", requestedByMembershipId: id, createdAt: t, permittedActions: ["CancelUpload"],
+  };
+  assert.deepEqual(compiled.validate("urn:kauro:test:UploadView", upload), []);
+  assert.deepEqual(compiled.validate("urn:kauro:test:UploadView", { ...upload, providerSessionSecretRef: "https://storage.example/upload/session" }).map((e) => e.code), ["UNKNOWN_FIELD"], "the bearer reference never rides on progress");
+  assert.deepEqual(compiled.validate("urn:kauro:test:UploadView", { ...upload, observedGeneration: "1700000000000001" }).map((e) => e.code), ["UNKNOWN_FIELD"]);
+  assert.deepEqual(compiled.validate("urn:kauro:test:UploadView", { ...upload, displayName: "bad\u0085name" }).map((e) => e.code), ["FORMAT"], "a C1 control character is not a label (B06 N6)");
+  const preview = { tableId: id, fileId: id, columns: [{ ordinal: 0, label: "Email", labelState: "PRESENT" }], rows: [["ana@example.com"], [null]], truncated: false };
+  assert.deepEqual(compiled.validate("urn:kauro:test:TablePreviewView", preview), []);
+  assert.ok(compiled.validate("urn:kauro:test:TablePreviewView", { ...preview, rows: Array.from({ length: 21 }, () => ["x"]) }).length > 0, "at most 20 rows (D-SAPI-7)");
+  assert.ok(compiled.validate("urn:kauro:test:TablePreviewView", { ...preview, rows: [["x".repeat(201)]] }).length > 0, "at most 200 characters a cell");
+  // every command reply names a built view (CMD014 answers B06's ACCEPTED envelope)
+  for (const [command, reply] of Object.entries(SOURCE_COMMAND_RESPONSES)) {
+    if (reply.view === null) assert.equal(reply.status, 202, command);
+    else assert.ok(reply.view in all, `${command} names ${reply.view}`);
+  }
+  for (const route of Object.values(SOURCE_ROUTES)) assert.ok(route.view in all, `${route.path} names ${route.view}`);
+});
+
+test("the closed outcome catalogues of the B07 routes: registered codes and reasons, no duplicates, the access decisions on every tenant route, STALE_VERSION exactly where the command carries expectedVersion", () => {
+  const reasons = new Set<string>(FAILURE_REASONS);
+  for (const [route, outcomes] of [...Object.entries(SOURCE_COMMAND_OUTCOMES), ...Object.entries(SOURCE_ROUTE_OUTCOMES)]) {
+    const keys = outcomes.map((o) => `${o.code}/${o.reason ?? "-"}`);
+    assert.equal(new Set(keys).size, keys.length, `${route}: no entry twice`);
+    for (const o of outcomes) {
+      assert.ok(o.code in PROBLEM_STATUS, `${route}: ${o.code} has a status`);
+      if (o.reason !== null) assert.ok(reasons.has(o.reason), `${route}: ${o.reason} is a registered failure reason`);
+    }
+    assert.ok(keys.includes("NOT_FOUND/NOT_A_MEMBER"), `${route}: a foreign and a nonexistent agency answer alike`);
+  }
+  for (const id of IN_SCOPE) {
+    const keys = SOURCE_COMMAND_OUTCOMES[id].map((o) => `${o.code}/${o.reason ?? "-"}`);
+    assert.equal(keys.includes("STALE_VERSION/-"), B07_COMMANDS[id].expectedVersionRequired, `${id}: STALE_VERSION iff expectedVersion`);
+    assert.ok(keys.includes("IDEMPOTENCY_CONFLICT/REQUEST_DIGEST_DIFFERS") && keys.includes("PRECONDITION_FAILED/OPERATION_PENDING"), `${id} is journaled`);
+    assert.ok(keys.includes("NOT_AUTHORIZED/ROLE_INSUFFICIENT"), `${id} is AGENCY_OPERATOR`);
+  }
+  // the selection intake is not journaled (D-SEL-2): no idempotency outcome
+  assert.ok(!SOURCE_ROUTE_OUTCOMES.SubmitSelectionManifest.some((o) => o.layer === "IDEMPOTENCY" || o.reason === "IDEMPOTENCY_KEY_MISSING"));
+  // the reads carry no role refusal (AGENCY_READER: every membership role reads); the session read does (the operator's own)
+  assert.ok(!SOURCE_ROUTE_OUTCOMES.GetUpload.some((o) => o.reason === "ROLE_INSUFFICIENT"));
+  assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
+  assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "UPLOAD_NOT_OWNED"));
 });

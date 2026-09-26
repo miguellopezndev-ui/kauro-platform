@@ -19,6 +19,8 @@ let owner: UserId;
 let A: AgencyFixture;
 let authority: ProcessingAuthorityId;
 let rawApp: Client;
+// the control plane seals the plan fixture's source through the B07 lifecycle (support.ts sealedSource)
+let rawControl: Client;
 let rawValidator: Client;
 
 before(async () => {
@@ -27,10 +29,12 @@ before(async () => {
   A = await h.createAgency(owner, "Journal Agency");
   authority = await h.processingAuthority(A);
   rawApp = await h.pg.connect("kauro_app_test");
+  rawControl = await h.pg.connect("kauro_control_test");
   rawValidator = await h.pg.connect("kauro_validator_test");
 });
 after(async () => {
   await rawApp.end();
+  await rawControl.end();
   await rawValidator.end();
   await h.stop();
 });
@@ -366,7 +370,7 @@ test("outbox ordering by aggregate version: events of one aggregate are appended
     return projectId;
   });
   // a VALIDATED plan with its receipt (recorded by the validator role) and a step-up proof of the owner (by the verifier)
-  const p = await planFixture(rawApp, A, projectId, "VALIDATED", "outbox", rawValidator);
+  const p = await planFixture({ app: rawApp, control: rawControl }, A, projectId, "VALIDATED", "outbox", rawValidator);
   const proof: AssuranceProofId = await h.recordStepUp(owner);
   const planId = p.planId as PlanId;
   const approvalId = await h.app.run(h.tenant(A.agencyId, owner), async (uow) => {

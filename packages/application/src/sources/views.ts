@@ -6,24 +6,15 @@
  * browser DTOs"; UI14 "Separate upload progress, provider observation, scanner coverage, parser state and accepted bytes"; UI15;
  * UI16 "Present selected files/tables, billable units, edges, parser settings, exclusions and retention").
  *
- * No view carries an object name, a provider location, a generation string, a provider session reference or a vault key. The
- * display filename, worksheet names and header labels appear only in views the tenant reads (never in events or logs), and
- * always as untrusted display text.
+ * These are the TypeScript shapes of the closed response schemas of sources/response-views.ts (SOURCE_VIEW_DEFINITIONS, derived
+ * from the registry bundle where a contract exists); a test keeps the two member for member. No view carries an object name, a
+ * provider location, a generation string, a provider session reference or a vault key; ProtectedSessionView alone carries the
+ * resumable session URL, to its requester only. Display filenames, worksheet names, header labels and preview cells appear only in
+ * views the tenant reads (never in events or logs), always as untrusted display text.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type {
-  DeclaredFormat,
-  DetectedFormat,
-  ParserChoice,
-  ProviderCancellationState,
-  RejectionClass,
-  ScanState,
-  SourcePopulations,
-  StructureStatus,
-  TableVisibility,
-  FormulaCacheState,
-  UploadState,
-} from "@kauro/domain";
+import type { DeclaredFormat, DetectedFormat, FormulaCacheState, ProviderCancellationState, RejectionClass, ScanState, SourcePopulations, StructureStatus, TableVisibility, UploadState } from "@kauro/domain";
+import type { SourceResourceAction } from "./response-views.js";
 
 /** Why a revision cannot move forward right now (read-model facts, recomputed at read time, never stored as a flag). */
 export const SOURCE_BLOCKERS = [
@@ -43,58 +34,67 @@ export const SOURCE_BLOCKERS = [
 ] as const;
 export type SourceBlocker = (typeof SOURCE_BLOCKERS)[number];
 
+/** The inspection outcome of one upload: separate results, never one generic safe flag (09 "Completion and inspection"). */
+export interface UploadInspectionView {
+  readonly structureStatus: StructureStatus;
+  readonly scanState: ScanState;
+  readonly semanticStatus: "SEMANTIC_NOT_YET_PROFILED";
+  readonly detectedFormat: DetectedFormat;
+  readonly claimConsistent: boolean;
+  readonly scanCoverage: { readonly expectedParts: number; readonly scannedParts: number; readonly expectedBytes: number; readonly scannedBytes: number };
+  readonly problems: ReadonlyArray<string>;
+  readonly rejectionClass?: RejectionClass;
+}
+
 export interface UploadView {
   readonly uploadId: string;
-  readonly agencyId: string;
-  readonly projectId: string;
   readonly revisionId: string;
   readonly version: number;
   readonly state: UploadState;
-  /** Untrusted display filename (escaped by the UI; never a storage path). */
-  readonly displayName: string;
-  readonly declaredFormat: DeclaredFormat;
   readonly reservedBytes: number;
   /** The application acceptance deadline (09: twenty-four hours from initiation; polling never extends it). */
   readonly applicationExpiresAt: UtcInstant;
   readonly providerCancellationState: ProviderCancellationState;
+  readonly inspectionReceiptHash?: string;
+  readonly agencyId: string;
+  readonly projectId: string;
+  /** Untrusted display filename (escaped by the UI; never a storage path). */
+  readonly displayName: string;
+  readonly declaredFormat: DeclaredFormat;
   /** What the provider actually holds once observed (UI14 "provider observation"). */
-  readonly observation?: { readonly bytes: number; readonly observedAt: UtcInstant; readonly claimConsistent?: boolean };
-  /** The inspection outcome: separate results, never one generic safe flag (09 "Completion and inspection"). */
-  readonly inspection?: {
-    readonly receiptHash: string;
-    readonly structureStatus: StructureStatus;
-    readonly scanState: ScanState;
-    readonly semanticStatus: "SEMANTIC_NOT_YET_PROFILED";
-    readonly detectedFormat: DetectedFormat;
-    readonly scanCoverage: { readonly expectedParts: number; readonly scannedParts: number; readonly expectedBytes: number; readonly scannedBytes: number };
-    readonly problems: ReadonlyArray<string>;
-    readonly rejectionClass?: RejectionClass;
-  };
+  readonly observation?: { readonly bytes: number; readonly observedAt: UtcInstant };
+  readonly inspection?: UploadInspectionView;
   readonly fileId?: string;
   readonly terminalReason?: string;
   readonly requestedByMembershipId: string;
   readonly createdAt: UtcInstant;
+  readonly permittedActions: ReadonlyArray<SourceResourceAction>;
 }
 
-/** The provider session, delivered only in the protected response of CMD013 (and its replay) to the requester. */
-export type ProtectedSessionView =
-  | {
-      readonly delivery: "PROTECTED_RESPONSE";
-      /** The resumable upload URL: a bearer credential; never journaled, logged, cached or shown to another reader. */
-      readonly uploadUrl: string;
-      readonly method: "PUT";
-      readonly chunkMultipleBytes: number;
-      readonly applicationExpiresAt: UtcInstant;
-    }
-  | {
-      /** The session is no longer deliverable (cancelled, expired, verified, or the reader is not the requester). */
-      readonly delivery: "UNAVAILABLE";
-      readonly reason: "SESSION_NOT_ACTIVE" | "NOT_REQUESTER";
-    };
+export interface UploadPage {
+  readonly items: ReadonlyArray<UploadView>;
+  readonly nextCursor?: string;
+}
 
 /**
- * The journaled form of the session member: the command journal stores this placeholder, never the bearer value (09: the session
- * reference is stored encrypted in the temporary control record only); the transport replaces it by a ProtectedSessionView.
+ * The provider session, delivered only in the protected response of CMD013 (its replay and the session read) to the requester.
+ * delivery PROTECTED_RESPONSE carries the session members; UNAVAILABLE carries the reason only (the producer guarantees it; the
+ * closed schema has no conditional keywords).
+ */
+export interface ProtectedSessionView {
+  readonly delivery: "PROTECTED_RESPONSE" | "UNAVAILABLE";
+  /** The resumable upload URL: a bearer credential; never journaled, logged, cached or shown to another reader. */
+  readonly uploadUrl?: string;
+  readonly method?: "PUT";
+  readonly chunkMultipleBytes?: number;
+  readonly applicationExpiresAt?: UtcInstant;
+  readonly unavailableReason?: "SESSION_NOT_ACTIVE" | "NOT_REQUESTER" | "SESSION_PENDING";
+}
+
+/**
+ * The journaled form of the session member (never on the wire): the command journal stores this placeholder, never the bearer
+ * value (09: the session reference is stored encrypted in the temporary control record only); the transport replaces it by a
+ * ProtectedSessionView for the requester (D-SESSION-2).
  */
 export interface JournaledSessionPlaceholder {
   readonly delivery: "PROTECTED_RESPONSE";
@@ -111,29 +111,46 @@ export interface RevisionQuotaView {
   readonly agencySessionLimit: number;
 }
 
-export interface SourceRevisionView {
+/** B06's RevisionSummary (revision id, state, version). */
+export interface RevisionSummaryView {
   readonly revisionId: string;
-  readonly agencyId: string;
-  readonly projectId: string;
   readonly version: number;
   readonly state: string;
+}
+
+export interface RetentionView {
+  readonly retentionId: string;
+  readonly class: string;
+  readonly anchorEvidenceHash: string;
+  readonly softDeadline?: UtcInstant;
+  readonly hardDeadline: UtcInstant;
+  readonly effectiveDeadline: UtcInstant;
+  readonly policyVersion: string;
+  readonly providerResiduals: ReadonlyArray<string>;
+  readonly state: string;
+}
+
+export interface SourceRevisionView {
+  readonly revisionId: string;
+  readonly version: number;
+  readonly state: string;
+  readonly sealedAt?: UtcInstant;
   readonly supersedesRevisionId?: string;
+  readonly agencyId: string;
+  readonly projectId: string;
   readonly supersededByRevisionId?: string;
-  readonly selectionManifestId?: string;
-  readonly selectionHash?: string;
+  readonly selection?: { readonly selectionManifestId: string; readonly selectionHash: string; readonly inventoryHash: string; readonly selectedAt: UtcInstant };
   readonly evaluationHash?: string;
   /** The frozen populations once evaluated (READY_TO_SEAL) and sealed. */
   readonly populations?: SourcePopulations;
-  readonly manifestHash?: string;
-  readonly projectionHash?: string;
-  readonly sealedAt?: UtcInstant;
-  readonly sealedFileCount?: number;
-  readonly sealedBytes?: number;
+  readonly seal?: { readonly manifestHash: string; readonly projectionHash: string; readonly fileCount: number; readonly bytes: number };
+  readonly retention?: ReadonlyArray<RetentionView>;
   /** 09 "Notifications and customer action": dataAvailableUntil is shown on every source screen once a record governs it. */
   readonly dataAvailableUntil?: UtcInstant;
   readonly terminalReason?: string;
   readonly blockers: ReadonlyArray<SourceBlocker>;
   readonly createdAt: UtcInstant;
+  readonly permittedActions: ReadonlyArray<SourceResourceAction>;
 }
 
 export interface InspectionColumnView {
@@ -162,13 +179,14 @@ export interface InspectionTableView {
 
 export interface InspectionFileView {
   readonly fileId: string;
+  readonly sha256: string;
+  readonly bytes: number;
+  readonly format: DeclaredFormat;
+  readonly scanState: ScanState;
+  readonly parserProfileHash: string;
+  readonly admitted: boolean;
   readonly origin: "THIS_REVISION" | "REUSABLE";
   readonly uploadId: string;
-  readonly format: DeclaredFormat;
-  readonly bytes: number;
-  readonly sha256: string;
-  readonly scanState: ScanState;
-  readonly admitted: boolean;
   readonly tables: ReadonlyArray<InspectionTableView>;
 }
 
@@ -182,7 +200,7 @@ export interface InspectionView {
   readonly selection?: {
     readonly selectionManifestId: string;
     readonly selectionHash: string;
-    readonly tables: ReadonlyArray<{ readonly tableId: string; readonly disposition: "INCLUDE" | "EXCLUDE"; readonly exclusionReason?: string; readonly parser?: ParserChoice }>;
+    readonly tables: ReadonlyArray<{ readonly tableId: string; readonly disposition: "INCLUDE" | "EXCLUDE"; readonly exclusionReason?: string }>;
   };
   readonly evaluation?: {
     readonly evaluationHash: string;
@@ -197,4 +215,28 @@ export interface RevisionImpactView {
   readonly planIds: ReadonlyArray<string>;
   readonly approvalIds: ReadonlyArray<string>;
   readonly commercialAuthorizationIds: ReadonlyArray<string>;
+}
+
+export interface ProjectRevisionPointerView {
+  readonly projectId: string;
+  readonly version: number;
+  readonly currentRevisionId: string;
+}
+
+/** A bounded preview sample (10 "A preview endpoint returns a bounded authorized sample"; D-SAPI-7). */
+export interface TablePreviewView {
+  readonly tableId: string;
+  readonly fileId: string;
+  readonly columns: ReadonlyArray<InspectionColumnView>;
+  readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly truncated: boolean;
+}
+
+export interface SelectionManifestView {
+  readonly selectionManifestId: string;
+  readonly revisionId: string;
+  readonly bodyHash: string;
+  readonly createdByMembershipId: string;
+  readonly createdAt: UtcInstant;
+  readonly document: unknown;
 }

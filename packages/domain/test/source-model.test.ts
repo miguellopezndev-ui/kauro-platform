@@ -66,11 +66,11 @@ test("policy values of the source lifecycle equal the vendored registry", () => 
 });
 
 test("the platform machines are well formed, terminal states have no outgoing edge, and the guard refuses every unlisted pair", () => {
-  assert.deepEqual(SOURCE_LIFECYCLE_STATE_MACHINES.map((m) => m.contract), ["UploadSession", "StoredObject", "SourceFile"]);
+  assert.deepEqual(SOURCE_LIFECYCLE_STATE_MACHINES.map((m) => m.contract), ["UploadSession", "StoredObject", "SourceFile", "RetentionRecord"]);
   for (const m of SOURCE_LIFECYCLE_STATE_MACHINES) {
     assert.equal(m.unlistedTransition, "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED");
     for (const t of m.transitions) assert.ok(!m.terminal.includes(t.from), `${m.contract}: terminal ${t.from} has an outgoing edge`);
-    const name = m.contract as "UploadSession" | "StoredObject" | "SourceFile";
+    const name = m.contract as "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord";
     const states = statesOf(name);
     const events = [...new Set(m.transitions.map((t) => t.event))];
     for (const from of states) {
@@ -86,6 +86,12 @@ test("the platform machines are well formed, terminal states have no outgoing ed
   for (const s of ["CANCELLED", "EXPIRED", "REJECTED"]) assert.ok(isTerminal("UploadSession", s), s);
   assert.equal(isListed("UploadSession", "CANCELLED", "completion_reported"), false, "a late completion cannot resurrect a cancelled upload");
   assert.equal(isListed("UploadSession", "EXPIRED", "inspection_admitted"), false);
+  // RetentionRecord (D-RET-2): the registry contract's states; B07 takes ACTIVE -> EXPIRED, the deletion package the rest; a
+  // record never becomes ACTIVE again, and its terminal states are the managed deletion's outcomes
+  assert.deepEqual([...statesOf("RetentionRecord")].sort(), ["ACTIVE", "DELETED", "DELETED_WITH_RESIDUALS", "DELETING", "EXPIRED"]);
+  assert.equal(transition("RetentionRecord", "ACTIVE", "effective_deadline_reached"), "EXPIRED");
+  for (const s of ["DELETED", "DELETED_WITH_RESIDUALS"]) assert.ok(isTerminal("RetentionRecord", s), s);
+  assert.ok(SOURCE_LIFECYCLE_STATE_MACHINES.find((m) => m.contract === "RetentionRecord")!.transitions.every((t) => t.to !== "ACTIVE"), "no edge returns to ACTIVE");
   // quota holding mirrors the SQL functions kauro.upload_holds_file / kauro.upload_holds_slot (migration 0008)
   assert.deepEqual([...UPLOAD_QUOTA_HOLDING_STATES].sort(), ["ADMITTED", "RESERVED", "UPLOADING", "VERIFYING"]);
   assert.deepEqual([...UPLOAD_SLOT_HOLDING_STATES].sort(), ["RESERVED", "UPLOADING", "VERIFYING"]);
@@ -226,7 +232,16 @@ test("object names are opaque, zone-prefixed and scoped to one agency; a prefix 
 
 test("every B07 event type carries an allowlist without customer-text keys, and every B07 consumer subscription names a registered type", () => {
   const b07 = EVENT_TYPES.filter((t) => t.startsWith("upload_session.") || t.startsWith("retention_record.") || t === "project.current_revision_changed.v1" || (t.startsWith("dataset_revision.") && t !== "dataset_revision.created.v1"));
-  assert.equal(b07.length, 22);
+  // the ten upload-session edges, the retention record's creation and expiry, the project pointer, the selection binding and the
+  // nine DatasetRevision lifecycle events B06 registered with the machine (B07 publishes them; migration 0011 seeds the other 14)
+  assert.deepEqual([...b07].sort(), [
+    "dataset_revision.cancelled.v1", "dataset_revision.deleted.v1", "dataset_revision.expired.v1", "dataset_revision.inspecting.v1", "dataset_revision.ready_to_seal.v1",
+    "dataset_revision.rejected.v1", "dataset_revision.sealed.v1", "dataset_revision.selection_changed.v1", "dataset_revision.superseded.v1", "dataset_revision.uploading.v1",
+    "project.current_revision_changed.v1", "retention_record.created.v1", "retention_record.expired.v1",
+    "upload_session.admitted.v1", "upload_session.cancelled.v1", "upload_session.completion_not_observed.v1", "upload_session.completion_observed.v1",
+    "upload_session.completion_reported.v1", "upload_session.expired.v1", "upload_session.provider_cancellation_recorded.v1", "upload_session.rejected.v1",
+    "upload_session.reserved.v1", "upload_session.session_issued.v1",
+  ]);
   for (const t of b07) {
     const keys = EVENT_PAYLOAD_ALLOWLIST[t];
     assert.ok(keys.length > 0, t);

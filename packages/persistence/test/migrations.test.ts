@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { AGGREGATE_KINDS, EVENT_TYPES, PLATFORM_STATE_MACHINES } from "@kauro/domain";
+import { AGGREGATE_KINDS, EVENT_TYPES, PLATFORM_STATE_MACHINES, SOURCE_LIFECYCLE_STATE_MACHINES } from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
@@ -164,8 +164,9 @@ test("the listed-transition seed equals the registry machines for every machine 
       assert.deepEqual(r.rows.map((x) => x.edge), expected, name);
     }
     const others = await su.query<{ machine: string }>("SELECT DISTINCT machine FROM kauro.state_transitions ORDER BY 1");
-    // B07 adds the platform machines SourceFile, StoredObject and UploadSession (their edges: source-migrations.test.ts)
-    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "SourceFile", "StoredObject", "UploadSession"]);
+    // B07 adds the platform machines RetentionRecord, SourceFile, StoredObject and UploadSession (their edges equal the domain
+    // SOURCE_LIFECYCLE_STATE_MACHINES: source-migrations.test.ts)
+    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "RetentionRecord", "SourceFile", "StoredObject", "UploadSession"]);
   } finally {
     await su.end();
   }
@@ -175,8 +176,9 @@ test("R20: the initial-state seed equals the registry machines (and the platform
   const su = await pg.connect("postgres");
   try {
     const seeded = await su.query<{ machine: string; initial_state: string }>("SELECT machine, initial_state FROM kauro.state_machines ORDER BY machine");
-    const expected = ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"].map((name) => {
-      const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name);
+    // B07 adds the platform machines of the source lifecycle (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2), each born in its initial state
+    const expected = ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "RetentionRecord", "SourceFile", "StoredObject", "UploadSession"].map((name) => {
+      const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ?? SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name);
       assert.ok(m, `${name} is a registry or platform machine`);
       return { machine: name, initial_state: m.initial };
     });

@@ -239,6 +239,24 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetProject: readCatalogueOf("GetProject"),
 });
 
+/**
+ * The pipeline's shared outcome lists and the entry constructor, exported so a later package composes the closed catalogues of its
+ * own routes from the same entries instead of restating them (the B07 source lifecycle: @kauro/application sources/outcomes).
+ */
+export const OUTCOME_BLOCKS = Object.freeze({ EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED });
+export { outcome as problemOutcome };
+
+/** A closed catalogue from its entries: refuses an entry listed twice (by code and reason). */
+export function closedCatalogue(route: string, entries: ReadonlyArray<ProblemOutcome>): ReadonlyArray<ProblemOutcome> {
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const key = `${e.code}/${e.reason ?? "-"}`;
+    if (seen.has(key)) throw new TypeError(`${route}: the outcome ${key} is listed twice`);
+    seen.add(key);
+  }
+  return Object.freeze([...entries]);
+}
+
 /** The catalogue entry a problem is an instance of, or null. */
 export function outcomeOf(outcomes: ReadonlyArray<ProblemOutcome>, code: string, reason: string | undefined): ProblemOutcome | null {
   return outcomes.find((o) => o.code === code && o.reason === (reason ?? null)) ?? null;

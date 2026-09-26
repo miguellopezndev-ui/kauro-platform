@@ -25,24 +25,36 @@ export type {
   B07CommandId,
   B07Handlers,
   SelectionManifestIntakeView,
+  SourceRouteSpec,
 } from "./contracts.js";
 export { CREATE_REVISION, RESERVE_UPLOAD, COMPLETE_UPLOAD, CANCEL_UPLOAD, SELECT_INPUT_TABLES, SEAL_REVISION, B07_COMMANDS, SOURCE_ROUTES } from "./contracts.js";
 export type { SourceRequestSchemaCommand, SourceRequestSchemaId } from "./request-schemas.js";
 export { SOURCE_REQUEST_SCHEMAS, SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, SELECTION_MANIFEST_SCHEMA } from "./request-schemas.js";
 export type {
   SourceBlocker,
+  UploadInspectionView,
   UploadView,
+  UploadPage,
   ProtectedSessionView,
   JournaledSessionPlaceholder,
   RevisionQuotaView,
+  RevisionSummaryView,
+  RetentionView,
   SourceRevisionView,
   InspectionColumnView,
   InspectionTableView,
   InspectionFileView,
   InspectionView,
   RevisionImpactView,
+  ProjectRevisionPointerView,
+  TablePreviewView,
+  SelectionManifestView,
 } from "./views.js";
 export { SOURCE_BLOCKERS } from "./views.js";
+export type { SourceRouteId } from "./outcomes.js";
+export { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "./outcomes.js";
+export type { SourceResourceAction } from "./response-views.js";
+export { SOURCE_VIEW_DEFINITIONS, SOURCE_COMMAND_RESPONSES, SOURCE_RESOURCE_ACTIONS, SESSION_URL_MEMBER, SESSION_URL_VIEW, buildSourceViewSchemas } from "./response-views.js";
 export type {
   PhaseContext,
   JournaledOutcome,

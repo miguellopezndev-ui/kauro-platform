@@ -74,8 +74,8 @@ export const PENDING_RESUME_GRACE_SECONDS = 30;
 /** Decision D-RUN-2: the bounded wait for one provider call made between the two units of work of a command. */
 export const PROVIDER_CALL_TIMEOUT_MS = 10_000;
 
-/** Decision D-API-2: a completion reference longer than this is refused structurally (text field of CMD014). */
+/** Decision D-SAPI-2: a completion reference longer than this is refused structurally (text field of CMD014). */
 export const COMPLETION_REF_MAX_CHARS = 4_096;
 
-/** Decision D-API-3: polling guidance of the ACCEPTED answer of CompleteUpload (10: status URL and allowed polling guidance). */
+/** Decision D-SAPI-3: polling guidance of the ACCEPTED answer of CompleteUpload (10: status URL and allowed polling guidance). */
 export const COMPLETION_POLL_AFTER_SECONDS = 5;

@@ -8,6 +8,7 @@ import { randomBytes, createHash } from "node:crypto";
 import type { Client } from "pg";
 import { createIdGenerator, identityUserId, toUtcInstant, type IdGenerator } from "@kauro/domain";
 import { CAPABILITY_PUBLICATION_PATH, type CapabilityPublicationState } from "../src/testing/harness.js";
+import { sealSourceRevision, type SourceFixtureSessions } from "../src/testing/source-lifecycle.js";
 
 export const clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -245,25 +246,28 @@ export async function validationReceipt(
   });
 }
 
+/** The two runtime connections a sealed source needs: the request handlers and the control plane (B07 design D-CTRL-1). */
+export interface SourceClients {
+  readonly app: Client;
+  readonly control: Client;
+}
+
+/** The fixture sessions of an agency's owner (request handlers) and of the control plane bound to that agency. */
+export function sourceSessions(clients: SourceClients, ag: AgencyFixture): SourceFixtureSessions {
+  return {
+    app: (fn) => tx(clients.app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, fn),
+    control: (fn) => tx(clients.control, { agencyId: ag.agencyId }, fn),
+  };
+}
+
 /**
- * A revision of the project born DRAFT and walked along the listed DatasetRevision edges to SEALED, one version and one event
- * per edge, as the upload lifecycle leaves it; its manifest hash is the source hash a plan names (plans_source_fk).
+ * A revision of the project sealed as the B07 source lifecycle leaves it (@kauro/persistence/testing sealSourceRevision: the
+ * reservation, completion, inspection and admission, selection, evaluation and seal, each written by the runtime role that owns
+ * it); its manifest hash is the source hash a plan names (plans_source_fk). Sealed fifteen days ago, so a test may expire it.
  */
-export async function sealedSource(app: Client, ag: AgencyFixture, projectId: string, seed: string): Promise<{ revisionId: string; manifestHash: string }> {
-  const revisionId = ids.next();
-  const manifestHash = sha(`${seed}-manifest-${revisionId}`);
-  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
-    await c.query("INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, version, state, created_at, updated_at) VALUES ($1, $2, $3, 1, 'DRAFT', now(), now())", [revisionId, ag.agencyId, projectId]);
-    const ref = { revisionId, agencyId: ag.agencyId, projectId };
-    await event(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "dataset_revision.created.v1", actorUserId: ag.ownerUserId, payload: { ...ref, state: "DRAFT" } });
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'INSPECTING', version = 2 WHERE revision_id = $1", [revisionId]);
-    await event(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 2, agencyId: ag.agencyId, eventType: "dataset_revision.inspecting.v1", actorUserId: ag.ownerUserId, payload: ref });
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'READY_TO_SEAL', version = 3 WHERE revision_id = $1", [revisionId]);
-    await event(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 3, agencyId: ag.agencyId, eventType: "dataset_revision.ready_to_seal.v1", actorUserId: ag.ownerUserId, payload: ref });
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'SEALED', version = 4, manifest_hash = $2, projection_hash = $3, sealed_at = now() WHERE revision_id = $1", [revisionId, manifestHash, sha(`${seed}-projection-${revisionId}`)]);
-    await event(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: 4, agencyId: ag.agencyId, eventType: "dataset_revision.sealed.v1", actorUserId: ag.ownerUserId, payload: { ...ref, manifestHash } });
-  });
-  return { revisionId, manifestHash };
+export async function sealedSource(clients: SourceClients, ag: AgencyFixture, projectId: string, seed: string, state: "SEALED" | "EXPIRED" = "SEALED"): Promise<{ revisionId: string; manifestHash: string }> {
+  const sealed = await sealSourceRevision(sourceSessions(clients, ag), { agencyId: ag.agencyId, projectId, ownerUserId: ag.ownerUserId, ownerMembershipId: ag.ownerMembershipId }, { seed, state });
+  return { revisionId: sealed.revisionId, manifestHash: sealed.manifestHash };
 }
 
 /** A confirmed, current target contract of the project, as observation and confirmation leave it (plans_target_fk). */
@@ -292,7 +296,7 @@ export function planBody(revisionHash: string, targetContractHash: string, polic
  * VALID receipt and the handlers then apply valid_receipt (VALIDATING -> VALIDATED binding it).
  */
 export async function plan(
-  app: Client,
+  clients: SourceClients,
   ag: AgencyFixture,
   projectId: string,
   state: "DRAFT" | "VALIDATION_REQUIRED" | "VALIDATING" | "VALIDATED",
@@ -300,9 +304,10 @@ export async function plan(
   validator?: Client,
   subjects?: { readonly revisionHash: string; readonly targetContractHash: string },
 ): Promise<PlanFixture & { version: number; receiptHash?: string }> {
+  const app = clients.app;
   const planId = ids.next();
   const bodyHash = sha(seed + "-body-" + planId);
-  const revisionHash = subjects?.revisionHash ?? (await sealedSource(app, ag, projectId, seed)).manifestHash;
+  const revisionHash = subjects?.revisionHash ?? (await sealedSource(clients, ag, projectId, seed)).manifestHash;
   const targetContractHash = subjects?.targetContractHash ?? (await targetContract(app, ag, projectId, seed)).bodyHash;
   const fixture: PlanFixture = { planId, bodyHash, revisionHash, targetContractHash };
   let version = 1;

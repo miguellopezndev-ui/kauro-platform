@@ -9,16 +9,20 @@
  * dependent requirements (a CSV table's dialect, an exclusion's reason) are checked by the domain validator of CMD016.
  */
 import type { RequestSchema } from "../api/request-schemas.js";
-import { REQUEST_SCHEMA_PREFIX } from "../api/request-schemas.js";
+import { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX } from "../api/request-schemas.js";
 
 const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
-const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]+$" } as const;
+/** B06 label: 1..200 characters, no Unicode Cc code point (C0, DEL, C1) — the rule of kauro.is_label (B06 D-LABEL-1, N6). */
+const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const COUNT = { type: "integer", minimum: 0, maximum: 9007199254740991 } as const;
-/** CMD014 providerCompletionRef: an opaque provider completion token forwarded by the browser (decision D-API-2). */
-const TEXT = { type: "string", minLength: 1, maxLength: 4096, pattern: "^[^\\u0000-\\u001f\\u007f]+$" } as const;
-/** CMD013 declaredFormat is a catalogue label restricted to the supported formats (FileManifest.format), like CMD011 mode. */
+/**
+ * CMD014 providerCompletionRef (registry type text): an opaque provider completion token the browser forwards, bounded, with the
+ * label control-character rule (decision D-SAPI-2).
+ */
+const TEXT = { type: "string", minLength: 1, maxLength: 4096, pattern: LABEL_PATTERN } as const;
+/** CMD013 declaredFormat: a catalogue label narrowed to the supported formats (FileManifest.format), as B06 narrows CMD011 mode (D-SAPI-4). */
 const DECLARED_FORMAT = { type: "string", enum: ["CSV", "XLSX"] } as const;
 const TOKEN = { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" } as const;
 const ORDINAL = { type: "integer", minimum: 0, maximum: 16383 } as const;
