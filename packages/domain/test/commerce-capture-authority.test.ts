@@ -139,6 +139,7 @@ function ready(overrides: Partial<CheckoutFacts> = {}): CheckoutFacts {
     fiscalProfile: reviewed,
     openOrder: null,
     paid: false,
+    capacity: { available: true },
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ import type {
   AgencyId,
   AmbiguityReason,
   AssuranceProofId,
+  CaptureId,
   CausationId,
   CommerceUnitOfWork,
   CommercialAuthorizationId,
@@ -25,6 +26,7 @@ import type {
   IdentityFacts,
   InboxId,
   IntegrationClass,
+  MembershipId,
   NormalizedProviderEvent,
   ObservationEffect,
   ObservationSource,
@@ -33,14 +35,20 @@ import type {
   PaymentAttemptId,
   PaymentEnvironment,
   PaymentOrderId,
+  ProjectId,
   ProviderExceptionKind,
+  PurchaseRebindingId,
+  QuoteId,
   ProviderRequest,
   ReconciliationCaseId,
   ReconciliationCaseKind,
   RefundPolicyId,
+  ReplacementBlocker,
   ServiceIdentity,
+  ServiceMode,
   ServiceRole,
   TaxDocumentRecord,
+  UnitOfWork,
 } from "@kauro/domain";
 
 // --- payment processor --------------------------------------------------------------------------------------------------------
@@ -319,4 +327,82 @@ export interface CommerceEventConsumer {
   readonly consumer: "FINANCE" | "FISCAL" | "PAYMENT_SERVICE";
   readonly eventTypes: ReadonlyArray<string>;
   consume(uow: CommerceUnitOfWork, delivery: CommerceEventDelivery, now: UtcInstant): Promise<"APPLIED" | "DUPLICATE" | "NOT_APPLICABLE">;
+}
+
+// --- ports of the packages B09 meets at integration (design §15 "Integration obligations") --------------------------------------------
+//
+// These are platform components, not external providers: B09 declares the shape it needs, the owning package implements it over its
+// own tables inside the caller's unit of work (never a call outside a transaction), and until that package is on main the tests bind
+// a labelled contract fake (binding CONTRACT_FAKE, never counted as the owner's behaviour; D-FAKE-B1). B09's SQL never references
+// their tables (FOUNDATION D-AGGK-5); the database bounds what it can see in B06 columns and the port supplies the owner's exact fact.
+
+/** Who implements a platform port in this deployment: the owning package's adapter, or a labelled contract fake in tests. */
+export type PlatformBinding = "PLATFORM" | "CONTRACT_FAKE";
+
+/**
+ * Deliverable capacity for a purchase (15 "PaymentOrder and intent": CreatePaymentOrder "first validates the exact quote, approved
+ * plan, source availability, capacity, legal profile and agency billing authority"; 07 "Quote and checkout states": checkout
+ * readiness includes deliverable capacity; 07 "Job and attempt states": "Payment readiness accounts for realistic delivery capacity;
+ * the system does not take unlimited purchases into an unbounded queue"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §14). The adapter belongs
+ * to the processing package's admission and capacity reservation (B08). CMD028 reads it in T1 and CMD029 in T1 before the capture
+ * is dispatched; unavailable (or no answer) is CAPACITY_UNAVAILABLE / DELIVERY_CAPACITY_UNAVAILABLE and nothing is written (D-CAP-B1,
+ * B09-F5). B09 never reserves capacity: the reservation is B08's, when the entitlement is consumed (CMD036).
+ */
+export interface DeliveryCapacityPort {
+  readonly binding: PlatformBinding;
+  checkoutCapacity(
+    uow: UnitOfWork,
+    request: { readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly mode: ServiceMode; readonly billableUnits: number; readonly at: UtcInstant },
+  ): Promise<{ readonly available: true; readonly evidenceHash: Sha256Hex } | { readonly available: false; readonly reason: "ADMISSION_QUEUE_FULL" | "OUTSIDE_QUALIFIED_ENVELOPE" | "EXECUTION_UNFUNDED" }>;
+}
+
+/**
+ * The availability of a sealed source (09 retention; reference/HASHING "Retention formulas"; 07: "A fourteen-day price lifetime does
+ * not extend seven-day source retention"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §16). Provided by the source lifecycle (B07) over its
+ * retention records: the effective deadline is the minimum of the record's anchors, the hard deadline the policy cap from the seal.
+ * CMD027 (B10) sets Quote.sourceAvailableUntil to the effective deadline; CMD028 and CMD029 refuse SOURCE_EXPIRED when the revision is
+ * no longer SEALED or its effective deadline has passed (D-QUOTE-B7, B09-F10). The database bounds the promise by the B06 seal instant
+ * and the policy's hard cap (quotes_source_binding) until the integrator binds the exact deadline.
+ */
+export interface SourceAvailabilityReader {
+  readonly binding: PlatformBinding;
+  availabilityOf(
+    uow: UnitOfWork,
+    request: { readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly revisionHash: Sha256Hex },
+  ): Promise<{ readonly revisionId: string; readonly state: string; readonly sealedAt: UtcInstant; readonly effectiveDeadline: UtcInstant; readonly hardDeadline: UtcInstant; readonly evidenceHash: Sha256Hex } | null>;
+}
+
+/**
+ * The lineage of a replacement source (B07 D-REV-1, Q-B07-17: the source lifecycle records lineage and the impact map; the allowance
+ * is counted against the quote by B09). The re-binding of a paid capture (D-QUOTE-B6) records the evidence hash it returns; the
+ * database re-checks the lineage over B06's dataset_revisions.supersedes_revision_id (purchase_rebindings_guard).
+ */
+export interface SourceLineageReader {
+  readonly binding: PlatformBinding;
+  replacementOf(
+    uow: UnitOfWork,
+    request: { readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly replacedRevisionHash: Sha256Hex; readonly replacementRevisionHash: Sha256Hex },
+  ): Promise<{ readonly replacedRevisionId: string; readonly replacementRevisionId: string; readonly replacementSealed: boolean; readonly evidenceHash: Sha256Hex } | null>;
+}
+
+/**
+ * The included pre-execution source replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18; registry
+ * R2-092, owned by the recurrence package B10): implemented by B09 (mandate M2) and called by B10's replacement flow once the new
+ * revision is sealed, its plan approved and the replacement quote issued. It runs in a SERVICE unit of work under kauro_payment (only
+ * the payment service revokes and issues entitlements, B09-F1): records the re-binding, revokes the replaced entitlement
+ * (SOURCE_REPLACED, PRE_EXECUTION), supersedes the replaced quote, accepts the replacement and issues its entitlement bound to the same
+ * capture — one transaction; refused with its blockers otherwise (commerce/authority replacementBlockers; SQLSTATE KP013).
+ */
+export interface PurchaseRebinder {
+  rebind(
+    serviceUow: CommerceUnitOfWork,
+    input: {
+      readonly captureId: CaptureId;
+      readonly fromQuoteId: QuoteId;
+      readonly toQuoteId: QuoteId;
+      readonly requestedByMembershipId: MembershipId;
+      readonly causationId: CausationId;
+      readonly now: UtcInstant;
+    },
+  ): Promise<{ readonly kind: "REBOUND"; readonly rebindingId: PurchaseRebindingId; readonly authorizationId: CommercialAuthorizationId } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<ReplacementBlocker> }>;
 }

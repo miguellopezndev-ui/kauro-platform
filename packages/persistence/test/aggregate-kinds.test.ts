@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
+import { AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
 import { constraintOf, event, ids, plan, project, sha, sqlState, tx, type PlanFixture } from "./support.js";
@@ -30,10 +30,18 @@ let B: AgencyFixture;
 let C: AgencyFixture;
 let carolInA: string;
 /** One aggregate of every B06 kind in agency A, with its current version (read by the oracle). */
-const ofA = new Map<AggregateKind, { readonly id: string; readonly version: number }>();
+const ofA = new Map<B06Kind, { readonly id: string; readonly version: number }>();
+
+/**
+ * The B06 kinds this file walks (the foundation owns their rows). The kinds a later package registers bind through the same
+ * unchanged function and are exercised by that package: package B09 registers eight commerce kinds whose events every B09 schema
+ * test appends (b09-migrations.test.ts, b09-critique.test.ts).
+ */
+type B06Kind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number]>;
+const B06_KINDS: ReadonlyArray<B06Kind> = AGGREGATE_KINDS.filter((k): k is B06Kind => !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k));
 
 /** Where each B06 kind lives (0002..0004); the oracle reads current versions from here, independently of the registry. */
-const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn: string]>> = Object.freeze({
+const TABLE_OF: Readonly<Record<B06Kind, readonly [table: string, idColumn: string]>> = Object.freeze({
   agency: ["agencies", "agency_id"],
   membership: ["memberships", "membership_id"],
   end_client: ["end_clients", "client_id"],
@@ -43,7 +51,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   approval: ["approvals", "approval_id"],
 });
 
-const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin] as const;
+// every runtime login of this branch: B06 five and package B09 payment service
+const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin, ROLES.paymentLogin] as const;
 
 const refusedWith = (code: string, constraint?: string) => (e: unknown): boolean => sqlState(e) === code && (constraint === undefined || constraintOf(e) === constraint);
 
@@ -106,7 +115,7 @@ before(async () => {
     await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = 5 WHERE plan_id = $1 AND version = 4", [p.planId, approvalId]);
     await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 5, agencyId: A.agencyId, eventType: "plan.approved.v1", actorUserId: approver, payload: { planId: p.planId, agencyId: A.agencyId, approvalId } });
   });
-  const idOf: Record<AggregateKind, string> = {
+  const idOf: Record<B06Kind, string> = {
     agency: A.agencyId,
     membership: approverMembership,
     end_client: clientA,
@@ -115,7 +124,7 @@ before(async () => {
     plan: p.planId,
     approval: approvalId,
   };
-  for (const kind of AGGREGATE_KINDS) {
+  for (const kind of B06_KINDS) {
     const [table, column] = TABLE_OF[kind];
     const r = await h.oracle.query<{ version: string }>(`SELECT version FROM kauro.${table} WHERE ${column} = $1 AND agency_id = $2`, [idOf[kind], A.agencyId]);
     assert.equal(r.rows.length, 1, kind);
@@ -129,7 +138,7 @@ after(async () => {
   await h.stop();
 });
 
-function aggregateOfA(kind: AggregateKind): { readonly id: string; readonly version: number } {
+function aggregateOfA(kind: B06Kind): { readonly id: string; readonly version: number } {
   const a = ofA.get(kind);
   assert.ok(a, kind);
   return a;
@@ -140,8 +149,8 @@ async function eventCount(): Promise<number> {
 }
 
 test("every B06 kind binds: each aggregate of A was born and walked under kauro_app with one bound event per version, and an event at or below its version passes the binding (only the one-event-per-version identity refuses a second)", async () => {
-  assert.deepEqual([...ofA.keys()].sort(), [...AGGREGATE_KINDS].sort());
-  for (const kind of AGGREGATE_KINDS) {
+  assert.deepEqual([...ofA.keys()].sort(), [...B06_KINDS].sort());
+  for (const kind of B06_KINDS) {
     const { id, version } = aggregateOfA(kind);
     const recorded = await h.oracle.query<{ v: string }>(
       "SELECT aggregate_version AS v FROM kauro.domain_events WHERE agency_id = $1 AND aggregate_kind = $2 AND aggregate_id = $3 ORDER BY aggregate_version",
@@ -152,7 +161,7 @@ test("every B06 kind binds: each aggregate of A was born and walked under kauro_
   // the binding admits an event at the aggregate's version and below it; what refuses the row is the identity after it (a
   // BEFORE trigger runs before the row's constraints and indexes, so 23505 proves the binding let it through)
   await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
-    for (const kind of AGGREGATE_KINDS) {
+    for (const kind of B06_KINDS) {
       const { id, version } = aggregateOfA(kind);
       for (const v of new Set([version, 1])) {
         await refusedInSavepoint(c, () => eventOf(c, kind, id, v, A.agencyId), "23505", "domain_events_one_per_aggregate_version", `${kind} v${v} passes the binding`);
@@ -181,7 +190,7 @@ test("an unregistered kind is refused: KA006 by the binding (as B06's CASE answe
 
 test("for every kind: another agency's aggregate, an aggregate the writer's policies hide, an unknown id, an event without agency and a writer without context are refused KA006; an event ahead of its aggregate is refused KA002; another agency's aggregate the writer can see is refused KA006 too", async () => {
   const before_ = await eventCount();
-  for (const kind of AGGREGATE_KINDS) {
+  for (const kind of B06_KINDS) {
     const { id, version } = aggregateOfA(kind);
     // B's handlers name A's aggregate: as an aggregate of B it does not exist, as an aggregate of A it is invisible to B's policies
     await tx(app, { agencyId: B.agencyId, userId: bob }, async (c) => {
@@ -217,7 +226,7 @@ test("for every kind: another agency's aggregate, an aggregate the writer's poli
   assert.equal(await eventCount(), before_, "no refused event was recorded");
 });
 
-test("only the migration owner writes the registry: every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the request handlers read it, and the owner can register but never rewrite or remove a kind", async () => {
+test("only the migration owner writes the registry: every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the event inserters (the request handlers; package B09's payment service) read it, and the owner can register but never rewrite or remove a kind", async () => {
   const registry = (await h.oracle.query<{ aggregate_kind: string; table_name: string; id_column: string; owner_package: string }>("SELECT * FROM kauro.aggregate_kinds ORDER BY aggregate_kind")).rows;
   for (const login of RUNTIME_LOGINS) {
     const c = await h.pg.connect(login);
@@ -226,8 +235,9 @@ test("only the migration owner writes the registry: every runtime login is refus
       await assert.rejects(c.query("UPDATE kauro.aggregate_kinds SET table_name = 'plans', id_column = 'plan_id' WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} UPDATE`);
       await assert.rejects(c.query("DELETE FROM kauro.aggregate_kinds WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} DELETE`);
       await assert.rejects(c.query("TRUNCATE kauro.aggregate_kinds"), refusedWith("42501"), `${login} TRUNCATE`);
-      if (login === ROLES.appLogin) {
-        // the request handlers insert domain events, so the binding (SECURITY INVOKER) reads the registry as them
+      if (login === ROLES.appLogin || login === ROLES.paymentLogin) {
+        // the request handlers insert domain events, and so does package B09's payment service (its read policy
+        // aggregate_kinds_read_b09_payment, FOUNDATION §4), so the binding (SECURITY INVOKER) reads the registry as them
         const seen = await c.query("SELECT aggregate_kind, table_name, id_column, owner_package FROM kauro.aggregate_kinds ORDER BY aggregate_kind");
         assert.deepEqual(seen.rows, registry);
       } else {
@@ -244,7 +254,7 @@ test("only the migration owner writes the registry: every runtime login is refus
       WHERE c.oid = 'kauro.aggregate_kinds'::regclass AND r.rolname = ANY($1::text[]) ORDER BY 1, 2`,
     [[...RUNTIME_ROLES]],
   );
-  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }]);
+  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }, { role: "kauro_payment", privilege: "SELECT" }]);
   // the rule behind that one grant, stated over the catalog so that a later package that lets a runtime group append events cannot
   // forget the registry the binding reads as that group: the groups that may read the registry (a grant and a SELECT policy) are
   // exactly the groups that may insert domain events — on main, the request handlers alone
@@ -260,7 +270,8 @@ test("only the migration owner writes the registry: every runtime login is refus
     [[...RUNTIME_ROLES]],
   );
   assert.deepEqual(readers.rows, inserters.rows, "registry readers are exactly the event inserters");
-  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }]);
+  // package B09 extends the list (FOUNDATION §4): its payment service appends the commerce events of the agency it adopted
+  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }, { role: "kauro_payment" }]);
   const columnGrants = await h.oracle.query("SELECT attname FROM pg_attribute WHERE attrelid = 'kauro.aggregate_kinds'::regclass AND attacl IS NOT NULL");
   assert.deepEqual(columnGrants.rows, []);
   const policies = await h.oracle.query<{ policyname: string; cmd: string; roles: string[] }>(
@@ -268,6 +279,7 @@ test("only the migration owner writes the registry: every runtime login is refus
   );
   assert.deepEqual(policies.rows, [
     { policyname: "aggregate_kinds_read", cmd: "SELECT", roles: ["kauro_app"] },
+    { policyname: "aggregate_kinds_read_b09_payment", cmd: "SELECT", roles: ["kauro_payment"] },
     { policyname: "aggregate_kinds_register", cmd: "INSERT", roles: [ROLES.owner] },
   ]);
   const rls = await h.oracle.query("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = 'kauro.aggregate_kinds'::regclass");

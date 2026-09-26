@@ -1,4 +1,4 @@
-// The schema of the payments and fiscal workflow (package B09, migrations 0008..0012) on real PostgreSQL 17 (07 "Acceptance
+// The schema of the payments and fiscal workflow (package B09, migrations 0009..0013) on real PostgreSQL 17 (07 "Acceptance
 // obligations": real PostgreSQL for tenant constraints, transactions, migrations and concurrency). The seeds equal the registry and
 // the domain; every guard is proven by the forbidden write performed AS THE RUNTIME ROLE that would perform it and refused, beside
 // the legitimate write that commits (21 "Positive and negative symmetry"; 08 "Database isolation": application checks improve
@@ -94,7 +94,7 @@ async function quotedProject(ag: AgencyFixture, clientId: string, seed: string, 
 
 async function paidOrder(seed: string): Promise<{ order: OrderFixture; captureId: string; authorizationId: string }> {
   const quote = await quotedProject(A, clientA, seed);
-  const order = await createdOrder(app, A, quote, routes);
+  const order = await createdOrder(app, A, quote, routes, { payment });
   const paid = await observedCapture(payment, A, order, routes, { amountCents: quote.totalCents, serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0 }, hubspot);
   return { order, captureId: paid.captureId, authorizationId: paid.authorizationId as string };
 }
@@ -246,13 +246,14 @@ test("R2-077 and D-QUOTE-B1: a quote carries the exact rounded arithmetic of the
 
 test("CMD028/D-PROTO-B1: an order is the quote's exact amounts through the qualified route's merchant, one open checkout per project; a later attempt follows only a proved no-effect", async () => {
   const quote = await quotedProject(A, clientA, "cmd028");
-  const order = await createdOrder(app, A, quote, routes);
+  const order = await createdOrder(app, A, quote, routes, { payment });
   const row = await h.oracle.query("SELECT state, version, provider_order_id IS NOT NULL AS known, expected_amount_cents FROM kauro.payment_orders WHERE order_id = $1", [order.orderId]);
   assert.deepEqual(row.rows[0], { state: "CREATED", version: "3", known: true, expected_amount_cents: "97125" });
   // a second open order of the project (a concurrent checkout under another key) is refused by the index (CMD028-RACE)
-  await assert.rejects(createdOrder(app, A, quote, routes, { acceptQuote: false }), refusedWith("23505", "payment_orders_one_open_per_project"));
-  // the provider order identity is learned once and never re-pointed
-  await assert.rejects(within(app, tenant(A), (c) => c.query("UPDATE kauro.payment_orders SET provider_order_id = 'PO-OTHER' WHERE order_id = $1", [order.orderId])), refusedWith("KA004"));
+  await assert.rejects(createdOrder(app, A, quote, routes, { acceptQuote: false, payment }), refusedWith("23505", "payment_orders_one_open_per_project"));
+  // the provider order identity is learned once (by the payment service, the only writer of provider facts) and never re-pointed
+  await assert.rejects(within(payment, service(A.agencyId), (c) => c.query("UPDATE kauro.payment_orders SET provider_order_id = 'PO-OTHER' WHERE order_id = $1", [order.orderId])), refusedWith("KA004"));
+  await assert.rejects(within(app, tenant(A), (c) => c.query("UPDATE kauro.payment_orders SET provider_order_id = 'PO-OTHER' WHERE order_id = $1", [order.orderId])), refusedWith("42501"));
   // the attempt's provider idempotency identity is its own; a second CREATE_ORDER attempt without a proved no-effect is refused
   await assert.rejects(
     within(app, tenant(A), (c) =>
@@ -275,7 +276,7 @@ test("CMD028/D-PROTO-B1: an order is the quote's exact amounts through the quali
 
 test("S058/S057: a capture of another payee is never a capture of the order; the obligation is allocated once and exactly; the authorization needs a completed capture that alone pays it", async () => {
   const quote = await quotedProject(A, clientA, "s058");
-  const order = await createdOrder(app, A, quote, routes);
+  const order = await createdOrder(app, A, quote, routes, { payment });
   const full = { amountCents: quote.totalCents, serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0 };
   // S058: a wrong payee cannot be recorded as this order's capture (it becomes a provider event exception instead)
   await assert.rejects(within(payment, service(A.agencyId), (c) => insertCapture(c, A, order, routes, { ...full, payeeDigest: sha("someone-else") }, PAYMENT_SERVICE)), refusedWith("23503", "capture_facts_order_fk"));
@@ -289,7 +290,8 @@ test("S058/S057: a capture of another payee is never a capture of the order; the
   );
   // an allocation that is not exactly min(amount, owed) is refused (KP002), and nobody writes the order's allocation directly
   await assert.rejects(within(payment, service(A.agencyId), (c) => insertCapture(c, A, order, routes, { ...full, serviceCents: quote.serviceCents - 1, excessCents: 1 }, PAYMENT_SERVICE)), refusedWith("KP002"));
-  await assert.rejects(within(app, tenant(A), (c) => c.query("UPDATE kauro.payment_orders SET allocated_cents = 1 WHERE order_id = $1", [order.orderId])), refusedWith("KP002"));
+  await assert.rejects(within(payment, service(A.agencyId), (c) => c.query("UPDATE kauro.payment_orders SET allocated_cents = 1 WHERE order_id = $1", [order.orderId])), refusedWith("KP002"));
+  await assert.rejects(within(app, tenant(A), (c) => c.query("UPDATE kauro.payment_orders SET allocated_cents = 1 WHERE order_id = $1", [order.orderId])), refusedWith("42501"));
   // the legitimate capture completes the order and carries the authorization in the same transaction
   const paid = await observedCapture(payment, A, order, routes, full, hubspot);
   const allocation = await h.oracle.query("SELECT allocated_cents FROM kauro.payment_orders WHERE order_id = $1", [order.orderId]);
@@ -353,7 +355,7 @@ test("S059/D-AUTH-B2: a reversal cannot commit while the entitlement it paid for
 
 test("S060: a price-valid quote whose source expired can be paid for but carries no authorization (the capture is reconciled, the entitlement refused)", async () => {
   const quote = await quotedProject(A, clientA, "s060");
-  const order = await createdOrder(app, A, quote, routes);
+  const order = await createdOrder(app, A, quote, routes, { payment });
   await within(app, tenant(A), async (c) => {
     await c.query("UPDATE kauro.dataset_revisions SET state = 'EXPIRED', version = version + 1 WHERE revision_id = $1", [quote.subject.revisionId]);
     const v = await c.query<{ version: string }>("SELECT version FROM kauro.dataset_revisions WHERE revision_id = $1", [quote.subject.revisionId]);
@@ -376,7 +378,7 @@ test("D-MACH-B1: a quote leaves ACCEPTED_FOR_CHECKOUT only when no capture of it
     refusedWith("KA008"),
   );
   const free = await quotedProject(A, clientA, "quote-release-free");
-  await createdOrder(app, A, free, routes);
+  await createdOrder(app, A, free, routes, { payment });
   await within(app, tenant(A), async (c) => {
     await c.query("UPDATE kauro.quotes SET state = 'WITHDRAWN', version = 4 WHERE quote_id = $1 AND version = 3", [free.quoteId]);
     await commerceEvent(c, "quote", free.quoteId, 4, A.agencyId, "quote.withdrawn.v1", { kind: "USER", id: alice });
@@ -387,7 +389,7 @@ test("CMD031/CMD032 boundaries: the agency files its own request; only a corpora
   const { order, captureId } = await paidOrder("refund-boundaries");
   const refundId = await requestRefund(app, A, order, captureId, { serviceCents: 97125, taxCents: 0 });
   // a second open request of the capture is refused (CMD031-RACE)
-  await assert.rejects(requestRefund(app, A, order, captureId, { serviceCents: 1, taxCents: 0 }), refusedWith("23505", "refunds_one_requested_per_capture"));
+  await assert.rejects(requestRefund(app, A, order, captureId, { serviceCents: 1, taxCents: 0 }), refusedWith("23505", "refunds_one_requested_per_origin"));
   // the reason is a label: a control character is refused under the field's own constraint name (LABEL_CONSTRAINT_FIELDS)
   await assert.rejects(requestRefund(app, A, order, captureId, { serviceCents: 1, taxCents: 0 }, "bad\u0007reason"), refusedWith("23514", "refunds_reason_code_label"));
   // the agency cannot approve its own request, and the payment service cannot review at all: the row is not theirs to update
@@ -513,8 +515,8 @@ test("R2-078/D-LEDGER-B1: postings balance per source and currency at COMMIT, a 
   const post = async (c: Client, lines: Array<[number, string, "DEBIT" | "CREDIT", number]>): Promise<void> => {
     for (const [lineNo, account, direction, amount] of lines) {
       await c.query(
-        `INSERT INTO kauro.ledger_entries (entry_id, agency_id, domain_event_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, posted_at, evidence_hash, policy_version)
-         VALUES ($1, $2, $3, $4, $5, 'OPS-1', $6, $7, 'USD', 'CAPTURE', $8, now(), now(), $9, 'B09-1')`,
+        `INSERT INTO kauro.ledger_entries (entry_id, agency_id, domain_event_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version)
+         VALUES ($1, $2, $3, $4, $5, 'OPS-1', $6, $7, 'USD', 'CAPTURE', $8, now(), now(), now(), $9, 'B09-1')`,
         [ids.next(), A.agencyId, eventId, lineNo, account, direction, amount, captureId, sha(`posting-${captureId}`)],
       );
     }
@@ -531,7 +533,8 @@ test("R2-078/D-LEDGER-B1: postings balance per source and currency at COMMIT, a 
   // a replayed delivery of the same event posts nothing: the source and line identity is taken
   await assert.rejects(within(payment, service(A.agencyId), (c) => post(c, lines)), refusedWith("23505"));
   // another agency's adopted scope can neither post for A nor read A's postings
-  await assert.rejects(within(payment, service(B.agencyId), (c) => post(c, [[5, "PSP_RECEIVABLE", "DEBIT", 1], [6, "PSP_RECEIVABLE", "CREDIT", 1]])), refusedWith("42501"));
+  // (the source event of another agency is not visible to it: the source binding refuses before row security would, KP001)
+  await assert.rejects(within(payment, service(B.agencyId), (c) => post(c, [[5, "PSP_RECEIVABLE", "DEBIT", 1], [6, "PSP_RECEIVABLE", "CREDIT", 1]])), refusedWith("KP001"));
   const net = await within(payment, service(A.agencyId), async (c) => {
     const r = await c.query<{ net: string }>("SELECT sum(CASE direction WHEN 'DEBIT' THEN amount_cents ELSE -amount_cents END)::text AS net FROM kauro.ledger_entries WHERE account_code = 'PSP_RECEIVABLE' AND source_ref = $1", [captureId]);
     return r.rows[0]!.net;
@@ -587,7 +590,7 @@ test("D-SCOPE-B1/D-ING-B1: the scope index maps stored operations to their agenc
   });
   // a verified event no order can take is an exception of the platform, kept for the owner's review (S058)
   await within(payment, {}, (c) =>
-    c.query("INSERT INTO kauro.provider_event_exceptions (exception_id, inbox_id, provider, environment, kind, provider_ref, evidence_hash, observed_at, created_at) VALUES ($1, $2, $3, 'SANDBOX', 'UNKNOWN_PROVIDER_REFERENCE', 'PO-UNKNOWN', $4, now(), now())", [ids.next(), ours, PROVIDER, sha("exception")]),
+    c.query("INSERT INTO kauro.provider_event_exceptions (exception_id, source, inbox_id, provider, environment, kind, provider_ref, evidence_hash, observed_at, created_at) VALUES ($1, 'WEBHOOK', $2, $3, 'SANDBOX', 'UNKNOWN_PROVIDER_REFERENCE', 'PO-UNKNOWN', $4, now(), now())", [ids.next(), ours, PROVIDER, sha("exception")]),
   );
   await within(app, operator(kora, A.agencyId), async (c) => {
     assert.equal((await c.query("SELECT 1 FROM kauro.provider_event_exceptions WHERE inbox_id = $1", [ours])).rowCount, 1);

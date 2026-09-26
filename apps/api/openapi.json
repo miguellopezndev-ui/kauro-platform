@@ -5923,6 +5923,7 @@
       "x-kauro-role": "AGENCY_BILLING",
       "x-kauro-principal": "AGENCY_MEMBER",
       "x-kauro-runtime-role": "kauro_app",
+      "x-kauro-settle-runtime-role": "kauro_payment",
       "x-kauro-scope": "AGENCY_HEADER",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "NEVER",
@@ -6435,7 +6436,7 @@
           ]
         },
         "503": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
           "headers": {
             "X-Correlation-Id": {
               "$ref": "#/components/headers/CorrelationId"
@@ -6457,6 +6458,12 @@
               "reason": null,
               "layer": "PLATFORM",
               "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+            },
+            {
+              "code": "CAPACITY_UNAVAILABLE",
+              "reason": "DELIVERY_CAPACITY_UNAVAILABLE",
+              "layer": "COMMAND",
+              "meaning": "the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key"
             }
           ]
         }
@@ -6470,6 +6477,7 @@
       "x-kauro-role": "PAYMENT_SERVICE",
       "x-kauro-principal": "PAYMENT_SERVICE",
       "x-kauro-runtime-role": "kauro_payment",
+      "x-kauro-settle-runtime-role": null,
       "x-kauro-scope": "STORED_OPERATION",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "NEVER",
@@ -6858,6 +6866,7 @@
       "x-kauro-role": "AUTHENTICATED_PROVIDER",
       "x-kauro-principal": "PROVIDER",
       "x-kauro-runtime-role": "kauro_payment",
+      "x-kauro-settle-runtime-role": null,
       "x-kauro-scope": "PROVIDER_INGRESS",
       "x-kauro-idempotency": "PROVIDER_INBOX",
       "x-kauro-step-up": "NEVER",
@@ -7114,6 +7123,7 @@
       "x-kauro-role": "AGENCY_BILLING",
       "x-kauro-principal": "AGENCY_MEMBER",
       "x-kauro-runtime-role": "kauro_app",
+      "x-kauro-settle-runtime-role": null,
       "x-kauro-scope": "AGENCY_HEADER",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "NEVER",
@@ -7547,6 +7557,7 @@
       "x-kauro-role": "AGENCY_BILLING",
       "x-kauro-principal": "AGENCY_MEMBER",
       "x-kauro-runtime-role": "kauro_app",
+      "x-kauro-settle-runtime-role": "kauro_payment",
       "x-kauro-scope": "AGENCY_HEADER",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "NEVER",
@@ -8057,7 +8068,7 @@
           ]
         },
         "503": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
           "headers": {
             "X-Correlation-Id": {
               "$ref": "#/components/headers/CorrelationId"
@@ -8079,6 +8090,12 @@
               "reason": null,
               "layer": "PLATFORM",
               "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+            },
+            {
+              "code": "CAPACITY_UNAVAILABLE",
+              "reason": "DELIVERY_CAPACITY_UNAVAILABLE",
+              "layer": "COMMAND",
+              "meaning": "the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key"
             }
           ]
         }
@@ -8092,6 +8109,7 @@
       "x-kauro-role": "KAURO_OWNER",
       "x-kauro-principal": "CORPORATE_OPERATOR",
       "x-kauro-runtime-role": "kauro_app",
+      "x-kauro-settle-runtime-role": null,
       "x-kauro-scope": "STORED_OPERATION",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "UNLESS_STANDING_POLICY",
@@ -8394,7 +8412,7 @@
           ]
         },
         "409": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+          "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
           "headers": {
             "X-Correlation-Id": {
               "$ref": "#/components/headers/CorrelationId"
@@ -8448,6 +8466,15 @@
               "reason": "REFUND_EXCEEDS_REMAINING",
               "layer": "COMMAND",
               "meaning": "the amounts exceed the reconciled remaining capture, given every committed refund (CMD032 failure)"
+            },
+            {
+              "code": "PRECONDITION_FAILED",
+              "reason": "REFUND_TAX_INCONSISTENT",
+              "fieldCodes": [
+                "RANGE"
+              ],
+              "layer": "COMMAND",
+              "meaning": "taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6)"
             }
           ]
         },
@@ -8545,6 +8572,7 @@
       "x-kauro-role": "PAYMENT_SERVICE",
       "x-kauro-principal": "PAYMENT_SERVICE",
       "x-kauro-runtime-role": "kauro_payment",
+      "x-kauro-settle-runtime-role": "kauro_payment",
       "x-kauro-scope": "STORED_OPERATION",
       "x-kauro-idempotency": "REQUIRED",
       "x-kauro-step-up": "NEVER",
@@ -11170,6 +11198,8 @@
               "FISCAL_PROFILE_NOT_EFFECTIVE",
               "FISCAL_TREATMENT_CHANGED",
               "ALREADY_PAID",
+              "DELIVERY_CAPACITY_UNAVAILABLE",
+              "REPLACEMENT_NOT_ALLOWED",
               "CREATION_IN_PROGRESS",
               "CAPTURE_IN_PROGRESS",
               "CAPTURE_UNCERTAIN",
@@ -11182,6 +11212,7 @@
               "REFUND_REQUEST_OPEN",
               "REFUND_EXCEEDS_REMAINING",
               "REFUND_COMPONENT_INVALID",
+              "REFUND_TAX_INCONSISTENT",
               "REFUND_NOT_REQUESTED",
               "REFUND_NOT_APPROVED",
               "REFUND_IN_PROGRESS",

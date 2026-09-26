@@ -14,7 +14,9 @@ import { allocateLargestRemainder, assertMoney } from "./money.js";
 import type { ObservedCapture } from "./provider.js";
 import type { CaptureFactRecord, CaptureStatus, PaymentOrderRecord, RefundComponents } from "./records.js";
 
-export type CaptureMismatch = "WRONG_PROVIDER" | "WRONG_ENVIRONMENT" | "WRONG_ORDER" | "WRONG_PAYEE" | "WRONG_CURRENCY";
+/** The ways an observed capture is not a capture of the order (each is a provider exception kind of the same name; B09-F9). */
+export const CAPTURE_MISMATCHES = ["WRONG_PROVIDER", "WRONG_ENVIRONMENT", "WRONG_ORDER", "WRONG_PAYEE", "WRONG_CURRENCY"] as const;
+export type CaptureMismatch = (typeof CAPTURE_MISMATCHES)[number];
 
 export type CaptureMatch = { readonly kind: "MATCH" } | { readonly kind: "MISMATCH"; readonly reason: CaptureMismatch };
 
@@ -77,7 +79,7 @@ export function splitObligation(order: Pick<PaymentOrderRecord, "expectedService
  * The allocation of a capture observed COMPLETED (or first observed REVERSED; D-PAY-B5): the part that pays what is still owed
  * on the order goes to the obligation — split into service and tax cumulatively, so several partial captures always add up to
  * exactly the quoted service and tax — and the rest is excess, an overpayment to return (R2-140). The database re-checks the
- * sum (capture_facts_allocation) and the cap (kauro.capture_facts_allocate, migration 0010, SQLSTATE KP002).
+ * sum (capture_facts_allocation) and the cap (kauro.capture_facts_allocate, migration 0011, SQLSTATE KP002).
  */
 export function allocateCapture(order: Pick<PaymentOrderRecord, "expectedAmountCents" | "expectedServiceCents" | "expectedTaxCents" | "allocatedCents">, amountCents: bigint): RefundComponents {
   assertMoney(amountCents);

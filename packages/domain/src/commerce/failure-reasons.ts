@@ -29,6 +29,10 @@ export const COMMERCE_FAILURE_REASONS = [
   "FISCAL_PROFILE_NOT_EFFECTIVE",
   "FISCAL_TREATMENT_CHANGED",
   "ALREADY_PAID",
+  // deliverable capacity (15 "PaymentOrder and intent"; 07 "Job and attempt states"; D-CAP-B1): the processing package's admission
+  "DELIVERY_CAPACITY_UNAVAILABLE",
+  // the included pre-execution source replacement (16 "Scope changes and credits"; D-QUOTE-B6; SQLSTATE KP013)
+  "REPLACEMENT_NOT_ALLOWED",
   // orders, attempts, captures and observations (15 "PaymentOrder and intent", "Capture and authority", "Payment state transitions")
   "CREATION_IN_PROGRESS",
   "CAPTURE_IN_PROGRESS",
@@ -43,12 +47,14 @@ export const COMMERCE_FAILURE_REASONS = [
   "REFUND_REQUEST_OPEN",
   "REFUND_EXCEEDS_REMAINING",
   "REFUND_COMPONENT_INVALID",
+  // the tax of a partial refund follows its service under the sale's rule (15 "Exact representation and rounding"; D-REF-B6; KP012)
+  "REFUND_TAX_INCONSISTENT",
   "REFUND_NOT_REQUESTED",
   "REFUND_NOT_APPROVED",
   "REFUND_IN_PROGRESS",
   "REFUND_UNCERTAIN",
   "CAPTURE_NOT_REFUNDABLE",
-  // integrity (the SQLSTATEs KP001..KP011 of migrations 0008..0012; a handler that respects the schema never meets them)
+  // integrity (the SQLSTATEs KP001..KP013 of migrations 0009..0013; a handler that respects the schema never meets them)
   "LEDGER_UNBALANCED",
   "OBLIGATION_OVER_ALLOCATED",
   "FACT_REGRESSION",

@@ -1,4 +1,4 @@
--- 0009 — fiscal profiles, quotes and price-eligibility snapshots (package B09).
+-- 0010 — known price policies, fiscal profiles, quotes and price-eligibility snapshots (package B09).
 --
 -- Authority: 16 "Price schedule", "Recurrence decision", "Founding incentive", "Quote calculation" (calculation order: billable
 -- units and mode → base band → the single highest eligible discount, never a sum → the discount rounded once in minor units →
@@ -8,7 +8,9 @@
 -- snapshots", 07 "Quote and checkout states" (a quote freezes terms; price expiry and source availability are separate dates),
 -- 15 "FiscalProfile" (reviewed versions; unknown facts remain unresolved and block affected fiscal claims; no treatment is
 -- inferred from an email, a currency or an address), registry contracts FiscalProfile, Quote, PriceEligibilitySnapshot.
--- Design: docs/design/B09-payments-fiscal.md (D-QUOTE-B1..B4, D-FISC-B1, D-FISC-B2, D-MONEY-B1, D-BIND-B1).
+-- reference/HASHING_AND_ACCOUNTING_RULES "Retention formulas" (UTC instants; a duration day is exactly 86400 seconds), 07 "Quote
+-- and checkout states" (a fourteen-day price lifetime does not extend source retention), COMMERCIAL_LEDGER_WORKED_EXAMPLES §16
+-- and §18. Design: docs/design/B09-payments-fiscal.md (D-QUOTE-B1..B7, D-FISC-B1, D-FISC-B2, D-MONEY-B1, D-BIND-B1, D-TIME-B1).
 
 -- --- exact arithmetic of the pricing policy (the database re-checks what the domain computes; D-MONEY-B1) --------------------------
 -- The platform's one rounding primitive for a non-negative basis and a rate in basis points, computed in numeric so no product
@@ -36,6 +38,34 @@ $$;
 CREATE OR REPLACE FUNCTION kauro.r2_initial_repeat_bps(qualifying integer) RETURNS integer
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
 $$ SELECT CASE WHEN qualifying >= 25 THEN 1500 WHEN qualifying >= 10 THEN 1000 WHEN qualifying >= 1 THEN 500 ELSE 0 END $$;
+
+-- --- known price policies (B09-F10; D-QUOTE-B5) -----------------------------------------------------------------------------------------
+-- A quote and its eligibility snapshot name the price policy they were priced under; only a policy this table knows can be named
+-- (foreign keys), so no quote can escape the schedule's CHECKs by naming an unknown version. The rows are migration-owned
+-- reference data mirrored from the vendored registry policy (the persistence test proves R2-INITIAL equal to policy.pricing and
+-- policy.retention); a later policy is a later migration's INSERT, reviewed with its CHECK arm. Durations are exact seconds
+-- (reference/HASHING "Retention formulas": a duration day is 86400 seconds, D-TIME-B1): quote_seconds = quoteDays × 86400,
+-- repeat_lookback_seconds = repeatLookbackDays × 86400, unpaid_source_hard_seconds = retention.unpaidDaysHardFromSeal × 86400
+-- (the latest instant a quote may promise its sealed source stays available), pre_execution_replacements_included =
+-- customerPreExecutionSourceReplacementsIncluded (the one included source replacement a paid purchase may be re-bound to, 16
+-- "Scope changes and credits"; D-QUOTE-B6). Append-only; readable by the request handlers and the payment service; no runtime
+-- role writes it.
+CREATE TABLE kauro.price_policies (
+  policy_version                       text PRIMARY KEY CHECK (policy_version ~ '^[A-Z][A-Z0-9_.-]{0,63}$'),
+  quote_seconds                        integer NOT NULL CHECK (quote_seconds > 0),
+  repeat_lookback_seconds              integer NOT NULL CHECK (repeat_lookback_seconds > 0),
+  founding_discount_bps                integer NOT NULL CHECK (founding_discount_bps BETWEEN 0 AND 10000),
+  pre_execution_replacements_included  integer NOT NULL CHECK (pre_execution_replacements_included >= 0),
+  unpaid_source_hard_seconds           integer NOT NULL CHECK (unpaid_source_hard_seconds > 0)
+);
+INSERT INTO kauro.price_policies (policy_version, quote_seconds, repeat_lookback_seconds, founding_discount_bps, pre_execution_replacements_included, unpaid_source_hard_seconds)
+  VALUES ('R2-INITIAL', 1209600, 31536000, 2500, 1, 1209600);
+CREATE TRIGGER price_policies_append_only BEFORE UPDATE OR DELETE ON kauro.price_policies FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+CREATE TRIGGER price_policies_no_truncate BEFORE TRUNCATE ON kauro.price_policies FOR EACH STATEMENT EXECUTE FUNCTION kauro.forbid_change();
+ALTER TABLE kauro.price_policies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.price_policies FORCE ROW LEVEL SECURITY;
+CREATE POLICY price_policies_read ON kauro.price_policies FOR SELECT TO kauro_app, kauro_payment USING (true);
+GRANT SELECT ON kauro.price_policies TO kauro_app, kauro_payment;
 
 -- --- binding keys on B06 tables (D-BIND-B1) ----------------------------------------------------------------------------------------------
 -- Composite foreign keys bind tenant and parent identity (08 "Database isolation"; 07 "Composite foreign keys ... prevent a
@@ -120,9 +150,23 @@ CREATE TRIGGER fiscal_profiles_transition_lock BEFORE UPDATE OF superseded_at ON
 -- issued by CreateQuote (CMD027, the recurrence package B10) in one transaction — born DRAFT (version 1) and moved along
 -- issue_quote to ISSUED (version 2) — and accepted for checkout by CreatePaymentOrder (CMD028). Every amount is re-checked here:
 -- the discount is rounded once from the base, service = base - discount, the tax is the reviewed rule's, total = service + tax;
--- under the R2-INITIAL policy the base is the registry band of the mode and units and the price expires exactly fourteen days
--- after issuance. The subject columns are the approved plan's own (composite keys), the tax snapshot is the fiscal profile's own,
--- and the discount is the eligibility snapshot's applied rate (checked at COMMIT: the snapshot names the quote).
+-- under the R2-INITIAL policy the base is the registry band of the mode and units and the price expires exactly 1,209,600
+-- seconds (fourteen duration days) after issuance. The subject columns are the approved plan's own (composite keys), the tax
+-- snapshot is the fiscal profile's own, and the discount is the eligibility snapshot's applied rate, evaluated at the quote's own
+-- issuance instant (checked at COMMIT: the snapshot names the quote and its as_of is the quote's issued_at).
+--
+-- Only a known price policy can be named (price_policies; B09-F10). The source a quote promises is a SEALED revision of its
+-- project, sealed no later than the issuance, and its promised availability (dataAvailableUntil, 16 "Quote calculation") lies
+-- after the issuance, no later than the price expiry (07: "A fourteen-day price lifetime does not extend seven-day source
+-- retention") and no later than the policy's hard cap from the seal (quotes_source_binding; the exact effective deadline comes
+-- from the source lifecycle's retention record through the SourceAvailabilityReader port, D-QUOTE-B7). Interval arithmetic is in
+-- exact hours or seconds, never in days on timestamptz, so no session TimeZone moves a boundary (B09-F12, D-TIME-B1).
+--
+-- A replacement quote (replaces_quote_id; D-QUOTE-B6) re-binds a paid purchase to a replacement revision under the one included
+-- pre-execution source replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18): it carries exactly the
+-- replaced quote's commercial terms (same project, mode, policy, band, discount, service, tax rule and amounts: the composite key
+-- quotes_replacement_terms_fk), is never paid again (no order may name it) and is accepted only by the payment service's
+-- re-binding of the paid capture (purchase_rebindings, 0011).
 CREATE TABLE kauro.quotes (
   quote_id                  uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(quote_id)),
   agency_id                 uuid NOT NULL REFERENCES kauro.agencies (agency_id),
@@ -136,8 +180,8 @@ CREATE TABLE kauro.quotes (
   target_contract_hash      text NOT NULL CHECK (kauro.is_sha256_hex(target_contract_hash)),
   billable_units            bigint NOT NULL CHECK (billable_units >= 1),
   mode                      text NOT NULL CHECK (mode IN ('CLEAN', 'HUBSPOT', 'SALESFORCE')),
-  price_policy_version      text NOT NULL CHECK (price_policy_version ~ '^[A-Z][A-Z0-9_.-]{0,63}$'),
-  discount_policy_version   text NOT NULL CHECK (discount_policy_version ~ '^[A-Z][A-Z0-9_.-]{0,63}$'),
+  price_policy_version      text NOT NULL REFERENCES kauro.price_policies (policy_version),
+  discount_policy_version   text NOT NULL REFERENCES kauro.price_policies (policy_version),
   base_service_cents        bigint NOT NULL CHECK (kauro.is_money(base_service_cents) AND base_service_cents > 0),
   discount_bps              integer NOT NULL CHECK (discount_bps BETWEEN 0 AND 10000),
   discount_cents            bigint NOT NULL CHECK (kauro.is_money(discount_cents)),
@@ -157,6 +201,7 @@ CREATE TABLE kauro.quotes (
   expires_at                timestamptz NOT NULL,
   source_available_until    timestamptz NOT NULL,
   superseded_by_quote_id    uuid,
+  replaces_quote_id         uuid,
   created_by_membership_id  uuid NOT NULL,
   created_at                timestamptz NOT NULL,
   updated_at                timestamptz NOT NULL,
@@ -166,6 +211,8 @@ CREATE TABLE kauro.quotes (
   CONSTRAINT quotes_order_binding UNIQUE (agency_id, quote_id, project_id, approval_id, terms_hash, total_cents, service_cents, tax_cents, currency),
   -- binding target of commercial_authorizations_quote_fk: an authorization names exactly the quoted subject
   CONSTRAINT quotes_authorization_binding UNIQUE (agency_id, quote_id, project_id, plan_id, approval_id, plan_hash, revision_hash, target_contract_hash, mode, billable_units),
+  -- binding target of quotes_replacement_terms_fk: a replacement carries exactly the replaced purchase's commercial terms
+  CONSTRAINT quotes_replacement_terms UNIQUE (agency_id, quote_id, project_id, mode, price_policy_version, discount_policy_version, base_service_cents, discount_bps, discount_cents, service_cents, tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency),
   FOREIGN KEY (agency_id, project_id, mode) REFERENCES kauro.projects (agency_id, project_id, mode),
   -- the quoted plan is a plan of this project, with exactly its body, source and target; the approval is that plan's
   FOREIGN KEY (agency_id, plan_id, project_id) REFERENCES kauro.plans (agency_id, plan_id, project_id),
@@ -176,6 +223,8 @@ CREATE TABLE kauro.quotes (
     REFERENCES kauro.fiscal_profiles (agency_id, profile_id, operator_legal_ref, tax_treatment, tax_rule, tax_rate_bps),
   FOREIGN KEY (agency_id, created_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
   FOREIGN KEY (agency_id, superseded_by_quote_id) REFERENCES kauro.quotes (agency_id, quote_id) DEFERRABLE INITIALLY DEFERRED,
+  CONSTRAINT quotes_replacement_terms_fk FOREIGN KEY (agency_id, replaces_quote_id, project_id, mode, price_policy_version, discount_policy_version, base_service_cents, discount_bps, discount_cents, service_cents, tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency)
+    REFERENCES kauro.quotes (agency_id, quote_id, project_id, mode, price_policy_version, discount_policy_version, base_service_cents, discount_bps, discount_cents, service_cents, tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency),
   -- 16 "Quote calculation": the discount rounded once from the base, service after it, the reviewed tax, the total
   CONSTRAINT quotes_discount_arithmetic CHECK (discount_cents = kauro.round_half_up_bps(base_service_cents, discount_bps)),
   CONSTRAINT quotes_service_arithmetic CHECK (service_cents = base_service_cents - discount_cents),
@@ -185,36 +234,73 @@ CREATE TABLE kauro.quotes (
   ),
   CONSTRAINT quotes_total_arithmetic CHECK (total_cents = service_cents + tax_cents),
   -- the registry schedule the quote says it priced with (R2-INITIAL): the band of the mode and units, a discount the policy can
-  -- produce (a repeat tier or the founding rate), and the fourteen-day price expiry
+  -- produce (a repeat tier or the founding rate), and the price expiry of exactly quoteDays x 86400 s (336 hours: an interval in
+  -- hours never follows a daylight-saving change of the session's TimeZone, as '14 days' would; B09-F12)
   CONSTRAINT quotes_r2_initial_schedule CHECK (
     price_policy_version <> 'R2-INITIAL'
     OR (base_service_cents = coalesce(kauro.r2_initial_base_cents(mode, billable_units), -1)
         AND discount_bps IN (0, 500, 1000, 1500, 2500)
-        AND expires_at = issued_at + interval '14 days')
+        AND expires_at = issued_at + interval '336 hours')
   ),
   CONSTRAINT quotes_expiry_after_issue CHECK (expires_at > issued_at),
+  -- the source a quote promises is available after its issuance and never beyond its price expiry (07; B09-F10)
+  CONSTRAINT quotes_source_window CHECK (source_available_until > issued_at AND source_available_until <= expires_at),
   CONSTRAINT quotes_superseded_names_successor CHECK ((state = 'SUPERSEDED') = (superseded_by_quote_id IS NOT NULL)),
-  CONSTRAINT quotes_no_self_lineage CHECK (superseded_by_quote_id IS DISTINCT FROM quote_id)
+  CONSTRAINT quotes_no_self_lineage CHECK (superseded_by_quote_id IS DISTINCT FROM quote_id AND replaces_quote_id IS DISTINCT FROM quote_id)
 );
--- one live quote per project (a new binding quote supersedes the previous one before it is created; S060, 16 "Quote calculation")
-CREATE UNIQUE INDEX quotes_one_live_per_project ON kauro.quotes (agency_id, project_id) WHERE state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT');
+-- one live quote per project (a new binding quote supersedes the previous one before it is created; S060, 16 "Quote calculation");
+-- a replacement quote counts once it is accepted — while it is drafted or issued the paid quote it replaces is still the live one,
+-- and the re-binding supersedes that quote before it accepts the replacement (D-QUOTE-B6)
+CREATE UNIQUE INDEX quotes_one_live_per_project ON kauro.quotes (agency_id, project_id)
+  WHERE (replaces_quote_id IS NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')) OR state = 'ACCEPTED_FOR_CHECKOUT';
+-- at most one pending replacement of a paid quote
+CREATE UNIQUE INDEX quotes_one_pending_replacement ON kauro.quotes (agency_id, replaces_quote_id)
+  WHERE replaces_quote_id IS NOT NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT');
 CREATE UNIQUE INDEX quotes_one_snapshot ON kauro.quotes (eligibility_snapshot_id);
 CREATE INDEX quotes_by_project ON kauro.quotes (agency_id, project_id, created_at);
 CREATE TRIGGER quotes_touch BEFORE UPDATE ON kauro.quotes FOR EACH ROW EXECUTE FUNCTION kauro.touch_updated_at();
 CREATE TRIGGER quotes_version BEFORE UPDATE ON kauro.quotes FOR EACH ROW EXECUTE FUNCTION kauro.enforce_version_bump();
 CREATE TRIGGER quotes_immutable BEFORE UPDATE ON kauro.quotes
-  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('quote_id,agency_id,project_id,plan_id,approval_id,revision_hash,plan_hash,target_contract_hash,billable_units,mode,price_policy_version,discount_policy_version,base_service_cents,discount_bps,discount_cents,service_cents,fiscal_profile_id,issuer_ref,tax_treatment,tax_rule,tax_rate_bps,tax_cents,total_cents,currency,eligibility_snapshot_id,terms_hash,terms_version,issued_at,expires_at,source_available_until,created_by_membership_id,created_at');
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('quote_id,agency_id,project_id,plan_id,approval_id,revision_hash,plan_hash,target_contract_hash,billable_units,mode,price_policy_version,discount_policy_version,base_service_cents,discount_bps,discount_cents,service_cents,fiscal_profile_id,issuer_ref,tax_treatment,tax_rule,tax_rate_bps,tax_cents,total_cents,currency,eligibility_snapshot_id,terms_hash,terms_version,issued_at,expires_at,source_available_until,replaces_quote_id,created_by_membership_id,created_at');
 CREATE TRIGGER quotes_transition BEFORE UPDATE OF state ON kauro.quotes
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('Quote');
 CREATE TRIGGER quotes_initial_state BEFORE INSERT ON kauro.quotes
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Quote');
 -- checkout and capture rely on the quote's state without changing it (CMD028 on an accepted quote, CMD029, authorization
 -- issuance): a quote's state is a transition subject (D-TX-2), so an expiry, supersession or withdrawal waits for a checkout or a
--- capture intent in flight and is then checked against what it committed (quotes_release_guard, migration 0010)
+-- capture intent in flight and is then checked against what it committed (quotes_release_guard, migration 0012)
 CREATE TRIGGER quotes_transition_lock BEFORE UPDATE OF state ON kauro.quotes
   FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.take_transition_lock('kauro.quotes', 'quote_id');
 CREATE CONSTRAINT TRIGGER quotes_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.quotes
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('quote', 'quote_id');
+
+-- The source binding (B09-F10, D-QUOTE-B7): the quoted revision hash is a revision of the quote's project that is SEALED, sealed
+-- no later than the issuance, and the promised availability is no later than the policy's hard cap from that seal
+-- (retention.unpaidDaysHardFromSeal; reference/HASHING "Retention formulas": the unpaid source's soft deadline is capped at
+-- fourteen days after sealing). Only B06 columns are read (dataset_revisions.state, manifest_hash, sealed_at): the retention
+-- record of the source lifecycle (package B07) is not referenced here (FOUNDATION D-AGGK-5); its exact effective deadline reaches
+-- the issuer through the SourceAvailabilityReader port, and the integrator binds the two when both packages are on main (design
+-- §15 "Integration obligations").
+CREATE OR REPLACE FUNCTION kauro.quotes_source_binding() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  sealed timestamptz;
+  hard_seconds integer;
+BEGIN
+  SELECT r.sealed_at INTO sealed FROM kauro.dataset_revisions r
+   WHERE r.agency_id = NEW.agency_id AND r.project_id = NEW.project_id AND r.manifest_hash = NEW.revision_hash AND r.state = 'SEALED';
+  SELECT p.unpaid_source_hard_seconds INTO hard_seconds FROM kauro.price_policies p WHERE p.policy_version = NEW.price_policy_version;
+  -- an unknown policy is refused by the foreign key on price_policy_version (23503), not by this binding
+  IF sealed IS NULL OR sealed > NEW.issued_at
+     OR (hard_seconds IS NOT NULL AND NEW.source_available_until > sealed + make_interval(secs => hard_seconds::double precision)) THEN
+    RAISE EXCEPTION 'SOURCE_BINDING: quote % promises a source that is not a sealed revision of its project available until the promised instant', NEW.quote_id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'quotes_source_binding', SCHEMA = 'kauro', TABLE = 'quotes';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER quotes_source_binding BEFORE INSERT ON kauro.quotes FOR EACH ROW EXECUTE FUNCTION kauro.quotes_source_binding();
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('Quote', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -228,13 +314,18 @@ INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('Quote', 'ACCEPTED_FOR_CHECKOUT', 'SUPERSEDED'),
   ('Quote', 'ACCEPTED_FOR_CHECKOUT', 'WITHDRAWN');
 
+-- the quote is an aggregate kind of the shared registry (foundation 0008, D-AGGK-1; D-EVT-B1)
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package) VALUES ('quote', 'quotes', 'quote_id', 'B09');
+
 -- --- price eligibility snapshots (D-QUOTE-B2) ---------------------------------------------------------------------------------------------
 -- The recurrence and founding facts a quote was priced with, frozen at issuance (reference/HASHING "Price and recurrence
--- snapshots"; registry PriceEligibilitySnapshot: "Complete prior distinct paid/non-fully-refunded project set", "Must equal that
--- unique set size", "Exact 365-day boundary", "Maximum eligible rate without stacking"). Which projects qualify is the
--- recurrence package's decision (B10: first-project designation, commission windows); the database guarantees the shape — a
--- distinct set of other projects of the same agency, the count equal to its size, the tier of that count, the exact boundary and
--- the maximum (never the sum) of the two rates — and binds the quote's discount to the applied rate. Append-only.
+-- snapshots": "Evaluate the 365-day lookback at one server issuance instant and persist the exact eligible set"; registry
+-- PriceEligibilitySnapshot: "Complete prior distinct paid/non-fully-refunded project set", "Must equal that unique set size",
+-- "Exact 365-day boundary", "Maximum eligible rate without stacking"). Which projects qualify is the recurrence package's
+-- decision (B10: first-project designation, commission windows); the database guarantees the shape — a distinct set of other
+-- projects of the same agency, the count equal to its size, the tier of that count, the exact boundary (8760 hours: 365 duration
+-- days, time-zone independent, B09-F12) and the maximum (never the sum) of the two rates — under a known policy, and binds the
+-- quote's discount to the applied rate and the snapshot's as_of to the quote's issued_at (quotes_snapshot_fk). Append-only.
 CREATE TABLE kauro.price_eligibility_snapshots (
   snapshot_id             uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(snapshot_id)),
   agency_id               uuid NOT NULL REFERENCES kauro.agencies (agency_id),
@@ -248,11 +339,12 @@ CREATE TABLE kauro.price_eligibility_snapshots (
   founding_slot_ref       uuid,
   founding_discount_bps   integer NOT NULL CHECK (founding_discount_bps BETWEEN 0 AND 10000),
   applied_discount_bps    integer NOT NULL CHECK (applied_discount_bps BETWEEN 0 AND 10000),
-  policy_version          text NOT NULL CHECK (policy_version ~ '^[A-Z][A-Z0-9_.-]{0,63}$'),
+  policy_version          text NOT NULL REFERENCES kauro.price_policies (policy_version),
   created_at              timestamptz NOT NULL,
   UNIQUE (quote_id),
-  -- binding target of quotes_snapshot_fk: the quote's discount is the snapshot's applied rate under its policy
-  CONSTRAINT price_eligibility_snapshots_quote_binding UNIQUE (agency_id, snapshot_id, quote_id, applied_discount_bps, policy_version),
+  -- binding target of quotes_snapshot_fk: the quote's discount is the snapshot's applied rate under its policy, evaluated at the
+  -- quote's own issuance instant
+  CONSTRAINT price_eligibility_snapshots_quote_binding UNIQUE (agency_id, snapshot_id, quote_id, applied_discount_bps, policy_version, as_of),
   FOREIGN KEY (agency_id, quote_id, project_id) REFERENCES kauro.quotes (agency_id, quote_id, project_id),
   CONSTRAINT price_eligibility_snapshots_count CHECK (qualifying_count = cardinality(qualifying_project_ids)),
   CONSTRAINT price_eligibility_snapshots_not_self CHECK (NOT (project_id = ANY (qualifying_project_ids))),
@@ -262,7 +354,7 @@ CREATE TABLE kauro.price_eligibility_snapshots (
     policy_version <> 'R2-INITIAL'
     OR (repeat_discount_bps = kauro.r2_initial_repeat_bps(qualifying_count)
         AND founding_discount_bps IN (0, 2500)
-        AND lookback_starts_at = as_of - interval '365 days')
+        AND lookback_starts_at = as_of - interval '8760 hours')
   ),
   CONSTRAINT price_eligibility_snapshots_lookback CHECK (lookback_starts_at < as_of)
 );
@@ -286,10 +378,11 @@ $$;
 CREATE TRIGGER price_eligibility_snapshots_projects_bound BEFORE INSERT ON kauro.price_eligibility_snapshots
   FOR EACH ROW EXECUTE FUNCTION kauro.price_eligibility_projects_bound();
 
--- the quote names its snapshot and the snapshot names its quote: the key is checked at COMMIT (either can be written first)
+-- the quote names its snapshot and the snapshot names its quote: the key is checked at COMMIT (either can be written first); the
+-- snapshot's as_of is the quote's issuance instant (reference/HASHING "at one server issuance instant"; B09-F10)
 ALTER TABLE kauro.quotes ADD CONSTRAINT quotes_snapshot_fk
-  FOREIGN KEY (agency_id, eligibility_snapshot_id, quote_id, discount_bps, discount_policy_version)
-  REFERENCES kauro.price_eligibility_snapshots (agency_id, snapshot_id, quote_id, applied_discount_bps, policy_version) DEFERRABLE INITIALLY DEFERRED;
+  FOREIGN KEY (agency_id, eligibility_snapshot_id, quote_id, discount_bps, discount_policy_version, issued_at)
+  REFERENCES kauro.price_eligibility_snapshots (agency_id, snapshot_id, quote_id, applied_discount_bps, policy_version, as_of) DEFERRABLE INITIALLY DEFERRED;
 
 -- --- row-level security -------------------------------------------------------------------------------------------------------------------
 ALTER TABLE kauro.fiscal_profiles ENABLE ROW LEVEL SECURITY;
@@ -301,10 +394,15 @@ CREATE POLICY fiscal_profiles_finance ON kauro.fiscal_profiles FOR ALL TO kauro_
   WITH CHECK (kauro.in_finance_scope(agency_id) AND (reviewed_by_user_id IS NULL OR reviewed_by_user_id = kauro.current_user_id()));
 CREATE POLICY fiscal_profiles_payment_read ON kauro.fiscal_profiles FOR SELECT TO kauro_payment USING (agency_id = kauro.current_agency_id());
 
+-- The agency issues (CMD027, B10) and accepts (CMD028) its own quotes; it never accepts a replacement quote, which only the
+-- payment service's re-binding of the paid capture accepts (quotes_payment_rebinding, 0011; D-QUOTE-B6).
 ALTER TABLE kauro.quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.quotes FORCE ROW LEVEL SECURITY;
-CREATE POLICY quotes_tenant ON kauro.quotes FOR ALL TO kauro_app
-  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
+CREATE POLICY quotes_tenant_read ON kauro.quotes FOR SELECT TO kauro_app USING (agency_id = kauro.current_agency_id());
+CREATE POLICY quotes_tenant_issue ON kauro.quotes FOR INSERT TO kauro_app WITH CHECK (agency_id = kauro.current_agency_id());
+CREATE POLICY quotes_tenant_update ON kauro.quotes FOR UPDATE TO kauro_app
+  USING (agency_id = kauro.current_agency_id())
+  WITH CHECK (agency_id = kauro.current_agency_id() AND NOT (state = 'ACCEPTED_FOR_CHECKOUT' AND replaces_quote_id IS NOT NULL));
 CREATE POLICY quotes_finance_read ON kauro.quotes FOR SELECT TO kauro_app USING (kauro.in_finance_scope(agency_id));
 CREATE POLICY quotes_payment_read ON kauro.quotes FOR SELECT TO kauro_payment USING (agency_id = kauro.current_agency_id());
 

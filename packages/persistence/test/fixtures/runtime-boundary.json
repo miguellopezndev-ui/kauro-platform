@@ -21,9 +21,7 @@
         "SELECT"
       ],
       "kauro.capture_facts": [
-        "INSERT",
-        "SELECT",
-        "UPDATE"
+        "SELECT"
       ],
       "kauro.command_journal": [
         "INSERT",
@@ -35,9 +33,7 @@
         "SELECT"
       ],
       "kauro.commercial_authorizations": [
-        "INSERT",
-        "SELECT",
-        "UPDATE"
+        "SELECT"
       ],
       "kauro.corporate_roles": [
         "SELECT"
@@ -90,13 +86,11 @@
       ],
       "kauro.payment_attempts": [
         "INSERT",
-        "SELECT",
-        "UPDATE"
+        "SELECT"
       ],
       "kauro.payment_orders": [
         "INSERT",
-        "SELECT",
-        "UPDATE"
+        "SELECT"
       ],
       "kauro.payment_routes": [
         "SELECT"
@@ -108,6 +102,9 @@
       ],
       "kauro.price_eligibility_snapshots": [
         "INSERT",
+        "SELECT"
+      ],
+      "kauro.price_policies": [
         "SELECT"
       ],
       "kauro.processing_authorities": [
@@ -123,7 +120,9 @@
         "SELECT"
       ],
       "kauro.provider_observations": [
-        "INSERT",
+        "SELECT"
+      ],
+      "kauro.purchase_rebindings": [
         "SELECT"
       ],
       "kauro.quotes": [
@@ -132,7 +131,6 @@
         "UPDATE"
       ],
       "kauro.reconciliation_cases": [
-        "INSERT",
         "SELECT"
       ],
       "kauro.refund_policies": [
@@ -179,9 +177,6 @@
       ]
     },
     "kauro_control": {
-      "kauro.aggregate_kinds": [
-        "SELECT"
-      ],
       "kauro.capabilities": [
         "INSERT",
         "SELECT",
@@ -291,8 +286,7 @@
       ],
       "kauro.commercial_authorizations": [
         "INSERT",
-        "SELECT",
-        "UPDATE"
+        "SELECT"
       ],
       "kauro.domain_events": [
         "INSERT",
@@ -332,11 +326,18 @@
       "kauro.price_eligibility_snapshots": [
         "SELECT"
       ],
+      "kauro.price_policies": [
+        "SELECT"
+      ],
       "kauro.provider_event_exceptions": [
         "INSERT",
         "SELECT"
       ],
       "kauro.provider_observations": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.purchase_rebindings": [
         "INSERT",
         "SELECT"
       ],
@@ -409,6 +410,21 @@
         "UPDATE": [
           "consumed_at",
           "revoked_at"
+        ]
+      },
+      "kauro.payment_attempts": {
+        "UPDATE": [
+          "dispatch_deadline_at",
+          "state",
+          "updated_at",
+          "version"
+        ]
+      },
+      "kauro.payment_orders": {
+        "UPDATE": [
+          "state",
+          "updated_at",
+          "version"
         ]
       },
       "kauro.reconciliation_cases": {
@@ -511,6 +527,16 @@
           "withdrawn_at"
         ]
       },
+      "kauro.commercial_authorizations": {
+        "UPDATE": [
+          "revocation_code",
+          "revocation_phase",
+          "revoked_at",
+          "state",
+          "updated_at",
+          "version"
+        ]
+      },
       "kauro.dataset_revisions": {
         "SELECT": [
           "agency_id",
@@ -519,6 +545,7 @@
           "revision_id",
           "sealed_at",
           "state",
+          "supersedes_revision_id",
           "version"
         ]
       },
@@ -588,6 +615,14 @@
           "version"
         ]
       },
+      "kauro.quotes": {
+        "UPDATE": [
+          "state",
+          "superseded_by_quote_id",
+          "updated_at",
+          "version"
+        ]
+      },
       "kauro.refunds": {
         "UPDATE": [
           "completed_at",
@@ -640,12 +675,26 @@
     "aggregate_kinds/aggregate_kinds_read": {
       "command": "SELECT",
       "roles": [
-        "kauro_app",
-        "kauro_control",
+        "kauro_app"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "aggregate_kinds/aggregate_kinds_read_b09_payment": {
+      "command": "SELECT",
+      "roles": [
         "kauro_payment"
       ],
       "using": "true",
       "check": null
+    },
+    "aggregate_kinds/aggregate_kinds_register": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": null,
+      "check": "true"
     },
     "approvals/approvals_act": {
       "command": "INSERT",
@@ -735,13 +784,13 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
     },
-    "capture_facts/capture_facts_tenant": {
-      "command": "ALL",
+    "capture_facts/capture_facts_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
     "command_journal/command_journal_control": {
       "command": "SELECT",
@@ -791,21 +840,29 @@
       "using": "true",
       "check": null
     },
-    "commerce_scopes/commerce_scopes_payment_write": {
+    "commerce_scopes/commerce_scopes_payment_record": {
       "command": "INSERT",
       "roles": [
         "kauro_payment"
       ],
       "using": null,
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": "((agency_id = kauro.current_agency_id()) AND (scope_kind = ANY (ARRAY['REFUND'::text, 'PROVIDER_ORDER'::text, 'PROVIDER_CAPTURE'::text, 'PROVIDER_REFUND'::text])))"
     },
-    "commerce_scopes/commerce_scopes_tenant": {
-      "command": "ALL",
+    "commerce_scopes/commerce_scopes_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
+    },
+    "commerce_scopes/commerce_scopes_tenant_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (scope_kind = ANY (ARRAY['PAYMENT_ORDER'::text, 'REFUND'::text])))"
     },
     "commercial_authorizations/commercial_authorizations_finance_read": {
       "command": "SELECT",
@@ -815,21 +872,37 @@
       "using": "kauro.in_finance_scope(agency_id)",
       "check": null
     },
-    "commercial_authorizations/commercial_authorizations_payment": {
-      "command": "ALL",
+    "commercial_authorizations/commercial_authorizations_payment_issue": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'ACTIVE'::text))"
+    },
+    "commercial_authorizations/commercial_authorizations_payment_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_payment"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
-    "commercial_authorizations/commercial_authorizations_tenant": {
-      "command": "ALL",
+    "commercial_authorizations/commercial_authorizations_payment_revoke": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state <> 'REVOKED'::text))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'REVOKED'::text))"
+    },
+    "commercial_authorizations/commercial_authorizations_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
     "corporate_roles/corporate_roles_control": {
       "command": "ALL",
@@ -1161,13 +1234,29 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
     },
-    "payment_attempts/payment_attempts_tenant": {
-      "command": "ALL",
+    "payment_attempts/payment_attempts_tenant_claim": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = 'PREPARED'::text) AND (operation = ANY (ARRAY['CREATE_ORDER'::text, 'CAPTURE'::text])))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'DISPATCHING'::text))"
+    },
+    "payment_attempts/payment_attempts_tenant_intent": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'PREPARED'::text) AND (operation = ANY (ARRAY['CREATE_ORDER'::text, 'CAPTURE'::text])) AND (refund_id IS NULL) AND (evidence_hash IS NULL) AND (outcome_code IS NULL) AND (dispatch_deadline_at IS NULL))"
+    },
+    "payment_attempts/payment_attempts_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
     "payment_orders/payment_orders_finance_read": {
       "command": "SELECT",
@@ -1193,13 +1282,29 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
     },
-    "payment_orders/payment_orders_tenant": {
-      "command": "ALL",
+    "payment_orders/payment_orders_tenant_claim": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['INTENT_CREATED'::text, 'CREATED'::text, 'APPROVED'::text])))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['CREATING'::text, 'CAPTURING'::text])))"
+    },
+    "payment_orders/payment_orders_tenant_intent": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'INTENT_CREATED'::text) AND (allocated_cents = 0) AND (provider_order_id IS NULL) AND (provider_approval_url IS NULL) AND (NOT (EXISTS ( SELECT 1\n   FROM kauro.quotes q\n  WHERE ((q.agency_id = payment_orders.agency_id) AND (q.quote_id = payment_orders.quote_id) AND (q.replaces_quote_id IS NOT NULL))))))"
+    },
+    "payment_orders/payment_orders_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
     "payment_routes/payment_routes_control": {
       "command": "ALL",
@@ -1250,6 +1355,15 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
     },
+    "price_policies/price_policies_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app",
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
     "processing_authorities/processing_authorities_tenant": {
       "command": "ALL",
       "roles": [
@@ -1295,8 +1409,8 @@
       "roles": [
         "kauro_payment"
       ],
-      "using": "true",
-      "check": "true"
+      "using": "(((agency_id IS NULL) AND (kauro.current_agency_id() IS NULL)) OR (agency_id = kauro.current_agency_id()))",
+      "check": "(((agency_id IS NULL) AND (kauro.current_agency_id() IS NULL)) OR (agency_id = kauro.current_agency_id()))"
     },
     "provider_observations/provider_observations_finance_read": {
       "command": "SELECT",
@@ -1314,13 +1428,37 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
     },
-    "provider_observations/provider_observations_tenant": {
-      "command": "ALL",
+    "provider_observations/provider_observations_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "purchase_rebindings/purchase_rebindings_finance_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.in_finance_scope(agency_id)",
+      "check": null
+    },
+    "purchase_rebindings/purchase_rebindings_payment": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "purchase_rebindings/purchase_rebindings_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
     },
     "quotes/quotes_finance_read": {
       "command": "SELECT",
@@ -1338,13 +1476,37 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
-    "quotes/quotes_tenant": {
-      "command": "ALL",
+    "quotes/quotes_payment_rebinding": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.purchase_rebindings b\n  WHERE ((b.agency_id = quotes.agency_id) AND ((b.from_quote_id = quotes.quote_id) OR (b.to_quote_id = quotes.quote_id))))))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['SUPERSEDED'::text, 'ACCEPTED_FOR_CHECKOUT'::text])))"
+    },
+    "quotes/quotes_tenant_issue": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "quotes/quotes_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
+    },
+    "quotes/quotes_tenant_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "((agency_id = kauro.current_agency_id()) AND (NOT ((state = 'ACCEPTED_FOR_CHECKOUT'::text) AND (replaces_quote_id IS NOT NULL))))"
     },
     "reconciliation_cases/reconciliation_cases_finance_read": {
       "command": "SELECT",
@@ -1378,21 +1540,13 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
-    "reconciliation_cases/reconciliation_cases_tenant": {
+    "reconciliation_cases/reconciliation_cases_tenant_read": {
       "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
-    },
-    "reconciliation_cases/reconciliation_cases_tenant_open": {
-      "command": "INSERT",
-      "roles": [
-        "kauro_app"
-      ],
-      "using": null,
-      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'OPEN'::text))"
     },
     "refund_policies/refund_policies_control": {
       "command": "ALL",

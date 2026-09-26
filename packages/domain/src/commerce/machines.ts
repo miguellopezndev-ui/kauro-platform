@@ -5,7 +5,7 @@
  * CaptureFact, Refund and CommercialAuthorization carry states without a machine, and the platform records (payment routes,
  * fiscal issuer routes, corporate grants, standing refund policies, reconciliation cases) need one; decisions D-MACH-B1..B10
  * declare them here in the registry's own shape and under the registry's unlisted-transition policy — exactly as B06 declared
- * EndClient and Project (D-AGG-1, D-AGG-2) — and migrations 0008..0012 seed exactly the same initial states and edges into
+ * EndClient and Project (D-AGG-1, D-AGG-2) — and migrations 0009..0013 seed exactly the same initial states and edges into
  * kauro.state_machines / kauro.state_transitions (the persistence test proves equality).
  *
  * Every event name is unique per (machine, from state), so `transition(machine, from, event)` is a function.
@@ -34,13 +34,13 @@ export const COMMERCE_PLATFORM_MACHINES: ReadonlyArray<StateMachine> = Object.fr
     transitions: [
       { from: "DRAFT", event: "issue_quote", to: "ISSUED", guard: "Saleable scope, exact count, offered capability, customer identity and a reviewed fiscal treatment resolved (CMD027).", effect: "Freeze terms, amounts, the eligibility snapshot and both expiries." },
       { from: "DRAFT", event: "withdraw_quote", to: "WITHDRAWN", guard: "Authorized billing actor.", effect: "The draft never becomes binding." },
-      { from: "ISSUED", event: "accept_terms_for_checkout", to: "ACCEPTED_FOR_CHECKOUT", guard: "The agency names the exact termsHash inside CreatePaymentOrder (CMD028) and checkout is ready.", effect: "The accepted terms govern every order of this quote." },
+      { from: "ISSUED", event: "accept_terms_for_checkout", to: "ACCEPTED_FOR_CHECKOUT", guard: "The agency names the exact termsHash inside CreatePaymentOrder (CMD028) and checkout is ready; or, for a replacement quote, the payment service re-binds the paid capture to it under the included source replacement (D-QUOTE-B6).", effect: "The accepted terms govern every order of this quote (a replacement is never paid again)." },
       { from: "ISSUED", event: "price_expiry_reached", to: "EXPIRED", guard: "Server time passed expiresAt.", effect: "Checkout is blocked; a new quote is required." },
       { from: "ISSUED", event: "superseding_quote_issued", to: "SUPERSEDED", guard: "A new binding quote names this one.", effect: "The old offer stops; its reservation does not extend." },
       { from: "ISSUED", event: "withdraw_quote", to: "WITHDRAWN", guard: "Authorized billing or corporate actor.", effect: "The offer stops." },
-      { from: "ACCEPTED_FOR_CHECKOUT", event: "price_expiry_reached", to: "EXPIRED", guard: "No capture completed, in flight or uncertain (16 Founding incentive).", effect: "Checkout is blocked; only a proven absence of capture releases what the quote reserved." },
-      { from: "ACCEPTED_FOR_CHECKOUT", event: "superseding_quote_issued", to: "SUPERSEDED", guard: "No capture completed; pending attempts reconciled first.", effect: "The previous unpaid offer is superseded explicitly." },
-      { from: "ACCEPTED_FOR_CHECKOUT", event: "withdraw_quote", to: "WITHDRAWN", guard: "No capture completed, in flight or uncertain.", effect: "The offer stops." },
+      { from: "ACCEPTED_FOR_CHECKOUT", event: "price_expiry_reached", to: "EXPIRED", guard: "Nothing in flight or uncertain, and the purchase closed: no live entitlement and every completed capture wholly refunded or reversed (D-QUOTE-B4; 16 Founding incentive).", effect: "Checkout is blocked; only a proven absence (or complete return) of the payment releases what the quote reserved." },
+      { from: "ACCEPTED_FOR_CHECKOUT", event: "superseding_quote_issued", to: "SUPERSEDED", guard: "Nothing in flight or uncertain; the purchase closed, or re-bound to exactly this replacement (D-QUOTE-B4, D-QUOTE-B6).", effect: "The previous offer is superseded explicitly; a paid purchase continues under its replacement." },
+      { from: "ACCEPTED_FOR_CHECKOUT", event: "withdraw_quote", to: "WITHDRAWN", guard: "Nothing in flight or uncertain, and the purchase closed (no live entitlement; every completed capture wholly refunded or reversed).", effect: "The offer stops; a new quote may follow (15 Price and source expiry races: refund and issue a new quote)." },
     ],
     unlistedTransition: POLICY,
   },
@@ -91,7 +91,7 @@ export const COMMERCE_PLATFORM_MACHINES: ReadonlyArray<StateMachine> = Object.fr
     transitions: [
       { from: "ACTIVE", event: "execution_admitted", to: "CONSUMED", guard: "One logical job binds it (CMD036 ExecuteProject, package B08).", effect: "Technical retries and repairs reuse the same entitlement." },
       { from: "CONSUMED", event: "package_published", to: "DELIVERED", guard: "Atomic publication of the purchased package (package B08).", effect: "Delivery is recorded; history is kept." },
-      { from: "ACTIVE", event: "authority_revoked", to: "REVOKED", guard: "Reversal or full service refund before execution.", effect: "Prevents launch (phase PRE_EXECUTION)." },
+      { from: "ACTIVE", event: "authority_revoked", to: "REVOKED", guard: "Reversal or full service refund before execution, or the re-binding of the paid capture to its replacement quote under the included source replacement (SOURCE_REPLACED, D-QUOTE-B6).", effect: "Prevents launch (phase PRE_EXECUTION); a re-binding issues the replacement's entitlement in the same transaction." },
       { from: "CONSUMED", event: "authority_revoked", to: "REVOKED", guard: "Same, during execution.", effect: "Blocks new publication and opens reconciliation (phase DURING_EXECUTION)." },
       { from: "DELIVERED", event: "authority_revoked", to: "REVOKED", guard: "Same, after delivery.", effect: "Restricts further service; the delivered package and financial history remain (phase POST_DELIVERY)." },
     ],

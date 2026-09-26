@@ -6,7 +6,7 @@
  * refund webhook replay does not post another refund; a corrected amount is a reversal plus a new entry, never an edit).
  *
  * B09 posts only reconciled money movements, each from the domain event that records it (the event id is the idempotency
- * identity of the posting set, migration 0012 ledger_entries UNIQUE (event_id, line_no)):
+ * identity of the posting set, migration 0013 ledger_entries UNIQUE (event_id, line_no)):
  *   capture completed → DEBIT PSP_RECEIVABLE amount / CREDIT CONTRACT_LIABILITY service, TAX_PAYABLE tax,
  *                       CUSTOMER_OVERPAYMENT excess (a capture before delivery is a contract liability, not revenue: 15
  *                       "Revenue recognition follows the actual accounting policy")
@@ -67,6 +67,18 @@ export function capturePostings(allocation: RefundComponents): ReadonlyArray<Pos
 
 export function providerFeePostings(feeCents: bigint): ReadonlyArray<PostingLine> {
   return lines(line("PROCESSOR_EXPENSE", "DEBIT", feeCents), line("PSP_RECEIVABLE", "CREDIT", feeCents));
+}
+
+/**
+ * A provider availability change of captured funds (capture.funds_observed.v1, D-EVT-B2): HELD moves the receivable into the
+ * provider's hold, AVAILABLE out of it into the available provider balance — never bank cash (CMD034 failure; bank cash comes only
+ * from a settlement with bank evidence).
+ */
+export function fundsPostings(previous: "UNKNOWN" | "HELD" | "AVAILABLE", next: "HELD" | "AVAILABLE", amountCents: bigint): ReadonlyArray<PostingLine> {
+  const from: LedgerAccount = previous === "HELD" ? "PSP_HELD" : previous === "AVAILABLE" ? "PSP_AVAILABLE" : "PSP_RECEIVABLE";
+  const to: LedgerAccount = next === "HELD" ? "PSP_HELD" : "PSP_AVAILABLE";
+  if (from === to) return [];
+  return lines(line(to, "DEBIT", amountCents), line(from, "CREDIT", amountCents));
 }
 
 /** A completed refund, or a chargeback over the unrefunded components (the provider returned the money in both cases). */

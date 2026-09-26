@@ -1,5 +1,5 @@
 /**
- * Commerce ports (package B09; docs/design/B09-payments-fiscal.md §5): the repositories of migrations 0008..0012, the scope
+ * Commerce ports (package B09; docs/design/B09-payments-fiscal.md §5): the repositories of migrations 0009..0013, the scope
  * index and the commerce unit of work. They extend the B06 foundation, never fork it: a CommerceUnitOfWork IS a UnitOfWork (the
  * same transaction on the same connection, the same context binding, event publisher, command journal and security events),
  * with the commerce repositories on that connection and one more capability — adopting the scope of a stored operation
@@ -47,7 +47,10 @@ import type {
   PaymentRouteId,
   PaymentRouteRecord,
   PriceEligibilitySnapshotRecord,
+  PricePolicyRecord,
   ProviderEventExceptionRecord,
+  PurchaseRebindingId,
+  PurchaseRebindingRecord,
   ProviderObservationRecord,
   QuoteId,
   QuoteRecord,
@@ -97,8 +100,14 @@ export interface NewFiscalProfile extends Omit<FiscalProfileRecord, "supersededA
 }
 
 export interface FiscalRepository {
-  /** The current (unsuperseded) reviewed version of an agency's fiscal profile, read after its transition lock, or null. */
+  /** The current (unsuperseded) reviewed version of an agency's fiscal profile, read after its transition lock, or null (quotes, checkout). */
   currentProfile(agencyId: AgencyId): Promise<FiscalProfileRecord | null>;
+  /**
+   * The version in force at an instant — the latest recorded version whose validity covers it and that was not superseded by then
+   * (commerce/fiscal profileInForceAt; D-FISC-B4) — read after the profile's transition lock; the fiscal drafter picks a document's
+   * profile with it (the tax point: the capture's completion), never the current version (B09-F4). Null when none was in force.
+   */
+  profileInForceAt(agencyId: AgencyId, at: UtcInstant): Promise<FiscalProfileRecord | null>;
   getProfile(profileId: FiscalProfileId): Promise<FiscalProfileRecord | null>;
   /** An issuer route, read after its transition lock (a suspension orders itself with a checkout in flight). */
   getIssuer(issuerRef: FiscalIssuerRef): Promise<FiscalIssuerRecord | null>;
@@ -122,10 +131,19 @@ export interface RefundPolicyRepository {
   get(policyId: RefundPolicyId): Promise<RefundPolicyRecord | null>;
 }
 
+/** The known price policies (migration 0010 price_policies; B09-F10): read-only reference data. */
+export interface PricePolicyRepository {
+  get(policyVersion: string): Promise<PricePolicyRecord | null>;
+}
+
 // --- scope index (D-SCOPE-B1) -----------------------------------------------------------------------------------------------------
 
 export interface ScopeIndex {
-  /** Appends the scope of a new stored operation or of a newly learned provider identity (written by the operation's writer). */
+  /**
+   * Appends the scope of a new stored operation or of a newly learned provider identity (written by the operation's writer): the
+   * request handlers record PAYMENT_ORDER and REFUND rows, the payment service REFUND rows of the requests it files and the provider
+   * keys it learns — a provider key must be the identity its object learned (commerce_scopes_bind_key, D-SCOPE-B2).
+   */
   record(entry: ScopeEntry, now: UtcInstant): Promise<void>;
   /**
    * Reads one entry: the owning tenant (its own rows), the payment service (any row) or an operator holding an ACTIVE corporate
@@ -163,7 +181,10 @@ export interface NewQuote {
   readonly termsVersion: string;
   readonly issuedAt: UtcInstant;
   readonly expiresAt: UtcInstant;
+  /** The promised source availability: the SourceAvailabilityReader's effective deadline of the sealed revision (D-QUOTE-B7). */
   readonly sourceAvailableUntil: UtcInstant;
+  /** A replacement quote of the included source replacement: the paid quote whose terms it carries exactly (D-QUOTE-B6). */
+  readonly replacesQuoteId?: QuoteId;
   readonly createdByMembershipId: MembershipId;
 }
 
@@ -306,8 +327,16 @@ export interface CaptureFactRepository {
   insert(fact: NewCaptureFact): Promise<CaptureFactRecord>;
   /** A listed status move at expectedVersion + 1 (KA008 for an unlisted one, KP005 for a regression). */
   advance(captureId: CaptureId, expectedVersion: number, change: CaptureAdvance, now: UtcInstant): Promise<VersionedWrite<CaptureFactRecord>>;
-  /** Observation-only facts without a new version: provider-reported funds availability and the latest observation time. */
-  observeFunds(captureId: CaptureId, change: { readonly fundsState: FundsState; readonly observedAt: UtcInstant }): Promise<CaptureFactRecord>;
+  /**
+   * A provider-reported change of the funds' availability (HELD, AVAILABLE) at expectedVersion + 1; the caller publishes
+   * capture.funds_observed.v1 (FINANCE only; D-EVT-B2, B09-F15). Known availability never becomes unknown (KP005).
+   */
+  observeFunds(captureId: CaptureId, expectedVersion: number, change: { readonly fundsState: Exclude<FundsState, "UNKNOWN">; readonly observedAt: UtcInstant; readonly evidenceHash: Sha256Hex }, now: UtcInstant): Promise<VersionedWrite<CaptureFactRecord>>;
+  /**
+   * The fee the provider reported after the completion, learned once at expectedVersion + 1; the caller publishes
+   * capture.fee_observed.v1 (FINANCE only), never a second capture.completed.v1 (domain_events_capture_completed_once; B09-F8).
+   */
+  observeFee(captureId: CaptureId, expectedVersion: number, change: { readonly providerFeeCents: bigint; readonly observedAt: UtcInstant; readonly evidenceHash: Sha256Hex }, now: UtcInstant): Promise<VersionedWrite<CaptureFactRecord>>;
 }
 
 export interface NewProviderObservation {
@@ -344,7 +373,11 @@ export interface NewCommercialAuthorization {
   readonly projectId: ProjectId;
   readonly quoteId: QuoteId;
   readonly orderId: PaymentOrderId;
+  /** The quote the capturing order charged (quoteId itself unless the entitlement is re-bound). */
+  readonly orderQuoteId: QuoteId;
   readonly captureId: CaptureId;
+  /** The re-binding a replacement's entitlement is issued under (D-QUOTE-B6). */
+  readonly rebindingId?: PurchaseRebindingId;
   readonly approvalId: ApprovalId;
   readonly approvalHash: Sha256Hex;
   readonly planId: PlanId;
@@ -367,12 +400,28 @@ export interface AuthorizationChange {
   readonly revocation?: { readonly at: UtcInstant; readonly phase: RevocationPhase; readonly code: string };
 }
 
+/**
+ * The recorded re-bindings of paid captures to replacement quotes (migration 0011 purchase_rebindings; D-QUOTE-B6). Payment service
+ * only; append-only. `record` inserts the row (the guard KP013 checks the allowance, the intact purchase, the replacement's terms
+ * and the source lineage); the same unit of work then revokes the replaced entitlement (SOURCE_REPLACED), supersedes the replaced
+ * quote, accepts the replacement and issues its entitlement — all four checked at COMMIT.
+ */
+export interface PurchaseRebindingRepository {
+  record(rebinding: PurchaseRebindingRecord): Promise<PurchaseRebindingRecord>;
+  listForCapture(captureId: CaptureId): Promise<ReadonlyArray<PurchaseRebindingRecord>>;
+  findTo(quoteId: QuoteId): Promise<PurchaseRebindingRecord | null>;
+}
+
 export interface CommercialAuthorizationRepository {
   get(authorizationId: CommercialAuthorizationId): Promise<CommercialAuthorizationRecord | null>;
   lock(authorizationId: CommercialAuthorizationId): Promise<CommercialAuthorizationRecord | null>;
   findByQuote(quoteId: QuoteId): Promise<CommercialAuthorizationRecord | null>;
-  findByCapture(captureId: CaptureId): Promise<CommercialAuthorizationRecord | null>;
-  /** Inserts ACTIVE at version 1; the database refuses it without a completed capture that alone pays the order (KP004). */
+  /** The live (non-revoked) entitlement of a capture, if any (commercial_authorizations_one_live_per_capture). */
+  findLiveByCapture(captureId: CaptureId): Promise<CommercialAuthorizationRecord | null>;
+  /**
+   * Payment service only (B09-F1): inserts ACTIVE at version 1; the database refuses it without a completed capture that alone pays
+   * the order (KP004), and a re-bound one without its re-binding and the revocation of the entitlement it replaces.
+   */
   issue(authorization: NewCommercialAuthorization): Promise<CommercialAuthorizationRecord>;
   transition(authorizationId: CommercialAuthorizationId, expectedVersion: number, change: AuthorizationChange, now: UtcInstant): Promise<VersionedWrite<CommercialAuthorizationRecord>>;
 }
@@ -410,10 +459,19 @@ export interface RefundRepository {
   get(refundId: RefundId): Promise<RefundRecord | null>;
   lock(refundId: RefundId): Promise<RefundRecord | null>;
   listForCapture(captureId: CaptureId): Promise<ReadonlyArray<RefundRecord>>;
-  /** The REQUESTED refund of a capture, if any (refunds_one_requested_per_capture guarantees at most one). */
-  findOpenForCapture(captureId: CaptureId): Promise<RefundRecord | null>;
-  /** Inserts REQUESTED at version 1; a second open request of the capture fails the unique index (REFUND_REQUEST_OPEN). */
+  /** The REQUESTED refund of a capture and origin, if any (refunds_one_requested_per_origin guarantees at most one; D-REF-B1). */
+  findOpenForCapture(captureId: CaptureId, origin: RefundOrigin): Promise<RefundRecord | null>;
+  /**
+   * CMD031: inserts a CUSTOMER_REQUEST REQUESTED at version 1; a second open customer request of the capture fails the unique index
+   * (REFUND_REQUEST_OPEN).
+   */
   request(refund: NewRefundRequest): Promise<RefundRecord>;
+  /**
+   * The reconciler's server-originated request (EXCESS_CAPTURE, KAURO_REMEDY): INSERT ... ON CONFLICT DO NOTHING against
+   * refunds_one_requested_per_origin, so an open request of the same capture and origin is the answer (filed false) and a repeated
+   * or concurrent filing can never abort the transaction that records the capture fact it follows (B09-F3).
+   */
+  fileServerRequest(refund: NewRefundRequest): Promise<{ readonly filed: boolean; readonly record: RefundRecord }>;
   /**
    * REQUESTED → APPROVED with the immutable intent. The database takes the capture's commitment lock and refuses an amount
    * above the remaining components (KP003 → REFUND_EXCEEDS_REMAINING; READ COMMITTED only, KP009), an approver without an ACTIVE
@@ -477,9 +535,14 @@ export interface PostingSet {
   readonly sourceKind: LedgerSourceKind;
   readonly sourceRef: string;
   readonly currency: string;
+  /** The economic date of the movement. */
   readonly effectiveAt: UtcInstant;
+  /** When the platform observed the fact it posts (15 "Operational ledger"; never after the posting). */
+  readonly observedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
   readonly lines: ReadonlyArray<PostingLine>;
+  /** For a CORRECTION: the entry each reversing line mirrors (reverses_entry_id), by line position. */
+  readonly reverses?: Readonly<Record<number, LedgerEntryRecord["entryId"]>>;
 }
 
 export interface LedgerRepository {
@@ -546,8 +609,15 @@ export interface PaymentInboxRepository {
   lockForApply(inboxId: InboxId): Promise<PaymentInboxEntry | null>;
   /** The consumer outcome, once: APPLIED (with its result event), IGNORED, REJECTED or RETRYABLE (B06 guards apply). */
   settle(inboxId: InboxId, outcome: { readonly state: "APPLIED" | "IGNORED" | "REJECTED" | "RETRYABLE"; readonly resultEventId?: EventId }, now: UtcInstant): Promise<PaymentInboxEntry>;
-  /** A verified event no order of any agency can take (the owner's finance review; S058, CMD030-DENY). */
-  recordException(exception: Omit<ProviderEventExceptionRecord, "exceptionId">): Promise<ProviderEventExceptionRecord>;
+}
+
+/**
+ * Authenticated observations no order can take (the owner's finance review; S058, CMD030-DENY; B09-F9, D-ING-B3), from any source:
+ * a delivered webhook (with no agency adopted when it cannot be attributed), a dispatch response of a stored operation or a stored
+ * provider query (in the adopted agency of that operation). Idempotent per source and kind.
+ */
+export interface ProviderExceptionRepository {
+  record(exception: Omit<ProviderEventExceptionRecord, "exceptionId">): Promise<{ readonly recorded: boolean; readonly record: ProviderEventExceptionRecord }>;
 }
 
 // --- the commerce unit of work -----------------------------------------------------------------------------------------------------
@@ -557,18 +627,21 @@ export interface CommerceRepositories {
   readonly fiscal: FiscalRepository;
   readonly corporateGrants: CorporateGrantRepository;
   readonly refundPolicies: RefundPolicyRepository;
+  readonly pricePolicies: PricePolicyRepository;
   readonly quotes: QuoteRepository;
   readonly orders: PaymentOrderRepository;
   readonly attempts: PaymentAttemptRepository;
   readonly captures: CaptureFactRepository;
   readonly observations: ProviderObservationRepository;
   readonly authorizations: CommercialAuthorizationRepository;
+  readonly rebindings: PurchaseRebindingRepository;
   readonly refunds: RefundRepository;
   readonly taxDocuments: TaxDocumentRepository;
   readonly ledger: LedgerRepository;
   readonly settlements: SettlementRepository;
   readonly cases: ReconciliationCaseRepository;
   readonly inbox: PaymentInboxRepository;
+  readonly exceptions: ProviderExceptionRepository;
 }
 
 export interface CommerceUnitOfWork extends UnitOfWork {

@@ -17,6 +17,13 @@ test("the committed matrix is the generated one and every source check passes: e
   for (const id of sources.served) assert.ok(generateMatrix(sources).includes(`### ${id} `), id);
 });
 
+test("B09-F17: the CostGrant funding edge is not claimed by the payments package, which funds no cost grant (Q-B09-9)", () => {
+  const edge = EDGE_OWNERS.CostGrant.actual_authorization_and_funding;
+  assert.notEqual(edge.owner, "B09");
+  assert.equal(edge.owner, "B03");
+  assert.match(edge.why, /Q-B09-9/);
+});
+
 test("an unowned edge, an owner of an edge the machine does not list, an unknown command, an unregistered event and a served edge naming an event its handler never publishes fail the check", () => {
   const unowned = clone(EDGE_OWNERS);
   delete unowned.Plan.withdraw_plan;

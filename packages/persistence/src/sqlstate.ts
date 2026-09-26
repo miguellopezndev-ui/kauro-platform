@@ -1,6 +1,6 @@
 /**
  * SQLSTATE vocabulary raised by the kauro schema (migrations/0001; the KP class of the payments and fiscal workflow, migrations
- * 0008..0012, package B09) and its translation into the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
+ * 0009..0013, package B09) and its translation into the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
  * the SQL message never leaves the server (10 "Responses and safe errors").
  */
 import { DomainFailure, type FailureCode, type FailureReason } from "@kauro/domain";
@@ -24,7 +24,7 @@ export const SQLSTATE = Object.freeze({
   // a live approval on a plan that is not APPROVED under it (migration 0004, the deferred constraint triggers
   // plans_live_approval_binding and approvals_live_approval_binding; decision D-PLAN-4)
   LIVE_APPROVAL_UNBOUND: "KA020",
-  // package B09 (migrations 0008..0012; docs/design/B09-payments-fiscal.md §7.3): the database backstops of the commerce rules
+  // package B09 (migrations 0009..0013; docs/design/B09-payments-fiscal.md §7): the database backstops of the commerce rules
   LEDGER_UNBALANCED: "KP001",
   OBLIGATION_OVER_ALLOCATED: "KP002",
   REFUND_EXCEEDS_REMAINING: "KP003",
@@ -36,6 +36,8 @@ export const SQLSTATE = Object.freeze({
   COMMITMENT_ISOLATION: "KP009",
   POLICY_NOT_APPLICABLE: "KP010",
   FISCAL_VALIDATION_REFUSED: "KP011",
+  REFUND_TAX_INCONSISTENT: "KP012",
+  REPLACEMENT_REFUSED: "KP013",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -74,6 +76,10 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP009: { code: "INTEGRITY_FAILURE", reason: "COMMITMENT_ISOLATION" },
   KP010: { code: "ASSURANCE_REQUIRED", reason: "POLICY_NOT_APPLICABLE" },
   KP011: { code: "INTEGRITY_FAILURE", reason: "FISCAL_VALIDATION_REFUSED" },
+  // a racing approval of another refund of the capture can change the basis the tax follows (D-REF-B6)
+  KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
+  // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
+  KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },

@@ -1,5 +1,5 @@
 /**
- * Commerce records as the domain sees them (package B09; migrations 0008..0012): the registry contracts Quote,
+ * Commerce records as the domain sees them (package B09; migrations 0009..0013): the registry contracts Quote,
  * PriceEligibilitySnapshot, PaymentOrder, PaymentAttempt, CaptureFact, CommercialAuthorization, Refund, Settlement,
  * FiscalProfile, TaxDocument and LedgerEntry plus the columns the platform needs for concurrency, lineage and exact bindings,
  * and the platform records (payment routes, fiscal issuers, corporate grants, standing refund policies, the scope index,
@@ -31,6 +31,8 @@ export type SettlementId = Branded<string, "SettlementId">;
 export type ReconciliationCaseId = Branded<string, "ReconciliationCaseId">;
 export type CorporateGrantId = Branded<string, "CorporateGrantId">;
 export type ProviderExceptionId = Branded<string, "ProviderExceptionId">;
+/** The recorded re-binding of a paid capture to a replacement quote (the included source replacement; D-QUOTE-B6). */
+export type PurchaseRebindingId = Branded<string, "PurchaseRebindingId">;
 /** A stored provider evidence artifact (the restricted reconciliation store; CMD030 providerEventArtifactRef, CMD034 observationRef). */
 export type EvidenceArtifactRef = Branded<string, "EvidenceArtifactRef">;
 /** A job of the processing package (B08); B09 records it opaquely on the authorization it consumes. */
@@ -78,11 +80,26 @@ export type ReconciliationCaseKind =
   | "UNRECOGNIZED_PROVIDER_STATE"
   | "PROVIDER_INCONSISTENCY"
   | "REVERSAL"
-  | "FEE_MISMATCH";
-export type ProviderExceptionKind = "UNKNOWN_PROVIDER_REFERENCE" | "WRONG_PAYEE" | "WRONG_CURRENCY" | "WRONG_ENVIRONMENT" | "UNRECOGNIZED_PROVIDER_STATE" | "BODY_CONFLICT";
+  | "FEE_MISMATCH"
+  /** A dispute in progress whose funds the provider holds; the capture stays COMPLETED until actually reversed (D-DISPUTE-B1). */
+  | "DISPUTE_OPEN";
+/**
+ * Why an authenticated provider observation became an exception instead of a fact (migration 0012 provider_event_exceptions): every
+ * CaptureMismatch of commerce/capture (WRONG_PROVIDER, WRONG_ENVIRONMENT, WRONG_ORDER, WRONG_PAYEE, WRONG_CURRENCY) plus the
+ * ingress's own kinds (an unknown reference or a conflicting body of a delivered event) and an unrecognized status (B09-F9).
+ */
+export type ProviderExceptionKind =
+  | "UNKNOWN_PROVIDER_REFERENCE"
+  | "WRONG_PROVIDER"
+  | "WRONG_ORDER"
+  | "WRONG_PAYEE"
+  | "WRONG_CURRENCY"
+  | "WRONG_ENVIRONMENT"
+  | "UNRECOGNIZED_PROVIDER_STATE"
+  | "BODY_CONFLICT";
 export type ObservationSource = "DISPATCH_RESPONSE" | "WEBHOOK" | "PROVIDER_QUERY";
 export type ObservationEffect = "ADVANCED" | "NO_CHANGE" | "STALE_IGNORED" | "DUPLICATE" | "MISMATCH" | "UNRECOGNIZED";
-/** The scope index kinds (migration 0008 commerce_scopes; D-SCOPE-B1). */
+/** The scope index kinds (migration 0009 commerce_scopes; D-SCOPE-B1). */
 export type ScopeKind = "PAYMENT_ORDER" | "REFUND" | "PROVIDER_ORDER" | "PROVIDER_CAPTURE" | "PROVIDER_REFUND";
 /** Corporate roles of the command catalogue this package authorizes (the catalogue's owner role, brand-mapped by amendment A2). */
 export type CorporateRole = "KAURO_OWNER";
@@ -144,12 +161,31 @@ export interface RefundPolicyRecord {
   readonly validUntil?: UtcInstant;
 }
 
-/** One row of the scope index: the agency of a stored operation or of a provider identity (identifiers only). */
+/**
+ * One row of the scope index: the agency of a stored operation or of a provider identity (identifiers only). Every row names its
+ * order, and its capture (PROVIDER_CAPTURE) or refund (REFUND, PROVIDER_REFUND); a provider key is the identity that object learned
+ * (migration 0012 commerce_scopes_bind_key; B09-F11, D-SCOPE-B2).
+ */
 export interface ScopeEntry {
   readonly kind: ScopeKind;
   readonly key: string;
   readonly agencyId: AgencyId;
-  readonly orderId: PaymentOrderId | null;
+  readonly orderId: PaymentOrderId;
+  readonly captureId?: CaptureId;
+  readonly refundId?: RefundId;
+}
+
+/**
+ * A known price policy (migration 0010 price_policies; B09-F10): durations in exact seconds (reference/HASHING "Retention formulas":
+ * a duration day is 86400 s), the founding rate and the included pre-execution source replacements.
+ */
+export interface PricePolicyRecord {
+  readonly policyVersion: string;
+  readonly quoteSeconds: number;
+  readonly repeatLookbackSeconds: number;
+  readonly foundingDiscountBps: number;
+  readonly preExecutionReplacementsIncluded: number;
+  readonly unpaidSourceHardSeconds: number;
 }
 
 // --- fiscal profile ---------------------------------------------------------------------------------------------------------------
@@ -216,6 +252,8 @@ export interface QuoteRecord {
   readonly expiresAt: UtcInstant;
   readonly sourceAvailableUntil: UtcInstant;
   readonly supersededByQuoteId?: QuoteId;
+  /** A replacement quote names the paid quote it replaces and carries exactly its commercial terms (D-QUOTE-B6). */
+  readonly replacesQuoteId?: QuoteId;
   readonly createdByMembershipId: MembershipId;
   readonly createdAt: UtcInstant;
   readonly updatedAt: UtcInstant;
@@ -345,7 +383,11 @@ export interface CommercialAuthorizationRecord {
   readonly projectId: ProjectId;
   readonly quoteId: QuoteId;
   readonly orderId: PaymentOrderId;
+  /** The quote the capturing order charged: quoteId itself, or the replaced quote of a re-bound entitlement (D-QUOTE-B6). */
+  readonly orderQuoteId: QuoteId;
   readonly captureId: CaptureId;
+  /** The re-binding that allocated the capture to this (replacement) quote, when the entitlement is a re-bound one. */
+  readonly rebindingId?: PurchaseRebindingId;
   readonly approvalId: ApprovalId;
   readonly approvalHash: Sha256Hex;
   readonly planId: PlanId;
@@ -364,8 +406,30 @@ export interface CommercialAuthorizationRecord {
   readonly deliveredAt?: UtcInstant;
   readonly revokedAt?: UtcInstant;
   readonly revocationPhase?: RevocationPhase;
-  /** A server token (CAPTURE_REVERSED, SERVICE_FULLY_REFUNDED); never customer text. */
+  /** A server token (CAPTURE_REVERSED, SERVICE_FULLY_REFUNDED, SOURCE_REPLACED); never customer text. */
   readonly revocationCode?: string;
+  readonly createdAt: UtcInstant;
+}
+
+/**
+ * The recorded allocation of one paid capture from the quote it paid to a replacement quote under the included pre-execution source
+ * replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18; migration 0011 purchase_rebindings).
+ */
+export interface PurchaseRebindingRecord {
+  readonly rebindingId: PurchaseRebindingId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly orderId: PaymentOrderId;
+  readonly captureId: CaptureId;
+  readonly fromQuoteId: QuoteId;
+  readonly fromAuthorizationId: CommercialAuthorizationId;
+  readonly toQuoteId: QuoteId;
+  /** 1 for the first included replacement of the capture; bounded by the price policy's included replacements. */
+  readonly allowanceOrdinal: number;
+  readonly reasonCode: "PRE_EXECUTION_SOURCE_REPLACEMENT";
+  /** The source lifecycle's lineage evidence (SourceLineageReader, provided by the upload package B07). */
+  readonly lineageEvidenceHash: Sha256Hex;
+  readonly requestedByMembershipId: MembershipId;
   readonly createdAt: UtcInstant;
 }
 
@@ -461,7 +525,12 @@ export type LedgerAccount =
   | "COMMISSION_EXPENSE"
   | "OWNER_CONTRIBUTION"
   | "OWNER_DISTRIBUTION";
-export type LedgerSourceKind = "CAPTURE" | "REFUND" | "FEE" | "CHARGEBACK" | "SETTLEMENT" | "CORRECTION";
+/**
+ * The kind of movement a posting set records and the event that may source it (migration 0013 ledger_entries_source_event): CAPTURE
+ * capture.completed.v1, FEE capture.fee_observed.v1, FUNDS capture.funds_observed.v1, CHARGEBACK capture.reversed.v1, REFUND
+ * refund.completed.v1, CORRECTION reconciliation_case.resolved.v1 (or a settlement's own correction), SETTLEMENT a settlement.
+ */
+export type LedgerSourceKind = "CAPTURE" | "REFUND" | "FEE" | "FUNDS" | "CHARGEBACK" | "SETTLEMENT" | "CORRECTION";
 
 export interface LedgerEntryRecord {
   readonly entryId: LedgerEntryId;
@@ -479,7 +548,10 @@ export interface LedgerEntryRecord {
   readonly sourceKind: LedgerSourceKind;
   readonly sourceRef: string;
   readonly reversesEntryId?: LedgerEntryId;
+  /** The economic date of the movement. */
   readonly effectiveAt: UtcInstant;
+  /** When the platform observed the fact it posts (15 "Operational ledger": every posting includes its observed date). */
+  readonly observedAt: UtcInstant;
   readonly postedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
   readonly policyVersion: string;
@@ -522,9 +594,19 @@ export interface ReconciliationCaseRecord {
   readonly resolutionCode?: string;
 }
 
+/**
+ * An authenticated observation no order can take (B09-F9, D-ING-B3): its source is exactly one of a delivered webhook (its inbox
+ * record; possibly unattributed), a dispatch response of a stored operation (its attempt) or a stored provider query (its
+ * artifact); the latter two are attributed to the stored operation's order and agency.
+ */
 export interface ProviderEventExceptionRecord {
   readonly exceptionId: ProviderExceptionId;
-  readonly inboxId: InboxId;
+  readonly source: ObservationSource;
+  readonly agencyId?: AgencyId;
+  readonly orderId?: PaymentOrderId;
+  readonly inboxId?: InboxId;
+  readonly attemptId?: PaymentAttemptId;
+  readonly artifactRef?: EvidenceArtifactRef;
   readonly provider: string;
   readonly environment: "LOCAL" | "SANDBOX" | "LIVE";
   readonly kind: ProviderExceptionKind;

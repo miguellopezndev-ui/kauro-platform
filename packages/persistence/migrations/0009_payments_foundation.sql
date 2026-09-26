@@ -1,7 +1,7 @@
--- 0008 — payments foundation (package B09, payments and fiscal workflow): the payment service's runtime group, the finance
--- scope of a corporate operator, the aggregate-kind registry and the event binding over it, the B09 event types, the platform
--- configuration (merchant routes, fiscal issuer routes, corporate grants, standing refund policies), the scope index, and the
--- policies B09 adds to B06 tables for its two new principals.
+-- 0009 — payments foundation (package B09, payments and fiscal workflow): the payment service's runtime group, the finance
+-- scope of a corporate operator, the payment service's read of the shared aggregate-kind registry (foundation 0008), the B09
+-- event types, the platform configuration (merchant routes, fiscal issuer routes, corporate grants, standing refund policies),
+-- the scope index, and the policies B09 adds to B06 tables for its two new principals.
 --
 -- Authority: 07 "Aggregate ownership" (Quote owns immutable commercial terms; PaymentOrder, PaymentAttempt, PaymentTransaction
 -- and Refund own provider effects; CommercialAuthorization links valid payment and approved scope to one logical processing
@@ -12,13 +12,16 @@
 -- COMMAND_CATALOGUE "Shared execution contract" (service commands require a verified service identity, with scope derived from
 -- the stored operation), 15 "Initial payment decision", "Accounting integration decision", "FiscalProfile", 19 "BusinessProfile
 -- and legal facts". Design: docs/design/B09-payments-fiscal.md (D-CTX-B1, D-CTX-B2, D-SCOPE-B1, D-EVT-B1, D-ROUTE-B1,
--- D-CORP-B1, D-RPOL-B1, D-ING-B1). This file references only B05/B06 objects; it is renumbered when B09 merges.
+-- D-CORP-B1, D-RPOL-B1, D-ING-B1). This file references only B05/B06 objects and the foundation's registry (0008), never a
+-- table of a package built in parallel (FOUNDATION D-AGGK-5: B09 numbers its migrations 0009..0013 on its own branch; the
+-- integrator renumbers the second package to merge).
 --
 -- SQLSTATE vocabulary added by B09 (a class of its own beside B06's KA0nn; sqlstate.ts maps each):
 --   KP001 LEDGER_UNBALANCED          KP002 OBLIGATION_OVER_ALLOCATED   KP003 REFUND_EXCEEDS_REMAINING
 --   KP004 AUTHORITY_WITHOUT_CAPTURE  KP005 FACT_REGRESSION             KP006 AUTHORITY_OUTLIVES_REVERSAL
 --   KP007 CORPORATE_ROLE_MISSING     KP008 SELF_APPROVAL_FORBIDDEN     KP009 COMMITMENT_ISOLATION
---   KP010 POLICY_NOT_APPLICABLE      KP011 FISCAL_VALIDATION_REFUSED
+--   KP010 POLICY_NOT_APPLICABLE      KP011 FISCAL_VALIDATION_REFUSED   KP012 REFUND_TAX_INCONSISTENT
+--   KP013 REPLACEMENT_REFUSED
 
 -- --- the payment service's runtime group (D-CTX-B1) ------------------------------------------------------------------------------
 -- kauro_payment is the payment service: the executor of refunds and the reconciler (CMD033, CMD034), the consumer of payment
@@ -150,65 +153,17 @@ BEGIN
 END
 $$;
 
--- --- aggregate-kind registry and the event binding over it (D-EVT-B1) ---------------------------------------------------------------
--- B06 fixed domain_events.aggregate_kind with a CHECK and bound every event to its aggregate with one CASE branch per kind. Every
--- package adds aggregates, so both become data: a registered kind names its table and id column, the foreign key refuses an
--- unregistered kind, and kauro.domain_events_bind_aggregate reads the registered table. The binding keeps B06's rule exactly
--- (review R3): the aggregate exists in the event's agency, visible to the writer under the writer's own policies (the function
--- is SECURITY INVOKER), and already carries the version the event records; an unknown and a foreign aggregate look alike
--- (KA006). The identifiers come from this migration-owned table, never from a request (08 "Dynamic SQL based on customer input
--- is prohibited"); no runtime role may write it. A later package registers its kinds as rows and never edits the function.
-CREATE TABLE kauro.aggregate_kinds (
-  aggregate_kind  text PRIMARY KEY CHECK (aggregate_kind ~ '^[a-z][a-z_]{1,62}$'),
-  table_name      text NOT NULL UNIQUE CHECK (table_name ~ '^[a-z][a-z_]{1,62}$'),
-  id_column       text NOT NULL CHECK (id_column ~ '^[a-z][a-z_]{1,62}$')
-);
-INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column) VALUES
-  ('agency', 'agencies', 'agency_id'),
-  ('membership', 'memberships', 'membership_id'),
-  ('end_client', 'end_clients', 'client_id'),
-  ('project', 'projects', 'project_id'),
-  ('dataset_revision', 'dataset_revisions', 'revision_id'),
-  ('plan', 'plans', 'plan_id'),
-  ('approval', 'approvals', 'approval_id'),
-  ('quote', 'quotes', 'quote_id'),
-  ('payment_order', 'payment_orders', 'order_id'),
-  ('payment_attempt', 'payment_attempts', 'attempt_id'),
-  ('capture', 'capture_facts', 'capture_id'),
-  ('commercial_authorization', 'commercial_authorizations', 'authorization_id'),
-  ('refund', 'refunds', 'refund_id'),
-  ('tax_document', 'tax_documents', 'document_id'),
-  ('reconciliation_case', 'reconciliation_cases', 'case_id');
-ALTER TABLE kauro.aggregate_kinds ENABLE ROW LEVEL SECURITY;
-ALTER TABLE kauro.aggregate_kinds FORCE ROW LEVEL SECURITY;
-CREATE POLICY aggregate_kinds_read ON kauro.aggregate_kinds FOR SELECT TO kauro_app, kauro_control, kauro_payment USING (true);
-GRANT SELECT ON kauro.aggregate_kinds TO kauro_app, kauro_control, kauro_payment;
-
-ALTER TABLE kauro.domain_events DROP CONSTRAINT domain_events_aggregate_kind_check;
-ALTER TABLE kauro.domain_events ADD CONSTRAINT domain_events_aggregate_kind_fkey FOREIGN KEY (aggregate_kind) REFERENCES kauro.aggregate_kinds (aggregate_kind);
-
-CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
-  LANGUAGE plpgsql SET search_path = pg_catalog AS
-$$
-DECLARE
-  target record;
-  current_version bigint;
-BEGIN
-  SELECT k.table_name, k.id_column INTO target FROM kauro.aggregate_kinds k WHERE k.aggregate_kind = NEW.aggregate_kind;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'CONTEXT: aggregate kind % has no binding', NEW.aggregate_kind USING ERRCODE = 'KA006';
-  END IF;
-  EXECUTE format('SELECT version FROM kauro.%I WHERE %I = $1 AND agency_id = $2', target.table_name, target.id_column)
-    INTO current_version USING NEW.aggregate_id, NEW.agency_id;
-  IF current_version IS NULL THEN
-    RAISE EXCEPTION 'CONTEXT: % % is not an aggregate of agency % visible in this transaction', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
-  END IF;
-  IF NEW.aggregate_version > current_version THEN
-    RAISE EXCEPTION 'VERSION_DISCIPLINE: an event of % % records version % ahead of the aggregate (version %)', NEW.aggregate_kind, NEW.aggregate_id, NEW.aggregate_version, current_version USING ERRCODE = 'KA002';
-  END IF;
-  RETURN NEW;
-END
-$$;
+-- --- the shared aggregate-kind registry (foundation migration 0008; FOUNDATION D-AGGK-1..D-AGGK-5; B09 D-EVT-B1) ------------------
+-- The kinds are rows of kauro.aggregate_kinds, owned by the foundation (0008): this package never edits that table, its foreign
+-- key or kauro.domain_events_bind_aggregate. Each B09 kind is registered with one INSERT by the migration that creates its table
+-- (quote 0010; payment_order, payment_attempt, capture, commercial_authorization 0011; refund, reconciliation_case 0012;
+-- tax_document 0013), after the table exists (aggregate_kinds_bind_catalog checks the table, its uuid key, agency_id and
+-- version). The binding is SECURITY INVOKER, so the payment service — a runtime group that appends events (domain_events_payment
+-- below) — reads the registry as itself: it gets SELECT and a read policy of its own here (FOUNDATION §4 and D-AGGK-3: never by
+-- altering the foundation's aggregate_kinds_read). The request handlers (kauro_app, whose finance scope also appends commerce
+-- events) already read it through the foundation's policy; the control plane appends no commerce event and reads nothing here.
+GRANT SELECT ON kauro.aggregate_kinds TO kauro_payment;
+CREATE POLICY aggregate_kinds_read_b09_payment ON kauro.aggregate_kinds FOR SELECT TO kauro_payment USING (true);
 
 -- --- B09 event types (design §9; mirrored by @kauro/domain COMMERCE_EVENT_TYPES; the persistence test proves equality) --------------
 -- event_types is FORCE ROW LEVEL SECURITY with read-only policies, so even its owner cannot insert: the vocabulary is extended by
@@ -225,6 +180,9 @@ INSERT INTO kauro.event_types (event_type) VALUES
   ('payment_attempt.confirmed.v1'), ('payment_attempt.failed_no_effect.v1'), ('payment_attempt.uncertain.v1'),
   ('payment_attempt.cancelled_before_dispatch.v1'),
   ('capture.pending.v1'), ('capture.completed.v1'), ('capture.denied.v1'), ('capture.reversed.v1'),
+  -- a provider fact learned after the status (a fee, the availability of the funds) is a new capture version with an event of its
+  -- own, never a second capture.completed.v1 (B09-F8, B09-F15; D-EVT-B2)
+  ('capture.fee_observed.v1'), ('capture.funds_observed.v1'),
   ('commercial_authorization.issued.v1'), ('commercial_authorization.consumed.v1'), ('commercial_authorization.delivered.v1'),
   ('commercial_authorization.revoked.v1'),
   ('refund.requested.v1'), ('refund.approved.v1'), ('refund.rejected.v1'), ('refund.submitting.v1'), ('refund.uncertain.v1'),
@@ -421,11 +379,18 @@ INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES ('Ref
 -- on (the catalogue's "scope derived from the stored operation"), a corporate owner reads the refund rows to adopt the finance
 -- scope of the refund it reviews; nobody updates or deletes them, and a provider identity maps to exactly one agency (PaymentOrder
 -- invariant "order identity cannot migrate between tenants").
+--
+-- Every row is bound to the object it indexes (B09-F11): it names its order, and its capture or refund by kind; the composite
+-- foreign keys to payment_orders, capture_facts and refunds (agency in the key, so a row can never point into another agency)
+-- are added by the migrations that create those tables (0011, 0012), and a provider key must be the provider identity that object
+-- actually learned (commerce_scopes_bind_key, 0012). A platform key is the object's own id (commerce_scopes_platform_key).
 CREATE TABLE kauro.commerce_scopes (
   scope_kind  text NOT NULL CHECK (scope_kind IN ('PAYMENT_ORDER', 'REFUND', 'PROVIDER_ORDER', 'PROVIDER_CAPTURE', 'PROVIDER_REFUND')),
   scope_key   text NOT NULL CHECK (length(scope_key) BETWEEN 1 AND 400),
   agency_id   uuid NOT NULL REFERENCES kauro.agencies (agency_id),
-  order_id    uuid,
+  order_id    uuid NOT NULL,
+  capture_id  uuid,
+  refund_id   uuid,
   created_at  timestamptz NOT NULL,
   PRIMARY KEY (scope_kind, scope_key),
   -- platform ids are the uuid itself; provider ids are "<provider>|<ENVIRONMENT>|<external id>"
@@ -433,7 +398,17 @@ CREATE TABLE kauro.commerce_scopes (
     (scope_kind IN ('PAYMENT_ORDER', 'REFUND') AND scope_key ~ '^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
     OR (scope_kind IN ('PROVIDER_ORDER', 'PROVIDER_CAPTURE', 'PROVIDER_REFUND') AND scope_key ~ '^[a-z][a-z0-9_-]{1,63}\|(SANDBOX|LIVE)\|[A-Za-z0-9._:-]+$')
   ),
-  CONSTRAINT commerce_scopes_order_binding CHECK ((scope_kind = 'PAYMENT_ORDER' AND order_id::text = scope_key) OR scope_kind <> 'PAYMENT_ORDER')
+  -- the subject each kind names: an order (PAYMENT_ORDER, PROVIDER_ORDER), a capture of it, or a refund of it
+  CONSTRAINT commerce_scopes_subject CHECK (
+    (scope_kind IN ('PAYMENT_ORDER', 'PROVIDER_ORDER') AND capture_id IS NULL AND refund_id IS NULL)
+    OR (scope_kind = 'PROVIDER_CAPTURE' AND capture_id IS NOT NULL AND refund_id IS NULL)
+    OR (scope_kind IN ('REFUND', 'PROVIDER_REFUND') AND refund_id IS NOT NULL AND capture_id IS NULL)
+  ),
+  CONSTRAINT commerce_scopes_platform_key CHECK (
+    (scope_kind = 'PAYMENT_ORDER' AND scope_key = order_id::text)
+    OR (scope_kind = 'REFUND' AND scope_key = refund_id::text)
+    OR scope_kind IN ('PROVIDER_ORDER', 'PROVIDER_CAPTURE', 'PROVIDER_REFUND')
+  )
 );
 CREATE INDEX commerce_scopes_by_agency ON kauro.commerce_scopes (agency_id, scope_kind);
 CREATE TRIGGER commerce_scopes_append_only BEFORE UPDATE OR DELETE ON kauro.commerce_scopes
@@ -462,12 +437,17 @@ CREATE POLICY refund_policies_control ON kauro.refund_policies FOR ALL TO kauro_
 
 ALTER TABLE kauro.commerce_scopes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.commerce_scopes FORCE ROW LEVEL SECURITY;
-CREATE POLICY commerce_scopes_tenant ON kauro.commerce_scopes FOR ALL TO kauro_app
-  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
+-- The request handlers record only the platform ids of the operations they create (CMD028's order, CMD031's refund); a provider
+-- identity is learned only from an authenticated provider result, which only the payment service applies (B09-F1, B09-F11). The
+-- payment service records the provider identities and the refunds it files (EXCESS_CAPTURE, KAURO_REMEDY), never an order.
+CREATE POLICY commerce_scopes_tenant_read ON kauro.commerce_scopes FOR SELECT TO kauro_app USING (agency_id = kauro.current_agency_id());
+CREATE POLICY commerce_scopes_tenant_record ON kauro.commerce_scopes FOR INSERT TO kauro_app
+  WITH CHECK (agency_id = kauro.current_agency_id() AND scope_kind IN ('PAYMENT_ORDER', 'REFUND'));
 CREATE POLICY commerce_scopes_operator_read ON kauro.commerce_scopes FOR SELECT TO kauro_app
   USING (scope_kind = 'REFUND' AND kauro.holds_corporate_role('KAURO_OWNER'));
 CREATE POLICY commerce_scopes_payment_read ON kauro.commerce_scopes FOR SELECT TO kauro_payment USING (true);
-CREATE POLICY commerce_scopes_payment_write ON kauro.commerce_scopes FOR INSERT TO kauro_payment WITH CHECK (agency_id = kauro.current_agency_id());
+CREATE POLICY commerce_scopes_payment_record ON kauro.commerce_scopes FOR INSERT TO kauro_payment
+  WITH CHECK (agency_id = kauro.current_agency_id() AND scope_kind IN ('REFUND', 'PROVIDER_ORDER', 'PROVIDER_CAPTURE', 'PROVIDER_REFUND'));
 CREATE POLICY commerce_scopes_control ON kauro.commerce_scopes FOR SELECT TO kauro_control USING (true);
 
 -- --- policies and grants B09 adds to B06 tables -------------------------------------------------------------------------------------------------
@@ -534,7 +514,8 @@ GRANT SELECT (agency_id, version, state) ON kauro.agencies TO kauro_payment;
 GRANT SELECT (project_id, agency_id, client_id, version, state, mode, capability_id, capability_version, current_revision_id) ON kauro.projects TO kauro_payment;
 GRANT SELECT (plan_id, agency_id, project_id, version, state, revision_hash, target_contract_hash, policy_hash, body_hash, validation_receipt_hash, approval_id, superseded_by_plan_id) ON kauro.plans TO kauro_payment;
 GRANT SELECT (approval_id, agency_id, plan_id, version, plan_hash, revision_hash, target_contract_hash, approval_hash, created_at, withdrawn_at) ON kauro.approvals TO kauro_payment;
-GRANT SELECT (revision_id, agency_id, project_id, version, state, manifest_hash, sealed_at) ON kauro.dataset_revisions TO kauro_payment;
+-- supersedes_revision_id: the lineage a paid capture's re-binding to a replacement revision is checked against (D-QUOTE-B6)
+GRANT SELECT (revision_id, agency_id, project_id, version, state, manifest_hash, sealed_at, supersedes_revision_id) ON kauro.dataset_revisions TO kauro_payment;
 GRANT SELECT (contract_id, agency_id, project_id, mode, body_hash, confirmed_at, superseded_at) ON kauro.target_contracts TO kauro_payment;
 GRANT SELECT ON kauro.capabilities TO kauro_payment;
 GRANT SELECT, INSERT ON kauro.domain_events TO kauro_payment;

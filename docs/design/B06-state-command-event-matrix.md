@@ -16,7 +16,7 @@ Registry: commands.json `6fa1a124821609a5ac911779304e8876df1a6954c530e895604da10
 
 `Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the
 edge, the owning package and why. `B06` says what the platform serves: **route** — a served command performs it;
-**database** — the schema (B06's migrations, or package B09's 0008..0012) stores the aggregate and seeds the edge in
+**database** — the schema (B06's migrations, or package B09's 0009..0013) stores the aggregate and seeds the edge in
 `kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and checked;
 **—** — the aggregate is not stored yet.
 
@@ -208,7 +208,7 @@ registry machine; initial PREPARED; terminal CLOSED, EXPIRED; unlisted edges: RE
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
 | — | (initial PREPARED) | PREPARED | B03: the durable audit request reserves a grant (CMD020 StartAudit) | — (no event type registered: the owning package registers it with the edge) | — |
-| PREPARED | actual_authorization_and_funding | AUTHORIZED | B09: funding evidence | — (no event type registered: the owning package registers it with the edge) | — |
+| PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9) | — (no event type registered: the owning package registers it with the edge) | — |
 | AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B03: bounded reservations | — (no event type registered: the owning package registers it with the edge) | — |
 | EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B03: reconciled reservations | — (no event type registered: the owning package registers it with the edge) | — |
 | AUTHORIZED | expiry_reached | EXPIRED | B03: the grant's expiry | — (no event type registered: the owning package registers it with the edge) | — |
@@ -282,12 +282,12 @@ platform machine (B09 decision D-MACH-B1); initial DRAFT; terminal EXPIRED, SUPE
 | — | (initial DRAFT) | DRAFT | CMD027 CreateQuote (B10); drafted and issued in one transaction | quote.drafted.v1 | database |
 | DRAFT | issue_quote | ISSUED | CMD027 CreateQuote (B10) | quote.issued.v1 | database |
 | DRAFT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
-| ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09) | quote.accepted_for_checkout.v1 | database |
+| ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09); a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6) | quote.accepted_for_checkout.v1 | database |
 | ISSUED | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
-| ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created | quote.superseded.v1 | database |
+| ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | database |
 | ISSUED | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
 | ACCEPTED_FOR_CHECKOUT | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
-| ACCEPTED_FOR_CHECKOUT | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created | quote.superseded.v1 | database |
+| ACCEPTED_FOR_CHECKOUT | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | database |
 | ACCEPTED_FOR_CHECKOUT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
 
 ### PaymentOrder

@@ -200,3 +200,15 @@ test("every B09 outcome names a registered failure code and reason, and every co
   // CMD032: a standing policy is referenced, never invented; otherwise a fresh step-up of the approver
   assert.ok(COMMERCE_COMMAND_OUTCOMES.CMD032.some((o) => o.code === "ASSURANCE_REQUIRED" && o.reason === "POLICY_NOT_APPLICABLE"));
 });
+
+test("B09-F1/B09-F5/B09-F6: a provider effect is settled by the payment service; checkout and capture answer CAPACITY_UNAVAILABLE without deliverable capacity; an approval whose tax does not follow its service is refused", () => {
+  // the settle step (T3) of every provider-effect command runs under kauro_payment, whatever principal asked for the effect
+  for (const id of IN_SCOPE) {
+    const spec = COMMERCE_COMMANDS[id];
+    assert.equal(spec.settleRuntimeRole, spec.externalEffect === "NONE" ? null : "kauro_payment", id);
+  }
+  for (const id of ["CMD028", "CMD029"] as const) {
+    assert.ok(COMMERCE_COMMAND_OUTCOMES[id].some((o) => o.code === "CAPACITY_UNAVAILABLE" && o.reason === "DELIVERY_CAPACITY_UNAVAILABLE" && o.layer === "COMMAND"), id);
+  }
+  assert.ok(COMMERCE_COMMAND_OUTCOMES.CMD032.some((o) => o.code === "PRECONDITION_FAILED" && o.reason === "REFUND_TAX_INCONSISTENT"));
+});

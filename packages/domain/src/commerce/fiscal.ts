@@ -58,8 +58,20 @@ export type FiscalTreatmentDecision =
   | { readonly kind: "TREATMENT"; readonly snapshot: TaxRuleSnapshot; readonly taxCents: bigint }
   | { readonly kind: "BLOCKED"; readonly blocker: FiscalBlocker };
 
+/**
+ * Whether a profile version was in force at an instant (D-FISC-B4): its validity window covers the instant and it had not been
+ * superseded by then. A re-review recorded after a sale does not take the sale's profile out of force for that sale's documents;
+ * only a new quote and a new draft's choice need the current version (quotableTaxRule).
+ */
+export function profileInForceAt(profile: Pick<FiscalProfileRecord, "validFrom" | "validUntil" | "supersededAt">, at: UtcInstant): boolean {
+  const t = instantMs(at);
+  if (instantMs(profile.validFrom) > t) return false;
+  if (profile.validUntil !== undefined && instantMs(profile.validUntil) <= t) return false;
+  return profile.supersededAt === undefined || instantMs(profile.supersededAt) > t;
+}
+
 export interface FiscalTreatmentInput {
-  /** The agency's current profile at the tax point (the unsuperseded version). */
+  /** The agency's profile version in force at the tax point (D-FISC-B4; migration 0013 tax_documents_validation_guard). */
   readonly profile: FiscalProfileRecord;
   readonly issuer: FiscalIssuerRecord;
   /** The tax point: the capture completion for an invoice, the refund completion for a credit note. */
@@ -73,7 +85,7 @@ export interface FiscalTreatmentInput {
  * DRAFT → VALIDATED guard of the registry TaxDocument machine ("Actual operator/customer/tax/numbering fields pass reviewed
  * rules"), in order; the first failing check blocks:
  *  1. the treatment is reviewed                                  → else FISCAL_TREATMENT_UNREVIEWED
- *  2. the profile is effective at the tax point                  → else FISCAL_PROFILE_NOT_EFFECTIVE
+ *  2. the profile version was in force at the tax point          → else FISCAL_PROFILE_NOT_EFFECTIVE (D-FISC-B4)
  *  3. the profile names this issuer                              → else FISCAL_ISSUER_MISMATCH
  *  4. the issuer's legal facts are observed or professionally
  *     confirmed and it holds a numbering authorization           → else ISSUER_FACTS_UNCONFIRMED
@@ -85,10 +97,7 @@ export interface FiscalTreatmentInput {
 export function resolveFiscalTreatment(input: FiscalTreatmentInput): FiscalTreatmentDecision {
   const snapshot = ruleSnapshotOf(input.profile);
   if (snapshot === null) return { kind: "BLOCKED", blocker: "FISCAL_TREATMENT_UNREVIEWED" };
-  const at = instantMs(input.taxPoint);
-  if (instantMs(input.profile.validFrom) > at) return { kind: "BLOCKED", blocker: "FISCAL_PROFILE_NOT_EFFECTIVE" };
-  if (input.profile.validUntil !== undefined && instantMs(input.profile.validUntil) <= at) return { kind: "BLOCKED", blocker: "FISCAL_PROFILE_NOT_EFFECTIVE" };
-  if (input.profile.supersededAt !== undefined) return { kind: "BLOCKED", blocker: "FISCAL_PROFILE_NOT_EFFECTIVE" };
+  if (!profileInForceAt(input.profile, input.taxPoint)) return { kind: "BLOCKED", blocker: "FISCAL_PROFILE_NOT_EFFECTIVE" };
   if (input.profile.operatorLegalRef !== input.issuer.issuerRef) return { kind: "BLOCKED", blocker: "FISCAL_ISSUER_MISMATCH" };
   const confirmed = input.issuer.legalFactStatus === "OBSERVED" || input.issuer.legalFactStatus === "PROFESSIONALLY_CONFIRMED";
   if (!confirmed || input.issuer.numberingAuthorizationRef === undefined) return { kind: "BLOCKED", blocker: "ISSUER_FACTS_UNCONFIRMED" };

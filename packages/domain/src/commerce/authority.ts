@@ -17,7 +17,7 @@ import { OFFERED_CAPABILITY_STATES } from "../model/aggregates.js";
 import { DomainFailure, type FailureCode, type FailureReason } from "../model/errors.js";
 import { instantMs } from "../model/fields.js";
 import { quotableTaxRule, sameTaxRule } from "./fiscal.js";
-import type { CommercialAuthorizationRecord, DeliveryPhase, FiscalProfileRecord, PaymentOrderState, QuoteRecord, RevocationPhase, RouteState } from "./records.js";
+import type { CaptureFactRecord, CommercialAuthorizationRecord, DeliveryPhase, FiscalProfileRecord, PaymentOrderState, QuoteRecord, RefundComponents, RevocationPhase, RouteState } from "./records.js";
 
 export const CHECKOUT_BLOCKERS = [
   "AGENCY_NOT_ACTIVE",
@@ -30,6 +30,7 @@ export const CHECKOUT_BLOCKERS = [
   "APPROVAL_NOT_CURRENT",
   "TARGET_STALE",
   "CAPABILITY_RESTRICTED",
+  "DELIVERY_CAPACITY_UNAVAILABLE",
   "PAYMENT_ROUTE_UNQUALIFIED",
   "FISCAL_ROUTE_UNQUALIFIED",
   "FISCAL_TREATMENT_UNREVIEWED",
@@ -54,8 +55,16 @@ export interface SubjectFacts {
   readonly capability: Pick<Capability, "state"> | null;
 }
 
-/** Checkout adds the payment and fiscal routes, the current fiscal profile and the payment state of the project. */
+/**
+ * Checkout adds the payment and fiscal routes, the current fiscal profile, the payment state of the project and the deliverable
+ * capacity the processing package's admission reports for the purchased scope (15 "PaymentOrder and intent": "CreatePaymentOrder
+ * first validates the exact quote, approved plan, source availability, capacity, legal profile and agency billing authority"; 07
+ * "Payment readiness accounts for realistic delivery capacity; the system does not take unlimited purchases into an unbounded
+ * queue"; D-CAP-B1). The capacity is read through the DeliveryCapacityPort, whose adapter is B08's admission; null (no answer)
+ * blocks like an explicit refusal.
+ */
 export interface CheckoutFacts extends SubjectFacts {
+  readonly capacity: { readonly available: boolean } | null;
   readonly paymentRoute: { readonly state: RouteState } | null;
   readonly fiscalIssuerRoute: { readonly state: RouteState } | null;
   readonly fiscalProfile: FiscalProfileRecord | null;
@@ -93,6 +102,7 @@ export function checkoutBlockers(f: CheckoutFacts): ReadonlyArray<CheckoutBlocke
   else if (f.openOrder !== null && f.openOrder.state === "CAPTURE_UNCERTAIN") out.push("PAYMENT_UNCERTAIN");
   else if (f.openOrder !== null && (f.openOrder.state === "INTENT_CREATED" || f.openOrder.state === "CREATING" || f.openOrder.state === "CAPTURING")) out.push("PAYMENT_IN_PROGRESS");
   out.push(...subjectBlockers(f));
+  if (f.capacity === null || !f.capacity.available) out.push("DELIVERY_CAPACITY_UNAVAILABLE");
   if (f.paymentRoute === null || f.paymentRoute.state !== "QUALIFIED") out.push("PAYMENT_ROUTE_UNQUALIFIED");
   if (f.fiscalIssuerRoute === null || f.fiscalIssuerRoute.state !== "QUALIFIED") out.push("FISCAL_ROUTE_UNQUALIFIED");
   const rule = quotableTaxRule(f.fiscalProfile, f.now);
@@ -132,16 +142,79 @@ const BLOCKER_FAILURE: Readonly<Record<CheckoutBlocker, { readonly code: Failure
   APPROVAL_NOT_CURRENT: { code: "PRECONDITION_FAILED", reason: "APPROVAL_NOT_CURRENT" },
   TARGET_STALE: { code: "TARGET_STALE", reason: null },
   CAPABILITY_RESTRICTED: { code: "CAPABILITY_UNAVAILABLE", reason: "MODE_NOT_OFFERED" },
+  DELIVERY_CAPACITY_UNAVAILABLE: { code: "CAPACITY_UNAVAILABLE", reason: "DELIVERY_CAPACITY_UNAVAILABLE" },
   PAYMENT_ROUTE_UNQUALIFIED: { code: "CAPABILITY_UNAVAILABLE", reason: "PAYMENT_ROUTE_UNQUALIFIED" },
   FISCAL_ROUTE_UNQUALIFIED: { code: "CAPABILITY_UNAVAILABLE", reason: "FISCAL_ROUTE_UNQUALIFIED" },
   FISCAL_TREATMENT_UNREVIEWED: { code: "PRECONDITION_FAILED", reason: "FISCAL_TREATMENT_UNREVIEWED" },
   FISCAL_TREATMENT_CHANGED: { code: "PRECONDITION_FAILED", reason: "FISCAL_TREATMENT_CHANGED" },
 });
 
-/** The failure a command answers for its first blocker (PAYMENT_PENDING is the one retryable answer). */
+/** The failure a command answers for its first blocker (PAYMENT_PENDING and CAPACITY_UNAVAILABLE are the retryable answers). */
 export function blockerFailure(blocker: CheckoutBlocker): DomainFailure {
   const f = BLOCKER_FAILURE[blocker];
-  return new DomainFailure(f.code, `commercial prerequisite not met: ${blocker}`, f.reason === null ? {} : { reason: f.reason }, f.code === "PAYMENT_PENDING");
+  return new DomainFailure(f.code, `commercial prerequisite not met: ${blocker}`, f.reason === null ? {} : { reason: f.reason }, f.code === "PAYMENT_PENDING" || f.code === "CAPACITY_UNAVAILABLE");
+}
+
+/** What the quote's release guard reads (migration 0012 kauro.quotes_release_guard; D-QUOTE-B4, B09-F2). */
+export interface QuoteReleaseFacts {
+  /** An order of the quote CREATING, CAPTURING or CAPTURE_UNCERTAIN, a PENDING capture of it, or a live CREATE_ORDER/CAPTURE attempt. */
+  readonly paymentInFlight: boolean;
+  /** An entitlement of the quote that is not REVOKED. */
+  readonly liveAuthorization: boolean;
+  /** Every capture paying the quote (its orders' captures and a capture re-bound to it) with what its COMPLETED refunds returned. */
+  readonly captures: ReadonlyArray<{ readonly status: CaptureFactRecord["status"]; readonly allocation: RefundComponents; readonly returned: RefundComponents }>;
+  /** The replacement a re-binding of this quote's purchase names, if any (D-QUOTE-B6). */
+  readonly reboundTo: QuoteRecord["quoteId"] | null;
+}
+
+export type QuoteRelease = { readonly kind: "RELEASABLE" } | { readonly kind: "BLOCKED"; readonly because: "PAYMENT_IN_FLIGHT" | "PURCHASE_STANDS" };
+
+/**
+ * Whether an ACCEPTED_FOR_CHECKOUT quote may leave for EXPIRED, SUPERSEDED or WITHDRAWN (Quote machine guards; D-QUOTE-B4): never
+ * while its payment is in flight or uncertain; to SUPERSEDED by exactly the replacement its purchase was re-bound to; otherwise
+ * only once the purchase is closed — no live entitlement and every completed capture's whole service and tax returned by completed
+ * refunds (a reversed capture's money already went back). 15 "Price and source expiry races": "otherwise refund and issue a new
+ * quote"; TRANSITIONS "Cross-aggregate finalization": "offer the documented reupload/reapproval or refund path".
+ */
+export function quoteRelease(f: QuoteReleaseFacts, target: { readonly state: "EXPIRED" | "SUPERSEDED" | "WITHDRAWN"; readonly supersededBy?: QuoteRecord["quoteId"] }): QuoteRelease {
+  if (f.paymentInFlight) return { kind: "BLOCKED", because: "PAYMENT_IN_FLIGHT" };
+  if (target.state === "SUPERSEDED" && f.reboundTo !== null && target.supersededBy === f.reboundTo) return { kind: "RELEASABLE" };
+  if (f.liveAuthorization) return { kind: "BLOCKED", because: "PURCHASE_STANDS" };
+  const stands = f.captures.some((c) => c.status === "COMPLETED" && (c.returned.serviceCents < c.allocation.serviceCents || c.returned.taxCents < c.allocation.taxCents));
+  return stands ? { kind: "BLOCKED", because: "PURCHASE_STANDS" } : { kind: "RELEASABLE" };
+}
+
+/** What the re-binding guard reads (migration 0011 kauro.purchase_rebindings_guard; D-QUOTE-B6). */
+export interface ReplacementFacts {
+  readonly authorizationState: CommercialAuthorizationRecord["state"];
+  /** The capture is COMPLETED and alone pays its order's whole obligation with no excess. */
+  readonly captureAlonePays: boolean;
+  /** A refund of the capture awaits review or commits (REQUESTED, APPROVED, SUBMITTING, UNCERTAIN, COMPLETED). */
+  readonly refundOpenOrCommitted: boolean;
+  readonly replacedQuoteState: QuoteRecord["state"];
+  readonly replacement: { readonly state: QuoteRecord["state"]; readonly replacesTheQuote: boolean };
+  readonly replacementsUsed: number;
+  /** price_policies.pre_execution_replacements_included of the replaced quote's policy (R2-INITIAL: 1). */
+  readonly replacementsIncluded: number;
+  /** The replacement revision is SEALED and its lineage in the project reaches the replaced revision (SourceLineageReader, B07). */
+  readonly lineageReachesReplaced: boolean;
+}
+
+export type ReplacementBlocker = "EXECUTION_STARTED" | "PURCHASE_NOT_INTACT" | "NOT_A_REPLACEMENT" | "ALLOWANCE_USED" | "LINEAGE_MISSING";
+
+/**
+ * The included pre-execution source replacement (16 "Scope changes and credits": one replacement after revalidation, provided no
+ * paid execution has started and the new scope stays in the same band — the same band and terms are the replacement quote's
+ * composite key to the replaced one; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18). An empty list means the paid capture may be re-bound.
+ */
+export function replacementBlockers(f: ReplacementFacts): ReadonlyArray<ReplacementBlocker> {
+  const out: ReplacementBlocker[] = [];
+  if (f.authorizationState !== "ACTIVE") out.push("EXECUTION_STARTED");
+  if (!f.captureAlonePays || f.refundOpenOrCommitted) out.push("PURCHASE_NOT_INTACT");
+  if (f.replacedQuoteState !== "ACCEPTED_FOR_CHECKOUT" || f.replacement.state !== "ISSUED" || !f.replacement.replacesTheQuote) out.push("NOT_A_REPLACEMENT");
+  if (f.replacementsUsed >= f.replacementsIncluded) out.push("ALLOWANCE_USED");
+  if (!f.lineageReachesReplaced) out.push("LINEAGE_MISSING");
+  return out;
 }
 
 /** The phase a revocation happens in is the state it leaves (07 "CommercialAuthorization"). */

@@ -144,7 +144,8 @@ export const EDGE_OWNERS = {
   },
   CostGrant: {
     "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: null },
-    actual_authorization_and_funding: { owner: "B09", why: "funding evidence", event: null },
+    // B09 funds no cost grant: the grant's own package records the owner's funding evidence (B09 open question Q-B09-9; B09-F17)
+    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: null },
     remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: null },
     reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: null },
     expiry_reached: { owner: "B03", why: "the grant's expiry", event: null },
@@ -190,9 +191,9 @@ export const EDGE_OWNERS = {
     "(initial DRAFT)": { command: "CMD027", event: "quote.drafted.v1", note: "drafted and issued in one transaction" },
     issue_quote: { command: "CMD027", event: "quote.issued.v1" },
     withdraw_quote: { owner: "B10", why: "the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it", event: "quote.withdrawn.v1" },
-    accept_terms_for_checkout: { command: "CMD028", event: "quote.accepted_for_checkout.v1" },
+    accept_terms_for_checkout: { command: "CMD028", event: "quote.accepted_for_checkout.v1", note: "a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6)" },
     price_expiry_reached: { owner: "B10", why: "the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED)", event: "quote.expired.v1" },
-    superseding_quote_issued: { command: "CMD027", event: "quote.superseded.v1", note: "the new binding quote supersedes the previous one before it is created" },
+    superseding_quote_issued: { command: "CMD027", event: "quote.superseded.v1", note: "the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6)" },
   },
   PaymentOrder: {
     "(initial INTENT_CREATED)": { command: "CMD028", event: "payment_order.intent_created.v1" },
@@ -461,7 +462,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `B06` says what the platform serves: **route** — a served command performs it;");
-  line("**database** — the schema (B06's migrations, or package B09's 0008..0012) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (B06's migrations, or package B09's 0009..0013) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and checked;");
   line("**—** — the aggregate is not stored yet.");
   line();

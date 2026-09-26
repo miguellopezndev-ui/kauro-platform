@@ -1,7 +1,7 @@
 /**
  * The event vocabulary of the payments and fiscal workflow (package B09; design §9). Appended to the registered vocabulary of
  * model/events.ts (EVENT_TYPES, AGGREGATE_KINDS, EVENT_PAYLOAD_ALLOWLIST, CONSUMERS, EVENT_SUBSCRIPTIONS) and seeded by
- * migration 0008 (kauro.event_types, kauro.aggregate_kinds); the persistence tests prove the database and these lists equal.
+ * migration 0009 (kauro.event_types) and by the migrations that create each table (their rows of the shared registry kauro.aggregate_kinds, foundation 0008); the persistence tests prove the database and these lists equal.
  *
  * One event type per reachable state of each versioned commerce aggregate (`<kind>.<state>.v1`), as B06 does for the
  * DatasetRevision lifecycle: a back edge (a capture proved to have had no effect returns the order to APPROVED) publishes the
@@ -43,6 +43,10 @@ export const COMMERCE_EVENT_TYPES = [
   "capture.completed.v1",
   "capture.denied.v1",
   "capture.reversed.v1",
+  // a provider fact learned after the status is a new capture version with its own event, never a second completion (B09-F8,
+  // B09-F15; D-EVT-B2): the fee the provider reported, and the provider's availability of the captured funds
+  "capture.fee_observed.v1",
+  "capture.funds_observed.v1",
   "commercial_authorization.issued.v1",
   "commercial_authorization.consumed.v1",
   "commercial_authorization.delivered.v1",
@@ -114,9 +118,11 @@ export const COMMERCE_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<CommerceEventType
     "captureId", "agencyId", "orderId", "projectId", "previousStatus", "reversedServiceCents", "reversedTaxCents", "reversedExcessCents",
     "evidenceHash", "source",
   ],
+  "capture.fee_observed.v1": ["captureId", "agencyId", "orderId", "providerFeeCents", "currency", "evidenceHash", "source"],
+  "capture.funds_observed.v1": ["captureId", "agencyId", "orderId", "fundsState", "previousFundsState", "amountCents", "currency", "evidenceHash", "source"],
   "commercial_authorization.issued.v1": [
-    "authorizationId", "agencyId", "projectId", "quoteId", "orderId", "captureId", "approvalId", "approvalHash", "planHash", "revisionHash",
-    "targetContractHash", "capabilityId", "capabilityVersion", "mode", "billableUnits", "honoredAfterPriceExpiry",
+    "authorizationId", "agencyId", "projectId", "quoteId", "orderId", "orderQuoteId", "captureId", "rebindingId", "approvalId", "approvalHash", "planHash",
+    "revisionHash", "targetContractHash", "capabilityId", "capabilityVersion", "mode", "billableUnits", "honoredAfterPriceExpiry",
   ],
   "commercial_authorization.consumed.v1": ["authorizationId", "agencyId", "jobRef", "previousState"],
   "commercial_authorization.delivered.v1": ["authorizationId", "agencyId", "jobRef", "previousState"],
@@ -163,6 +169,10 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   { eventType: "capture.completed.v1", consumer: "FINANCE" },
   { eventType: "capture.completed.v1", consumer: "FISCAL" },
   { eventType: "capture.completed.v1", consumer: "COMMISSIONS" },
+  // a fee or a funds availability learned later is posted by the ledger only: it is not a new collection, so neither the fiscal
+  // drafter nor the commission accrual receives it (B09-F8)
+  { eventType: "capture.fee_observed.v1", consumer: "FINANCE" },
+  { eventType: "capture.funds_observed.v1", consumer: "FINANCE" },
   { eventType: "capture.reversed.v1", consumer: "FINANCE" },
   { eventType: "capture.reversed.v1", consumer: "COMMISSIONS" },
   { eventType: "capture.reversed.v1", consumer: "NOTIFICATIONS" },
@@ -184,4 +194,6 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   { eventType: "tax_document.uncertain.v1", consumer: "FISCAL" },
   { eventType: "tax_document.issued.v1", consumer: "NOTIFICATIONS" },
   { eventType: "reconciliation_case.opened.v1", consumer: "NOTIFICATIONS" },
+  // the reviewed resolution of a case sources the correcting ledger postings it decides (D-LEDGER-B4; B09-F15)
+  { eventType: "reconciliation_case.resolved.v1", consumer: "FINANCE" },
 ]);

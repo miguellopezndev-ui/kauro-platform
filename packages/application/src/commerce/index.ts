@@ -93,6 +93,11 @@ export type {
   CommerceReconciler,
   CommerceEventDelivery,
   CommerceEventConsumer,
+  PlatformBinding,
+  DeliveryCapacityPort,
+  SourceAvailabilityReader,
+  SourceLineageReader,
+  PurchaseRebinder,
 } from "./ports.js";
-export type { DurableOperation, IntentOutcome, DispatchTicket, SettleInput, ProviderCommandPhases } from "./protocol.js";
+export type { DurableOperation, IntentOutcome, DispatchTicket, SettleInput, SettleOutcome, ProviderCommandPhases } from "./protocol.js";
 export { DISPATCH_TIMEOUT_SECONDS, DISPATCH_WATCHDOG_MARGIN_SECONDS, MAX_ATTEMPTS_PER_OPERATION, PENDING_POLL_AFTER_SECONDS } from "./protocol.js";

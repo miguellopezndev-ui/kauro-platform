@@ -2,9 +2,11 @@
 // runtime role that owns it — the agency's request handlers (kauro_app_test) under a TENANT context, a corporate owner
 // (kauro_app_test) under an OPERATOR context with its finance scope, the payment service (kauro_payment_test) under the agency it
 // adopted, the control plane (kauro_control_test) for the platform configuration — so the fixtures prove the policies admit the
-// legitimate writes (21 "Positive and negative symmetry"). Aggregates are born in their machine's initial state (a capture in the
-// status its first observation shows, D-INIT-B1) and walk the listed edges, one version and one event per edge. Implementation
-// mandate M1 replaces the raw statements with the pg adapters of @kauro/domain ports/commerce.ts and keeps these scenarios.
+// legitimate writes (21 "Positive and negative symmetry"). The role boundary of B09-F1 is followed exactly: the request handlers
+// write the intent and the claim of a provider effect (T1, T2), the payment service settles what the provider reported (T3) and
+// alone issues and revokes entitlements. Aggregates are born in their machine's initial state (a capture in the status its first
+// observation shows, D-INIT-B1) and walk the listed edges, one version and one event per edge. Implementation mandate M1 replaces
+// the raw statements with the pg adapters of @kauro/domain ports/commerce.ts and keeps these scenarios.
 import type { Client } from "pg";
 import { ids, sealedSource, sha, stepUpProof, targetContract, plan, type AgencyFixture } from "./support.js";
 
@@ -82,9 +84,30 @@ export interface ApprovedSubject {
   readonly approvalHash: string;
 }
 
+/**
+ * A revision of the project that explicitly supersedes `supersedes` (B06 dataset_revisions.supersedes_revision_id; the lineage the
+ * source lifecycle records, B07 D-REV-1), walked DRAFT -> INSPECTING -> READY_TO_SEAL -> SEALED with one event per edge.
+ */
+export async function replacementSource(app: Client, ag: AgencyFixture, projectId: string, supersedes: string, seed: string): Promise<{ revisionId: string; manifestHash: string }> {
+  const revisionId = ids.next();
+  const manifestHash = sha(`${seed}-manifest-${revisionId}`);
+  const actor = { kind: "USER" as const, id: ag.ownerUserId };
+  await within(app, tenant(ag), async (c) => {
+    await c.query("INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, version, state, supersedes_revision_id, created_at, updated_at) VALUES ($1, $2, $3, 1, 'DRAFT', $4, now(), now())", [revisionId, ag.agencyId, projectId, supersedes]);
+    await commerceEvent(c, "dataset_revision", revisionId, 1, ag.agencyId, "dataset_revision.created.v1", actor);
+    await c.query("UPDATE kauro.dataset_revisions SET state = 'INSPECTING', version = 2 WHERE revision_id = $1", [revisionId]);
+    await commerceEvent(c, "dataset_revision", revisionId, 2, ag.agencyId, "dataset_revision.inspecting.v1", actor);
+    await c.query("UPDATE kauro.dataset_revisions SET state = 'READY_TO_SEAL', version = 3 WHERE revision_id = $1", [revisionId]);
+    await commerceEvent(c, "dataset_revision", revisionId, 3, ag.agencyId, "dataset_revision.ready_to_seal.v1", actor);
+    await c.query("UPDATE kauro.dataset_revisions SET state = 'SEALED', version = 4, manifest_hash = $2, projection_hash = $3, sealed_at = now() WHERE revision_id = $1", [revisionId, manifestHash, sha(`${seed}-projection-${revisionId}`)]);
+    await commerceEvent(c, "dataset_revision", revisionId, 4, ag.agencyId, "dataset_revision.sealed.v1", actor);
+  });
+  return { revisionId, manifestHash };
+}
+
 /** A VALIDATED plan of the project over a sealed source and a confirmed target, approved by the agency owner with a fresh step-up (CMD025). */
-export async function approvedSubject(app: Client, validator: Client, assurance: Client, ag: AgencyFixture, projectId: string, seed: string): Promise<ApprovedSubject> {
-  const source = await sealedSource(app, ag, projectId, seed);
+export async function approvedSubject(app: Client, validator: Client, assurance: Client, ag: AgencyFixture, projectId: string, seed: string, source?: { revisionId: string; manifestHash: string }): Promise<ApprovedSubject> {
+  source ??= await sealedSource(app, ag, projectId, seed);
   const target = await targetContract(app, ag, projectId, seed);
   const p = await plan(app, ag, projectId, "VALIDATED", seed, validator, { revisionHash: source.manifestHash, targetContractHash: target.bodyHash });
   const proof = await stepUpProof(assurance, { userId: ag.ownerUserId });
@@ -188,10 +211,11 @@ export interface QuoteFixture {
  * the founding rate 2500 bps as the applied (maximum, never stacked) discount — R2-077: discount 32375, service 97125 — the
  * reviewed exempt-export treatment of the profile (tax 0), born DRAFT and issued (issue_quote), with its eligibility snapshot.
  */
-export async function issuedQuote(app: Client, ag: AgencyFixture, subject: ApprovedSubject, profileId: string, issuerRef: string, options: { readonly discountCents?: number; readonly treatment?: Treatment } = {}): Promise<QuoteFixture> {
+export async function issuedQuote(app: Client, ag: AgencyFixture, subject: ApprovedSubject, profileId: string, issuerRef: string, options: { readonly discountCents?: number; readonly treatment?: Treatment; readonly replacesQuoteId?: string; readonly billableUnits?: number; readonly baseCents?: number } = {}): Promise<QuoteFixture> {
   const quoteId = ids.next();
   const snapshotId = ids.next();
-  const base = 129500;
+  const base = options.baseCents ?? 129500;
+  const units = options.billableUnits ?? 40000;
   const discount = options.discountCents ?? 32375;
   const service = base - discount;
   const treatment = options.treatment ?? "EXEMPT_EXPORT";
@@ -201,24 +225,25 @@ export async function issuedQuote(app: Client, ag: AgencyFixture, subject: Appro
     await c.query(
       `INSERT INTO kauro.quotes (quote_id, agency_id, project_id, plan_id, approval_id, revision_hash, plan_hash, target_contract_hash, billable_units, mode, price_policy_version, discount_policy_version,
                                  base_service_cents, discount_bps, discount_cents, service_cents, fiscal_profile_id, issuer_ref, tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency,
-                                 eligibility_snapshot_id, terms_hash, terms_version, issued_at, expires_at, source_available_until, created_by_membership_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 40000, 'HUBSPOT', 'R2-INITIAL', 'R2-INITIAL', $9, 2500, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'USD',
-               $19, $20, 'TERMS-2026-01', now(), now() + interval '14 days', now() + interval '7 days', $21, now(), now())`,
+                                 eligibility_snapshot_id, terms_hash, terms_version, issued_at, expires_at, source_available_until, replaces_quote_id, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $22, 'HUBSPOT', 'R2-INITIAL', 'R2-INITIAL', $9, 2500, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'USD',
+               $19, $20, 'TERMS-2026-01', now(), now() + interval '336 hours', now() + interval '168 hours', $23, $21, now(), now())`,
       [
         quoteId, ag.agencyId, subject.projectId, subject.planId, subject.approvalId, subject.revisionHash, subject.planHash, subject.targetContractHash,
         base, discount, service, profileId, issuerRef, treatment, rule.rule, rule.rate, rule.tax, service + rule.tax, snapshotId, termsHash, ag.ownerMembershipId,
+        units, options.replacesQuoteId ?? null,
       ],
     );
     await c.query(
       `INSERT INTO kauro.price_eligibility_snapshots (snapshot_id, agency_id, quote_id, project_id, as_of, lookback_starts_at, qualifying_project_ids, qualifying_count, repeat_discount_bps, founding_slot_ref, founding_discount_bps, applied_discount_bps, policy_version, created_at)
-       VALUES ($1, $2, $3, $4, now(), now() - interval '365 days', '{}', 0, 0, $5, 2500, 2500, 'R2-INITIAL', now())`,
+       VALUES ($1, $2, $3, $4, now(), now() - interval '8760 hours', '{}', 0, 0, $5, 2500, 2500, 'R2-INITIAL', now())`,
       [snapshotId, ag.agencyId, quoteId, subject.projectId, ids.next()],
     );
     await commerceEvent(c, "quote", quoteId, 1, ag.agencyId, "quote.drafted.v1", { kind: "USER", id: ag.ownerUserId });
     await c.query("UPDATE kauro.quotes SET state = 'ISSUED', version = 2 WHERE quote_id = $1 AND version = 1", [quoteId]);
     await commerceEvent(c, "quote", quoteId, 2, ag.agencyId, "quote.issued.v1", { kind: "USER", id: ag.ownerUserId });
   });
-  return { quoteId, projectId: subject.projectId, subject, serviceCents: service, taxCents: rule.tax, totalCents: service + rule.tax, termsHash, billableUnits: 40000, mode: "HUBSPOT", profileId };
+  return { quoteId, projectId: subject.projectId, subject, serviceCents: service, taxCents: rule.tax, totalCents: service + rule.tax, termsHash, billableUnits: units, mode: "HUBSPOT", profileId };
 }
 
 export interface OrderFixture {
@@ -226,6 +251,8 @@ export interface OrderFixture {
   readonly quote: QuoteFixture;
   readonly providerOrderId: string;
   readonly createAttemptId: string;
+  /** False when only T1 and T2 ran (the order CREATING, the attempt DISPATCHING): the provider's result is not applied yet. */
+  readonly settled: boolean;
 }
 
 /** A CMD028 journal entry of the agency (the intent the order and its first attempt name). */
@@ -240,12 +267,13 @@ export async function journalEntry(c: Client, ag: AgencyFixture, operation: stri
 }
 
 /**
- * CreatePaymentOrder through the provider-effect protocol (D-PROTO-B1): T1 accepts the terms (ISSUED -> ACCEPTED_FOR_CHECKOUT on
- * the first order), records the order INTENT_CREATED and its PREPARED CREATE_ORDER attempt and the scope row; T2 commits the
- * dispatch intent (CREATING, DISPATCHING with its deadline); T3 records the provider's authenticated creation (CONFIRMED, CREATED
- * with the provider order identity learned once, and its scope row).
+ * CreatePaymentOrder through the provider-effect protocol (D-PROTO-B1, D-PROTO-B5): T1 (request handlers) accepts the terms (ISSUED
+ * -> ACCEPTED_FOR_CHECKOUT on the first order), records the order INTENT_CREATED and its PREPARED CREATE_ORDER attempt and the
+ * PAYMENT_ORDER scope row; T2 (request handlers) commits the dispatch intent (CREATING, DISPATCHING with its deadline); T3 (the
+ * payment service, in the agency it adopted) records the provider's authenticated creation (CONFIRMED, CREATED with the provider
+ * order identity learned once, and its PROVIDER_ORDER scope row) — a provider fact the request handlers cannot write (B09-F1).
  */
-export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteFixture, routes: Routes, options: { readonly acceptQuote?: boolean } = {}): Promise<OrderFixture> {
+export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteFixture, routes: Routes, options: { readonly acceptQuote?: boolean; readonly payment?: Client } = {}): Promise<OrderFixture> {
   const orderId = ids.next();
   const attemptId = ids.next();
   const providerOrderId = `PO-${orderId.slice(-12)}`;
@@ -276,17 +304,18 @@ export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteF
     await c.query("UPDATE kauro.payment_orders SET state = 'CREATING', version = 2 WHERE order_id = $1 AND version = 1", [orderId]);
     await commerceEvent(c, "payment_order", orderId, 2, ag.agencyId, "payment_order.creating.v1", actor);
   });
-  await within(app, tenant(ag), async (c) => {
+  if (options.payment === undefined) return { orderId, quote, providerOrderId, createAttemptId: attemptId, settled: false };
+  await within(options.payment, service(ag.agencyId), async (c) => {
     await c.query("UPDATE kauro.payment_attempts SET state = 'CONFIRMED', evidence_hash = $2, last_observed_at = now(), version = 3 WHERE attempt_id = $1 AND version = 2", [attemptId, sha(`create-evidence-${orderId}`)]);
-    await commerceEvent(c, "payment_attempt", attemptId, 3, ag.agencyId, "payment_attempt.confirmed.v1", actor);
+    await commerceEvent(c, "payment_attempt", attemptId, 3, ag.agencyId, "payment_attempt.confirmed.v1", PAYMENT_SERVICE);
     await c.query(
       "UPDATE kauro.payment_orders SET state = 'CREATED', provider_order_id = $2, provider_approval_url = $3, version = 3 WHERE order_id = $1 AND version = 2",
       [orderId, providerOrderId, `https://www.sandbox.paypal.com/checkoutnow?token=${providerOrderId}`],
     );
-    await commerceEvent(c, "payment_order", orderId, 3, ag.agencyId, "payment_order.created.v1", actor);
+    await commerceEvent(c, "payment_order", orderId, 3, ag.agencyId, "payment_order.created.v1", PAYMENT_SERVICE);
     await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, created_at) VALUES ('PROVIDER_ORDER', $1, $2, $3, now())", [`${PROVIDER}|${ENVIRONMENT}|${providerOrderId}`, ag.agencyId, orderId]);
   });
-  return { orderId, quote, providerOrderId, createAttemptId: attemptId };
+  return { orderId, quote, providerOrderId, createAttemptId: attemptId, settled: true };
 }
 
 export interface CaptureInput {
@@ -315,14 +344,17 @@ export async function insertCapture(c: Client, ag: AgencyFixture, order: OrderFi
   return captureId;
 }
 
-/** The authorization a capture that alone pays the whole obligation carries (07 "CommercialAuthorization"). */
-export async function insertAuthorization(c: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, capabilityId: string, actor: Actor): Promise<string> {
+/**
+ * The authorization a capture that alone pays the whole obligation carries (07 "CommercialAuthorization"); with `rebound`, the
+ * entitlement of a replacement quote issued under a re-binding of the order's capture (D-QUOTE-B6).
+ */
+export async function insertAuthorization(c: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, capabilityId: string, actor: Actor, rebound?: { readonly quote: QuoteFixture; readonly orderQuoteId: string; readonly rebindingId: string }): Promise<string> {
   const authorizationId = ids.next();
-  const q = order.quote;
+  const q = rebound?.quote ?? order.quote;
   await c.query(
-    `INSERT INTO kauro.commercial_authorizations (authorization_id, agency_id, project_id, quote_id, order_id, capture_id, approval_id, approval_hash, plan_id, plan_hash, revision_hash, target_contract_hash, capability_id, capability_version, mode, billable_units, honored_after_price_expiry, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'R2-INITIAL', $14, $15, false, now(), now())`,
-    [authorizationId, ag.agencyId, q.projectId, q.quoteId, order.orderId, captureId, q.subject.approvalId, q.subject.approvalHash, q.subject.planId, q.subject.planHash, q.subject.revisionHash, q.subject.targetContractHash, capabilityId, q.mode, q.billableUnits],
+    `INSERT INTO kauro.commercial_authorizations (authorization_id, agency_id, project_id, quote_id, order_id, order_quote_id, capture_id, rebinding_id, approval_id, approval_hash, plan_id, plan_hash, revision_hash, target_contract_hash, capability_id, capability_version, mode, billable_units, honored_after_price_expiry, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $16, $6, $17, $7, $8, $9, $10, $11, $12, $13, 'R2-INITIAL', $14, $15, false, now(), now())`,
+    [authorizationId, ag.agencyId, q.projectId, q.quoteId, order.orderId, captureId, q.subject.approvalId, q.subject.approvalHash, q.subject.planId, q.subject.planHash, q.subject.revisionHash, q.subject.targetContractHash, capabilityId, q.mode, q.billableUnits, rebound?.orderQuoteId ?? q.quoteId, rebound?.rebindingId ?? null],
   );
   await commerceEvent(c, "commercial_authorization", authorizationId, 1, ag.agencyId, "commercial_authorization.issued.v1", actor);
   return authorizationId;
@@ -353,7 +385,7 @@ export async function requestRefund(app: Client, ag: AgencyFixture, order: Order
       [refundId, ag.agencyId, order.quote.projectId, order.orderId, captureId, PROVIDER, ENVIRONMENT, reason, ids.next(), order.quote.termsHash, proposed.serviceCents, proposed.taxCents, ag.ownerMembershipId, ag.ownerUserId],
     );
     await commerceEvent(c, "refund", refundId, 1, ag.agencyId, "refund.requested.v1", { kind: "USER", id: ag.ownerUserId });
-    await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, created_at) VALUES ('REFUND', $1, $2, $3, now())", [refundId, ag.agencyId, order.orderId]);
+    await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, refund_id, created_at) VALUES ('REFUND', $1, $2, $3, $4, now())", [refundId, ag.agencyId, order.orderId, refundId]);
   });
   return refundId;
 }
@@ -381,3 +413,4 @@ export async function approveRefund(app: Client, assurance: Client, approverUser
     options.isolation,
   );
 }
+

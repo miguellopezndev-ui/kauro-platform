@@ -39,6 +39,13 @@ export interface CommerceCommandSpec<Body> {
    * and the payment service applies the inbox record under kauro_payment (D-ING-B1); this names the applying half.
    */
   readonly runtimeRole: "kauro_app" | "kauro_payment";
+  /**
+   * The database role of the settle step of a provider-effect command (T3; D-PROTO-B5, B09-F1): the authenticated provider result is
+   * applied by the payment service in a SERVICE unit of work — only kauro_payment writes provider-observed facts and issues or revokes
+   * an entitlement — whatever principal asked for the effect; null for a command without a provider effect. The request handler then
+   * completes its own journal entry (T4) from the durable result.
+   */
+  readonly settleRuntimeRole: "kauro_payment" | null;
   readonly scope: CommerceScope;
   /** The path parameter naming the aggregate (or, for the webhook, the provider label). */
   readonly aggregateParam: string;
@@ -80,6 +87,7 @@ export const CREATE_PAYMENT_ORDER = spec<CreatePaymentOrderBody>({
   role: "AGENCY_BILLING",
   principal: "AGENCY_MEMBER",
   runtimeRole: "kauro_app",
+  settleRuntimeRole: "kauro_payment",
   scope: "AGENCY_HEADER",
   aggregateParam: "quoteId",
   scopeKind: null,
@@ -107,6 +115,7 @@ export const CAPTURE_PAYMENT = spec<CapturePaymentBody>({
   role: "AGENCY_BILLING",
   principal: "AGENCY_MEMBER",
   runtimeRole: "kauro_app",
+  settleRuntimeRole: "kauro_payment",
   scope: "AGENCY_HEADER",
   aggregateParam: "orderId",
   scopeKind: null,
@@ -135,6 +144,7 @@ export const RECEIVE_PAYMENT_WEBHOOK = spec<ReceivePaymentWebhookBody>({
   role: "AUTHENTICATED_PROVIDER",
   principal: "PROVIDER",
   runtimeRole: "kauro_payment",
+  settleRuntimeRole: null,
   scope: "PROVIDER_INGRESS",
   aggregateParam: "provider",
   scopeKind: null,
@@ -163,6 +173,7 @@ export const REQUEST_REFUND = spec<RequestRefundBody>({
   role: "AGENCY_BILLING",
   principal: "AGENCY_MEMBER",
   runtimeRole: "kauro_app",
+  settleRuntimeRole: null,
   scope: "AGENCY_HEADER",
   aggregateParam: "projectId",
   scopeKind: null,
@@ -193,6 +204,7 @@ export const APPROVE_REFUND = spec<ApproveRefundBody>({
   role: "KAURO_OWNER",
   principal: "CORPORATE_OPERATOR",
   runtimeRole: "kauro_app",
+  settleRuntimeRole: null,
   scope: "STORED_OPERATION",
   aggregateParam: "refundId",
   scopeKind: "REFUND",
@@ -219,6 +231,7 @@ export const EXECUTE_REFUND = spec<ExecuteRefundBody>({
   role: "PAYMENT_SERVICE",
   principal: "PAYMENT_SERVICE",
   runtimeRole: "kauro_payment",
+  settleRuntimeRole: "kauro_payment",
   scope: "STORED_OPERATION",
   aggregateParam: "refundId",
   scopeKind: "REFUND",
@@ -246,6 +259,7 @@ export const RECONCILE_PAYMENT = spec<ReconcilePaymentBody>({
   role: "PAYMENT_SERVICE",
   principal: "PAYMENT_SERVICE",
   runtimeRole: "kauro_payment",
+  settleRuntimeRole: null,
   scope: "STORED_OPERATION",
   aggregateParam: "orderId",
   scopeKind: "PAYMENT_ORDER",

@@ -60,7 +60,7 @@ export const EVENT_TYPES = [
   "plan.withdrawn.v1",
   "approval.created.v1",
   "approval.withdrawn.v1",
-  // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0008)
+  // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0009)
   ...COMMERCE_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];

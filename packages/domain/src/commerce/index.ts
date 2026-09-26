@@ -31,18 +31,18 @@ export type { PriceBand, RepeatTier, PricePolicy, DiscountSelection, QuoteAmount
 export { pricePolicyFrom, registryPricePolicy, baseServiceCents, repeatDiscountBps, selectDiscount, quoteAmounts, quoteExpiresAt, lookbackStartsAt, quoteTermsHash, termsMoney } from "./pricing.js";
 
 export type { FiscalBlocker, FiscalTreatmentDecision, FiscalTreatmentInput } from "./fiscal.js";
-export { taxOf, ruleSnapshotOf, sameTaxRule, FISCAL_BLOCKERS, resolveFiscalTreatment, quotableTaxRule } from "./fiscal.js";
+export { taxOf, ruleSnapshotOf, sameTaxRule, FISCAL_BLOCKERS, profileInForceAt, resolveFiscalTreatment, quotableTaxRule } from "./fiscal.js";
 
-export type { ProviderOutcomeKind, AmbiguityReason, ProviderRequest, ScopeKey, ObservedCapture, ObservedRefund, NormalizedProviderEventKind, NormalizedProviderEvent, PaymentIntentPreimage } from "./provider.js";
-export { providerRequestHash, providerRequestIdOf, providerScopeKey, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
+export type { ProviderOutcomeKind, AmbiguityReason, ProviderRequest, ScopeKey, ObservedCapture, ObservedRefund, ObservedDispute, NormalizedProviderEventKind, NormalizedProviderEvent, PaymentIntentPreimage } from "./provider.js";
+export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, providerScopeKey, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
 
 export type { CaptureMismatch, CaptureMatch, CaptureStatusStep } from "./capture.js";
-export { matchCapture, captureStatusStep, splitObligation, allocateCapture, authorizesObligation, isFullyPaid } from "./capture.js";
+export { CAPTURE_MISMATCHES, matchCapture, captureStatusStep, splitObligation, allocateCapture, authorizesObligation, isFullyPaid } from "./capture.js";
 
-export type { CheckoutBlocker, SubjectFacts, CheckoutFacts } from "./authority.js";
-export { CHECKOUT_BLOCKERS, checkoutBlockers, authorizationBlockers, honoredAfterPriceExpiry, blockerFailure, revocationPhaseOf, deliveryPhaseOf } from "./authority.js";
+export type { CheckoutBlocker, SubjectFacts, CheckoutFacts, QuoteReleaseFacts, QuoteRelease, ReplacementFacts, ReplacementBlocker } from "./authority.js";
+export { CHECKOUT_BLOCKERS, checkoutBlockers, authorizationBlockers, honoredAfterPriceExpiry, blockerFailure, revocationPhaseOf, deliveryPhaseOf, quoteRelease, replacementBlockers } from "./authority.js";
 
-export type { RefundAmountCheck, RefundEffects, RefundAuthorizationPreimage } from "./refunds.js";
+export type { RefundAmountCheck, RefundTaxCheck, RefundEffects, RefundAuthorizationPreimage } from "./refunds.js";
 export {
   ZERO_COMPONENTS,
   COMMITTING_REFUND_STATES,
@@ -52,6 +52,10 @@ export {
   proposeRefund,
   approvedComponents,
   checkRefundAmounts,
+  taxRemainingAfter,
+  refundTaxFor,
+  checkRefundTax,
+  refundTaxFailure,
   policyCovers,
   REFUND_AUTHORIZATION_DOMAIN,
   REFUND_EFFECTS_DOMAIN,
@@ -62,7 +66,7 @@ export {
 } from "./refunds.js";
 
 export type { PostingLine } from "./ledger.js";
-export { LEDGER_ACCOUNT_VERSION, LEDGER_POLICY_VERSION, LEDGER_ACCOUNTS, capturePostings, providerFeePostings, returnPostings, isBalanced } from "./ledger.js";
+export { LEDGER_ACCOUNT_VERSION, LEDGER_POLICY_VERSION, LEDGER_ACCOUNTS, capturePostings, providerFeePostings, fundsPostings, returnPostings, isBalanced } from "./ledger.js";
 
 export type { CommercePlatformMachineName } from "./machines.js";
 export { COMMERCE_PLATFORM_MACHINES } from "./machines.js";

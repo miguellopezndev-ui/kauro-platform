@@ -325,6 +325,7 @@ export function generateOpenApi(sources) {
       "x-kauro-role": spec.role,
       "x-kauro-principal": spec.principal,
       "x-kauro-runtime-role": spec.runtimeRole,
+      "x-kauro-settle-runtime-role": spec.settleRuntimeRole,
       "x-kauro-scope": spec.scope,
       "x-kauro-idempotency": webhook ? "PROVIDER_INBOX" : command.idempotency,
       "x-kauro-step-up": spec.stepUp,

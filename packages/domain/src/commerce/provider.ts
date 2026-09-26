@@ -9,7 +9,19 @@
  * UNRECOGNIZED_PROVIDER_STATE and block consequential assumptions").
  */
 import { DOMAINS, canonicalBytes, rawDigest, structuredDigest, type CanonicalValue, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
-import type { CaptureStatus, FundsState, PaymentEnvironment, ScopeKind } from "./records.js";
+import type { CaptureStatus, FundsState, PaymentEnvironment, ProviderExceptionKind, ScopeKind } from "./records.js";
+
+/** The provider exception vocabulary, in the order of migration 0012 provider_event_exceptions.kind (the persistence test proves it equal). */
+export const PROVIDER_EXCEPTION_KINDS: ReadonlyArray<ProviderExceptionKind> = Object.freeze([
+  "UNKNOWN_PROVIDER_REFERENCE",
+  "WRONG_PROVIDER",
+  "WRONG_ORDER",
+  "WRONG_PAYEE",
+  "WRONG_CURRENCY",
+  "WRONG_ENVIRONMENT",
+  "UNRECOGNIZED_PROVIDER_STATE",
+  "BODY_CONFLICT",
+]);
 
 /** What a dispatch or an observation proved (10: "which observations can prove no effect, which prove an effect and which remain uncertain"). */
 export type ProviderOutcomeKind = "COMPLETED" | "PENDING" | "PROVED_NO_EFFECT" | "AMBIGUOUS" | "UNRECOGNIZED";
@@ -47,7 +59,7 @@ export function providerRequestIdOf(attemptId: string): string {
   return `kauro-${attemptId}`;
 }
 
-/** The scope-index key of a provider identity: `<provider>|<ENVIRONMENT>|<external id>` (migration 0008 commerce_scopes). */
+/** The scope-index key of a provider identity: `<provider>|<ENVIRONMENT>|<external id>` (migration 0009 commerce_scopes). */
 export function providerScopeKey(provider: string, environment: PaymentEnvironment, externalId: string): string {
   if (!/^[a-z][a-z0-9_-]{1,63}$/.test(provider)) throw new TypeError("provider label");
   if (!/^[A-Za-z0-9._:-]{1,256}$/.test(externalId)) throw new TypeError("provider external identity");
@@ -89,6 +101,21 @@ export interface ObservedRefund {
   readonly evidenceHash: Sha256Hex;
 }
 
+/** A dispute as an adapter observed it: the provider's case identity, the disputed amount and the provider's hold. */
+export interface ObservedDispute {
+  readonly provider: string;
+  readonly environment: PaymentEnvironment;
+  readonly providerCaptureId: string;
+  readonly providerDisputeId: string;
+  readonly status: "OPEN" | "CLOSED_WON";
+  readonly amountCents: bigint;
+  readonly currency: string;
+  /** A server token of the provider's reason category; never provider prose. */
+  readonly reasonCode: string;
+  readonly responseDueAt: UtcInstant | null;
+  readonly evidenceHash: Sha256Hex;
+}
+
 export type NormalizedProviderEventKind =
   | "ORDER_APPROVED"
   | "ORDER_VOIDED"
@@ -99,6 +126,15 @@ export type NormalizedProviderEventKind =
   | "REFUND_COMPLETED"
   | "REFUND_PENDING"
   | "REFUND_FAILED"
+  /**
+   * A dispute (chargeback claim) opened on a capture: the provider holds the disputed funds; the capture stays COMPLETED and its
+   * entitlement live until the provider actually reverses it (CAPTURE_REVERSED); the reconciler opens a DISPUTE_OPEN case with the
+   * amount and records the funds HELD (D-DISPUTE-B1). The dispute workflow itself — deadlines, evidence, response — is the
+   * integration package's (B15; Q-B09-17).
+   */
+  | "DISPUTE_OPENED"
+  /** A dispute closed in the merchant's favor: the funds are released (a loss arrives as CAPTURE_REVERSED). */
+  | "DISPUTE_CLOSED"
   | "UNRECOGNIZED";
 
 /** A verified provider event after classification (the webhook row of CMD030 is this normalized form, not the vendor schema). */
@@ -110,6 +146,7 @@ export interface NormalizedProviderEvent {
   readonly providerOrderId?: string;
   readonly capture?: ObservedCapture;
   readonly refund?: ObservedRefund;
+  readonly dispute?: ObservedDispute;
   /** Provider chronology of the event (never used to roll a fact back). */
   readonly providerEventAt?: UtcInstant;
   /** SHA-256 of the exact authenticated raw body (InboxRecord.bodyHash). */

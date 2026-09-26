@@ -8,7 +8,7 @@
  *
  * A capture has three refundable components: its allocated service, its allocated tax and its excess over the obligation. The
  * remaining balance of each is `allocated - committed`, where the refunds that are APPROVED, SUBMITTING, UNCERTAIN or COMPLETED
- * commit (D-REF-B3). The database keeps the same invariant under the capture's commitment lock (migration 0011,
+ * commit (D-REF-B3). The database keeps the same invariant under the capture's commitment lock (migration 0012,
  * kauro.refunds_commitment_ceiling, SQLSTATE KP003), so two approvals of one capture serialize and the second one sees the first.
  *
  * The refund's reasonCode is the registry `label` of CMD031 (customer text; B06 D-API-1): nothing here branches on it. What a
@@ -18,8 +18,8 @@
 import { canonicalBytes, rawDigest, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { DomainFailure } from "../model/errors.js";
 import { instantMs } from "../model/fields.js";
-import { assertMoney, formatMoney } from "./money.js";
-import type { CaptureFactRecord, DeliveryPhase, RefundAuthorizationKind, RefundComponents, RefundOrigin, RefundPolicyRecord, RefundState } from "./records.js";
+import { assertMoney, formatMoney, roundHalfUpBps } from "./money.js";
+import type { CaptureFactRecord, DeliveryPhase, RefundAuthorizationKind, RefundComponents, RefundOrigin, RefundPolicyRecord, RefundState, TaxRuleSnapshot } from "./records.js";
 
 export const ZERO_COMPONENTS: RefundComponents = Object.freeze({ serviceCents: 0n, taxCents: 0n, excessCents: 0n });
 
@@ -53,6 +53,7 @@ export function refundableBalance(capture: Pick<CaptureFactRecord, "status" | "a
  * an excess return (R2-140). The approver decides the amounts (CMD032); the proposal is never an authorization.
  */
 export function proposeRefund(origin: RefundOrigin, balance: RefundComponents): RefundComponents {
+  // the whole remaining service releases the whole remaining tax, which is exactly what D-REF-B6 derives for it
   return origin === "EXCESS_CAPTURE"
     ? { serviceCents: 0n, taxCents: 0n, excessCents: balance.excessCents }
     : { serviceCents: balance.serviceCents, taxCents: balance.taxCents, excessCents: 0n };
@@ -83,6 +84,51 @@ export function checkRefundAmounts(origin: RefundOrigin, balance: RefundComponen
   if (requested.taxCents > balance.taxCents) fields.push("taxCents");
   if (requested.excessCents > balance.excessCents) fields.push("excessCents");
   return fields.length > 0 ? { kind: "EXCEEDS", fields } : { kind: "OK" };
+}
+
+/**
+ * The tax a capture keeps while `basisCents` of its allocated service is not refunded (D-REF-B6; migration 0012
+ * kauro.refund_tax_remaining, the same function): the whole collected tax while no service is refunded, nothing once no service
+ * basis remains, and in between the sale's reviewed rule applied once to the remaining basis — RATE_HALF_UP floor((B x r + 5000) /
+ * 10000), the quote's own rounding; ZERO_REVIEWED zero — never more than the tax the capture collected. 15 "Exact representation
+ * and rounding": "A partial refund allocates service and tax components explicitly ... any rounding remainder follows a
+ * deterministic rule"; 15 "Refund policy and calculation": "allocates tax consistently"; reference/HASHING: recompute cumulatively
+ * from the remaining service basis and take the difference, so a sequence of partial refunds ends at exactly the collected tax.
+ */
+export function taxRemainingAfter(allocation: Pick<RefundComponents, "serviceCents" | "taxCents">, basisCents: bigint, rule: TaxRuleSnapshot): bigint {
+  assertMoney(allocation.serviceCents);
+  assertMoney(allocation.taxCents);
+  if (basisCents >= allocation.serviceCents) return allocation.taxCents;
+  if (basisCents <= 0n || rule.rule === "ZERO_REVIEWED") return 0n;
+  const byRule = roundHalfUpBps(basisCents, rule.rateBps);
+  return byRule < allocation.taxCents ? byRule : allocation.taxCents;
+}
+
+/**
+ * The tax component a refund of `serviceCents` carries, given the components the capture's committing refunds already hold: the
+ * tax the refunded service releases under the sale's rule, cumulatively (the database re-checks it under the capture's commitment
+ * lock, KP012 REFUND_TAX_INCONSISTENT). A proposal (CMD031) and an approval (CMD032) use it; an excess return carries none.
+ */
+export function refundTaxFor(allocation: RefundComponents, committed: RefundComponents, serviceCents: bigint, rule: TaxRuleSnapshot): bigint {
+  const basisAfter = allocation.serviceCents - committed.serviceCents - serviceCents;
+  if (basisAfter < 0n) throw new RangeError("the refund exceeds the remaining service basis");
+  return assertMoney(allocation.taxCents - taxRemainingAfter(allocation, basisAfter, rule) - committed.taxCents);
+}
+
+export type RefundTaxCheck = { readonly kind: "OK" } | { readonly kind: "TAX_INCONSISTENT"; readonly expectedTaxCents: bigint };
+
+/** CMD032: the approved tax is exactly the tax the approved service releases (D-REF-B6); an excess return names none. */
+export function checkRefundTax(allocation: RefundComponents, committed: RefundComponents, requested: RefundComponents, rule: TaxRuleSnapshot): RefundTaxCheck {
+  const expected = refundTaxFor(allocation, committed, requested.serviceCents, rule);
+  return requested.taxCents === expected ? { kind: "OK" } : { kind: "TAX_INCONSISTENT", expectedTaxCents: expected };
+}
+
+/** The failure CMD032 answers for a tax component that does not follow the refunded service (a racing approval can meet it). */
+export function refundTaxFailure(): DomainFailure {
+  return new DomainFailure("PRECONDITION_FAILED", "the tax component does not follow the refunded service under the sale's reviewed rule", {
+    reason: "REFUND_TAX_INCONSISTENT",
+    fields: [{ field: "taxCents", code: "RANGE" }],
+  });
 }
 
 /**

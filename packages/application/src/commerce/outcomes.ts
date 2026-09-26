@@ -49,6 +49,13 @@ const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FO
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 const PROVIDER_SERVICES = outcome("COMMAND", "INTEGRITY_FAILURE", "PROVIDER_SERVICES_UNAVAILABLE", "no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written)");
 
+/**
+ * No deliverable capacity for the purchased scope: the processing package's admission (DeliveryCapacityPort, adapter B08) reports
+ * none, or answers nothing (15 "PaymentOrder and intent" validates capacity; 07 "Payment readiness accounts for realistic delivery
+ * capacity"; D-CAP-B1, B09-F5). Retryable: capacity is released as admitted work completes.
+ */
+const DELIVERY_CAPACITY = outcome("COMMAND", "CAPACITY_UNAVAILABLE", "DELIVERY_CAPACITY_UNAVAILABLE", "the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key");
+
 /** Blockers of checkout readiness shared by CMD028 and CMD029 (commerce/authority blockerFailure). */
 const SUBJECT_BLOCKERS: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("COMMAND", "PRECONDITION_FAILED", "AGENCY_NOT_ACTIVE", "the agency is not ACTIVE (DRAFT, RESTRICTED, CLOSING or CLOSED block new purchases; 07)", { current: "ALWAYS" }),
@@ -70,6 +77,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PAYMENT_PENDING", "CAPTURE_IN_PROGRESS", "the project's open order is being captured; retry with the same key once it settles"),
     outcome("COMMAND", "PAYMENT_PENDING", "CREATION_IN_PROGRESS", "the project's open order is still being created at the provider; retry with the same key once it settles"),
     ...SUBJECT_BLOCKERS,
+    DELIVERY_CAPACITY,
     outcome("COMMAND", "CAPABILITY_UNAVAILABLE", "PAYMENT_ROUTE_UNQUALIFIED", "no qualified merchant route for the provider and environment"),
     outcome("COMMAND", "CAPABILITY_UNAVAILABLE", "FISCAL_ROUTE_UNQUALIFIED", "the quoted fiscal issuer route is not qualified"),
     outcome("COMMAND", "PRECONDITION_FAILED", "FISCAL_TREATMENT_UNREVIEWED", "the agency's current fiscal profile carries no reviewed treatment (R2-082): the sale path is blocked"),
@@ -86,6 +94,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PAYMENT_PENDING", "CAPTURE_IN_PROGRESS", "a capture of this order is in flight under another key; retry with the same key once it settles"),
     outcome("COMMAND", "PAYMENT_UNCERTAIN", "CAPTURE_UNCERTAIN", "a capture of this order may have happened: it is reconciled, never repeated"),
     ...SUBJECT_BLOCKERS,
+    DELIVERY_CAPACITY,
     outcome("COMMAND", "CAPABILITY_UNAVAILABLE", "PAYMENT_ROUTE_UNQUALIFIED", "the order's merchant route is no longer qualified"),
     // 15 "Price and source expiry races": the same terms are honored only while the legal treatment remains valid
     outcome("COMMAND", "CAPABILITY_UNAVAILABLE", "FISCAL_ROUTE_UNQUALIFIED", "the quoted fiscal issuer route is no longer qualified"),
@@ -107,6 +116,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PRECONDITION_FAILED", "CAPTURE_NOT_REFUNDABLE", "the capture is not COMPLETED (reversed captures already returned the money)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "REFUND_EXCEEDS_REMAINING", "the amounts exceed the reconciled remaining capture, given every committed refund (CMD032 failure)"),
     outcome("COMMAND", "INVALID_REQUEST", "REFUND_COMPONENT_INVALID", "the amounts are empty, or name a component this refund does not carry", { fieldCodes: ["RANGE"] }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "REFUND_TAX_INCONSISTENT", "taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6)", { fieldCodes: ["RANGE"] }),
     outcome("COMMAND", "NOT_AUTHORIZED", "SELF_APPROVAL_FORBIDDEN", "the approver is the identity that requested the refund (segregation of duties, D-AUTHZ-B2)"),
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "authorizationRef names neither an applicable standing policy nor a step-up proof of the approver"),
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the approver's step-up is older than the freshness window"),
