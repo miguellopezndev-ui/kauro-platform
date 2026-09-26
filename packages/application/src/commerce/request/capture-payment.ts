@@ -95,12 +95,21 @@ export function capturePaymentHandler(runtime: CommerceRequestRuntime, co: Comme
           const read = await readCheckoutPrerequisites(uow, co, quoteSeen, { provider: seen.provider, environment: seen.environment });
           await co.queries.awaitTransition(uow, "kauro.quotes", quoteSeen.quoteId);
           const quote = await c.quotes.get(seen.quoteId);
-          const order = await c.orders.lock(orderId);
-          if (quote === null || order === null) throw new NotFoundFailure("payment_order");
+          if (quote === null) throw new NotFoundFailure("payment_order");
+          // the order as it stands: the request handlers may lock it only in a claimable state (payment_orders_tenant_claim: a
+          // provider-reported state is the payment service's to change, D-AUTH-B4), so a state they may not act on is answered
+          // from the committed row, and a claimable one is locked FOR UPDATE and read again
+          const standing = await c.orders.get(orderId);
+          if (standing === null) throw new NotFoundFailure("payment_order");
           // the browser's echo names the stored provider order, or nothing is done (S057: a browser claim is never payment)
-          if (order.providerOrderId === undefined || body.providerApprovalRef !== order.providerOrderId) {
+          if (standing.providerOrderId === undefined || body.providerApprovalRef !== standing.providerOrderId) {
             throw new InvalidRequestFailure([{ field: "providerApprovalRef", code: "UNKNOWN_REFERENCE" }], "PROVIDER_REFERENCE_MISMATCH");
           }
+          const standingFailure = orderStateFailure(standing);
+          if (standingFailure !== null) throw standingFailure;
+          const order = await c.orders.lock(orderId);
+          // a concurrent writer moved the order out of the claimable states while this command waited: answer its new state
+          if (order === null) throw orderStateFailure((await c.orders.get(orderId)) ?? standing) ?? new NotFoundFailure("payment_order");
           const stateFailure = orderStateFailure(order);
           if (stateFailure !== null) throw stateFailure;
           const live = await c.attempts.findLive({ orderId, operation: "CAPTURE" });

@@ -331,3 +331,27 @@ test("RACE: an identical retry replays the one order, the same key with another 
     assert.deepEqual([(await w.journal(k))?.state, attempt.state], ["COMMITTED", "CONFIRMED"]);
   }
 });
+
+test("D-REQ-B8: a creation the provider proved had no effect takes a new deliberate attempt under a new request identity through the route — the request handlers never lock the CREATING order they do not move — and after three proved no-effects the order FAILED with no provider order", async () => {
+  const { w } = pw;
+  // one proved no-effect: the second attempt creates the provider order
+  const q1 = await pw.readyQuote("cmd028-no-effect-once");
+  pw.provider.program("ORDERS_V2_CREATE", { kind: "PROVED_NO_EFFECT", outcomeCode: "VALIDATION_ERROR" });
+  const once = completed<CreatePaymentOrderView>(await createOrder(q1), 201);
+  assert.equal(once.data.order.state, "CREATED");
+  const tries = await attemptsOf(once.data.order.orderId);
+  assert.deepEqual(tries.map((a) => [a.ordinal, a.state]), [[1, "FAILED_NO_EFFECT"], [2, "CONFIRMED"]]);
+  assert.deepEqual(dispatchesOf("ORDERS_V2_CREATE").filter((c) => tries.some((a) => c.identity === `kauro-${a.attempt_id}`)).map((c) => c.identity), tries.map((a) => `kauro-${a.attempt_id}`), "each attempt under its own request identity");
+  assert.notEqual(tries[0]!.request_hash, tries[1]!.request_hash, "a new request identity is a new request");
+
+  // three proved no-effects: the attempts are spent, the order FAILED, no provider order exists, and a new checkout is offered
+  const q3 = await pw.readyQuote("cmd028-no-effect-spent");
+  for (let i = 0; i < 3; i++) pw.provider.program("ORDERS_V2_CREATE", { kind: "PROVED_NO_EFFECT", outcomeCode: "VALIDATION_ERROR" });
+  const created = pw.provider.effects.ordersCreated;
+  const spent = completed<CreatePaymentOrderView>(await createOrder(q3), 201);
+  assert.deepEqual([spent.data.order.state, spent.data.order.paymentStatus], ["FAILED", "FAILED"]);
+  assert.deepEqual((await attemptsOf(spent.data.order.orderId)).map((a) => [a.ordinal, a.state]), [[1, "FAILED_NO_EFFECT"], [2, "FAILED_NO_EFFECT"], [3, "FAILED_NO_EFFECT"]]);
+  assert.equal(pw.provider.effects.ordersCreated, created);
+  assert.deepEqual([spent.data.quote.checkoutReady, spent.data.quote.permittedActions], [true, ["CMD028"]], "the failed checkout is closed: a new one is offered to the billing member");
+  assert.equal(await w.count("payment_orders", "quote_id = $1 AND state = 'FAILED'", [q3.quoteId]), 1);
+});

@@ -125,7 +125,10 @@ export function approveRefundHandler(runtime: CommerceRequestRuntime, co: Commer
           await co.queries.awaitTransition(uow, "kauro.capture_facts", seen.captureId);
           const live: CommercialAuthorizationRecord | null = await c.authorizations.findLiveByCapture(seen.captureId);
           if (live !== null) await co.queries.awaitTransition(uow, "kauro.commercial_authorizations", live.authorizationId);
-          const refund = await c.refunds.lock(refundId);
+          // the finance scope may lock a refund only while it is REQUESTED (refunds_finance_review): a refund already reviewed, or one a
+          // concurrent approval moved on while this one waited for its row, is answered from its committed row (STALE_VERSION or
+          // REFUND_NOT_REQUESTED below, with its current version and state)
+          const refund = (await c.refunds.lock(refundId)) ?? (await c.refunds.get(refundId));
           if (refund === null) throw new NotFoundFailure("refund");
           const capture = await c.captures.get(refund.captureId);
           const order = await c.orders.get(refund.orderId);
