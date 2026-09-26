@@ -24,8 +24,11 @@
 // Planned operations (package B09, docs/design/B09-payments-fiscal.md §10): the payment routes are designed with their request
 // schemas, closed response schemas and outcome catalogues before their handlers exist. They are generated from the same
 // application contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths": the check proves no
-// planned route is registered (a registered route must be documented under "paths"), and when implementation mandate M3 serves a
-// route it moves into the served inventory and out of the planned list.
+// planned route is registered (a registered route must be documented under "paths"). When a stage-2 mandate serves a route it
+// names it in the application's served lists (COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS; decision D-REQ-B7), and the
+// same generated operation moves out of the planned list into "paths", where it is checked against the registered route like
+// every served one — implementation mandate M4 serves the request side (CMD028, CMD029, CMD031, CMD032 and the four reads), M3
+// the payment service's side.
 //
 // Requires the workspace to be built (pnpm run build); the root "verify" script runs it after the build and the tests.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -286,8 +289,12 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // package B09: the planned payment routes (see the header), generated from the application contracts, keyed "METHOD path"
+  // package B09: the payment routes (see the header), generated from the application contracts; a served one under "paths" with
+  // exactly the replies its route declares, a planned one under "x-kauro-planned" keyed "METHOD path"
   const planned = {};
+  const serve = (method, path, operation) => {
+    paths[path] = { ...(paths[path] ?? {}), [method.toLowerCase()]: operation };
+  };
   const PROVIDER_LABEL = { type: "string", pattern: "^[a-z][a-z0-9_-]{1,63}$" };
   for (const spec of Object.values(application.COMMERCE_COMMANDS)) {
     const command = registryCommands.find((c) => c.id === spec.id);
@@ -317,7 +324,7 @@ export function generateOpenApi(sources) {
       };
     }
     Object.assign(responses, problemResponses(application.COMMERCE_COMMAND_OUTCOMES[spec.id]));
-    planned[`${spec.method} ${spec.path}`] = {
+    const operation = {
       operationId: spec.name,
       summary: `${spec.id} ${spec.name}`,
       description: `Precondition: ${command.precondition}\n\nEffect: ${command.effect}\n\nFailure: ${command.failure}`,
@@ -355,11 +362,18 @@ export function generateOpenApi(sources) {
       ...(webhook ? { "x-kauro-normalized-command": { $ref: `${COMPONENTS}${spec.name}Request` } } : {}),
       responses,
     };
+    if (application.isServedCommerceCommand(spec.id)) {
+      // the route's own contract: the statuses it declares are the ones documented, nothing more (the check compares the schemas)
+      const contract = application.commerceCommandRouteResponses(spec.id, spec.name);
+      const documented = Object.keys(responses).filter((status) => Number(status) < 400);
+      if (!isDeepStrictEqual(documented.sort(), Object.keys(contract.declared).sort())) throw new Error(`${spec.id}: the documented replies ${documented} differ from the route's ${Object.keys(contract.declared)}`);
+      serve(spec.method, spec.path, operation);
+    } else planned[`${spec.method} ${spec.path}`] = operation;
   }
   for (const [operationId, spec] of Object.entries(application.COMMERCE_READ_ROUTES)) {
     const schemaId = application.commerceReadResponseSchemaId(operationId);
     addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
-    planned[`GET ${spec.path}`] = {
+    const operation = {
       operationId,
       summary: spec.summary,
       description: `Authority: ${spec.authority}`,
@@ -378,6 +392,8 @@ export function generateOpenApi(sources) {
         ...problemResponses(application.COMMERCE_READ_OUTCOMES[operationId]),
       },
     };
+    if (application.isServedCommerceRead(operationId)) serve("GET", spec.path, operation);
+    else planned[`GET ${spec.path}`] = operation;
   }
 
   for (const route of operationalRoutes) {
@@ -446,7 +462,8 @@ export async function registeredRoutes() {
   // the real pg adapter, never connected: route registration opens no transaction, and the assertion below proves it
   const pool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
   try {
-    const unitOfWork = persistence.createUnitOfWorkFactory(pool, { clock: api.systemClock });
+    // the composition root's own factory: the commerce unit of work over the app pool (the request side's reads bind to it)
+    const unitOfWork = persistence.createCommerceUnitOfWorkFactory({ app: pool }, { clock: api.systemClock });
     // the readiness side of the database handle: the build's schema version, and a readiness read that refuses loudly, since
     // registering the routes serves no request (a probe answered here would be a defect of this tool, never a silent answer)
     const database = {
