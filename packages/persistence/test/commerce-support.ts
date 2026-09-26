@@ -5,10 +5,64 @@
 // legitimate writes (21 "Positive and negative symmetry"). The role boundary of B09-F1 is followed exactly: the request handlers
 // write the intent and the claim of a provider effect (T1, T2), the payment service settles what the provider reported (T3) and
 // alone issues and revokes entitlements. Aggregates are born in their machine's initial state (a capture in the status its first
-// observation shows, D-INIT-B1) and walk the listed edges, one version and one event per edge. Implementation mandate M1 replaces
-// the raw statements with the pg adapters of @kauro/domain ports/commerce.ts and keeps these scenarios.
+// observation shows, D-INIT-B1) and walk the listed edges, one version and one event per edge.
+//
+// Every write of an aggregate that has an adapter goes through it (implementation mandate M1): the commerce repositories of
+// @kauro/persistence (quotes, orders, attempts, captures, authorizations, refunds, fiscal profiles, the scope index), B06's
+// repositories (the agency's activation, the approval and the plan's approval) and B06's command journal, each on the test's own
+// connection and inside the transaction the test opened, so a scenario can still hold, probe or roll back what it wrote. The
+// adapters publish the event of each version (commerceVersionEventType) through the fixtures' event sink, which records the event
+// row exactly as the raw fixtures did — without outbox records, whose routing the adapter tests prove through the unit of work's
+// PgEventPublisher (b09-critique's B09-N1 inserts the outbox records it probes itself). A database refusal reaches the test as the
+// PostgreSQL error the adapter translated (its SQLSTATE and constraint), so the tests keep asserting the database's own verdict.
+// What no adapter writes stays SQL of its owner: the control plane's configuration (@kauro/persistence/testing commerce-fixtures),
+// a replacement revision's lineage (the source lifecycle's, B07) and the raw event of a probe (commerceEvent).
 import type { Client } from "pg";
-import { ids, sealedSource, sha, stepUpProof, targetContract, plan, type AgencyFixture } from "./support.js";
+import type { Sha256Hex } from "@kauro/contracts";
+import {
+  assertAllowlistedPayload,
+  isDomainFailure,
+  payloadDigest,
+  toUtcInstant,
+  type ActorRef,
+  type AgencyId,
+  type ApprovalId,
+  type AssuranceProofId,
+  type CapabilityId,
+  type CaptureId,
+  type CausationId,
+  type CommerceRepositories,
+  type CorrelationId,
+  type EligibilitySnapshotId,
+  type EventPublisher,
+  type FiscalIssuerRef,
+  type FiscalProfileId,
+  type JournalEntryId,
+  type MembershipId,
+  type MerchantRef,
+  type NewDomainEvent,
+  type PaymentAttemptId,
+  type PaymentOrderId,
+  type PaymentRouteId,
+  type PlanId,
+  type ProjectId,
+  type PublishedEvent,
+  type PurchaseRebindingId,
+  type QuoteId,
+  type RefundId,
+  type ScopeIndex,
+  type ServiceMode,
+  type TaxRuleSnapshot,
+  type UserId,
+} from "@kauro/domain";
+import { PgCommandJournal } from "../src/command-journal.js";
+import { EVENT_COLUMNS, eventRecord } from "../src/event-publisher.js";
+import { createCommerceRepositories } from "../src/repositories/commerce-repositories.js";
+import { PgApprovalRepository, PgPlanRepository } from "../src/repositories/plans.js";
+import { PgAgencyRepository, actorColumns } from "../src/repositories/tenancy.js";
+import { isDatabaseError } from "../src/sql.js";
+import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute } from "../src/testing/commerce-fixtures.js";
+import { clock, ids, sealedSource, sha, stepUpProof, targetContract, plan, type AgencyFixture } from "./support.js";
 
 export const PROVIDER = "paypal";
 export const ENVIRONMENT = "SANDBOX";
@@ -45,31 +99,81 @@ export async function within<T>(client: Client, ctx: CommerceContext, fn: (c: Cl
 export type Actor = { readonly kind: "USER"; readonly id: string } | { readonly kind: "SERVICE"; readonly id: string };
 export const PAYMENT_SERVICE: Actor = { kind: "SERVICE", id: "payment-service" };
 
-/** Appends the domain event of an aggregate version (what the EventPublisher adapter does; the payload allowlist is the publisher's). */
-export async function commerceEvent(c: Client, aggregateKind: string, aggregateId: string, aggregateVersion: number, agencyId: string, eventType: string, actor: Actor): Promise<string> {
+/** The raw event row of an aggregate version (the event sink of the fixtures and the probes: no outbox record). */
+async function insertEvent(c: Client, e: { aggregateKind: string; aggregateId: string; aggregateVersion: number; agencyId: string | null; eventType: string; actor: { kind: string; id: string | null }; causationId: string; correlationId: string; payload: Readonly<Record<string, unknown>> }) {
   const eventId = ids.next();
-  await c.query(
+  const r = await c.query(
     `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '{}'::jsonb, $11, '1', now())`,
-    [eventId, aggregateKind, aggregateId, aggregateVersion, agencyId, eventType, actor.kind, actor.id, ids.next(), ids.next(), sha("{}")],
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, '1', now()) RETURNING ${EVENT_COLUMNS}`,
+    [eventId, e.aggregateKind, e.aggregateId, e.aggregateVersion, e.agencyId, e.eventType, e.actor.kind, e.actor.id, e.causationId, e.correlationId, JSON.stringify(e.payload), payloadDigest(e.payload as never)],
   );
-  return eventId;
+  return r.rows[0];
 }
+
+/** Appends the domain event of an aggregate version with an empty payload (the raw probe of a test; the fixtures publish through the adapters). */
+export async function commerceEvent(c: Client, aggregateKind: string, aggregateId: string, aggregateVersion: number, agencyId: string, eventType: string, actor: Actor): Promise<string> {
+  const row = await insertEvent(c, { aggregateKind, aggregateId, aggregateVersion, agencyId, eventType, actor, causationId: ids.next(), correlationId: ids.next(), payload: {} });
+  return String((row as { event_id: string }).event_id);
+}
+
+/** The fixtures' EventPublisher: the adapters' event row with its allowlisted payload, recorded by the connection's own role. */
+class FixtureEvents implements Pick<EventPublisher, "publish"> {
+  constructor(private readonly c: Client) {}
+  async publish(event: NewDomainEvent): Promise<PublishedEvent> {
+    assertAllowlistedPayload(event.eventType, event.payload);
+    const row = await insertEvent(this.c, { ...event, actor: actorColumns(event.actor) });
+    return { event: eventRecord(row), outbox: [] };
+  }
+}
+
+function actorRef(actor: Actor): ActorRef {
+  return actor.kind === "USER" ? { kind: "USER", userId: actor.id as UserId } : { kind: "SERVICE", serviceId: actor.id };
+}
+
+/** The commerce adapters on the test's own connection, publishing as `actor`. */
+function adapters(c: Client, actor: Actor): { readonly commerce: CommerceRepositories; readonly scopes: ScopeIndex } {
+  const built = createCommerceRepositories({
+    db: c,
+    ids,
+    clock,
+    events: new FixtureEvents(c),
+    provenance: () => ({ actor: actorRef(actor), causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId }),
+  });
+  return { commerce: built.repositories, scopes: built.scopes };
+}
+
+/** A database refusal reaches the test as PostgreSQL's own error (its SQLSTATE and constraint), not as the adapter's translation. */
+async function asDatabase<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (isDomainFailure(e) && isDatabaseError(e.cause)) throw e.cause;
+    throw e;
+  }
+}
+
+function applied<T>(outcome: { readonly kind: "APPLIED"; readonly record: T } | { readonly kind: "STALE"; readonly currentVersion: number; readonly currentState: string }, what: string): T {
+  if (outcome.kind !== "APPLIED") throw new Error(`${what} is stale: version ${outcome.currentVersion}, ${outcome.currentState}`);
+  return outcome.record;
+}
+
+const HOURS = 3_600_000;
 
 export const tenant = (ag: AgencyFixture, userId: string = ag.ownerUserId): CommerceContext => ({ agencyId: ag.agencyId, userId });
 export const operator = (userId: string, financeAgencyId: string): CommerceContext => ({ userId, financeAgencyId });
 export const service = (agencyId: string): CommerceContext => ({ agencyId });
 
-/** The owner accepts the agreements and activates the agency (Agency agreements_and_profile_accepted; CMD002 as it writes it). */
+/** The owner accepts the agreements and activates the agency (Agency agreements_and_profile_accepted, through B06's agency adapter). */
 export async function activateAgency(app: Client, ag: AgencyFixture): Promise<void> {
-  await within(app, tenant(ag), async (c) => {
-    const r = await c.query<{ version: string }>(
-      "UPDATE kauro.agencies SET state = 'ACTIVE', terms_version = 'T-1', privacy_agreement_version = 'P-1', legal_profile_ref = $2, version = version + 1 WHERE agency_id = $1 AND state = 'DRAFT' RETURNING version",
-      [ag.agencyId, ids.next()],
-    );
-    const version = Number(r.rows[0]!.version);
-    await commerceEvent(c, "agency", ag.agencyId, version, ag.agencyId, "agency.activated.v1", { kind: "USER", id: ag.ownerUserId });
-  });
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const activated = applied(
+        await new PgAgencyRepository(c).transition(ag.agencyId as AgencyId, 1, { state: "ACTIVE", termsVersion: "T-1", privacyAgreementVersion: "P-1", legalProfileRef: ids.next() }, clock.now()),
+        "agency activation",
+      );
+      await commerceEvent(c, "agency", ag.agencyId, activated.version, ag.agencyId, "agency.activated.v1", { kind: "USER", id: ag.ownerUserId });
+    }),
+  );
 }
 
 export interface ApprovedSubject {
@@ -86,7 +190,8 @@ export interface ApprovedSubject {
 
 /**
  * A revision of the project that explicitly supersedes `supersedes` (B06 dataset_revisions.supersedes_revision_id; the lineage the
- * source lifecycle records, B07 D-REV-1), walked DRAFT -> INSPECTING -> READY_TO_SEAL -> SEALED with one event per edge.
+ * source lifecycle records, B07 D-REV-1), walked DRAFT -> INSPECTING -> READY_TO_SEAL -> SEALED with one event per edge. The source
+ * lifecycle is package B07's: no adapter of this branch walks a revision, so its owner's statements stand here (design §15 item 9).
  */
 export async function replacementSource(app: Client, ag: AgencyFixture, projectId: string, supersedes: string, seed: string): Promise<{ revisionId: string; manifestHash: string }> {
   const revisionId = ids.next();
@@ -105,7 +210,10 @@ export async function replacementSource(app: Client, ag: AgencyFixture, projectI
   return { revisionId, manifestHash };
 }
 
-/** A VALIDATED plan of the project over a sealed source and a confirmed target, approved by the agency owner with a fresh step-up (CMD025). */
+/**
+ * A VALIDATED plan of the project over a sealed source and a confirmed target, approved by the agency owner with a fresh step-up
+ * (CMD025): the approval and the plan's approval through B06's approval and plan adapters.
+ */
 export async function approvedSubject(app: Client, validator: Client, assurance: Client, ag: AgencyFixture, projectId: string, seed: string, source?: { revisionId: string; manifestHash: string }): Promise<ApprovedSubject> {
   source ??= await sealedSource(app, ag, projectId, seed);
   const target = await targetContract(app, ag, projectId, seed);
@@ -113,16 +221,29 @@ export async function approvedSubject(app: Client, validator: Client, assurance:
   const proof = await stepUpProof(assurance, { userId: ag.ownerUserId });
   const approvalId = ids.next();
   const approvalHash = sha(`approval-${approvalId}`);
-  await within(app, tenant(ag), async (c) => {
-    await c.query(
-      `INSERT INTO kauro.approvals (approval_id, agency_id, plan_id, actor_id, actor_membership_id, actor_membership_version, assurance_proof_ref, plan_hash, revision_hash, target_contract_hash, validation_receipt_hash, disclosures_hash, approval_hash, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, $10, $11, $12, now(), now())`,
-      [approvalId, ag.agencyId, p.planId, ag.ownerUserId, ag.ownerMembershipId, proof, p.bodyHash, p.revisionHash, p.targetContractHash, p.receiptHash, sha(`disclosures-${approvalId}`), approvalHash],
-    );
-    await commerceEvent(c, "approval", approvalId, 1, ag.agencyId, "approval.created.v1", { kind: "USER", id: ag.ownerUserId });
-    await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = 5 WHERE plan_id = $1 AND version = 4", [p.planId, approvalId]);
-    await commerceEvent(c, "plan", p.planId, 5, ag.agencyId, "plan.approved.v1", { kind: "USER", id: ag.ownerUserId });
-  });
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const approval = await new PgApprovalRepository(c).insert({
+        approvalId: approvalId as ApprovalId,
+        agencyId: ag.agencyId as AgencyId,
+        planId: p.planId as PlanId,
+        actorId: ag.ownerUserId as UserId,
+        actorMembershipId: ag.ownerMembershipId as MembershipId,
+        actorMembershipVersion: 1,
+        assuranceProofRef: proof as AssuranceProofId,
+        planHash: p.bodyHash,
+        revisionHash: p.revisionHash,
+        targetContractHash: p.targetContractHash,
+        validationReceiptHash: p.receiptHash as Sha256Hex,
+        disclosuresHash: sha(`disclosures-${approvalId}`),
+        approvalHash,
+        createdAt: clock.now(),
+      });
+      await commerceEvent(c, "approval", approvalId, approval.version, ag.agencyId, "approval.created.v1", { kind: "USER", id: ag.ownerUserId });
+      const approved = applied(await new PgPlanRepository(c).transition(p.planId as PlanId, 4, { state: "APPROVED", approvalId: approvalId as ApprovalId }, clock.now()), "plan approval");
+      await commerceEvent(c, "plan", p.planId, approved.version, ag.agencyId, "plan.approved.v1", { kind: "USER", id: ag.ownerUserId });
+    }),
+  );
   return { projectId, planId: p.planId, planHash: p.bodyHash, revisionId: source.revisionId, revisionHash: source.manifestHash, contractId: target.contractId, targetContractHash: target.bodyHash, approvalId, approvalHash };
 }
 
@@ -135,61 +256,51 @@ export interface Routes {
 
 /** The qualified merchant route and fiscal issuer route of the platform, as the control plane configures and qualifies them. */
 export async function qualifiedRoutes(control: Client): Promise<Routes> {
-  const routeId = ids.next();
-  const merchantRef = ids.next();
-  const payeeDigest = sha("merchant-payee");
-  await control.query(
-    `INSERT INTO kauro.payment_routes (route_id, provider, environment, merchant_ref, payee_digest, currency, integration_class, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, 'USD', 'CONTRACT_FAKE', now(), now())`,
-    [routeId, PROVIDER, ENVIRONMENT, merchantRef, payeeDigest],
-  );
-  await control.query("UPDATE kauro.payment_routes SET state = 'QUALIFIED', qualification_evidence_hashes = $2::jsonb, valid_from = now() WHERE route_id = $1", [routeId, JSON.stringify([sha("route-qualification")])]);
-  const issuerRef = ids.next();
-  await control.query(
-    `INSERT INTO kauro.fiscal_issuers (issuer_ref, jurisdiction, legal_identity_hash, legal_fact_status, route_kind, integration_class, numbering_authorization_ref, entitlement_evidence_hash, created_at, updated_at)
-     VALUES ($1, 'CO', $2, 'PROFESSIONALLY_CONFIRMED', 'PROVIDER_API', 'CONTRACT_FAKE', 'DIAN-18764000001', $3, now(), now())`,
-    [issuerRef, sha("issuer-legal-identity"), sha("issuer-entitlement")],
-  );
-  await control.query("UPDATE kauro.fiscal_issuers SET route_state = 'QUALIFIED', qualification_evidence_hashes = $2::jsonb, valid_from = now() - interval '1 day' WHERE issuer_ref = $1", [issuerRef, JSON.stringify([sha("issuer-qualification")])]);
-  return { routeId, merchantRef, payeeDigest, issuerRef };
+  const route = await recordQualifiedPaymentRoute(control, { provider: PROVIDER, environment: ENVIRONMENT });
+  const issuerRef = await recordQualifiedFiscalIssuer(control);
+  return { routeId: route.routeId, merchantRef: route.merchantRef, payeeDigest: route.payeeDigest, issuerRef };
 }
 
 /** An ACTIVE KAURO_OWNER grant of a corporate identity, provisioned by the control plane (D-CORP-B1). */
 export async function grantKauroOwner(control: Client, userId: string): Promise<string> {
-  const grantId = ids.next();
-  await control.query(
-    "INSERT INTO kauro.corporate_roles (grant_id, user_id, role, evidence_hash, granted_at, created_at, updated_at) VALUES ($1, $2, 'KAURO_OWNER', $3, now(), now(), now())",
-    [grantId, userId, sha(`grant-${grantId}`)],
-  );
-  return grantId;
+  return grantCorporateRole(control, userId as UserId);
 }
 
 export type Treatment = "REVIEW_REQUIRED" | "EXEMPT_EXPORT" | "DOMESTIC_TAXABLE";
 
-/** A reviewed fiscal profile version of the agency, recorded by the corporate owner in its finance scope (D-FISC-B1). */
+function ruleOf(treatment: Treatment): { readonly rule: "UNRESOLVED" | "ZERO_REVIEWED" | "RATE_HALF_UP"; readonly rate: number } {
+  return treatment === "REVIEW_REQUIRED" ? { rule: "UNRESOLVED", rate: 0 } : treatment === "EXEMPT_EXPORT" ? { rule: "ZERO_REVIEWED", rate: 0 } : { rule: "RATE_HALF_UP", rate: 1900 };
+}
+
+/**
+ * A reviewed fiscal profile version of the agency, recorded by the corporate owner in its finance scope (D-FISC-B1) through
+ * FiscalRepository.recordProfile: a successor supersedes its predecessor at exactly its own recorded instant (B09-N5).
+ */
 export async function fiscalProfile(app: Client, ownerUserId: string, ag: AgencyFixture, issuerRef: string, treatment: Treatment, supersedes?: string): Promise<string> {
   const profileId = ids.next();
-  const rule = treatment === "REVIEW_REQUIRED" ? ["UNRESOLVED", 0] : treatment === "EXEMPT_EXPORT" ? ["ZERO_REVIEWED", 0] : ["RATE_HALF_UP", 1900];
-  await within(app, operator(ownerUserId, ag.agencyId), async (c) => {
-    if (supersedes !== undefined) await c.query("UPDATE kauro.fiscal_profiles SET superseded_at = now() WHERE profile_id = $1", [supersedes]);
-    await c.query(
-      `INSERT INTO kauro.fiscal_profiles (profile_id, agency_id, operator_legal_ref, customer_legal_ref, service_classification, territory, tax_treatment, tax_rule, tax_rate_bps, evidence_hash, export_evidence_hash, reviewed_by_user_id, valid_from, supersedes_profile_id, created_at)
-       VALUES ($1, $2, $3, $4, 'Data services', 'Colombia and abroad', $5, $6, $7, $8, $9, $10, now() - interval '1 day', $11, now())`,
-      [
-        profileId,
-        ag.agencyId,
-        issuerRef,
-        ids.next(),
-        treatment,
-        rule[0],
-        rule[1],
-        sha(`fiscal-evidence-${profileId}`),
-        treatment === "EXEMPT_EXPORT" ? sha(`export-facts-${profileId}`) : null,
-        treatment === "REVIEW_REQUIRED" ? null : ownerUserId,
-        supersedes ?? null,
-      ],
-    );
-  });
+  const { rule, rate } = ruleOf(treatment);
+  await within(app, operator(ownerUserId, ag.agencyId), async (c) =>
+    asDatabase(async () => {
+      const recordedAt = clock.now();
+      const base = {
+        profileId: profileId as FiscalProfileId,
+        agencyId: ag.agencyId as AgencyId,
+        operatorLegalRef: issuerRef as FiscalIssuerRef,
+        customerLegalRef: ids.next(),
+        serviceClassification: "Data services",
+        territory: "Colombia and abroad",
+        taxTreatment: treatment,
+        taxRule: rule,
+        taxRateBps: rate,
+        evidenceHash: sha(`fiscal-evidence-${profileId}`),
+        validFrom: toUtcInstant(Date.parse(recordedAt) - 24 * HOURS),
+        recordedAt,
+      };
+      const withExport = treatment === "EXEMPT_EXPORT" ? { ...base, exportEvidenceHash: sha(`export-facts-${profileId}`) } : base;
+      const withReviewer = treatment === "REVIEW_REQUIRED" ? withExport : { ...withExport, reviewedByUserId: ownerUserId as UserId };
+      await adapters(c, { kind: "USER", id: ownerUserId }).commerce.fiscal.recordProfile(supersedes === undefined ? withReviewer : { ...withReviewer, supersedesProfileId: supersedes as FiscalProfileId });
+    }),
+  );
   return profileId;
 }
 
@@ -207,43 +318,77 @@ export interface QuoteFixture {
 }
 
 /**
- * A quote issued for the approved subject (CMD027 as the recurrence package will write it): R2-INITIAL HUBSPOT band 1 (129500),
- * the founding rate 2500 bps as the applied (maximum, never stacked) discount — R2-077: discount 32375, service 97125 — the
- * reviewed exempt-export treatment of the profile (tax 0), born DRAFT and issued (issue_quote), with its eligibility snapshot.
+ * A quote issued for the approved subject (CMD027 as the recurrence package will write it) through QuoteRepository.issue: R2-INITIAL
+ * HUBSPOT band 1 (129500), the founding rate 2500 bps as the applied (maximum, never stacked) discount — R2-077: discount 32375,
+ * service 97125 — the reviewed exempt-export treatment of the profile (tax 0), born DRAFT and issued (issue_quote), with its
+ * eligibility snapshot evaluated at the issuance instant.
  */
 export async function issuedQuote(app: Client, ag: AgencyFixture, subject: ApprovedSubject, profileId: string, issuerRef: string, options: { readonly discountCents?: number; readonly treatment?: Treatment; readonly replacesQuoteId?: string; readonly billableUnits?: number; readonly baseCents?: number } = {}): Promise<QuoteFixture> {
-  const quoteId = ids.next();
-  const snapshotId = ids.next();
+  const quoteId = ids.next() as QuoteId;
+  const snapshotId = ids.next() as EligibilitySnapshotId;
   const base = options.baseCents ?? 129500;
   const units = options.billableUnits ?? 40000;
   const discount = options.discountCents ?? 32375;
   const service = base - discount;
   const treatment = options.treatment ?? "EXEMPT_EXPORT";
-  const rule = treatment === "EXEMPT_EXPORT" ? { rule: "ZERO_REVIEWED", rate: 0, tax: 0 } : { rule: "RATE_HALF_UP", rate: 1900, tax: Math.floor((service * 1900 + 5000) / 10000) };
+  const rule: TaxRuleSnapshot = treatment === "DOMESTIC_TAXABLE" ? { treatment: "DOMESTIC_TAXABLE", rule: "RATE_HALF_UP", rateBps: 1900 } : { treatment: "EXEMPT_EXPORT", rule: "ZERO_REVIEWED", rateBps: 0 };
+  const tax = rule.rule === "RATE_HALF_UP" ? Math.floor((service * 1900 + 5000) / 10000) : 0;
   const termsHash = sha(`terms-${quoteId}`);
-  await within(app, tenant(ag), async (c) => {
-    await c.query(
-      `INSERT INTO kauro.quotes (quote_id, agency_id, project_id, plan_id, approval_id, revision_hash, plan_hash, target_contract_hash, billable_units, mode, price_policy_version, discount_policy_version,
-                                 base_service_cents, discount_bps, discount_cents, service_cents, fiscal_profile_id, issuer_ref, tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency,
-                                 eligibility_snapshot_id, terms_hash, terms_version, issued_at, expires_at, source_available_until, replaces_quote_id, created_by_membership_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $22, 'HUBSPOT', 'R2-INITIAL', 'R2-INITIAL', $9, 2500, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'USD',
-               $19, $20, 'TERMS-2026-01', now(), now() + interval '336 hours', now() + interval '168 hours', $23, $21, now(), now())`,
-      [
-        quoteId, ag.agencyId, subject.projectId, subject.planId, subject.approvalId, subject.revisionHash, subject.planHash, subject.targetContractHash,
-        base, discount, service, profileId, issuerRef, treatment, rule.rule, rule.rate, rule.tax, service + rule.tax, snapshotId, termsHash, ag.ownerMembershipId,
-        units, options.replacesQuoteId ?? null,
-      ],
-    );
-    await c.query(
-      `INSERT INTO kauro.price_eligibility_snapshots (snapshot_id, agency_id, quote_id, project_id, as_of, lookback_starts_at, qualifying_project_ids, qualifying_count, repeat_discount_bps, founding_slot_ref, founding_discount_bps, applied_discount_bps, policy_version, created_at)
-       VALUES ($1, $2, $3, $4, now(), now() - interval '8760 hours', '{}', 0, 0, $5, 2500, 2500, 'R2-INITIAL', now())`,
-      [snapshotId, ag.agencyId, quoteId, subject.projectId, ids.next()],
-    );
-    await commerceEvent(c, "quote", quoteId, 1, ag.agencyId, "quote.drafted.v1", { kind: "USER", id: ag.ownerUserId });
-    await c.query("UPDATE kauro.quotes SET state = 'ISSUED', version = 2 WHERE quote_id = $1 AND version = 1", [quoteId]);
-    await commerceEvent(c, "quote", quoteId, 2, ag.agencyId, "quote.issued.v1", { kind: "USER", id: ag.ownerUserId });
-  });
-  return { quoteId, projectId: subject.projectId, subject, serviceCents: service, taxCents: rule.tax, totalCents: service + rule.tax, termsHash, billableUnits: units, mode: "HUBSPOT", profileId };
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const issuedAt = clock.now();
+      const issuedMs = Date.parse(issuedAt);
+      await adapters(c, { kind: "USER", id: ag.ownerUserId }).commerce.quotes.issue(
+        {
+          quoteId,
+          agencyId: ag.agencyId as AgencyId,
+          projectId: subject.projectId as ProjectId,
+          planId: subject.planId as PlanId,
+          approvalId: subject.approvalId as ApprovalId,
+          revisionHash: subject.revisionHash,
+          planHash: subject.planHash,
+          targetContractHash: subject.targetContractHash,
+          billableUnits: units,
+          mode: "HUBSPOT",
+          pricePolicyVersion: "R2-INITIAL",
+          discountPolicyVersion: "R2-INITIAL",
+          baseServiceCents: BigInt(base),
+          discountBps: 2500,
+          discountCents: BigInt(discount),
+          serviceCents: BigInt(service),
+          fiscalProfileId: profileId as FiscalProfileId,
+          issuerRef: issuerRef as FiscalIssuerRef,
+          tax: rule,
+          taxCents: BigInt(tax),
+          totalCents: BigInt(service + tax),
+          eligibilitySnapshotId: snapshotId,
+          termsHash,
+          termsVersion: "TERMS-2026-01",
+          issuedAt,
+          expiresAt: toUtcInstant(issuedMs + 336 * HOURS),
+          sourceAvailableUntil: toUtcInstant(issuedMs + 168 * HOURS),
+          ...(options.replacesQuoteId === undefined ? {} : { replacesQuoteId: options.replacesQuoteId as QuoteId }),
+          createdByMembershipId: ag.ownerMembershipId as MembershipId,
+        },
+        {
+          snapshotId,
+          agencyId: ag.agencyId as AgencyId,
+          quoteId,
+          projectId: subject.projectId as ProjectId,
+          asOf: issuedAt,
+          lookbackStartsAt: toUtcInstant(issuedMs - 8760 * HOURS),
+          qualifyingProjectIds: [],
+          qualifyingCount: 0,
+          repeatDiscountBps: 0,
+          foundingSlotRef: ids.next(),
+          foundingDiscountBps: 2500,
+          appliedDiscountBps: 2500,
+          policyVersion: "R2-INITIAL",
+        },
+      );
+    }),
+  );
+  return { quoteId, projectId: subject.projectId, subject, serviceCents: service, taxCents: tax, totalCents: service + tax, termsHash, billableUnits: units, mode: "HUBSPOT", profileId };
 }
 
 export interface OrderFixture {
@@ -255,66 +400,78 @@ export interface OrderFixture {
   readonly settled: boolean;
 }
 
-/** A CMD028 journal entry of the agency (the intent the order and its first attempt name). */
+/** A command journal entry of the agency owner (the intent an order and its first attempt name), through B06's command journal. */
 export async function journalEntry(c: Client, ag: AgencyFixture, operation: string): Promise<string> {
-  const entryId = ids.next();
-  await c.query(
-    `INSERT INTO kauro.command_journal (entry_id, environment, actor_kind, actor_id, agency_id, operation, idempotency_key, request_digest, correlation_id, reserved_at, updated_at)
-     VALUES ($1, 'LOCAL', 'USER', $2, $3, $4, $5, $6, $7, now(), now())`,
-    [entryId, ag.ownerUserId, ag.agencyId, operation, `key_${entryId.replace(/-/g, "")}`, sha(`request-${entryId}`), ids.next()],
+  const key = `key_${ids.next().replace(/-/g, "")}`;
+  const reservation = await asDatabase(() =>
+    new PgCommandJournal(c, ids, clock).reserve(
+      { environment: "LOCAL", actor: { kind: "USER", userId: ag.ownerUserId as UserId }, agencyId: ag.agencyId as AgencyId, operation: operation as never, key },
+      sha(`request-${key}`),
+      ids.next(),
+    ),
   );
-  return entryId;
+  if (reservation.kind !== "RESERVED") throw new Error(`the ${operation} journal fixture was not RESERVED`);
+  return reservation.entryId;
 }
 
 /**
- * CreatePaymentOrder through the provider-effect protocol (D-PROTO-B1, D-PROTO-B5): T1 (request handlers) accepts the terms (ISSUED
- * -> ACCEPTED_FOR_CHECKOUT on the first order), records the order INTENT_CREATED and its PREPARED CREATE_ORDER attempt and the
- * PAYMENT_ORDER scope row; T2 (request handlers) commits the dispatch intent (CREATING, DISPATCHING with its deadline); T3 (the
- * payment service, in the agency it adopted) records the provider's authenticated creation (CONFIRMED, CREATED with the provider
- * order identity learned once, and its PROVIDER_ORDER scope row) — a provider fact the request handlers cannot write (B09-F1).
+ * CreatePaymentOrder through the provider-effect protocol (D-PROTO-B1, D-PROTO-B5) and the commerce adapters: T1 (request handlers)
+ * accepts the terms (ISSUED -> ACCEPTED_FOR_CHECKOUT on the first order), records the order INTENT_CREATED and its PREPARED
+ * CREATE_ORDER attempt and the PAYMENT_ORDER scope row; T2 (request handlers) commits the dispatch intent (CREATING; DISPATCHING with
+ * the database's deadline); T3 (the payment service, in the agency it adopted) records the provider's authenticated creation
+ * (CONFIRMED, CREATED with the provider order identity learned once, and its PROVIDER_ORDER scope row) — a provider fact the request
+ * handlers cannot write (B09-F1).
  */
 export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteFixture, routes: Routes, options: { readonly acceptQuote?: boolean; readonly payment?: Client } = {}): Promise<OrderFixture> {
-  const orderId = ids.next();
-  const attemptId = ids.next();
+  const orderId = ids.next() as PaymentOrderId;
+  const attemptId = ids.next() as PaymentAttemptId;
   const providerOrderId = `PO-${orderId.slice(-12)}`;
-  const actor: Actor = { kind: "USER", id: ag.ownerUserId };
-  await within(app, tenant(ag), async (c) => {
-    const entryId = await journalEntry(c, ag, "CMD028");
-    if (options.acceptQuote !== false) {
-      await c.query("UPDATE kauro.quotes SET state = 'ACCEPTED_FOR_CHECKOUT', version = 3 WHERE quote_id = $1 AND version = 2", [quote.quoteId]);
-      await commerceEvent(c, "quote", quote.quoteId, 3, ag.agencyId, "quote.accepted_for_checkout.v1", actor);
-    }
-    await c.query(
-      `INSERT INTO kauro.payment_orders (order_id, agency_id, project_id, quote_id, approval_id, provider, environment, route_id, merchant_ref, payee_digest, expected_amount_cents, expected_service_cents, expected_tax_cents, currency, terms_hash, idempotency_hash, created_by_membership_id, intent_entry_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'USD', $14, $15, $16, $17, now(), now())`,
-      [orderId, ag.agencyId, quote.projectId, quote.quoteId, quote.subject.approvalId, PROVIDER, ENVIRONMENT, routes.routeId, routes.merchantRef, routes.payeeDigest, quote.totalCents, quote.serviceCents, quote.taxCents, quote.termsHash, sha(`intent-${orderId}`), ag.ownerMembershipId, entryId],
-    );
-    await commerceEvent(c, "payment_order", orderId, 1, ag.agencyId, "payment_order.intent_created.v1", actor);
-    await c.query(
-      `INSERT INTO kauro.payment_attempts (attempt_id, agency_id, order_id, operation, ordinal, provider, environment, request_hash, provider_request_id, started_at, last_observed_at, intent_entry_id, created_at, updated_at)
-       VALUES ($1, $2, $3, 'CREATE_ORDER', 1, $4, $5, $6, $7, now(), now(), $8, now(), now())`,
-      [attemptId, ag.agencyId, orderId, PROVIDER, ENVIRONMENT, sha(`create-request-${orderId}`), `kauro-${attemptId}`, entryId],
-    );
-    await commerceEvent(c, "payment_attempt", attemptId, 1, ag.agencyId, "payment_attempt.prepared.v1", actor);
-    await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, created_at) VALUES ('PAYMENT_ORDER', $1, $2, $3, now())", [orderId, ag.agencyId, orderId]);
-  });
-  await within(app, tenant(ag), async (c) => {
-    await c.query("UPDATE kauro.payment_attempts SET state = 'DISPATCHING', dispatch_deadline_at = now() + interval '60 seconds', version = 2 WHERE attempt_id = $1 AND version = 1", [attemptId]);
-    await commerceEvent(c, "payment_attempt", attemptId, 2, ag.agencyId, "payment_attempt.dispatching.v1", actor);
-    await c.query("UPDATE kauro.payment_orders SET state = 'CREATING', version = 2 WHERE order_id = $1 AND version = 1", [orderId]);
-    await commerceEvent(c, "payment_order", orderId, 2, ag.agencyId, "payment_order.creating.v1", actor);
-  });
+  const agencyId = ag.agencyId as AgencyId;
+  const owner: Actor = { kind: "USER", id: ag.ownerUserId };
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const { commerce, scopes } = adapters(c, owner);
+      const entryId = (await journalEntry(c, ag, "CMD028")) as JournalEntryId;
+      const now = clock.now();
+      if (options.acceptQuote !== false) applied(await commerce.quotes.transition(quote.quoteId as QuoteId, 2, { state: "ACCEPTED_FOR_CHECKOUT" }, now), "the quote's acceptance");
+      await commerce.orders.insert({
+        orderId,
+        agencyId,
+        projectId: quote.projectId as ProjectId,
+        quoteId: quote.quoteId as QuoteId,
+        approvalId: quote.subject.approvalId as ApprovalId,
+        route: { routeId: routes.routeId as PaymentRouteId, provider: PROVIDER, environment: ENVIRONMENT, merchantRef: routes.merchantRef as MerchantRef, payeeDigest: routes.payeeDigest, currency: "USD" },
+        expectedAmountCents: BigInt(quote.totalCents),
+        expectedServiceCents: BigInt(quote.serviceCents),
+        expectedTaxCents: BigInt(quote.taxCents),
+        termsHash: quote.termsHash,
+        idempotencyHash: sha(`intent-${orderId}`),
+        createdByMembershipId: ag.ownerMembershipId as MembershipId,
+        intentEntryId: entryId,
+        createdAt: now,
+      });
+      await commerce.attempts.prepare({ attemptId, agencyId, orderId, operation: "CREATE_ORDER", ordinal: 1, provider: PROVIDER, environment: ENVIRONMENT, requestHash: sha(`create-request-${orderId}`), providerRequestId: `kauro-${attemptId}`, intentEntryId: entryId, startedAt: now });
+      await scopes.record({ kind: "PAYMENT_ORDER", key: orderId, agencyId, orderId }, now);
+    }),
+  );
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const { commerce } = adapters(c, owner);
+      const now = clock.now();
+      applied(await commerce.attempts.transition(attemptId, 1, { state: "DISPATCHING", lastObservedAt: now }, now), "the attempt's claim");
+      applied(await commerce.orders.transition(orderId, 1, { state: "CREATING" }, now), "the order's claim");
+    }),
+  );
   if (options.payment === undefined) return { orderId, quote, providerOrderId, createAttemptId: attemptId, settled: false };
-  await within(options.payment, service(ag.agencyId), async (c) => {
-    await c.query("UPDATE kauro.payment_attempts SET state = 'CONFIRMED', evidence_hash = $2, last_observed_at = now(), version = 3 WHERE attempt_id = $1 AND version = 2", [attemptId, sha(`create-evidence-${orderId}`)]);
-    await commerceEvent(c, "payment_attempt", attemptId, 3, ag.agencyId, "payment_attempt.confirmed.v1", PAYMENT_SERVICE);
-    await c.query(
-      "UPDATE kauro.payment_orders SET state = 'CREATED', provider_order_id = $2, provider_approval_url = $3, version = 3 WHERE order_id = $1 AND version = 2",
-      [orderId, providerOrderId, `https://www.sandbox.paypal.com/checkoutnow?token=${providerOrderId}`],
-    );
-    await commerceEvent(c, "payment_order", orderId, 3, ag.agencyId, "payment_order.created.v1", PAYMENT_SERVICE);
-    await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, created_at) VALUES ('PROVIDER_ORDER', $1, $2, $3, now())", [`${PROVIDER}|${ENVIRONMENT}|${providerOrderId}`, ag.agencyId, orderId]);
-  });
+  await within(options.payment, service(ag.agencyId), async (c) =>
+    asDatabase(async () => {
+      const { commerce, scopes } = adapters(c, PAYMENT_SERVICE);
+      const now = clock.now();
+      applied(await commerce.attempts.transition(attemptId, 2, { state: "CONFIRMED", lastObservedAt: now, evidenceHash: sha(`create-evidence-${orderId}`) }, now), "the attempt's result");
+      applied(await commerce.orders.transition(orderId, 2, { state: "CREATED", providerOrderId, providerApprovalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${providerOrderId}` }, now), "the order's creation");
+      await scopes.record({ kind: "PROVIDER_ORDER", key: `${PROVIDER}|${ENVIRONMENT}|${providerOrderId}`, agencyId, orderId }, now);
+    }),
+  );
   return { orderId, quote, providerOrderId, createAttemptId: attemptId, settled: true };
 }
 
@@ -337,38 +494,72 @@ export interface CaptureInput {
 }
 
 /**
- * A capture fact of the order, born in the status of its first authenticated observation (D-INIT-B1) with its funds UNKNOWN (an
- * availability is a version of its own, capture.funds_observed.v1; D-EVT-B3), with the event of that status.
+ * A capture fact of the order through CaptureFactRepository.insert, born in the status of its first authenticated observation
+ * (D-INIT-B1) with its funds UNKNOWN (an availability is a version of its own, capture.funds_observed.v1; D-EVT-B3), publishing the
+ * event of that status. The input may carry what the database must refuse (a REVERSED birth, known funds): the adapter writes it
+ * as given and the database answers.
  */
 export async function insertCapture(c: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, actor: Actor): Promise<string> {
-  const captureId = ids.next();
+  const captureId = ids.next() as CaptureId;
   const status = input.status ?? "COMPLETED";
-  await c.query(
-    `INSERT INTO kauro.capture_facts (capture_id, agency_id, order_id, status, provider, environment, provider_capture_id, merchant_ref, payee_digest, amount_cents, currency, allocated_service_cents, allocated_tax_cents, excess_cents, funds_state, provider_fee_cents, provider_completed_at, first_observation_source, first_observed_at, observed_at, evidence_hash, attempt_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'USD', $11, $12, $13, $17, $14, $15, 'WEBHOOK', now(), now(), $16, $18, now(), now())`,
-    [
-      captureId, ag.agencyId, order.orderId, status, PROVIDER, ENVIRONMENT, `CAP-${captureId.slice(-12)}`, routes.merchantRef, input.payeeDigest ?? routes.payeeDigest, input.amountCents,
-      input.serviceCents, input.taxCents, input.excessCents, input.feeCents ?? null, status === "COMPLETED" || status === "REVERSED" ? new Date() : null, sha(`capture-evidence-${captureId}`),
-      input.fundsState ?? "UNKNOWN", input.attemptId ?? null,
-    ],
+  const now = clock.now();
+  await asDatabase(() =>
+    adapters(c, actor).commerce.captures.insert({
+      captureId,
+      agencyId: ag.agencyId as AgencyId,
+      orderId: order.orderId as PaymentOrderId,
+      status: status as "COMPLETED",
+      provider: PROVIDER,
+      environment: ENVIRONMENT,
+      providerCaptureId: `CAP-${captureId.slice(-12)}`,
+      merchantRef: routes.merchantRef as MerchantRef,
+      payeeDigest: input.payeeDigest ?? routes.payeeDigest,
+      amountCents: BigInt(input.amountCents),
+      allocation: { serviceCents: BigInt(input.serviceCents), taxCents: BigInt(input.taxCents), excessCents: BigInt(input.excessCents) },
+      fundsState: (input.fundsState ?? "UNKNOWN") as "UNKNOWN",
+      ...(input.feeCents === undefined ? {} : { providerFeeCents: BigInt(input.feeCents) }),
+      ...(status === "COMPLETED" || status === "REVERSED" ? { providerCompletedAt: now } : {}),
+      firstObservationSource: "WEBHOOK",
+      observedAt: now,
+      evidenceHash: sha(`capture-evidence-${captureId}`),
+      ...(input.attemptId === undefined ? {} : { attemptId: input.attemptId as PaymentAttemptId }),
+    }),
   );
-  await commerceEvent(c, "capture", captureId, 1, ag.agencyId, `capture.${status.toLowerCase()}.v1`, actor);
   return captureId;
 }
 
 /**
- * The authorization a capture that alone pays the whole obligation carries (07 "CommercialAuthorization"); with `rebound`, the
- * entitlement of a replacement quote issued under a re-binding of the order's capture (D-QUOTE-B6).
+ * The authorization a capture that alone pays the whole obligation carries (07 "CommercialAuthorization"), through
+ * CommercialAuthorizationRepository.issue; with `rebound`, the entitlement of a replacement quote issued under a re-binding of the
+ * order's capture (D-QUOTE-B6).
  */
 export async function insertAuthorization(c: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, capabilityId: string, actor: Actor, rebound?: { readonly quote: QuoteFixture; readonly orderQuoteId: string; readonly rebindingId: string }): Promise<string> {
   const authorizationId = ids.next();
   const q = rebound?.quote ?? order.quote;
-  await c.query(
-    `INSERT INTO kauro.commercial_authorizations (authorization_id, agency_id, project_id, quote_id, order_id, order_quote_id, capture_id, rebinding_id, approval_id, approval_hash, plan_id, plan_hash, revision_hash, target_contract_hash, capability_id, capability_version, mode, billable_units, honored_after_price_expiry, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $16, $6, $17, $7, $8, $9, $10, $11, $12, $13, 'R2-INITIAL', $14, $15, false, now(), now())`,
-    [authorizationId, ag.agencyId, q.projectId, q.quoteId, order.orderId, captureId, q.subject.approvalId, q.subject.approvalHash, q.subject.planId, q.subject.planHash, q.subject.revisionHash, q.subject.targetContractHash, capabilityId, q.mode, q.billableUnits, rebound?.orderQuoteId ?? q.quoteId, rebound?.rebindingId ?? null],
+  await asDatabase(() =>
+    adapters(c, actor).commerce.authorizations.issue({
+      authorizationId: authorizationId as never,
+      agencyId: ag.agencyId as AgencyId,
+      projectId: q.projectId as ProjectId,
+      quoteId: q.quoteId as QuoteId,
+      orderId: order.orderId as PaymentOrderId,
+      orderQuoteId: (rebound?.orderQuoteId ?? q.quoteId) as QuoteId,
+      captureId: captureId as CaptureId,
+      ...(rebound === undefined ? {} : { rebindingId: rebound.rebindingId as PurchaseRebindingId }),
+      approvalId: q.subject.approvalId as ApprovalId,
+      approvalHash: q.subject.approvalHash,
+      planId: q.subject.planId as PlanId,
+      planHash: q.subject.planHash,
+      revisionHash: q.subject.revisionHash,
+      targetContractHash: q.subject.targetContractHash,
+      capabilityId: capabilityId as CapabilityId,
+      capabilityVersion: "R2-INITIAL",
+      mode: q.mode as ServiceMode,
+      billableUnits: q.billableUnits,
+      honoredAfterPriceExpiry: false,
+      createdAt: clock.now(),
+    }),
   );
-  await commerceEvent(c, "commercial_authorization", authorizationId, 1, ag.agencyId, "commercial_authorization.issued.v1", actor);
   return authorizationId;
 }
 
@@ -380,49 +571,78 @@ export async function insertAuthorization(c: Client, ag: AgencyFixture, order: O
 export async function observedCapture(payment: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, capabilityId: string | null, orderVersion = 3): Promise<{ captureId: string; authorizationId: string | null }> {
   return within(payment, service(ag.agencyId), async (c) => {
     const captureId = await insertCapture(c, ag, order, routes, input, PAYMENT_SERVICE);
-    await c.query("UPDATE kauro.payment_orders SET state = 'CAPTURED', version = $2 WHERE order_id = $1 AND version = $3", [order.orderId, orderVersion + 1, orderVersion]);
-    await commerceEvent(c, "payment_order", order.orderId, orderVersion + 1, ag.agencyId, "payment_order.captured.v1", PAYMENT_SERVICE);
+    await asDatabase(async () => applied(await adapters(c, PAYMENT_SERVICE).commerce.orders.transition(order.orderId as PaymentOrderId, orderVersion, { state: "CAPTURED" }, clock.now()), "the order's capture"));
     const authorizationId = capabilityId === null ? null : await insertAuthorization(c, ag, order, captureId, capabilityId, PAYMENT_SERVICE);
     return { captureId, authorizationId };
   });
 }
 
-/** CMD031 as the request handlers write it: a REQUESTED customer refund of the capture with the agency's reason (a label). */
+/** CMD031 as the request handlers write it through RefundRepository.request: a REQUESTED customer refund with the agency's reason (a label). */
 export async function requestRefund(app: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, proposed: { readonly serviceCents: number; readonly taxCents: number }, reason = "Client cancelled before execution"): Promise<string> {
-  const refundId = ids.next();
-  await within(app, tenant(ag), async (c) => {
-    await c.query(
-      `INSERT INTO kauro.refunds (refund_id, agency_id, project_id, order_id, capture_id, provider, environment, origin, reason_code, evidence_ref, terms_hash, delivery_phase, proposed_service_cents, proposed_tax_cents, proposed_excess_cents, requested_by_membership_id, requested_by_user_id, requested_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'CUSTOMER_REQUEST', $8, $9, $10, 'PRE_EXECUTION', $11, $12, 0, $13, $14, now(), now(), now())`,
-      [refundId, ag.agencyId, order.quote.projectId, order.orderId, captureId, PROVIDER, ENVIRONMENT, reason, ids.next(), order.quote.termsHash, proposed.serviceCents, proposed.taxCents, ag.ownerMembershipId, ag.ownerUserId],
-    );
-    await commerceEvent(c, "refund", refundId, 1, ag.agencyId, "refund.requested.v1", { kind: "USER", id: ag.ownerUserId });
-    await c.query("INSERT INTO kauro.commerce_scopes (scope_kind, scope_key, agency_id, order_id, refund_id, created_at) VALUES ('REFUND', $1, $2, $3, $4, now())", [refundId, ag.agencyId, order.orderId, refundId]);
-  });
+  const refundId = ids.next() as RefundId;
+  await within(app, tenant(ag), async (c) =>
+    asDatabase(async () => {
+      const { commerce, scopes } = adapters(c, { kind: "USER", id: ag.ownerUserId });
+      const now = clock.now();
+      await commerce.refunds.request({
+        refundId,
+        agencyId: ag.agencyId as AgencyId,
+        projectId: order.quote.projectId as ProjectId,
+        orderId: order.orderId as PaymentOrderId,
+        captureId: captureId as CaptureId,
+        origin: "CUSTOMER_REQUEST",
+        reasonCode: reason,
+        evidenceRef: ids.next() as never,
+        termsHash: order.quote.termsHash,
+        deliveryPhase: "PRE_EXECUTION",
+        proposed: { serviceCents: BigInt(proposed.serviceCents), taxCents: BigInt(proposed.taxCents), excessCents: 0n },
+        requestedByMembershipId: ag.ownerMembershipId as MembershipId,
+        requestedByUserId: ag.ownerUserId as UserId,
+        requestedAt: now,
+      });
+      await scopes.record({ kind: "REFUND", key: refundId, agencyId: ag.agencyId as AgencyId, orderId: order.orderId as PaymentOrderId, refundId }, now);
+    }),
+  );
   return refundId;
 }
 
-/** CMD032's write as the corporate owner performs it in the finance scope: the immutable intent under the owner's own step-up. */
+/**
+ * CMD032's write as the corporate owner performs it in the finance scope, through RefundRepository.approve: the immutable intent
+ * under the owner's own step-up (or a cited standing policy). A refund the reviewer cannot see answers NO_ROW, as a raw review did.
+ */
 export async function approveRefund(app: Client, assurance: Client, approverUserId: string, ag: AgencyFixture, refundId: string, amounts: { readonly serviceCents: number; readonly taxCents: number; readonly excessCents?: number }, options: { readonly isolation?: string; readonly policyId?: string } = {}): Promise<void> {
   const proof = options.policyId === undefined ? await stepUpProof(assurance, { userId: approverUserId }) : null;
   await within(
     app,
     operator(approverUserId, ag.agencyId),
     async (c) => {
-      const r = await c.query(
-        `UPDATE kauro.refunds SET state = 'APPROVED', version = 2, approved_service_cents = $2, approved_tax_cents = $3, approved_excess_cents = $4,
-                authorization_kind = $5, authorization_proof_ref = $6, authorization_policy_id = $7, authorization_hash = $8, effects_hash = $9,
-                credit_note_required = $10, approved_by_user_id = $11, approved_at = now()
-          WHERE refund_id = $1 AND version = 1`,
-        [
-          refundId, amounts.serviceCents, amounts.taxCents, amounts.excessCents ?? 0, options.policyId === undefined ? "OWNER_STEP_UP" : "STANDING_POLICY", proof, options.policyId ?? null,
-          sha(`authorization-${refundId}`), sha(`effects-${refundId}`), amounts.serviceCents + amounts.taxCents > 0, approverUserId,
-        ],
-      );
-      if (r.rowCount !== 1) throw Object.assign(new Error(`refund ${refundId} was not visible to the reviewer`), { code: "NO_ROW" });
-      await commerceEvent(c, "refund", refundId, 2, ag.agencyId, "refund.approved.v1", { kind: "USER", id: approverUserId });
+      const now = clock.now();
+      let outcome;
+      try {
+        outcome = await asDatabase(() =>
+          adapters(c, { kind: "USER", id: approverUserId }).commerce.refunds.approve(
+            refundId as RefundId,
+            1,
+            {
+              amounts: { serviceCents: BigInt(amounts.serviceCents), taxCents: BigInt(amounts.taxCents), excessCents: BigInt(amounts.excessCents ?? 0) },
+              authorizationKind: options.policyId === undefined ? "OWNER_STEP_UP" : "STANDING_POLICY",
+              ...(proof === null ? {} : { authorizationProofRef: proof as AssuranceProofId }),
+              ...(options.policyId === undefined ? {} : { authorizationPolicyId: options.policyId as never }),
+              authorizationHash: sha(`authorization-${refundId}`),
+              effectsHash: sha(`effects-${refundId}`),
+              creditNoteRequired: amounts.serviceCents + amounts.taxCents > 0,
+              approvedByUserId: approverUserId as UserId,
+              approvedAt: now,
+            },
+            now,
+          ),
+        );
+      } catch (e) {
+        if (isDomainFailure(e) && e.code === "NOT_FOUND" && e.cause === undefined) throw Object.assign(new Error(`refund ${refundId} was not visible to the reviewer`), { code: "NO_ROW" });
+        throw e;
+      }
+      if (outcome.kind !== "APPLIED") throw Object.assign(new Error(`refund ${refundId} was not at version 1 for the reviewer`), { code: "NO_ROW" });
     },
     options.isolation,
   );
 }
-
