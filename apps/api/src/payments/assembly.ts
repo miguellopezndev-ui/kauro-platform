@@ -34,8 +34,17 @@ export interface PaymentServiceAdapters {
   readonly lineage?: SourceLineageReader;
 }
 
-/** Where a crash of the provider-effect protocol may be injected (tests only; ProviderCommandRun.hold). */
-export type PaymentHold = (command: "CMD033", point: ProtocolPoint, operation: DurableOperation | null) => Promise<void>;
+/** The command a hold point belongs to. */
+export type PaymentHoldCommand = "CMD030" | "CMD033" | "CMD034";
+
+/**
+ * Where a crash may be injected, or an interleaving fixed (tests only, like the B06 hold points): the provider-effect protocol's
+ * points of CMD033 (ProviderCommandRun.hold); CMD030 after the ingress committed the delivery and inside the application before it
+ * commits; CMD034 inside its unit of work before it commits.
+ */
+export type PaymentHoldPoint = ProtocolPoint | "AFTER_INGRESS" | "APPLICATION_BEFORE_COMMIT";
+
+export type PaymentHold = (command: PaymentHoldCommand, point: PaymentHoldPoint, operation: DurableOperation | null) => Promise<void>;
 
 /** Everything the payment service's routes, consumers and workers need. */
 export interface PaymentServiceAssembly extends PaymentServiceAdapters {

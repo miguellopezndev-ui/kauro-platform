@@ -89,6 +89,8 @@ export async function receiveWebhook(rt: PaymentRuntime, validator: SchemaValida
   }
   const recorded = await rt.assembly.ingress.record({ inboxId: rt.ids.next() as InboxId, provider: event.provider, environment: event.environment, externalEventId: event.externalEventId, bodyHash: event.bodyHash, receivedAt });
   await rt.assembly.ingressFacts.record({ outcome: "ALLOW", actor: { kind: "SERVICE", serviceId: PROVIDER_INGRESS_ID }, reasonCode: "PROVIDER_EVENT_AUTHENTICATED", policyVersion: COMMERCE_POLICY_VERSION, correlationId, occurredAt: rt.clock.now() });
+  // the delivery is durable from here on (a crash now leaves a RECEIVED record the inbox worker applies once)
+  await rt.assembly.hold?.("CMD030", "AFTER_INGRESS", null);
   let inboxState: InboxState = "RECEIVED";
   try {
     inboxState = recorded.kind === "BODY_CONFLICT" ? await settleConflict(rt, recorded.inboxId, correlationId) : await applyInboxRecord(rt, recorded.inboxId, event, correlationId);
@@ -112,6 +114,7 @@ export async function applyInboxRecord(rt: PaymentRuntime, inboxId: InboxId, eve
     // the order the event was attributed to, for a completion that needs a provider query (D-PAY-B6)
     let orderId: PaymentOrderId | null = null;
     if (applied.kind === "APPLIED" && applied.result.providerQueryRequired) orderId = await attributedOrder(uow, event);
+    await rt.assembly.hold?.("CMD030", "APPLICATION_BEFORE_COMMIT", null);
     return { state: entry?.state ?? "RECEIVED", orderId };
   });
   if (outcome.orderId !== null) await reconcileByQuery(rt, outcome.orderId, correlationId);

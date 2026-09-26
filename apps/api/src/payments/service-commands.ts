@@ -221,6 +221,7 @@ export async function reconcilePayment(rt: PaymentRuntime, request: ServiceComma
         if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();
         if (reservation.kind === "PENDING") throw new DomainFailure("PRECONDITION_FAILED", "the same logical operation is still pending", { reason: "OPERATION_PENDING" }, true);
         const view = await applyStoredQuery(rt, uow, { orderId, stored, observationRef: request.body.observationRef, causationId: reservation.entryId as string as CausationId });
+        await rt.assembly.hold?.("CMD034", "INTENT_BEFORE_COMMIT", null);
         const committed = await uow.journal.commit(reservation.entryId, { responseStatus: 200, responseBody: view, resourceKind: "payment_order", resourceId: orderId });
         if (committed.state !== "COMMITTED" || committed.responseStatus !== 200 || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
         return { replay: false, status: 200, view: committed.responseBody as ReconcilePaymentView, version: view.order.version };

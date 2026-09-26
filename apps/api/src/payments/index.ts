@@ -61,7 +61,7 @@ export function createPaymentService(input: {
 }
 
 export { openPaymentPools, PAYMENT_APPLICATION_NAME } from "./assembly.js";
-export type { PaymentServiceAssembly, PaymentServiceAdapters, PaymentDatabases, PaymentPools, PaymentHold } from "./assembly.js";
+export type { PaymentServiceAssembly, PaymentServiceAdapters, PaymentDatabases, PaymentPools, PaymentHold, PaymentHoldCommand, PaymentHoldPoint } from "./assembly.js";
 export { PAYMENT_SERVICE_ID, PROVIDER_INGRESS_ID, SERVICE_AUDIENCE, pgPurchasedSubjectReader } from "./runtime.js";
 export type { PaymentRuntime } from "./runtime.js";
 export { NotDueYet, recordServiceDenial, storeProviderQuery, watchAttempt } from "./service-commands.js";
