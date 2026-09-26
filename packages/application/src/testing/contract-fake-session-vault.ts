@@ -27,9 +27,20 @@ const TAG_BYTES = 16;
 /** The registry bound of a sealed secret (ciphertext with its tag, 17..8,192 bytes): at most 8,176 plaintext bytes. */
 const MAX_PLAINTEXT_BYTES = 8_192 - TAG_BYTES;
 
+/** The `purpose` member of the associated data, so a sealed session secret can never authenticate as another kind of secret. */
+export const CONTRACT_FAKE_VAULT_AAD_PURPOSE = "kauro upload session secret";
+
 /** The labelled TEST KEY: SHA-256 of a public label, so it can never be mistaken for, or be, a deployment's key. */
 function testKey(label: string): Uint8Array {
   return createHash("sha256").update(`Kauro contract-fake vault TEST KEY (SIMULATED, never a deployment key): ${label}`).digest();
+}
+
+/**
+ * The labelled TEST KEY a fake vault holds under `keyRef` — public by construction (the digest of a public label), published so a
+ * test can decrypt a sealed secret independently with AES-256-GCM and prove the algorithm and the associated data.
+ */
+export function contractFakeVaultTestKey(keyRef: string): Uint8Array {
+  return new Uint8Array(testKey(keyRef));
 }
 
 export type ContractFakeVaultRefusalReason =
@@ -142,6 +153,6 @@ export class ContractFakeSessionVault implements SessionVaultPort {
     if (!isUuid(agencyId) || !isUuid(uploadId) || !isUuid(requestedByUserId) || !Number.isSafeInteger(sessionAttempt) || sessionAttempt < 1) {
       throw new ContractFakeVaultRefusal("MALFORMED");
     }
-    return canonicalBytes({ purpose: "kauro upload session secret", keyRef: this.keyRef, agencyId, uploadId, requestedByUserId, sessionAttempt });
+    return canonicalBytes({ purpose: CONTRACT_FAKE_VAULT_AAD_PURPOSE, keyRef: this.keyRef, agencyId, uploadId, requestedByUserId, sessionAttempt });
   }
 }

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
-import { DomainFailure, EVENT_SUBSCRIPTIONS, FAILURE_REASONS } from "@kauro/domain";
+import { DomainFailure, EVENT_SUBSCRIPTIONS, FAILURE_REASONS, machine, type MachineName } from "@kauro/domain";
 import {
   AUTHORITY_TOMBSTONES,
   B07_COMMANDS,
@@ -257,14 +257,43 @@ test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombs
   assert.deepEqual(Object.keys(AUTHORITY_TOMBSTONES).sort(), routed);
   assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.expired.v1"], { kind: "REVISION_EXPIRED", state: "EXPIRED" });
   assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.rejected.v1"], { kind: "REVISION_REJECTED", state: "REJECTED" });
-  const terminal = new Set(["CANCELLED", "EXPIRED", "REJECTED", "SUPERSEDED", "DELETED", "REVOKED"]);
-  for (const [eventType, t] of Object.entries(AUTHORITY_TOMBSTONES)) assert.ok(terminal.has(t.state), `${eventType} records a terminal state`);
+  // D-RESTORE-2 (residual FINAL-N1): the state a tombstone names is derived from the subject's own machine, never from a literal
+  // list — a state the machine enters by one of its edges, from which it never leads back to a live state (every state reachable
+  // from it is itself a tombstoned state of that subject), and every terminal state of the machine is tombstoned.
+  const subjectMachine: Readonly<Record<string, MachineName>> = { upload_session: "UploadSession", dataset_revision: "DatasetRevision", source_file: "SourceFile" };
+  const tombstoned = new Map<MachineName, Set<string>>();
+  const entries = Object.entries(AUTHORITY_TOMBSTONES).map(([eventType, t]) => {
+    const name = subjectMachine[eventType.slice(0, eventType.indexOf("."))];
+    assert.ok(name !== undefined, `${eventType} names a tombstoned subject`);
+    tombstoned.set(name, (tombstoned.get(name) ?? new Set<string>()).add(t.state));
+    return { eventType, state: t.state as string, name };
+  });
+  for (const { eventType, state, name } of entries) {
+    const m = machine(name);
+    assert.ok(m.transitions.some((e) => e.to === state), `${eventType}: ${state} is a state ${name} enters`);
+    const reachable = new Set<string>([state]);
+    const pending = [state];
+    for (let s = pending.pop(); s !== undefined; s = pending.pop()) {
+      for (const e of m.transitions) {
+        if (e.from === s && !reachable.has(e.to)) {
+          reachable.add(e.to);
+          pending.push(e.to);
+        }
+      }
+    }
+    for (const s of reachable) assert.ok(tombstoned.get(name)!.has(s), `${eventType}: ${name} leads from ${state} to ${s}, which no tombstone names`);
+  }
+  for (const [name, states] of tombstoned) for (const s of machine(name).terminal) assert.ok(states.has(s), `${name} terminal ${s} is tombstoned`);
 });
 
-test("N5: a file-admission revocation is a restore tombstone — source_file.admission_revoked.v1 is routed to AUTHORITY_JOURNAL and produces FILE_ADMISSION_REVOKED in the terminal state REVOKED, so a restore never re-admits bytes whose retention ended or whose generation was lost", () => {
+test("N5: a file-admission revocation is a restore tombstone — source_file.admission_revoked.v1 is routed to AUTHORITY_JOURNAL and produces FILE_ADMISSION_REVOKED in the SourceFile machine's terminal state ADMISSION_REVOKED, so a restore never re-admits bytes whose retention ended or whose generation was lost", () => {
   const consumers = EVENT_SUBSCRIPTIONS.filter((s) => s.eventType === "source_file.admission_revoked.v1").map((s) => s.consumer).sort();
   assert.deepEqual(consumers, ["AUTHORITY_JOURNAL", "EXECUTION_CONTROL", "NOTIFICATIONS"]);
-  assert.deepEqual((AUTHORITY_TOMBSTONES as Readonly<Record<string, { readonly kind: string; readonly state: string }>>)["source_file.admission_revoked.v1"], { kind: "FILE_ADMISSION_REVOKED", state: "REVOKED" });
+  assert.deepEqual((AUTHORITY_TOMBSTONES as Readonly<Record<string, { readonly kind: string; readonly state: string }>>)["source_file.admission_revoked.v1"], { kind: "FILE_ADMISSION_REVOKED", state: "ADMISSION_REVOKED" });
+  // D-RESTORE-2 (residual FINAL-N1): the consumer appends only when the subject is in the named state, so it must be the state a
+  // revoked file is in — the machine's terminal state and the only state source_files records for a revoked admission
+  assert.deepEqual(machine("SourceFile").terminal, ["ADMISSION_REVOKED"]);
+  assert.ok(machine("SourceFile").transitions.some((e) => e.event === "admission_revoked" && e.to === AUTHORITY_TOMBSTONES["source_file.admission_revoked.v1"].state));
 });
 
 test("B07-F13: the sweepers of the contracts are exactly the sweepers of design §12.5, LOCATION_POLICY and RETENTION included", () => {
