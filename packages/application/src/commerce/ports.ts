@@ -98,6 +98,11 @@ export type ProviderDispatchResult =
 /** An authenticated read of the provider's current state of an order (the reconciler's only instrument). */
 export interface ProviderOrderObservation {
   readonly providerOrderId: string | null;
+  /**
+   * The provider-hosted approval page of the order, when the provider's view names one (the order's approve link); a creation whose
+   * response was lost is learned from this view with it (the reconciler keeps it only on an allowlisted host; D-CORE-B3).
+   */
+  readonly approvalUrl?: string;
   readonly orderStatus: "CREATED" | "APPROVED" | "VOIDED" | "EXPIRED" | "COMPLETED" | "NOT_FOUND" | "UNRECOGNIZED";
   readonly captures: ReadonlyArray<ObservedCapture>;
   readonly refunds: ReadonlyArray<ObservedRefund>;
@@ -256,7 +261,11 @@ export type ServiceDecision = { readonly kind: "ALLOW"; readonly serviceId: stri
  * Every DENY is recorded as a durable security fact by the runtime (B06 D-FACT-1; D-FACT-B1 for the new streams).
  */
 export interface CommerceAuthorizer {
-  authorizeOperator(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts; readonly role: "KAURO_OWNER" }): Promise<OperatorDecision>;
+  /**
+   * `storedOperation`, when the command is keyed by one (CMD032: the refund; GetRefundReview), is resolved through the scope index
+   * after the grant and adopted as the operator's finance scope — NOT_FOUND alike for a foreign and an unknown key (design §3.4).
+   */
+  authorizeOperator(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts; readonly role: "KAURO_OWNER"; readonly storedOperation?: { readonly kind: "REFUND"; readonly key: string } }): Promise<OperatorDecision>;
   assureOperator(uow: CommerceUnitOfWork, request: { readonly userId: string; readonly authorizationRef: string; readonly covers: (policyId: RefundPolicyId) => Promise<boolean> }): Promise<OperatorAssurance>;
   authorizeService(request: { readonly identity: ServiceIdentity; readonly role: ServiceRole; readonly deploymentEnvironment: "LOCAL" | "SANDBOX" | "LIVE" }): ServiceDecision;
 }
@@ -275,6 +284,12 @@ export interface ReconcileResult {
   readonly authorizationIssued: CommercialAuthorizationId | null;
   /** The event of the first fact the observation changed (the inbox record's result event when it is APPLIED), or null. */
   readonly resultEventId: EventId | null;
+  /**
+   * D-PAY-B6 (residual FINAL-N2): the observation reported a completion without the provider's completion instant — the sale's tax
+   * point — so nothing of it was applied; the caller obtains a stored provider query of the order and applies it (CMD034). A stored
+   * query that lacks the instant too opens PROVIDER_INCONSISTENCY instead, and this stays false.
+   */
+  readonly providerQueryRequired: boolean;
 }
 
 /**
