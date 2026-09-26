@@ -134,7 +134,7 @@ export interface PaymentsWorld {
   /** The reconciler of the payment service's settle step, for applying a verified webhook as CMD030's application half does. */
   readonly reconciler: CommerceReconciler;
   /** An ISSUED quote over a plan of a fresh project approved through CMD025, its source available for the quote's promise. */
-  readyQuote(label: string): Promise<ReadyQuote>;
+  readyQuote(label: string, treatment?: "EXEMPT_EXPORT" | "DOMESTIC_TAXABLE"): Promise<ReadyQuote>;
   /** A purchase paid by one capture with its entitlement, written through the commerce adapters (paidPurchase). */
   paidProject(label: string, treatment?: "EXEMPT_EXPORT" | "DOMESTIC_TAXABLE"): Promise<PaidPurchase & { readonly plan: PlanFixture }>;
   /**
@@ -170,7 +170,8 @@ export async function paymentsWorld(): Promise<PaymentsWorld> {
   const issuerRef = await w.h.qualifiedFiscalIssuer();
   const kora = await w.person("kora-corporate-owner");
   const koraGrantId = await w.h.grantKauroOwner(kora.userId);
-  const profileId = await recordReviewedFiscalProfile(w.h, { operatorUserId: kora.userId as UserId, agencyId: w.A.agencyId, issuerRef });
+  // the agency's current reviewed profile version: the quotes of this world are issued under it (recordProfileVersion moves it)
+  let profileId = await recordReviewedFiscalProfile(w.h, { operatorUserId: kora.userId as UserId, agencyId: w.A.agencyId, issuerRef });
   const reconciler = createCommerceReconciler({ subjects: purchasedSubjectReader, approvalHosts: provider.approvalHosts });
   const oracle = w.h.oracle;
 
@@ -191,14 +192,16 @@ export async function paymentsWorld(): Promise<PaymentsWorld> {
     holds,
     route,
     issuerRef,
-    profileId,
+    get profileId() {
+      return profileId;
+    },
     kora,
     koraGrantId,
     reconciler,
 
-    async readyQuote(label) {
+    async readyQuote(label, treatment) {
       const { plan } = await approvedPlan(label);
-      const quote = await issueQuote(w.h, { agency: w.A, planId: plan.planId as PlanId, issuerRef, profileId });
+      const quote = await issueQuote(w.h, { agency: w.A, planId: plan.planId as PlanId, issuerRef, profileId, ...(treatment !== undefined ? { treatment } : {}) });
       const r = await oracle.query<{ revision_id: string; sealed_at: Date }>("SELECT revision_id, sealed_at FROM kauro.dataset_revisions WHERE manifest_hash = $1", [quote.revisionHash]);
       const revision = r.rows[0];
       if (!revision) throw new Error("the quoted revision is not sealed");
@@ -238,6 +241,9 @@ export async function paymentsWorld(): Promise<PaymentsWorld> {
           recordedAt,
         });
         return profileId;
+      }).then((recorded) => {
+        if (treatment !== "REVIEW_REQUIRED") profileId = recorded;
+        return recorded;
       });
     },
 
