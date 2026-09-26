@@ -16,6 +16,6 @@ export { IsolatedContainerInspector, InspectorFailure, type ContainerInspectorOp
 export { IsolatedSelectionEvaluator, billableUnder, checkManifest, type EvaluationEvidence, type SelectionEvaluatorOptions } from "./evaluator/selection-evaluator.js";
 export { IsolatedTablePreviewReader, PreviewFailure, type TablePreview, type TablePreviewRequest } from "./preview/preview-reader.js";
 export { rejectionClassOfInspection, rejectionClassOfScan } from "./scan/classify.js";
-export { storedTableFacts, type StoredTableFacts } from "./inventory.js";
+export { parserProfileHashOfInspection, storedTableFacts, type StoredTableFacts } from "./inventory.js";
 export { partDigestOf } from "./archive/zip.js";
 export { SANDBOX_CODE_ROOT, runIsolated, sandboxFlags, type SandboxRequest, type SandboxResult } from "./sandbox/runner.js";

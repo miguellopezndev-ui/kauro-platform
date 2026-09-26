@@ -4,8 +4,8 @@
  * and every later reader agree. Customer text (a worksheet name, a header label) enters only as a digest; the display value is kept
  * only when it is a safe label (it always is: the inspector hands out display forms only).
  */
-import type { DetectedTable } from "@kauro/application";
-import { tableStructureHashOf, textDigest, type SourceColumnRecord } from "@kauro/domain";
+import type { ContainerInspection, DetectedTable } from "@kauro/application";
+import { parserProfileHashOf, tableStructureHashOf, textDigest, type SourceColumnRecord } from "@kauro/domain";
 import type { Sha256Hex } from "@kauro/contracts";
 
 export interface StoredTableFacts {
@@ -39,4 +39,12 @@ export function storedTableFacts(fileId: string, table: DetectedTable): StoredTa
     issues: table.issues,
   });
   return { nameDigest, structureHash, columns };
+}
+
+/**
+ * FileManifest.parserProfileHash of an inspection (KAURO_PARSER_PROFILE_V1, design D-HASH-2): the digest of the pinned configuration
+ * and the detected container facts the inspection reports (`parserProfile`), computed in one place for the receipt and the file.
+ */
+export function parserProfileHashOfInspection(inspection: Pick<ContainerInspection, "parserProfile">): Sha256Hex {
+  return parserProfileHashOf(inspection.parserProfile);
 }
