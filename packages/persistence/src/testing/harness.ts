@@ -39,6 +39,7 @@ import {
   type RevisionId,
   type SystemContext,
   type TenantContext,
+  type FiscalIssuerRef,
   type UserId,
   type ValidationReceiptRecord,
 } from "@kauro/domain";
@@ -46,7 +47,8 @@ import { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "../eviden
 import { PgInboxIngress } from "../inbox-outbox.js";
 import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
-import { createUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { createCommerceUnitOfWorkFactory, createUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -85,6 +87,11 @@ export interface Harness {
   /** Payment-service pool (login role in kauro_payment; package B09, D-CTX-B1) and its unit-of-work factory: SERVICE contexts only. */
   readonly paymentPool: KauroPool;
   readonly payment: PgUnitOfWorkFactory;
+  /**
+   * The commerce unit-of-work factory of package B09 (CommerceUnitOfWorkFactory): TENANT and OPERATOR contexts on the request-handler
+   * pool, SERVICE contexts on the payment-service pool, each unit of work with the commerce repositories and scope adoption.
+   */
+  readonly commerce: PgCommerceUnitOfWorkFactory;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
@@ -140,6 +147,14 @@ export interface Harness {
    * current state to `state` in one control-plane transaction, recording each gate's evidence with its edge (D-CAP-2).
    */
   publishCapability(capabilityId: string, state: Exclude<CapabilityPublicationState, "DESIGN">): Promise<void>;
+  /** A QUALIFIED merchant route of a provider and environment, as the control plane configures it (package B09; commerce-fixtures). */
+  qualifiedPaymentRoute(options?: Parameters<typeof recordQualifiedPaymentRoute>[1]): Promise<QualifiedRoute>;
+  /** A QUALIFIED fiscal issuer route (package B09; commerce-fixtures). */
+  qualifiedFiscalIssuer(options?: Parameters<typeof recordQualifiedFiscalIssuer>[1]): Promise<FiscalIssuerRef>;
+  /** An ACTIVE KAURO_OWNER grant of a corporate identity, provisioned by the control plane (package B09, D-CORP-B1). */
+  grantKauroOwner(userId: UserId): Promise<string>;
+  /** Revokes a corporate grant (grant_revoked). */
+  revokeCorporateGrant(grantId: string): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -177,6 +192,7 @@ export async function start(): Promise<Harness> {
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
   const payment = createUnitOfWorkFactory(paymentPool, { clock });
+  const commerce = createCommerceUnitOfWorkFactory({ app: appPool, payment: paymentPool }, { clock });
   const proofs = new PgAssuranceProofRecorder(assurancePool);
   const receipts = new PgValidationReceiptRecorder(validatorPool);
   const oracle = await pg.connect("postgres");
@@ -216,6 +232,7 @@ export async function start(): Promise<Harness> {
     inboxIngress,
     paymentPool,
     payment,
+    commerce,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
@@ -385,6 +402,11 @@ export async function start(): Promise<Harness> {
         throw e;
       }
     },
+
+    qualifiedPaymentRoute: (options) => recordQualifiedPaymentRoute(controlClient, options),
+    qualifiedFiscalIssuer: (options) => recordQualifiedFiscalIssuer(controlClient, options),
+    grantKauroOwner: (userId) => grantCorporateRole(controlClient, userId),
+    revokeCorporateGrant: (grantId) => revokeCorporateRole(controlClient, grantId),
 
     async stop() {
       await controlClient.end();

@@ -103,16 +103,77 @@ export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.
 });
 
 /**
+ * Commerce unique indexes a racing request can meet, decided by their name (package B09, design §7): a second open checkout of a
+ * project is PAYMENT_PENDING (retry with the same key once the open order settles), a second open request of a capture and origin
+ * is REFUND_REQUEST_OPEN, and a second capture.completed.v1 of one capture is an integrity failure (a reconciler that follows
+ * D-EVT-B2 never meets it).
+ */
+const COMMERCE_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = Object.freeze({
+  payment_orders_one_open_per_project: () => new DomainFailure("PAYMENT_PENDING", "the project already has an open checkout", { reason: "CREATION_IN_PROGRESS" }, true),
+  refunds_one_requested_per_origin: () => new DomainFailure("PRECONDITION_FAILED", "a request of this capture already awaits review", { reason: "REFUND_REQUEST_OPEN" }),
+  domain_events_capture_completed_once: () => new DomainFailure("INTEGRITY_FAILURE", "a capture publishes its completion once", { reason: "EVENT_MISSING" }),
+});
+
+/**
+ * Commerce unique indexes the handler decides (it re-reads the current row, B06 practice): the replayed or current entitlement
+ * (commercial_authorizations_one_*), and the capture identity already recorded (capture_facts_provider_identity: the observation is a
+ * DUPLICATE). They surface as ConstraintViolation carrying the constraint name; `commerceReplayOf` names what the handler answers.
+ */
+export const COMMERCE_REPLAY_CONSTRAINTS: Readonly<Record<string, "AUTHORIZATION_REPLAY" | "DUPLICATE_CAPTURE">> = Object.freeze({
+  commercial_authorizations_one_per_quote: "AUTHORIZATION_REPLAY",
+  commercial_authorizations_one_original_per_capture: "AUTHORIZATION_REPLAY",
+  commercial_authorizations_one_per_rebinding: "AUTHORIZATION_REPLAY",
+  commercial_authorizations_one_live_per_capture: "AUTHORIZATION_REPLAY",
+  commercial_authorizations_one_live_per_project: "AUTHORIZATION_REPLAY",
+  capture_facts_provider_identity: "DUPLICATE_CAPTURE",
+});
+
+/** What a unique violation of a commerce write means to its handler, when it is one of COMMERCE_REPLAY_CONSTRAINTS. */
+export function commerceReplayOf(sqlState: string | undefined, constraint: string | undefined): "AUTHORIZATION_REPLAY" | "DUPLICATE_CAPTURE" | null {
+  if (sqlState !== SQLSTATE.UNIQUE_VIOLATION || constraint === undefined) return null;
+  return COMMERCE_REPLAY_CONSTRAINTS[constraint] ?? null;
+}
+
+/**
+ * Checks and keys that only a writer bypassing the domain rules meets (design §7, the second revision's guards): the claim's own
+ * deadline (payment_attempts_dispatch_deadline_bound; the claim writes the database's deadline), the fiscal lineage
+ * (fiscal_profiles_supersession_lineage, fiscal_profiles_successor_fk; a re-review writes its two instants as one), the ledger's
+ * account rules (ledger_entries_funds_accounts, ledger_entries_bank_accounts; postings come from planPostings) and the attempt and
+ * case bindings of D-BIND-B2. They are integrity failures, never B06's default INVALID_REQUEST.
+ */
+export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
+  "payment_attempts_dispatch_deadline_bound",
+  "fiscal_profiles_supersession_lineage",
+  "fiscal_profiles_successor_fk",
+  "ledger_entries_funds_accounts",
+  "ledger_entries_bank_accounts",
+  "payment_attempts_order_binding",
+  "provider_observations_attempt_fk",
+  "capture_facts_attempt_fk",
+  "provider_event_exceptions_attempt_fk",
+  "reconciliation_cases_capture_order_fk",
+  "reconciliation_cases_refund_order_fk",
+  "reconciliation_cases_refund_capture_fk",
+  "reconciliation_cases_refund_own_capture_fk",
+]);
+
+/**
  * Translates a database error code into a DomainFailure, or null when the adapter must decide by context (a unique violation
  * is IDEMPOTENCY replay, LAST-approval race or DRAFT_AGENCY_EXISTS depending on the constraint name it carries).
  */
 export function failureOfSqlState(sqlState: string | undefined, constraint?: string): DomainFailure | null {
   if (!sqlState) return null;
+  if (constraint !== undefined && COMMERCE_INTEGRITY_CONSTRAINTS.has(constraint) && (sqlState === SQLSTATE.CHECK_VIOLATION || sqlState === SQLSTATE.FOREIGN_KEY_VIOLATION || sqlState === SQLSTATE.UNIQUE_VIOLATION)) {
+    return new DomainFailure("INTEGRITY_FAILURE", `database refused the write (${sqlState} ${constraint})`);
+  }
   if (sqlState === SQLSTATE.UNIQUE_VIOLATION) {
     if (constraint === "agencies_one_draft_per_creator") return new DomainFailure("ADMISSION_LIMITED", "one draft agency per identity", { reason: "DRAFT_AGENCY_EXISTS" });
+    const commerce = constraint === undefined ? undefined : COMMERCE_UNIQUE_FAILURES[constraint];
+    if (commerce !== undefined) return commerce();
     // command_journal_identity (concurrent duplicate), approvals_one_live_per_plan (lost approval race) and
     // plans_supersedes_once (lost revision race) are decided by the handler, which re-reads the current row and answers
-    // with the replayed result or STALE_VERSION carrying the current safe version.
+    // with the replayed result or STALE_VERSION carrying the current safe version; so are the commerce replay constraints
+    // (COMMERCE_REPLAY_CONSTRAINTS).
     return null;
   }
   if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint !== undefined && LABEL_CONSTRAINT_FIELDS[constraint] !== undefined) {
