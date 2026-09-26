@@ -147,19 +147,27 @@ interface Reserved {
  * the issuance fence, its UPLOAD_INITIATED anchor, all at the server instant (`at` positions the TEST CLOCK of this transaction),
  * and its event. The revision is not moved.
  */
-async function reserveIn(c: Client, t: Tenant, projectId: string, revisionId: string, bytes: number, options: { readonly anchored?: boolean; readonly at?: Date } = {}): Promise<Reserved> {
+async function reserveIn(
+  c: Client,
+  t: Tenant,
+  projectId: string,
+  revisionId: string,
+  bytes: number,
+  options: { readonly anchored?: boolean; readonly at?: Date; readonly requester?: { readonly membershipId: string; readonly userId: string } } = {},
+): Promise<Reserved> {
   if (options.at !== undefined) await clockAt(c, options.at);
   const uploadId = ids.next();
   const objectId = ids.next();
+  const requester = options.requester ?? { membershipId: t.ag.ownerMembershipId, userId: t.ag.ownerUserId };
   await c.query(
     `INSERT INTO kauro.stored_objects (object_id, agency_id, project_id, revision_id, upload_id, zone, data_class, provider, location_ref, object_name, created_by_kind, created_by_ref, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, 'QUARANTINE', 'RAW', 'contract-fake-storage', 'QUARANTINE_PRIMARY', $6, 'MEMBERSHIP', $7, kauro.server_now(), now())`,
-    [objectId, t.ag.agencyId, projectId, revisionId, uploadId, `quarantine/${t.ag.agencyId}/${projectId}/${revisionId}/${uploadId}`, t.ag.ownerMembershipId],
+    [objectId, t.ag.agencyId, projectId, revisionId, uploadId, `quarantine/${t.ag.agencyId}/${projectId}/${revisionId}/${uploadId}`, requester.membershipId],
   );
   await c.query(
     `INSERT INTO kauro.upload_sessions (upload_id, agency_id, project_id, revision_id, display_name, declared_format, reserved_bytes, quarantine_object_id, requested_by_membership_id, requested_by_user_id, application_expires_at, session_attempt, created_at, updated_at)
      VALUES ($1, $2, $3, $4, 'contacts export.csv', 'CSV', $5, $6, $7, $8, kauro.server_now() + interval '86400 seconds', 1, kauro.server_now(), now())`,
-    [uploadId, t.ag.agencyId, projectId, revisionId, bytes, objectId, t.ag.ownerMembershipId, t.ag.ownerUserId],
+    [uploadId, t.ag.agencyId, projectId, revisionId, bytes, objectId, requester.membershipId, requester.userId],
   );
   await event(c, { aggregateKind: "upload_session", aggregateId: uploadId, aggregateVersion: 1, agencyId: t.ag.agencyId, eventType: "upload_session.reserved.v1", actorUserId: t.ag.ownerUserId, payload: { uploadId, reservedBytes: bytes } });
   if (options.anchored !== false) {
@@ -239,6 +247,12 @@ async function verifyingUpload(t: Tenant, reservedBytes: number, generation: str
   return verifyingUploadIn(t, projectId, revisionId, reservedBytes, generation, observedBytes, true);
 }
 
+/**
+ * The instant a receipt of the current attempt starts at (D-INSP-4): the claim the database stamped when the fence advanced. Every
+ * receipt insert of this file binds the agency as $2 and the upload as $3.
+ */
+const CLAIMED_AT = "(SELECT u.inspection_claimed_at FROM kauro.upload_sessions u WHERE u.agency_id = $2 AND u.upload_id = $3)";
+
 /** One complete coverage entry: the container scanned at its full observed length (S054, B07-F4). */
 function containerCoverage(uploadId: string, bytes: number): string {
   return JSON.stringify([{ partDigest: sha("container-" + uploadId), partKind: "CONTAINER", expectedBytes: bytes, scannedBytes: bytes, outcome: "CLEAN" }]);
@@ -282,7 +296,7 @@ async function admitIn(c: Client, t: Tenant, up: Verifying, generation: string, 
         signatures_published_at, signature_max_age_seconds, scanner_config_hash, scanned_at, expected_parts, expected_bytes, scanned_parts, scanned_bytes, coverage, parser_profile_hash,
         inspector_version, outcome, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, created_at)
      VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, $10, true, 'CSV', 'CSV', 'STRUCTURE_VALID', 'COVERED_CLEAN', 'contract-fake-scanner', 'SIMULATED-1', 'SIG-1',
-        kauro.server_now() - interval '1 hour', 86400, $11, kauro.server_now(), 1, $8, 1, $8, $12, $13, 'data-plane-0.1.0', 'ADMITTED', $14, $15, $9, kauro.server_now(), kauro.server_now(), now())`,
+        kauro.server_now() - interval '1 hour', 86400, $11, kauro.server_now(), 1, $8, 1, $8, $12, $13, 'data-plane-0.1.0', 'ADMITTED', $14, $15, $9, ${CLAIMED_AT}, kauro.server_now(), kauro.server_now())`,
     [ids.next(), t.ag.agencyId, up.uploadId, up.revisionId, receiptHash, up.objectId, generation, bytes, bytesHash, sha("claim-" + up.uploadId), sha("scanner-config"), containerCoverage(up.uploadId, bytes), sha("parser-profile"), acceptedId, acceptedGeneration],
   );
   await c.query(
@@ -320,7 +334,7 @@ async function reject(t: Tenant, up: Verifying, generation: string, bytes: numbe
     await c.query(
       `INSERT INTO kauro.inspection_receipts (receipt_id, agency_id, upload_id, revision_id, receipt_hash, inspection_fence, quarantine_object_id, observed_generation, observed_bytes,
           completion_claim_digest, claim_consistent, declared_format, detected_format, structure_status, scan_state, inspector_version, outcome, rejection_class, started_at, completed_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, true, 'CSV', 'CSV', 'STRUCTURE_INVALID', 'NOT_SCANNED', 'data-plane-0.1.0', 'REJECTED', 'CORRUPT_STRUCTURE', now(), now(), now())`,
+       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, true, 'CSV', 'CSV', 'STRUCTURE_INVALID', 'NOT_SCANNED', 'data-plane-0.1.0', 'REJECTED', 'CORRUPT_STRUCTURE', ${CLAIMED_AT}, kauro.server_now(), kauro.server_now())`,
       [ids.next(), t.ag.agencyId, up.uploadId, up.revisionId, receiptHash, up.objectId, generation, bytes, sha("claim-" + up.uploadId)],
     );
     await c.query("UPDATE kauro.upload_sessions SET state = 'REJECTED', version = 5, rejected_at = kauro.server_now(), terminal_reason = 'CORRUPT_STRUCTURE', inspection_receipt_hash = $2 WHERE upload_id = $1 AND version = 4", [up.uploadId, receiptHash]);
@@ -332,14 +346,15 @@ async function reject(t: Tenant, up: Verifying, generation: string, bytes: numbe
   });
 }
 
-/** CMD015 as the handler writes it: the upload tombstoned by its requester (provider cancellation requested once a session exists). */
-async function cancelUpload(c: Client, t: Tenant, uploadId: string, version: number, providerSession: boolean, reason = "CANCELLED_BY_REQUESTER"): Promise<void> {
+/**
+ * CMD015 as the handler writes it: the upload tombstoned by its requester. The provider cancellation is not the handler's to write
+ * (D-ROLE-3): the database requests it in the same update when a session was issued (upload_sessions_cancellation_requested).
+ */
+async function cancelUpload(c: Client, t: Tenant, uploadId: string, version: number, reason = "CANCELLED_BY_REQUESTER"): Promise<void> {
   const r = await c.query(
-    `UPDATE kauro.upload_sessions SET state = 'CANCELLED', version = $2, cancelled_at = kauro.server_now(), cancelled_by_membership_id = $3, terminal_reason = $4,
-            provider_cancellation_state = CASE WHEN $5::boolean THEN 'REQUESTED' ELSE provider_cancellation_state END,
-            provider_cancellation_at = CASE WHEN $5::boolean THEN kauro.server_now() ELSE provider_cancellation_at END
+    `UPDATE kauro.upload_sessions SET state = 'CANCELLED', version = $2, cancelled_at = kauro.server_now(), cancelled_by_membership_id = $3, terminal_reason = $4
       WHERE upload_id = $1 AND version = $2 - 1`,
-    [uploadId, version, t.ag.ownerMembershipId, reason, providerSession],
+    [uploadId, version, t.ag.ownerMembershipId, reason],
   );
   assert.equal(r.rowCount, 1);
   await event(c, { aggregateKind: "upload_session", aggregateId: uploadId, aggregateVersion: version, agencyId: t.ag.agencyId, eventType: "upload_session.cancelled.v1", actorUserId: t.ag.ownerUserId });
@@ -641,7 +656,7 @@ test("B07-F1: the last open upload cancelled (CMD015), expired (the deadline swe
   const scenarios: Array<[string, (up: Verifying) => Promise<void>]> = [
     ["cancelled", (up) => tx(app, as(t), async (c) => {
       await c.query("SELECT 1 FROM kauro.dataset_revisions WHERE revision_id = $1 FOR NO KEY UPDATE", [up.revisionId]);
-      await cancelUpload(c, t, up.uploadId, 5, true);
+      await cancelUpload(c, t, up.uploadId, 5);
     })],
     ["expired", (up) => controlTx(t.ag.agencyId, async (c) => {
       await c.query("SELECT 1 FROM kauro.dataset_revisions WHERE revision_id = $1 FOR NO KEY UPDATE", [up.revisionId]);
@@ -727,7 +742,7 @@ test("an agency holds two concurrent upload sessions: the third is refused by th
   assert.deepEqual(await oracleRow("SELECT active_sessions, session_limit FROM kauro.upload_capacity WHERE agency_id = $1", [t.ag.agencyId]), { active_sessions: 2, session_limit: 2 });
   await assert.rejects(tx(app, as(t), (c) => reserveIn(c, t, p3.projectId, p3.revisionId, 10)), refusedWith("23514", "upload_capacity_within_limit"));
   // cancelling the first releases its slot and its bytes exactly once
-  await tx(app, as(t), (c) => cancelUpload(c, t, first.uploadId, 2, false));
+  await tx(app, as(t), (c) => cancelUpload(c, t, first.uploadId, 2));
   assert.deepEqual(await oracleRow("SELECT active_sessions FROM kauro.upload_capacity WHERE agency_id = $1", [t.ag.agencyId]), { active_sessions: 1 });
   assert.deepEqual(await quotaOf(p1.revisionId), { bytes: "0", files: 0 });
   // a cancelled upload never comes back: every edge out of CANCELLED is unlisted
@@ -747,7 +762,7 @@ test("cancellation wins while verification races: a stale inspection attempt can
   const t = await tenant("cancel-race");
   const up = await verifyingUpload(t, 100, "4242", 100);
   // the inspection claimed its attempt and observed the object; the requester's cancellation then wins the upload row (CMD015)
-  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 5, true));
+  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 5));
   // the stale attempt tries to record its receipt: refused (KA071), whatever it observed
   await assert.rejects(
     controlTx(t.ag.agencyId, (c) =>
@@ -804,7 +819,7 @@ test("D-LOCK-2 (B07-F14): a cancellation and an inspection outcome of the same r
       await control2.query("COMMIT");
     }
     assert.deepEqual((await cancel).rows, [{ state: "ADMITTED" }], "the cancellation waited and read the settled upload");
-    await assert.rejects(cancelUpload(app, t, a.uploadId, 6, true), refusedWith("KA008"));
+    await assert.rejects(cancelUpload(app, t, a.uploadId, 6), refusedWith("KA008"));
     await app.query("ROLLBACK");
   } catch (e) {
     await rollback(control2, app);
@@ -816,7 +831,7 @@ test("D-LOCK-2 (B07-F14): a cancellation and an inspection outcome of the same r
   await hold(app, as(t));
   try {
     await app.query("SELECT 1 FROM kauro.dataset_revisions WHERE revision_id = $1 FOR NO KEY UPDATE", [b.revisionId]);
-    await cancelUpload(app, t, b.uploadId, 5, true);
+    await cancelUpload(app, t, b.uploadId, 5);
     await hold(control2, { agencyId: t.ag.agencyId });
     const admission = admitIn(control2, t, b, "601", 64);
     try {
@@ -861,7 +876,7 @@ test("B07-F10: the ledgers are checked by a write that changed what an upload ho
   // a completion report moves nothing a ledger counts: it commits (the check is not queued for it)
   await tx(app, as(t), (c) => reportCompletion(c, t, up.uploadId));
   // a cancellation releases bytes, a file and a slot: its check runs and names the disagreement
-  await assert.rejects(tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 4, true)), refusedWith("KA070"));
+  await assert.rejects(tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 4)), refusedWith("KA070"));
   // the check reads the uploads and the ledger in one statement (one snapshot, B07-F10)
   const body = await oracleRow<{ def: string }>("SELECT pg_get_functiondef('kauro.check_upload_ledgers(uuid, uuid)'::regprocedure) AS def");
   assert.equal((body.def.match(/INTO r;/g) ?? []).length, 2, "one statement per ledger");
@@ -870,26 +885,39 @@ test("B07-F10: the ledgers are checked by a write that changed what an upload ho
   await su.query("SET LOCAL session_replication_role = replica");
   await su.query("UPDATE kauro.revision_quota SET reserved_bytes = 1000 WHERE revision_id = $1", [revisionId]);
   await su.query("COMMIT");
-  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 4, true));
+  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 4));
   assert.deepEqual(await quotaOf(revisionId), { bytes: "0", files: 0 });
 });
 
 test("S054 at the database: COVERED_CLEAN requires complete coverage of this object by pinned, fresh signatures — a skipped part or byte, a stale or future signature database, nothing expected, a container shorter than the object, a widened signature age are never clean (B07-F4) — and admission requires every separate result", async () => {
   const t = await tenant("s054");
   const up = await verifyingUpload(t, 100, "42", 100);
+  // a column value is a parameter, or a SQL expression the server evaluates in the receipt's own transaction (its clock, the claim)
+  interface SqlExpr { readonly sql: string }
+  const expr = (sql: string): SqlExpr => ({ sql });
+  const isExpr = (v: unknown): v is SqlExpr => typeof v === "object" && v !== null && "sql" in v;
+  const now = expr("kauro.server_now()");
   const receipt = (over: Record<string, unknown>) => {
     const r: Record<string, unknown> = {
       receipt_id: ids.next(), agency_id: t.ag.agencyId, upload_id: up.uploadId, revision_id: up.revisionId, receipt_hash: sha("receipt-" + ids.next()), inspection_fence: 1,
       quarantine_object_id: up.objectId, observed_generation: "42", observed_bytes: 100, sha256: sha("bytes"), completion_claim_digest: sha("claim-" + up.uploadId), claim_consistent: true,
       declared_format: "CSV", detected_format: "CSV", structure_status: "STRUCTURE_INVALID", scan_state: "COVERED_CLEAN", scanner_engine: "contract-fake-scanner",
       scanner_engine_version: "SIMULATED-1", signature_version: "SIG-1", signatures_published_at: new Date(Date.now() - HOUR_MS), signature_max_age_seconds: 86400,
-      scanner_config_hash: sha("scanner-config"), scanner_exit_code: 0, scanner_verdict: "CLEAN", scanned_at: new Date(), expected_parts: 1, expected_bytes: 100, scanned_parts: 1,
+      scanner_config_hash: sha("scanner-config"), scanner_exit_code: 0, scanner_verdict: "CLEAN", scanned_at: now, expected_parts: 1, expected_bytes: 100, scanned_parts: 1,
       scanned_bytes: 100, coverage: containerCoverage(up.uploadId, 100), parser_profile_hash: sha("parser-profile"), inspector_version: "data-plane-0.1.0", outcome: "REJECTED", rejection_class: "CORRUPT_STRUCTURE",
-      started_at: new Date(Date.now() - 1_000), completed_at: new Date(), created_at: new Date(),
+      // D-INSP-4: the attempt starts at its claim (stamped by the database with the fence), completes and is recorded now
+      started_at: expr(`(SELECT u.inspection_claimed_at FROM kauro.upload_sessions u WHERE u.upload_id = '${up.uploadId}')`), completed_at: now, created_at: now,
       ...over,
     };
     const cols = Object.keys(r);
-    return controlTx(t.ag.agencyId, (c) => c.query(`INSERT INTO kauro.inspection_receipts (${cols.join(", ")}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")})`, cols.map((k) => r[k])));
+    const params: unknown[] = [];
+    const values = cols.map((k) => {
+      const v = r[k];
+      if (isExpr(v)) return v.sql;
+      params.push(v);
+      return `$${params.length}`;
+    });
+    return controlTx(t.ag.agencyId, (c) => c.query(`INSERT INTO kauro.inspection_receipts (${cols.join(", ")}) VALUES (${values.join(", ")})`, params));
   };
   const notClean = refusedWith("23514", "inspection_receipts_clean_means_covered");
   // the scanner skip (the ClamAV archive case): exit code 0 and a CLEAN verdict, but the part was never read
@@ -910,6 +938,22 @@ test("S054 at the database: COVERED_CLEAN requires complete coverage of this obj
   );
   await assert.rejects(receipt({ signature_max_age_seconds: 604800 }), refusedWith("23514", "inspection_receipts_signature_max_age_seconds_check"));
   await assert.rejects(receipt({ expected_bytes: 1, scanned_bytes: 1, coverage: containerCoverage(up.uploadId, 1) }), notClean);
+  // re-check N3 (D-INSP-4, D-CLOCK-1): the scan instant the pinned age is measured at is bounded by the server's instants. The
+  // re-checker's receipt — six-day-old signatures, "scanned" an hour after their publication, i.e. before the upload existed — is
+  // refused (KA072), although the age CHECK alone would pass it
+  const outsideTheAttempt = refusedWith("KA072");
+  await assert.rejects(
+    receipt({ signatures_published_at: expr("kauro.server_now() - interval '6 days'"), scanned_at: expr("kauro.server_now() - interval '6 days' + interval '1 hour'") }),
+    outsideTheAttempt,
+  );
+  // a scan after the attempt completed, an attempt that did not start at its claim, a completion ahead of the server clock and a
+  // receipt recorded at another instant are refused the same way
+  await assert.rejects(receipt({ scanned_at: expr("kauro.server_now() + interval '1 hour'") }), outsideTheAttempt);
+  await assert.rejects(receipt({ started_at: now }), outsideTheAttempt);
+  await assert.rejects(receipt({ scanned_at: expr("kauro.server_now() + interval '1 hour'"), completed_at: expr("kauro.server_now() + interval '1 day'") }), outsideTheAttempt);
+  await assert.rejects(receipt({ created_at: expr("kauro.server_now() - interval '1 day'") }), outsideTheAttempt);
+  // the claim instant is the database's stamp: the control plane cannot write it, nor move it without claiming a new attempt
+  await assert.rejects(controlTx(t.ag.agencyId, (c) => c.query("UPDATE kauro.upload_sessions SET inspection_claimed_at = kauro.server_now() - interval '6 days' WHERE upload_id = $1", [up.uploadId])), refusedWith("42501"));
   // the counts agree with themselves but no part is the container at the observed length, or the listed parts do not add up
   await assert.rejects(receipt({ coverage: JSON.stringify([{ partDigest: sha("part"), partKind: "WORKSHEET_PART", expectedBytes: 100, scannedBytes: 100, outcome: "CLEAN" }]) }), notClean);
   await assert.rejects(receipt({ expected_parts: 2, scanned_parts: 2, expected_bytes: 150, scanned_bytes: 150 }), notClean);
@@ -940,7 +984,7 @@ test("S053 at the database: a receipt describes exactly the recorded provider ob
   // a receipt claiming another generation, or the browser's declared size, than the server observed is refused (KA072)
   const claimMismatch = `INSERT INTO kauro.inspection_receipts (receipt_id, agency_id, upload_id, revision_id, receipt_hash, inspection_fence, quarantine_object_id, observed_generation, observed_bytes,
       completion_claim_digest, claim_consistent, declared_format, detected_format, structure_status, scan_state, inspector_version, outcome, rejection_class, started_at, completed_at, created_at)
-    VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, false, 'CSV', 'NOT_EVALUATED', 'NOT_EVALUATED', 'NOT_SCANNED', 'data-plane-0.1.0', 'REJECTED', 'CLAIM_MISMATCH', now(), now(), now())`;
+    VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, false, 'CSV', 'NOT_EVALUATED', 'NOT_EVALUATED', 'NOT_SCANNED', 'data-plane-0.1.0', 'REJECTED', 'CLAIM_MISMATCH', ${CLAIMED_AT}, kauro.server_now(), kauro.server_now())`;
   const params = (hash: string, generation: string, bytes: number) => [ids.next(), t.ag.agencyId, rejected.uploadId, rejected.revisionId, hash, rejected.objectId, generation, bytes, sha("claim-" + rejected.uploadId)];
   await assert.rejects(controlTx(t.ag.agencyId, (c) => c.query(claimMismatch, params(sha("wrong generation"), "778", 64))), refusedWith("KA072"));
   await assert.rejects(controlTx(t.ag.agencyId, (c) => c.query(claimMismatch, params(sha("declared size"), "777", 100))), refusedWith("KA072"));
@@ -976,7 +1020,7 @@ test("S053 at the database: a receipt describes exactly the recorded provider ob
           signatures_published_at, signature_max_age_seconds, scanner_config_hash, scanned_at, expected_parts, expected_bytes, scanned_parts, scanned_bytes, coverage, parser_profile_hash,
           inspector_version, outcome, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, created_at)
        VALUES ($1, $2, $3, $4, $5, 1, $6, '901', 64, $7, $8, true, 'CSV', 'CSV', 'STRUCTURE_VALID', 'COVERED_CLEAN', 'contract-fake-scanner', 'SIMULATED-1', 'SIG-1',
-          now() - interval '1 hour', 86400, $9, now(), 1, 64, 1, 64, $12, $10, 'data-plane-0.1.0', 'ADMITTED', $11, '902', $7, now(), now(), now())`,
+          now() - interval '1 hour', 86400, $9, now(), 1, 64, 1, 64, $12, $10, 'data-plane-0.1.0', 'ADMITTED', $11, '902', $7, ${CLAIMED_AT}, kauro.server_now(), kauro.server_now())`,
       [ids.next(), t.ag.agencyId, up.uploadId, up.revisionId, receiptHash, up.objectId, bytesHash, sha("claim-" + up.uploadId), sha("scanner-config"), sha("parser-profile"), acceptedId, containerCoverage(up.uploadId, 64)],
     );
   });
@@ -1059,7 +1103,7 @@ test("the provider session secret is readable by its requester only while UPLOAD
   assert.equal((await controlRead(other.ag.agencyId)).rowCount, 0, "the control plane bound elsewhere does not");
   assert.equal((await controlRead(t.ag.agencyId)).rowCount, 1, "the control plane bound to the agency does (provider cancellation)");
   // once acceptance is tombstoned the requester can no longer read it; request handlers cannot delete it; the control plane purges it
-  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 3, true));
+  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 3));
   assert.equal((await read(as(t))).rowCount, 0);
   await assert.rejects(tx(app, as(t), (c) => c.query("DELETE FROM kauro.upload_session_secrets WHERE upload_id = $1", [up.uploadId])), refusedWith("42501"));
   assert.equal((await controlTx(t.ag.agencyId, (c) => c.query("DELETE FROM kauro.upload_session_secrets WHERE upload_id = $1", [up.uploadId]))).rowCount, 1);
@@ -1220,7 +1264,7 @@ test("a reservation and a revision transition are ordered by the revision row: a
   assert.ok(upload);
   await tx(app2, as(t), async (c) => {
     await cancelRevision(c, t, second.revisionId);
-    await cancelUpload(c, t, upload.uploadId, 2, false, "REVISION_REPLACED");
+    await cancelUpload(c, t, upload.uploadId, 2, "REVISION_REPLACED");
   });
   assert.deepEqual(await oracleRow("SELECT state FROM kauro.upload_sessions WHERE upload_id = $1", [upload.uploadId]), { state: "CANCELLED" });
 });
@@ -1826,12 +1870,17 @@ test("R2-051 at the database: after the application deadline the session is tomb
   const sevenDays = "kauro.server_now() + interval '604800 seconds'";
   // no deletion is recorded for a location whose effective retention setting was never read back (D-OBJ-2)
   await assert.rejects(recordDeletion("DELETED", "NULL"), refusedWith("KA072"));
-  await controlTx(t.ag.agencyId, (c) =>
-    c.query(
-      "INSERT INTO kauro.storage_location_policies (observation_id, provider, location_ref, soft_delete_retention_seconds, object_versioning, evidence_hash, evidence_class, observed_at) VALUES ($1, 'contract-fake-storage', 'QUARANTINE_PRIMARY', 604800, false, $2, 'SIMULATED', now())",
-      [ids.next(), sha("contract fake retention read-back")],
-    ),
-  );
+  const readBack = (observedAt: string, retentionSeconds: number) =>
+    controlTx(t.ag.agencyId, (c) =>
+      c.query(
+        `INSERT INTO kauro.storage_location_policies (observation_id, provider, location_ref, soft_delete_retention_seconds, object_versioning, evidence_hash, evidence_class, observed_at) VALUES ($1, 'contract-fake-storage', 'QUARANTINE_PRIMARY', $2, false, $3, 'SIMULATED', ${observedAt})`,
+        [ids.next(), retentionSeconds, sha("contract fake retention read-back " + observedAt)],
+      ),
+    );
+  // re-check N3 (D-CLOCK-1): a read-back is recorded at the server's instant — one dated back (here a zero retention "observed"
+  // yesterday) would govern the deletion residual of every deletion since
+  await assert.rejects(readBack("kauro.server_now() - interval '1 day'", 0), refusedWith("KA072"));
+  await readBack("kauro.server_now()", 604800);
   // the read-back says the provider keeps a deleted generation seven days: "vanished" and any other residual are refused
   await assert.rejects(recordDeletion("DELETED", "NULL"), refusedWith("KA072"));
   await assert.rejects(recordDeletion("DELETED", "kauro.server_now() + interval '1 day'"), refusedWith("KA072"));
@@ -1887,4 +1936,254 @@ test("R2-051 at the database: after the application deadline the session is tomb
   // nothing of the expired upload was admitted, and its quota was released once
   assert.deepEqual(await quotaOf(revisionId), { bytes: "0", files: 0 });
   assert.deepEqual(await oracleRow("SELECT count(*)::int AS n FROM kauro.source_files WHERE origin_upload_id = $1", [up.uploadId]), { n: 0 });
+});
+
+// --- the second re-check's residuals (design §18, N1..N4 at the database) -------------------------------------------------------
+
+/** A sealed manifest (its CHECKs satisfied: HASHING's four members, a subject naming the revision and the row's hashes) sealed at `sealedAt`. */
+async function forgedSealedManifest(c: Client, t: Tenant, projectId: string, revisionId: string, sealedAt: string): Promise<void> {
+  const hashes = { manifestHash: sha("forged-manifest-" + revisionId + sealedAt), projectionHash: sha("forged-projection"), selectionHash: sha("forged-selection"), evaluationHash: sha("forged-evaluation") };
+  await c.query(
+    `INSERT INTO kauro.sealed_manifests (revision_id, agency_id, project_id, manifest_hash, projection_hash, selection_hash, evaluation_hash, subject_hash, canonical_version, manifest, subject, sealed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10, ${sealedAt})`,
+    [
+      revisionId, t.ag.agencyId, projectId, hashes.manifestHash, hashes.projectionHash, hashes.selectionHash, hashes.evaluationHash, sha("forged-subject-" + revisionId + sealedAt),
+      JSON.stringify({ files: [], tableSelection: [], parserProfile: [], projection: {} }), JSON.stringify({ revisionId, canonicalVersion: 1, ...hashes }),
+    ],
+  );
+}
+
+/** An INCLUDED sealed file row naming a file at its exact admitted generation, digest and length. */
+async function sealedFileRow(c: Client, t: Tenant, projectId: string, revisionId: string, fileId: string, ordinal: number): Promise<void> {
+  await c.query(
+    `INSERT INTO kauro.sealed_revision_files (revision_id, file_id, agency_id, project_id, ordinal, disposition, provider_generation, sha256, bytes)
+     SELECT $1, f.file_id, f.agency_id, f.project_id, $4, 'INCLUDED', f.provider_generation, f.sha256, f.bytes FROM kauro.source_files f WHERE f.agency_id = $2 AND f.project_id = $3 AND f.file_id = $5`,
+    [revisionId, t.ag.agencyId, projectId, ordinal, fileId],
+  );
+}
+
+test("N1: sealed manifests and sealed file rows are the record of the seal that writes them — a file row added later to a sealed revision, a manifest dated back and a manifest or file row of a revision that is not sealing are refused, so no request handler keeps bytes admitted past their window or moves their first seal", async () => {
+  const t = await tenant("n1");
+  const p = await freshProject(t);
+  const scope = scopeOf(t, p.projectId);
+  // (a) R1 sealed fifteen days ago and expired by the retention sweeper (its record's deadline passed); R2, a younger revision of the
+  // same project, genuinely sealed an hour ago
+  const r1 = await sealSourceRevision(sessionsOf(t), scope, { seed: "n1-old", state: "EXPIRED" });
+  const r2 = await sealSourceRevision(sessionsOf(t), scope, { seed: "n1-young", base: new Date(Date.now() - HOUR_MS) });
+  // the re-checker's probe: in a later transaction a request handler adds an INCLUDED row naming R1's old file to R2 — refused at
+  // COMMIT (R2's seal is not this transaction's), so the row cannot count R2's ACTIVE record against the old bytes
+  await assert.rejects(tx(app, as(t), (c) => sealedFileRow(c, t, p.projectId, r2.revisionId, r1.fileId, 1)), refusedWith("KA072"));
+  assert.deepEqual(await oracleRow("SELECT count(*)::int AS n FROM kauro.sealed_revision_files WHERE file_id = $1", [r1.fileId]), { n: 1 });
+  // the old bytes' retention ended: the retention sweeper's RETENTION_EXPIRED revocation commits
+  await controlTx(t.ag.agencyId, (c) => revokeIn(c, t, r1.fileId, "RETENTION_EXPIRED"));
+  assert.deepEqual(await oracleRow("SELECT state, revocation_reason FROM kauro.source_files WHERE file_id = $1", [r1.fileId]), { state: "ADMISSION_REVOKED", revocation_reason: "RETENTION_EXPIRED" });
+  // R2's own bytes keep their first seal (the hard cap of its UNPAID record is its seal + fourteen days)
+  assert.deepEqual(
+    await oracleRow("SELECT rr.hard_deadline = r.sealed_at + interval '1209600 seconds' AS own_cap FROM kauro.retention_records rr JOIN kauro.dataset_revisions r ON r.revision_id = rr.revision_id WHERE rr.retention_id = $1", [r2.retentionId]),
+    { own_cap: true },
+  );
+
+  // (b) R3 still UPLOADING with an admitted file whose intake window closed fourteen days ago (the fixture initiated it fifteen days ago)
+  const r3 = await admitSourceFile(sessionsOf(t), scope, { seed: "n1-uploading" });
+  // the re-checker's second probe: a sealed manifest dated 2000-01-01 and an INCLUDED row for the UPLOADING revision — refused at
+  // the manifest (the seal instant is the server's) ...
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      await forgedSealedManifest(c, t, p.projectId, r3.revisionId, "'2000-01-01T00:00:00Z'::timestamptz");
+      await sealedFileRow(c, t, p.projectId, r3.revisionId, r3.fileId, 0);
+    }),
+    refusedWith("KA072"),
+  );
+  // ... and, at the server's instant, refused at COMMIT: the revision took no seal in this transaction
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      await forgedSealedManifest(c, t, p.projectId, r3.revisionId, "kauro.server_now()");
+      await sealedFileRow(c, t, p.projectId, r3.revisionId, r3.fileId, 0);
+    }),
+    refusedWith("KA072"),
+  );
+  // nor can a request handler record a seal instant (or any seal fact) on a revision outside seal_command
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      const r = await c.query<{ version: string }>("UPDATE kauro.dataset_revisions SET sealed_at = kauro.server_now(), version = version + 1 WHERE revision_id = $1 RETURNING version::text", [r3.revisionId]);
+      await event(c, { aggregateKind: "dataset_revision", aggregateId: r3.revisionId, aggregateVersion: Number(r.rows[0]!.version), agencyId: t.ag.agencyId, eventType: "dataset_revision.selection_changed.v1", actorUserId: t.ag.ownerUserId });
+    }),
+    refusedWith("KA072"),
+  );
+  assert.deepEqual(await oracleRow("SELECT count(*)::int AS n FROM kauro.sealed_manifests WHERE revision_id = $1", [r3.revisionId]), { n: 0 });
+  // the readers' half: rows that bypassed the write-side binding (the superuser as the adversary, triggers and foreign keys off) are
+  // still no seal — the revocation guard and the first seal of the bytes count only a revision that went through SEALED at its
+  // manifest's instant (kauro.is_real_seal)
+  await su.query("BEGIN");
+  try {
+    await su.query("SET LOCAL session_replication_role = replica");
+    await forgedSealedManifest(su, t, p.projectId, r3.revisionId, "'2000-01-01T00:00:00Z'::timestamptz");
+    await sealedFileRow(su, t, p.projectId, r3.revisionId, r3.fileId, 0);
+    await su.query("COMMIT");
+  } catch (e) {
+    await su.query("ROLLBACK");
+    throw e;
+  }
+  // the unsealed intake follows its upload's window: the deadline sweeper's INTAKE_EXPIRED revocation commits (D-RET-1)
+  await controlTx(t.ag.agencyId, (c) => revokeIn(c, t, r3.fileId, "INTAKE_EXPIRED"));
+  assert.deepEqual(await oracleRow("SELECT state, revocation_reason FROM kauro.source_files WHERE file_id = $1", [r3.fileId]), { state: "ADMISSION_REVOKED", revocation_reason: "INTAKE_EXPIRED" });
+});
+
+test("N2: the provider-session evidence is the control plane's — a request handler's cancellation has the database request the provider cancellation, but no request handler records the provider's answer, reopens a session by an unobserved completion, or appends an event type of the control plane", async () => {
+  const t = await tenant("n2");
+  await setSessionLimit(t, 8);
+  const { projectId, revisionId } = await freshProject(t);
+  const up = await tx(app, as(t), async (c) => {
+    const r = await reserveIn(c, t, projectId, revisionId, 100);
+    await toUploading(c, t, revisionId, r.uploadId);
+    return r;
+  });
+  await tx(app, as(t), (c) => issueSession(c, t, up.uploadId));
+  // CMD015: the handler tombstones the upload; the database requests the provider cancellation in the same update, at its instant
+  await tx(app, as(t), (c) => cancelUpload(c, t, up.uploadId, 3));
+  assert.deepEqual(
+    await oracleRow("SELECT provider_cancellation_state, provider_cancellation_at = cancelled_at AS same_instant FROM kauro.upload_sessions WHERE upload_id = $1", [up.uploadId]),
+    { provider_cancellation_state: "REQUESTED", same_instant: true },
+  );
+  // the re-checker's probe: the handler records the provider's answer CONFIRMED with its event — refused (no grant on the result)
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      await c.query("UPDATE kauro.upload_sessions SET provider_cancellation_state = 'CONFIRMED', provider_cancellation_at = kauro.server_now(), version = 4 WHERE upload_id = $1 AND version = 3", [up.uploadId]);
+      await event(c, { aggregateKind: "upload_session", aggregateId: up.uploadId, aggregateVersion: 4, agencyId: t.ag.agencyId, eventType: "upload_session.provider_cancellation_recorded.v1", actorUserId: t.ag.ownerUserId, payload: { uploadId: up.uploadId, providerCancellationState: "CONFIRMED" } });
+    }),
+    refusedWith("42501"),
+  );
+  // the same probe under an event type the handler may append (its own cancellation's): refused by the grant alone
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      await c.query("UPDATE kauro.upload_sessions SET provider_cancellation_state = 'CONFIRMED', provider_cancellation_at = kauro.server_now(), version = 4 WHERE upload_id = $1 AND version = 3", [up.uploadId]);
+      await event(c, { aggregateKind: "upload_session", aggregateId: up.uploadId, aggregateVersion: 4, agencyId: t.ag.agencyId, eventType: "upload_session.cancelled.v1", actorUserId: t.ag.ownerUserId });
+    }),
+    refusedWith("42501"),
+  );
+  // a tombstone's facts are set once: the handler cannot re-date, re-explain or re-attribute its cancellation (KA004)
+  for (const sets of ["cancelled_at = kauro.server_now()", "terminal_reason = 'SOMETHING_ELSE'", "cancelled_by_membership_id = NULL"]) {
+    await assert.rejects(
+      tx(app, as(t), async (c) => {
+        await c.query(`UPDATE kauro.upload_sessions SET ${sets}, version = 4 WHERE upload_id = $1 AND version = 3`, [up.uploadId]);
+        await event(c, { aggregateKind: "upload_session", aggregateId: up.uploadId, aggregateVersion: 4, agencyId: t.ag.agencyId, eventType: "upload_session.cancelled.v1", actorUserId: t.ag.ownerUserId });
+      }),
+      refusedWith("KA004"),
+      sets,
+    );
+  }
+  // nor in the tombstoning update itself: a second upload cancelled "already CONFIRMED" is refused the same way
+  const second = await tx(app, as(t), (c) => reserveIn(c, t, projectId, revisionId, 100));
+  await tx(app, as(t), (c) => issueSession(c, t, second.uploadId));
+  await assert.rejects(
+    tx(app, as(t), (c) => c.query("UPDATE kauro.upload_sessions SET state = 'CANCELLED', version = 3, cancelled_at = kauro.server_now(), cancelled_by_membership_id = $2, terminal_reason = 'CANCELLED_BY_REQUESTER', provider_cancellation_state = 'CONFIRMED', provider_cancellation_at = kauro.server_now() WHERE upload_id = $1", [second.uploadId, t.ag.ownerMembershipId])),
+    refusedWith("42501"),
+  );
+  // the control plane's event types are not the request handlers' to append, not even on a version bump of their own aggregate:
+  // a forged "recorded" or "expired" fact would reach its consumers (AUTHORITY_JOURNAL, STORAGE_LIFECYCLE)
+  const bumpWith = (kind: "upload_session" | "dataset_revision", id: string, eventType: string) =>
+    tx(app, as(t), async (c) => {
+      const table = kind === "upload_session" ? "upload_sessions" : "dataset_revisions";
+      const key = kind === "upload_session" ? "upload_id" : "revision_id";
+      const r = await c.query<{ version: string }>(`UPDATE kauro.${table} SET version = version + 1 WHERE ${key} = $1 RETURNING version::text`, [id]);
+      await event(c, { aggregateKind: kind, aggregateId: id, aggregateVersion: Number(r.rows[0]!.version), agencyId: t.ag.agencyId, eventType, actorUserId: t.ag.ownerUserId });
+    });
+  await assert.rejects(bumpWith("upload_session", up.uploadId, "upload_session.provider_cancellation_recorded.v1"), refusedWith("42501"));
+  await assert.rejects(bumpWith("upload_session", up.uploadId, "upload_session.expired.v1"), refusedWith("42501"));
+  await assert.rejects(bumpWith("dataset_revision", revisionId, "dataset_revision.expired.v1"), refusedWith("42501"));
+  await assert.rejects(bumpWith("dataset_revision", revisionId, "dataset_revision.ready_to_seal.v1"), refusedWith("42501"));
+  // a cancelled revision's terminal facts are set once as well (CMD012 cancelled it; nothing re-dates it afterwards)
+  const cancelled = await freshProject(t);
+  await tx(app, as(t), (c) => cancelRevision(c, t, cancelled.revisionId, "ABANDONED"));
+  await assert.rejects(
+    tx(app, as(t), async (c) => {
+      const r = await c.query<{ version: string }>("UPDATE kauro.dataset_revisions SET cancelled_at = kauro.server_now(), terminal_reason = 'REPLACED_BY_NEW_REVISION', version = version + 1 WHERE revision_id = $1 RETURNING version::text", [cancelled.revisionId]);
+      await event(c, { aggregateKind: "dataset_revision", aggregateId: cancelled.revisionId, aggregateVersion: Number(r.rows[0]!.version), agencyId: t.ag.agencyId, eventType: "dataset_revision.cancelled.v1", actorUserId: t.ag.ownerUserId });
+    }),
+    refusedWith("KA004"),
+  );
+  // the list is exactly the control plane's edges of D-CTRL-2, the same list its own insert policy admits
+  assert.deepEqual((await oracleRow<{ types: string[] }>("SELECT kauro.source_control_event_types() AS types")).types, [
+    "upload_session.completion_observed.v1", "upload_session.completion_not_observed.v1", "upload_session.admitted.v1",
+    "upload_session.rejected.v1", "upload_session.expired.v1", "upload_session.provider_cancellation_recorded.v1",
+    "dataset_revision.ready_to_seal.v1", "dataset_revision.rejected.v1", "dataset_revision.expired.v1",
+    "retention_record.expired.v1", "source_file.admitted.v1", "source_file.admission_revoked.v1",
+  ]);
+  // positive symmetry: the control plane records the provider's answer (UNCERTAIN, then CONFIRMED) with its event
+  await controlTx(t.ag.agencyId, async (c) => {
+    await c.query("UPDATE kauro.upload_sessions SET provider_cancellation_state = 'UNCERTAIN', provider_cancellation_at = kauro.server_now(), version = 4 WHERE upload_id = $1 AND version = 3", [up.uploadId]);
+    await appendFixtureEvent(c, { aggregateKind: "upload_session", aggregateId: up.uploadId, aggregateVersion: 4, agencyId: t.ag.agencyId, eventType: "upload_session.provider_cancellation_recorded.v1", actorUserId: null, payload: { uploadId: up.uploadId, providerCancellationState: "UNCERTAIN" } });
+  });
+  await controlTx(t.ag.agencyId, async (c) => {
+    await c.query("UPDATE kauro.upload_sessions SET provider_cancellation_state = 'CONFIRMED', provider_cancellation_at = kauro.server_now(), version = 5 WHERE upload_id = $1 AND version = 4", [up.uploadId]);
+    await appendFixtureEvent(c, { aggregateKind: "upload_session", aggregateId: up.uploadId, aggregateVersion: 5, agencyId: t.ag.agencyId, eventType: "upload_session.provider_cancellation_recorded.v1", actorUserId: null, payload: { uploadId: up.uploadId, providerCancellationState: "CONFIRMED" } });
+  });
+  assert.deepEqual(await oracleRow("SELECT provider_cancellation_state FROM kauro.upload_sessions WHERE upload_id = $1", [up.uploadId]), { provider_cancellation_state: "CONFIRMED" });
+
+  // completion_not_observed (VERIFYING -> UPLOADING) reopens a bearer session: the request handler cannot take it, with or without
+  // the negative observation it holds no grant on; the control plane takes it with its observation
+  const third = await tx(app, as(t), (c) => reserveIn(c, t, projectId, revisionId, 100));
+  await tx(app, as(t), (c) => issueSession(c, t, third.uploadId));
+  await tx(app, as(t), (c) => reportCompletion(c, t, third.uploadId));
+  const reopen = (sets: string, eventType: string, actorUserId: string | null) => async (c: Client) => {
+    await c.query(`UPDATE kauro.upload_sessions SET state = 'UPLOADING', version = 4, completion_claim_digest = NULL, completion_reported_at = NULL${sets} WHERE upload_id = $1 AND version = 3`, [third.uploadId]);
+    await appendFixtureEvent(c, { aggregateKind: "upload_session", aggregateId: third.uploadId, aggregateVersion: 4, agencyId: t.ag.agencyId, eventType, actorUserId, payload: { uploadId: third.uploadId } });
+  };
+  // the handler, under an event type it may append, without the negative observation (KA072) and with it (no grant, 42501)
+  await assert.rejects(tx(app, as(t), reopen("", "upload_session.completion_reported.v1", t.ag.ownerUserId)), refusedWith("KA072"));
+  await assert.rejects(tx(app, as(t), reopen(", completion_not_observed_at = kauro.server_now()", "upload_session.completion_reported.v1", t.ag.ownerUserId)), refusedWith("42501"));
+  await controlTx(t.ag.agencyId, reopen(", completion_not_observed_at = kauro.server_now()", "upload_session.completion_not_observed.v1", null));
+  assert.deepEqual(await oracleRow("SELECT state, completion_not_observed_at IS NOT NULL AS observed FROM kauro.upload_sessions WHERE upload_id = $1", [third.uploadId]), { state: "UPLOADING", observed: true });
+});
+
+test("N4: tenant-scope pairs are bound by composite keys — a retention record's client is its project's client, and an upload is requested by the acting person through their own live operator membership, the pair bound for every writer", async () => {
+  const t = await tenant("n4");
+  // (a) the UNPAID record of a seal naming another client of the same agency: refused by the composite key to the project
+  const otherClient = await endClient(app, t.ag, await processingAuthority(app, t.ag), "Client Two");
+  const p = await freshProject(t);
+  const scope = scopeOf(t, p.projectId);
+  const ready = await readySourceRevision(sessionsOf(t), scope, await admitSourceFile(sessionsOf(t), scope, { seed: "n4" }));
+  const sealedAt = new Date(ready.initiatedAt.getTime() + 600_000);
+  await assert.rejects(tx(app, as(t), (c) => sealStatements(c, scope, { ...ready, clientId: otherClient }, sealedAt)), refusedWith("23503", "retention_records_project_client_fk"));
+  await tx(app, as(t), (c) => sealStatements(c, scope, ready, sealedAt)); // positive neighbour: the project's own client
+
+  // (b) the requester of an upload
+  const q = await freshProject(t);
+  const stranger = await person(app, "b07-n4-stranger"); // an identity with no membership in the agency
+  const colleague = await person(app, "b07-n4-colleague");
+  const colleagueMembershipId = await member(app, t.ag, colleague, "OPERATOR");
+  const viewer = await person(app, "b07-n4-viewer");
+  const viewerMembershipId = await member(app, t.ag, viewer, "VIEWER");
+  // the re-checker's probe: the owner names its own membership and, as the requester, a person with no membership in the agency
+  await assert.rejects(tx(app, as(t), (c) => reserveIn(c, t, q.projectId, q.revisionId, 10, { requester: { membershipId: t.ag.ownerMembershipId, userId: stranger.userId } })), refusedWith("42501"));
+  // another member's membership under the actor's own person, and a VIEWER's own membership (CMD013 is AGENCY_OPERATOR)
+  await assert.rejects(tx(app, as(t), (c) => reserveIn(c, t, q.projectId, q.revisionId, 10, { requester: { membershipId: colleagueMembershipId, userId: t.ag.ownerUserId } })), refusedWith("42501"));
+  await assert.rejects(
+    tx(app, { agencyId: t.ag.agencyId, userId: viewer.userId }, (c) => reserveIn(c, t, q.projectId, q.revisionId, 10, { requester: { membershipId: viewerMembershipId, userId: viewer.userId } })),
+    refusedWith("42501"),
+  );
+  // the pair itself is a composite key for every writer: the superuser (the adversary here, no row security) is refused it too
+  await su.query("BEGIN");
+  try {
+    const objectId = ids.next();
+    const uploadId = ids.next();
+    await su.query(
+      `INSERT INTO kauro.stored_objects (object_id, agency_id, project_id, revision_id, upload_id, zone, data_class, provider, location_ref, object_name, created_by_kind, created_by_ref, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'QUARANTINE', 'RAW', 'contract-fake-storage', 'QUARANTINE_PRIMARY', $6, 'MEMBERSHIP', $7, kauro.server_now(), now())`,
+      [objectId, t.ag.agencyId, q.projectId, q.revisionId, uploadId, `quarantine/${t.ag.agencyId}/${q.projectId}/${q.revisionId}/${uploadId}`, t.ag.ownerMembershipId],
+    );
+    await assert.rejects(
+      su.query(
+        `INSERT INTO kauro.upload_sessions (upload_id, agency_id, project_id, revision_id, display_name, declared_format, reserved_bytes, quarantine_object_id, requested_by_membership_id, requested_by_user_id, application_expires_at, session_attempt, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'contacts export.csv', 'CSV', 10, $5, $6, $7, kauro.server_now() + interval '86400 seconds', 1, kauro.server_now(), now())`,
+        [uploadId, t.ag.agencyId, q.projectId, q.revisionId, objectId, t.ag.ownerMembershipId, stranger.userId],
+      ),
+      refusedWith("23503", "upload_sessions_requester_fk"),
+    );
+  } finally {
+    await su.query("ROLLBACK");
+  }
+  // positive neighbour: the OPERATOR colleague reserves as themselves, through their own membership
+  const own = await tx(app, { agencyId: t.ag.agencyId, userId: colleague.userId }, (c) => reserveIn(c, t, q.projectId, q.revisionId, 10, { requester: { membershipId: colleagueMembershipId, userId: colleague.userId } }));
+  assert.deepEqual(await oracleRow("SELECT requested_by_membership_id AS m, requested_by_user_id AS u FROM kauro.upload_sessions WHERE upload_id = $1", [own.uploadId]), { m: colleagueMembershipId, u: colleague.userId });
 });

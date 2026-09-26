@@ -153,13 +153,21 @@ CREATE TRIGGER inspection_receipts_append_only BEFORE UPDATE OR DELETE ON kauro.
 -- and a concurrent cancellation are ordered on it (cancellation remains valid while verification races, CMD015). The control-plane
 -- unit of work has already taken the revision row (FOR NO KEY UPDATE) before any upload row, the order of the commands (D-LOCK-2,
 -- B07-F14), so this upload lock never inverts it.
+-- D-INSP-4 (re-check N3; D-CLOCK-1): the receipt's instants are bounded by the server's. The attempt starts at its claim (the
+-- instant the database stamped when the fence advanced), the scan follows the provider observation and lies within the attempt,
+-- the completion is not ahead of the server clock and the receipt is recorded at the server's transaction time. The pinned
+-- signature age (inspection_receipts_clean_means_covered) is therefore measured at an instant inside the attempt, never at one the
+-- writer set back to before the upload existed (09 "Scanner coverage": stale signatures beyond the recorded policy block new
+-- admission; S054).
 CREATE OR REPLACE FUNCTION kauro.inspection_receipts_current_attempt() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 DECLARE
   u record;
+  clock timestamptz := kauro.server_now();
 BEGIN
-  SELECT state, inspection_fence, observed_generation, observed_bytes, completion_claim_digest, declared_format, quarantine_object_id
+  SELECT state, inspection_fence, inspection_claimed_at, observed_generation, observed_bytes, completion_observed_at, completion_claim_digest,
+         declared_format, quarantine_object_id
     INTO u FROM kauro.upload_sessions WHERE agency_id = NEW.agency_id AND upload_id = NEW.upload_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'CONTEXT: upload % is not visible in this transaction', NEW.upload_id USING ERRCODE = 'KA006';
@@ -174,6 +182,14 @@ BEGIN
      OR u.completion_claim_digest IS DISTINCT FROM NEW.completion_claim_digest OR u.declared_format <> NEW.declared_format
      OR u.quarantine_object_id <> NEW.quarantine_object_id THEN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: receipt for upload % does not describe the recorded observation', NEW.upload_id USING ERRCODE = 'KA072';
+  END IF;
+  IF NEW.started_at IS DISTINCT FROM u.inspection_claimed_at
+     OR NEW.completed_at > clock
+     OR NEW.created_at IS DISTINCT FROM clock
+     OR (NEW.scanned_at IS NOT NULL AND (
+          NEW.scanned_at < NEW.started_at OR NEW.scanned_at > NEW.completed_at
+          OR u.completion_observed_at IS NULL OR NEW.scanned_at < u.completion_observed_at)) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the receipt of upload % starts at its attempt''s claim, scans after the observation and within the attempt, and is recorded at the server''s transaction time', NEW.upload_id USING ERRCODE = 'KA072';
   END IF;
   RETURN NEW;
 END
@@ -279,6 +295,9 @@ CREATE TRIGGER source_files_admitting_upload BEFORE INSERT ON kauro.source_files
 --                     expires itself, does not keep the bytes admitted and reusable forever);
 --   GENERATION_MISSING / GENERATION_CHANGED  the bytes are gone or not the admitted ones: revoked whatever retains them (an incident
 --                     for the deletion package, not data).
+-- "Included by a seal" means included by a real seal (D-SEAL-1, re-check N1): a file row of a revision that entered SEALED at exactly
+-- its sealed manifest's instant (kauro.is_real_seal, 0011) — a row no seal recorded can neither keep bytes admitted past their
+-- window nor postpone the end of their retention. 0011 binds every sealed row to its seal at COMMIT; this is the reader's half.
 -- The revocation is recorded at the server's transaction time (D-CLOCK-1).
 CREATE OR REPLACE FUNCTION kauro.source_files_revocation_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
@@ -289,7 +308,8 @@ BEGIN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: the admission of file % is revoked at the server''s transaction time', OLD.file_id USING ERRCODE = 'KA072';
   END IF;
   IF NEW.revocation_reason = 'INTAKE_EXPIRED' AND EXISTS (
-    SELECT 1 FROM kauro.sealed_revision_files s WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED'
+    SELECT 1 FROM kauro.sealed_revision_files s
+     WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED' AND kauro.is_real_seal(s.agency_id, s.revision_id)
   ) THEN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: file % was sealed; its bytes follow the seal''s retention, not the intake window', OLD.file_id USING ERRCODE = 'KA072';
   END IF;
@@ -300,10 +320,13 @@ BEGIN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: the intake window of file % is still open', OLD.file_id USING ERRCODE = 'KA072';
   END IF;
   IF NEW.revocation_reason = 'RETENTION_EXPIRED' AND (
-    NOT EXISTS (SELECT 1 FROM kauro.sealed_revision_files s WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED')
+    NOT EXISTS (
+      SELECT 1 FROM kauro.sealed_revision_files s
+       WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED' AND kauro.is_real_seal(s.agency_id, s.revision_id)
+    )
     OR EXISTS (
       SELECT 1 FROM kauro.sealed_revision_files s JOIN kauro.retention_records rr ON rr.agency_id = s.agency_id AND rr.revision_id = s.revision_id
-       WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED'
+       WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED' AND kauro.is_real_seal(s.agency_id, s.revision_id)
          AND rr.state = 'ACTIVE' AND rr.effective_deadline > kauro.server_now()
     )
   ) THEN

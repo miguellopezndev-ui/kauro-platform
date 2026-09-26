@@ -329,6 +329,21 @@ CREATE TABLE kauro.storage_location_policies (
 CREATE TRIGGER storage_location_policies_append_only BEFORE UPDATE OR DELETE ON kauro.storage_location_policies
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
 
+-- D-CLOCK-1 (re-check N3): a read-back is recorded at the server's transaction time. The deletion residual is looked up as the
+-- latest read-back at or before the deletion instant, so a read-back dated back would govern deletions it never preceded.
+CREATE OR REPLACE FUNCTION kauro.storage_location_policies_server_clock() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.observed_at IS DISTINCT FROM kauro.server_now() THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the read-back of % % is recorded at the server''s transaction time, not %', NEW.provider, NEW.location_ref, NEW.observed_at USING ERRCODE = 'KA072';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER storage_location_policies_server_clock BEFORE INSERT ON kauro.storage_location_policies
+  FOR EACH ROW EXECUTE FUNCTION kauro.storage_location_policies_server_clock();
+
 -- --- quota ledgers (R2-052; 09 "Upload reservation") ---------------------------------------------------------------------------
 -- Operational ledgers, not aggregates: maintained only by the upload_sessions trigger below; the row lock their UPDATE takes is
 -- the serialization point of concurrent reservations, and the CHECK refuses the combination beyond the envelope (decision D-UP-2).
@@ -391,8 +406,15 @@ CREATE TABLE kauro.upload_sessions (
   completion_observed_at       timestamptz,
   observed_generation          text CHECK (observed_generation IS NULL OR kauro.is_generation(observed_generation)),
   observed_bytes               bigint CHECK (observed_bytes IS NULL OR observed_bytes >= 0),
+  -- the control plane's negative observation: the instant the provider was found holding no complete object for the claim
+  -- (completion_not_observed, VERIFYING -> UPLOADING; decision D-ROLE-3). Request handlers hold no grant on it, so the edge that
+  -- reopens a bearer session is the control plane's alone (B06 D-EVID-1)
+  completion_not_observed_at   timestamptz,
   -- fence of the inspection attempt (a stale worker's result is refused, D-INSP-2); not a business version
   inspection_fence             integer NOT NULL DEFAULT 0 CHECK (inspection_fence >= 0),
+  -- the server's instant of the current attempt's claim, stamped by the database when the fence advances (D-INSP-4): the receipt
+  -- of the attempt starts exactly here, so its scan instant is bounded by server instants on both sides
+  inspection_claimed_at        timestamptz,
   inspection_receipt_hash      text CHECK (inspection_receipt_hash IS NULL OR kauro.is_sha256_hex(inspection_receipt_hash)),
   file_id                      uuid,
   terminal_reason              text CHECK (terminal_reason IS NULL OR kauro.is_token(terminal_reason)),
@@ -409,7 +431,10 @@ CREATE TABLE kauro.upload_sessions (
   UNIQUE (agency_id, upload_id, requested_by_user_id),
   FOREIGN KEY (agency_id, project_id, revision_id) REFERENCES kauro.dataset_revisions (agency_id, project_id, revision_id),
   FOREIGN KEY (agency_id, quarantine_object_id) REFERENCES kauro.stored_objects (agency_id, object_id),
-  FOREIGN KEY (agency_id, requested_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
+  -- the requester is one membership of this agency and the person who holds it (07 "Database representation": composite foreign
+  -- keys bind tenant and parent identity; re-check N4): the session secret and its read policy follow requested_by_user_id
+  CONSTRAINT upload_sessions_requester_fk FOREIGN KEY (agency_id, requested_by_membership_id, requested_by_user_id)
+    REFERENCES kauro.memberships (agency_id, membership_id, user_id),
   FOREIGN KEY (agency_id, cancelled_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
   -- UploadSession.applicationExpiresAt: exactly twenty-four hours from initiation (policy retention.uploadReservationSeconds);
   -- created_at is the server's transaction time (upload_sessions_window_clock, D-CLOCK-1)
@@ -443,7 +468,9 @@ CREATE TABLE kauro.upload_sessions (
   CONSTRAINT upload_sessions_cancellation_after_tombstone CHECK (
     provider_cancellation_state = 'NOT_REQUESTED' OR state IN ('CANCELLED', 'EXPIRED', 'REJECTED', 'VERIFYING', 'ADMITTED')
   ),
-  CONSTRAINT upload_sessions_cancellation_recorded CHECK ((provider_cancellation_state = 'NOT_REQUESTED') = (provider_cancellation_at IS NULL))
+  CONSTRAINT upload_sessions_cancellation_recorded CHECK ((provider_cancellation_state = 'NOT_REQUESTED') = (provider_cancellation_at IS NULL)),
+  -- an inspection attempt exists exactly when its claim instant does (D-INSP-4)
+  CONSTRAINT upload_sessions_attempt_claimed CHECK ((inspection_fence = 0) = (inspection_claimed_at IS NULL))
 );
 CREATE INDEX upload_sessions_by_revision ON kauro.upload_sessions (agency_id, revision_id, created_at, upload_id);
 CREATE INDEX upload_sessions_live_by_agency ON kauro.upload_sessions (agency_id) WHERE state IN ('RESERVED', 'UPLOADING', 'VERIFYING');
@@ -453,7 +480,7 @@ CREATE INDEX upload_sessions_provider_reconciliation ON kauro.upload_sessions (p
 
 CREATE TRIGGER upload_sessions_touch BEFORE UPDATE ON kauro.upload_sessions FOR EACH ROW EXECUTE FUNCTION kauro.touch_updated_at();
 CREATE TRIGGER upload_sessions_version BEFORE UPDATE ON kauro.upload_sessions
-  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_version_bump('session_attempt,inspection_fence');
+  FOR EACH ROW EXECUTE FUNCTION kauro.enforce_version_bump('session_attempt,inspection_fence,inspection_claimed_at');
 CREATE TRIGGER upload_sessions_immutable BEFORE UPDATE ON kauro.upload_sessions
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('upload_id,agency_id,project_id,revision_id,display_name,declared_format,reserved_bytes,quarantine_object_id,requested_by_membership_id,requested_by_user_id,application_expires_at,created_at');
 CREATE TRIGGER upload_sessions_transition BEFORE UPDATE OF state ON kauro.upload_sessions
@@ -488,6 +515,8 @@ BEGIN
   IF (NEW.session_issued_at IS DISTINCT FROM OLD.session_issued_at AND NEW.session_issued_at IS DISTINCT FROM clock)
      OR (NEW.completion_reported_at IS DISTINCT FROM OLD.completion_reported_at AND NEW.completion_reported_at IS NOT NULL AND NEW.completion_reported_at IS DISTINCT FROM clock)
      OR (NEW.completion_observed_at IS DISTINCT FROM OLD.completion_observed_at AND NEW.completion_observed_at IS DISTINCT FROM clock)
+     OR (NEW.completion_not_observed_at IS DISTINCT FROM OLD.completion_not_observed_at AND NEW.completion_not_observed_at IS DISTINCT FROM clock)
+     OR (NEW.inspection_claimed_at IS DISTINCT FROM OLD.inspection_claimed_at AND NEW.inspection_claimed_at IS DISTINCT FROM clock)
      OR (NEW.admitted_at IS DISTINCT FROM OLD.admitted_at AND NEW.admitted_at IS DISTINCT FROM clock)
      OR (NEW.rejected_at IS DISTINCT FROM OLD.rejected_at AND NEW.rejected_at IS DISTINCT FROM clock)
      OR (NEW.cancelled_at IS DISTINCT FROM OLD.cancelled_at AND NEW.cancelled_at IS DISTINCT FROM clock)
@@ -556,6 +585,11 @@ BEGIN
   IF NEW.inspection_fence > OLD.inspection_fence AND OLD.state <> 'VERIFYING' THEN
     RAISE EXCEPTION 'FENCE_DISCIPLINE: upload % is % and claims no inspection attempt', OLD.upload_id, OLD.state USING ERRCODE = 'KA071';
   END IF;
+  -- the claim instant is the database's stamp of the fence advance (upload_sessions_attempt_claimed) and changes with nothing else
+  -- (D-INSP-4, re-check N3)
+  IF NEW.inspection_claimed_at IS DISTINCT FROM OLD.inspection_claimed_at AND NEW.inspection_fence = OLD.inspection_fence THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: upload % records an attempt''s claim instant only when the attempt is claimed', OLD.upload_id USING ERRCODE = 'KA004';
+  END IF;
   IF (OLD.observed_generation IS NOT NULL AND NEW.observed_generation IS DISTINCT FROM OLD.observed_generation)
      OR (OLD.observed_bytes IS NOT NULL AND NEW.observed_bytes IS DISTINCT FROM OLD.observed_bytes)
      OR (OLD.completion_observed_at IS NOT NULL AND NEW.completion_observed_at IS DISTINCT FROM OLD.completion_observed_at)
@@ -564,6 +598,17 @@ BEGIN
      OR (OLD.session_issued_at IS NOT NULL AND NEW.session_issued_at IS DISTINCT FROM OLD.session_issued_at)
      OR (OLD.provider_session_digest IS NOT NULL AND NEW.provider_session_digest IS DISTINCT FROM OLD.provider_session_digest) THEN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: upload % observed facts are set once', OLD.upload_id USING ERRCODE = 'KA004';
+  END IF;
+  -- the facts of a decided or tombstoned upload are set once (D-CLOCK-1, re-check N2): an admission, a rejection, a cancellation or
+  -- an expiry is never re-dated, re-explained or re-attributed by a later update of the row (a request handler may still update a
+  -- CANCELLED row it owns, and the control plane records the provider cancellation on it)
+  IF (OLD.admitted_at IS NOT NULL AND NEW.admitted_at IS DISTINCT FROM OLD.admitted_at)
+     OR (OLD.rejected_at IS NOT NULL AND NEW.rejected_at IS DISTINCT FROM OLD.rejected_at)
+     OR (OLD.cancelled_at IS NOT NULL AND NEW.cancelled_at IS DISTINCT FROM OLD.cancelled_at)
+     OR (OLD.expired_at IS NOT NULL AND NEW.expired_at IS DISTINCT FROM OLD.expired_at)
+     OR (OLD.terminal_reason IS NOT NULL AND NEW.terminal_reason IS DISTINCT FROM OLD.terminal_reason)
+     OR (OLD.cancelled_by_membership_id IS NOT NULL AND NEW.cancelled_by_membership_id IS DISTINCT FROM OLD.cancelled_by_membership_id) THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: upload % records its outcome once', OLD.upload_id USING ERRCODE = 'KA004';
   END IF;
   -- a completion claim is recorded only by the completion report itself (UPLOADING -> VERIFYING), and a claim the provider did
   -- not honour is cleared with the observation that says so (VERIFYING -> UPLOADING, completion_not_observed)
@@ -577,6 +622,17 @@ BEGIN
      AND NOT (OLD.state = 'VERIFYING' AND NEW.state = 'UPLOADING' AND NEW.completion_claim_digest IS NULL AND NEW.completion_reported_at IS NULL) THEN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: upload % completion claim changes only with a completion report', OLD.upload_id USING ERRCODE = 'KA004';
   END IF;
+  -- completion_not_observed (VERIFYING -> UPLOADING) reopens a bearer session, so it needs the control plane's negative observation
+  -- recorded in the same update (a column no request handler is granted; decision D-ROLE-3, re-check N2), and only while no
+  -- observation is recorded: an upload whose object the provider was seen holding is inspected, never reopened (09 "Completion
+  -- and inspection"). The negative observation changes on that edge only.
+  IF OLD.state = 'VERIFYING' AND NEW.state = 'UPLOADING' THEN
+    IF NEW.completion_not_observed_at IS NOT DISTINCT FROM OLD.completion_not_observed_at OR OLD.completion_observed_at IS NOT NULL THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: completion_not_observed of upload % records the control plane''s negative observation of an unobserved completion', OLD.upload_id USING ERRCODE = 'KA072';
+    END IF;
+  ELSIF NEW.completion_not_observed_at IS DISTINCT FROM OLD.completion_not_observed_at THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: upload % records a negative observation only with completion_not_observed', OLD.upload_id USING ERRCODE = 'KA004';
+  END IF;
   IF NEW.provider_cancellation_state IS DISTINCT FROM OLD.provider_cancellation_state AND NOT (
        (OLD.provider_cancellation_state = 'NOT_REQUESTED' AND NEW.provider_cancellation_state = 'REQUESTED')
     OR (OLD.provider_cancellation_state = 'REQUESTED' AND NEW.provider_cancellation_state IN ('CONFIRMED', 'UNSUPPORTED', 'UNCERTAIN'))
@@ -588,6 +644,47 @@ BEGIN
 END
 $$;
 CREATE TRIGGER upload_sessions_guard BEFORE UPDATE ON kauro.upload_sessions FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_guard();
+
+-- D-ROLE-3 (re-check N2): the provider-session evidence is the control plane's. A request handler's cancellation (CMD015, or CMD012
+-- replacing the revision) tombstones the upload and, when a provider session was issued, requests its cancellation in the same
+-- update: the database stamps REQUESTED at the server's transaction time (09 "Resumable session security": the application enforces
+-- its deadline by cancelling the provider session). Request handlers hold no grant on the provider cancellation columns, so the
+-- result — CONFIRMED, UNSUPPORTED or UNCERTAIN, and an UNCERTAIN one resolved — is recorded only by its producer (STORAGE_LIFECYCLE,
+-- PROVIDER_SESSION_RECONCILIATION; upload_session.provider_cancellation_recorded.v1), never collapsed into success by a request
+-- (09: if cancellation cannot be confirmed, reconciliation continues until the provider lifetime ends). Named to fire before
+-- upload_sessions_guard and upload_sessions_window_clock (triggers fire by name), which judge the stamped row like any other.
+CREATE OR REPLACE FUNCTION kauro.upload_sessions_cancellation_requested() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.state = 'CANCELLED' AND OLD.state IS DISTINCT FROM 'CANCELLED' AND OLD.session_issued_at IS NOT NULL
+     AND NEW.provider_cancellation_state = 'NOT_REQUESTED' THEN
+    NEW.provider_cancellation_state := 'REQUESTED';
+    NEW.provider_cancellation_at := kauro.server_now();
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER upload_sessions_cancellation_requested BEFORE UPDATE OF state ON kauro.upload_sessions
+  FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_cancellation_requested();
+
+-- D-INSP-4 (re-check N3): claiming an inspection attempt (the fence advance, D-INSP-2) is stamped by the database at the server's
+-- transaction time, whoever claims it; the receipt of that attempt must start exactly at this instant and scan no earlier than the
+-- provider observation (kauro.inspection_receipts_current_attempt, 0010), so the instant the pinned signature age is measured at
+-- lies between two server instants and cannot be set back to admit stale signatures (09 "Scanner coverage"). Named to fire before
+-- upload_sessions_guard and upload_sessions_window_clock, which judge the stamped row.
+CREATE OR REPLACE FUNCTION kauro.upload_sessions_attempt_claimed() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.inspection_fence > OLD.inspection_fence THEN
+    NEW.inspection_claimed_at := kauro.server_now();
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER upload_sessions_attempt_claimed BEFORE UPDATE OF inspection_fence ON kauro.upload_sessions
+  FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_attempt_claimed();
 
 -- Bytes an upload holds against its revision's envelope: the reservation while in flight, the observed bytes once admitted,
 -- nothing once acceptance is tombstoned (CANCELLED, EXPIRED, REJECTED) — which is why freed quota cannot be consumed twice.
@@ -763,18 +860,30 @@ CREATE TRIGGER upload_session_secrets_no_update BEFORE UPDATE ON kauro.upload_se
 -- Since B07-F1 the control plane never closes intake (all_uploads_completed is the agency's explicit act, CMD016), so
 -- dataset_revision.inspecting.v1 is not among its events; since B07-F9 the admitted file is an aggregate whose birth and revocation
 -- the control plane records (source_file.admitted.v1, source_file.admission_revoked.v1).
+--
+-- The event types of those edges are one list (re-check N2): the control plane may append exactly these, and the request handlers
+-- may append none of them. B06 lets kauro_app append any registered type for an aggregate version of its own tenant; without the
+-- restriction below a request handler could publish, on a version bump of its own, the control plane's facts — a provider
+-- cancellation recorded, an admission, an expiry — which reach consumers that act on them (AUTHORITY_JOURNAL tombstones an
+-- "expired" revision; STORAGE_LIFECYCLE purges a session secret). The restriction is a restrictive policy beside B06's
+-- domain_events_tenant: B06's own types are untouched (08 "Role and capability model"; B06 D-EVID-1).
+CREATE OR REPLACE FUNCTION kauro.source_control_event_types() RETURNS text[]
+  LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$ SELECT ARRAY[
+     'upload_session.completion_observed.v1', 'upload_session.completion_not_observed.v1', 'upload_session.admitted.v1',
+     'upload_session.rejected.v1', 'upload_session.expired.v1', 'upload_session.provider_cancellation_recorded.v1',
+     'dataset_revision.ready_to_seal.v1', 'dataset_revision.rejected.v1', 'dataset_revision.expired.v1',
+     'retention_record.expired.v1', 'source_file.admitted.v1', 'source_file.admission_revoked.v1'
+   ]::text[] $$;
 CREATE POLICY domain_events_control_source_lifecycle ON kauro.domain_events FOR INSERT TO kauro_control
   WITH CHECK (
     agency_id = kauro.current_agency_id()
     AND actor_kind = 'SERVICE'
     AND aggregate_kind IN ('upload_session', 'dataset_revision', 'retention_record', 'source_file')
-    AND event_type IN (
-      'upload_session.completion_observed.v1', 'upload_session.completion_not_observed.v1', 'upload_session.admitted.v1',
-      'upload_session.rejected.v1', 'upload_session.expired.v1', 'upload_session.provider_cancellation_recorded.v1',
-      'dataset_revision.ready_to_seal.v1', 'dataset_revision.rejected.v1', 'dataset_revision.expired.v1',
-      'retention_record.expired.v1', 'source_file.admitted.v1', 'source_file.admission_revoked.v1'
-    )
+    AND event_type = ANY (kauro.source_control_event_types())
   );
+CREATE POLICY domain_events_tenant_not_source_control ON kauro.domain_events AS RESTRICTIVE FOR INSERT TO kauro_app
+  WITH CHECK (NOT (event_type = ANY (kauro.source_control_event_types())));
 GRANT INSERT ON kauro.domain_events TO kauro_control;
 GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_control;
 -- The shared binding (0008, SECURITY INVOKER) reads the registry as the writer: the control plane, which now appends events, reads
@@ -830,6 +939,18 @@ CREATE POLICY upload_sessions_tenant ON kauro.upload_sessions FOR ALL TO kauro_a
 -- expiry): the database refuses the row, whatever the handler computed
 CREATE POLICY upload_sessions_tenant_edges ON kauro.upload_sessions AS RESTRICTIVE FOR UPDATE TO kauro_app
   USING (true) WITH CHECK (state IN ('RESERVED', 'UPLOADING', 'VERIFYING', 'CANCELLED'));
+-- re-check N4: a reservation is requested by the acting person through their own live operator membership (CMD013 is
+-- AGENCY_OPERATOR: OWNER, ADMIN, OPERATOR), as B06 binds an approval to its actor (approvals_act); the composite foreign key
+-- upload_sessions_requester_fk binds the pair for every writer
+CREATE POLICY upload_sessions_tenant_requester ON kauro.upload_sessions AS RESTRICTIVE FOR INSERT TO kauro_app
+  WITH CHECK (
+    requested_by_user_id = kauro.current_user_id()
+    AND EXISTS (
+      SELECT 1 FROM kauro.memberships m
+       WHERE m.agency_id = upload_sessions.agency_id AND m.membership_id = upload_sessions.requested_by_membership_id
+         AND m.user_id = kauro.current_user_id() AND m.state = 'ACTIVE' AND m.role IN ('OWNER', 'ADMIN', 'OPERATOR')
+    )
+  );
 CREATE POLICY upload_sessions_control_read ON kauro.upload_sessions FOR SELECT TO kauro_control
   USING (kauro.current_agency_id() IS NULL OR agency_id = kauro.current_agency_id());
 CREATE POLICY upload_sessions_control_update ON kauro.upload_sessions FOR UPDATE TO kauro_control
@@ -873,9 +994,10 @@ GRANT SELECT, INSERT, UPDATE ON kauro.revision_quota TO kauro_app, kauro_control
 GRANT SELECT ON kauro.upload_capacity TO kauro_app;
 GRANT INSERT (agency_id, active_sessions, updated_at), UPDATE (active_sessions, updated_at) ON kauro.upload_capacity TO kauro_app;
 GRANT SELECT, INSERT, UPDATE ON kauro.upload_capacity TO kauro_control;
--- request handlers write the reservation, the session issue, the completion claim and the cancellation; the provider observation,
--- the inspection fence and outcome and the deadline expiry are the control plane's evidence (B06 D-EVID-1): not even a column
--- grant lets a handler record them (D-ROLE-2)
+-- request handlers write the reservation, the session issue, the completion claim and the cancellation; the provider observation
+-- (positive or negative), the inspection fence and outcome, the provider cancellation result and the deadline expiry are the control
+-- plane's evidence (B06 D-EVID-1): not even a column grant lets a handler record them (D-ROLE-2, D-ROLE-3). The provider
+-- cancellation a handler's tombstone requests is stamped by the database (upload_sessions_cancellation_requested).
 GRANT SELECT ON kauro.upload_sessions TO kauro_app;
 GRANT INSERT (
   upload_id, agency_id, project_id, revision_id, version, state, display_name, declared_format, reserved_bytes, quarantine_object_id,
@@ -884,7 +1006,7 @@ GRANT INSERT (
 GRANT UPDATE (
   version, state, session_attempt, session_issued_at, provider_session_digest, provider_session_expires_at, completion_reported_at,
   completion_claim_digest, claimed_generation, claimed_bytes, claimed_crc32c, claimed_md5, cancelled_at, cancelled_by_membership_id,
-  terminal_reason, provider_cancellation_state, provider_cancellation_at, updated_at
+  terminal_reason, updated_at
 ) ON kauro.upload_sessions TO kauro_app;
 -- the control plane never reads the display filename (customer text) and writes only lifecycle columns
 GRANT SELECT (
@@ -892,13 +1014,16 @@ GRANT SELECT (
   requested_by_membership_id, requested_by_user_id, application_expires_at, session_attempt, session_issued_at,
   provider_session_digest, provider_session_expires_at, provider_cancellation_state, provider_cancellation_at,
   completion_reported_at, completion_claim_digest, claimed_generation, claimed_bytes, claimed_crc32c, claimed_md5,
-  completion_observed_at, observed_generation, observed_bytes, inspection_fence, inspection_receipt_hash, file_id,
-  terminal_reason, cancelled_by_membership_id, admitted_at, rejected_at, cancelled_at, expired_at, created_at, updated_at
+  completion_observed_at, observed_generation, observed_bytes, completion_not_observed_at, inspection_fence, inspection_claimed_at,
+  inspection_receipt_hash, file_id, terminal_reason, cancelled_by_membership_id, admitted_at, rejected_at, cancelled_at, expired_at,
+  created_at, updated_at
 ) ON kauro.upload_sessions TO kauro_control;
+-- the attempt's claim instant is stamped by the database with the fence advance (upload_sessions_attempt_claimed): no role writes it
 GRANT UPDATE (
   version, state, provider_cancellation_state, provider_cancellation_at, completion_reported_at, completion_claim_digest,
   claimed_generation, claimed_bytes, claimed_crc32c, claimed_md5, completion_observed_at, observed_generation, observed_bytes,
-  inspection_fence, inspection_receipt_hash, file_id, terminal_reason, admitted_at, rejected_at, expired_at, updated_at
+  completion_not_observed_at, inspection_fence, inspection_receipt_hash, file_id, terminal_reason, admitted_at, rejected_at, expired_at,
+  updated_at
 ) ON kauro.upload_sessions TO kauro_control;
 GRANT SELECT, INSERT ON kauro.upload_session_secrets TO kauro_app;
 GRANT SELECT, DELETE ON kauro.upload_session_secrets TO kauro_control;

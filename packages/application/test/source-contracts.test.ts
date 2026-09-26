@@ -257,8 +257,14 @@ test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombs
   assert.deepEqual(Object.keys(AUTHORITY_TOMBSTONES).sort(), routed);
   assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.expired.v1"], { kind: "REVISION_EXPIRED", state: "EXPIRED" });
   assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.rejected.v1"], { kind: "REVISION_REJECTED", state: "REJECTED" });
-  const terminal = new Set(["CANCELLED", "EXPIRED", "REJECTED", "SUPERSEDED", "DELETED"]);
+  const terminal = new Set(["CANCELLED", "EXPIRED", "REJECTED", "SUPERSEDED", "DELETED", "REVOKED"]);
   for (const [eventType, t] of Object.entries(AUTHORITY_TOMBSTONES)) assert.ok(terminal.has(t.state), `${eventType} records a terminal state`);
+});
+
+test("N5: a file-admission revocation is a restore tombstone — source_file.admission_revoked.v1 is routed to AUTHORITY_JOURNAL and produces FILE_ADMISSION_REVOKED in the terminal state REVOKED, so a restore never re-admits bytes whose retention ended or whose generation was lost", () => {
+  const consumers = EVENT_SUBSCRIPTIONS.filter((s) => s.eventType === "source_file.admission_revoked.v1").map((s) => s.consumer).sort();
+  assert.deepEqual(consumers, ["AUTHORITY_JOURNAL", "EXECUTION_CONTROL", "NOTIFICATIONS"]);
+  assert.deepEqual((AUTHORITY_TOMBSTONES as Readonly<Record<string, { readonly kind: string; readonly state: string }>>)["source_file.admission_revoked.v1"], { kind: "FILE_ADMISSION_REVOKED", state: "REVOKED" });
 });
 
 test("B07-F13: the sweepers of the contracts are exactly the sweepers of design §12.5, LOCATION_POLICY and RETENTION included", () => {

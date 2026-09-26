@@ -177,6 +177,61 @@ CREATE INDEX sealed_revision_files_by_file ON kauro.sealed_revision_files (agenc
 CREATE TRIGGER sealed_revision_files_append_only BEFORE UPDATE OR DELETE ON kauro.sealed_revision_files
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
 
+-- --- a sealed row is evidence of the seal that records it (decision D-SEAL-1, re-check N1) ---------------------------------------
+-- B06 D-EVID-1 and D-ANCH-2: evidence is bound at COMMIT to the transition it records. A sealed manifest and its file set are the
+-- record of seal_command (READY_TO_SEAL -> SEALED); written anywhere else they would keep bytes admitted past their intake window
+-- (the INTAKE_EXPIRED revocation reads "was sealed"), postpone the end of their retention (RETENTION_EXPIRED counts the including
+-- revisions) and move the bytes' first-seal clock (D-RET-3) — 09 "Retention schedule" (incomplete upload: 24 h from initiation;
+-- unpaid sources: no later than fourteen days from sealing) and HASHING "Retention formulas" (nothing resets a hard clock). So:
+--   the manifest records the server's transaction time as its seal instant (sealed_manifests_server_clock);
+--   at COMMIT, the revision of a sealed manifest or a sealed file row has entered SEALED in this very transaction, at exactly the
+--   manifest's instant (sealed_manifests_bound, sealed_revision_files_bound): a row added to a revision sealed earlier, or to one
+--   that is not sealing, cannot commit (07 "application checks cannot be the sole protection").
+-- kauro.is_real_seal is the readers' half: a revision whose sealed manifest is its real seal (it went through SEALED at that
+-- manifest's instant; SUPERSEDED, EXPIRED and DELETED keep the instant). The revocation guard (0010) and the first seal of the bytes
+-- (dataset_revisions_sealed_subject) count only such revisions.
+CREATE OR REPLACE FUNCTION kauro.is_real_seal(p_agency uuid, p_revision uuid) RETURNS boolean
+  LANGUAGE sql STABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$
+  SELECT EXISTS (
+    SELECT 1 FROM kauro.dataset_revisions r JOIN kauro.sealed_manifests m ON m.agency_id = r.agency_id AND m.revision_id = r.revision_id
+     WHERE r.agency_id = p_agency AND r.revision_id = p_revision
+       AND r.state IN ('SEALED', 'SUPERSEDED', 'EXPIRED', 'DELETED') AND r.sealed_at = m.sealed_at
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION kauro.sealed_manifests_server_clock() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.sealed_at IS DISTINCT FROM kauro.server_now() THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the sealed manifest of revision % records its seal at the server''s transaction time, not %', NEW.revision_id, NEW.sealed_at USING ERRCODE = 'KA072';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER sealed_manifests_server_clock BEFORE INSERT ON kauro.sealed_manifests
+  FOR EACH ROW EXECUTE FUNCTION kauro.sealed_manifests_server_clock();
+
+CREATE OR REPLACE FUNCTION kauro.sealed_rows_bound() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM kauro.dataset_revisions r JOIN kauro.sealed_manifests m ON m.agency_id = r.agency_id AND m.revision_id = r.revision_id
+     WHERE r.agency_id = NEW.agency_id AND r.revision_id = NEW.revision_id
+       AND r.state = 'SEALED' AND r.sealed_at = m.sealed_at AND m.sealed_at = kauro.server_now()
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: a % row of revision % records no seal taken in this transaction', TG_TABLE_NAME, NEW.revision_id USING ERRCODE = 'KA072';
+  END IF;
+  RETURN NULL;
+END
+$$;
+CREATE CONSTRAINT TRIGGER sealed_manifests_bound AFTER INSERT ON kauro.sealed_manifests
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.sealed_rows_bound();
+CREATE CONSTRAINT TRIGGER sealed_revision_files_bound AFTER INSERT ON kauro.sealed_revision_files
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.sealed_rows_bound();
+
 -- An included file is admitted when it is sealed: the file's admission is a transition subject (0010), read after its shared
 -- transition lock and held to COMMIT, so a revocation in flight is ordered before the seal (and read) or after it (and refused
 -- by the revocation guard, which sees the seal).
@@ -286,6 +341,28 @@ BEGIN
     OR NEW.billable_source_units IS DISTINCT FROM OLD.billable_source_units OR NEW.association_edges IS DISTINCT FROM OLD.association_edges
     OR NEW.sealed_file_count IS DISTINCT FROM OLD.sealed_file_count OR NEW.sealed_bytes IS DISTINCT FROM OLD.sealed_bytes) THEN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: sealed revision % cannot change its subject', OLD.revision_id USING ERRCODE = 'KA004';
+  END IF;
+
+  -- D-SEAL-1 (re-check N1): the seal's facts are recorded by seal_command only — a seal instant, a manifest or projection hash or
+  -- the frozen sealed counts set on any other update would state a seal no transition took
+  IF (NEW.sealed_at IS DISTINCT FROM OLD.sealed_at OR NEW.manifest_hash IS DISTINCT FROM OLD.manifest_hash
+      OR NEW.projection_hash IS DISTINCT FROM OLD.projection_hash OR NEW.sealed_file_count IS DISTINCT FROM OLD.sealed_file_count
+      OR NEW.sealed_bytes IS DISTINCT FROM OLD.sealed_bytes)
+     AND NOT (OLD.state = 'READY_TO_SEAL' AND NEW.state = 'SEALED') THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: revision % records seal facts only with seal_command', OLD.revision_id USING ERRCODE = 'KA072';
+  END IF;
+
+  -- the terminal facts of a revision are set once (D-CLOCK-1, re-check N2): a supersession, cancellation, rejection, expiry or
+  -- deletion is never re-dated, re-explained or re-pointed by a later update (a request handler may still update a CANCELLED or
+  -- SUPERSEDED revision of its tenant)
+  IF (OLD.superseded_at IS NOT NULL AND NEW.superseded_at IS DISTINCT FROM OLD.superseded_at)
+     OR (OLD.superseded_by_revision_id IS NOT NULL AND NEW.superseded_by_revision_id IS DISTINCT FROM OLD.superseded_by_revision_id)
+     OR (OLD.cancelled_at IS NOT NULL AND NEW.cancelled_at IS DISTINCT FROM OLD.cancelled_at)
+     OR (OLD.rejected_at IS NOT NULL AND NEW.rejected_at IS DISTINCT FROM OLD.rejected_at)
+     OR (OLD.expired_at IS NOT NULL AND NEW.expired_at IS DISTINCT FROM OLD.expired_at)
+     OR (OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS DISTINCT FROM OLD.deleted_at)
+     OR (OLD.terminal_reason IS NOT NULL AND NEW.terminal_reason IS DISTINCT FROM OLD.terminal_reason) THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: revision % records its terminal facts once', OLD.revision_id USING ERRCODE = 'KA004';
   END IF;
 
   -- D-CLOCK-1 (B07-F2): a lifecycle instant this update records is the server's transaction time, never a value the writer chose
@@ -476,12 +553,14 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: sealed revision % has no REVISION_SEALED anchor at its seal', NEW.revision_id USING ERRCODE = 'KA072';
   END IF;
-  -- the first seal of the bytes: the earliest seal of any revision that included any file this seal includes (this one included)
+  -- the first seal of the bytes: the earliest real seal (D-SEAL-1, kauro.is_real_seal) of any revision that included any file this
+  -- seal includes (this one included, which is SEALED at its manifest's instant now)
   SELECT min(m.sealed_at) INTO first_seal
     FROM kauro.sealed_revision_files s
     JOIN kauro.sealed_revision_files o ON o.agency_id = s.agency_id AND o.file_id = s.file_id AND o.disposition = 'INCLUDED'
     JOIN kauro.sealed_manifests m ON m.agency_id = o.agency_id AND m.revision_id = o.revision_id
-   WHERE s.agency_id = NEW.agency_id AND s.revision_id = NEW.revision_id AND s.disposition = 'INCLUDED';
+   WHERE s.agency_id = NEW.agency_id AND s.revision_id = NEW.revision_id AND s.disposition = 'INCLUDED'
+     AND kauro.is_real_seal(o.agency_id, o.revision_id);
   -- policy retention.unpaidDaysHardFromSeal = 14; a day is an exact 86400-second duration (HASHING "Retention formulas")
   IF first_seal IS NULL OR first_seal + interval '1209600 seconds' <= NEW.sealed_at THEN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: the retention window of the bytes of revision % closed before this seal; reuse needs a new upload', NEW.revision_id USING ERRCODE = 'KA072';

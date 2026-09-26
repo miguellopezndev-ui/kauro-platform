@@ -34,6 +34,7 @@ const PLANNED = new Set([
   "apps/api/test/cmd017-seal-revision.test.ts",
   "apps/api/test/source-reads.test.ts",
   "packages/persistence/test/source-adapters.test.ts",
+  "packages/application/test/source-provider-fakes.test.ts",
 ]);
 
 /** Every `file` :: "title" citation, with the line it stands on. */

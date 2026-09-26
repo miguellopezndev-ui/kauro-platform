@@ -3,7 +3,7 @@
  * every repository lives inside a unit of work and its bound context (RLS decides visibility; a write outside the context fails
  * WITH CHECK), versioned writes are compare-and-swap returning VersionedWrite, a new aggregate version is published by the caller
  * through the same EventPublisher, and the command journal is the same table. Implementations belong to @kauro/persistence
- * (mandate B07-PERSISTENCE, docs/design/B07-upload-source-lifecycle.md §13).
+ * (mandate B07-PERSISTENCE, docs/design/B07-upload-source-lifecycle.md §15).
  *
  * `SourceUnitOfWork` is the B06 UnitOfWork plus `sources`. The factory gains `runSource` instead of changing `run`, so the B06
  * handlers and adapters compile untouched; at integration `sources` folds into UnitOfWork (one member, design §13).
@@ -97,7 +97,12 @@ export type UploadTransition =
   | { readonly event: "completion_not_observed" }
   | { readonly event: "inspection_admitted"; readonly fileId: SourceFileId; readonly receiptHash: Sha256Hex; readonly inspectionFence: number }
   | { readonly event: "inspection_rejected"; readonly receiptHash: Sha256Hex; readonly rejectionClass: RejectionClass; readonly inspectionFence: number }
-  | { readonly event: "cancel_upload"; readonly byMembershipId: MembershipId; readonly reason: string; readonly providerCancellation: "NOT_REQUESTED" | "REQUESTED" }
+  /**
+   * The request handler's tombstone (CMD015, CMD012). It carries no provider cancellation: the database requests it in the same
+   * update when a session was issued (upload_sessions_cancellation_requested), and only the control plane records the provider's
+   * answer (D-ROLE-3).
+   */
+  | { readonly event: "cancel_upload"; readonly byMembershipId: MembershipId; readonly reason: string }
   /** At or after the application deadline on the server clock only (the database refuses an earlier expiry, KA072). */
   | { readonly event: "reservation_expired"; readonly reason: string; readonly providerCancellation: "NOT_REQUESTED" | "REQUESTED" }
   | { readonly event: "intake_deadline_reached"; readonly reason: string };
@@ -115,8 +120,11 @@ export interface UploadSessionRepository {
   transition(uploadId: UploadId, expectedVersion: number, change: UploadTransition): Promise<VersionedWrite<UploadSessionRecord>>;
   /** Advances the session-issue fence of a RESERVED upload unexpired on the server clock (no version bump); null when it no longer qualifies. */
   claimSessionAttempt(uploadId: UploadId): Promise<number | null>;
-  /** Advances the inspection fence of a VERIFYING upload (no version bump); null when it is no longer VERIFYING. */
-  claimInspectionAttempt(uploadId: UploadId): Promise<number | null>;
+  /**
+   * Advances the inspection fence of a VERIFYING upload (no version bump) and returns it with the claim instant the database stamped
+   * (D-INSP-4) — the `startedAt` of the attempt's receipt; null when it is no longer VERIFYING.
+   */
+  claimInspectionAttempt(uploadId: UploadId): Promise<{ readonly inspectionFence: number; readonly claimedAt: UtcInstant } | null>;
   /** Records what the provider holds for a VERIFYING upload (set once) at expectedVersion + 1 (upload_session.completion_observed.v1). */
   recordObservation(uploadId: UploadId, expectedVersion: number, observation: { readonly generation: string; readonly bytes: number }): Promise<VersionedWrite<UploadSessionRecord>>;
   /** Records the provider cancellation result at expectedVersion + 1 (upload_session.provider_cancellation_recorded.v1). */
@@ -195,8 +203,8 @@ export interface StoredObjectRepository {
    */
   recordProviderResidual(object: NewStoredObject & { readonly generation: string; readonly softDeletedAt: UtcInstant; readonly providerExpiresAt: UtcInstant }): Promise<StoredObjectRecord>;
   retryDeletion(objectId: StoredObjectId, at: UtcInstant): Promise<StoredObjectRecord>;
-  /** Appends a retention read-back of a location (control plane; append-only). */
-  recordLocationPolicy(observation: StorageLocationPolicyRecord): Promise<void>;
+  /** Appends a retention read-back of a location (control plane; append-only), observed at the server's transaction time (D-CLOCK-1). */
+  recordLocationPolicy(observation: Omit<StorageLocationPolicyRecord, "observedAt">): Promise<StorageLocationPolicyRecord>;
   /** The latest read-back of a location at or before an instant, or null when it was never read back. */
   locationPolicyAt(provider: string, locationRef: string, at: UtcInstant): Promise<StorageLocationPolicyRecord | null>;
   /** The deletion inventory of a scope: every registered object with its zone, class, state and result (raw/derived/residual). */
@@ -209,7 +217,12 @@ export interface StoredObjectRepository {
 // --- inspection, files, inventory ------------------------------------------------------------------------------------------------
 
 export interface InspectionReceiptRepository {
-  /** Appends the receipt of the current attempt of a VERIFYING upload (a stale attempt is refused by the database, KA071). */
+  /**
+   * Appends the receipt of the current attempt of a VERIFYING upload (a stale attempt is refused by the database, KA071), recorded at
+   * the server's transaction time. Its instants are bounded by the server's (D-INSP-4, KA072 otherwise): `startedAt` is the attempt's
+   * claim instant (`UploadSessionRepository.claimInspectionAttempt`), the scan lies between the provider observation and
+   * `completedAt`, and `completedAt` is not ahead of the server clock — the worker reads them from `SourceUnitOfWork.serverInstant()`.
+   */
   append(receipt: InspectionReceiptRecord): Promise<void>;
   getByHash(receiptHash: Sha256Hex): Promise<InspectionReceiptRecord | null>;
   forUpload(uploadId: UploadId): Promise<ReadonlyArray<InspectionReceiptRecord>>;
@@ -323,7 +336,8 @@ export interface SealedFileEntry {
 export interface SealedManifestRepository {
   /**
    * Inserts the sealed manifest (the KAURO_SOURCE_REVISION_V1 preimage and the sealed subject, B07-F12) and its file set in the
-   * seal's unit of work, sealed at the server's transaction time (checked against the revision at commit).
+   * seal's unit of work, sealed at the server's transaction time. They are the record of that seal (D-SEAL-1): at commit the
+   * revision must have entered SEALED in the same unit of work at exactly this instant, otherwise nothing commits (KA072).
    */
   insert(manifest: Omit<SealedManifestRecord, "sealedAt">, files: ReadonlyArray<SealedFileEntry>): Promise<SealedManifestRecord>;
   get(revisionId: RevisionId): Promise<SealedManifestRecord | null>;

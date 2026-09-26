@@ -304,10 +304,11 @@ test("every B07 event type carries an allowlist without customer-text keys, and 
     "upload_session.completion_reported.v1", "upload_session.expired.v1", "upload_session.provider_cancellation_recorded.v1", "upload_session.rejected.v1",
     "upload_session.reserved.v1", "upload_session.session_issued.v1",
   ]);
-  // B07-F9: an admission revoked under a selection or a seal reaches the execution consumer and the agency
-  assert.deepEqual([...consumersOf("source_file.admission_revoked.v1")].sort(), ["EXECUTION_CONTROL", "NOTIFICATIONS"]);
+  // B07-F9: an admission revoked under a selection or a seal reaches the execution consumer and the agency; re-check N5: it is a
+  // restore tombstone too
+  assert.deepEqual([...consumersOf("source_file.admission_revoked.v1")].sort(), ["AUTHORITY_JOURNAL", "EXECUTION_CONTROL", "NOTIFICATIONS"]);
   // B07-F8: every terminal authority fact of the source lifecycle is tombstoned outside the restore boundary
-  for (const t of ["upload_session.cancelled.v1", "upload_session.expired.v1", "upload_session.rejected.v1", "dataset_revision.cancelled.v1", "dataset_revision.superseded.v1", "dataset_revision.rejected.v1", "dataset_revision.expired.v1", "dataset_revision.deleted.v1"] as const) {
+  for (const t of ["upload_session.cancelled.v1", "upload_session.expired.v1", "upload_session.rejected.v1", "dataset_revision.cancelled.v1", "dataset_revision.superseded.v1", "dataset_revision.rejected.v1", "dataset_revision.expired.v1", "dataset_revision.deleted.v1", "source_file.admission_revoked.v1"] as const) {
     assert.ok(consumersOf(t).includes("AUTHORITY_JOURNAL"), t);
   }
   for (const t of b07) {

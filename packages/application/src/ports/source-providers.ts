@@ -5,7 +5,9 @@
  * external authority journal that survives a database restore — are reached only through these ports. Until the real integration
  * package (B15) binds provider adapters, tests bind contract-faithful fakes that report `evidenceClass: "SIMULATED"` and are
  * labelled as such in code and evidence (21 "Evidence classes": SIMULATED demonstrates a local contract with fakes; it is never
- * EXECUTED_PROVIDER). A deployment of this edition binds no fake: the edition answers INTEGRITY_FAILURE /
+ * EXECUTED_PROVIDER). Each fake has one owner (design §15): the scanner's is mandate B07-DATA-PLANE's (`@kauro/data-plane/testing`),
+ * object storage's, the session vault's and the authority journal's are mandate B07-PROVIDER-FAKES' (`@kauro/application/testing`),
+ * both test-only subpaths. A deployment of this edition binds no fake: the edition answers INTEGRITY_FAILURE /
  * SOURCE_SERVICES_UNAVAILABLE until a provider adapter is bound (like B06's I-INT-2).
  *
  * The container inspector and the selection evaluator are not providers: they are the platform's own bounded parsers
@@ -285,7 +287,9 @@ export interface SessionVaultPort {
  * The terminal authority facts of the source lifecycle that must survive a database restore (09 "Deletion receipts and
  * restoration": restoration applies tombstones and current revocation facts before traffic; the registry's SEALED -> EXPIRED
  * effect "Revoke reads/execution"). B07-F8: an expired revision (and a rejected one, whose selected input failed the admission
- * contract) is a tombstone like a cancelled, superseded or deleted one — a restore must not re-enable any of them.
+ * contract) is a tombstone like a cancelled, superseded or deleted one — a restore must not re-enable any of them. Re-check N5: a
+ * file whose admission was revoked (its retention ended, its intake window closed unsealed, or its generation was lost or changed)
+ * is one too — a restore must not re-admit its bytes (09: restoring must not "recreate source data").
  */
 export type AuthorityTombstoneKind =
   | "UPLOAD_ACCEPTANCE_REVOKED"
@@ -293,10 +297,11 @@ export type AuthorityTombstoneKind =
   | "REVISION_SUPERSEDED"
   | "REVISION_REJECTED"
   | "REVISION_EXPIRED"
-  | "REVISION_DELETED";
+  | "REVISION_DELETED"
+  | "FILE_ADMISSION_REVOKED";
 
 /** The terminal state a tombstoned subject reached (closed: a tombstone never records a live state). */
-export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED";
+export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "REVOKED";
 
 /**
  * Which tombstone each event routed to AUTHORITY_JOURNAL produces (EVENT_SUBSCRIPTIONS): the AUTHORITY_JOURNAL consumer appends
@@ -312,6 +317,7 @@ export const AUTHORITY_TOMBSTONES = Object.freeze({
   "dataset_revision.rejected.v1": { kind: "REVISION_REJECTED", state: "REJECTED" },
   "dataset_revision.expired.v1": { kind: "REVISION_EXPIRED", state: "EXPIRED" },
   "dataset_revision.deleted.v1": { kind: "REVISION_DELETED", state: "DELETED" },
+  "source_file.admission_revoked.v1": { kind: "FILE_ADMISSION_REVOKED", state: "REVOKED" },
 } as const satisfies Readonly<Record<string, { readonly kind: AuthorityTombstoneKind; readonly state: AuthorityTombstoneState }>>);
 
 /** A minimal durable fact (14: scoped ids, deadlines, sequence and evidence hashes; no CRM payload). */
@@ -320,7 +326,9 @@ export interface AuthorityTombstone {
   readonly tombstoneId: Id;
   readonly kind: AuthorityTombstoneKind;
   readonly agencyId: AgencyId;
+  /** The revision whose authority the subject belonged to (for a file: the revision it was admitted from). */
   readonly revisionId: RevisionId;
+  /** The tombstoned subject: the upload, the revision, or the file. */
   readonly subjectId: Id;
   /** The terminal state the subject reached. */
   readonly state: AuthorityTombstoneState;

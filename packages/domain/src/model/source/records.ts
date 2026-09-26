@@ -61,7 +61,11 @@ export interface UploadSessionRecord extends Omit<UploadSession, "providerSessio
   readonly completionObservedAt?: UtcInstant;
   readonly observedGeneration?: string;
   readonly observedBytes?: number;
+  /** The control plane's negative observation that reopened the session (completion_not_observed; decision D-ROLE-3). */
+  readonly completionNotObservedAt?: UtcInstant;
   readonly inspectionFence: number;
+  /** The server's instant of the current inspection attempt's claim, stamped by the database with the fence (D-INSP-4). */
+  readonly inspectionClaimedAt?: UtcInstant;
   readonly inspectionReceiptHash?: Sha256Hex;
   readonly fileId?: SourceFileId;
   readonly terminalReason?: string;

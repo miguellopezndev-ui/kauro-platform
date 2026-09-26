@@ -119,6 +119,10 @@ CREATE CONSTRAINT TRIGGER upload_sessions_initiation_anchored AFTER INSERT ON ka
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_initiation_anchored();
 
 -- --- retention records (registry contract RetentionRecord; platform machine RetentionRecord, D-RET-2) -----------------------------
+-- Binding target of the record's tenant scope (re-check N4): a project names exactly one client of its agency (B06 keeps
+-- projects.client_id immutable), so (agency, client, project) is a key of projects and a record's client is its project's client.
+ALTER TABLE kauro.projects ADD CONSTRAINT projects_client_scope UNIQUE (agency_id, client_id, project_id);
+
 CREATE TABLE kauro.retention_records (
   retention_id          uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(retention_id)),
   agency_id             uuid NOT NULL REFERENCES kauro.agencies (agency_id),
@@ -140,8 +144,9 @@ CREATE TABLE kauro.retention_records (
   created_at            timestamptz NOT NULL,
   updated_at            timestamptz NOT NULL,
   UNIQUE (agency_id, retention_id),
-  FOREIGN KEY (agency_id, client_id) REFERENCES kauro.end_clients (agency_id, client_id),
-  FOREIGN KEY (agency_id, project_id) REFERENCES kauro.projects (agency_id, project_id),
+  -- registry RetentionRecord TenantScope (agencyId, clientId, projectId) is one scope: the client is the project's client (07
+  -- "Database representation": composite foreign keys bind tenant and parent identity; 08 "Database isolation"; re-check N4)
+  CONSTRAINT retention_records_project_client_fk FOREIGN KEY (agency_id, client_id, project_id) REFERENCES kauro.projects (agency_id, client_id, project_id),
   FOREIGN KEY (agency_id, project_id, revision_id) REFERENCES kauro.dataset_revisions (agency_id, project_id, revision_id),
   FOREIGN KEY (agency_id, anchor_id, anchor_evidence_hash) REFERENCES kauro.retention_anchors (agency_id, anchor_id, evidence_hash),
   -- "The effective deadline is a minimum of named anchors" (RetentionRecord invariant)

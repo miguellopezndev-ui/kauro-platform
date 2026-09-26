@@ -377,15 +377,17 @@ export async function admitSourceFile(sessions: SourceFixtureSessions, scope: So
     );
     await c.query("UPDATE kauro.stored_objects SET state = 'PRESENT', generation = $3, bytes = $4, observed_at = kauro.server_now() WHERE agency_id = $1 AND object_id = $2", [scope.agencyId, acceptedObjectId, acceptedGeneration, bytes]);
     await c.query("UPDATE kauro.stored_objects SET state = 'VERIFIED', sha256 = $3, verified_at = kauro.server_now() WHERE agency_id = $1 AND object_id = $2", [scope.agencyId, acceptedObjectId, sha256]);
-    // the receipt: the container (a CSV is its own container) scanned completely at its observed length by fresh signatures
+    // the receipt: the container (a CSV is its own container) scanned completely at its observed length by fresh signatures; the
+    // attempt starts at its claim (stamped by the database with the fence), scans after the observation and is recorded at the
+    // server's instant (D-INSP-4) — the whole attempt runs in this one transaction, so every instant is this transaction's
     await c.query(
       `INSERT INTO kauro.inspection_receipts (receipt_id, agency_id, upload_id, revision_id, receipt_hash, inspection_fence, quarantine_object_id, observed_generation, observed_bytes, sha256,
           completion_claim_digest, claim_consistent, declared_format, detected_format, structure_status, scan_state, scanner_engine, scanner_engine_version, signature_version,
           signatures_published_at, signature_max_age_seconds, scanner_config_hash, scanner_exit_code, scanner_verdict, scanned_at, expected_parts, expected_bytes, scanned_parts, scanned_bytes,
           coverage, problems, parser_profile_hash, inspector_version, outcome, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, created_at)
        VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, $10, true, 'CSV', 'CSV', 'STRUCTURE_VALID', 'COVERED_CLEAN', $11, 'SIMULATED-1', 'SIG-FIXTURE',
-          kauro.server_now() - interval '1 hour', 86400, $12, 0, 'CLEAN', kauro.server_now() - interval '2 seconds', 1, $8, 1, $8, $13, '[]', $14, 'data-plane-0.1.0', 'ADMITTED', $15, $16, $9,
-          kauro.server_now() - interval '5 seconds', kauro.server_now(), now())`,
+          kauro.server_now() - interval '1 hour', 86400, $12, 0, 'CLEAN', kauro.server_now(), 1, $8, 1, $8, $13, '[]', $14, 'data-plane-0.1.0', 'ADMITTED', $15, $16, $9,
+          (SELECT u.inspection_claimed_at FROM kauro.upload_sessions u WHERE u.agency_id = $2 AND u.upload_id = $3), kauro.server_now(), kauro.server_now())`,
       [
         ids.next(), scope.agencyId, uploadId, revisionId, receiptHash, quarantineObjectId, quarantineGeneration, bytes, sha256, claimDigest, FIXTURE_SCANNER, scannerConfigHash,
         JSON.stringify([{ partDigest: textDigest(`container-${uploadId}`), partKind: "CONTAINER", expectedBytes: bytes, scannedBytes: bytes, outcome: "CLEAN" }]),

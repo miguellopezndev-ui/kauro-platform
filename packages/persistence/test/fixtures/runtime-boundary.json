@@ -356,8 +356,6 @@
           "claimed_md5",
           "completion_claim_digest",
           "completion_reported_at",
-          "provider_cancellation_at",
-          "provider_cancellation_state",
           "provider_session_digest",
           "provider_session_expires_at",
           "session_attempt",
@@ -463,12 +461,14 @@
           "claimed_generation",
           "claimed_md5",
           "completion_claim_digest",
+          "completion_not_observed_at",
           "completion_observed_at",
           "completion_reported_at",
           "created_at",
           "declared_format",
           "expired_at",
           "file_id",
+          "inspection_claimed_at",
           "inspection_fence",
           "inspection_receipt_hash",
           "observed_bytes",
@@ -499,6 +499,7 @@
           "claimed_generation",
           "claimed_md5",
           "completion_claim_digest",
+          "completion_not_observed_at",
           "completion_observed_at",
           "completion_reported_at",
           "expired_at",
@@ -704,7 +705,7 @@
         "kauro_control"
       ],
       "using": null,
-      "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (aggregate_kind = ANY (ARRAY['upload_session'::text, 'dataset_revision'::text, 'retention_record'::text, 'source_file'::text])) AND (event_type = ANY (ARRAY['upload_session.completion_observed.v1'::text, 'upload_session.completion_not_observed.v1'::text, 'upload_session.admitted.v1'::text, 'upload_session.rejected.v1'::text, 'upload_session.expired.v1'::text, 'upload_session.provider_cancellation_recorded.v1'::text, 'dataset_revision.ready_to_seal.v1'::text, 'dataset_revision.rejected.v1'::text, 'dataset_revision.expired.v1'::text, 'retention_record.expired.v1'::text, 'source_file.admitted.v1'::text, 'source_file.admission_revoked.v1'::text])))"
+      "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (aggregate_kind = ANY (ARRAY['upload_session'::text, 'dataset_revision'::text, 'retention_record'::text, 'source_file'::text])) AND (event_type = ANY (kauro.source_control_event_types())))"
     },
     "domain_events/domain_events_tenant": {
       "command": "ALL",
@@ -713,6 +714,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "domain_events/domain_events_tenant_not_source_control": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(NOT (event_type = ANY (kauro.source_control_event_types())))"
     },
     "end_clients/end_clients_tenant": {
       "command": "ALL",
@@ -1331,6 +1340,14 @@
       ],
       "using": "true",
       "check": "(state = ANY (ARRAY['RESERVED'::text, 'UPLOADING'::text, 'VERIFYING'::text, 'CANCELLED'::text]))"
+    },
+    "upload_sessions/upload_sessions_tenant_requester": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((requested_by_user_id = kauro.current_user_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = upload_sessions.agency_id) AND (m.membership_id = upload_sessions.requested_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text]))))))"
     },
     "validation_receipts/validation_receipts_tenant_read": {
       "command": "SELECT",

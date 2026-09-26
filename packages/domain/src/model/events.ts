@@ -194,9 +194,12 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   // a rejection is a terminal authority fact too: a restore must not bring back an INSPECTING revision whose selected input failed
   // the admission contract (B07-F8, D-RESTORE-1)
   { eventType: "dataset_revision.rejected.v1", consumer: "AUTHORITY_JOURNAL" },
-  // an admission revoked under a selection or a seal reaches the execution consumer and the agency (B07-F9)
+  // an admission revoked under a selection or a seal reaches the execution consumer and the agency (B07-F9), and is a terminal
+  // authority fact a restore applies before traffic, so a restored database never re-admits bytes whose retention ended or whose
+  // generation was lost (re-check N5, D-RESTORE-1)
   { eventType: "source_file.admission_revoked.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "source_file.admission_revoked.v1", consumer: "NOTIFICATIONS" },
+  { eventType: "source_file.admission_revoked.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.sealed.v1", consumer: "NOTIFICATIONS" },
   { eventType: "dataset_revision.superseded.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "dataset_revision.superseded.v1", consumer: "AUTHORITY_JOURNAL" },
