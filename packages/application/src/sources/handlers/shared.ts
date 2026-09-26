@@ -25,6 +25,8 @@ export interface SourceRuntime extends CommandRuntime {
 export interface SourceProviders {
   readonly storage: ObjectStoragePort;
   readonly vault: SessionVaultPort;
+  /** The application origin every resumable session is bound to (09 "Resumable session security": one destination and origin). */
+  readonly origin: string;
 }
 
 /** The preview reader (the platform's own bounded parser, D-SAPI-7) with the limits and the scratch it runs under. */
@@ -45,8 +47,6 @@ export interface B07Collaborators {
   readonly preview: SourcePreview | null;
   /** CMD012's impact map of commercial authority (design §17 item 7): the edition's inspector answers none until B09 binds its reader. */
   readonly commercialScope: CommercialScopeInspector;
-  /** The application origin a resumable session is bound to (09 "Resumable session security": bound to one destination and origin). */
-  readonly origin: string;
 }
 
 /**

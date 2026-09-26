@@ -16,7 +16,7 @@
 import type { Id } from "@kauro/contracts";
 import type { UploadId, UserId } from "@kauro/domain";
 import { COMPLETION_POLL_AFTER_SECONDS, DomainFailure, textDigest } from "@kauro/domain";
-import { applied, requireMembership } from "../../commands/handlers/shared.js";
+import { requireMembership } from "../../commands/handlers/shared.js";
 import type { AcceptedOutcome } from "../../commands/runtime.js";
 import { COMPLETE_UPLOAD, type CompleteUploadBody, type CompleteUploadHandler } from "../contracts.js";
 import { reachedOnServer, requireProviders, runSourceCommand, type B07Collaborators, type SourceRuntime } from "./shared.js";
@@ -83,7 +83,10 @@ export function completeUploadHandler(runtime: SourceRuntime, collaborators: B07
             if (upload.completionClaimDigest === claimDigest) return accepted;
             throw new DomainFailure("PRECONDITION_FAILED", "the upload is being verified under another completion claim", { reason: "COMPLETION_CLAIM_CONFLICT", ...current });
           }
-          const reported = applied(await uow.sources.uploads.transition(uploadId, upload.version, { event: "completion_reported", claimDigest, claim: parsed.claim }));
+          // the upload row is locked by this unit of work: its version cannot move under the write (CMD014 carries no expectedVersion)
+          const write = await uow.sources.uploads.transition(uploadId, upload.version, { event: "completion_reported", claimDigest, claim: parsed.claim });
+          if (write.kind === "STALE") throw new DomainFailure("INTEGRITY_FAILURE", "the locked upload changed under its lock");
+          const reported = write.record;
           await uow.events.publish({
             aggregateKind: "upload_session",
             aggregateId: uploadId,

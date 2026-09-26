@@ -172,7 +172,7 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
     const upload = first.upload;
     const { location, objectName } = quarantineOf(providers.storage, upload);
     try {
-      session = await providers.storage.createResumableSession({ location, objectName, declaredBytes: upload.reservedBytes, contentType: CONTENT_TYPES[upload.declaredFormat], origin: collaborators.origin }, PROVIDER_CALL_TIMEOUT_MS);
+      session = await providers.storage.createResumableSession({ location, objectName, declaredBytes: upload.reservedBytes, contentType: CONTENT_TYPES[upload.declaredFormat], origin: providers.origin }, PROVIDER_CALL_TIMEOUT_MS);
     } catch (cause) {
       const failure = new DomainFailure("CAPACITY_UNAVAILABLE", "the provider did not issue the session within its bound; the reservation stays pending", { reason: "SESSION_ISSUE_FAILED", retryAfterSeconds: PENDING_RESUME_GRACE_SECONDS }, true);
       failure.cause = cause;

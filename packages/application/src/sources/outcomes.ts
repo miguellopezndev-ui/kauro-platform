@@ -154,7 +154,7 @@ const ROUTE_SPECIFIC: Readonly<Record<SourceRouteId, ReadonlyArray<ProblemOutcom
   ListUploads: [...EVERY_READ, ...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the revision")],
   GetUpload: [...EVERY_READ, ...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload")],
   /** The protected session read: the requester only, the command's role (D-SESSION-2). */
-  GetUploadSession: [...EVERY_READ, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload"), NOT_OWNED],
+  GetUploadSession: [...EVERY_READ, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload")],
   /** 10 "A preview endpoint returns a bounded authorized sample with safe display escaping and no shared caching" (D-SAPI-7). */
   PreviewTable: [
     ...EVERY_READ,

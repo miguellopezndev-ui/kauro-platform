@@ -90,8 +90,8 @@ export {
   mediaTypeOf,
   responseIntegrityProblem,
 } from "./api/response-contract.js";
-export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
+export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome, DocumentRoute, DocumentAdmission, DocumentAdmissionOutcome } from "./api/admission.js";
+export { admitHeaders, admitStructure, admitDocument, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,

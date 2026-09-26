@@ -205,9 +205,13 @@ test("N16: every read answers only the outcomes of its catalogue — each listed
       checkReply(w.validator, contract, problem.status, "application/problem+json", problem);
     }
     for (const [code, reason] of [["STALE_VERSION", undefined], ["IDEMPOTENCY_CONFLICT", "REQUEST_DIGEST_DIFFERS"], ["NOT_AUTHORIZED", "ROLE_INSUFFICIENT"]] as const) {
+      // every role reads (AGENCY_READER); the one read that follows a command's role is B07's session read (AGENCY_OPERATOR, D-SAPI-1)
+      if (operationId === "GetUploadSession" && reason === "ROLE_INSUFFICIENT") continue;
       const problem = problemOf(new DomainFailure(code, "probe", reason !== undefined ? { reason } : {}), ids.next());
       assert.throws(() => checkReply(w.validator, contract, problem.status, "application/problem+json", problem), (e: unknown) => e instanceof ResponseContractViolation, `${operationId} ${code}`);
     }
   }
-  assert.ok(Object.keys(READ_OUTCOMES).length === 5 && (w.A.agencyId as AgencyId).length > 0);
+  // the five manual-10 reads and the seven source reads (B07 design §9.1)
+  assert.ok(Object.keys(READ_OUTCOMES).length === 12 && (w.A.agencyId as AgencyId).length > 0);
+  assert.ok(READ_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
 });
