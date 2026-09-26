@@ -30,7 +30,7 @@ export function cutUnits(value: string, units: number): string {
 
 /** The display form of untrusted text and whether it had to change (control characters replaced, length cut). */
 export function displayOf(raw: string): { readonly display: string; readonly changed: boolean } {
-  const cleaned = raw.replace(CONTROL, "�");
+  const cleaned = raw.replace(CONTROL, "\uFFFD");
   const display = cutUnits(cleaned, LABEL_MAX_UNITS);
   return { display, changed: display !== raw };
 }

@@ -14,3 +14,14 @@ export function patternedBytes(total: number, randomPerBlock = 600, seed = 7): B
   }
   return out;
 }
+
+/** `length` pseudo-random letters (seeded): text that compresses under 2:1, so its part stays far inside the ratio bound. */
+export function patternedText(length: number, seed = 11): string {
+  const out = Buffer.alloc(length);
+  let state = seed >>> 0;
+  for (let i = 0; i < length; i++) {
+    state = (Math.imul(state, 1_103_515_245) + 12_345) >>> 0;
+    out[i] = 97 + ((state >>> 24) % 26);
+  }
+  return out.toString("latin1");
+}

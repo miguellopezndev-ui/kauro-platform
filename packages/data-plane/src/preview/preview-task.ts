@@ -128,7 +128,7 @@ async function previewWorksheet(payload: PreviewPayload): Promise<PreviewResult>
   const needed = new Set<number>();
   let first = 0;
   let cut = false;
-  const reader = new SheetReader(part, limits.decodedCellBytes, (row) => {
+  const reader = new SheetReader(part, limits.decodedCellBytes, limits.decodedRecordBytes, (row) => {
     if (!row.cells.some(occupies)) return;
     if (first === 0) first = row.row;
     const index = row.row - first;

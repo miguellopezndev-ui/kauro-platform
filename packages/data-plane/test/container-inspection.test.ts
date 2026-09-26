@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
@@ -20,6 +20,7 @@ import { INPUT_ENVELOPE, parserProfileHashOf } from "@kauro/domain";
 import { ARCHIVE_BOUNDS, INSPECTOR_VERSION, IsolatedContainerInspector, IsolatedTablePreviewReader, PreviewFailure, inspectionLimits, parserProfileHashOfInspection, partDigestOf, runIsolated, sandboxFlags } from "../src/index.js";
 import { freshDir, listener, removeDir, sentinel, source, type Listener, type Sentinel } from "./support/harness.js";
 import { REL, buildWorkbook, workbookItems, type Cell, type SheetSpec } from "./support/workbook.js";
+import { patternedText } from "./support/patterns.js";
 import { buildOverlappingZip, buildZip, type ZipItem } from "./support/zip.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -138,7 +139,7 @@ test("S024: an XLSX with a traversal entry, duplicate entries, an XML entity or 
   // duplicate entries: the same name twice, and names that collide once normalized (case-folded; NFC against NFD)
   const items = workbookItems({ sheets: BENIGN });
   const sheet = items.find((i) => i.name === "xl/worksheets/sheet1.xml") as ZipItem;
-  for (const extra of [[{ ...sheet }], [{ ...sheet, name: "XL/Worksheets/Sheet1.xml" }], [{ name: "xl/café.xml", data: "<x/>" }, { name: "xl/café.xml", data: "<x/>" }]]) {
+  for (const extra of [[{ ...sheet }], [{ ...sheet, name: "XL/Worksheets/Sheet1.xml" }], [{ name: "xl/caf\u00e9.xml", data: "<x/>" }, { name: "xl/cafe\u0301.xml", data: "<x/>" }]]) {
     const bytes = buildZip([...items, ...extra]);
     const r = await inspect(bytes);
     assertRefused(r, "CORRUPT_STRUCTURE", "DUPLICATE_ENTRY", bytes.length);
@@ -172,6 +173,14 @@ test("S024: an XLSX with a traversal entry, duplicate entries, an XML entity or 
   const depthResult = await inspect(depthBomb);
   assertRefused(depthResult, "RESOURCE_LIMIT", "XML_DEPTH_LIMIT", depthBomb.length);
   assertIsolated(depthResult, totalBound);
+  // one row whose cells, each within the 1 MiB cell bound, together exceed the 8 MiB record bound (09 "Initial intake envelope")
+  const cellChars = 1_000_000;
+  const cells = Math.floor(limits.decodedRecordBytes / cellChars) + 1;
+  assert.ok(cellChars <= limits.decodedCellBytes && cells * cellChars > limits.decodedRecordBytes);
+  const wideRow = buildWorkbook({ sheets: [{ name: "Wide", rows: [["Id"], Array.from({ length: cells }, (_, k) => ({ inline: patternedText(cellChars, k + 1) }))] }] });
+  const wideResult = await inspect(wideRow);
+  assertRefused(wideResult, "RESOURCE_LIMIT", "RECORD_BYTES_LIMIT", wideRow.length);
+  assertIsolated(wideResult, totalBound);
 
   // an XML DTD with entities (the billion laughs), an external entity aimed at the test's listener, an undefined entity
   const lol = `<!DOCTYPE worksheet [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">]>`;
@@ -294,6 +303,12 @@ test("D-ISO-1 negative controls: a probe that writes outside the attempt scratch
   } finally {
     await control.close();
   }
+  // and the sentinel observer itself sees a write outside the scratch when one happens (made here by the test, then undone)
+  const planted = join(guard.dir, "outside", "planted.txt");
+  writeFileSync(planted, "x");
+  assert.equal(guard.unchanged(), false, "the sentinel observer detects a file written beside it");
+  rmSync(planted);
+  assert.ok(guard.unchanged());
 });
 
 const LONG = "L".repeat(250);

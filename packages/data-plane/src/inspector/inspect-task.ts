@@ -51,6 +51,7 @@ export async function run(payload: InspectPayload): Promise<RawInspection> {
       archive,
       xml: { maxDepth: limits.maxXmlDepth, maxTokenChars: Math.max(65_536, limits.decodedCellBytes) },
       decodedCellBytes: limits.decodedCellBytes,
+      decodedRecordBytes: limits.decodedRecordBytes,
       columns: limits.columns,
       inventoryColumns: payload.archive.inventoryColumns,
     });

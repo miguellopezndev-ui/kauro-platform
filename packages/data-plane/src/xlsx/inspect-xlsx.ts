@@ -31,6 +31,7 @@ export interface XlsxInspectionLimits {
   readonly archive: ArchiveLimits;
   readonly xml: XmlLimits;
   readonly decodedCellBytes: number;
+  readonly decodedRecordBytes: number;
   readonly columns: number;
   readonly inventoryColumns: number;
 }
@@ -210,7 +211,7 @@ export async function inspectXlsx(path: string, limits: XlsxInspectionLimits): P
       if (sheet !== undefined) {
         const part = partDigestOf(entry.name);
         let inventory: WorksheetInventory | undefined;
-        const reader = new SheetReader(part, limits.decodedCellBytes, (row) => inventory?.onRow(row));
+        const reader = new SheetReader(part, limits.decodedCellBytes, limits.decodedRecordBytes, (row) => inventory?.onRow(row));
         inventory = new WorksheetInventory(sheet, part, reader);
         const scanner = new XmlScanner(reader, limits.xml, part);
         for await (const chunk of expandEntry(archive, entry, meter)) scanner.write(chunk);

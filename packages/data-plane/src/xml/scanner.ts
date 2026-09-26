@@ -38,8 +38,8 @@ const PREDEFINED: ReadonlyMap<string, string> = new Map([
   ["quot", '"'],
   ["apos", "'"],
 ]);
-const INVALID_CHARACTER = /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/;
-const NAME = /^[A-Za-z_À-�][-A-Za-z0-9_.·À-�]*(?::[A-Za-z_À-�][-A-Za-z0-9_.·À-�]*)?$/;
+const INVALID_CHARACTER = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\uFFFE\uFFFF]/;
+const NAME = /^[A-Za-z_\u00C0-\uFFFD][-A-Za-z0-9_.\u00B7\u00C0-\uFFFD]*(?::[A-Za-z_\u00C0-\uFFFD][-A-Za-z0-9_.\u00B7\u00C0-\uFFFD]*)?$/;
 const MARKUP_DECLARATIONS = ["<!DOCTYPE", "<!ENTITY", "<!ELEMENT", "<!ATTLIST", "<!NOTATION"];
 
 export function localName(qualified: string): string {

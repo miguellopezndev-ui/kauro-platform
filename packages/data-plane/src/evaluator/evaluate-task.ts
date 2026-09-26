@@ -150,7 +150,7 @@ async function countCsv(file: FilePlan, plan: TablePlan, counters: TableCounters
   tokenizer.end();
 }
 
-async function countWorksheet(index: PackageIndex, partName: string, plan: TablePlan, counters: TableCounters, sst: SharedStringStore | undefined, meter: ExpansionMeter, xml: XmlLimits, cellBytes: number): Promise<void> {
+async function countWorksheet(index: PackageIndex, partName: string, plan: TablePlan, counters: TableCounters, sst: SharedStringStore | undefined, meter: ExpansionMeter, xml: XmlLimits, cellBytes: number, recordBytes: number): Promise<void> {
   const choice = plan.parser as WorksheetParserChoice;
   const entry = lookup(index, partName);
   if (entry === undefined) throw new InspectionRefusal("CORRUPT_STRUCTURE", "MISSING_PART");
@@ -159,7 +159,7 @@ async function countWorksheet(index: PackageIndex, partName: string, plan: Table
   const excludeHiddenColumns = choice.hiddenColumns === "EXCLUDE";
   const selected = plan.selectedColumns === undefined ? undefined : new Set(plan.selectedColumns);
   const headerIndex = choice.header.mode === "ROW" ? choice.header.rowIndex : -1;
-  const reader: SheetReader = new SheetReader(part, cellBytes, (row) => {
+  const reader: SheetReader = new SheetReader(part, cellBytes, recordBytes, (row) => {
     const occupied = row.cells.filter(occupies);
     if (occupied.length === 0) {
       span.emptyRow(row.row, row.hidden);
@@ -254,7 +254,7 @@ export async function run(payload: EvaluatePayload, context: { readonly workDir:
         const sheet = structure.sheets.find((s) => s.ordinal === plan.ordinal);
         try {
           if (sheet === undefined) throw new InspectionRefusal("CORRUPT_STRUCTURE", "TABLE_NOT_FOUND");
-          await countWorksheet(index, sheet.partName, plan, counters, sst, meter, xml, limits.decodedCellBytes);
+          await countWorksheet(index, sheet.partName, plan, counters, sst, meter, xml, limits.decodedCellBytes, limits.decodedRecordBytes);
           tables.push(counters.result());
         } catch (error) {
           if (!(error instanceof InspectionRefusal)) throw error;

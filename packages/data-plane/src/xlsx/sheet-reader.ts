@@ -61,7 +61,7 @@ export class SheetReader implements XmlEvents {
   private readonly value: TextAccumulator;
   private readonly formulaText: TextAccumulator;
   private inSheetData = false;
-  private row: { row: number; hidden: boolean; cells: SheetCell[]; lastCol: number } | undefined;
+  private row: { row: number; hidden: boolean; cells: SheetCell[]; lastCol: number; bytes: number } | undefined;
   private lastRow = 0;
   private cell: { col: number; type: string; value?: string; hasFormula: boolean; formula?: string } | undefined;
   private capture: "v" | "f" | "t" | undefined;
@@ -72,6 +72,8 @@ export class SheetReader implements XmlEvents {
   constructor(
     private readonly part: string,
     cellBytes: number,
+    /** The decoded bytes one row may hold across its cells (values and formula texts): the registry's 8 MiB per parsed record. */
+    private readonly recordBytes: number,
     private readonly onRow: (row: SheetRow) => void,
   ) {
     this.value = new TextAccumulator(cellBytes, part, "CELL_BYTES_LIMIT");
@@ -111,7 +113,7 @@ export class SheetReader implements XmlEvents {
         const index = r === undefined ? this.lastRow + 1 : Number(r);
         if (!Number.isInteger(index) || index < 1 || index > GRID_ROWS) throw this.corrupt("CELL_REFERENCE_INVALID");
         if (index <= this.lastRow) throw this.corrupt("ROW_ORDER");
-        this.row = { row: index, hidden: /^(1|true)$/.test(attributes.get("hidden") ?? ""), cells: [], lastCol: 0 };
+        this.row = { row: index, hidden: /^(1|true)$/.test(attributes.get("hidden") ?? ""), cells: [], lastCol: 0, bytes: 0 };
         this.lastRow = index;
         return;
       }
@@ -193,6 +195,8 @@ export class SheetReader implements XmlEvents {
           ...(cell.value === undefined ? {} : { value: cell.value }),
           ...(cell.hasFormula ? { formula: cell.formula ?? "" } : {}),
         };
+        this.row.bytes += Buffer.byteLength(cell.value ?? "", "utf8") + Buffer.byteLength(cell.formula ?? "", "utf8");
+        if (this.row.bytes > this.recordBytes) throw new InspectionRefusal("RESOURCE_LIMIT", "RECORD_BYTES_LIMIT", this.part);
         this.row.cells.push(out);
         this.cell = undefined;
         return;
