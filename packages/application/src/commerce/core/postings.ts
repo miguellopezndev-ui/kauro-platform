@@ -5,16 +5,17 @@
  * instant as effective and observed date. Pure: amounts come only from the event's payload — every amount a set posts is fixed by
  * its event, so the balances a capture ends with do not depend on the order in which the consumer delivers the events.
  *
- *   capture.completed.v1        CAPTURE    capturePostings(allocation) + providerFeePostings(fee reported with it, UNKNOWN)
- *   capture.fee_observed.v1     FEE        providerFeePostings(fee, the funds state the event names)
+ *   capture.completed.v1        CAPTURE    capturePostings(allocation) + providerFeePostings(fee reported with it, UNKNOWN, the amount)
+ *   capture.fee_observed.v1     FEE        providerFeePostings(fee, the funds state and the movable balance the event names)
  *   capture.funds_observed.v1   FUNDS      fundsPostings(previous, next, the movable balance the event carries)
- *   capture.reversed.v1         CHARGEBACK returnPostings(reversed components, the funds state the event names)
- *   refund.completed.v1         REFUND     returnPostings(approved components, the funds state the event names)
+ *   capture.reversed.v1         CHARGEBACK returnPostings(reversed components, the funds state and the movable balance the event names)
+ *   refund.completed.v1         REFUND     returnPostings(approved components, the funds state and the movable balance the event names)
  *   reconciliation_case.resolved.v1  CORRECTION  the reviewed resolution's reversing entries (mirrors) and adjusting lines
  *
  * Any other type posts nothing (NOT_APPLICABLE); a funds change that moves no money (a zero movable balance) posts nothing either.
- * The returns follow the domain's returnPostings exactly (the residual N4 — a full return after a kept fee — is the domain's to
- * decide; design Q-B09-23).
+ * A fee or a return takes from the balance its event names at most the capture's movable balance before it (movableBalanceCents)
+ * and the rest — the fee the provider keeps — from the merchant's available balance (the domain's providerFeePostings and
+ * returnPostings; D-LEDGER-B6, the re-check's residual N4).
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, EventId, EventPayload, FundsState, LedgerEntryRecord, LedgerSourceKind, PostingLine, PostingSet, RefundComponents } from "@kauro/domain";
@@ -99,20 +100,22 @@ export function planPostings(source: PostingSource, correction?: CaseCorrection)
     case "capture.completed.v1": {
       const allocation = components(source, "allocatedServiceCents", "allocatedTaxCents", "excessCents");
       // a fee the provider reported with the completion is taken from the receivable the completion debited (born UNKNOWN)
+      // whose movable balance before the fee is the whole amount
       const fee = money(source, "providerFeeCents", false);
-      return set(source, "CAPTURE", [...capturePostings(allocation), ...providerFeePostings(fee, "UNKNOWN")]);
+      const amount = allocation.serviceCents + allocation.taxCents + allocation.excessCents;
+      return set(source, "CAPTURE", [...capturePostings(allocation), ...providerFeePostings(fee, "UNKNOWN", amount)]);
     }
     case "capture.fee_observed.v1":
-      return set(source, "FEE", providerFeePostings(money(source, "providerFeeCents"), funds(source, "fundsState")));
+      return set(source, "FEE", providerFeePostings(money(source, "providerFeeCents"), funds(source, "fundsState"), money(source, "movableBalanceCents")));
     case "capture.funds_observed.v1": {
       const next = funds(source, "fundsState");
       if (next === "UNKNOWN") throw malformed(source, "fundsState");
       return set(source, "FUNDS", fundsPostings(funds(source, "previousFundsState"), next, money(source, "amountCents")));
     }
     case "capture.reversed.v1":
-      return set(source, "CHARGEBACK", returnPostings(components(source, "reversedServiceCents", "reversedTaxCents", "reversedExcessCents"), funds(source, "fundsState")));
+      return set(source, "CHARGEBACK", returnPostings(components(source, "reversedServiceCents", "reversedTaxCents", "reversedExcessCents"), funds(source, "fundsState"), money(source, "movableBalanceCents")));
     case "refund.completed.v1":
-      return set(source, "REFUND", returnPostings(components(source, "serviceCents", "taxCents", "excessCents"), funds(source, "fundsState")));
+      return set(source, "REFUND", returnPostings(components(source, "serviceCents", "taxCents", "excessCents"), funds(source, "fundsState"), money(source, "movableBalanceCents")));
     case "reconciliation_case.resolved.v1": {
       if (correction === undefined) return { kind: "NOT_APPLICABLE", eventType: source.eventType };
       const currencies = new Set(correction.reverse.map((e) => e.currency));

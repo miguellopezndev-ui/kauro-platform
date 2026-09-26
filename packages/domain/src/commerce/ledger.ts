@@ -14,13 +14,23 @@
  *                       CUSTOMER_OVERPAYMENT excess (a capture before delivery is a contract liability, not revenue: 15
  *                       "Revenue recognition follows the actual accounting policy"); a capture is born with its funds UNKNOWN
  *   provider fee       → DEBIT PROCESSOR_EXPENSE / CREDIT the balance of the funds state the fee's event names (the actual fee
- *                        the provider reported; a fee reported with the completion is credited to PSP_RECEIVABLE)
+ *                        the provider reported; a fee reported with the completion is credited to PSP_RECEIVABLE), up to the
+ *                        capture's movable balance before it; the rest from the merchant's available balance (below)
  *   funds observed     → the capture's movable balance (`movableBalanceOf`: its amount less the reported fee and the money
  *                        already returned) moves from the balance of the previous funds state to the balance of the new one —
  *                        provider balances only, never bank cash (CMD034 failure; migration 0013 ledger_entries_funds_accounts)
  *   refund completed   → DEBIT CONTRACT_LIABILITY service, TAX_PAYABLE tax, CUSTOMER_OVERPAYMENT excess / CREDIT the balance of
- *                        the funds state the refund's completion event names
+ *                        the funds state the refund's completion event names, up to the capture's movable balance before it;
+ *                        the rest from the merchant's available balance (below)
  *   chargeback         → the same shape over the unrefunded components of the reversed capture
+ * A capture holds at the provider only its movable balance — its amount less the fee the provider reported and the money already
+ * returned. A return or a fee that takes more than that (a full refund or a chargeback after a fee the provider keeps, or a fee
+ * reported after most of the money went back) is not taken from the capture's own balance: the provider recovers the difference
+ * from the merchant's available balance (PSP_AVAILABLE, `MERCHANT_BALANCE_ACCOUNT`), so the capture's receivable and held balances
+ * never go negative and end at zero once its money has left, and the merchant's available balance carries exactly the fees the
+ * provider kept (D-LEDGER-B6; the re-check's residual N4). The events that take money out carry the movable balance before them
+ * (`movableBalanceCents`, read under the capture's row lock and, for a refund's completion, after the completions of the same
+ * capture that committed before it).
  * Every amount a set posts is fixed by its event, so the balances a capture ends with do not depend on the order in which the
  * consumer delivers the events. Bank movements (the provider's available balance → bank in transit → bank cash) are posted only
  * from settlement observations with bank evidence (R2-085, the settlement reconciler of the integration package B15; migration
@@ -92,15 +102,39 @@ export function capturePostings(allocation: RefundComponents): ReadonlyArray<Pos
   );
 }
 
-/** The provider's reported fee, taken from the balance the capture's money sits in when the fee's event was published. */
-export function providerFeePostings(feeCents: bigint, fundsState: FundsState): ReadonlyArray<PostingLine> {
-  return lines(line("PROCESSOR_EXPENSE", "DEBIT", feeCents), line(fundsAccountOf(fundsState), "CREDIT", feeCents));
+/**
+ * The merchant's balance at the provider, from which the provider recovers what a fee or a return takes beyond a capture's movable
+ * balance (D-LEDGER-B6): the available balance, where the provider nets refunds, chargebacks and the fees it keeps.
+ */
+export const MERCHANT_BALANCE_ACCOUNT: LedgerAccount = "PSP_AVAILABLE";
+
+/**
+ * The credit lines of money taken out of a capture at the provider: up to the capture's movable balance before it from the balance
+ * of the funds state the event names, the rest — only ever a fee the provider keeps — from the merchant's available balance.
+ */
+function takenFromProvider(amountCents: bigint, fundsState: FundsState, movableBalanceCents: bigint): ReadonlyArray<PostingLine | null> {
+  assertMoney(amountCents);
+  assertMoney(movableBalanceCents);
+  const from = fundsAccountOf(fundsState);
+  const own = amountCents < movableBalanceCents ? amountCents : movableBalanceCents;
+  if (from === MERCHANT_BALANCE_ACCOUNT) return [line(from, "CREDIT", amountCents)];
+  return [line(from, "CREDIT", own), line(MERCHANT_BALANCE_ACCOUNT, "CREDIT", amountCents - own)];
+}
+
+/**
+ * The provider's reported fee, taken from the balance the capture's money sits in when the fee's event was published, up to the
+ * capture's movable balance before the fee (its amount less the money already returned; for a fee reported with the completion, the
+ * amount); the rest from the merchant's available balance (D-LEDGER-B6).
+ */
+export function providerFeePostings(feeCents: bigint, fundsState: FundsState, movableBalanceCents: bigint): ReadonlyArray<PostingLine> {
+  return lines(line("PROCESSOR_EXPENSE", "DEBIT", feeCents), ...takenFromProvider(feeCents, fundsState, movableBalanceCents));
 }
 
 /**
  * What of a capture's money is still at the provider to move between its balances: the captured amount less the fee the provider
  * reported and the money already returned (completed refunds), never below zero — a return beyond it (a refund or chargeback that
- * returns a fee the provider keeps) is recovered by the provider from the merchant's balance, not from this capture's.
+ * returns a fee the provider keeps) is recovered by the provider from the merchant's available balance, not from this capture's
+ * (returnPostings and providerFeePostings credit that part to MERCHANT_BALANCE_ACCOUNT; D-LEDGER-B6).
  */
 export function movableBalanceOf(capture: { readonly amountCents: bigint; readonly providerFeeCents: bigint; readonly returnedCents: bigint }): bigint {
   assertMoney(capture.amountCents);
@@ -124,15 +158,16 @@ export function fundsPostings(previous: FundsState, next: Exclude<FundsState, "U
 
 /**
  * A completed refund, or a chargeback over the unrefunded components (the provider returned the money in both cases), taken from
- * the balance the capture's money sits in when the event was published.
+ * the balance the capture's money sits in when the event was published, up to the capture's movable balance before the return; what
+ * it returns beyond that — the fee the provider keeps — from the merchant's available balance (D-LEDGER-B6).
  */
-export function returnPostings(amounts: RefundComponents, fundsState: FundsState): ReadonlyArray<PostingLine> {
+export function returnPostings(amounts: RefundComponents, fundsState: FundsState, movableBalanceCents: bigint): ReadonlyArray<PostingLine> {
   const total = amounts.serviceCents + amounts.taxCents + amounts.excessCents;
   return lines(
     line("CONTRACT_LIABILITY", "DEBIT", amounts.serviceCents),
     line("TAX_PAYABLE", "DEBIT", amounts.taxCents),
     line("CUSTOMER_OVERPAYMENT", "DEBIT", amounts.excessCents),
-    line(fundsAccountOf(fundsState), "CREDIT", total),
+    ...takenFromProvider(total, fundsState, movableBalanceCents),
   );
 }
 

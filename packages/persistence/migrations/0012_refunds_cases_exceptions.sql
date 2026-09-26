@@ -13,7 +13,7 @@
 -- verified event no order can take is kept for review), TRANSITIONS "Cross-aggregate finalization" (capture confirmation can create
 -- financial facts even when source expiry prevents execution; offer the documented reupload/reapproval or refund path), registry
 -- contract Refund; scenarios S058, S059, R2-081, R2-140. Design: docs/design/B09-payments-fiscal.md (D-MACH-B5, D-MACH-B6,
--- D-REF-B1..B6, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2, D-EVT-B3, D-BIND-B2, D-BIND-B3).
+-- D-REF-B1..B7, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2, D-EVT-B3, D-BIND-B2, D-BIND-B3, D-LEDGER-B6).
 
 -- --- refunds (platform machine Refund, D-MACH-B5) ---------------------------------------------------------------------------------------
 -- A refund of one capture: requested by the agency (CUSTOMER_REQUEST, CMD031), by the reconciler for an overpayment
@@ -264,6 +264,22 @@ CREATE CONSTRAINT TRIGGER refunds_event_per_version AFTER INSERT OR UPDATE OF ve
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('refund', 'refund_id');
 CREATE CONSTRAINT TRIGGER refunds_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.refunds
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('refund', 'refund_id', 'state');
+
+-- The completions of one capture's refunds take the capture's exclusive refund lock in turn, after the capture's shared half, as its
+-- approvals do (D-REF-B7): a completion that waited for another reads it — the service basis its event publishes (R2-081), the
+-- movable balance its money is taken from (D-LEDGER-B6) and the full-refund check below (KP006) never miss a completion of the same
+-- capture that committed while it waited. Without it two completions of one capture ran side by side, each blind to the other.
+CREATE OR REPLACE FUNCTION kauro.refunds_completion_order() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  PERFORM kauro.await_transition('kauro.capture_facts', OLD.capture_id::text);
+  PERFORM pg_advisory_xact_lock(kauro.transition_key('kauro.capture_refunds', OLD.capture_id::text));
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER refunds_completion_order BEFORE UPDATE OF state ON kauro.refunds
+  FOR EACH ROW WHEN (NEW.state = 'COMPLETED' AND OLD.state IS DISTINCT FROM 'COMPLETED') EXECUTE FUNCTION kauro.refunds_completion_order();
 
 -- A completed refund that leaves no service basis revokes the entitlement it paid for (CommercialAuthorization authority_revoked:
 -- "Reversal or full service refund"), in the same transaction, checked at COMMIT. AUTHORITY_OUTLIVES_REVERSAL (KP006).

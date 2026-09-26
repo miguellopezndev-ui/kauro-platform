@@ -255,12 +255,13 @@ export const COMMERCE_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<CommerceEventType
     "excessCents", "providerFeeCents", "previousStatus", "evidenceHash", "source",
   ],
   "capture.denied.v1": ["captureId", "agencyId", "orderId", "previousStatus", "evidenceHash", "source"],
-  // fundsState: the balance the returned money is taken from, as the capture's funds stood at this version (D-LEDGER-B5)
+  // fundsState: the balance the returned money is taken from, as the capture's funds stood at this version (D-LEDGER-B5);
+  // movableBalanceCents: the capture's movable balance before the money left, the most taken from that balance (D-LEDGER-B6)
   "capture.reversed.v1": [
     "captureId", "agencyId", "orderId", "projectId", "previousStatus", "reversedServiceCents", "reversedTaxCents", "reversedExcessCents",
-    "fundsState", "evidenceHash", "source",
+    "fundsState", "movableBalanceCents", "evidenceHash", "source",
   ],
-  "capture.fee_observed.v1": ["captureId", "agencyId", "orderId", "providerFeeCents", "fundsState", "currency", "evidenceHash", "source"],
+  "capture.fee_observed.v1": ["captureId", "agencyId", "orderId", "providerFeeCents", "fundsState", "movableBalanceCents", "currency", "evidenceHash", "source"],
   // amountCents: the capture's movable balance at this version (commerce/ledger movableBalanceOf), the amount the FUNDS postings move
   "capture.funds_observed.v1": ["captureId", "agencyId", "orderId", "fundsState", "previousFundsState", "amountCents", "currency", "evidenceHash", "source"],
   "commercial_authorization.issued.v1": [
@@ -281,9 +282,11 @@ export const COMMERCE_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<CommerceEventType
   "refund.rejected.v1": ["refundId", "agencyId", "rejectionCode"],
   "refund.submitting.v1": ["refundId", "agencyId", "attemptId"],
   "refund.uncertain.v1": ["refundId", "agencyId", "attemptId"],
+  // fundsState and movableBalanceCents: the balance the refunded money is taken from, and the capture's movable balance before this
+  // refund, read after the completions of the same capture that committed before it (D-LEDGER-B5, D-LEDGER-B6)
   "refund.completed.v1": [
     "refundId", "agencyId", "projectId", "orderId", "captureId", "serviceCents", "taxCents", "excessCents", "serviceBasisAfterCents", "fundsState",
-    "previousState", "evidenceHash",
+    "movableBalanceCents", "previousState", "evidenceHash",
   ],
   "refund.failed.v1": ["refundId", "agencyId", "failureCode", "previousState"],
   "tax_document.drafted.v1": [

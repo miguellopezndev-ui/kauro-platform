@@ -341,13 +341,13 @@ test("an out-of-order reversal: a capture first seen REVERSED is inserted COMPLE
   assert.deepEqual([reversed.record?.status, reversed.record?.providerCompletedAt, reversed.record?.allocation.serviceCents], ["REVERSED", completedAt, 97125n], "the completion instant stays the sale's tax point");
   const [completion, reversal] = reversed.events;
   const p = reversal!.payload;
-  assert.deepEqual([p["reversedServiceCents"], p["reversedTaxCents"], p["reversedExcessCents"], p["fundsState"], p["previousStatus"]], [97125, 0, 0, "UNKNOWN", "COMPLETED"]);
+  assert.deepEqual([p["reversedServiceCents"], p["reversedTaxCents"], p["reversedExcessCents"], p["fundsState"], p["movableBalanceCents"], p["previousStatus"]], [97125, 0, 0, "UNKNOWN", 97125, "COMPLETED"]);
   // the FINANCE consumer's postings, each set sourced by its own event with the capture as the source reference
   const posted = await adopted(orderId, async (uow) => {
     const set = (eventId: EventId, sourceKind: "CAPTURE" | "CHARGEBACK", lines: ReturnType<typeof capturePostings>) =>
       uow.commerce.ledger.post({ agencyId: A.agencyId, source: { kind: "EVENT", eventId }, sourceKind, sourceRef: captureId, currency: "USD", effectiveAt: completedAt, observedAt: clock.now(), evidenceHash: sha(`${sourceKind}-${captureId}`), lines }, clock.now());
     const capture = await set(completion!.eventId, "CAPTURE", capturePostings({ serviceCents: 97125n, taxCents: 0n, excessCents: 0n }));
-    const chargeback = await set(reversal!.eventId, "CHARGEBACK", returnPostings({ serviceCents: BigInt(p["reversedServiceCents"] as number), taxCents: BigInt(p["reversedTaxCents"] as number), excessCents: BigInt(p["reversedExcessCents"] as number) }, p["fundsState"] as FundsState));
+    const chargeback = await set(reversal!.eventId, "CHARGEBACK", returnPostings({ serviceCents: BigInt(p["reversedServiceCents"] as number), taxCents: BigInt(p["reversedTaxCents"] as number), excessCents: BigInt(p["reversedExcessCents"] as number) }, p["fundsState"] as FundsState, BigInt(p["movableBalanceCents"] as number)));
     return { capture, chargeback, bySource: await uow.commerce.ledger.listForSource("CHARGEBACK", captureId) };
   });
   assert.deepEqual([posted.capture.posted, posted.chargeback.posted], [true, true]);

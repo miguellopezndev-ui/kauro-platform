@@ -73,6 +73,7 @@ export {
   LEDGER_ACCOUNTS,
   PROVIDER_BALANCE_ACCOUNTS,
   BANK_ACCOUNTS,
+  MERCHANT_BALANCE_ACCOUNT,
   fundsAccountOf,
   capturePostings,
   providerFeePostings,

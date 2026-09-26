@@ -541,8 +541,13 @@ class Planner {
           taxCents: approved?.amounts.taxCents,
           excessCents: approved?.amounts.excessCents,
           serviceBasisAfterCents: basisAfter < 0n ? 0n : basisAfter,
-          // the balance the returned money is taken from, as the capture's funds stand at this version (D-LEDGER-B5)
+          // the balance the returned money is taken from, as the capture's funds stand at this version (D-LEDGER-B5), and the
+          // capture's movable balance before this refund: what the return takes beyond it is the fee the provider keeps (D-LEDGER-B6)
           fundsState: capture?.fundsState ?? "UNKNOWN",
+          movableBalanceCents:
+            capture === undefined
+              ? undefined
+              : movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(this.completedRefundsOf(refund.captureId, refund.refundId)) }),
           previousState,
           evidenceHash: extra.evidenceHash,
         };
@@ -609,8 +614,9 @@ class Planner {
     return null;
   }
 
-  private completedRefundsOf(captureId: CaptureId): RefundComponents {
-    return sumComponents([...this.refunds.values()].filter((r) => r.captureId === captureId && r.state === "COMPLETED" && r.approved !== undefined).map((r) => r.approved!.amounts));
+  /** The components the completed refunds of a capture returned (all but `except`, the refund being completed). */
+  private completedRefundsOf(captureId: CaptureId, except?: RefundId): RefundComponents {
+    return sumComponents([...this.refunds.values()].filter((r) => r.captureId === captureId && r.state === "COMPLETED" && r.refundId !== except && r.approved !== undefined).map((r) => r.approved!.amounts));
   }
 
   private committedRefundsOf(captureId: CaptureId): RefundComponents {
@@ -1089,6 +1095,8 @@ class Planner {
           reversedTaxCents: left(capture.allocation.taxCents, returned.taxCents),
           reversedExcessCents: left(capture.allocation.excessCents, returned.excessCents),
           fundsState: capture.fundsState,
+          // the capture's movable balance before the chargeback: what it returns beyond it is the kept fee (D-LEDGER-B6)
+          movableBalanceCents: movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(returned) }),
         });
       }
     }
@@ -1106,8 +1114,10 @@ class Planner {
         agencyId: this.agencyId,
         orderId: capture.orderId,
         providerFeeCents: feeCents,
-        // the balance the fee is taken from, as the capture's funds stand at this version (D-LEDGER-B5)
+        // the balance the fee is taken from, as the capture's funds stand at this version (D-LEDGER-B5), and the capture's movable
+        // balance before the fee: its amount less the money already returned (D-LEDGER-B6)
         fundsState: capture.fundsState,
+        movableBalanceCents: movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(this.completedRefundsOf(capture.captureId)) }),
         currency: capture.currency,
         evidenceHash,
         source: this.source,

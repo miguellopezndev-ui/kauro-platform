@@ -7,7 +7,9 @@
  * that records the capture it follows; B09-F3), a corporate owner in the finance scope reviews a REQUESTED refund (the database
  * checks the grant, segregation, the ceiling and the tax rule: KP007, KP008, KP003, KP009, KP010, KP012), and the payment service
  * executes an approved one. A completion reads the capture's funds state after SELECT ... FOR SHARE of the capture row, so its
- * refund.completed.v1 names the provider balance the money is returned from (D-LEDGER-B5). Cases open once per kind and subject.
+ * refund.completed.v1 names the provider balance the money is returned from (D-LEDGER-B5); the completions of one capture then take
+ * the capture's refund lock in turn (0012 refunds_completion_order, D-REF-B7), so the service basis and the movable balance the event
+ * carries (R2-081, D-LEDGER-B6) count every completion of the capture committed before it. Cases open once per kind and subject.
  */
 import type { UtcInstant } from "@kauro/contracts";
 import {
@@ -325,8 +327,11 @@ export class PgRefundRepository implements RefundRepository {
 
   /**
    * Every other listed move at expectedVersion + 1: the review's rejection (the finance scope), the execution's edges (the payment
-   * service). A completion first takes SELECT ... FOR SHARE of its capture row (the capture before the refund, design §6.2) and
-   * publishes refund.completed.v1 with the funds state read under it and the capture's remaining service basis (R2-081).
+   * service). A completion first takes SELECT ... FOR SHARE of its capture row (the capture before the refund, design §6.2); its
+   * update then waits for any other completion of the capture in flight (refunds_completion_order, D-REF-B7), and it publishes
+   * refund.completed.v1 with the funds state read under the row lock, the capture's remaining service basis (R2-081) and the capture's
+   * movable balance before this refund — its amount less the reported fee and the money the completions before it returned — read
+   * after that wait (D-LEDGER-B6).
    */
   async transition(refundId: RefundId, expectedVersion: number, change: RefundChange, _now: UtcInstant): Promise<VersionedWrite<RefundRecord>> {
     let fundsState: string | undefined;
@@ -366,13 +371,18 @@ export class PgRefundRepository implements RefundRepository {
     const record = refundRecord(row);
     let extra: Candidate = {};
     if (record.state === "COMPLETED") {
-      const basis = await execute<{ basis: string }>(
+      const balance = await execute<{ basis: string; movable: string }>(
         this.ctx.db,
-        `SELECT greatest(c.allocated_service_cents - coalesce((SELECT sum(r.approved_service_cents) FROM kauro.refunds r WHERE r.capture_id = c.capture_id AND r.state = 'COMPLETED'), 0), 0)::text AS basis
-           FROM kauro.capture_facts c WHERE c.capture_id = $1`,
-        [record.captureId],
+        `SELECT greatest(c.allocated_service_cents - coalesce(sum(r.approved_service_cents), 0), 0)::text AS basis,
+                greatest(c.amount_cents - coalesce(c.provider_fee_cents, 0)
+                         - coalesce(sum(r.approved_service_cents + r.approved_tax_cents + r.approved_excess_cents) FILTER (WHERE r.refund_id <> $2), 0), 0)::text AS movable
+           FROM kauro.capture_facts c LEFT JOIN kauro.refunds r ON r.capture_id = c.capture_id AND r.state = 'COMPLETED'
+          WHERE c.capture_id = $1
+          GROUP BY c.capture_id, c.allocated_service_cents, c.amount_cents, c.provider_fee_cents`,
+        [record.captureId, record.refundId],
       );
-      extra = { fundsState, serviceBasisAfterCents: basis.rows[0] ? cents(basis.rows[0].basis) : undefined };
+      const sums = balance.rows[0];
+      extra = { fundsState, serviceBasisAfterCents: sums ? cents(sums.basis) : undefined, movableBalanceCents: sums ? cents(sums.movable) : undefined };
     }
     await publishVersion(this.ctx, "refund", { id: record.refundId, agencyId: record.agencyId, version: record.version }, { previousState: row.previous_state, state: record.state }, refundCandidate(record, row.previous_state, extra));
     return { kind: "APPLIED", record };

@@ -16,6 +16,7 @@ import {
   COMMERCE_EVENT_SUBSCRIPTIONS,
   COMMERCE_EVENT_TYPES,
   BANK_ACCOUNTS,
+  MERCHANT_BALANCE_ACCOUNT,
   PROVIDER_BALANCE_ACCOUNTS,
   PROVIDER_EXCEPTION_KINDS,
   blockerFailure,
@@ -275,13 +276,13 @@ test("B09-N3 (D-PAY-B5): a capture first seen REVERSED, or reversed while known 
   assert.equal(commerceVersionEventType("capture", { previousState: "COMPLETED", state: "REVERSED" }), "capture.reversed.v1");
   // the two posting sets of a born-reversed capture net the receivable to zero: debited by the completion, credited by the chargeback
   const allocation = { serviceCents: 97125n, taxCents: 0n, excessCents: 0n };
-  const net = [...capturePostings(allocation), ...returnPostings(allocation, "UNKNOWN")]
+  const net = [...capturePostings(allocation), ...returnPostings(allocation, "UNKNOWN", 97125n)]
     .filter((l) => l.account === "PSP_RECEIVABLE")
     .reduce((n, l) => n + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents), 0n);
   assert.equal(net, 0n);
 });
 
-test("B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a time — its fee and every return are taken from the balance of the funds state their event names, and a funds observation moves the movable balance (the amount less the fee and the money returned), so no provider balance of the capture goes negative and none of it is ever bank money", () => {
+test("B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a time — its fee and every return are taken from the balance of the funds state their event names, and a funds observation moves the movable balance (the amount less the fee and the money returned), so while the capture's money covers what leaves it no provider balance of the capture goes negative, and none of it is ever bank money", () => {
   const balances = new Map<string, bigint>();
   const post = (ls: ReadonlyArray<PostingLine>, step: string): void => {
     assert.ok(isBalanced(ls), step);
@@ -295,7 +296,7 @@ test("B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a 
   const fee = 5275n;
   post(capturePostings({ serviceCents: amount, taxCents: 0n, excessCents: 0n }), "completion");
   // the fee reported after the completion, while the funds are still UNKNOWN: taken from the receivable
-  post(providerFeePostings(fee, "UNKNOWN"), "fee");
+  post(providerFeePostings(fee, "UNKNOWN", amount), "fee");
   // HELD: the receivable's balance moves, net of the fee — the design before this revision moved the whole 97125 and left the
   // receivable at -5275
   const held = movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 0n });
@@ -303,19 +304,87 @@ test("B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a 
   post(fundsPostings("UNKNOWN", "HELD", held), "held");
   assert.equal(balances.get("PSP_RECEIVABLE"), 0n);
   // a partial refund completed while the funds are held is returned from the held balance
-  post(returnPostings({ serviceCents: 1000n, taxCents: 0n, excessCents: 0n }, "HELD"), "refund");
+  post(returnPostings({ serviceCents: 1000n, taxCents: 0n, excessCents: 0n }, "HELD", held), "refund");
   // AVAILABLE: the held balance moves, net of the fee and of the money returned
   post(fundsPostings("HELD", "AVAILABLE", movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 1000n })), "available");
   assert.deepEqual(PROVIDER_BALANCE_ACCOUNTS.map((a) => balances.get(a) ?? 0n), [0n, 0n, 90850n]);
   assert.equal(balances.get("PROCESSOR_EXPENSE"), fee);
   // a fee learned while the funds are available is taken from the available balance; nothing left to move posts nothing
-  assert.deepEqual(providerFeePostings(5n, "AVAILABLE").map((l) => [l.account, l.direction]), [["PROCESSOR_EXPENSE", "DEBIT"], ["PSP_AVAILABLE", "CREDIT"]]);
+  assert.deepEqual(providerFeePostings(5n, "AVAILABLE", 90850n).map((l) => [l.account, l.direction]), [["PROCESSOR_EXPENSE", "DEBIT"], ["PSP_AVAILABLE", "CREDIT"]]);
   assert.equal(movableBalanceOf({ amountCents: 100n, providerFeeCents: 30n, returnedCents: 100n }), 0n);
   assert.deepEqual(fundsPostings("HELD", "AVAILABLE", 0n), []);
   // the funds' movements touch the provider balances only
   for (const [from, to] of [["UNKNOWN", "HELD"], ["UNKNOWN", "AVAILABLE"], ["HELD", "AVAILABLE"], ["AVAILABLE", "HELD"]] as const) {
     for (const l of fundsPostings(from, to, 1n)) assert.ok(PROVIDER_BALANCE_ACCOUNTS.includes(l.account), `${from} -> ${to}: ${l.account}`);
   }
+});
+
+test("B09-N4 residual (D-LEDGER-B6): a full refund or a chargeback after a fee the provider keeps, and a fee reported after the money went back, take from the capture's own balance at most its movable balance and the kept fee from the merchant's available balance — the receivable and held balances end at zero, the available balance carries exactly the kept fee, and the balances do not depend on the order in which the events are posted", () => {
+  const amount = 97125n;
+  const fee = 5275n;
+  const all = { serviceCents: amount, taxCents: 0n, excessCents: 0n };
+  const balancesOf = (sets: ReadonlyArray<ReadonlyArray<PostingLine>>): Map<string, bigint> => {
+    const balances = new Map<string, bigint>();
+    for (const ls of sets) {
+      assert.ok(isBalanced(ls));
+      for (const l of ls) {
+        assert.ok(!BANK_ACCOUNTS.includes(l.account), l.account);
+        balances.set(l.account, (balances.get(l.account) ?? 0n) + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents));
+      }
+    }
+    return balances;
+  };
+  const providerBalances = (b: Map<string, bigint>): ReadonlyArray<bigint> => PROVIDER_BALANCE_ACCOUNTS.map((a) => b.get(a) ?? 0n);
+  assert.equal(MERCHANT_BALANCE_ACCOUNT, "PSP_AVAILABLE");
+
+  // the residual's replay: amount 97125, fee 5275 while the funds are UNKNOWN, then a full refund while still UNKNOWN — before this
+  // decision the receivable ended at -5275; now the refund takes the movable balance (91850) from it and the kept fee from the
+  // merchant's available balance, and a later availability has nothing left to move
+  const movableAtRefund = movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 0n });
+  const unknownRefund = returnPostings(all, "UNKNOWN", movableAtRefund);
+  assert.deepEqual(unknownRefund.filter((l) => l.direction === "CREDIT").map((l) => [l.account, l.amountCents]), [["PSP_RECEIVABLE", 91850n], ["PSP_AVAILABLE", 5275n]]);
+  const afterRefund = movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: amount });
+  assert.equal(afterRefund, 0n);
+  const unknownSets = [capturePostings(all), providerFeePostings(fee, "UNKNOWN", amount), unknownRefund, fundsPostings("UNKNOWN", "AVAILABLE", afterRefund)];
+  const unknownBalances = balancesOf(unknownSets);
+  assert.deepEqual(providerBalances(unknownBalances), [0n, 0n, -fee], "receivable and held at zero, the kept fee on the merchant's available balance");
+  assert.equal(unknownBalances.get("PROCESSOR_EXPENSE"), fee);
+  assert.equal(unknownBalances.get("CONTRACT_LIABILITY") ?? 0n, 0n);
+  // any delivery order posts the same balances: every amount is fixed by its event
+  assert.deepEqual(providerBalances(balancesOf([...unknownSets].reverse())), [0n, 0n, -fee]);
+
+  // the same while the funds are HELD: the held balance moved net of the fee, the full refund empties it
+  const heldSets = [
+    capturePostings(all),
+    providerFeePostings(fee, "UNKNOWN", amount),
+    fundsPostings("UNKNOWN", "HELD", movableAtRefund),
+    returnPostings(all, "HELD", movableAtRefund),
+    fundsPostings("HELD", "AVAILABLE", afterRefund),
+  ];
+  assert.deepEqual(providerBalances(balancesOf(heldSets)), [0n, 0n, -fee]);
+
+  // a chargeback of the unrefunded components after a partial refund: the chargeback takes the rest of the movable balance and the fee
+  const partial = { serviceCents: 1000n, taxCents: 0n, excessCents: 0n };
+  const chargedBack = { serviceCents: amount - 1000n, taxCents: 0n, excessCents: 0n };
+  const chargebackSets = [
+    capturePostings(all),
+    providerFeePostings(fee, "UNKNOWN", amount),
+    returnPostings(partial, "UNKNOWN", movableAtRefund),
+    returnPostings(chargedBack, "UNKNOWN", movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 1000n })),
+  ];
+  assert.deepEqual(providerBalances(balancesOf(chargebackSets)), [0n, 0n, -fee]);
+
+  // a fee the provider reports after the whole capture went back: nothing of the capture is left, so all of it is the merchant's
+  const lateFee = [
+    capturePostings(all),
+    returnPostings(all, "UNKNOWN", amount),
+    providerFeePostings(fee, "UNKNOWN", movableBalanceOf({ amountCents: amount, providerFeeCents: 0n, returnedCents: amount })),
+  ];
+  assert.deepEqual(providerBalances(balancesOf(lateFee)), [0n, 0n, -fee]);
+
+  // a return within the movable balance never touches the merchant's balance, and one from the available balance is one line
+  assert.deepEqual(returnPostings(partial, "UNKNOWN", 91850n).filter((l) => l.direction === "CREDIT").map((l) => l.account), ["PSP_RECEIVABLE"]);
+  assert.deepEqual(returnPostings(all, "AVAILABLE", 91850n).filter((l) => l.direction === "CREDIT").map((l) => [l.account, l.amountCents]), [["PSP_AVAILABLE", amount]]);
 });
 
 test("B09-N5 (D-FISC-B4, D-FISC-B6): every document of a sale takes the version of the sale's tax point — a credit note drafted after a re-review keeps the invoice's version and is judged at the capture's completion, never at the refund's; a later version never replaces a reviewed treatment for the sale, and a later review resolves an unknown one", () => {

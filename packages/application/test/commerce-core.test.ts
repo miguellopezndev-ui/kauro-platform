@@ -650,7 +650,10 @@ test("runProviderCommand — REFUND by the payment service principal on its stor
     ["refund.completed.v1", "SERVICE"],
   ]);
   const completedEvent = events.at(-1)!;
-  assert.deepEqual([completedEvent.payload["serviceCents"], completedEvent.payload["taxCents"], completedEvent.payload["serviceBasisAfterCents"], completedEvent.payload["fundsState"]], [1000, 190, Number(R2_077.service - 1000n), "UNKNOWN"]);
+  assert.deepEqual(
+    [completedEvent.payload["serviceCents"], completedEvent.payload["taxCents"], completedEvent.payload["serviceBasisAfterCents"], completedEvent.payload["fundsState"], completedEvent.payload["movableBalanceCents"]],
+    [1000, 190, Number(R2_077.service - 1000n), "UNKNOWN", Number(R2_077.total)],
+  );
   assert.deepEqual(outboxOf(w, completedEvent.eventId), ["COMMISSIONS", "FINANCE", "FISCAL", "NOTIFICATIONS"]);
   assert.deepEqual([dispatches(w, "CAPTURES_V2_REFUND").length, w.provider.effects.refunds], [1, 1]);
   assert.equal([...w.store().authorizations.values()][0]!.state, "ACTIVE", "a partial refund leaves the service basis and the entitlement");

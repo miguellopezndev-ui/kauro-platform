@@ -7,9 +7,11 @@
  * availability (observeFunds, capture.funds_observed.v1) or the fee (observeFee, capture.fee_observed.v1), never both (D-EVT-B3).
  * A capture first seen REVERSED is inserted COMPLETED and then advanced to REVERSED in the same unit of work (D-PAY-B5): two
  * versions, two events, its completion instant kept as the tax point. The events that move money name the provider balance it is
- * taken from (D-LEDGER-B5): capture.fee_observed.v1 and capture.reversed.v1 carry the capture's funds state at that version, and
- * capture.funds_observed.v1 carries the capture's movable balance as its amountCents, computed after SELECT ... FOR UPDATE of the
- * capture row so that a refund completing concurrently is either seen or ordered after it.
+ * taken from (D-LEDGER-B5): capture.fee_observed.v1 and capture.reversed.v1 carry the capture's funds state at that version and the
+ * capture's movable balance before the money left (movableBalanceCents, D-LEDGER-B6: what the fee or the chargeback takes beyond it
+ * is the fee the provider keeps, taken from the merchant's available balance), and capture.funds_observed.v1 carries the capture's
+ * movable balance as its amountCents — each computed under the capture's row lock (the version's own UPDATE, or SELECT ... FOR
+ * UPDATE) so that a refund completing concurrently (which holds FOR SHARE of the row) is either seen or ordered after it.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
@@ -287,13 +289,15 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
     let extra: Candidate = { previousStatus: row.previous_status, source: record.firstObservationSource };
     if (record.status === "COMPLETED" || record.status === "REVERSED") extra = { ...extra, ...(await purchaseOf(this.ctx.db, record.orderId)) };
     if (record.status === "REVERSED") {
-      // the chargeback returns the components no completed refund returned already, from the balance the funds sit in now
+      // the chargeback returns the components no completed refund returned already, from the balance the funds sit in now, up to
+      // the capture's movable balance before it (D-LEDGER-B6)
       const returned = await refundSums(this.ctx.db, record.captureId, ["COMPLETED"]);
       extra = {
         ...extra,
         reversedServiceCents: zeroOrPositive(record.allocation.serviceCents - returned.serviceCents),
         reversedTaxCents: zeroOrPositive(record.allocation.taxCents - returned.taxCents),
         reversedExcessCents: zeroOrPositive(record.allocation.excessCents - returned.excessCents),
+        movableBalanceCents: movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: record.providerFeeCents ?? 0n, returnedCents: returned.serviceCents + returned.taxCents + returned.excessCents }),
       };
     }
     await publishVersion(
@@ -341,7 +345,8 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
 
   /**
    * The fee the provider reported after the completion, learned once at expectedVersion + 1 (capture.fee_observed.v1, FINANCE only;
-   * never a second capture.completed.v1). Read under the capture's row lock, the event names the funds state the fee is taken from.
+   * never a second capture.completed.v1). Read under the capture's row lock, the event names the funds state the fee is taken from
+   * and the capture's movable balance before the fee — its amount less the money completed refunds returned (D-LEDGER-B6).
    * The fee already recorded answers the current record unchanged; another fee is refused (KA004: learned once) — a contradiction
    * the reconciler records as a case.
    */
@@ -359,12 +364,14 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
     const row = r.rows[0];
     if (!row) return staleOf(this.ctx.db, "capture_facts", "capture_id", "status", captureId, "capture fact");
     const record = captureRecord(row);
+    const returned = await refundSums(this.ctx.db, record.captureId, ["COMPLETED"]);
+    const movable = movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: current.providerFeeCents ?? 0n, returnedCents: returned.serviceCents + returned.taxCents + returned.excessCents });
     await publishVersion(
       this.ctx,
       "capture",
       { id: record.captureId, agencyId: record.agencyId, version: record.version },
       { previousState: record.status, state: record.status, feeChanged: true },
-      captureCandidate(record, { source: record.firstObservationSource }),
+      captureCandidate(record, { movableBalanceCents: movable, source: record.firstObservationSource }),
     );
     return { kind: "APPLIED", record };
   }

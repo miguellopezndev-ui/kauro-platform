@@ -305,6 +305,7 @@ test("planObservation — D-EVT-B2: a fee and a funds availability learned after
   const [fee, funds] = [find(later, "CAPTURE_FEE")[0]!, find(later, "CAPTURE_FUNDS")[0]!];
   assert.equal(fee.event.type, "capture.fee_observed.v1");
   assert.equal(fee.event.payload["fundsState"], "UNKNOWN");
+  assert.equal(fee.event.payload["movableBalanceCents"], 115579, "the movable balance before the fee: the amount, nothing returned yet (D-LEDGER-B6)");
   assert.equal(fee.expectedVersion, 1);
   assert.equal(funds.event.type, "capture.funds_observed.v1");
   assert.equal(funds.expectedVersion, 2);
@@ -509,7 +510,7 @@ test("planPostings — R2-078 and D-LEDGER-B5: the completion posts the contract
   assert.ok(isBalanced(completed.set.lines));
   assert.equal(completed.set.observedAt, completed.set.effectiveAt);
 
-  const fee = planPostings(source("capture.fee_observed.v1", { providerFeeCents: 5275, fundsState: "HELD", evidenceHash: "b".repeat(64) }));
+  const fee = planPostings(source("capture.fee_observed.v1", { providerFeeCents: 5275, fundsState: "HELD", movableBalanceCents: 97125, evidenceHash: "b".repeat(64) }));
   assert.ok(fee.kind === "POST" && fee.set.sourceKind === "FEE");
   if (fee.kind === "POST") assert.deepEqual(fee.set.lines.map((l) => [l.account, l.direction, l.amountCents]), [["PROCESSOR_EXPENSE", "DEBIT", 5275n], ["PSP_HELD", "CREDIT", 5275n]]);
 
@@ -521,30 +522,33 @@ test("planPostings — R2-078 and D-LEDGER-B5: the completion posts the contract
   }
   assert.equal(planPostings(source("capture.funds_observed.v1", { fundsState: "HELD", previousFundsState: "UNKNOWN", amountCents: 0 })).kind, "NOT_APPLICABLE", "nothing to move posts nothing");
 
-  const refund = planPostings(source("refund.completed.v1", { serviceCents: 1000, taxCents: 190, excessCents: 0, fundsState: "AVAILABLE", evidenceHash: "d".repeat(64) }, "01920000-0000-7000-8000-000000000f01"));
+  const refund = planPostings(source("refund.completed.v1", { serviceCents: 1000, taxCents: 190, excessCents: 0, fundsState: "AVAILABLE", movableBalanceCents: 91850, evidenceHash: "d".repeat(64) }, "01920000-0000-7000-8000-000000000f01"));
   assert.ok(refund.kind === "POST" && refund.set.sourceKind === "REFUND" && refund.set.sourceRef === "01920000-0000-7000-8000-000000000f01");
   if (refund.kind === "POST") assert.deepEqual(refund.set.lines.at(-1), { account: "PSP_AVAILABLE", direction: "CREDIT", amountCents: 1190n });
 
-  const chargeback = planPostings(source("capture.reversed.v1", { reversedServiceCents: 97125, reversedTaxCents: 18454, reversedExcessCents: 0, fundsState: "UNKNOWN", evidenceHash: "e".repeat(64) }));
+  const chargeback = planPostings(source("capture.reversed.v1", { reversedServiceCents: 97125, reversedTaxCents: 18454, reversedExcessCents: 0, fundsState: "UNKNOWN", movableBalanceCents: 115579, evidenceHash: "e".repeat(64) }));
   assert.ok(chargeback.kind === "POST" && chargeback.set.sourceKind === "CHARGEBACK");
   if (chargeback.kind === "POST") assert.ok(isBalanced(chargeback.set.lines));
 
   assert.equal(planPostings(source("capture.pending.v1", {})).kind, "NOT_APPLICABLE");
   assert.throws(() => planPostings(source("refund.completed.v1", { serviceCents: 1000, taxCents: 190, excessCents: 0 })), /fundsState/);
+  assert.throws(() => planPostings(source("refund.completed.v1", { serviceCents: 1000, taxCents: 190, excessCents: 0, fundsState: "UNKNOWN" })), /movableBalanceCents/);
 });
 
-test("planPostings — Q-B09-23 (the re-check's residual N4, open for the design owner): a full refund after a reported fee returns the whole amount from the balance its event names, which leaves that provider balance negative for the capture by exactly the fee the provider kept; every set still balances and no bank account is touched", () => {
-  // the capture (fee reported while funds were UNKNOWN), then the whole capture refunded while funds are still UNKNOWN
+test("planPostings — D-LEDGER-B6 (the re-check's residual N4): a full refund after a reported fee takes the capture's movable balance from the balance its event names and the fee the provider kept from the merchant's available balance, so the receivable ends at zero; every set balances and no bank account is touched", () => {
+  // the capture (fee reported while funds were UNKNOWN), then the whole capture refunded while funds are still UNKNOWN: the events
+  // carry the movable balance before them (the amount before the fee; the amount less the fee before the refund)
   const sets = [
     planPostings(source("capture.completed.v1", { allocatedServiceCents: 97125, allocatedTaxCents: 18454, excessCents: 0, evidenceHash: "a".repeat(64) })),
-    planPostings(source("capture.fee_observed.v1", { providerFeeCents: 5275, fundsState: "UNKNOWN", evidenceHash: "b".repeat(64) })),
-    planPostings(source("refund.completed.v1", { serviceCents: 97125, taxCents: 18454, excessCents: 0, fundsState: "UNKNOWN", evidenceHash: "c".repeat(64) }, "01920000-0000-7000-8000-000000000f02")),
+    planPostings(source("capture.fee_observed.v1", { providerFeeCents: 5275, fundsState: "UNKNOWN", movableBalanceCents: 115579, evidenceHash: "b".repeat(64) })),
+    planPostings(source("refund.completed.v1", { serviceCents: 97125, taxCents: 18454, excessCents: 0, fundsState: "UNKNOWN", movableBalanceCents: 110304, evidenceHash: "c".repeat(64) }, "01920000-0000-7000-8000-000000000f02")),
   ];
   const lines = sets.flatMap((p) => (p.kind === "POST" ? [...p.set.lines] : []));
-  assert.equal(lines.length, 8, "zero lines are never written");
+  assert.equal(lines.length, 9, "zero lines are never written");
   for (const p of sets) assert.ok(p.kind === "POST" && isBalanced(p.set.lines));
   const net = (account: string) => lines.filter((l) => l.account === account).reduce((n, l) => n + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents), 0n);
-  assert.equal(net("PSP_RECEIVABLE"), -5275n, "the receivable the capture debited is credited the fee and the whole return (Q-B09-23)");
+  assert.equal(net("PSP_RECEIVABLE"), 0n, "the receivable the capture debited ends at zero (before D-LEDGER-B6 it ended at -5275)");
+  assert.equal(net("PSP_AVAILABLE"), -5275n, "the fee the provider kept is taken from the merchant's available balance");
   assert.deepEqual([net("CONTRACT_LIABILITY"), net("TAX_PAYABLE"), net("PROCESSOR_EXPENSE")], [0n, 0n, 5275n]);
   assert.ok(lines.every((l) => l.account !== "BANK_CASH" && l.account !== "BANK_IN_TRANSIT"));
 });
