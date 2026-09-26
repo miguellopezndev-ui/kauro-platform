@@ -32,6 +32,7 @@ import type { AgencyMembershipView, AgencyView, EndClientView, Page, ProjectView
 import { REQUEST_LIMITS } from "../api/envelope.js";
 import { recordDenialFact, type CommandRuntime } from "../commands/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION, type AuthorizationDecision } from "../ports/authorizer.js";
+import { SOURCE_READ_ROUTES } from "../sources/read-specs.js";
 
 export interface ReadSpec {
   readonly operationId: ReadOperationId;
@@ -53,7 +54,7 @@ function readSpec(s: ReadSpec): ReadSpec {
   return Object.freeze(s);
 }
 
-/** The five reads, in route order. */
+/** The five manual-10 reads of B06 and the seven reads of the source lifecycle (B07, sources/read-specs), in route order. */
 export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.freeze({
   ListAgencies: readSpec({
     operationId: "ListAgencies",
@@ -105,6 +106,7 @@ export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.f
     summary: "A project with its current revision summary, readiness blockers and permitted actions",
     authority: '10 "Client and project routes": "GET /projects/{projectId} returns the current revision summary, commercial state, retention deadlines, safe progress and permitted actions"',
   }),
+  ...SOURCE_READ_ROUTES,
 });
 
 // --- the query (a closed schema too) ------------------------------------------------------------------------------------------
@@ -212,20 +214,38 @@ export interface ReadRuntime extends Pick<CommandRuntime, "unitOfWork" | "author
   readonly cursorKey: Uint8Array;
 }
 
-interface ReadContext {
+export interface ReadContext {
   /** The caller's ACTIVE membership in the selected agency; null for ListAgencies. */
   readonly membership: ResolvedMembership | null;
 }
 
 /** An access denial, thrown so the unit of work rolls back and recognised afterwards as a decision to record. */
 class ReadDenied extends DomainFailure {
-  constructor(operationId: ReadOperationId, readonly decision: Extract<AuthorizationDecision, { kind: "DENY" }>) {
+  constructor(operationId: string, readonly decision: Extract<AuthorizationDecision, { kind: "DENY" }>) {
     super(decision.code, `${operationId} denied: ${decision.reason}`, { reason: decision.reason });
     this.name = "ReadDenied";
   }
 }
 
 export async function runRead<View>(spec: ReadSpec, runtime: ReadRuntime, request: ReadRequest, body: (uow: UnitOfWork, ctx: ReadContext) => Promise<View>): Promise<ReadResult<View>> {
+  return runReadIn<View, UnitOfWork>(spec, runtime, request, (context, work) => runtime.unitOfWork.run(context, work), body);
+}
+
+/** What the access of a read (or of a document intake, B07 D-SEL-2) is decided and recorded under. */
+export type AccessSpec = Pick<ReadSpec, "scope" | "action"> & { readonly operationId: string };
+
+/**
+ * The pipeline of `runRead` (the subject and identity status, the ACTIVE live membership after its transition lock — any role,
+ * AGENCY_READER — then the body; every denial a durable fact) in the unit of work `run` opens: B06's `run`, or the source
+ * lifecycle's `runSource` (B07), whose store lives on the same connection and context.
+ */
+export async function runReadIn<View, U extends UnitOfWork>(
+  spec: AccessSpec,
+  runtime: Pick<ReadRuntime, "unitOfWork" | "authorizer" | "clock">,
+  request: Pick<ReadRequest, "correlationId" | "subject" | "agencyId">,
+  run: <T>(context: TenantContext | IdentityContext, work: (uow: U) => Promise<T>) => Promise<T>,
+  body: (uow: U, ctx: ReadContext) => Promise<View>,
+): Promise<ReadResult<View>> {
   const userId = request.subject.identity.userId;
   if (spec.scope !== "NONE" && request.agencyId === null) {
     return { kind: "PROBLEM", problem: problemOf(new DomainFailure("INVALID_REQUEST", `${spec.operationId} needs an agency selector`, { reason: "TENANT_CONTEXT_MISSING" }), request.correlationId) };
@@ -235,7 +255,7 @@ export async function runRead<View>(spec: ReadSpec, runtime: ReadRuntime, reques
       ? { kind: "IDENTITY", userId, correlationId: request.correlationId }
       : { kind: "TENANT", agencyId: request.agencyId, userId, correlationId: request.correlationId };
   try {
-    const view = await runtime.unitOfWork.run(context, async (uow) => {
+    const view = await run(context, async (uow) => {
       const access = await runtime.authorizer.authorizeRead(uow, { identity: request.subject.identity, agencyId: spec.scope === "NONE" ? null : request.agencyId });
       if (access.kind === "DENY") throw new ReadDenied(spec.operationId, access);
       return body(uow, { membership: access.membership });

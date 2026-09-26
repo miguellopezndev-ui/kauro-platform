@@ -59,7 +59,12 @@ export const CONTRACT_FAKE_CHUNK_MULTIPLE_BYTES = 262_144;
 /** The retention a location reads back until a test sets another: the provider default for a new bucket (seven days, no versioning). */
 export const CONTRACT_FAKE_DEFAULT_RETENTION: RetentionPolicy = Object.freeze({ softDeleteRetentionSeconds: 604_800, objectVersioning: false });
 
-const SESSION_REF_PREFIX = `${CONTRACT_FAKE_STORAGE_PROVIDER}:resumable-session:`;
+/**
+ * The resumable session URI the fake mints: an https URI like the provider's own (the protected response carries an https upload URL,
+ * ProtectedSessionView), on the reserved .invalid domain (RFC 2606) so it can never reach a network.
+ */
+export const CONTRACT_FAKE_SESSION_REF_PREFIX = `https://${CONTRACT_FAKE_STORAGE_PROVIDER}.invalid/resumable-session/`;
+const SESSION_REF_PREFIX = CONTRACT_FAKE_SESSION_REF_PREFIX;
 const PAGE_TOKEN_PREFIX = `${CONTRACT_FAKE_STORAGE_PROVIDER}:page:`;
 const ZONES: ReadonlyArray<StorageZone> = ["QUARANTINE", "ACCEPTED", "PROFILE", "MINIMIZED", "STAGING", "DELIVERY", "IMPORT_RECEIPT", "LEGAL_FINANCE", "SECURITY"];
 const LOCATION_REF = /^[A-Z][A-Z0-9_]{2,63}$/;

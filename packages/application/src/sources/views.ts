@@ -98,7 +98,10 @@ export interface ProtectedSessionView {
  */
 export interface JournaledSessionPlaceholder {
   readonly delivery: "PROTECTED_RESPONSE";
+  /** The sealed secret it stands for: UploadSession.providerSessionSecretRef, the upload id (records.ts), never the bearer value. */
   readonly sessionRef: string;
+  /** The chunk multiple the provider named when it created the session (not a secret): the hydrated view repeats it. */
+  readonly chunkMultipleBytes?: number;
 }
 
 export interface RevisionQuotaView {

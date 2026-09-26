@@ -24,9 +24,10 @@ import {
   SOURCE_SWEEPERS,
   SOURCE_VIEW_DEFINITIONS,
   buildResponseSchemas,
-  buildSourceResponseSchemas,
-  sourceCommandResponseSchemaId,
-  sourceRouteResponseSchemaId,
+  commandResponseSchemaId,
+  intakeResponseSchemaId,
+  readResponseSchemaId,
+  ACCEPTED_RESPONSE_SCHEMA_ID,
   buildSourceViewSchemas,
   compileSchemaBundle,
   declaredMembers,
@@ -142,10 +143,18 @@ test("the auxiliary routes read with any live membership and write with the oper
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle & { $defs: Record<string, { properties: Record<string, Record<string, unknown>>; required?: string[] }> };
 
+/** The names of B06's own views: the served build carries B06's and B07's views together (VIEW_DEFINITIONS). */
+function b06ViewNames(): Set<string> {
+  const sourceNames = new Set(SOURCE_VIEW_DEFINITIONS.map((v) => v.name));
+  return new Set(Object.keys(buildResponseSchemas(bundle).defs).filter((name) => !sourceNames.has(name)));
+}
+
 function sourceSchemas(): { readonly all: Record<string, JsonSchema>; readonly source: Readonly<Record<string, JsonSchema>> } {
-  const b06 = buildResponseSchemas(bundle);
-  const source = buildSourceViewSchemas(bundle, new Set(Object.keys(b06.defs)));
-  return { all: { ...b06.defs, ...source }, source };
+  const served = buildResponseSchemas(bundle);
+  const source = buildSourceViewSchemas(bundle, b06ViewNames());
+  // the served build carries exactly these views
+  for (const [name, schema] of Object.entries(source)) assert.deepEqual(served.defs[name], schema, `${name} is served as built`);
+  return { all: served.defs, source };
 }
 
 test("the B07 response views build from the registry bundle exactly as B06's do: registry members derived and narrowed only by added keywords, every registry member selected or withheld with a reason, closed, no forbidden member", () => {
@@ -182,7 +191,7 @@ test("the B07 response views build from the registry bundle exactly as B06's do:
   // a view that tried to carry it elsewhere is refused at build time, as is a forbidden member
   const upload = SOURCE_VIEW_DEFINITIONS.find((v) => v.name === "UploadView")!;
   const withMember = (name: string): ViewDefinition => ({ ...upload, members: { ...upload.members, [name]: { kind: "platform", required: false, schema: { type: "string" }, description: "a leak" } } });
-  const b06Names = new Set(Object.keys(buildResponseSchemas(bundle).defs));
+  const b06Names = b06ViewNames();
   const refusal = (views: ReadonlyArray<ViewDefinition>) => {
     try {
       buildSourceViewSchemas(bundle, b06Names, views);
@@ -304,18 +313,18 @@ test("B07-F13: the sweepers of the contracts are exactly the sweepers of design 
   assert.ok(SOURCE_SWEEPERS.includes("RETENTION") && SOURCE_SWEEPERS.includes("LOCATION_POLICY"));
 });
 
-test("B07-F13: the planned reply envelopes of the source routes build closed from the views — a COMPLETED envelope per command but CMD014 (ACCEPTED), a READ envelope per read, a STORED envelope for the selection manifest intake", () => {
-  const b06 = buildResponseSchemas(bundle);
-  const planned = buildSourceResponseSchemas(bundle, new Set(Object.keys(b06.defs)), SOURCE_ROUTES);
-  const expected = [
-    ...(["CMD012", "CMD013", "CMD015", "CMD016", "CMD017"] as const).map((c) => sourceCommandResponseSchemaId(c)),
-    ...Object.keys(SOURCE_ROUTES).map((op) => sourceRouteResponseSchemaId(op as keyof typeof SOURCE_ROUTES)),
-  ].sort();
-  assert.deepEqual(Object.keys(planned.roots).sort(), expected);
-  for (const id of Object.keys(b06.roots)) assert.ok(!(id in planned.roots), `${id} is a served schema, never shadowed`);
-  const roots: Record<string, unknown> = { ...planned.roots };
-  const compiled = compileSchemaBundle({ defs: { ...bundle.$defs, ...b06.defs, ...planned.defs }, roots });
+test("B07-F13: the reply envelopes of the source routes are served and build closed from the views — a COMPLETED envelope per command but CMD014 (ACCEPTED), a READ envelope per read, a STORED envelope for the selection manifest intake", () => {
+  const served = buildResponseSchemas(bundle);
+  for (const command of ["CMD012", "CMD013", "CMD015", "CMD016", "CMD017"] as const) assert.ok(commandResponseSchemaId(command) in served.roots, command);
+  assert.ok(!(commandResponseSchemaId("CMD014") in served.roots), "CMD014 answers the shared ACCEPTED envelope");
+  assert.ok(ACCEPTED_RESPONSE_SCHEMA_ID in served.roots);
+  for (const op of Object.keys(SOURCE_ROUTES).filter((op) => op !== "SubmitSelectionManifest")) {
+    assert.ok(readResponseSchemaId(op as Parameters<typeof readResponseSchemaId>[0]) in served.roots, op);
+  }
+  const intakeId = intakeResponseSchemaId("SubmitSelectionManifest");
+  assert.ok(intakeId in served.roots);
+  const compiled = compileSchemaBundle({ defs: { ...bundle.$defs, ...served.defs }, roots: served.roots });
   const intake = { selectionManifestId: "0190c7a2-0000-7000-8000-00000000000a", revisionId: "0190c7a2-0000-7000-8000-00000000000b", bodyHash: "a".repeat(64), created: true };
-  assert.deepEqual(compiled.validate(sourceRouteResponseSchemaId("SubmitSelectionManifest"), { kind: "STORED", data: intake }), []);
-  assert.ok(compiled.validate(sourceRouteResponseSchemaId("SubmitSelectionManifest"), { kind: "STORED", data: intake, replayed: false }).length > 0, "the envelope is closed");
+  assert.deepEqual(compiled.validate(intakeId, { kind: "STORED", data: intake }), []);
+  assert.ok(compiled.validate(intakeId, { kind: "STORED", data: intake, replayed: false }).length > 0, "the envelope is closed");
 });

@@ -390,6 +390,16 @@ export class PgSourceFileRepository implements SourceFileRepository {
     return r.rows[0] ? fileRecord(r.rows[0]) : null;
   }
 
+  /**
+   * The file after its shared transition lock (kauro.await_transition, the lock sealed_revision_files_admitted takes), held to the
+   * end of the unit of work: a revocation in flight is ordered before this read (and read) or after the unit of work (and refused
+   * by the database once the file is sealed). Decision D-CMD-7 (mandate B07-COMMANDS).
+   */
+  async lockShared(fileId: SourceFileId): Promise<SourceFileRecord | null> {
+    await execute(this.db, "SELECT kauro.await_transition('kauro.source_files', $1::uuid::text)", [fileId]);
+    return this.get(fileId);
+  }
+
   /** Every file admitted from the revision's own uploads, revoked ones included (each record carries its state). */
   async listForRevision(revisionId: RevisionId): Promise<ReadonlyArray<SourceFileRecord>> {
     const r = await execute<Row>(this.db, `SELECT ${FILE_COLUMNS} FROM kauro.source_files WHERE origin_revision_id = $1 ORDER BY admitted_at, file_id`, [revisionId]);

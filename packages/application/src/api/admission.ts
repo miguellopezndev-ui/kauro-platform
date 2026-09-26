@@ -13,7 +13,7 @@ import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type { AgencyId, Clock, CorrelationId, Environment, FieldError, IdGenerator, UserId } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { CommandSpec } from "../ports/command-handler.js";
-import type { SchemaValidator } from "../ports/schema-validator.js";
+import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
 import { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, type AuthenticatedSubject, type CommandEnvelope } from "./envelope.js";
 import { problemOf, type Problem } from "./problems.js";
 import { requestSchemaId, type RequestSchemaCommand } from "./request-schemas.js";
@@ -183,6 +183,66 @@ export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, v
     };
   } catch (e) {
     if (e instanceof DomainFailure) return fail(e);
+    throw e;
+  }
+}
+
+/** What a document intake's admission needs from its route (B07 D-SEL-2: a POST that stores a document, not a command). */
+export interface DocumentRoute {
+  readonly path: string;
+  readonly scope: "AGENCY_HEADER";
+  /** The closed schema the document is validated against. */
+  readonly schemaId: KnownSchemaId;
+}
+
+export interface DocumentAdmission {
+  readonly correlationId: CorrelationId;
+  readonly agencyId: AgencyId;
+  readonly path: Readonly<Record<string, string>>;
+  readonly body: unknown;
+}
+
+export type DocumentAdmissionOutcome = { readonly kind: "ADMITTED"; readonly admission: DocumentAdmission } | { readonly kind: "PROBLEM"; readonly correlationId: CorrelationId; readonly problem: Problem };
+
+/**
+ * Structural admission of a document intake (B07 D-SEL-2), in the order of manual 10 like a command's: repeated envelope header,
+ * content type, byte size, strict UTF-8 JSON, the closed document schema, then the path ids and the agency selector. An intake is
+ * content-idempotent and journals nothing, so it takes no idempotency key; nothing here reads a row or echoes a value.
+ */
+export function admitDocument(route: DocumentRoute, raw: RawRequest, validator: SchemaValidator): DocumentAdmissionOutcome {
+  const correlationId = raw.correlationId;
+  try {
+    const early = headerFailure(raw);
+    if (early !== null) throw early;
+    if ((raw.body?.byteLength ?? 0) > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
+    if (raw.body === null) throw invalid("JSON_SYNTAX");
+    let text: string;
+    try {
+      text = UTF8.decode(raw.body);
+    } catch (e) {
+      if (e instanceof TypeError) throw invalid("JSON_SYNTAX");
+      throw e;
+    }
+    let parsed: unknown;
+    try {
+      parsed = parseStrictJson(text);
+    } catch (e) {
+      if (e instanceof StrictJsonError) throw invalid(e.reason);
+      throw e;
+    }
+    const outcome = validator.validate(route.schemaId, parsed);
+    if (outcome.kind === "INVALID") throw invalid("SCHEMA_VIOLATION", outcome.fields);
+    const path: Record<string, string> = {};
+    for (const name of route.path.match(/\{([a-zA-Z]+)\}/g)?.map((m) => m.slice(1, -1)) ?? []) {
+      const value = raw.params[name];
+      if (value === undefined || !UUID_PATH.test(value)) throw invalid("PATH_ID_INVALID", [{ field: name, code: "FORMAT" }]);
+      path[name] = value;
+    }
+    const selector = raw.headers[HEADERS.agency];
+    if (selector === undefined || !isUuid(selector)) throw invalid("AGENCY_SELECTOR_INVALID");
+    return { kind: "ADMITTED", admission: { correlationId, agencyId: selector as AgencyId, path, body: outcome.value } };
+  } catch (e) {
+    if (e instanceof DomainFailure) return { kind: "PROBLEM", correlationId, problem: problemOf(e, correlationId) };
     throw e;
   }
 }

@@ -28,6 +28,7 @@ import {
   CONTRACT_FAKE_CHUNK_MULTIPLE_BYTES,
   CONTRACT_FAKE_DEFAULT_RETENTION,
   CONTRACT_FAKE_JOURNAL_PROVIDER,
+  CONTRACT_FAKE_SESSION_REF_PREFIX,
   CONTRACT_FAKE_STORAGE_PROVIDER,
   CONTRACT_FAKE_VAULT_AAD_PURPOSE,
   CONTRACT_FAKE_VAULT_KEY_REF,
@@ -125,7 +126,8 @@ test("the labelled object-storage fake keeps a resumable session usable past the
   //    until the provider horizon (D-SESSION-3, 604,800 s by default), and not one instant longer.
   const declared = 2 * CHUNK + 10;
   const session = await newSession(storage, quarantineName(1), declared);
-  assert.match(session.sessionRef, /^contract-fake-storage:resumable-session:/);
+  assert.ok(session.sessionRef.startsWith(CONTRACT_FAKE_SESSION_REF_PREFIX), "an https session URI on the reserved .invalid domain");
+  assert.equal(new URL(session.sessionRef).protocol, "https:");
   assert.equal(session.providerExpiresAt, toUtcInstant(T0 + HORIZON_MS));
   assert.equal(session.chunkMultipleBytes, CHUNK);
   t.advance(APPLICATION_DEADLINE_MS + 1);
@@ -200,7 +202,7 @@ test("the labelled object-storage fake keeps a resumable session usable past the
   t3.advance(APPLICATION_DEADLINE_MS + 1);
   assert.equal(noCancel.uploadThroughSession(ns.sessionRef, content(10)).outcome, "FINALIZED", "a session the provider cannot cancel outlives the deadline");
   assert.throws(() => storage.failNext("cancelResumableSession", { code: "UNAVAILABLE" }), RangeError, "a cancellation answers; its loss is UNCERTAIN");
-  await assert.rejects(storage.cancelResumableSession(`${CONTRACT_FAKE_STORAGE_PROVIDER}:resumable-session:${v7(99)}`, PROVIDER_CALL_TIMEOUT_MS), storageError("UNKNOWN_SESSION"));
+  await assert.rejects(storage.cancelResumableSession(`${CONTRACT_FAKE_SESSION_REF_PREFIX}${v7(99)}`, PROVIDER_CALL_TIMEOUT_MS), storageError("UNKNOWN_SESSION"));
 
   // 3. Every platform write carries a no-overwrite precondition: a second session to a name that holds a live object fails at
   //    finalization, a copy to such a name is refused, and a delete of another generation than the live one is PRECONDITION_FAILED.
@@ -406,7 +408,7 @@ test("the labelled object-storage fake answers a finalized session with the comp
   assert.equal(done.outcome, "FINALIZED");
   if (done.outcome !== "FINALIZED") return;
   assert.deepEqual(storage.writeThroughSession(session.sessionRef, content(1), { final: true }), { outcome: "REFUSED", reason: "SESSION_CLOSED" });
-  assert.deepEqual(storage.uploadThroughSession(`${CONTRACT_FAKE_STORAGE_PROVIDER}:resumable-session:${v7(77)}`, content(1)), { outcome: "REFUSED", reason: "UNKNOWN_SESSION" });
+  assert.deepEqual(storage.uploadThroughSession(`${CONTRACT_FAKE_SESSION_REF_PREFIX}${v7(77)}`, content(1)), { outcome: "REFUSED", reason: "UNKNOWN_SESSION" });
   const observed = await storage.stat(quarantine, quarantineName(1));
   assert.deepEqual(await drain(storage.read(quarantine, quarantineName(1), done.generation)), bytes);
 
@@ -441,7 +443,7 @@ test("the labelled session-vault fake seals a session reference with AES-256-GCM
   assert.deepEqual([vault.provider, vault.evidenceClass, vault.keyRef], [CONTRACT_FAKE_VAULT_PROVIDER, "SIMULATED", CONTRACT_FAKE_VAULT_KEY_REF]);
   assert.match(vault.keyRef, /^[a-z][a-z0-9_.:/-]{2,127}$/, "the registry grammar of upload_session_secrets.key_ref");
   const binding: SessionSecretBinding = { agencyId: AGENCY, uploadId: v7(1001) as UploadId, requestedByUserId: "6f1c2d3e-4b5a-5c6d-8e7f-0123456789ab" as UserId, sessionAttempt: 1 };
-  const sessionRef = `${CONTRACT_FAKE_STORAGE_PROVIDER}:resumable-session:${v7(4242)}`;
+  const sessionRef = `${CONTRACT_FAKE_SESSION_REF_PREFIX}${v7(4242)}`;
   const sealed = await vault.seal(sessionRef, binding);
   const plaintext = new TextEncoder().encode(sessionRef);
   assert.equal(sealed.keyRef, CONTRACT_FAKE_VAULT_KEY_REF);
@@ -471,7 +473,7 @@ test("the labelled session-vault fake seals a session reference with AES-256-GCM
   }
   // another upload's secret under this upload's binding (a swapped row) never opens
   const neighbour = { ...binding, uploadId: v7(1003) as UploadId };
-  const neighbourSealed = await vault.seal(`${CONTRACT_FAKE_STORAGE_PROVIDER}:resumable-session:${v7(4343)}`, neighbour);
+  const neighbourSealed = await vault.seal(`${CONTRACT_FAKE_SESSION_REF_PREFIX}${v7(4343)}`, neighbour);
   await assert.rejects(vault.open(neighbourSealed, binding), vaultRefusal("AUTHENTICATION_FAILED"));
   // another key: the other vault does not hold this key; relabelled, the tag still fails
   const otherVault = new ContractFakeSessionVault({ keyRef: "contract-fake-vault/aes-256-gcm/test-key-2" });
