@@ -1,5 +1,5 @@
 /**
- * AUTHORITY_JOURNAL (docs/design/B07-upload-source-lifecycle.md §12.4; decisions D-RESTORE-1, D-RESTORE-2; B07-F8, re-check N5,
+ * AUTHORITY_JOURNAL (docs/design/B07-upload-source-lifecycle.md §12.4; decisions D-RESTORE-1, D-RESTORE-2, D-CTRL-8; B07-F8, re-check N5,
  * FINAL-N1; 09 "Deletion receipts and restoration": tombstones survive separately from the database and restoration applies them, in
  * order, before traffic; 14 "Minimal durable facts outside the primary restore boundary").
  *

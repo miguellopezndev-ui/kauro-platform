@@ -1,6 +1,6 @@
 /**
  * STORAGE_LIFECYCLE (docs/design/B07-upload-source-lifecycle.md §12.3; decisions D-ROLE-3, D-SESSION-1, D-SESSION-3, D-OBJ-1, D-OBJ-2,
- * D-PERS-4, D-CTRL-2; R2-051, CMD015): the consumer of the ends of application acceptance and of source authority —
+ * D-PERS-4, D-CTRL-2, D-CTRL-7; R2-051, CMD015): the consumer of the ends of application acceptance and of source authority —
  * `upload_session.cancelled.v1`, `.expired.v1`, `.rejected.v1`, `dataset_revision.cancelled.v1`, `.expired.v1`.
  *
  * It acts only for a subject whose acceptance is tombstoned (07: consumers verify state before an effect; a subject in another
@@ -11,7 +11,7 @@
  *   recorded with upload_session.provider_cancellation_recorded.v1 (D-ROLE-3); an UNCERTAIN one is reconciled until the provider
  *   horizon by PROVIDER_SESSION_RECONCILIATION. The temporary control record is purged once the cancellation resolved; a session
  *   that was never issued, or was finalized (the provider holds its object: a rejected upload, an admitted one past its window),
- *   needs no cancellation and its record, if any, is purged (D-SESSION-1, decision D-CTRL-2);
+ *   needs no cancellation and its record, if any, is purged (D-SESSION-1, decision D-CTRL-7);
  * - the objects: every registered generation of the upload — the quarantine object, a late object found under its name (observed as
  *   a RESIDUAL for good), a promotion copy of a lost attempt — and, for an expired revision, the accepted generations whose
  *   admission was revoked, are requested for deletion and deleted by exact generation, each result recorded at the server's

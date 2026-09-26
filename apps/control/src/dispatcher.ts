@@ -1,7 +1,7 @@
 /**
  * The control-plane outbox dispatcher (07 "Outbox, inbox and event ordering": dispatch is at least once, consumers deduplicate and
  * verify state before an effect; 07 "Job and attempt states": a claim creates a monotonically increasing fence and a lease). It is
- * B06's primitives composed, nothing forked (docs/design/B07-upload-source-lifecycle.md §6, §12):
+ * B06's primitives composed, nothing forked (docs/design/B07-upload-source-lifecycle.md §6, §12; decision D-CTRL-4):
  *
  *   1. an unbound SYSTEM unit of work claims up to `limit` due records of one consumer (`OutboxDispatchStore.claim`: PENDING or
  *      RETRYABLE whose next attempt is due, or CLAIMED whose claim expired; attempts + 1 is the settlement fence);

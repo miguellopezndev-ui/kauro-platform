@@ -1,6 +1,6 @@
 /**
  * UPLOAD_INSPECTION (docs/design/B07-upload-source-lifecycle.md §12.1; decisions D-INSP-1..4, D-SCAN-1, D-SCAN-2, D-ISO-1, D-FILE-1,
- * D-LOCK-2, D-INTAKE-1, D-CLOCK-1; S053, S054, S024, CMD014): the consumer of `upload_session.completion_reported.v1`. The browser's
+ * D-LOCK-2, D-INTAKE-1, D-CLOCK-1, D-CTRL-6; S053, S054, S024, CMD014): the consumer of `upload_session.completion_reported.v1`. The browser's
  * completion report is a claim; this pipeline observes what the provider actually holds and decides admission on the server's own
  * facts, under one inspection attempt fence:
  *
@@ -425,7 +425,7 @@ export class UploadInspection implements OutboxConsumer {
         await uow.sources.retention.appendAnchor({ anchorId: uow.ids.next() as RetentionAnchorId, agencyId: item.agencyId, projectId: upload.projectId, revisionId: upload.revisionId, uploadId: upload.uploadId, kind: "INTAKE_REJECTED", sourceEvidenceHash: receiptHash });
         if (promotion !== undefined) await uow.sources.objects.requestDeletion([promotion.acceptedObjectId], "PROMOTION_UNVERIFIED", completedAt);
       }
-      // the session was finalized (the provider holds its object): the bearer reference can do nothing more (D-SESSION-1, D-CTRL-2)
+      // the session was finalized (the provider holds its object): the bearer reference can do nothing more (D-SESSION-1, D-CTRL-6)
       await uow.sources.sessionSecrets.purge(upload.uploadId);
     });
   }

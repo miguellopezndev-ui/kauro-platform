@@ -1,5 +1,5 @@
 /**
- * RETENTION (docs/design/B07-upload-source-lifecycle.md §12.5; decisions D-RET-1..3, D-EXP-1, D-PERS-3, D-SEAL-1, D-CLOCK-1; 09
+ * RETENTION (docs/design/B07-upload-source-lifecycle.md §12.5; decisions D-RET-1..3, D-EXP-1, D-PERS-3, D-SEAL-1, D-CLOCK-1, D-CTRL-8; 09
  * "Retention schedule": unpaid sources no later than fourteen days from sealing; HASHING "Retention formulas": nothing resets a hard
  * clock; registry RetentionRecord: "a record expires no earlier than its effective deadline").
  *
