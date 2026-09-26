@@ -1,0 +1,40 @@
+{
+  "name": "@kauro/data-plane",
+  "version": "0.1.0",
+  "description": "Kauro data plane: the platform's own bounded parsers of untrusted source files — the container inspector (hardened ZIP/XML reader, CSV dialect facts, worksheet inventory, scan parts) and the selection evaluator and preview reader, each run in an isolated child process under the Node permission model with network hooks — and, as the test-only subpath @kauro/data-plane/testing, the labelled contract fake of the malware scanner port.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./testing": {
+      "types": "./dist/src/testing/index.d.ts",
+      "default": "./dist/src/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/application": "workspace:*",
+    "@kauro/contracts": "workspace:*",
+    "@kauro/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

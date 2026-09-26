@@ -90,6 +90,25 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  packages/data-plane:
+    dependencies:
+      '@kauro/application':
+        specifier: workspace:*
+        version: link:../application
+      '@kauro/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@kauro/domain':
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      '@types/node':
+        specifier: 24.3.1
+        version: 24.3.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   packages/domain:
     dependencies:
       '@kauro/contracts':
