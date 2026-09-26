@@ -76,3 +76,56 @@ test("B07 case map: every case of the package has its section, and every EXECUTE
   }
   for (const c of citations().filter((x) => /EXECUTED_LOCAL/.test(x.line))) assert.ok(existsSync(join(root, c.file)), `${c.file} is cited as EXECUTED_LOCAL but does not exist`);
 });
+
+/** The lines of a case's section: a scenario's `### <id> ` heading, or a command family's `- **<id>**` item. */
+function sectionOf(caseId) {
+  const lines = text.split("\n");
+  const family = /^CMD\d{3}-(OK|DENY|RACE)$/.test(caseId);
+  const start = lines.findIndex((l) => (family ? l.startsWith(`- **${caseId}**`) : l.startsWith(`### ${caseId} `)));
+  assert.ok(start >= 0, `${caseId} has no section`);
+  const out = [];
+  for (const l of lines.slice(start + 1)) {
+    if (l.startsWith("### ") || l.startsWith("## ") || (family && l.startsWith("- **"))) break;
+    out.push(l);
+  }
+  return out;
+}
+
+const STATUS_ROW = /^\| ([A-Z0-9-]+) \| (EXECUTED_LOCAL|PARTIAL|MISSING) \| (\d+) EXECUTED_LOCAL, (\d+) SIMULATED — [^|]+ \| ([^|]+) \| ([^|]+) \|$/;
+
+test("B07 case map: the status table of b07/stage-1 names every case once, with the counts of its section's EXECUTED_LOCAL and SIMULATED rows, every mandate of its SPECIFIED rows, and the status those rows imply", () => {
+  const b07 = registry("program.json").find((p) => p.id === "B07");
+  const start = text.indexOf("\n## Status at `b07/stage-1`\n");
+  assert.ok(start >= 0, "the case map has its status section");
+  const end = text.indexOf("\n## ", start + 1);
+  const section = text.slice(start, end < 0 ? undefined : end).split("\n");
+  const rows = section.filter((l) => l.startsWith("| ") && !l.startsWith("| case |"));
+  const byCase = new Map();
+  for (const row of rows) {
+    const m = STATUS_ROW.exec(row);
+    assert.ok(m !== null, `a status row has the table's shape: ${row.slice(0, 80)}`);
+    assert.ok(!byCase.has(m[1]), `${m[1]} has one status row`);
+    byCase.set(m[1], { status: m[2], executed: Number(m[3]), simulated: Number(m[4]), stage2: m[5].trim(), later: m[6].trim() });
+  }
+  assert.deepEqual([...byCase.keys()].sort(), [...b07.caseIds].sort(), "the table names exactly the package's cases");
+  const tally = { EXECUTED_LOCAL: 0, PARTIAL: 0, MISSING: 0 };
+  for (const caseId of b07.caseIds) {
+    const row = byCase.get(caseId);
+    const lines = sectionOf(caseId);
+    const executed = lines.filter((l) => /^\s*- EXECUTED_LOCAL\b/.test(l)).length;
+    const simulated = lines.filter((l) => /^\s*- SIMULATED\b/.test(l)).length;
+    const specified = new Set(lines.flatMap((l) => [...l.matchAll(/^\s*- SPECIFIED \((B07-[A-Z-]+)/g)].map((x) => x[1])));
+    assert.deepEqual([row.executed, row.simulated], [executed, simulated], `${caseId}: the counts are its section's rows`);
+    const named = new Set([...row.stage2.matchAll(/B07-[A-Z]+(?:-[A-Z]+)*/g)].map((x) => x[0]));
+    assert.deepEqual([...named].sort(), [...specified].sort(), `${caseId}: the stage-2 column names exactly the mandates of its SPECIFIED rows`);
+    if (specified.size === 0) assert.equal(row.stage2, "none", `${caseId}: nothing is open in stage 2`);
+    const laterOpen = !row.later.startsWith("none");
+    if (laterOpen) assert.match(row.later, /\bB\d{2}\b/, `${caseId}: an open later clause names its package`);
+    const expected = executed === 0 ? "MISSING" : specified.size > 0 || laterOpen ? "PARTIAL" : "EXECUTED_LOCAL";
+    assert.equal(row.status, expected, `${caseId}: the status its rows imply`);
+    tally[row.status] += 1;
+  }
+  const totals = /Totals: (\d+) cases — (\d+) EXECUTED_LOCAL, (\d+) PARTIAL, (\d+) MISSING\./.exec(section.join("\n"));
+  assert.ok(totals !== null, "the section states its totals");
+  assert.deepEqual(totals.slice(1).map(Number), [b07.caseIds.length, tally.EXECUTED_LOCAL, tally.PARTIAL, tally.MISSING]);
+});

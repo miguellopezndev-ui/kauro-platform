@@ -27,8 +27,12 @@
  * `sealReadyRevision` (SEALED; `sealStatements` issues the same writes inside a transaction the caller holds, for race tests),
  * `expireSealedRevision` (the retention sweeper's retention_expires), and `sealSourceRevision` runs them in order.
  *
- * The provider facts (generations, the scanner's report) are those of the labelled contract fakes (`contract-fake-storage`,
- * `contract-fake-scanner`, evidence class SIMULATED): a fixture never claims a provider effect (21 "Evidence classes").
+ * The provider facts (generations, the scanner's report) are those of the labelled contract fakes, under the tokens those fakes
+ * report (`contract-fake-storage` of @kauro/application/testing, `contract-fake-malware-scanner` of @kauro/data-plane/testing;
+ * evidence class SIMULATED), and the receipt and the evaluation name the versions of the real inspector and evaluator of
+ * @kauro/data-plane: a fixture never claims a provider effect (21 "Evidence classes"). This package may not import the data plane
+ * (architecture.rules.json), so the tokens are written here and `tools/test/b07-stage-one.test.mjs` pins them to the fakes' and
+ * parsers' own exports.
  *
  * Shortcut, stated: the first revision a project seals is its current DRAFT revision, as in the product; a later revision of the
  * same project is inserted beside it without lineage (only CreateRevision creates lineage), so tests that need several
@@ -156,9 +160,14 @@ export interface SealSourceOptions {
 
 /** The fixture's service identity on control-plane events and objects (a SERVICE actor, never a person). */
 export const FIXTURE_SERVICE = "source-lifecycle-fixture";
-/** The labelled contract fakes the fixture's provider facts come from (21 "Evidence classes": SIMULATED). */
+/** The labelled contract fakes the fixture's provider facts come from (21 "Evidence classes": SIMULATED), under their own tokens. */
 export const FIXTURE_STORAGE_PROVIDER = "contract-fake-storage";
-export const FIXTURE_SCANNER = "contract-fake-scanner";
+export const FIXTURE_SCANNER = "contract-fake-malware-scanner";
+export const FIXTURE_SCANNER_ENGINE_VERSION = "contract-fake-malware-scanner-1.0.0";
+export const FIXTURE_SIGNATURE_VERSION = "contract-fake-signatures-1";
+/** The versions the real parsers of @kauro/data-plane record (INSPECTOR_VERSION, EVALUATOR_VERSION). */
+export const FIXTURE_INSPECTOR_VERSION = "kauro-container-inspector-1.0.0";
+export const FIXTURE_EVALUATOR_VERSION = "kauro-selection-evaluator-1.0.0";
 
 const DAY_MS = 86_400_000;
 const FIFTEEN_DAYS_MS = 15 * DAY_MS;
@@ -352,8 +361,8 @@ export async function admitSourceFile(sessions: SourceFixtureSessions, scope: So
     columnLabelDigests: [textDigest("Email"), textDigest("Name")], hasFormulas: false, formulaCache: "NOT_APPLICABLE",
     mergedCellCount: 0, hiddenRowCount: 0, hiddenColumnCount: 0, issues: [],
   });
-  const parserProfileHash = parserProfileHashOf({ inspector: "data-plane-0.1.0", format: "CSV", encoding: "UTF_8", delimiter: "COMMA" });
-  const scannerConfigHash = textDigest("contract-fake-scanner-config");
+  const parserProfileHash = parserProfileHashOf({ inspector: FIXTURE_INSPECTOR_VERSION, format: "CSV", encoding: "UTF_8", delimiter: "COMMA" });
+  const scannerConfigHash = textDigest(`${FIXTURE_SCANNER}-config`);
   const receiptHash = inspectionReceiptHashOf({ uploadId, inspectionFence: 1, observedGeneration: quarantineGeneration, observedBytes: bytes, sha256, outcome: "ADMITTED", acceptedGeneration });
   await sessions.control(async (c) => {
     await clockAt(c, at(initiatedAt, 66_000));
@@ -385,13 +394,13 @@ export async function admitSourceFile(sessions: SourceFixtureSessions, scope: So
           completion_claim_digest, claim_consistent, declared_format, detected_format, structure_status, scan_state, scanner_engine, scanner_engine_version, signature_version,
           signatures_published_at, signature_max_age_seconds, scanner_config_hash, scanner_exit_code, scanner_verdict, scanned_at, expected_parts, expected_bytes, scanned_parts, scanned_bytes,
           coverage, problems, parser_profile_hash, inspector_version, outcome, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, created_at)
-       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, $10, true, 'CSV', 'CSV', 'STRUCTURE_VALID', 'COVERED_CLEAN', $11, 'SIMULATED-1', 'SIG-FIXTURE',
-          kauro.server_now() - interval '1 hour', 86400, $12, 0, 'CLEAN', kauro.server_now(), 1, $8, 1, $8, $13, '[]', $14, 'data-plane-0.1.0', 'ADMITTED', $15, $16, $9,
+       VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $9, $10, true, 'CSV', 'CSV', 'STRUCTURE_VALID', 'COVERED_CLEAN', $11, $17, $18,
+          kauro.server_now() - interval '1 hour', 86400, $12, 0, 'CLEAN', kauro.server_now(), 1, $8, 1, $8, $13, '[]', $14, $19, 'ADMITTED', $15, $16, $9,
           (SELECT u.inspection_claimed_at FROM kauro.upload_sessions u WHERE u.agency_id = $2 AND u.upload_id = $3), kauro.server_now(), kauro.server_now())`,
       [
         ids.next(), scope.agencyId, uploadId, revisionId, receiptHash, quarantineObjectId, quarantineGeneration, bytes, sha256, claimDigest, FIXTURE_SCANNER, scannerConfigHash,
         JSON.stringify([{ partDigest: textDigest(`container-${uploadId}`), partKind: "CONTAINER", expectedBytes: bytes, scannedBytes: bytes, outcome: "CLEAN" }]),
-        parserProfileHash, acceptedObjectId, acceptedGeneration,
+        parserProfileHash, acceptedObjectId, acceptedGeneration, FIXTURE_SCANNER_ENGINE_VERSION, FIXTURE_SIGNATURE_VERSION, FIXTURE_INSPECTOR_VERSION,
       ],
     );
     await c.query(
@@ -494,12 +503,13 @@ export async function countSourceSelection(c: SqlSession, scope: SourceFixtureSc
   await c.query(
     `INSERT INTO kauro.selection_evaluations (evaluation_id, agency_id, revision_id, selection_manifest_id, selection_hash, evaluation_hash, result, physical_source_rows, logical_source_records, billable_source_units, association_edges,
         file_count, total_bytes, files, tables, projections, pricing_definition, evaluator_version, started_at, completed_at, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETE', $7, $8, $9, $10, 1, $11, $12, $13, $14, 'R2-INITIAL', 'data-plane-0.1.0', now(), now(), now())`,
+     VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETE', $7, $8, $9, $10, 1, $11, $12, $13, $14, 'R2-INITIAL', $15, now(), now(), now())`,
     [
       evaluationId, scope.agencyId, bound.revisionId, bound.selectionManifestId, bound.selectionHash, evaluationHash, counts.physicalSourceRows, counts.logicalSourceRecords, counts.billableSourceUnits, counts.associationEdges, bound.bytes,
       JSON.stringify([{ fileId: bound.fileId, generation: bound.acceptedGeneration, sha256: bound.sha256, bytes: bound.bytes }]),
       JSON.stringify([{ tableId: bound.tableId, physicalRows: 120, columnCount: 2, excludedHiddenRows: 0, issues: [] }]),
       JSON.stringify([{ projectionKey: "CONTACT", objectKind: "CONTACT", logicalRecords: 120, billable: true }]),
+      FIXTURE_EVALUATOR_VERSION,
     ],
   );
   return { evaluationId, evaluationHash, counts };
