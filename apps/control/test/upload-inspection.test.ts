@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { CONTRACT_FAKE_STORAGE_PROVIDER, completionRefOf, providerChecksumsOf } from "@kauro/application/testing";
 import { FAKE_SCANNER_ENGINE, FAKE_SCANNER_EVIDENCE_CLASS } from "@kauro/data-plane/testing";
-import { acceptedObjectName, type CausationId, type CorrelationId, type RetentionAnchorId, type SourceFileId, type SourceTableId } from "@kauro/domain";
+import { acceptedObjectName, isDomainFailure, type CausationId, type CorrelationId, type RetentionAnchorId, type SourceFileId, type SourceTableId, type StoredObjectId } from "@kauro/domain";
 import { PgEventPublisher, PgSourceStore } from "@kauro/persistence";
 import { waitForLockWait } from "@kauro/persistence/testing";
 import { clock, ids, startControlEnv, type ControlEnv } from "./support/env.js";
@@ -135,6 +135,18 @@ test("OK: UPLOAD_INSPECTION observes, hashes, inspects, scans, promotes and admi
   const anchor = await oracle<{ occurred_at: Date; admitted_at: Date }>(env, "SELECT a.occurred_at, u.admitted_at FROM kauro.retention_anchors a JOIN kauro.upload_sessions u ON u.upload_id = a.upload_id WHERE a.upload_id = $1 AND a.anchor_kind = 'INPUT_ADMITTED'", [up.uploadId]);
   assert.equal(anchor.occurred_at.getTime(), anchor.admitted_at.getTime(), "INPUT_ADMITTED at the admission's server instant");
   assert.equal((await oracle<{ n: string }>(env, "SELECT count(*)::text AS n FROM kauro.upload_session_secrets WHERE upload_id = $1", [up.uploadId])).n, "0");
+
+  // the accepted intent was registered before the copy, without a file link (D-CTRL-3): the standing admission still retains it — the
+  // control plane cannot request its deletion (D-PERS-4), and nothing of the refused request commits
+  const acceptedObjectId = objects.find((o) => o.zone === "ACCEPTED")?.object_id;
+  assert.ok(acceptedObjectId);
+  await assert.rejects(
+    env.plane.units.runSource({ kind: "SYSTEM", serviceId: "storage-lifecycle", correlationId: ids.next() as CorrelationId, agencyId: t.ag.agencyId }, (uow) =>
+      uow.sources.objects.requestDeletion([acceptedObjectId as StoredObjectId], "ACCEPTANCE_TOMBSTONED", clock.now()),
+    ),
+    (e: unknown) => isDomainFailure(e) && e.code === "PRECONDITION_FAILED",
+  );
+  assert.equal((await oracle<{ state: string }>(env, "SELECT state FROM kauro.stored_objects WHERE object_id = $1", [acceptedObjectId])).state, "VERIFIED");
 
   // the revision stays UPLOADING (D-INTAKE-1): no observation, inspection outcome or admission closes the intake
   assert.equal((await oracle<{ state: string }>(env, "SELECT state FROM kauro.dataset_revisions WHERE revision_id = $1", [p.revisionId])).state, "UPLOADING");
