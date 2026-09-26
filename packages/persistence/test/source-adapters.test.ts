@@ -515,6 +515,174 @@ function rejectingReceipt(t: Tenant, up: Reserved, fence: number, startedAt: str
   } as const;
 }
 
+interface SelectedFile {
+  readonly fileId: SourceFileId;
+  readonly tableId: SourceTableId;
+  readonly structureHash: Sha256Hex;
+  readonly origin: "THIS_REVISION" | "REUSED";
+}
+
+interface Bound {
+  readonly selection: SelectionManifestDocument;
+  readonly selectionManifestId: SelectionManifestId;
+  readonly selectionHash: Sha256Hex;
+  readonly inventoryHash: Sha256Hex;
+  readonly version: number;
+}
+
+/**
+ * The selection manifest intake and CMD016 through the adapters: the manifest made against the revision's current inventory
+ * (SourceRevisionRepository.inventory), stored content-idempotently, bound after the revision row — all_uploads_completed from
+ * UPLOADING, previously_admitted_inputs_selected from DRAFT, selection_changes from READY_TO_SEAL, selection_rebound while INSPECTING.
+ */
+async function bindVia(s: SourceStore, emit: Emit, t: Tenant, projectId: ProjectId, revisionId: RevisionId, file: SelectedFile, projectionKey = "CONTACT"): Promise<Bound> {
+  const inventoryHash = inventoryHashOf(await s.revisions.inventory(revisionId));
+  const base = fixtureSelection(revisionId, file, inventoryHash);
+  const selection: SelectionManifestDocument = { ...base, projections: base.projections.map((x) => ({ ...x, projectionKey })) };
+  const selectionHash = selectionHashOf(selection);
+  const { record } = await s.selections.put({ selectionManifestId: ids.next() as SelectionManifestId, agencyId: t.ag.agencyId, projectId, revisionId, body: selection, bodyHash: selectionHash, createdByMembershipId: t.ag.ownerMembershipId, createdAt: CALLER_INSTANT });
+  const revision = await s.revisions.lock(revisionId);
+  assert.ok(revision);
+  const binding = { selectionManifestId: record.selectionManifestId, selectionHash, inventoryHash };
+  const change =
+    revision.state === "UPLOADING"
+      ? ({ event: "all_uploads_completed", selection: binding } as const)
+      : revision.state === "DRAFT"
+        ? ({ event: "previously_admitted_inputs_selected", selection: binding } as const)
+        : revision.state === "READY_TO_SEAL"
+          ? ({ event: "selection_changes", selection: binding } as const)
+          : ({ event: "selection_rebound", selection: binding } as const);
+  const bound = applied(await s.revisions.transition(revisionId, revision.version, change), change.event);
+  await emit("dataset_revision", revisionId, bound.version, "dataset_revision.selection_changed.v1", {
+    revisionId,
+    agencyId: t.ag.agencyId,
+    projectId,
+    selectionManifestId: record.selectionManifestId,
+    selectionHash,
+    inventoryHash,
+    previousState: revision.state,
+    state: "INSPECTING",
+    includedFileCount: 1,
+    includedTableCount: 1,
+    reusedFileIds: file.origin === "REUSED" ? [file.fileId] : [],
+  });
+  return { selection, selectionManifestId: record.selectionManifestId, selectionHash, inventoryHash, version: bound.version };
+}
+
+const COUNTS = { physicalSourceRows: 120, logicalSourceRecords: 120, billableSourceUnits: 120, associationEdges: 0 } as const;
+
+interface Counted {
+  readonly evaluationId: EvaluationId;
+  readonly evaluationHash: Sha256Hex;
+  readonly version: number;
+}
+
+/** SELECTION_EVALUATION through the adapters (revision row first): the complete evaluation and all_selected_inputs_admitted. */
+async function evaluateVia(
+  s: SourceStore,
+  emit: Emit,
+  t: Tenant,
+  projectId: ProjectId,
+  revisionId: RevisionId,
+  bound: Bound,
+  file: { readonly fileId: SourceFileId; readonly tableId: SourceTableId; readonly generation: string; readonly sha256: Sha256Hex; readonly bytes: number },
+  now: string,
+): Promise<Counted> {
+  const revision = await s.revisions.lock(revisionId);
+  assert.ok(revision);
+  const evaluationId = ids.next() as EvaluationId;
+  const files = [{ fileId: file.fileId, generation: file.generation, sha256: file.sha256, bytes: file.bytes }];
+  const evaluationHash = evaluationHashOf({ revisionId, selectionHash: bound.selectionHash, files, populations: COUNTS });
+  await s.evaluations.append({
+    evaluationId,
+    agencyId: t.ag.agencyId,
+    revisionId,
+    selectionManifestId: bound.selectionManifestId,
+    selectionHash: bound.selectionHash,
+    evaluationHash,
+    result: "COMPLETE",
+    populations: COUNTS,
+    fileCount: 1,
+    totalBytes: file.bytes,
+    files,
+    tables: [{ tableId: file.tableId, physicalRows: 120, columnCount: 2, excludedHiddenRows: 0, issues: [] }],
+    projections: [{ projectionKey: "CONTACT", objectKind: "CONTACT", logicalRecords: 120, billable: true }],
+    failures: [],
+    pricingDefinition: PRICING_DEFINITION,
+    evaluatorVersion: "data-plane-0.1.0",
+    startedAt: now,
+    completedAt: now,
+  });
+  const ready = applied(await s.revisions.transition(revisionId, revision.version, { event: "all_selected_inputs_admitted", evaluationId, evaluationHash, populations: COUNTS }), "all_selected_inputs_admitted");
+  await emit("dataset_revision", revisionId, ready.version, "dataset_revision.ready_to_seal.v1", { revisionId, agencyId: t.ag.agencyId, projectId, selectionHash: bound.selectionHash, evaluationHash, ...COUNTS });
+  return { evaluationId, evaluationHash, version: ready.version };
+}
+
+/** The fixture shape the sealed documents are composed from (sealedManifestOf of @kauro/persistence/testing). */
+function readyOf(t: Tenant, revisionId: RevisionId, file: { readonly fileId: string; readonly tableId: string; readonly generation: string; readonly sha256: string; readonly bytes: number; readonly structureHash: string; readonly parserProfileHash: string; readonly receiptHash: string }, bound: Bound, counted: Counted): ReadySourceFixture {
+  return {
+    revisionId,
+    clientId: t.clientId,
+    revisionVersion: counted.version,
+    uploadId: ids.next(),
+    quarantineObjectId: ids.next(),
+    acceptedObjectId: ids.next(),
+    fileId: file.fileId,
+    tableId: file.tableId,
+    bytes: file.bytes,
+    acceptedGeneration: file.generation,
+    sha256: file.sha256,
+    receiptHash: file.receiptHash,
+    structureHash: file.structureHash,
+    parserProfileHash: file.parserProfileHash,
+    initiatedAt: new Date(),
+    selection: bound.selection,
+    selectionManifestId: bound.selectionManifestId,
+    selectionHash: bound.selectionHash,
+    inventoryHash: bound.inventoryHash,
+    evaluationId: counted.evaluationId,
+    evaluationHash: counted.evaluationHash,
+    counts: COUNTS,
+  };
+}
+
+/**
+ * CMD017 through the adapters (revision row first): the first seal of the bytes read, the sealed manifest and subject with the
+ * file set, the REVISION_SEALED anchor, the UNPAID record — anchored on the first seal of the bytes, or (`THIS_SEAL`) on this seal
+ * to show the database refuses a restarted clock — and seal_command, each with its event.
+ */
+async function sealVia(s: SourceStore, emit: Emit, t: Tenant, projectId: ProjectId, ready: ReadySourceFixture, anchorOn: "FIRST_SEAL" | "THIS_SEAL" = "FIRST_SEAL") {
+  const revisionId = ready.revisionId as RevisionId;
+  const revision = await s.revisions.lock(revisionId);
+  assert.ok(revision);
+  const firsts = await s.seals.firstSeals([ready.fileId as SourceFileId]);
+  const docs = sealedManifestOf(scopeOf(t, projectId), ready, ids.next());
+  const sealed = await s.seals.insert(
+    { revisionId, agencyId: t.ag.agencyId, projectId, manifestHash: docs.manifestHash, projectionHash: docs.projectionHash, selectionHash: ready.selectionHash as Sha256Hex, evaluationHash: ready.evaluationHash as Sha256Hex, subjectHash: docs.subjectHash, manifest: docs.manifest, subject: docs.subject },
+    [{ fileId: ready.fileId as SourceFileId, ordinal: 0, disposition: "INCLUDED", providerGeneration: ready.acceptedGeneration, sha256: ready.sha256 as Sha256Hex, bytes: ready.bytes }],
+  );
+  const anchor = await s.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId, revisionId, kind: "REVISION_SEALED", sourceEvidenceHash: docs.manifestHash });
+  const first = firsts.find((f) => f.fileId === ready.fileId);
+  const retentionId = ids.next() as RetentionId;
+  const record = await s.retention.insertUnpaidRecord({ retentionId, agencyId: t.ag.agencyId, clientId: t.clientId, projectId, revisionId, anchorId: anchorOn === "FIRST_SEAL" && first !== undefined ? first.anchorId : anchor.anchorId, policyVersion: RETENTION_POLICY_VERSION });
+  await emit("retention_record", retentionId, 1, "retention_record.created.v1", { retentionId, agencyId: t.ag.agencyId, projectId, revisionId, retentionClass: "UNPAID", anchorEvidenceHash: record.anchorEvidenceHash, policyVersion: RETENTION_POLICY_VERSION });
+  const moved = applied(await s.revisions.transition(revisionId, revision.version, { event: "seal_command", manifestHash: docs.manifestHash, projectionHash: docs.projectionHash, sealedFileCount: 1, sealedBytes: ready.bytes }), "seal_command");
+  await emit("dataset_revision", revisionId, moved.version, "dataset_revision.sealed.v1", {
+    revisionId,
+    agencyId: t.ag.agencyId,
+    projectId,
+    manifestHash: docs.manifestHash,
+    projectionHash: docs.projectionHash,
+    selectionHash: ready.selectionHash,
+    evaluationHash: ready.evaluationHash,
+    ...COUNTS,
+    fileCount: 1,
+    sealedBytes: ready.bytes,
+    retentionId,
+  });
+  return { sealed, anchor, record, revision: moved, firsts, manifest: docs.manifest };
+}
+
 /** A fresh project whose revision holds one file admitted entirely through the adapters (the revision stays UPLOADING). */
 async function admittedThroughAdapters(t: Tenant, bytes = 1_234): Promise<Admitted> {
   const p = await project(t);
@@ -944,4 +1112,636 @@ test("compare-and-swap and fences: a stale version answers STALE with the curren
   const retried = await h.control.runSource(asControl(t), (uow) => uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, uploadId: up.uploadId, kind: "INTAKE_REJECTED", sourceEvidenceHash: null }));
   assert.equal(retried.occurredAt, rejected.rejectedAt);
   assert.deepEqual(await oracle("SELECT count(*)::int AS n FROM kauro.retention_anchors WHERE upload_id = $1 AND anchor_kind = 'INTAKE_REJECTED'", [up.uploadId]), { n: 1 });
+});
+
+test("cancel_upload writes no provider-cancellation column: the database requests the provider cancellation with the tombstone of an issued session at the tombstone's instant, the control plane alone records the answer (UNCERTAIN, then CONFIRMED) and purges the secret, and an unissued reservation's cancellation requests nothing (D-ROLE-3)", async () => {
+  const t = await tenant("cancel");
+  const p = await project(t);
+  const unissued = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { first: true }));
+  const live = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10));
+  await h.app.runSource(asOwner(t), (uow) => issueVia(uow.sources, emitOf(uow, t), t, live));
+  // no session was issued: nothing to request from the provider
+  const quiet = await h.app.runSource(asOwner(t), (uow) => cancelVia(uow.sources, emitOf(uow, t), t, unissued, 1));
+  assert.deepEqual([quiet.state, quiet.providerCancellationState, quiet.providerCancellationAt, quiet.cancelledByMembershipId, quiet.terminalReason], ["CANCELLED", "NOT_REQUESTED", undefined, t.ag.ownerMembershipId, "CANCELLED_BY_REQUESTER"]);
+  // an issued session: the database stamps REQUESTED at the tombstone's own server instant
+  const cancelled = await h.app.runSource(asOwner(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const c = await cancelVia(uow.sources, emitOf(uow, t), t, live, 2);
+    assert.deepEqual([c.state, c.cancelledAt, c.providerCancellationState, c.providerCancellationAt], ["CANCELLED", now, "REQUESTED", now]);
+    assert.equal(await uow.sources.sessionSecrets.readOwn(live.uploadId), null, "a tombstoned session is never delivered again");
+    return c;
+  });
+  // the request handlers hold no grant on the provider's answer
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.recordProviderCancellation(live.uploadId, cancelled.version, "CONFIRMED")), refused("NOT_FOUND", "TENANT_CONTEXT_MISSING", "42501"));
+  // discovery: the pending cancellation is reconciled until the provider horizon
+  assert.ok((await h.control.runSource(asControl(null), (uow) => uow.sources.uploads.findProviderReconciliation(1000))).some((x) => x.uploadId === live.uploadId && x.agencyId === t.ag.agencyId));
+  const emitControl = (uow: SourceUnitOfWork) => emitOf(uow, t);
+  const uncertain = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const secret = await uow.sources.sessionSecrets.readForRevocation(live.uploadId);
+    assert.deepEqual([secret?.uploadId, secret?.sessionAttempt, secret?.keyRef], [live.uploadId, 1, "contract-fake-vault/test-key:1"]);
+    assert.ok(await uow.sources.revisions.lock(p.revisionId));
+    const w = applied(await uow.sources.uploads.recordProviderCancellation(live.uploadId, cancelled.version, "UNCERTAIN"), "UNCERTAIN");
+    await emitControl(uow)("upload_session", live.uploadId, w.version, "upload_session.provider_cancellation_recorded.v1", { uploadId: live.uploadId, agencyId: t.ag.agencyId, revisionId: p.revisionId, providerCancellationState: "UNCERTAIN" });
+    assert.deepEqual([w.providerCancellationState, w.providerCancellationAt, w.cancelledAt], ["UNCERTAIN", now, cancelled.cancelledAt]);
+    return w;
+  });
+  const confirmed = await h.control.runSource(asControl(t), async (uow) => {
+    const w = applied(await uow.sources.uploads.recordProviderCancellation(live.uploadId, uncertain.version, "CONFIRMED"), "CONFIRMED");
+    await emitControl(uow)("upload_session", live.uploadId, w.version, "upload_session.provider_cancellation_recorded.v1", { uploadId: live.uploadId, agencyId: t.ag.agencyId, revisionId: p.revisionId, providerCancellationState: "CONFIRMED" });
+    assert.equal(await uow.sources.sessionSecrets.purge(live.uploadId), true);
+    assert.equal(await uow.sources.sessionSecrets.purge(live.uploadId), false, "purged once");
+    assert.equal(await uow.sources.sessionSecrets.readForRevocation(live.uploadId), null);
+    return w;
+  });
+  assert.equal(confirmed.providerCancellationState, "CONFIRMED");
+  // the result only moves forward (KA008)
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.uploads.recordProviderCancellation(live.uploadId, confirmed.version, "UNCERTAIN")), refused("PRECONDITION_FAILED", "UNLISTED_TRANSITION", "KA008"));
+  assert.ok(!(await h.control.runSource(asControl(null), (uow) => uow.sources.uploads.findProviderReconciliation(1000))).some((x) => x.uploadId === live.uploadId), "a resolved cancellation is reconciled no more");
+  assert.deepEqual(await oracle("SELECT count(*)::int AS n FROM kauro.upload_session_secrets WHERE upload_id = $1", [live.uploadId]), { n: 0 });
+});
+
+test("the deadline edges on the server clock: findDeadlinePassed finds live and unsealed-admitted uploads past their deadline across agencies (never a sealed one), reservation_expired and intake_deadline_reached commit only at or after the deadline — requesting the provider cancellation of an issued session — and nothing is accepted after it", async () => {
+  const t = await tenant("deadlines");
+  const other = await tenant("deadlines-other");
+  await setSessionLimit(t, 8);
+  const p = await project(t);
+  // reserved (and one issued) a day and an hour ago, through the adapters at that instant of the TEST CLOCK
+  const dayAgo = new Date(Date.now() - 25 * HOUR_MS);
+  const stale = await storeAt("REQUEST", t, dayAgo, (s, emit) => reserveVia(s, emit, t, p, 100, { first: true }));
+  const issued = await storeAt("REQUEST", t, new Date(dayAgo.getTime() + 1_000), (s, emit) => reserveVia(s, emit, t, p, 100));
+  await storeAt("REQUEST", t, new Date(dayAgo.getTime() + 2_000), (s, emit) => issueVia(s, emit, t, issued));
+  const fresh = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 100));
+  // in another agency: an admitted file two days old that no seal included, and one sealed fifteen days ago
+  const q = await project(other);
+  const unsealed = await admitSourceFile(sessionsOf(other), scopeOf(other, q.projectId), { seed: "deadline-unsealed", base: new Date(Date.now() - 2 * DAY_MS) });
+  const q2 = await project(other);
+  const sealed = await sealSourceRevision(sessionsOf(other), scopeOf(other, q2.projectId), { seed: "deadline-sealed" });
+  // discovery across agencies, no customer text, on the server clock
+  const due = await h.control.runSource(asControl(null), (uow) => uow.sources.uploads.findDeadlinePassed(1000));
+  const stateOf = (uploadId: string): string | undefined => due.find((d) => d.uploadId === uploadId)?.state;
+  assert.deepEqual([stateOf(stale.uploadId), stateOf(issued.uploadId), stateOf(unsealed.uploadId)], ["RESERVED", "UPLOADING", "ADMITTED"]);
+  assert.equal(stateOf(fresh.uploadId), undefined, "a window still open");
+  assert.equal(stateOf(sealed.uploadId), undefined, "a sealed file follows its seal's retention, not the window");
+  // nothing is accepted after the deadline: no issuance fence, no session issue, no completion report (KA072)
+  assert.equal(await h.app.runSource(asOwner(t), (uow) => uow.sources.uploads.claimSessionAttempt(stale.uploadId)), null);
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => issueVia(uow.sources, emitOf(uow, t), t, stale)), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => reportVia(uow.sources, emitOf(uow, t), t, issued, "1700000000000009", 10)), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  // nothing expires before its deadline (KA072)
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.uploads.transition(fresh.uploadId, 1, { event: "reservation_expired", reason: "RESERVATION_EXPIRED", providerCancellation: "NOT_REQUESTED" })), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  // at or after it the control plane expires them, the revision row first, requesting the provider cancellation of the issued one
+  await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const emit = emitOf(uow, t);
+    assert.ok(await uow.sources.revisions.lock(p.revisionId));
+    for (const [up, version, providerCancellation] of [[stale, 1, "NOT_REQUESTED"], [issued, 2, "REQUESTED"]] as const) {
+      const e = applied(await uow.sources.uploads.transition(up.uploadId, version, { event: "reservation_expired", reason: "RESERVATION_EXPIRED", providerCancellation }), "reservation_expired");
+      assert.deepEqual([e.state, e.expiredAt, e.terminalReason, e.providerCancellationState, e.providerCancellationAt], ["EXPIRED", now, "RESERVATION_EXPIRED", providerCancellation, providerCancellation === "REQUESTED" ? now : undefined]);
+      await emit("upload_session", up.uploadId, e.version, "upload_session.expired.v1", { uploadId: up.uploadId, agencyId: t.ag.agencyId, revisionId: p.revisionId, previousState: version === 1 ? "RESERVED" : "UPLOADING", reasonCode: "RESERVATION_EXPIRED", releasedBytes: 100, providerCancellationState: providerCancellation });
+      await uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, uploadId: up.uploadId, kind: "INTAKE_EXPIRED", sourceEvidenceHash: null });
+    }
+    assert.deepEqual(await uow.sources.uploads.quota(p.revisionId), { revisionId: p.revisionId, reservedBytes: 100, fileCount: 1 }, "only the fresh reservation still holds");
+  });
+  // an admitted upload past its window: intake_deadline_reached; its file stays named on the row (the admission is revoked on the file)
+  const expired = await h.control.runSource(asControl(other), async (uow) => {
+    assert.ok(await uow.sources.revisions.lock(unsealed.revisionId as RevisionId));
+    const e = applied(await uow.sources.uploads.transition(unsealed.uploadId as UploadId, 5, { event: "intake_deadline_reached", reason: "INTAKE_DEADLINE" }), "intake_deadline_reached");
+    await emitOf(uow, other)("upload_session", unsealed.uploadId, e.version, "upload_session.expired.v1", { uploadId: unsealed.uploadId, agencyId: other.ag.agencyId, revisionId: unsealed.revisionId, previousState: "ADMITTED", reasonCode: "INTAKE_DEADLINE", releasedBytes: unsealed.bytes, providerCancellationState: "NOT_REQUESTED", fileId: unsealed.fileId });
+    await uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: other.ag.agencyId, projectId: q.projectId, revisionId: unsealed.revisionId as RevisionId, uploadId: unsealed.uploadId as UploadId, kind: "INTAKE_EXPIRED", sourceEvidenceHash: null });
+    return e;
+  });
+  assert.deepEqual([expired.state, expired.fileId], ["EXPIRED", unsealed.fileId]);
+  const after = new Set<string>((await h.control.runSource(asControl(null), (uow) => uow.sources.uploads.findDeadlinePassed(1000))).map((d) => d.uploadId));
+  assert.ok(![stale.uploadId, issued.uploadId, unsealed.uploadId].some((id) => after.has(id)), "an expired upload is due no more");
+  assert.ok((await h.control.runSource(asControl(null), (uow) => uow.sources.uploads.findProviderReconciliation(1000))).some((x) => x.uploadId === issued.uploadId), "the expired session is reconciled until its provider horizon");
+});
+
+test("recordDeletion records the provider residual the latest location read-back implies, at the server's instant — refused at a location never read back; recordLocationPolicy and locationPolicyAt answer the read-back as stored; a failed deletion is retried; recordProviderResidual records the provider-reported expiry; the inventory enumerates raw, derived and residual objects", async () => {
+  const t = await tenant("deletion");
+  const p = await project(t);
+  const reserved = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { first: true }));
+  const orphan = (s: SourceStore, zone: "QUARANTINE" | "ACCEPTED", locationRef: string, generation: string) => {
+    const objectId = ids.next() as StoredObjectId;
+    return s.objects.register({
+      objectId,
+      agencyId: t.ag.agencyId,
+      projectId: p.projectId,
+      revisionId: p.revisionId,
+      zone,
+      dataClass: "RESIDUAL",
+      provider: STORAGE,
+      locationRef,
+      objectName: `${zone.toLowerCase()}/${t.ag.agencyId}/${p.projectId}/${ids.next()}`,
+      createdBy: { kind: "SERVICE", serviceId: SERVICE },
+      createdAt: CALLER_INSTANT,
+      observed: { generation, bytes: 64, observedAt: CALLER_INSTANT, late: true },
+    });
+  };
+  // the read-backs: seven days of soft-delete retention at one location, none at another, a third location never read back
+  const readBack = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const kept = await uow.sources.objects.recordLocationPolicy({ observationId: ids.next(), provider: STORAGE, locationRef: "QUARANTINE_T10", softDeleteRetentionSeconds: 604_800, objectVersioning: true, evidenceHash: textDigest("read-back-kept"), evidenceClass: "SIMULATED" });
+    const none = await uow.sources.objects.recordLocationPolicy({ observationId: ids.next(), provider: STORAGE, locationRef: "ACCEPTED_T10", softDeleteRetentionSeconds: 0, objectVersioning: false, evidenceHash: textDigest("read-back-none"), evidenceClass: "SIMULATED" });
+    assert.deepEqual([kept.observedAt, none.observedAt, kept.evidenceClass], [now, now, "SIMULATED"]);
+    return kept;
+  });
+  await h.control.runSource(asControl(t), async (uow) => {
+    assert.deepEqual(await uow.sources.objects.locationPolicyAt(STORAGE, "QUARANTINE_T10", readBack.observedAt), readBack, "the read-back as stored, found at its own instant");
+    assert.equal(await uow.sources.objects.locationPolicyAt(STORAGE, "QUARANTINE_T10", CALLER_INSTANT), null, "no read-back before it");
+    assert.equal(await uow.sources.objects.locationPolicyAt(STORAGE, "NEVER_READ_T10", await uow.serverInstant()), null);
+  });
+  // objects: residuals found at each location, and a derived object
+  const objects = await h.control.runSource(asControl(t), async (uow) => {
+    const kept = await orphan(uow.sources, "QUARANTINE", "QUARANTINE_T10", "1700000000000101");
+    const none = await orphan(uow.sources, "ACCEPTED", "ACCEPTED_T10", "1700000000000102");
+    const unread = await orphan(uow.sources, "QUARANTINE", "NEVER_READ_T10", "1700000000000103");
+    const failing = await orphan(uow.sources, "QUARANTINE", "QUARANTINE_T10", "1700000000000104");
+    const derived = await uow.sources.objects.register({
+      objectId: ids.next() as StoredObjectId,
+      agencyId: t.ag.agencyId,
+      projectId: p.projectId,
+      revisionId: p.revisionId,
+      zone: "PROFILE",
+      dataClass: "DERIVED",
+      provider: STORAGE,
+      locationRef: "PROFILE_T10",
+      objectName: `profile/${t.ag.agencyId}/${p.projectId}/${ids.next()}`,
+      createdBy: { kind: "SERVICE", serviceId: SERVICE },
+      createdAt: CALLER_INSTANT,
+    });
+    assert.deepEqual([kept.state, kept.late, kept.dataClass, kept.generation], ["PRESENT", true, "RESIDUAL", "1700000000000101"]);
+    // a generation is observed once
+    await assert.rejects(uow.sources.objects.observe(kept.objectId, { generation: "1700000000000999", bytes: 1, observedAt: CALLER_INSTANT, late: true }), refused("PRECONDITION_FAILED", "UNLISTED_TRANSITION"));
+    const now = await uow.serverInstant();
+    assert.equal(await uow.sources.objects.requestDeletion([kept.objectId, none.objectId, unread.objectId, failing.objectId], "ORPHAN_OBJECT", CALLER_INSTANT), 4);
+    assert.equal(await uow.sources.objects.requestDeletion([kept.objectId], "ORPHAN_OBJECT", CALLER_INSTANT), 0, "a repeated request changes nothing");
+    assert.equal((await uow.sources.objects.get(kept.objectId))?.deletionRequestedAt, now);
+    return { kept, none, unread, failing, derived, requestedAt: now };
+  });
+  // a deletion at a location never read back cannot be recorded (KA072)
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.objects.recordDeletion(objects.unread.objectId, "DELETED")), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  const deleted = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const kept = await uow.sources.objects.recordDeletion(objects.kept.objectId, "DELETED");
+    assert.deepEqual([kept.state, kept.deletedAt, kept.deletionResult, kept.deletionAttempts, kept.providerResidual], ["DELETED", now, "DELETED", 1, { basis: "LOCATION_POLICY", until: await plusSeconds(now, 604_800) }]);
+    const none = await uow.sources.objects.recordDeletion(objects.none.objectId, "ALREADY_ABSENT");
+    assert.deepEqual([none.state, none.deletionResult, none.providerResidual], ["DELETED", "ALREADY_ABSENT", { basis: "LOCATION_POLICY" }], "a location that retains nothing leaves no residual expiry");
+    const failed = await uow.sources.objects.recordDeletion(objects.failing.objectId, "PROVIDER_ERROR");
+    assert.deepEqual([failed.state, failed.deletionResult, failed.deletionAttempts, failed.providerResidual], ["DELETION_FAILED", "PROVIDER_ERROR", 1, undefined]);
+    return kept;
+  });
+  assert.deepEqual(await oracle<{ ok: boolean }>("SELECT provider_residual_until = deleted_at + interval '604800 seconds' AS ok FROM kauro.stored_objects WHERE object_id = $1", [deleted.objectId]), { ok: true });
+  // the pending deletions (discovery), the retry of the failed one, and its second attempt
+  const pending = new Set((await h.control.runSource(asControl(null), (uow) => uow.sources.objects.pendingDeletion(1000))).map((x) => x.objectId));
+  assert.ok(pending.has(objects.failing.objectId) && pending.has(objects.unread.objectId) && !pending.has(objects.kept.objectId));
+  await h.control.runSource(asControl(t), async (uow) => {
+    const retried = await uow.sources.objects.retryDeletion(objects.failing.objectId, CALLER_INSTANT);
+    assert.deepEqual([retried.state, retried.deletionRequestedAt, retried.deletionAttempts], ["DELETION_REQUESTED", objects.requestedAt, 1], "the first request's instant stays");
+    const again = await uow.sources.objects.recordDeletion(objects.failing.objectId, "DELETED");
+    assert.deepEqual([again.state, again.deletionAttempts], ["DELETED", 2]);
+    await assert.rejects(uow.sources.objects.retryDeletion(objects.kept.objectId, CALLER_INSTANT), refused("PRECONDITION_FAILED", "UNLISTED_TRANSITION"));
+  });
+  // a generation provider inventory found already soft-deleted: registered, requested and DELETED with the provider's own expiry
+  const providerExpiresAt = new Date(Date.now() + 3 * DAY_MS).toISOString();
+  const residual = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const r = await uow.sources.objects.recordProviderResidual({
+      objectId: ids.next() as StoredObjectId,
+      agencyId: t.ag.agencyId,
+      projectId: p.projectId,
+      revisionId: p.revisionId,
+      zone: "QUARANTINE",
+      dataClass: "RESIDUAL",
+      provider: STORAGE,
+      locationRef: "QUARANTINE_T10",
+      objectName: `quarantine/${t.ag.agencyId}/${p.projectId}/${ids.next()}`,
+      createdBy: { kind: "SERVICE", serviceId: SERVICE },
+      createdAt: CALLER_INSTANT,
+      generation: "1700000000000105",
+      softDeletedAt: CALLER_INSTANT,
+      providerExpiresAt,
+    });
+    assert.deepEqual([r.state, r.deletionResult, r.deletedAt, r.deletionAttempts, r.deletionReason, r.providerResidual?.basis], ["DELETED", "ALREADY_ABSENT", now, 0, "PROVIDER_SOFT_DELETED", "PROVIDER_REPORTED"]);
+    assert.equal(Date.parse(r.providerResidual?.until ?? ""), Date.parse(providerExpiresAt));
+    return r;
+  });
+  // a residual at a location never read back is refused as well
+  await assert.rejects(
+    h.control.runSource(asControl(t), (uow) =>
+      uow.sources.objects.recordProviderResidual({ objectId: ids.next() as StoredObjectId, agencyId: t.ag.agencyId, projectId: p.projectId, zone: "QUARANTINE", dataClass: "RESIDUAL", provider: STORAGE, locationRef: "NEVER_READ_T10", objectName: `quarantine/${t.ag.agencyId}/${p.projectId}/${ids.next()}`, createdBy: { kind: "SERVICE", serviceId: SERVICE }, createdAt: CALLER_INSTANT, generation: "1700000000000106", softDeletedAt: CALLER_INSTANT, providerExpiresAt }),
+    ),
+    refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"),
+  );
+  // the deletion inventory of the project: raw, derived and residual, each with its state and result (G-UPLOAD evidence rule)
+  const inventory = await h.app.runSource(asOwner(t), (uow) => uow.sources.objects.inventory({ projectId: p.projectId }));
+  const byId = new Map(inventory.map((o) => [o.objectId, o]));
+  assert.deepEqual(
+    [reserved.objectId, objects.derived.objectId, deleted.objectId, objects.unread.objectId, residual.objectId].map((id) => [byId.get(id)?.dataClass, byId.get(id)?.state]),
+    [["RAW", "INTENDED"], ["DERIVED", "INTENDED"], ["RESIDUAL", "DELETED"], ["RESIDUAL", "DELETION_REQUESTED"], ["RESIDUAL", "DELETED"]],
+  );
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.objects.inventory({ projectId: p.projectId, uploadId: reserved.uploadId }))).map((o) => o.objectId), [reserved.objectId]);
+  // an accepted generation whose admission stands is retained: its deletion is refused until the admission is revoked
+  const admitted = await admittedThroughAdapters(t);
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.objects.requestDeletion([admitted.acceptedObjectId], "INTAKE_EXPIRED", CALLER_INSTANT)), refused("PRECONDITION_FAILED", "UNLISTED_TRANSITION"));
+});
+
+test("revokeAdmission commits only with its event: INTAKE_EXPIRED is refused KA072 while the upload's window is open and once a real seal included the file, RETENTION_EXPIRED while an including revision holds an ACTIVE record ahead; after the window or the retention ended each commits at the server's instant with source_file.admission_revoked.v1 naming the revisions that selected or sealed the file", async () => {
+  const t = await tenant("revocation");
+  const revoke = (fileId: string, version: number, reason: "INTAKE_EXPIRED" | "RETENTION_EXPIRED" | "GENERATION_MISSING", projectId: string) =>
+    h.control.runSource(asControl(t), async (uow) => {
+      const now = await uow.serverInstant();
+      const w = applied(await uow.sources.files.revokeAdmission(fileId as SourceFileId, version, reason), reason);
+      const selectedBy = await uow.sources.files.selectedBy(fileId as SourceFileId);
+      const sealedBy = await uow.sources.files.sealedBy(fileId as SourceFileId);
+      await emitOf(uow, t)("source_file", fileId, w.version, "source_file.admission_revoked.v1", { fileId, agencyId: t.ag.agencyId, projectId, revocationReason: reason, selectedByRevisionIds: [...selectedBy], sealedByRevisionIds: [...sealedBy] });
+      assert.deepEqual([w.state, w.admitted, w.revokedAt, w.revocationReason, w.version], ["ADMISSION_REVOKED", false, now, reason, version + 1]);
+      return { record: w, selectedBy, sealedBy };
+    });
+  const refusedRevocation = (fileId: string, version: number, reason: "INTAKE_EXPIRED" | "RETENTION_EXPIRED") =>
+    assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.files.revokeAdmission(fileId as SourceFileId, version, reason)), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"), reason);
+  // the upload's window is still open: the unsealed intake is not expired yet
+  const pOpen = await project(t);
+  const open = await admitSourceFile(sessionsOf(t), scopeOf(t, pOpen.projectId), { seed: "revoke-open", base: new Date(Date.now() - HOUR_MS) });
+  await refusedRevocation(open.fileId, 1, "INTAKE_EXPIRED");
+  // the window closed and no seal included the file: without its event nothing commits (KA003), with it the revocation commits
+  const pClosed = await project(t);
+  const closed = await admitSourceFile(sessionsOf(t), scopeOf(t, pClosed.projectId), { seed: "revoke-closed", base: new Date(Date.now() - 2 * DAY_MS) });
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.files.revokeAdmission(closed.fileId as SourceFileId, 1, "INTAKE_EXPIRED")), refused("INTEGRITY_FAILURE", "EVENT_MISSING", "KA003"));
+  const intake = await revoke(closed.fileId, 1, "INTAKE_EXPIRED", pClosed.projectId);
+  assert.deepEqual([intake.selectedBy, intake.sealedBy], [[], []]);
+  assert.deepEqual(await h.control.runSource(asControl(t), (uow) => uow.sources.files.revokeAdmission(closed.fileId as SourceFileId, 1, "INTAKE_EXPIRED")), { kind: "STALE", currentVersion: 2, currentState: "ADMISSION_REVOKED" });
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.files.listReusable(pClosed.projectId as ProjectId))).map((f) => f.fileId), [], "a revoked file is reusable no more");
+  // sealed two days ago: its UNPAID record is ACTIVE ahead, so neither the intake window nor the retention ends the admission
+  const pYoung = await project(t);
+  const young = await sealSourceRevision(sessionsOf(t), scopeOf(t, pYoung.projectId), { seed: "revoke-young", base: new Date(Date.now() - 2 * DAY_MS) });
+  await refusedRevocation(young.fileId, 1, "INTAKE_EXPIRED");
+  await refusedRevocation(young.fileId, 1, "RETENTION_EXPIRED");
+  // a lost generation is revoked whatever retains it
+  const lost = await revoke(young.fileId, 1, "GENERATION_MISSING", pYoung.projectId);
+  assert.deepEqual([lost.selectedBy, lost.sealedBy], [[young.revisionId], [young.revisionId]]);
+  // sealed fifteen days ago: the seal governs (INTAKE_EXPIRED refused), and its retention ended (RETENTION_EXPIRED commits)
+  const pOld = await project(t);
+  const old = await sealSourceRevision(sessionsOf(t), scopeOf(t, pOld.projectId), { seed: "revoke-old" });
+  await refusedRevocation(old.fileId, 1, "INTAKE_EXPIRED");
+  const retention = await revoke(old.fileId, 1, "RETENTION_EXPIRED", pOld.projectId);
+  assert.deepEqual([retention.selectedBy, retention.sealedBy], [[old.revisionId], [old.revisionId]]);
+  assert.deepEqual(await oracle("SELECT count(*)::int AS n FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'source_file.admission_revoked.v1' AND actor_kind = 'SERVICE'", [old.fileId]), { n: 1 });
+});
+
+test("SelectionManifestRepository.put is content-idempotent: the same body again answers the stored manifest with created false whatever id and instant the caller minted, another body is another manifest, and a body hash that is not the body's digest is refused", async () => {
+  const t = await tenant("manifest");
+  const p = await project(t);
+  const body = fixtureSelection(p.revisionId, { fileId: ids.next(), tableId: ids.next(), structureHash: textDigest("structure"), origin: "THIS_REVISION" }, textDigest("inventory"));
+  const bodyHash = selectionHashOf(body);
+  const put = (id: string, document: SelectionManifestDocument, hash: Sha256Hex = selectionHashOf(document)) =>
+    h.app.runSource(asOwner(t), async (uow) => ({ now: await uow.serverInstant(), out: await uow.sources.selections.put({ selectionManifestId: id as SelectionManifestId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, body: document, bodyHash: hash, createdByMembershipId: t.ag.ownerMembershipId, createdAt: CALLER_INSTANT }) }));
+  const firstId = ids.next();
+  const first = await put(firstId, body);
+  assert.deepEqual([first.out.created, first.out.record.selectionManifestId, first.out.record.bodyHash, first.out.record.createdAt], [true, firstId, bodyHash, first.now]);
+  // the same content, members in another order, another id: the stored manifest, created false
+  const reordered = Object.fromEntries(Object.entries(body).reverse()) as unknown as SelectionManifestDocument;
+  const againId = ids.next();
+  const again = await put(againId, reordered);
+  assert.deepEqual([again.out.created, again.out.record.selectionManifestId, again.out.record.createdAt], [false, firstId, first.now]);
+  await h.app.runSource(asOwner(t), async (uow) => {
+    const stored = await uow.sources.selections.get(p.revisionId, firstId as SelectionManifestId);
+    assert.ok(stored);
+    assert.deepEqual(stored.body, body);
+    assert.equal(selectionHashOf(stored.body), bodyHash, "the stored document is the one its hash names");
+    assert.equal(await uow.sources.selections.get(p.revisionId, againId as SelectionManifestId), null, "the second id was never stored");
+    const elsewhere = await project(t);
+    assert.equal(await uow.sources.selections.get(elsewhere.revisionId, firstId as SelectionManifestId), null, "a manifest is read only under its own revision");
+  });
+  // another body is another manifest
+  const changed: SelectionManifestDocument = { ...body, projections: body.projections.map((x) => ({ ...x, projectionKey: "PERSON" })) };
+  const third = await put(ids.next(), changed);
+  assert.equal(third.out.created, true);
+  assert.notEqual(third.out.record.bodyHash, bodyHash);
+  // a hash that is not the body's digest is never stored under it
+  await assert.rejects(put(ids.next(), changed, textDigest("another document")), refused("INTEGRITY_FAILURE", "HASH_MISMATCH"));
+  assert.deepEqual(await oracle("SELECT count(*)::int AS n FROM kauro.selection_manifests WHERE revision_id = $1", [p.revisionId]), { n: 2 });
+});
+
+test("the revision lifecycle through SourceRevisionRepository, SelectionEvaluationRepository, SealedManifestRepository and RetentionRepository: the selection made against the revision's own inventory closes the intake (all_uploads_completed), is rebound and changed, the evaluation counts it READY_TO_SEAL, and the seal commits the manifest, the file set, the seal anchor and the UNPAID record of new bytes — every instant the server's", async () => {
+  const t = await tenant("revision-lifecycle");
+  const admitted = await admittedThroughAdapters(t);
+  const { projectId, revisionId } = admitted;
+  const file: SelectedFile = { fileId: admitted.fileId, tableId: admitted.tableId, structureHash: admitted.structureHash, origin: "THIS_REVISION" };
+  // the inventory is the revision's own uploads and files, ids and digests only (KAURO_SOURCE_INVENTORY_V1)
+  const inventory = await h.app.runSource(asOwner(t), (uow) => uow.sources.revisions.inventory(revisionId));
+  assert.deepEqual(inventory, {
+    revisionId,
+    uploads: [{ uploadId: admitted.uploadId, state: "ADMITTED", fileId: admitted.fileId, inspectionReceiptHash: admitted.receiptHash }],
+    files: [{ fileId: admitted.fileId, generation: admitted.acceptedGeneration, sha256: admitted.sha256, bytes: admitted.bytes, tables: [{ tableId: admitted.tableId, ordinal: 0, structureHash: admitted.structureHash }] }],
+  });
+  // CMD016 on the UPLOADING revision: the agency's explicit closing of the intake, at the server's instant
+  const bound = await h.app.runSource(asOwner(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const b = await bindVia(uow.sources, emitOf(uow, t), t, projectId, revisionId, file);
+    const revision = await uow.sources.revisions.get(revisionId);
+    assert.deepEqual([revision?.state, revision?.selectedAt, revision?.selectionHash, revision?.inventoryHash, revision?.selectionManifestId, revision?.populations], ["INSPECTING", now, b.selectionHash, inventoryHashOf(inventory), b.selectionManifestId, undefined]);
+    return b;
+  });
+  // a new selection while INSPECTING: selection_rebound, still INSPECTING
+  const rebound = await h.app.runSource(asOwner(t), (uow) => bindVia(uow.sources, emitOf(uow, t), t, projectId, revisionId, file, "PERSON"));
+  assert.notEqual(rebound.selectionHash, bound.selectionHash);
+  assert.equal(rebound.version, bound.version + 1);
+  // SELECTION_EVALUATION counts the bound selection
+  const counted = await h.control.runSource(asControl(t), async (uow) => {
+    const c = await evaluateVia(uow.sources, emitOf(uow, t), t, projectId, revisionId, rebound, { fileId: admitted.fileId, tableId: admitted.tableId, generation: admitted.acceptedGeneration, sha256: admitted.sha256, bytes: admitted.bytes }, await uow.serverInstant());
+    const latest = await uow.sources.evaluations.latestFor(revisionId, rebound.selectionHash);
+    assert.deepEqual([latest?.evaluationId, latest?.result, latest?.populations], [c.evaluationId, "COMPLETE", COUNTS]);
+    assert.equal(await uow.sources.evaluations.latestFor(revisionId, bound.selectionHash), null, "no evaluation of the superseded selection");
+    assert.equal((await uow.sources.evaluations.get(c.evaluationId))?.evaluationHash, c.evaluationHash);
+    return c;
+  });
+  // selection_changes from READY_TO_SEAL clears the counts; the new selection is counted again
+  const changed = await h.app.runSource(asOwner(t), async (uow) => {
+    const b = await bindVia(uow.sources, emitOf(uow, t), t, projectId, revisionId, file);
+    const revision = await uow.sources.revisions.get(revisionId);
+    assert.deepEqual([revision?.state, revision?.evaluationId, revision?.populations], ["INSPECTING", undefined, undefined], "the counts are cleared with the new selection");
+    return b;
+  });
+  assert.equal(changed.selectionManifestId, bound.selectionManifestId, "the first body again is the first manifest (content-idempotent intake)");
+  const recounted = await h.control.runSource(asControl(t), async (uow) => evaluateVia(uow.sources, emitOf(uow, t), t, projectId, revisionId, changed, { fileId: admitted.fileId, tableId: admitted.tableId, generation: admitted.acceptedGeneration, sha256: admitted.sha256, bytes: admitted.bytes }, await uow.serverInstant()));
+  assert.notEqual(recounted.evaluationId, counted.evaluationId);
+  // CMD017: new bytes, so this seal is the first seal of the bytes
+  const ready = readyOf(t, revisionId, { fileId: admitted.fileId, tableId: admitted.tableId, generation: admitted.acceptedGeneration, sha256: admitted.sha256, bytes: admitted.bytes, structureHash: admitted.structureHash, parserProfileHash: admitted.parserProfileHash, receiptHash: admitted.receiptHash }, changed, recounted);
+  const seal = await h.app.runSource(asOwner(t), async (uow) => {
+    const sealedAt = await uow.serverInstant();
+    const out = await sealVia(uow.sources, emitOf(uow, t), t, projectId, ready);
+    assert.deepEqual(out.firsts, [], "bytes no real seal included before");
+    assert.deepEqual([out.sealed.sealedAt, out.anchor.occurredAt, out.revision.sealedAt, out.revision.state], [sealedAt, sealedAt, sealedAt, "SEALED"]);
+    assert.deepEqual([out.record.class, out.record.state, out.record.softDeadline, out.record.hardDeadline, out.record.effectiveDeadline, out.record.anchorId, out.record.version], ["UNPAID", "ACTIVE", undefined, await plusSeconds(sealedAt, 1_209_600), await plusSeconds(sealedAt, 1_209_600), out.anchor.anchorId, 1]);
+    return out;
+  });
+  // read back: the manifest (its hash recomputed from the stored preimage), the first seal, the anchors, the records, availability
+  await h.app.runSource(asOwner(t), async (uow) => {
+    const stored = await uow.sources.seals.get(revisionId);
+    assert.ok(stored);
+    assert.equal(sourceRevisionManifestHashOf(stored.manifest), stored.manifestHash, "the stored manifest is exactly HASHING's preimage of its hash");
+    assert.deepEqual(stored.subject.revisionId, revisionId);
+    assert.deepEqual(await uow.sources.seals.firstSeals([admitted.fileId]), [{ fileId: admitted.fileId, revisionId, sealedAt: seal.sealed.sealedAt, anchorId: seal.anchor.anchorId }]);
+    assert.deepEqual((await uow.sources.retention.anchorsOf(revisionId)).map((a) => a.kind), ["UPLOAD_INITIATED", "INPUT_ADMITTED", "REVISION_SEALED"]);
+    assert.deepEqual((await uow.sources.retention.recordFor(revisionId, "UNPAID"))?.retentionId, seal.record.retentionId);
+    assert.equal(await uow.sources.retention.recordFor(revisionId, "PAID_ORDINARY"), null);
+    assert.deepEqual((await uow.sources.retention.recordsFor(revisionId)).map((r) => r.retentionId), [seal.record.retentionId]);
+    assert.deepEqual(await uow.sources.availability.availabilityOf(revisionId), { revisionId, state: "SEALED", manifestHash: stored.manifestHash, availableUntil: seal.record.effectiveDeadline, retentionId: seal.record.retentionId });
+    assert.deepEqual([await uow.sources.files.selectedBy(admitted.fileId), await uow.sources.files.sealedBy(admitted.fileId)], [[revisionId], [revisionId]]);
+    const revision = await uow.sources.revisions.get(revisionId);
+    assert.deepEqual([revision?.sealedFileCount, revision?.sealedBytes, revision?.manifestHash, revision?.populations], [1, admitted.bytes, stored.manifestHash, COUNTS]);
+  });
+  // the evidence anchor digest covers the anchor's exact server instant (KAURO_RETENTION_ANCHOR_V1)
+  const anchorRow = await oracle<{ occurred_at: string; evidence_hash: string }>(`SELECT ${exactSql("occurred_at")} AS occurred_at, evidence_hash FROM kauro.retention_anchors WHERE anchor_id = $1`, [seal.anchor.anchorId]);
+  assert.deepEqual(anchorRow, { occurred_at: seal.anchor.occurredAt, evidence_hash: seal.anchor.evidenceHash });
+});
+
+test("CMD012 through the adapters and firstSeals of reused bytes: the successor supersedes its sealed predecessor, the project pointer moves, the impact map names the plans bound to the old manifest, and a seal of the reused file is anchored on the first seal of the bytes with its fourteen days — a record restarting the clock at this seal is refused; replacementsSince and availabilityOf answer from the lineage and the records", async () => {
+  const t = await tenant("lineage");
+  const p = await project(t);
+  const a = await sealSourceRevision(sessionsOf(t), scopeOf(t, p.projectId), { seed: "lineage-a", base: new Date(Date.now() - 3 * DAY_MS) });
+  const target = await targetContract(rawApp, t.ag, p.projectId, "lineage");
+  const boundPlan = await plan({ app: rawApp, control: rawControl }, t.ag, p.projectId, "DRAFT", "lineage", undefined, { revisionHash: a.manifestHash, targetContractHash: target.bodyHash });
+  const owner = t.ag.ownerMembershipId;
+  // CMD012: project first, predecessor row next (D-LOCK-1), the successor, the supersession with its impact map, the pointer
+  const b = await h.app.runSource(asOwner(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const emit = emitOf(uow, t);
+    const projectRecord = await uow.projects.lock(p.projectId);
+    assert.ok(projectRecord);
+    const predecessor = await uow.sources.revisions.lock(a.revisionId as RevisionId);
+    assert.ok(predecessor?.manifestHash);
+    const impact = await uow.sources.authority.boundTo(predecessor.manifestHash);
+    assert.deepEqual(impact, { planIds: [boundPlan.planId as PlanId], approvalIds: [] });
+    const successorId = uow.ids.next() as RevisionId;
+    const successor = await uow.sources.revisions.insertSuccessor({ revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, supersedesRevisionId: predecessor.revisionId, createdByMembershipId: owner, createdAt: CALLER_INSTANT });
+    assert.deepEqual([successor.state, successor.version, successor.supersedesRevisionId, successor.createdAt, successor.createdByMembershipId], ["DRAFT", 1, a.revisionId, now, owner]);
+    await emit("dataset_revision", successorId, 1, "dataset_revision.created.v1", { revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, state: "DRAFT", supersedesRevisionId: predecessor.revisionId, createdByMembershipId: owner });
+    const superseded = applied(await uow.sources.revisions.transition(predecessor.revisionId, predecessor.version, { event: "new_revision_explicitly_supersedes", successorRevisionId: successorId }), "supersede");
+    assert.deepEqual([superseded.state, superseded.supersededByRevisionId, superseded.supersededAt, superseded.sealedAt], ["SUPERSEDED", successorId, now, predecessor.sealedAt]);
+    await emit("dataset_revision", predecessor.revisionId, superseded.version, "dataset_revision.superseded.v1", { revisionId: predecessor.revisionId, agencyId: t.ag.agencyId, projectId: p.projectId, successorRevisionId: successorId, manifestHash: predecessor.manifestHash, affectedPlanIds: [...impact.planIds], affectedApprovalIds: [...impact.approvalIds], affectedCommercialAuthorizationIds: [] });
+    assert.deepEqual(await uow.sources.projects.switchCurrentRevision(p.projectId, projectRecord.version - 1, successorId, CALLER_INSTANT), { kind: "STALE", currentVersion: projectRecord.version, currentState: "OPEN" });
+    const moved = applied(await uow.sources.projects.switchCurrentRevision(p.projectId, projectRecord.version, successorId, CALLER_INSTANT), "switch");
+    assert.equal(moved.currentRevisionId, successorId);
+    await emit("project", p.projectId, moved.version, "project.current_revision_changed.v1", { projectId: p.projectId, agencyId: t.ag.agencyId, currentRevisionId: successorId, previousRevisionId: predecessor.revisionId, changedByMembershipId: owner });
+    return successor;
+  });
+  await h.app.runSource(asOwner(t), async (uow) => {
+    assert.deepEqual(await uow.sources.lineage.replacementsSince(a.revisionId as RevisionId), [{ revisionId: b.revisionId, supersedesRevisionId: a.revisionId, predecessorOutcome: "SUPERSEDED", createdAt: b.createdAt }]);
+    assert.deepEqual(await uow.sources.lineage.replacementsSince(b.revisionId), []);
+    assert.deepEqual(await uow.sources.availability.availabilityOf(a.revisionId as RevisionId), { revisionId: a.revisionId, state: "SUPERSEDED", manifestHash: a.manifestHash, availableUntil: null, retentionId: null }, "nothing of a superseded source is available");
+  });
+  // the successor reuses the predecessor's admitted file (previously_admitted_inputs_selected): an explicit selection from DRAFT
+  const reused = await h.app.runSource(asOwner(t), async (uow) => {
+    const f = await uow.sources.files.get(a.fileId as SourceFileId);
+    const [table] = await uow.sources.files.tables(a.fileId as SourceFileId);
+    assert.ok(f && table);
+    assert.deepEqual((await uow.sources.files.listReusable(p.projectId)).map((x) => x.fileId), [a.fileId]);
+    assert.deepEqual(await uow.sources.revisions.inventory(b.revisionId), { revisionId: b.revisionId, uploads: [], files: [] }, "the successor has no upload of its own");
+    const bound = await bindVia(uow.sources, emitOf(uow, t), t, p.projectId, b.revisionId, { fileId: f.fileId, tableId: table.tableId, structureHash: table.structureHash, origin: "REUSED" });
+    return { f, table, bound };
+  });
+  const counted = await h.control.runSource(asControl(t), async (uow) => evaluateVia(uow.sources, emitOf(uow, t), t, p.projectId, b.revisionId, reused.bound, { fileId: reused.f.fileId, tableId: reused.table.tableId, generation: reused.f.providerGeneration, sha256: reused.f.sha256, bytes: reused.f.bytes }, await uow.serverInstant()));
+  const ready = readyOf(t, b.revisionId, { fileId: reused.f.fileId, tableId: reused.table.tableId, generation: reused.f.providerGeneration, sha256: reused.f.sha256, bytes: reused.f.bytes, structureHash: reused.table.structureHash, parserProfileHash: reused.f.parserProfileHash, receiptHash: reused.f.inspectionReceiptHash }, reused.bound, counted);
+  // a record anchored on this seal would restart the bytes' fourteen days: refused at COMMIT (D-RET-3, KA072), nothing sealed
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => sealVia(uow.sources, emitOf(uow, t), t, p.projectId, ready, "THIS_SEAL")), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  assert.equal((await h.app.runSource(asOwner(t), (uow) => uow.sources.revisions.get(b.revisionId)))?.state, "READY_TO_SEAL");
+  // anchored on the first seal of the bytes: the predecessor's seal, found through firstSeals
+  const seal = await h.app.runSource(asOwner(t), (uow) => sealVia(uow.sources, emitOf(uow, t), t, p.projectId, ready, "FIRST_SEAL"));
+  const aAnchor = (await h.app.runSource(asOwner(t), (uow) => uow.sources.retention.anchorsOf(a.revisionId as RevisionId))).find((x) => x.kind === "REVISION_SEALED");
+  assert.deepEqual(seal.firsts, [{ fileId: a.fileId, revisionId: a.revisionId, sealedAt: a.sealedAt, anchorId: aAnchor?.anchorId }]);
+  const hard = await plusSeconds(a.sealedAt, 1_209_600);
+  assert.deepEqual([seal.record.anchorId, seal.record.hardDeadline, seal.record.effectiveDeadline], [aAnchor?.anchorId, hard, hard], "the hard cap belongs to the bytes: the first seal + fourteen days");
+  assert.ok(seal.sealed.sealedAt > a.sealedAt);
+  const availability = await h.app.runSource(asOwner(t), (uow) => uow.sources.availability.availabilityOf(b.revisionId));
+  assert.deepEqual([availability?.state, availability?.availableUntil, availability?.retentionId], ["SEALED", hard, seal.record.retentionId]);
+});
+
+test("CMD012 over a mutable predecessor through the adapters: cancel_revision cancels it with its uploads in flight, releases their quota and names the successor (replacementsSince CANCELLED); a second mutable revision is REVISION_NOT_MUTABLE and a second successor of one predecessor PREDECESSOR_NOT_CURRENT", async () => {
+  const t = await tenant("replace-mutable");
+  const p = await project(t);
+  const reservedOnly = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 10, { first: true }));
+  const uploading = await h.app.runSource(asOwner(t), (uow) => reserveVia(uow.sources, emitOf(uow, t), t, p, 20));
+  await h.app.runSource(asOwner(t), (uow) => issueVia(uow.sources, emitOf(uow, t), t, uploading));
+  const successor = (uow: SourceUnitOfWork, revisionId: RevisionId, supersedes: RevisionId) =>
+    uow.sources.revisions.insertSuccessor({ revisionId, agencyId: t.ag.agencyId, projectId: p.projectId, supersedesRevisionId: supersedes, createdByMembershipId: t.ag.ownerMembershipId, createdAt: CALLER_INSTANT });
+  // a project holds one mutable revision (dataset_revisions_one_mutable_per_project)
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => successor(uow, uow.ids.next() as RevisionId, p.revisionId)), refused("PRECONDITION_FAILED", "REVISION_NOT_MUTABLE", "23505"));
+  const replacement = await h.app.runSource(asOwner(t), async (uow) => {
+    const emit = emitOf(uow, t);
+    const projectRecord = await uow.projects.lock(p.projectId);
+    const predecessor = await uow.sources.revisions.lock(p.revisionId);
+    assert.ok(projectRecord && predecessor);
+    const inFlight = await uow.sources.uploads.inStates(p.revisionId, ["RESERVED", "UPLOADING", "VERIFYING"]);
+    assert.deepEqual(inFlight.map((u) => u.uploadId).sort(), [reservedOnly.uploadId, uploading.uploadId].sort());
+    for (const u of inFlight) await cancelVia(uow.sources, emit, t, { ...reservedOnly, uploadId: u.uploadId, objectId: u.quarantineObjectId, record: u }, u.version, "REVISION_REPLACED");
+    const successorId = uow.ids.next() as RevisionId;
+    const cancelled = applied(await uow.sources.revisions.transition(p.revisionId, predecessor.version, { event: "cancel_revision", reason: "REPLACED_BY_NEW_REVISION", successorRevisionId: successorId }), "cancel_revision");
+    assert.deepEqual([cancelled.state, cancelled.terminalReason, cancelled.supersededByRevisionId, cancelled.cancelledAt], ["CANCELLED", "REPLACED_BY_NEW_REVISION", successorId, await uow.serverInstant()]);
+    await emit("dataset_revision", p.revisionId, cancelled.version, "dataset_revision.cancelled.v1", { revisionId: p.revisionId, agencyId: t.ag.agencyId, projectId: p.projectId, previousState: "UPLOADING", reasonCode: "REPLACED_BY_NEW_REVISION", successorRevisionId: successorId, cancelledUploadIds: inFlight.map((u) => u.uploadId) });
+    const created = await successor(uow, successorId, p.revisionId);
+    await emit("dataset_revision", successorId, 1, "dataset_revision.created.v1", { revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, state: "DRAFT", supersedesRevisionId: p.revisionId, createdByMembershipId: t.ag.ownerMembershipId });
+    const moved = applied(await uow.sources.projects.switchCurrentRevision(p.projectId, projectRecord.version, successorId, CALLER_INSTANT), "switch");
+    await emit("project", p.projectId, moved.version, "project.current_revision_changed.v1", { projectId: p.projectId, agencyId: t.ag.agencyId, currentRevisionId: successorId, previousRevisionId: p.revisionId, changedByMembershipId: t.ag.ownerMembershipId });
+    return created;
+  });
+  await h.app.runSource(asOwner(t), async (uow) => {
+    assert.deepEqual((await uow.sources.uploads.inStates(p.revisionId, ["CANCELLED"])).map((u) => [u.uploadId, u.providerCancellationState, u.terminalReason]).sort(), [[reservedOnly.uploadId, "NOT_REQUESTED", "REVISION_REPLACED"], [uploading.uploadId, "REQUESTED", "REVISION_REPLACED"]].sort());
+    assert.deepEqual(await uow.sources.uploads.quota(p.revisionId), { revisionId: p.revisionId, reservedBytes: 0, fileCount: 0 });
+    assert.equal((await uow.sources.uploads.capacity(t.ag.agencyId)).activeSessions, 0);
+    assert.deepEqual(await uow.sources.lineage.replacementsSince(p.revisionId), [{ revisionId: replacement.revisionId, supersedesRevisionId: p.revisionId, predecessorOutcome: "CANCELLED", createdAt: replacement.createdAt }]);
+    assert.deepEqual((await uow.sources.retention.anchorsOf(p.revisionId)).filter((x) => x.kind === "INTAKE_CANCELLED").length, 2);
+  });
+  // a predecessor is replaced once (dataset_revisions_supersedes_once), even when the first successor no longer blocks as mutable
+  await assert.rejects(
+    h.app.runSource(asOwner(t), async (uow) => {
+      const first = await uow.sources.revisions.lock(replacement.revisionId);
+      assert.ok(first);
+      applied(await uow.sources.revisions.transition(replacement.revisionId, first.version, { event: "cancel_revision", reason: "WITHDRAWN_BY_AGENCY" }), "cancel");
+      await successor(uow, uow.ids.next() as RevisionId, p.revisionId);
+    }),
+    refused("PRECONDITION_FAILED", "PREDECESSOR_NOT_CURRENT", "23505"),
+  );
+});
+
+test("no early expireRecord: a record whose effective deadline lies ahead is neither due nor expirable (LIFECYCLE_BINDING_MISSING) and its revision not due for retention_expires, while one whose deadline passed expires at the server's instant with its event, and the revision then expires by retention_expires and is available no more", async () => {
+  const t = await tenant("expiry");
+  const pYoung = await project(t);
+  const young = await sealSourceRevision(sessionsOf(t), scopeOf(t, pYoung.projectId), { seed: "expiry-young", base: new Date(Date.now() - HOUR_MS) });
+  const pOld = await project(t);
+  const old = await sealSourceRevision(sessionsOf(t), scopeOf(t, pOld.projectId), { seed: "expiry-old" });
+  const dueRecords = new Set((await h.control.runSource(asControl(null), (uow) => uow.sources.retention.findDue(1000))).map((x) => x.retentionId));
+  const dueRevisions = new Set((await h.control.runSource(asControl(null), (uow) => uow.sources.revisions.findRetentionDue(1000))).map((x) => x.revisionId));
+  assert.deepEqual([dueRecords.has(old.retentionId as RetentionId), dueRecords.has(young.retentionId as RetentionId)], [true, false]);
+  assert.deepEqual([dueRevisions.has(old.revisionId as RevisionId), dueRevisions.has(young.revisionId as RevisionId)], [true, false]);
+  // never early: the record (the CHECK on the server's instant) and the revision (KA072)
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.retention.expireRecord(young.retentionId as RetentionId, 1)), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "23514"));
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.revisions.transition(young.revisionId as RevisionId, young.version, { event: "retention_expires", reason: "RETENTION_DEADLINE" })), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  const youngRecord = await h.app.runSource(asOwner(t), (uow) => uow.sources.retention.recordFor(young.revisionId as RevisionId, "UNPAID"));
+  assert.deepEqual([youngRecord?.state, youngRecord?.expiredAt], ["ACTIVE", undefined]);
+  // past its effective deadline: the record expires at the server's instant, and then the revision
+  await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const emit = emitOf(uow, t);
+    const revision = await uow.sources.revisions.lock(old.revisionId as RevisionId);
+    assert.ok(revision);
+    const before = await uow.sources.retention.recordFor(old.revisionId as RevisionId, "UNPAID");
+    assert.ok(before);
+    const expired = applied(await uow.sources.retention.expireRecord(old.retentionId as RetentionId, before.version), "expireRecord");
+    assert.deepEqual([expired.state, expired.expiredAt, expired.version, expired.hardDeadline, expired.effectiveDeadline], ["EXPIRED", now, before.version + 1, before.hardDeadline, before.effectiveDeadline]);
+    await emit("retention_record", old.retentionId, expired.version, "retention_record.expired.v1", { retentionId: old.retentionId, agencyId: t.ag.agencyId, projectId: pOld.projectId, revisionId: old.revisionId, retentionClass: "UNPAID" });
+    assert.deepEqual(await uow.sources.retention.expireRecord(old.retentionId as RetentionId, before.version), { kind: "STALE", currentVersion: expired.version, currentState: "EXPIRED" });
+    const gone = applied(await uow.sources.revisions.transition(revision.revisionId, revision.version, { event: "retention_expires", reason: "RETENTION_DEADLINE" }), "retention_expires");
+    assert.deepEqual([gone.state, gone.expiredAt, gone.terminalReason, gone.sealedAt], ["EXPIRED", now, "RETENTION_DEADLINE", revision.sealedAt]);
+    await emit("dataset_revision", revision.revisionId, gone.version, "dataset_revision.expired.v1", { revisionId: revision.revisionId, agencyId: t.ag.agencyId, projectId: pOld.projectId, previousState: "SEALED", reasonCode: "RETENTION_DEADLINE", retentionId: old.retentionId });
+  });
+  await h.app.runSource(asOwner(t), async (uow) => {
+    assert.deepEqual(await uow.sources.availability.availabilityOf(old.revisionId as RevisionId), { revisionId: old.revisionId, state: "EXPIRED", manifestHash: old.manifestHash, availableUntil: null, retentionId: null });
+    const youngAvailability = await uow.sources.availability.availabilityOf(young.revisionId as RevisionId);
+    assert.deepEqual([youngAvailability?.state, youngAvailability?.availableUntil, youngAvailability?.retentionId], ["SEALED", youngRecord?.effectiveDeadline, young.retentionId]);
+  });
+  assert.ok(!(await h.control.runSource(asControl(null), (uow) => uow.sources.retention.findDue(1000))).some((x) => x.retentionId === old.retentionId));
+});
+
+test("FINAL-N2: retention_expires takes a REJECTED revision to EXPIRED once every intake window closed and keeps the rejection's reason — refused while a window is open — and a re-explained reason is refused KA004", async () => {
+  const t = await tenant("rejected-expiry");
+  /** A revision whose bound selection failed its evaluation (fatal_input_rejection by the control plane), intake begun at `base`. */
+  const rejectedRevision = async (seed: string, base: Date) => {
+    const p = await project(t);
+    const bound = await bindSourceSelection(sessionsOf(t), scopeOf(t, p.projectId), await admitSourceFile(sessionsOf(t), scopeOf(t, p.projectId), { seed, base }));
+    const revisionId = bound.revisionId as RevisionId;
+    const rejected = await h.control.runSource(asControl(t), async (uow) => {
+      const now = await uow.serverInstant();
+      const revision = await uow.sources.revisions.lock(revisionId);
+      assert.ok(revision);
+      const evaluationId = ids.next() as EvaluationId;
+      const evaluationHash = evaluationHashOf({ revisionId, selectionHash: bound.selectionHash, failures: ["FORMULA_ERROR_VALUES"] });
+      await uow.sources.evaluations.append({
+        evaluationId,
+        agencyId: t.ag.agencyId,
+        revisionId,
+        selectionManifestId: bound.selectionManifestId as SelectionManifestId,
+        selectionHash: bound.selectionHash as Sha256Hex,
+        evaluationHash,
+        result: "ADMISSION_FAILED",
+        files: [],
+        tables: [],
+        projections: [],
+        failures: [{ code: "FORMULA_ERROR_VALUES", tableId: bound.tableId as SourceTableId }],
+        pricingDefinition: PRICING_DEFINITION,
+        evaluatorVersion: "data-plane-0.1.0",
+        startedAt: now,
+        completedAt: now,
+      });
+      const w = applied(await uow.sources.revisions.transition(revisionId, revision.version, { event: "fatal_input_rejection", reason: "SELECTED_INPUT_REJECTED" }), "fatal_input_rejection");
+      await emitOf(uow, t)("dataset_revision", revisionId, w.version, "dataset_revision.rejected.v1", { revisionId, agencyId: t.ag.agencyId, projectId: p.projectId, selectionHash: bound.selectionHash, evaluationHash, reasonCode: "SELECTED_INPUT_REJECTED" });
+      assert.deepEqual([w.state, w.rejectedAt, w.terminalReason], ["REJECTED", now, "SELECTED_INPUT_REJECTED"]);
+      return w;
+    });
+    return { p, rejected };
+  };
+  // the intake window of the rejected input is still open: not due, and refused (KA072)
+  const young = await rejectedRevision("rejected-young", new Date(Date.now() - HOUR_MS));
+  assert.ok(!(await h.control.runSource(asControl(null), (uow) => uow.sources.revisions.findRetentionDue(1000))).some((x) => x.revisionId === young.rejected.revisionId));
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.revisions.transition(young.rejected.revisionId, young.rejected.version, { event: "retention_expires", reason: "RETENTION_DEADLINE" })), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+  // every window closed: due, and the expiry commits keeping the rejection's reason (terminal facts are set once)
+  const old = await rejectedRevision("rejected-old", new Date(Date.now() - 2 * DAY_MS));
+  assert.ok((await h.control.runSource(asControl(null), (uow) => uow.sources.revisions.findRetentionDue(1000))).some((x) => x.revisionId === old.rejected.revisionId));
+  const expired = await h.control.runSource(asControl(t), async (uow) => {
+    const now = await uow.serverInstant();
+    const w = applied(await uow.sources.revisions.transition(old.rejected.revisionId, old.rejected.version, { event: "retention_expires", reason: "RETENTION_DEADLINE" }), "retention_expires");
+    await emitOf(uow, t)("dataset_revision", w.revisionId, w.version, "dataset_revision.expired.v1", { revisionId: w.revisionId, agencyId: t.ag.agencyId, projectId: old.p.projectId, previousState: "REJECTED", reasonCode: "SELECTED_INPUT_REJECTED" });
+    assert.deepEqual([w.state, w.expiredAt, w.rejectedAt, w.terminalReason], ["EXPIRED", now, old.rejected.rejectedAt, "SELECTED_INPUT_REJECTED"]);
+    return w;
+  });
+  // the reason is never re-explained, whoever writes it (KA004)
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.dataset_revisions SET terminal_reason = 'RETENTION_DEADLINE', version = version + 1 WHERE revision_id = $1", [expired.revisionId])),
+    (e: unknown) => {
+      assert.equal((e as { code?: string }).code, "KA004");
+      return true;
+    },
+  );
+});
+
+test("tenant isolation of runSource: a request handler finds, locks and moves nothing of another agency's uploads, objects, receipts, files, revisions, anchors or lineage, cannot reserve into its revision, and the control plane bound to one agency neither sees nor revokes another's", async () => {
+  const a = await tenant("isolation-a");
+  const b = await tenant("isolation-b");
+  const admitted = await admittedThroughAdapters(a);
+  await h.app.runSource(asOwner(b), async (uow) => {
+    const s = uow.sources;
+    assert.equal(await s.uploads.get(admitted.uploadId), null);
+    assert.equal(await s.uploads.lock(admitted.uploadId), null);
+    assert.deepEqual(await s.uploads.listByRevision(admitted.revisionId, { limit: 10 }), []);
+    assert.deepEqual(await s.uploads.quota(admitted.revisionId), { revisionId: admitted.revisionId, reservedBytes: 0, fileCount: 0 });
+    assert.equal(await s.revisions.get(admitted.revisionId), null);
+    assert.equal(await s.revisions.lock(admitted.revisionId), null);
+    assert.deepEqual(await s.revisions.inventory(admitted.revisionId), { revisionId: admitted.revisionId, uploads: [], files: [] });
+    assert.equal(await s.files.get(admitted.fileId), null);
+    assert.deepEqual(await s.files.tables(admitted.fileId), []);
+    assert.deepEqual(await s.files.columns(admitted.tableId), []);
+    assert.deepEqual(await s.files.listReusable(admitted.projectId), []);
+    assert.equal(await s.objects.get(admitted.acceptedObjectId), null);
+    assert.deepEqual(await s.objects.inventory({ projectId: admitted.projectId }), []);
+    assert.equal(await s.inspections.getByHash(admitted.receiptHash), null);
+    assert.deepEqual(await s.retention.anchorsOf(admitted.revisionId), []);
+    assert.equal(await s.availability.availabilityOf(admitted.revisionId), null);
+    assert.deepEqual(await s.lineage.replacementsSince(admitted.revisionId), []);
+    assert.equal(await s.sessionSecrets.readOwn(admitted.uploadId), null);
+  });
+  await assert.rejects(h.app.runSource(asOwner(b), (uow) => uow.sources.uploads.transition(admitted.uploadId, 5, { event: "cancel_upload", byMembershipId: b.ag.ownerMembershipId, reason: "CANCELLED_BY_REQUESTER" })), refused("NOT_FOUND"));
+  await assert.rejects(h.app.runSource(asOwner(b), (uow) => uow.sources.revisions.transition(admitted.revisionId, 2, { event: "cancel_revision", reason: "REPLACED_BY_NEW_REVISION" })), refused("NOT_FOUND"));
+  // a reservation of B into A's revision: the composite keys bind the tenant (07 "Database representation")
+  await assert.rejects(h.app.runSource(asOwner(b), (uow) => reserveVia(uow.sources, emitOf(uow, b), b, { projectId: admitted.projectId, revisionId: admitted.revisionId }, 10, { lockRevision: false })), refused("INVALID_REQUEST", "UNKNOWN_REFERENCE", "23503"));
+  // the control plane bound to B: nothing of A
+  await h.control.runSource(asControl(b), async (uow) => {
+    assert.equal(await uow.sources.uploads.get(admitted.uploadId), null);
+    assert.equal(await uow.sources.files.get(admitted.fileId), null);
+    assert.equal(await uow.sources.revisions.get(admitted.revisionId), null);
+    assert.equal(await uow.sources.inspections.getByHash(admitted.receiptHash), null);
+  });
+  await assert.rejects(h.control.runSource(asControl(b), (uow) => uow.sources.files.revokeAdmission(admitted.fileId, 1, "GENERATION_MISSING")), refused("NOT_FOUND"));
+  // bound to A it sees A's rows (and could move them)
+  assert.equal((await h.control.runSource(asControl(a), (uow) => uow.sources.files.get(admitted.fileId)))?.state, "ADMITTED");
+  assert.deepEqual(await oracle("SELECT state, version::int AS version FROM kauro.upload_sessions WHERE upload_id = $1", [admitted.uploadId]), { state: "ADMITTED", version: 5 });
 });
