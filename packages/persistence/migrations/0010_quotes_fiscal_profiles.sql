@@ -10,7 +10,8 @@
 -- inferred from an email, a currency or an address), registry contracts FiscalProfile, Quote, PriceEligibilitySnapshot.
 -- reference/HASHING_AND_ACCOUNTING_RULES "Retention formulas" (UTC instants; a duration day is exactly 86400 seconds), 07 "Quote
 -- and checkout states" (a fourteen-day price lifetime does not extend source retention), COMMERCIAL_LEDGER_WORKED_EXAMPLES §16
--- and §18. Design: docs/design/B09-payments-fiscal.md (D-QUOTE-B1..B7, D-FISC-B1, D-FISC-B2, D-MONEY-B1, D-BIND-B1, D-TIME-B1).
+-- and §18. Design: docs/design/B09-payments-fiscal.md (D-QUOTE-B1..B7, D-FISC-B1, D-FISC-B2, D-FISC-B6, D-MONEY-B1, D-BIND-B1,
+-- D-TIME-B1).
 
 -- --- exact arithmetic of the pricing policy (the database re-checks what the domain computes; D-MONEY-B1) --------------------------
 -- The platform's one rounding primitive for a non-negative basis and a rate in basis points, computed in numeric so no product
@@ -82,7 +83,11 @@ ALTER TABLE kauro.command_journal ADD CONSTRAINT command_journal_agency_binding 
 -- A reviewed version per row (15 "FiscalProfile": "Reviewed version identity"; "Unknown facts remain unresolved and block
 -- affected fiscal claims"). REVIEW_REQUIRED is the explicit unknown and carries no rule; every other treatment names its rule, its
 -- rate, its reviewer and — for an exempt export — the reviewed export facts (R2-128: never inferred from a currency or a foreign
--- email; R2-082: no guessed zero VAT). A new version supersedes the current one exactly once, in the same transaction. The current
+-- email; R2-082: no guessed zero VAT). A new version supersedes the current one exactly once, in the same transaction, at exactly
+-- the instant it is recorded (fiscal_profiles_successor_fk), and the versions of an agency form one lineage
+-- (fiscal_profiles_supersession_lineage): a version is superseded only by its successor, and only the agency's first version
+-- supersedes nothing. So the version current at any instant — recorded by then and not superseded by then — is unique: the version
+-- a sale's documents take while it carries a reviewed treatment (commerce/fiscal saleProfileAt; D-FISC-B6; B09-N5). The current
 -- profile is a transition subject (B06 D-TX-2) keyed by the agency: a quote issuance or a fiscal validation in flight is ordered
 -- before or after a re-review, never interleaved with it.
 --
@@ -110,7 +115,12 @@ CREATE TABLE kauro.fiscal_profiles (
   UNIQUE (agency_id, profile_id),
   -- binding target of quotes_fiscal_fk: a quote's tax snapshot is exactly its profile's reviewed rule and issuer
   CONSTRAINT fiscal_profiles_snapshot_binding UNIQUE (agency_id, profile_id, operator_legal_ref, tax_treatment, tax_rule, tax_rate_bps),
+  -- binding target of fiscal_profiles_successor_fk: a version and the instant it was superseded
+  CONSTRAINT fiscal_profiles_supersession_instant UNIQUE (agency_id, profile_id, superseded_at),
   FOREIGN KEY (agency_id, supersedes_profile_id) REFERENCES kauro.fiscal_profiles (agency_id, profile_id),
+  -- a successor is recorded at exactly the instant its predecessor is superseded (checked at COMMIT: the re-review writes both)
+  CONSTRAINT fiscal_profiles_successor_fk FOREIGN KEY (agency_id, supersedes_profile_id, created_at)
+    REFERENCES kauro.fiscal_profiles (agency_id, profile_id, superseded_at) DEFERRABLE INITIALLY DEFERRED,
   -- the explicit unknown carries no rule; a reviewed treatment carries its rule, rate and reviewer
   CONSTRAINT fiscal_profiles_treatment_rule CHECK (
     (tax_treatment = 'REVIEW_REQUIRED' AND tax_rule = 'UNRESOLVED' AND tax_rate_bps = 0)
@@ -144,6 +154,32 @@ CREATE TRIGGER fiscal_profiles_supersede_once BEFORE UPDATE ON kauro.fiscal_prof
 -- the current profile is a transition subject of its agency (D-TX-2): superseding it takes the exclusive half
 CREATE TRIGGER fiscal_profiles_transition_lock BEFORE UPDATE OF superseded_at ON kauro.fiscal_profiles
   FOR EACH ROW WHEN (OLD.superseded_at IS DISTINCT FROM NEW.superseded_at) EXECUTE FUNCTION kauro.take_transition_lock('kauro.fiscal_profiles', 'agency_id');
+
+-- One lineage per agency (D-FISC-B6; B09-N5), at COMMIT: a superseded version has its successor (a version that names it and, by
+-- fiscal_profiles_successor_fk, was recorded at the instant it was superseded), and a version that supersedes nothing is the
+-- agency's first. With fiscal_profiles_one_current and fiscal_profiles_supersedes_once, the versions' [recorded, superseded)
+-- intervals follow each other with no gap and no overlap. Named check violation fiscal_profiles_supersession_lineage (23514).
+CREATE OR REPLACE FUNCTION kauro.fiscal_profiles_supersession_lineage() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.superseded_at IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM kauro.fiscal_profiles s WHERE s.agency_id = NEW.agency_id AND s.supersedes_profile_id = NEW.profile_id
+  ) THEN
+    RAISE EXCEPTION 'SUPERSESSION_LINEAGE: fiscal profile % is superseded without a successor', NEW.profile_id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'fiscal_profiles_supersession_lineage', SCHEMA = 'kauro', TABLE = 'fiscal_profiles';
+  END IF;
+  IF TG_OP = 'INSERT' AND NEW.supersedes_profile_id IS NULL AND EXISTS (
+    SELECT 1 FROM kauro.fiscal_profiles o WHERE o.agency_id = NEW.agency_id AND o.profile_id <> NEW.profile_id
+  ) THEN
+    RAISE EXCEPTION 'SUPERSESSION_LINEAGE: fiscal profile % supersedes nothing although its agency has other versions', NEW.profile_id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'fiscal_profiles_supersession_lineage', SCHEMA = 'kauro', TABLE = 'fiscal_profiles';
+  END IF;
+  RETURN NULL;
+END
+$$;
+CREATE CONSTRAINT TRIGGER fiscal_profiles_supersession_lineage AFTER INSERT OR UPDATE OF superseded_at ON kauro.fiscal_profiles
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.fiscal_profiles_supersession_lineage();
 
 -- --- quotes (platform machine Quote, decision D-MACH-B1) ------------------------------------------------------------------------------------
 -- The immutable commercial terms of one purchase (07 "Aggregate ownership": Quote owns immutable commercial terms). Created and
@@ -273,6 +309,9 @@ CREATE TRIGGER quotes_transition_lock BEFORE UPDATE OF state ON kauro.quotes
   FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.take_transition_lock('kauro.quotes', 'quote_id');
 CREATE CONSTRAINT TRIGGER quotes_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.quotes
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('quote', 'quote_id');
+-- ... and that event is the one of the state the version reaches (D-EVT-B3; B09-N1; 0009 kauro.require_commerce_event_type)
+CREATE CONSTRAINT TRIGGER quotes_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.quotes
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('quote', 'quote_id', 'state');
 
 -- The source binding (B09-F10, D-QUOTE-B7): the quoted revision hash is a revision of the quote's project that is SEALED, sealed
 -- no later than the issuance, and the promised availability is no later than the policy's hard cap from that seal

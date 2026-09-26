@@ -60,8 +60,10 @@ export type FiscalTreatmentDecision =
 
 /**
  * Whether a profile version was in force at an instant (D-FISC-B4): its validity window covers the instant and it had not been
- * superseded by then. A re-review recorded after a sale does not take the sale's profile out of force for that sale's documents;
- * only a new quote and a new draft's choice need the current version (quotableTaxRule).
+ * superseded by then. A re-review recorded after a sale does not take the sale's version out of force for the sale's documents.
+ * A later version whose validity reaches back before the instant (a retroactive review) is in force at it too: which version a
+ * sale's documents take is `saleProfileAt`'s rule, and the database admits a document only under a version in force at the sale's
+ * tax point that carries the rule the sale was priced with (migration 0013 tax_documents_validation_guard).
  */
 export function profileInForceAt(profile: Pick<FiscalProfileRecord, "validFrom" | "validUntil" | "supersededAt">, at: UtcInstant): boolean {
   const t = instantMs(at);
@@ -70,11 +72,40 @@ export function profileInForceAt(profile: Pick<FiscalProfileRecord, "validFrom" 
   return profile.supersededAt === undefined || instantMs(profile.supersededAt) > t;
 }
 
+/**
+ * The profile version every document of a sale takes (D-FISC-B4, D-FISC-B6; B09-F4, B09-N5) — one rule for the invoice and every
+ * credit note that corrects it. The sale's tax point is the capture's completion (capture_facts.provider_completed_at), never a
+ * refund's completion. Among the agency's versions in force at the tax point (profileInForceAt):
+ *  1. the version that was current then — recorded by the tax point and not superseded by it (the lineage of migration 0010 makes
+ *     it unique: a version is superseded exactly when its successor is recorded) — when it carries a reviewed treatment;
+ *  2. otherwise, while that version is still the explicit unknown (REVIEW_REQUIRED) or none was in force, the latest-recorded
+ *     reviewed version in force at the tax point: a later review whose validity reaches back to the sale resolves the unknown
+ *     for it (the FISCAL consumer re-drafts a blocked draft under it);
+ *  3. otherwise the unknown itself (its draft records FISCAL_TREATMENT_UNREVIEWED), or null when nothing was in force.
+ * A reviewed treatment is never replaced for a sale by a version recorded after it, however that version's validity is dated: a
+ * retroactive change of a known treatment is a professional correction of the documents (Q-B09-20), and `resolveFiscalTreatment`
+ * blocks a document whose rule is not the one the sale was priced with (FISCAL_TREATMENT_CHANGED). The invoice is drafted under
+ * this version; a credit note carries exactly the fiscal snapshot of the invoice it corrects (D-FISC-B5), which this rule chose.
+ */
+export function saleProfileAt(versions: ReadonlyArray<FiscalProfileRecord>, taxPoint: UtcInstant): FiscalProfileRecord | null {
+  const t = instantMs(taxPoint);
+  const latestFirst = (a: FiscalProfileRecord, b: FiscalProfileRecord): number => instantMs(b.recordedAt) - instantMs(a.recordedAt);
+  const inForce = versions.filter((v) => profileInForceAt(v, taxPoint)).sort(latestFirst);
+  const current = inForce.find((v) => instantMs(v.recordedAt) <= t) ?? null;
+  if (current !== null && ruleSnapshotOf(current) !== null) return current;
+  const resolving = inForce.find((v) => instantMs(v.recordedAt) > t && ruleSnapshotOf(v) !== null);
+  return resolving ?? current ?? inForce[0] ?? null;
+}
+
 export interface FiscalTreatmentInput {
-  /** The agency's profile version in force at the tax point (D-FISC-B4; migration 0013 tax_documents_validation_guard). */
+  /** The sale's profile version (saleProfileAt; FiscalRepository.saleProfileAt; D-FISC-B4, D-FISC-B6; migration 0013 tax_documents_validation_guard). */
   readonly profile: FiscalProfileRecord;
   readonly issuer: FiscalIssuerRecord;
-  /** The tax point: the capture completion for an invoice, the refund completion for a credit note. */
+  /**
+   * The tax point of the sale the document belongs to: the capture's completion (capture_facts.provider_completed_at) — for the
+   * invoice and for every credit note that corrects it (a credit note corrects the sale and carries the invoice's fiscal snapshot,
+   * D-FISC-B5), never the refund's completion (B09-N5).
+   */
   readonly taxPoint: UtcInstant;
   readonly serviceCents: bigint;
   /** The reviewed snapshot the sale was priced with (the quote's); null only for a document with no priced snapshot. */

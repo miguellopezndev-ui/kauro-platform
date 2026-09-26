@@ -34,27 +34,42 @@ export function matchCapture(order: Pick<PaymentOrderRecord, "provider" | "envir
   return { kind: "MATCH" };
 }
 
+/** One listed edge of the CaptureFact machine: one more capture version with the event of the status it reaches. */
+export interface CaptureEdge {
+  readonly next: CaptureStatus;
+  readonly event: "provider_completed" | "provider_denied" | "provider_reversed";
+}
+
+/** The reversal a completion is followed by when the observation shows the capture already reversed (D-PAY-B5; B09-N3). */
+const THEN_REVERSED: ReadonlyArray<CaptureEdge> = Object.freeze([{ next: "REVERSED", event: "provider_reversed" }]);
+
 export type CaptureStatusStep =
-  | { readonly kind: "INSERT"; readonly status: CaptureStatus }
-  | { readonly kind: "ADVANCE"; readonly next: CaptureStatus; readonly event: "provider_completed" | "provider_denied" | "provider_reversed" }
+  /** Insert the fact at `status` (version 1), then walk `then`, one version and one event per edge, in the same transaction. */
+  | { readonly kind: "INSERT"; readonly status: "PENDING" | "COMPLETED" | "DENIED"; readonly then?: ReadonlyArray<CaptureEdge> }
+  /** Advance along the edge (one version), then walk `then` in the same transaction. */
+  | { readonly kind: "ADVANCE"; readonly next: CaptureStatus; readonly event: CaptureEdge["event"]; readonly then?: ReadonlyArray<CaptureEdge> }
   | { readonly kind: "SAME" }
   | { readonly kind: "STALE" }
   | { readonly kind: "INCONSISTENT" };
 
 /**
- * The monotonic lattice of provider capture states (CaptureFact machine, commerce/machines): PENDING → COMPLETED | DENIED |
- * REVERSED, COMPLETED → REVERSED. A fact is born in the status of its first authenticated observation (D-INIT-B1). An
- * observation behind the current state is STALE (kept as history, no change); one that contradicts a terminal state (DENIED
- * after COMPLETED, COMPLETED after DENIED) is INCONSISTENT and opens a PROVIDER_INCONSISTENCY case instead of moving anything.
+ * The monotonic lattice of provider capture states (CaptureFact machine, commerce/machines): PENDING → COMPLETED | DENIED,
+ * COMPLETED → REVERSED. A fact is born in the status of its first authenticated observation (D-INIT-B1): PENDING, or one edge
+ * from it (COMPLETED, DENIED). A reversal is the return of money that was captured (D-PAY-B5): a capture first seen REVERSED — or
+ * seen REVERSED while it is known only as PENDING — had completed at the provider, so it is recorded COMPLETED (allocated, and
+ * published once as capture.completed.v1, which sources its CAPTURE posting) and then REVERSED (capture.reversed.v1, which
+ * sources the CHARGEBACK posting that returns it): two versions and two events in one transaction (B09-N3). An observation behind
+ * the current state is STALE (kept as history, no change); one that contradicts a terminal state (DENIED after COMPLETED,
+ * COMPLETED after DENIED) is INCONSISTENT and opens a PROVIDER_INCONSISTENCY case instead of moving anything.
  */
 export function captureStatusStep(current: CaptureStatus | null, observed: CaptureStatus): CaptureStatusStep {
-  if (current === null) return { kind: "INSERT", status: observed };
+  if (current === null) return observed === "REVERSED" ? { kind: "INSERT", status: "COMPLETED", then: THEN_REVERSED } : { kind: "INSERT", status: observed };
   if (current === observed) return { kind: "SAME" };
   switch (current) {
     case "PENDING":
       if (observed === "COMPLETED") return { kind: "ADVANCE", next: "COMPLETED", event: "provider_completed" };
       if (observed === "DENIED") return { kind: "ADVANCE", next: "DENIED", event: "provider_denied" };
-      return { kind: "ADVANCE", next: "REVERSED", event: "provider_reversed" };
+      return { kind: "ADVANCE", next: "COMPLETED", event: "provider_completed", then: THEN_REVERSED };
     case "COMPLETED":
       if (observed === "REVERSED") return { kind: "ADVANCE", next: "REVERSED", event: "provider_reversed" };
       if (observed === "PENDING") return { kind: "STALE" };
@@ -76,7 +91,8 @@ export function splitObligation(order: Pick<PaymentOrderRecord, "expectedService
 }
 
 /**
- * The allocation of a capture observed COMPLETED (or first observed REVERSED; D-PAY-B5): the part that pays what is still owed
+ * The allocation of a capture at its COMPLETED version (also a capture first observed REVERSED, recorded COMPLETED then REVERSED;
+ * D-PAY-B5): the part that pays what is still owed
  * on the order goes to the obligation — split into service and tax cumulatively, so several partial captures always add up to
  * exactly the quoted service and tax — and the rest is excess, an overpayment to return (R2-140). The database re-checks the
  * sum (capture_facts_allocation) and the cap (kauro.capture_facts_allocate, migration 0011, SQLSTATE KP002).

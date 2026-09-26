@@ -143,11 +143,11 @@ test("ledger postings balance, omit zero lines and keep capture, excess, fee and
   // R2-140: the second full capture is entirely an overpayment obligation, never service
   const excess = capturePostings({ serviceCents: 0n, taxCents: 0n, excessCents: 97125n });
   assert.deepEqual(excess.map((l) => [l.account, l.direction, l.amountCents]), [["PSP_RECEIVABLE", "DEBIT", 97125n], ["CUSTOMER_OVERPAYMENT", "CREDIT", 97125n]]);
-  const fee = providerFeePostings(5275n);
+  const fee = providerFeePostings(5275n, "UNKNOWN");
   assert.deepEqual(fee.map((l) => [l.account, l.direction]), [["PROCESSOR_EXPENSE", "DEBIT"], ["PSP_RECEIVABLE", "CREDIT"]]);
-  const back = returnPostings({ serviceCents: 20000n, taxCents: 3800n, excessCents: 0n });
+  const back = returnPostings({ serviceCents: 20000n, taxCents: 3800n, excessCents: 0n }, "UNKNOWN");
   assert.equal(isBalanced(back), true);
   assert.deepEqual(back.at(-1), { account: "PSP_RECEIVABLE", direction: "CREDIT", amountCents: 23800n });
-  assert.deepEqual(providerFeePostings(0n), []);
+  assert.deepEqual(providerFeePostings(0n, "UNKNOWN"), []);
   assert.equal(isBalanced([{ account: "PSP_RECEIVABLE", direction: "DEBIT", amountCents: 1n }]), false);
 });

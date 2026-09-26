@@ -12,7 +12,7 @@
 -- COMMAND_CATALOGUE "Shared execution contract" (service commands require a verified service identity, with scope derived from
 -- the stored operation), 15 "Initial payment decision", "Accounting integration decision", "FiscalProfile", 19 "BusinessProfile
 -- and legal facts". Design: docs/design/B09-payments-fiscal.md (D-CTX-B1, D-CTX-B2, D-SCOPE-B1, D-EVT-B1, D-ROUTE-B1,
--- D-CORP-B1, D-RPOL-B1, D-ING-B1). This file references only B05/B06 objects and the foundation's registry (0008), never a
+-- D-CORP-B1, D-RPOL-B1, D-ING-B1, D-EVT-B3). This file references only B05/B06 objects and the foundation's registry (0008), never a
 -- table of a package built in parallel (FOUNDATION D-AGGK-5: B09 numbers its migrations 0009..0013 on its own branch; the
 -- integrator renumbers the second package to merge).
 --
@@ -112,8 +112,10 @@ $$;
 
 -- The birth of an observed fact (D-INIT-B1): a record of an external state the platform does not decide — a provider capture —
 -- is born at the first step of its machine that its first authenticated observation shows: the initial state, or a state one
--- listed edge away from it (a capture first seen COMPLETED, DENIED or REVERSED had been PENDING at the provider). Anything
--- further is the same unlisted transition B06 refuses (KA008). TG_ARGV[0] is the machine, TG_ARGV[1] the state column.
+-- listed edge away from it (a capture first seen COMPLETED or DENIED had been PENDING at the provider). Anything further is the
+-- same unlisted transition B06 refuses (KA008): a capture first seen REVERSED is two edges away (PENDING -> COMPLETED -> REVERSED),
+-- so the reconciler records it COMPLETED and then REVERSED in one transaction (D-PAY-B5; B09-N3). TG_ARGV[0] is the machine,
+-- TG_ARGV[1] the state column.
 CREATE OR REPLACE FUNCTION kauro.enforce_observed_birth() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -194,6 +196,213 @@ ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
 CREATE POLICY event_types_payment_read ON kauro.event_types FOR SELECT TO kauro_payment USING (true);
 GRANT SELECT ON kauro.event_types TO kauro_payment;
 GRANT SELECT ON kauro.state_machines, kauro.state_transitions TO kauro_payment;
+
+-- --- what each commerce event records, who may publish it and who receives it (D-EVT-B3; B09-N1) ------------------------------------
+-- An event records one committed version of one aggregate (07 "Outbox, inbox and event ordering"): a commerce event type names the
+-- aggregate kind it records (its `<kind>.` prefix) and what that version records — the state the version reaches, or for a capture
+-- version that keeps its status the one later provider fact it learned (FEE, FUNDS; D-EVT-B2). The request handlers (kauro_app) may
+-- publish only the types of their own edges: an agency member (TENANT) the quote lifecycle, the intent and claim of a provider
+-- effect and its own refund request; a corporate owner in its finance scope (OPERATOR) a refund's review and a case's resolution.
+-- Every other type records a provider fact, an entitlement, an execution, a fiscal document or a case's opening, which only the
+-- payment service writes (D-AUTH-B4; 08 "Threat model and assets": a malicious agency member; 07 "Application checks improve
+-- messages but cannot be the sole protection"). The rows mirror @kauro/domain COMMERCE_STATE_EVENT_TYPES and
+-- COMMERCE_REQUEST_HANDLER_EVENT_TYPES (the persistence test proves them equal); migration-owned, append-only.
+CREATE TABLE kauro.commerce_event_bindings (
+  event_type       text PRIMARY KEY REFERENCES kauro.event_types (event_type),
+  aggregate_kind   text NOT NULL CHECK (aggregate_kind IN ('quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case')),
+  recorded_state   text CHECK (recorded_state IS NULL OR recorded_state ~ '^[A-Z][A-Z_]{1,63}$'),
+  recorded_fact    text CHECK (recorded_fact IN ('FEE', 'FUNDS')),
+  request_handler  text CHECK (request_handler IN ('TENANT', 'OPERATOR')),
+  UNIQUE (aggregate_kind, recorded_state),
+  UNIQUE (aggregate_kind, recorded_fact),
+  -- a commerce type is named after the kind it records, so the binding below can refuse it on any other kind without a lookup
+  CONSTRAINT commerce_event_bindings_kind_prefix CHECK (split_part(event_type, '.', 1) = aggregate_kind),
+  CONSTRAINT commerce_event_bindings_records_one CHECK ((recorded_state IS NULL) <> (recorded_fact IS NULL)),
+  CONSTRAINT commerce_event_bindings_fact_of_capture CHECK (recorded_fact IS NULL OR (aggregate_kind = 'capture' AND request_handler IS NULL))
+);
+INSERT INTO kauro.commerce_event_bindings (event_type, aggregate_kind, recorded_state, recorded_fact, request_handler) VALUES
+  ('quote.drafted.v1', 'quote', 'DRAFT', NULL, 'TENANT'),
+  ('quote.issued.v1', 'quote', 'ISSUED', NULL, 'TENANT'),
+  ('quote.accepted_for_checkout.v1', 'quote', 'ACCEPTED_FOR_CHECKOUT', NULL, 'TENANT'),
+  ('quote.expired.v1', 'quote', 'EXPIRED', NULL, 'TENANT'),
+  ('quote.superseded.v1', 'quote', 'SUPERSEDED', NULL, 'TENANT'),
+  ('quote.withdrawn.v1', 'quote', 'WITHDRAWN', NULL, 'TENANT'),
+  ('payment_order.intent_created.v1', 'payment_order', 'INTENT_CREATED', NULL, 'TENANT'),
+  ('payment_order.creating.v1', 'payment_order', 'CREATING', NULL, 'TENANT'),
+  ('payment_order.created.v1', 'payment_order', 'CREATED', NULL, NULL),
+  ('payment_order.approved.v1', 'payment_order', 'APPROVED', NULL, NULL),
+  ('payment_order.capturing.v1', 'payment_order', 'CAPTURING', NULL, 'TENANT'),
+  ('payment_order.capture_uncertain.v1', 'payment_order', 'CAPTURE_UNCERTAIN', NULL, NULL),
+  ('payment_order.captured.v1', 'payment_order', 'CAPTURED', NULL, NULL),
+  ('payment_order.failed.v1', 'payment_order', 'FAILED', NULL, NULL),
+  ('payment_order.cancelled.v1', 'payment_order', 'CANCELLED', NULL, NULL),
+  ('payment_order.expired.v1', 'payment_order', 'EXPIRED', NULL, NULL),
+  ('payment_attempt.prepared.v1', 'payment_attempt', 'PREPARED', NULL, 'TENANT'),
+  ('payment_attempt.dispatching.v1', 'payment_attempt', 'DISPATCHING', NULL, 'TENANT'),
+  ('payment_attempt.provider_pending.v1', 'payment_attempt', 'PROVIDER_PENDING', NULL, NULL),
+  ('payment_attempt.confirmed.v1', 'payment_attempt', 'CONFIRMED', NULL, NULL),
+  ('payment_attempt.failed_no_effect.v1', 'payment_attempt', 'FAILED_NO_EFFECT', NULL, NULL),
+  ('payment_attempt.uncertain.v1', 'payment_attempt', 'UNCERTAIN', NULL, NULL),
+  ('payment_attempt.cancelled_before_dispatch.v1', 'payment_attempt', 'CANCELLED_BEFORE_DISPATCH', NULL, NULL),
+  ('capture.pending.v1', 'capture', 'PENDING', NULL, NULL),
+  ('capture.completed.v1', 'capture', 'COMPLETED', NULL, NULL),
+  ('capture.denied.v1', 'capture', 'DENIED', NULL, NULL),
+  ('capture.reversed.v1', 'capture', 'REVERSED', NULL, NULL),
+  ('capture.fee_observed.v1', 'capture', NULL, 'FEE', NULL),
+  ('capture.funds_observed.v1', 'capture', NULL, 'FUNDS', NULL),
+  ('commercial_authorization.issued.v1', 'commercial_authorization', 'ACTIVE', NULL, NULL),
+  ('commercial_authorization.consumed.v1', 'commercial_authorization', 'CONSUMED', NULL, NULL),
+  ('commercial_authorization.delivered.v1', 'commercial_authorization', 'DELIVERED', NULL, NULL),
+  ('commercial_authorization.revoked.v1', 'commercial_authorization', 'REVOKED', NULL, NULL),
+  ('refund.requested.v1', 'refund', 'REQUESTED', NULL, 'TENANT'),
+  ('refund.approved.v1', 'refund', 'APPROVED', NULL, 'OPERATOR'),
+  ('refund.rejected.v1', 'refund', 'REJECTED', NULL, 'OPERATOR'),
+  ('refund.submitting.v1', 'refund', 'SUBMITTING', NULL, NULL),
+  ('refund.uncertain.v1', 'refund', 'UNCERTAIN', NULL, NULL),
+  ('refund.completed.v1', 'refund', 'COMPLETED', NULL, NULL),
+  ('refund.failed.v1', 'refund', 'FAILED', NULL, NULL),
+  ('tax_document.drafted.v1', 'tax_document', 'DRAFT', NULL, NULL),
+  ('tax_document.validated.v1', 'tax_document', 'VALIDATED', NULL, NULL),
+  ('tax_document.submitting.v1', 'tax_document', 'SUBMITTING', NULL, NULL),
+  ('tax_document.issued.v1', 'tax_document', 'ISSUED', NULL, NULL),
+  ('tax_document.uncertain.v1', 'tax_document', 'UNCERTAIN', NULL, NULL),
+  ('tax_document.rejected.v1', 'tax_document', 'REJECTED', NULL, NULL),
+  ('tax_document.corrected.v1', 'tax_document', 'CORRECTED', NULL, NULL),
+  ('reconciliation_case.opened.v1', 'reconciliation_case', 'OPEN', NULL, NULL),
+  ('reconciliation_case.resolved.v1', 'reconciliation_case', 'RESOLVED', NULL, 'OPERATOR');
+CREATE TRIGGER commerce_event_bindings_append_only BEFORE UPDATE OR DELETE ON kauro.commerce_event_bindings
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+CREATE TRIGGER commerce_event_bindings_no_truncate BEFORE TRUNCATE ON kauro.commerce_event_bindings
+  FOR EACH STATEMENT EXECUTE FUNCTION kauro.forbid_change();
+
+-- The registered destinations of each commerce event (07 "consumer: Registered destination"; TRANSITIONS "Cross-aggregate
+-- finalization": one reconciled financial event, several separate idempotent effects): an outbox record of a commerce event goes
+-- only to a consumer of its type, so no writer can route a quote event to the ledger poster or a request to the commission accrual
+-- (B09-N1). The rows mirror @kauro/domain COMMERCE_EVENT_SUBSCRIPTIONS (the persistence test proves them equal); migration-owned,
+-- append-only; a later package that subscribes to a commerce event adds its row in its own migration.
+CREATE TABLE kauro.commerce_event_subscriptions (
+  event_type  text NOT NULL REFERENCES kauro.commerce_event_bindings (event_type),
+  consumer    text NOT NULL CHECK (kauro.is_token(consumer)),
+  PRIMARY KEY (event_type, consumer)
+);
+INSERT INTO kauro.commerce_event_subscriptions (event_type, consumer) VALUES
+  ('quote.issued.v1', 'NOTIFICATIONS'),
+  ('payment_attempt.dispatching.v1', 'PAYMENT_SERVICE'),
+  ('payment_attempt.provider_pending.v1', 'PAYMENT_SERVICE'),
+  ('payment_attempt.uncertain.v1', 'PAYMENT_SERVICE'),
+  ('payment_order.capture_uncertain.v1', 'NOTIFICATIONS'),
+  ('payment_order.captured.v1', 'NOTIFICATIONS'),
+  ('capture.completed.v1', 'FINANCE'),
+  ('capture.completed.v1', 'FISCAL'),
+  ('capture.completed.v1', 'COMMISSIONS'),
+  ('capture.fee_observed.v1', 'FINANCE'),
+  ('capture.funds_observed.v1', 'FINANCE'),
+  ('capture.reversed.v1', 'FINANCE'),
+  ('capture.reversed.v1', 'COMMISSIONS'),
+  ('capture.reversed.v1', 'NOTIFICATIONS'),
+  ('commercial_authorization.issued.v1', 'EXECUTION_CONTROL'),
+  ('commercial_authorization.issued.v1', 'NOTIFICATIONS'),
+  ('commercial_authorization.revoked.v1', 'EXECUTION_CONTROL'),
+  ('commercial_authorization.revoked.v1', 'NOTIFICATIONS'),
+  ('refund.requested.v1', 'NOTIFICATIONS'),
+  ('refund.approved.v1', 'PAYMENT_SERVICE'),
+  ('refund.uncertain.v1', 'PAYMENT_SERVICE'),
+  ('refund.completed.v1', 'FINANCE'),
+  ('refund.completed.v1', 'FISCAL'),
+  ('refund.completed.v1', 'COMMISSIONS'),
+  ('refund.completed.v1', 'NOTIFICATIONS'),
+  ('refund.failed.v1', 'NOTIFICATIONS'),
+  ('tax_document.validated.v1', 'FISCAL'),
+  ('tax_document.uncertain.v1', 'FISCAL'),
+  ('tax_document.issued.v1', 'NOTIFICATIONS'),
+  ('reconciliation_case.opened.v1', 'NOTIFICATIONS'),
+  ('reconciliation_case.resolved.v1', 'FINANCE');
+CREATE TRIGGER commerce_event_subscriptions_append_only BEFORE UPDATE OR DELETE ON kauro.commerce_event_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+CREATE TRIGGER commerce_event_subscriptions_no_truncate BEFORE TRUNCATE ON kauro.commerce_event_subscriptions
+  FOR EACH STATEMENT EXECUTE FUNCTION kauro.forbid_change();
+
+ALTER TABLE kauro.commerce_event_bindings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.commerce_event_bindings FORCE ROW LEVEL SECURITY;
+CREATE POLICY commerce_event_bindings_read ON kauro.commerce_event_bindings FOR SELECT TO kauro_app, kauro_payment USING (true);
+ALTER TABLE kauro.commerce_event_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.commerce_event_subscriptions FORCE ROW LEVEL SECURITY;
+CREATE POLICY commerce_event_subscriptions_read ON kauro.commerce_event_subscriptions FOR SELECT TO kauro_app, kauro_payment USING (true);
+GRANT SELECT ON kauro.commerce_event_bindings, kauro.commerce_event_subscriptions TO kauro_app, kauro_payment;
+
+-- A commerce event type records an aggregate of its own kind, and a commerce aggregate records only its kind's types (B09-N1): an
+-- additive BEFORE INSERT trigger beside the foundation's binding (which it never edits, FOUNDATION D-AGGK-4), with no table read,
+-- so an event writer of another package's kinds needs no privilege here. EVENT_MISSING (KA003): the version has no event of what it
+-- records.
+CREATE OR REPLACE FUNCTION kauro.domain_events_commerce_kind() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  commerce_kinds CONSTANT text[] := ARRAY['quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case'];
+  type_kind text := split_part(NEW.event_type, '.', 1);
+BEGIN
+  IF (NEW.aggregate_kind = ANY (commerce_kinds) OR type_kind = ANY (commerce_kinds)) AND type_kind IS DISTINCT FROM NEW.aggregate_kind THEN
+    RAISE EXCEPTION 'EVENT_MISSING: event type % does not record a % aggregate', NEW.event_type, NEW.aggregate_kind USING ERRCODE = 'KA003';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER domain_events_commerce_kind BEFORE INSERT ON kauro.domain_events
+  FOR EACH ROW EXECUTE FUNCTION kauro.domain_events_commerce_kind();
+
+-- The event of a commerce version is the event of what that version records (D-EVT-B3; B09-N1), checked at COMMIT beside B06's
+-- kauro.require_event_for_version (which proves the event exists; the foundation enumerates it on every registered kind): the
+-- binding's type of the state the version reaches; for a capture version that keeps its status, the type of the one later
+-- provider fact it learned — the fee or the funds' availability, never both (two facts are two versions) —; a capture is born with
+-- its funds UNKNOWN (an availability is a version of its own) and learns a fee with a status change only when it completes. So
+-- capture.completed.v1 records exactly the capture's completion, refund.completed.v1 exactly a refund's, and the ledger's source
+-- binding (0013) can trust the event it names. A version write that keeps the version (a column exempt from the bump) publishes
+-- nothing. TG_ARGV: the aggregate kind, its id column, its state column. EVENT_MISSING (KA003).
+CREATE OR REPLACE FUNCTION kauro.require_commerce_event_type() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  new_j jsonb := to_jsonb(NEW);
+  old_j jsonb := CASE WHEN TG_OP = 'UPDATE' THEN to_jsonb(OLD) END;
+  agg_kind text := TG_ARGV[0];
+  agg_state text := new_j ->> TG_ARGV[2];
+  keeps_state boolean := TG_OP = 'UPDATE' AND (old_j ->> TG_ARGV[2]) = (new_j ->> TG_ARGV[2]);
+  fee_learned boolean := false;
+  funds_changed boolean := false;
+  expected_type text;
+  published_type text;
+BEGIN
+  IF TG_OP = 'UPDATE' AND (old_j -> 'version') = (new_j -> 'version') THEN
+    RETURN NULL;
+  END IF;
+  IF agg_kind = 'capture' THEN
+    IF TG_OP = 'INSERT' THEN
+      funds_changed := (new_j ->> 'funds_state') IS DISTINCT FROM 'UNKNOWN';
+      fee_learned := jsonb_typeof(new_j -> 'provider_fee_cents') IS DISTINCT FROM 'null';
+    ELSE
+      funds_changed := (old_j -> 'funds_state') IS DISTINCT FROM (new_j -> 'funds_state');
+      fee_learned := (old_j -> 'provider_fee_cents') IS DISTINCT FROM (new_j -> 'provider_fee_cents');
+    END IF;
+  END IF;
+  IF agg_kind = 'capture' AND keeps_state THEN
+    IF fee_learned <> funds_changed THEN
+      SELECT b.event_type INTO expected_type FROM kauro.commerce_event_bindings b
+       WHERE b.aggregate_kind = 'capture' AND b.recorded_fact = CASE WHEN fee_learned THEN 'FEE' ELSE 'FUNDS' END;
+    END IF;
+  ELSIF NOT (agg_kind = 'capture' AND (funds_changed OR (fee_learned AND agg_state <> 'COMPLETED'))) THEN
+    SELECT b.event_type INTO expected_type FROM kauro.commerce_event_bindings b
+     WHERE b.aggregate_kind = agg_kind AND b.recorded_state = agg_state;
+  END IF;
+  SELECT e.event_type INTO published_type FROM kauro.domain_events e
+   WHERE e.agency_id = (new_j ->> 'agency_id')::uuid AND e.aggregate_kind = agg_kind
+     AND e.aggregate_id = (new_j ->> TG_ARGV[1])::uuid AND e.aggregate_version = (new_j ->> 'version')::bigint;
+  IF expected_type IS NULL OR published_type IS DISTINCT FROM expected_type THEN
+    RAISE EXCEPTION 'EVENT_MISSING: % % version % records % (%), but its event is %', agg_kind, new_j ->> TG_ARGV[1], new_j ->> 'version', agg_state,
+      coalesce(expected_type, 'no admissible event: one version records one fact'), coalesce(published_type, 'missing') USING ERRCODE = 'KA003';
+  END IF;
+  RETURN NULL;
+END
+$$;
 
 -- --- payment routes (platform; D-ROUTE-B1) ------------------------------------------------------------------------------------------
 -- The receiving merchant of each provider and environment, fixed by server configuration (15 "Merchant identity and environment
@@ -463,6 +672,37 @@ CREATE POLICY domain_events_finance ON kauro.domain_events FOR ALL TO kauro_app
          AND aggregate_kind IN ('quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case'))
   WITH CHECK (kauro.in_finance_scope(agency_id)
          AND aggregate_kind IN ('quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case'));
+-- The request handlers publish only their own edges' events (D-AUTH-B4, D-EVT-B3; B09-N1). B06's domain_events_tenant admits any
+-- event of the session's agency and domain_events_finance any commerce event of the finance scope; this restrictive policy (AND-ed
+-- with them, never widening anything; B06's policy is not edited) admits a commerce event from kauro_app only when its type is one
+-- the principal of the session authors: an agency member (its agency bound) a TENANT type, a corporate owner in its finance scope an
+-- OPERATOR type (kauro.commerce_event_bindings.request_handler). A provider fact, an entitlement, an execution, a fiscal document
+-- or a case's opening published by kauro_app is refused (42501), whatever aggregate of its agency it names.
+CREATE POLICY domain_events_commerce_request_handlers ON kauro.domain_events AS RESTRICTIVE FOR INSERT TO kauro_app
+  WITH CHECK (
+    (aggregate_kind NOT IN ('quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case')
+     AND split_part(event_type, '.', 1) NOT IN ('quote', 'payment_order', 'payment_attempt', 'capture', 'commercial_authorization', 'refund', 'tax_document', 'reconciliation_case'))
+    OR EXISTS (
+      SELECT 1 FROM kauro.commerce_event_bindings b
+       WHERE b.event_type = domain_events.event_type AND b.aggregate_kind = domain_events.aggregate_kind
+         AND ((b.request_handler = 'TENANT' AND domain_events.agency_id = kauro.current_agency_id())
+              OR (b.request_handler = 'OPERATOR' AND kauro.in_finance_scope(domain_events.agency_id)))
+    )
+  );
+-- An outbox record of a commerce event is addressed only to a registered consumer of its type (B09-N1): restrictive, for the two
+-- groups that append commerce events and their outbox rows (the control plane dispatches and never authors a record of a commerce
+-- event). The records of B06's and other packages' events are untouched.
+CREATE POLICY outbox_records_commerce_subscribers ON kauro.outbox_records AS RESTRICTIVE FOR INSERT TO kauro_app, kauro_payment
+  WITH CHECK (
+    NOT EXISTS (
+      SELECT 1 FROM kauro.domain_events e JOIN kauro.commerce_event_bindings b ON b.event_type = e.event_type
+       WHERE e.event_id = outbox_records.event_id
+    )
+    OR EXISTS (
+      SELECT 1 FROM kauro.domain_events e JOIN kauro.commerce_event_subscriptions s ON s.event_type = e.event_type
+       WHERE e.event_id = outbox_records.event_id AND s.consumer = outbox_records.consumer
+    )
+  );
 CREATE POLICY outbox_records_payment ON kauro.outbox_records FOR ALL TO kauro_payment
   USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id = kauro.current_agency_id()))
   WITH CHECK (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id = kauro.current_agency_id()));

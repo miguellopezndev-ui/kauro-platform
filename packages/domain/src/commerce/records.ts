@@ -72,17 +72,24 @@ export type TaxDocumentState = "DRAFT" | "VALIDATED" | "SUBMITTING" | "UNCERTAIN
 export type RouteState = "CONFIGURED" | "QUALIFIED" | "SUSPENDED";
 /** 19 "BusinessProfile and legal facts": every fact carries its status. */
 export type LegalFactStatus = "OBSERVED" | "OWNER_DECLARED" | "PROFESSIONALLY_CONFIRMED" | "PENDING" | "EXPIRED";
-export type ReconciliationCaseKind =
-  | "AMOUNT_MISMATCH"
-  | "EXCESS_CAPTURE"
-  | "CAPTURE_WITHOUT_VALID_SUBJECT"
-  | "UNCERTAIN_EFFECT"
-  | "UNRECOGNIZED_PROVIDER_STATE"
-  | "PROVIDER_INCONSISTENCY"
-  | "REVERSAL"
-  | "FEE_MISMATCH"
-  /** A dispute in progress whose funds the provider holds; the capture stays COMPLETED until actually reversed (D-DISPUTE-B1). */
-  | "DISPUTE_OPEN";
+/**
+ * The kinds of reconciliation case, in the order of migration 0012's reconciliation_cases.kind CHECK (the persistence test proves
+ * the two equal) and of ReconcilePaymentView.openCases (the application's view schema is derived from this list; B09-N2).
+ * DISPUTE_OPEN is a dispute in progress whose funds the provider holds; the capture stays COMPLETED until actually reversed
+ * (D-DISPUTE-B1).
+ */
+export const RECONCILIATION_CASE_KINDS = [
+  "AMOUNT_MISMATCH",
+  "EXCESS_CAPTURE",
+  "CAPTURE_WITHOUT_VALID_SUBJECT",
+  "UNCERTAIN_EFFECT",
+  "UNRECOGNIZED_PROVIDER_STATE",
+  "PROVIDER_INCONSISTENCY",
+  "REVERSAL",
+  "FEE_MISMATCH",
+  "DISPUTE_OPEN",
+] as const;
+export type ReconciliationCaseKind = (typeof RECONCILIATION_CASE_KINDS)[number];
 /**
  * Why an authenticated provider observation became an exception instead of a fact (migration 0012 provider_event_exceptions): every
  * CaptureMismatch of commerce/capture (WRONG_PROVIDER, WRONG_ENVIRONMENT, WRONG_ORDER, WRONG_PAYEE, WRONG_CURRENCY) plus the
@@ -208,6 +215,13 @@ export interface FiscalProfileRecord {
   readonly validFrom: UtcInstant;
   readonly validUntil?: UtcInstant;
   readonly supersedesProfileId?: FiscalProfileId;
+  /**
+   * The instant the version was recorded (fiscal_profiles.created_at): the version current at an instant is the one recorded by
+   * then and not superseded by then — the version a sale's documents take while it carries a reviewed treatment (saleProfileAt;
+   * D-FISC-B6; B09-N5).
+   */
+  readonly recordedAt: UtcInstant;
+  /** The instant its successor was recorded: exactly the successor's recordedAt (migration 0010 fiscal_profiles_successor_fk). */
   readonly supersededAt?: UtcInstant;
 }
 

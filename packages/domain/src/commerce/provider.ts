@@ -59,6 +59,15 @@ export function providerRequestIdOf(attemptId: string): string {
   return `kauro-${attemptId}`;
 }
 
+/**
+ * The furthest a dispatched attempt's deadline may lie ahead of its claim (D-PROTO-B4, D-PROTO-B6; B09-N7): the bounded call's
+ * timeout plus the watchdog's margin (@kauro/application commerce/protocol DISPATCH_TIMEOUT_SECONDS + DISPATCH_WATCHDOG_MARGIN_SECONDS,
+ * proven equal by the application test). The claim edge PREPARED → DISPATCHING is refused by the database when the deadline it
+ * records is not in the future or lies further ahead than this (migration 0011 payment_attempts_dispatch_deadline_bound), so the
+ * role that claims an attempt cannot keep it out of the watchdog's due set.
+ */
+export const DISPATCH_DEADLINE_SECONDS = 60;
+
 /** The scope-index key of a provider identity: `<provider>|<ENVIRONMENT>|<external id>` (migration 0009 commerce_scopes). */
 export function providerScopeKey(provider: string, environment: PaymentEnvironment, externalId: string): string {
   if (!/^[a-z][a-z0-9_-]{1,63}$/.test(provider)) throw new TypeError("provider label");

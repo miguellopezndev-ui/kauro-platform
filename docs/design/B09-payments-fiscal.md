@@ -11,7 +11,11 @@ of CMD028–CMD034 (`node tools/package-brief.mjs B09`); the case map is `docs/d
 
 This revision applies the adversarial review of the design (findings B09-F1..B09-F17, `.claude/b07-b09-design-review/critic_B09.json`;
 every finding's disposition is §16 "Critique record") on the new base, and adds §15 "Integration obligations" for the merge with the
-source lifecycle (B07), whose design is read from `b07/design` (never edited here).
+source lifecycle (B07), whose design is read from `b07/design` (never edited here). A second revision closes the residual findings
+of the independent re-check, B09-N1..B09-N8 (§16): the event each version publishes and who may publish it (D-EVT-B3), the closed
+views' vocabularies, the out-of-order reversal (D-PAY-B5), the provider balance a posting takes money from (D-LEDGER-B5), the
+fiscal version of a sale (D-FISC-B6), the attempt's order binding (D-BIND-B2), the claim's deadline (D-PROTO-B6) and the staged,
+self-contained implementation mandates (§14, D-STAGE-B1).
 
 Everything here is quoted from the authority (manual and section named, e.g. 15 "Capture and authority"; `reference/` files by
 name; B06 decisions as "B06 D-…"; the foundation's as "FOUNDATION D-AGGK-…") or is a recorded decision of this package (`D-…-B…`,
@@ -21,10 +25,10 @@ and the owner role it names under the pre-A2 brand is written KAURO_OWNER everyw
 
 | delivered on this branch | left to the implementation mandates (§14) |
 |---|---|
-| `packages/persistence/migrations/0009..0013`: roles, tables, composite keys, state machines, triggers, RLS and grants of the whole workflow, the B09 rows of the shared aggregate-kind registry, applied from empty by the B06 runner and tested on PostgreSQL 17 (`test/b09-migrations.test.ts`, 16 tests; `test/b09-critique.test.ts`, 14 tests reproducing every probe of the review; the B06 and foundation suites extended where they enumerate runtime roles, event inserters or migrations) | the `pg` adapters of the commerce ports, the commerce unit of work, the journal's UNCERTAIN path (M1) |
-| `@kauro/domain` commerce model: records, money and pricing arithmetic, fiscal treatment (the profile in force at a tax point), capture allocation, refund arithmetic and authority (the cumulative tax rule), the quote's release and re-binding predicates, ledger postings, provider vocabulary, principals, the ten platform machines, the event vocabulary, failure reasons, repository ports | the commerce authorizer, the reconciler, the re-binder, the consumers FINANCE / FISCAL / PAYMENT_SERVICE (M2) |
-| `@kauro/application` commerce contracts: the seven command specs (with the settle step's runtime role), closed request schemas, closed response schemas and DTO views, outcome catalogues, provider / fiscal / evidence / service ports, the platform ports of B07 and B08 (source availability and lineage, delivery capacity), the provider-effect protocol types (T1..T4) | the seven handlers, the provider-command runtime, the routes and the webhook ingress, the labelled contract fakes (M3) |
-| the generated OpenAPI document documents the eleven B09 operations as `x-kauro-planned`; the generated matrix owns every edge of the twelve B09 machines | serving the routes moves them into `paths` and into the matrix's served sections (M3) |
+| `packages/persistence/migrations/0009..0013`: roles, tables, composite keys, state machines, triggers, RLS and grants of the whole workflow, the B09 rows of the shared aggregate-kind registry, the event bindings and subscriptions of the commerce events, applied from empty by the B06 runner and tested on PostgreSQL 17 (`test/b09-migrations.test.ts`, 16 tests; `test/b09-critique.test.ts`, 20 tests reproducing every probe of the review and of the re-check; the B06 and foundation suites extended where they enumerate runtime roles, event inserters or migrations) | stage 1: the `pg` adapters of the commerce ports, the commerce unit of work, the journal's UNCERTAIN path, the harness fixtures (M1) |
+| `@kauro/domain` commerce model: records, money and pricing arithmetic, fiscal treatment (the profile in force at a tax point, the version of a sale), capture allocation, refund arithmetic and authority (the cumulative tax rule), the quote's release and re-binding predicates, ledger postings by provider balance, provider vocabulary and the claim's deadline bound, principals, the ten platform machines, the event vocabulary with the event each version publishes and who may publish it, failure reasons, repository ports | stage 1: the commerce core — planners, the reconciler, the provider-effect runtime, the authorizer — and the labelled contract fakes (M2) |
+| `@kauro/application` commerce contracts: the seven command specs (with the settle step's runtime role), closed request schemas, closed response schemas and DTO views derived from the domain's vocabularies, outcome catalogues, provider / fiscal / evidence / service ports, the platform ports of B07 and B08 (source availability and lineage, delivery capacity), the provider-effect protocol types (T1..T4) | stage 2: the payment service's side — T3 wiring, webhook ingress and application, CMD033, CMD034, the consumers, the re-binder (M3); the request side — CMD028, CMD029, CMD031, CMD032, the reads and their routes (M4) |
+| the generated OpenAPI document documents the eleven B09 operations as `x-kauro-planned`; the generated matrix owns every edge of the twelve B09 machines | serving the routes moves them into `paths` and into the matrix's served sections (M3, M4) |
 
 ## 1. Scope and boundaries
 
@@ -54,13 +58,13 @@ needs it.
 | B06 mechanism | how B09 uses it | extension (additive, named) |
 |---|---|---|
 | unit of work (`SET LOCAL` context, verified pools, one runtime group per login; B06 D-CTX-1) | every commerce write runs in a `PgUnitOfWork`; the commerce unit of work is the same transaction with the commerce repositories (`CommerceUnitOfWork extends UnitOfWork`) | contexts SERVICE (runs under the new group `kauro_payment`) and OPERATOR (runs under `kauro_app`, binds its user and a finance scope); `bindContext` clears `kauro.finance_agency_id` on every transaction (D-CTX-B1, D-CTX-B2) |
-| runtime roles `kauro_app`, `kauro_control`, `kauro_assurance`, `kauro_validator`, `kauro_ingress` | the agency's intents under `kauro_app`; the ingress half of the webhook under `kauro_ingress` (B06 D-ING-1, PgInboxIngress); platform configuration under `kauro_control` | one new group `kauro_payment` (the payment service), created by 0009 with the same NOSUPERUSER/NOBYPASSRLS checks; `RUNTIME_ROLES` lists it; it is the only writer of provider-observed facts and entitlements (D-AUTH-B4) |
+| runtime roles `kauro_app`, `kauro_control`, `kauro_assurance`, `kauro_validator`, `kauro_ingress` | the agency's intents under `kauro_app`; the ingress half of the webhook under `kauro_ingress` (B06 D-ING-1, PgInboxIngress); platform configuration under `kauro_control` | one new group `kauro_payment` (the payment service), created by 0009 with the same NOSUPERUSER/NOBYPASSRLS checks; `RUNTIME_ROLES` lists it; it is the only writer of provider-observed facts and entitlements (D-AUTH-B4), and the request handlers publish only their own edges' events (restrictive `domain_events_commerce_request_handlers`, D-EVT-B3) |
 | pipeline authenticate → access decision → journal reserve/replay → assurance → execute (B06 D-PIPE-1) | unchanged order for every command, including the provider-effect protocol's T1 (§6.1) | the commerce authorizer for the principals B06 denies by default (operator, service, provider) (§3.4) |
 | command journal (B06 D-IDEM-1..3) | idempotency of CMD028, CMD029, CMD031–CMD034; the orders, attempts and refunds name their journal entry (`intent_entry_id`) for resume | a provider effect of unknown outcome leaves the entry UNCERTAIN (the B06 guard admits RESERVED → UNCERTAIN → COMMITTED; the adapter gains the path, D-JOURNAL-B1); the journal is completed by the command's own principal in T4 after the payment service settled T3 (D-PROTO-B5); an operator's entry is identity-owned (`agency_id` NULL, D-IDEM-B2) |
-| outbox, inbox, D-ING locks (B06 D-OUTBOX-1, D-ING-1/2) | every commerce event has its outbox rows; the provider inbox dedupes webhook deliveries by provider, environment and event id | the payment service is the consumer of payment providers' inbox records (KA012, KA007, READ COMMITTED); an observation no order can take becomes a provider event exception from any source (D-ING-B1..B3) |
+| outbox, inbox, D-ING locks (B06 D-OUTBOX-1, D-ING-1/2) | every commerce event has its outbox rows; the provider inbox dedupes webhook deliveries by provider, environment and event id | the payment service is the consumer of payment providers' inbox records (KA012, KA007, READ COMMITTED); an observation no order can take becomes a provider event exception from any source (D-ING-B1..B3); a commerce event's outbox records go only to its registered consumers (`kauro.commerce_event_subscriptions`, restrictive `outbox_records_commerce_subscribers`; D-EVT-B3) |
 | security facts (agency / identity / anonymous streams, B06 D-FACT-1) | operator facts go to the operator's identity stream with `requested_agency_id`; agency commands to the agency stream | the payment service's and the ingress's own facts: `agency_id` NULL, actor SERVICE, or ANONYMOUS for an unverified delivery (D-FACT-B1) |
 | registry guards: `state_machines`, `state_transitions`, `enforce_initial_state`, `enforce_listed_transition` (B06 D-INIT-1) | every B09 table with a state seeds its machine and guards birth and edges | `_of` variants for a state column not named `state`; `enforce_observed_birth` for a provider fact (D-INIT-B1) |
-| event-per-version, the foundation's registry `kauro.aggregate_kinds` and table-driven binding (FOUNDATION D-AGGK-1..5) | every versioned commerce aggregate: its kind is one INSERT in the migration that creates its table (quote 0010; payment_order, payment_attempt, capture, commercial_authorization 0011; refund, reconciliation_case 0012; tax_document 0013) | `kauro_payment` reads the registry through its own policy `aggregate_kinds_read_b09_payment` (FOUNDATION §4); no edit of 0008, of the foreign key or of the binding (D-EVT-B1) |
+| event-per-version, the foundation's registry `kauro.aggregate_kinds` and table-driven binding (FOUNDATION D-AGGK-1..5) | every versioned commerce aggregate: its kind is one INSERT in the migration that creates its table (quote 0010; payment_order, payment_attempt, capture, commercial_authorization 0011; refund, reconciliation_case 0012; tax_document 0013), and B06's `require_event_for_version` on its table | `kauro_payment` reads the registry through its own policy `aggregate_kinds_read_b09_payment` (FOUNDATION §4); no edit of 0008, of the foreign key or of the binding (D-EVT-B1); beside them, each commerce event type is bound to its kind and to the state or provider fact its version records (`kauro.commerce_event_bindings`, `domain_events_commerce_kind`, the `*_event_type_per_version` triggers; D-EVT-B3) |
 | composite foreign keys, scoped uniqueness (08 "Database isolation") | every commerce row carries `agency_id` and names its parents with `agency_id` in the key | binding UNIQUE targets added to B06 tables (plans, projects, approvals, command_journal, inbox_records, domain_events) so copies of a subject are the original's (D-BIND-B1) |
 | transition locks (B06 D-TX-2) | commerce commands read agency, capability, source, target under B06's transition locks | new transition subjects: quotes, capture facts, commercial authorizations, fiscal profiles, fiscal issuers, payment routes, corporate grants, and the withdrawal of an approval (D-TX-B1) |
 | closed response schemas validated at runtime, registry-derived views (B06 D-RESP-1), outcome catalogues (B06 D-OUT-1), error contract (B06 D-API-1, D-LABEL-1) | B09 views are `ViewDefinition`s compiled by `viewSchemaOf`, refusing forbidden members and open objects; catalogues compose `ROUTE_OUTCOME_FRAGMENTS` | the KP SQLSTATE class and 49 commerce failure reasons (§7) |
@@ -71,14 +75,18 @@ B06 objects B09 alters (all additive; the B06 and foundation suites run unchange
 machines, the guard triggers' names — now also their `_of` and observed-birth forms —, the event inserters that read the registry
 (the foundation's test 4, extended with `kauro_payment` as FOUNDATION §4 prescribes) or, in CMD010's DENY test, asserted that no
 refund table exists — it now asserts that the refund tables hold no row): `domain_events` (new UNIQUE `(event_id, agency_id)`; the
-partial unique index `domain_events_capture_completed_once`), `event_types` (49 rows, seeded under a transaction-local lifting of
+partial unique index `domain_events_capture_completed_once`, keyed on the capture it records; the trigger
+`domain_events_commerce_kind`; the restrictive policy `domain_events_commerce_request_handlers`), `outbox_records` (the restrictive
+policy `outbox_records_commerce_subscribers`), `event_types` (49 rows, seeded under a transaction-local lifting of
 FORCE RLS; FOUNDATION Q-AGGK-2), `aggregate_kinds` (eight rows and one read policy), `plans`, `projects`, `approvals`,
 `command_journal`, `inbox_records` (UNIQUE binding targets), `approvals` (transition-lock trigger on `withdrawn_at`), and
 policies/grants for `kauro_payment`, the finance scope and the ingress on `agencies`, `projects`, `plans`, `approvals`,
 `dataset_revisions` (with `supersedes_revision_id`, the lineage a re-binding checks), `target_contracts`, `capabilities`,
 `domain_events`, `outbox_records`, `command_journal`, `security_events`, `inbox_records`, `inbox_body_conflicts`. The reviewed
 runtime-boundary matrix (`packages/persistence/test/fixtures/runtime-boundary.json`) was regenerated from the catalog: every
-entry of `main` (B06 and the foundation) is byte-identical, the rest is B09's.
+entry of `main` (B06 and the foundation) is byte-identical, the rest is B09's (the second revision adds only the SELECT grants and
+read policies of the two vocabulary tables and the two restrictive policies; the file prints a policy's command, roles and
+expressions, not whether it is restrictive — the migration names it `AS RESTRICTIVE`).
 
 ## 3. Principals, runtime roles and scope
 
@@ -106,7 +114,11 @@ CREATED | APPROVED → CAPTURING; attempt PREPARED → DISPATCHING) and the PAYM
 service (`kauro_payment`) writes what a provider reported: a provider identity, an attempt's result, a capture fact, its funds and
 fee, an observation, a case, a server-originated refund request, a provider scope key, the issuance and revocation of a
 CommercialAuthorization. The database enforces it with policies and column grants (0011, 0012) and
-`b09-critique.test.ts` "B09-F1: …" performs each forbidden write as `kauro_app_test` and sees it refused.
+`b09-critique.test.ts` "B09-F1: …" performs each forbidden write as `kauro_app_test` and sees it refused. The events are bound the
+same way (D-EVT-B3; B09-N1): the request handlers publish only the event types of their own edges — an agency member the quote
+lifecycle, the intent and claim of a provider effect and its refund request; a corporate owner a refund's review and a case's
+resolution —, every other commerce type is the payment service's (or, for consumption and delivery, B08's), and every event
+records exactly what its version records; "B09-N1: …" publishes every other type as `kauro_app_test` and sees it refused.
 
 ### 3.2 The payment service's scope (D-CTX-B1, D-SCOPE-B1, D-SCOPE-B2)
 
@@ -179,6 +191,8 @@ decision) by `kauro.forbid_reassignment` (0009).
 | `commerce_scopes` | the scope index (§3.2) | append-only; each row names its order, and its capture or refund (composite keys added by 0011 and 0012); a platform key is the object's id, a provider key the identity its object learned (D-SCOPE-B2) | the tenant records PAYMENT_ORDER and REFUND rows; the payment service REFUND and provider rows in its adopted agency and reads all; an owner reads REFUND rows |
 | `price_policies` (0010) | the known price policies (D-QUOTE-B5): quote seconds, lookback seconds, founding rate, included pre-execution replacements, the unpaid source's hard cap from the seal | migration-owned rows mirrored from policy.pricing and policy.retention (R2-INITIAL only; the persistence test proves equality); append-only | migrations only; app and payment read |
 | `aggregate_kinds` (foundation 0008) | the eight B09 kinds, one INSERT each in the migration that creates its table | FOUNDATION D-AGGK-2 checks each row against the catalog | migrations only; `kauro_payment` reads it through `aggregate_kinds_read_b09_payment` |
+| `commerce_event_bindings` (0009) | every commerce event type: the aggregate kind it records (its `<kind>.` prefix), the state — or, for a capture's later facts, the fact FEE / FUNDS — of the version it records, and the request handlers' principal that authors it (TENANT, OPERATOR, or none: the payment service; D-EVT-B3) | migration-owned, append-only; mirrors `COMMERCE_STATE_EVENT_TYPES` and `COMMERCE_REQUEST_HANDLER_EVENT_TYPES` (the persistence test proves equality); read by `domain_events_commerce_request_handlers` and `kauro.require_commerce_event_type` | migrations only; app and payment read |
+| `commerce_event_subscriptions` (0009) | the registered consumers of each commerce event type | migration-owned, append-only; mirrors `COMMERCE_EVENT_SUBSCRIPTIONS`; an outbox record of a commerce event goes only to one of them (`outbox_records_commerce_subscribers`) | migrations only; app and payment read |
 
 ### 4.2 Fiscal profile, quote, eligibility snapshot (0010)
 
@@ -188,9 +202,17 @@ OTHER_REVIEWED), `tax_rule` (UNRESOLVED, RATE_HALF_UP, ZERO_REVIEWED) and `tax_r
 supersession. Rules: REVIEW_REQUIRED ⇔ UNRESOLVED with rate 0 (the explicit unknown carries no rule); DOMESTIC_TAXABLE is a
 positive rate; EXEMPT_EXPORT is a reviewed zero that requires `export_evidence_hash` (R2-128: "The adapter cannot infer export
 exemption from currency or foreign email"; 15: "A foreign customer's address alone does not establish …"); a reviewed treatment
-names its reviewer; one current (unsuperseded) profile per agency; supersession once, under the agency's transition lock. A
-version is *in force* at an instant when its validity window covers it and it had not been superseded by then (D-FISC-B4): a new
-quote and a new draft read the current version; a document is validated against the version in force at its tax point (§4.5).
+names its reviewer; one current (unsuperseded) profile per agency; supersession once, under the agency's transition lock, at
+exactly the instant the successor is recorded (`fiscal_profiles_successor_fk`), in one lineage per agency
+(`fiscal_profiles_supersession_lineage`: a version is superseded only by its successor, only the first version supersedes
+nothing) — so the version *current* at an instant (recorded by then, not superseded by then) is unique. A version is *in force* at
+an instant when its validity window covers it and it had not been superseded by then (D-FISC-B4). One rule decides the version of
+every document of a sale (D-FISC-B6; B09-N5): a new quote reads the current version (`quotableTaxRule`); the documents of a sale
+take the version of the sale's tax point — the capture's completion, never a refund's — chosen by `saleProfileAt`: the version
+current at the tax point while it carries a reviewed treatment, else the latest-recorded reviewed version in force at it (a later
+review whose validity reaches back to the sale resolves an unknown treatment for it; it never changes a known one), else the
+unknown itself (a blocked draft). The invoice is drafted under that version and every credit note carries exactly the corrected
+invoice's snapshot (§4.5).
 Written by the finance scope, the reviewer being the session's person; read by the agency, the finance scope and the payment
 service.
 
@@ -242,9 +264,13 @@ service applies every provider result (D-AUTH-B4) and never inserts.
 **payment_attempts** (registry PaymentAttempt, machine as vendored): one physical provider effect: operation CREATE_ORDER,
 CAPTURE or REFUND (WITHDRAW is kept in the vocabulary and refused, Q-B09-5), ordinal 1..3 per logical operation, the exact
 request hash, the provider request identity `kauro-<attemptId>` (CHECK: an attempt can only ever repeat its own request),
-the dispatch deadline set once with DISPATCHING, evidence for PROVIDER_PENDING / CONFIRMED / FAILED_NO_EFFECT, an outcome token
+the dispatch deadline set once with DISPATCHING — in the future and at most DISPATCH_DEADLINE_SECONDS (60) ahead of the claim,
+whoever claims (`payment_attempts_dispatch_deadline_bound`, D-PROTO-B6; B09-N7) —, evidence for PROVIDER_PENDING / CONFIRMED /
+FAILED_NO_EFFECT, an outcome token
 for FAILED_NO_EFFECT / UNCERTAIN / CANCELLED_BEFORE_DISPATCH. One live and one CONFIRMED attempt per logical operation; ordinal
-n > 1 only after attempt n−1 proved no effect (KA008, D-PROTO-B3). A REFUND attempt names its refund of the same order. The request
+n > 1 only after attempt n−1 proved no effect (KA008, D-PROTO-B3). A REFUND attempt names its refund of the same order, and every
+row that names an attempt — an observation, a capture fact, a provider exception — names an attempt of its own order
+(`payment_attempts_order_binding`; D-BIND-B2, B09-N6). The request
 handlers insert CREATE_ORDER and CAPTURE attempts PREPARED and claim them (PREPARED → DISPATCHING); every result and every REFUND
 attempt is the payment service's.
 
@@ -257,9 +283,12 @@ such (15 "Unknown provider statuses become UNRECOGNIZED_PROVIDER_STATE"). Writte
 one real provider capture. Its economic identity (provider, environment, provider capture id) is unique across the platform
 ("deduplicate repeated events"). The composite key to the order admits only the order's provider, environment, merchant, payee
 and currency: a wrong payee, currency or environment is never a capture fact of the order (it becomes a provider event exception,
-S058). Born in the status its first authenticated observation shows (D-INIT-B1: the initial PENDING, or one listed edge away);
-moves PENDING → COMPLETED / DENIED / REVERSED, COMPLETED → REVERSED. When it completes (or is first seen reversed, D-PAY-B5) its
-amount is allocated once: `allocated_service + allocated_tax + excess = amount`, PENDING and DENIED allocate nothing; the
+S058). Born in the status its first authenticated observation shows (D-INIT-B1: the initial PENDING, or one listed edge away), with
+its funds UNKNOWN; moves PENDING → COMPLETED / DENIED, COMPLETED → REVERSED. A reversal returns money that was captured, so a capture
+first seen REVERSED — or reversed while known only as PENDING — is recorded COMPLETED and then REVERSED, two versions and two events
+in one transaction (D-PAY-B5; B09-N3): its completion is allocated, published and posted, its reversal returns it, and its
+completion instant stays its tax point (`capture_facts_completion_time` covers REVERSED). When it completes its amount is allocated
+once: `allocated_service + allocated_tax + excess = amount`, PENDING and DENIED allocate nothing; the
 allocation never changes afterwards, the observation time never goes back, known funds availability never becomes unknown
 (KP005). `kauro.capture_facts_allocate` (AFTER trigger, under the order's row lock): the part applied to the obligation is
 exactly min(amount, still owed), and the service and tax paid by all completed captures never exceed the order's (KP002) — the
@@ -267,7 +296,8 @@ domain's `allocateCapture` splits cumulatively by largest remainder so partial c
 (15 "Summed allocations must equal the total"). `funds_state` UNKNOWN / HELD / AVAILABLE and `provider_fee_cents` are
 provider-reported facts learned after the status: each change is a new version with an event of its own —
 `capture.funds_observed.v1`, `capture.fee_observed.v1` (FINANCE only) — and `capture.completed.v1` is published exactly once per
-capture (`domain_events_capture_completed_once`; D-EVT-B2, B09-F8, B09-F15). The status is a transition subject; a reversal
+capture (`domain_events_capture_completed_once`, keyed on the capture it records; D-EVT-B2, B09-F8, B09-F15). Every capture version
+publishes the event of what it records — its status, or the one later fact it learned, never two in one version (D-EVT-B3). The status is a transition subject; a reversal
 cannot commit while an authorization of the capture is live (KP006, deferred). Written by the payment service only.
 
 **commercial_authorizations** (registry CommercialAuthorization; platform machine, D-MACH-B4; 07 "CommercialAuthorization"):
@@ -332,15 +362,19 @@ create a case with amount and age"; 15 "Webhooks and reconciliation": "Exhaustin
 AMOUNT_MISMATCH, EXCESS_CAPTURE, CAPTURE_WITHOUT_VALID_SUBJECT, UNCERTAIN_EFFECT, UNRECOGNIZED_PROVIDER_STATE,
 PROVIDER_INCONSISTENCY, REVERSAL, FEE_MISMATCH (opened by B15's settlement comparison), DISPUTE_OPEN (a dispute in progress with
 its capture and disputed amount; D-DISPUTE-B1); a detail token, amount and currency, evidence; one OPEN case per kind and subject
-(a repeated observation adds history, never a second case); opened by the payment service only; resolution recorded once by the
-finance scope, whose event is the source of a correcting ledger posting set (D-LEDGER-B4).
+(a repeated observation adds history, never a second case); a case that names several subjects names one purchase — its capture
+and its refund are its order's (`reconciliation_cases_capture_order_fk`, `…_refund_order_fk`, `…_refund_capture_fk`; D-BIND-B2,
+B09-N6); opened by the payment service only; resolution recorded once by the finance scope, whose event is the source of a
+correcting ledger posting set (D-LEDGER-B4).
 
 **provider_event_exceptions** (D-ING-B2, D-ING-B3; B09-F9): an authenticated observation no order can take —
 UNKNOWN_PROVIDER_REFERENCE, WRONG_PROVIDER, WRONG_ORDER, WRONG_PAYEE, WRONG_CURRENCY, WRONG_ENVIRONMENT (every CaptureMismatch of
 the domain), UNRECOGNIZED_PROVIDER_STATE, BODY_CONFLICT — kept for the owner's review. Its source is exactly one of a delivered
 webhook (its inbox record, composite key to its provider and environment; unattributed when it names no known order), a dispatch
 response of a stored operation (its attempt) or a stored provider query (its artifact); the latter two are attributed to the stored
-operation's order and agency. One per source and kind; append-only. No money, no commission, no authority follows from it.
+operation's order and agency, and a dispatch response's attempt is an attempt of exactly that order
+(`provider_event_exceptions_attempt_fk`; D-BIND-B2, B09-N6). One per source and kind; append-only. No money, no commission, no
+authority follows from it.
 
 ### 4.5 Fiscal documents, ledger, settlements (0013)
 
@@ -352,7 +386,9 @@ ISSUER_FACTS_UNCONFIRMED) and can move nowhere; a draft is re-pointed at a re-re
 (`tax_documents_draft_only`). DRAFT → VALIDATED is re-checked (`tax_documents_validation_guard`, KP011, after the profile's and
 the issuer's transition locks): the document's profile is the version in force at the tax point (D-FISC-B4, B09-F4) — its window
 covers the sale's tax point and it had not been superseded by then, so a re-review recorded after the sale neither blocks the
-sale's invoice nor lends it a treatment that was not in force —, its treatment reviewed, the issuer's facts observed or
+sale's invoice nor lends it a treatment that was not in force; a version recorded after the sale is admitted only with the rule
+the sale was priced with (it can resolve an unknown treatment, never change a known one; the drafter's choice is `saleProfileAt`,
+D-FISC-B6) —, its treatment reviewed, the issuer's facts observed or
 professionally confirmed with a numbering authorization; an INVOICE carries the capture's allocation and the rule the sale was
 priced with (tax point: the capture's completion); a CREDIT_NOTE carries the completed refund's approved components and exactly the
 fiscal snapshot of the invoice it corrects, which must be ISSUED (D-FISC-B5, B09-F16; it corrects the sale, so its profile is judged
@@ -366,10 +402,16 @@ not overwritten"). The drafter (payment service) writes; issuance is CMD035 (B15
 movements only. A posting set has exactly one source — the domain event that records the movement or a settlement observation —
 exposed as the registry's `eventId` (generated `event_id`), and that source is the set's idempotency identity: UNIQUE
 `(event_id, line_no)`, so a replayed delivery posts nothing (reference/HASHING "a refund webhook replay does not post another
-refund"). The source kind names the event that may source it (`ledger_entries_source_event`, KP001): CAPTURE `capture.completed.v1`,
-FEE `capture.fee_observed.v1`, FUNDS `capture.funds_observed.v1` (PSP_RECEIVABLE / PSP_HELD / PSP_AVAILABLE, never bank cash),
-CHARGEBACK `capture.reversed.v1`, REFUND `refund.completed.v1`, CORRECTION `reconciliation_case.resolved.v1` (the reviewed decision
-whose reversing and adjusting entries correct an event-sourced posting) or a settlement's own correction, SETTLEMENT a settlement.
+refund"). The source kind names the event that may source it, and the source reference is that event's own aggregate
+(`ledger_entries_source_event`, KP001; B09-N1): CAPTURE `capture.completed.v1`, FEE `capture.fee_observed.v1`, FUNDS
+`capture.funds_observed.v1`, CHARGEBACK `capture.reversed.v1` — each an event of the capture named —, REFUND `refund.completed.v1` of
+the refund named, CORRECTION `reconciliation_case.resolved.v1` of the case named (the reviewed decision whose reversing and adjusting
+entries correct an event-sourced posting) or a settlement's own correction, SETTLEMENT a settlement. The money a capture brought in
+sits in one provider balance at a time — PSP_RECEIVABLE, PSP_HELD or PSP_AVAILABLE by its funds state —; every fee, refund and
+chargeback posting takes money from the balance its event names (`fundsState`), and a funds observation moves the capture's movable
+balance — its amount less the reported fee and the money returned — between them (D-LEDGER-B5; B09-N4). The database admits a
+FUNDS set only on the three provider balances (`ledger_entries_funds_accounts`) and bank money, in transit or cash, only from a
+settlement observation (`ledger_entries_bank_accounts`; the bank-available amount itself needs bank evidence).
 Every posting carries its effective date, its observed date (never after the posting) and its posting instant (15 "Every posting
 includes event ID, source object, amount/currency, effective date, observed date, policy version and reversal relationship";
 B09-F15). Each set balances within its currency and names one source kind, reference and agency at COMMIT (KP001); a correction
@@ -396,7 +438,7 @@ policy (REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED) — exactly as B06 d
 |---|---|---|
 | Quote (D-MACH-B1; 07 "Quote and checkout states" names the states) | DRAFT | issue_quote DRAFT→ISSUED; withdraw_quote DRAFT/ISSUED/ACCEPTED_FOR_CHECKOUT→WITHDRAWN; accept_terms_for_checkout ISSUED→ACCEPTED_FOR_CHECKOUT (CMD028; a replacement only by its re-binding); price_expiry_reached ISSUED/ACCEPTED→EXPIRED; superseding_quote_issued ISSUED/ACCEPTED→SUPERSEDED (a paid quote only when its purchase is closed or re-bound to that successor) |
 | PaymentOrder (D-MACH-B2; the contract's states) | INTENT_CREATED | dispatch_intent_committed →CREATING; cancel_before_dispatch INTENT_CREATED→CANCELLED; provider_order_created CREATING→CREATED; creation_proved_no_effect CREATING→FAILED; buyer_approval_observed CREATED→APPROVED; capture_dispatch_committed CREATED/APPROVED→CAPTURING; capture_observed CREATED/APPROVED/CAPTURING/CAPTURE_UNCERTAIN→CAPTURED; capture_ambiguous CAPTURING→CAPTURE_UNCERTAIN; capture_proved_no_effect CAPTURING→APPROVED; capture_proved_no_effect_unapproved CAPTURING→CREATED; reconciliation_proves_no_capture CAPTURE_UNCERTAIN→APPROVED; reconciliation_proves_no_capture_unapproved CAPTURE_UNCERTAIN→CREATED; order_voided CREATED/APPROVED→CANCELLED; order_expired CREATED/APPROVED→EXPIRED |
-| CaptureFact (D-MACH-B3) | PENDING (observed birth, D-INIT-B1) | provider_completed PENDING→COMPLETED; provider_denied PENDING→DENIED; provider_reversed PENDING/COMPLETED→REVERSED (the fee and funds observations are versions without a state change, D-EVT-B2) |
+| CaptureFact (D-MACH-B3) | PENDING (observed birth, D-INIT-B1) | provider_completed PENDING→COMPLETED; provider_denied PENDING→DENIED; provider_reversed COMPLETED→REVERSED (a capture first seen reversed is recorded COMPLETED then REVERSED, D-PAY-B5; the fee and funds observations are versions without a state change, D-EVT-B2) |
 | CommercialAuthorization (D-MACH-B4) | ACTIVE | execution_admitted ACTIVE→CONSUMED (CMD036, B08); package_published CONSUMED→DELIVERED (B08); authority_revoked ACTIVE/CONSUMED/DELIVERED→REVOKED (reversal, full service refund, or SOURCE_REPLACED by a re-binding) |
 | Refund (D-MACH-B5; the contract's states) | REQUESTED | approve_refund →APPROVED; reject_refund →REJECTED; dispatch_intent_committed APPROVED→SUBMITTING; authorization_lapsed APPROVED→FAILED; authenticated_completed SUBMITTING→COMPLETED; ambiguous_transport_result SUBMITTING→UNCERTAIN; proved_no_effect SUBMITTING→APPROVED; provider_refused SUBMITTING→FAILED; reconciliation_completed UNCERTAIN→COMPLETED; reconciliation_proves_no_effect UNCERTAIN→APPROVED; reconciliation_proves_refusal UNCERTAIN→FAILED |
 | ReconciliationCase (D-MACH-B6) | OPEN | case_resolved OPEN→RESOLVED |
@@ -411,21 +453,24 @@ B09, is re-assigned to its grant package B03 with the reason Q-B09-9 (B09 funds 
 ## 5. Ports
 
 Domain repositories (`@kauro/domain` `ports/commerce.ts`, implemented over `pg` by M1): `PaymentRouteRepository`,
-`FiscalRepository` (current profile after its transition lock; `profileInForceAt` for a document's tax point, D-FISC-B4; issuer
-after its lock; `recordProfile` superseding once), `CorporateGrantRepository.activeGrant` (after the grant's lock),
+`FiscalRepository` (current profile after its transition lock; `saleProfileAt`, the version of a sale's tax point, D-FISC-B6; issuer
+after its lock; `recordProfile` superseding once, at the successor's own instant), `CorporateGrantRepository.activeGrant` (after the grant's lock),
 `RefundPolicyRepository`, `PricePolicyRepository`, `ScopeIndex` (record / resolve), `QuoteRepository` (issue with snapshot; CAS
 transitions), `PaymentOrderRepository` (insert, `findByIntentEntry`, `findOpenForProject`, CAS transitions with provider ids
 learned once), `PaymentAttemptRepository` (prepare, `findLive`, `countFor`, `findByIntentEntry`, CAS transitions),
-`CaptureFactRepository` (insert at first observed status, `advance`, versioned `observeFunds` and `observeFee`,
+`CaptureFactRepository` (insert at first observed status with funds UNKNOWN, `advance` one edge per version, versioned `observeFunds`
+and `observeFee` — one fact per version —,
 `committedRefunds`, `findByProviderCapture`), `ProviderObservationRepository`, `CommercialAuthorizationRepository` (issue,
-`findLiveByCapture`, transitions), `PurchaseRebindingRepository`, `RefundRepository` (request, `fileServerRequest` idempotent per
+`findLiveByCapture`, `findLiveByRevisionHash` — the query behind B07's impact map, §15 item 6 —, transitions), `PurchaseRebindingRepository`, `RefundRepository` (request, `fileServerRequest` idempotent per
 capture and origin, approve with the immutable intent, transition, `findOpenForCapture(capture, origin)`), `TaxDocumentRepository`
-(draft, redraft, transition, live invoice / credit note, blocked drafts), `LedgerRepository.post` (idempotent by source; observed
-date; reversal links), `SettlementRepository`, `ReconciliationCaseRepository.open` (idempotent per kind and subject),
+(draft, redraft, transition, live invoice / credit note, blocked drafts), `LedgerRepository.post` (idempotent by source; the source
+reference is the event's aggregate; observed date; reversal links), `SettlementRepository`, `ReconciliationCaseRepository.open` (idempotent per kind and subject),
 `PaymentInboxRepository` (lock for apply, settle), `ProviderExceptionRepository` (from any source, idempotent per source and
 kind). `CommerceUnitOfWork extends UnitOfWork` adds `commerce`, `scopes`, `adoptScope`, `adoptFinanceScope`, `commerceScope`;
 `CommerceUnitOfWorkFactory` runs it. Every versioned write is compare-and-swap and answers STALE with the current safe version and
-state (B06 D-VER-1); every read of a fact relied on without change happens after that fact's transition lock (B06 D-TX-2).
+state (B06 D-VER-1); every read of a fact relied on without change happens after that fact's transition lock (B06 D-TX-2); every
+version is published with the event `commerceVersionEventType` names (D-EVT-B3), its outbox records addressed to that type's
+subscribers only.
 
 Application ports (`@kauro/application` `commerce/ports.ts`; no port call inside a database transaction, 07):
 `PaymentProviderAdapter` (pure `prepareCreateOrder` / `prepareCapture` / `prepareRefund` producing the exact `ProviderRequest`
@@ -437,9 +482,9 @@ raw bytes; signature, freshness, environment; bounded body), `ProviderEvidenceSt
 content-addressed; 10 "Raw sensitive provider responses stay in a restricted reconciliation store"), `FiscalDocumentBridge`
 (pure `prepare` of the issuance packet from the reviewed treatment — nothing it could infer an exemption from, R2-128; `submit`
 and `observe` are CMD035's, B15), `ServiceAuthenticator` (issuer, audience, identity, environment), `CommerceAuthorizer` (§3.4),
-`CommerceReconciler` (the §6.3 algorithm behind CMD029's settle step, the webhook's application and CMD034 — implemented by M2,
-called by M3), `CommerceEventConsumer` (FINANCE, FISCAL, PAYMENT_SERVICE; §8.1) and `PurchaseRebinder` (D-QUOTE-B6, implemented by
-M2, called by B10's replacement flow). The platform ports of the packages B09 meets at integration (§15; each read inside the
+`CommerceReconciler` (the §6.3 algorithm behind the settle step of CMD028, CMD029 and CMD033, the webhook's application and CMD034 —
+implemented by M2, called by M3 and M4), `CommerceEventConsumer` (FINANCE, FISCAL, PAYMENT_SERVICE; §8.1; implemented by M3) and
+`PurchaseRebinder` (D-QUOTE-B6, implemented by M3, called by B10's replacement flow). The platform ports of the packages B09 meets at integration (§15; each read inside the
 caller's unit of work, never a call outside a transaction; `binding` PLATFORM or CONTRACT_FAKE): `DeliveryCapacityPort` (B08's
 admission; D-CAP-B1), `SourceAvailabilityReader` and `SourceLineageReader` (B07's retention records and lineage; D-QUOTE-B7,
 D-QUOTE-B6). The provider-effect protocol's phase interface is `ProviderCommandPhases` (`commerce/protocol.ts`, §6.1).
@@ -448,7 +493,8 @@ Contract fakes (D-FAKE-B1): until B15, the tests bind fakes of `PaymentProviderA
 `ProviderEvidenceStore`, `FiscalDocumentBridge` and `ServiceAuthenticator` that implement the documented provider contract
 (PayPal Orders v2 shapes of 15 "Capture and authority"), declare `integrationClass: "CONTRACT_FAKE"`, live under `test/` or a
 `testing` subpath, and are named SIMULATED in the case map; until B07 and B08 are on main, the platform ports are bound to fakes
-declaring `binding: "CONTRACT_FAKE"`, named SIMULATED the same way. The database refuses a fake route on LIVE; nothing in the
+declaring `binding: "CONTRACT_FAKE"`, named SIMULATED the same way. Every fake has one owner, the stage-1 mandate M2 (§14). The
+database refuses a fake route on LIVE; nothing in the
 product wiring binds a fake.
 
 ## 6. Transaction discipline
@@ -463,8 +509,10 @@ as five steps (`commerce/protocol.ts`):
    (RESERVED) → assurance → locked preconditions → durable intent (the order or refund row; the attempt PREPARED with its request
    hash and provider request identity; the platform scope rows) → events and outbox → COMMIT. The journal entry stays RESERVED.
 2. **T2 claim** — one unit of work of the same principal: CAS the attempt PREPARED → DISPATCHING with `dispatch_deadline_at` =
-   now + DISPATCH_TIMEOUT_SECONDS (30) + DISPATCH_WATCHDOG_MARGIN_SECONDS (30), and the aggregate's own dispatch edge (order
-   CREATING / CAPTURING, refund SUBMITTING). The single serialization point of "dispatch at most once": a loser of the CAS never
+   now() + DISPATCH_DEADLINE_SECONDS (DISPATCH_TIMEOUT_SECONDS 30 + DISPATCH_WATCHDOG_MARGIN_SECONDS 30), computed by the database
+   in the claim's own statement, never on the claimant's clock — the database refuses any other deadline, in the past or further
+   ahead, whoever claims (`payment_attempts_dispatch_deadline_bound`, D-PROTO-B6; B09-N7), so no claimed attempt stays out of the
+   watchdog's due set — and the aggregate's own dispatch edge (order CREATING / CAPTURING, refund SUBMITTING). The single serialization point of "dispatch at most once": a loser of the CAS never
    calls the provider.
 3. **call** — outside any transaction: exactly the prepared request under `kauro-<attemptId>`, bounded by the deadline.
 4. **T3 settle** — a SERVICE unit of work under `kauro_payment` (the spec's `settleRuntimeRole`; D-PROTO-B5, B09-F1), adopting the
@@ -533,9 +581,13 @@ way, inside one SERVICE unit of work under the order's row lock:
    duplicate, or a regression is kept as history (STALE_IGNORED / DUPLICATE) and changes nothing (15 "An old pending event cannot
    roll back a confirmed terminal capture"); a contradiction of a terminal state opens PROVIDER_INCONSISTENCY; an unknown status
    is UNRECOGNIZED and opens UNRECOGNIZED_PROVIDER_STATE.
-5. **Step** (`captureStatusStep`): insert the fact at its observed status, or advance it along the lattice; on completion,
-   allocate (`allocateCapture`: min(amount, owed) to the obligation, split cumulatively, the rest excess). A funds availability or
-   a fee learned after the completion is a new version with `capture.funds_observed.v1` / `capture.fee_observed.v1` (D-EVT-B2).
+5. **Step** (`captureStatusStep`): insert the fact at its observed status with its funds UNKNOWN, or advance it along the lattice,
+   one version and one event per edge — an observation of REVERSED for a capture unknown or PENDING walks its completion first
+   (`then`: COMPLETED, then REVERSED, in this transaction; D-PAY-B5); on completion, allocate (`allocateCapture`: min(amount, owed)
+   to the obligation, split cumulatively, the rest excess). A funds availability or a fee learned after the completion is a new
+   version with `capture.funds_observed.v1` / `capture.fee_observed.v1`, one fact per version (D-EVT-B2, D-EVT-B3); a funds
+   observation's event carries the capture's movable balance, read after the capture's row lock (FOR UPDATE) so that a refund
+   completing concurrently is either seen or ordered after it (D-LEDGER-B5).
 6. **Consequences in the same transaction**: the order's edge (capture_observed, …); when the capture alone pays the whole
    obligation and every prerequisite still binds (`authorizationBlockers`; price expiry honored per D-AUTH-B3), issue the
    CommercialAuthorization; a partial amount opens AMOUNT_MISMATCH; an excess opens EXCESS_CAPTURE and files an EXCESS_CAPTURE
@@ -546,7 +598,9 @@ way, inside one SERVICE unit of work under the order's row lock:
    capture opens DISPUTE_OPEN with its amount and records the funds HELD, leaving the capture COMPLETED and its entitlement live
    (D-DISPUTE-B1); a reversal revokes the live authorization with its phase and lapses APPROVED refunds of the capture (Refund
    authorization_lapsed), and opens REVERSAL.
-7. **Events and outbox**, the inbox record's settlement (webhook: APPLIED with the result event, IGNORED, REJECTED or RETRYABLE),
+7. **Events and outbox** — each version's event is the one `commerceVersionEventType` names, a fee's, a refund's completion and a
+   reversal's payload name the funds state their money is taken from (D-EVT-B3, D-LEDGER-B5), and the outbox records go to the
+   type's subscribers —, the inbox record's settlement (webhook: APPLIED with the result event, IGNORED, REJECTED or RETRYABLE),
    and the observation's effect.
 
 ## 7. Error contract
@@ -575,6 +629,13 @@ KP010 POLICY_NOT_APPLICABLE → ASSURANCE_REQUIRED; `refunds_reason_code_label` 
 `refunds_one_requested_per_origin` → REFUND_REQUEST_OPEN (CUSTOMER_REQUEST; the server's origins file ON CONFLICT DO NOTHING),
 `commercial_authorizations_one_*` → the replayed/current authorization, `capture_facts_provider_identity` → DUPLICATE,
 `domain_events_capture_completed_once` → INTEGRITY_FAILURE (a reconciler that follows D-EVT-B2 never meets it).
+The guards of the second revision are met only by a writer that bypassed the domain rules, and translate to INTEGRITY_FAILURE:
+the event bindings (`domain_events_commerce_kind`, the `*_event_type_per_version` triggers) answer KA003 EVENT_MISSING; the
+restrictive policies on `domain_events` and `outbox_records` answer 42501 like every other policy (B06); the adapters of M1
+translate by constraint name the checks `payment_attempts_dispatch_deadline_bound` (the claim writes the database's own deadline),
+`fiscal_profiles_supersession_lineage` and `fiscal_profiles_successor_fk` (a re-review writes its two instants as one),
+`ledger_entries_funds_accounts` and `ledger_entries_bank_accounts` (postings come from `planPostings`) and the attempt keys of
+D-BIND-B2 to INTEGRITY_FAILURE rather than to B06's default INVALID_REQUEST.
 
 Outcome catalogues (`commerce/outcomes.ts`, D-OUT-B1): each route's closed catalogue composes B06's `ROUTE_OUTCOME_FRAGMENTS`
 (every route's transport, admission, authentication, idempotency and platform outcomes; path ids; tenant membership; the agency
@@ -749,7 +810,8 @@ one ("any prior ambiguous submission is reconciled": PAYMENT_UNCERTAIN REFUND_UN
 attempt PREPARED; **T2** refund SUBMITTING, attempt DISPATCHING; **call** `dispatch(prepareRefund)` for the approved total under
 the attempt's request identity; **T3**: REFUND_OBSERVED COMPLETED with the exact amount → attempt CONFIRMED, refund COMPLETED
 (refund.completed.v1 → FINANCE, FISCAL, COMMISSIONS, NOTIFICATIONS: the credit note, the ledger return posting and the commission
-adjustment follow the event, once each); a completion that leaves no service basis revokes the authorization in the same
+adjustment follow the event, once each; its payload names the capture's funds state, read after the capture's row lock FOR SHARE,
+D-LEDGER-B5); a completion that leaves no service basis revokes the authorization in the same
 transaction (KP006, D-REF-B5); AMBIGUOUS → refund UNCERTAIN, attempt UNCERTAIN, 202; PROVED_NO_EFFECT → refund back to APPROVED
 (a new deliberate attempt later); definitive refusal → FAILED (the commitment is released). **T4** completes the journal (the
 same SERVICE principal).
@@ -771,7 +833,7 @@ any transaction and stored it). Access → `adoptScope("PAYMENT_ORDER", id)` →
 and is about this order, provider and environment (OBSERVATION_SUBJECT_MISMATCH) → lock order → reconcile (§6.3) including
 uncertain attempts (UNCERTAIN → CONFIRMED / FAILED_NO_EFFECT), uncertain refunds (→ COMPLETED / APPROVED / FAILED), order
 creation (CREATING → CREATED / FAILED), capture uncertainty, reversals, disputes, funds availability (`funds_state` as reported,
-`capture.funds_observed.v1`; never available cash) and the reported fee (learned once, `capture.fee_observed.v1`; a fee that
+`capture.funds_observed.v1` with the movable balance; never bank cash) and the reported fee (learned once, `capture.fee_observed.v1`; a fee that
 differs from a fee already learned is a PROVIDER_INCONSISTENCY case; a statement fee differing is FEE_MISMATCH, B15's settlement
 comparison). A capture of the order the query shows with another payee, currency or order is the specific exception with the
 artifact as its source (D-ING-B3). 200 `ReconcilePaymentView { order, captures, commercialAuthorization, effects, openCases }`.
@@ -781,7 +843,8 @@ artifact as its source (D-ING-B3). 200 `ReconcilePaymentView { order, captures, 
 - **DENY**: an order of another agency than the stored operation's (NOT_FOUND), a wrong service identity (SERVICE_NOT_PERMITTED /
   SERVICE_ENVIRONMENT_MISMATCH) and one missing prerequisite (no stored evidence; evidence of another order): "A provider
   pending/held state is never coerced to settled available cash": funds are HELD/AVAILABLE as reported; bank cash exists only in a
-  settlement with bank evidence (`settlements_bank_evidence`, proven).
+  settlement with bank evidence (`settlements_bank_evidence`, proven), a FUNDS posting touches only the provider balances and no
+  event-sourced posting touches bank money (`ledger_entries_funds_accounts`, `ledger_entries_bank_accounts`; B09-N4, proven).
 - **RACE**: the identical retry replays; the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect; a
   crash at the intent/commit boundary leaves nothing and the retry applies the artifact once; reconcile vs webhook vs capture
   settle: the order row lock; observations are monotonic and idempotent per artifact and inbox record.
@@ -793,14 +856,16 @@ identity — 07 "Consumers deduplicate by their own durable inbox identity"):
 
 - **FINANCE** (capture.completed, capture.fee_observed, capture.funds_observed, capture.reversed, refund.completed,
   reconciliation_case.resolved): adopts the event's agency through its order, posts the balanced set (`capturePostings`,
-  `providerFeePostings` of the reported fee, `fundsPostings`, `returnPostings`, a case's reversing and adjusting entries) with the
-  event as source and its observed date; a replay is a no-op (UNIQUE `(event_id, line_no)`). A fee the provider reports after the
+  `providerFeePostings` of the reported fee from the provider balance its event names, `fundsPostings` of the movable balance
+  between the provider balances, `returnPostings` from the balance a refund's or reversal's event names, a case's reversing and
+  adjusting entries; D-LEDGER-B5) with the event as source — the source reference its aggregate — and its observed date; a replay is a no-op (UNIQUE `(event_id, line_no)`). A fee the provider reports after the
   completion is its own event, whose posting set carries only the fee lines; the completion is never re-published (D-EVT-B2).
-- **FISCAL** (capture.completed, refund.completed; tax_document.validated / uncertain for B15): drafts the invoice / credit note
-  (one live per capture / refund) under the profile version in force at the tax point (`profileInForceAt`, D-FISC-B4), resolves the
-  treatment (`resolveFiscalTreatment`), validates or records the blocker; a credit note takes the corrected invoice's snapshot and
-  waits for the invoice's issuance (D-FISC-B5); when a profile is re-reviewed, re-evaluates blocked drafts (`listBlockedDrafts`,
-  `redraft`). It does not receive the fee or funds events (they are not a new collection).
+- **FISCAL** (capture.completed, refund.completed; tax_document.validated / uncertain for B15): drafts the invoice (one live per
+  capture) under the version of the sale's tax point — the capture's completion — (`saleProfileAt`; D-FISC-B4, D-FISC-B6) and a
+  credit note (one live per refund) with exactly the corrected invoice's snapshot, judged at the sale's tax point, never at the
+  refund's completion (D-FISC-B5, B09-N5); resolves the treatment (`resolveFiscalTreatment`), validates or records the blocker; a
+  credit note waits for the invoice's issuance; when a profile is re-reviewed, re-evaluates blocked drafts (`listBlockedDrafts`,
+  `redraft`: a later review whose validity reaches back to the sale resolves an unknown treatment; it never changes a known one). It does not receive the fee or funds events (they are not a new collection).
 - **PAYMENT_SERVICE** (payment_attempt.dispatching / provider_pending / uncertain; refund.approved / uncertain): the watchdog
   and the refund executor (CMD033 with its own journal key derived from the refund and version).
 
@@ -829,7 +894,15 @@ authority (10 "A UI readiness flag is informative"); `paymentStatus` (D-PAY-B2):
 49 event types (`COMMERCE_EVENT_TYPES`; seeded by 0009): one per reachable state of each versioned commerce aggregate
 (`<kind>.<state>.v1`; a back edge publishes the type of its target state with `previousState`) plus the capture's two later facts
 (`capture.fee_observed.v1`, `capture.funds_observed.v1`; D-EVT-B2), 8 aggregate kinds (quote, payment_order, payment_attempt,
-capture, commercial_authorization, refund, tax_document, reconciliation_case) registered in the foundation's registry. Payloads
+capture, commercial_authorization, refund, tax_document, reconciliation_case) registered in the foundation's registry. What each
+type records and who may publish it is enforced by the database, not only by the code (D-EVT-B3; B09-N1):
+`kauro.commerce_event_bindings` binds every type to its aggregate kind and to the state — or, for the capture's later facts, the
+fact — its version records, and to the request handlers' principal that authors it (`COMMERCE_STATE_EVENT_TYPES`,
+`COMMERCE_REQUEST_HANDLER_EVENT_TYPES`, `commerceVersionEventType`); `domain_events_commerce_kind` refuses a commerce type on another
+kind, each commerce table's `*_event_type_per_version` trigger refuses a version whose event is not the one of what it records
+(KA003), `domain_events_commerce_request_handlers` refuses `kauro_app` every type its principal does not author (42501), and
+`outbox_records_commerce_subscribers` addresses a commerce event's outbox records only to its subscribers
+(`kauro.commerce_event_subscriptions`). Payloads
 follow B06 D-EVT-2 — ids, hashes, tokens, non-negative integers, booleans; no provider identifiers, no label (the refund's reason
 stays on its row), server reasons as tokens (`outcomeCode`, `failureCode`, `revocationCode`, `rejectionCode`, `detailCode`); the
 allowlists are `COMMERCE_EVENT_PAYLOAD_ALLOWLIST` (commercial_authorization.issued.v1 names `orderQuoteId` and `rebindingId`).
@@ -873,7 +946,8 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
   specific exception from whichever source observed it; a wrong amount is a real capture recorded with its allocation, never
   authority, AMOUNT_MISMATCH case (+ refund request).
 - **S059** reversal before local capture observation or after delivery → reconcile the real order, phase-specific restriction, no
-  second charge: a fact born REVERSED allocates and posts (D-PAY-B5); a reversal revokes with PRE_EXECUTION / DURING_EXECUTION /
+  second charge: a reversal observed before the capture is recorded as the capture's completion and then its reversal — allocated,
+  posted and returned (D-PAY-B5; B09-N3); a reversal revokes with PRE_EXECUTION / DURING_EXECUTION /
   POST_DELIVERY (KP006, phase trigger); the order stays CAPTURED (never charged again); delivered history stays; a dispute in
   progress holds the funds without revoking anything until the provider reverses (D-DISPUTE-B1).
 - **S060** a price-valid quote after source deletion → checkout blocked; identical reupload needs a new revision and approval:
@@ -883,7 +957,8 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
   nothing is refunded as KAURO_REMEDY and then releases its quote (D-QUOTE-B4).
 - **R2-077** 129500 at 2500 bps → discount 32375, service 97125: `discountCents`, `kauro.round_half_up_bps`, the quote CHECKs.
 - **R2-078** fee 5275, net 91850 (illustration; actual fees replace it): `illustrativeProcessorFee` for the illustration; the
-  ledger posts only the provider-reported fee (`providerFeePostings`, sourced by the completion or by `capture.fee_observed.v1`).
+  ledger posts only the provider-reported fee (`providerFeePostings`, sourced by the completion or by `capture.fee_observed.v1`), from
+  the provider balance its event names, and the funds move net of it (D-LEDGER-B5).
 - **R2-081** one-cent refund sequence → cumulative entitlement reaches exactly zero: `cumulativeEntitlement` /
   `entitlementAdjustment` from the remaining service basis (`serviceBasisAfterCents` in refund.completed.v1), and the tax of the
   same sequence returns exactly the collected tax (D-REF-B6); the commission ledger itself is B10's.
@@ -920,7 +995,7 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-INIT-B1 | A provider capture is born in the status its first authenticated observation shows: the initial state or one listed edge from it (`enforce_observed_birth`) | 07 "Provider webhooks can arrive … out of order"; 15 "Events may arrive before the browser returns"; B06 D-INIT-1 refuses skipped edges — a first observation of COMPLETED is not a skipped decision but a late observation |
 | D-MACH-B1..B10 | The ten platform machines of §4.6 | the registry contracts carry states without machines (Quote states named by 07; PaymentOrder, CaptureFact, Refund contracts); platform records need guarded lifecycles; declared like B06 D-AGG-1/2 |
 | D-EVT-B1 | The B09 aggregate kinds are rows of the foundation's `kauro.aggregate_kinds`, one INSERT per kind in the migration that creates its table; `kauro_payment` reads the registry through its own policy; B09 never edits 0008, the foreign key or the binding | FOUNDATION D-AGGK-1..5 and §4 (resolves Q-B09-13); 08 "Dynamic SQL based on customer input is prohibited" (the identifiers are the migration-owned registry's) |
-| D-EVT-B2 | A provider fact learned after the capture's status — the funds' availability, the fee — is a new capture version with its own event (`capture.funds_observed.v1`, `capture.fee_observed.v1`) routed to FINANCE only; `capture.completed.v1` is published once per capture (partial unique index on `domain_events`) | B09-F8, B09-F15; 15 "Repeated delivery cannot duplicate capture, authorization, refund or commission"; TRANSITIONS "Cross-aggregate finalization" (separate idempotent effects from the same reconciled financial event); CMD030 failure "duplicates do not add money or commissions" |
+| D-EVT-B2 | A provider fact learned after the capture's status — the funds' availability, the fee — is a new capture version with its own event (`capture.funds_observed.v1`, `capture.fee_observed.v1`) routed to FINANCE only; `capture.completed.v1` is published once per capture (partial unique index on `domain_events`, keyed on the capture) | B09-F8, B09-F15; 15 "Repeated delivery cannot duplicate capture, authorization, refund or commission"; TRANSITIONS "Cross-aggregate finalization" (separate idempotent effects from the same reconciled financial event); CMD030 failure "duplicates do not add money or commissions" |
 | D-FACT-B1 | Security facts of the payment service and the ingress: no agency, actor SERVICE or ANONYMOUS, action CMD030 for the ingress | 08 "Threat model and assets": "Every boundary has a schema, identity, authorization predicate, replay behavior and audit event" (provider webhook to inbox is one); B06 streams unchanged |
 | D-MONEY-B1 | BIGINT minor units within 0..2^53−1; arithmetic CHECKs in numeric; one rounding primitive floor((B×r+5000)/10000) | 07 "Money uses BIGINT minor units"; reference/HASHING "Exact money"; 15 "Round once at the named monetary boundary" |
 | D-TIME-B1 | Every duration constraint is exact hours or seconds on UTC instants (quote expiry 336 hours, lookback 8760 hours, source hard cap 1,209,600 s), never days on timestamptz | B09-F12; reference/HASHING "Retention formulas" ("Use UTC instants for storage … Duration days equal 86400 seconds") |
@@ -936,7 +1011,7 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-PAY-B2 | The agency's payment status is derived: NOT_STARTED, PENDING, CONFIRMED, FAILED, CHECKING | 15 "Payment state transitions" customer copy |
 | D-PAY-B3 | Every applied observation is history with its effect; facts move only forward | 15 "adds facts monotonically"; 07 "An old event may add historical evidence without rolling current state backward" |
 | D-PAY-B4 | The browser's `providerApprovalRef` is compared with the stored order, never evidence | CMD029 failure "Browser success … cannot create CommercialAuthorization"; S057 |
-| D-PAY-B5 | A capture first seen REVERSED was completed at the provider: it is allocated and posted, then reversed | S059 "reversal arrives out of order before local capture observation"; the money moved twice |
+| D-PAY-B5 | A capture first seen REVERSED — or reversed while known only as PENDING — was completed at the provider: it is recorded COMPLETED (allocated, `capture.completed.v1`, the CAPTURE posting, its completion instant as the tax point) and then REVERSED (`capture.reversed.v1`, the CHARGEBACK posting) in one transaction; the machine has no PENDING → REVERSED edge and a REVERSED birth is refused | S059 "reversal arrives out of order before local capture observation"; the money moved twice; B09-N3; 15 "Operational ledger"; D-INIT-B1 (a REVERSED birth is two edges from the initial state) |
 | D-AUTH-B1 | Authorization issuance is re-checked by the database under the transition locks (KP004) | 07 "CommercialAuthorization"; S057, S058, S060 |
 | D-AUTH-B2 | A reversal revokes the live authorization in the same transaction with the phase it leaves (KP006) | 07 "Payment reversal before execution prevents launch …"; 15 "Disputes and chargebacks" |
 | D-AUTH-B3 | A capture completed after price expiry is honored when source, target, approval, capability and the quoted reviewed tax rule still bind (`honored_after_price_expiry`); otherwise a remedy refund | 15 "Price and source expiry races" ("honors the same price only when source, target, legal treatment and delivery scope remain valid"); M2 adds the tax-rule check to `authorizationBlockers` for this case |
@@ -950,7 +1025,7 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-FISC-B1 | Reviewed fiscal profile versions; unreviewed treatments block quotes and fiscal drafts; validation re-checked by the database (KP011) | 15 "FiscalProfile"; R2-082; R2-128 |
 | D-FISC-B2 | A credit note is required exactly when service or tax is refunded | 15 "Refunds … create the legally appropriate credit/debit document"; an excess is not a sale |
 | D-FISC-B3 | Corrections keep lineage: a corrected draft names its predecessor; an issued document is corrected by an issued correction | registry TaxDocument corrected_draft_version, lawful_credit_or_correction_issued; 15 "Original issued facts are not overwritten" |
-| D-FISC-B4 | A document is validated against the profile version in force at its tax point (window covers it, not superseded by then); the current version is required only for a new quote and a new draft's choice; a re-review that changes the treatment after a sale leaves the sale's documents under the treatment it was priced and in force with (a retroactive correction is a professional decision, Q-B09-20) | B09-F4; registry FiscalProfile validFrom/validUntil; 15 "FiscalProfile" (effective dates, reviewer evidence); registry TaxDocument DRAFT→VALIDATED guard |
+| D-FISC-B4 | A document is validated against a profile version in force at the sale's tax point (window covers it, not superseded by then) carrying the rule the sale was priced with; the current version is required only for a new quote; which version a sale's documents take is D-FISC-B6; a re-review that changes the treatment after a sale leaves the sale's documents under the treatment it was priced and in force with (a retroactive correction is a professional decision, Q-B09-20) | B09-F4; registry FiscalProfile validFrom/validUntil; 15 "FiscalProfile" (effective dates, reviewer evidence); registry TaxDocument DRAFT→VALIDATED guard |
 | D-FISC-B5 | A credit note carries exactly the fiscal snapshot of the invoice it corrects, which must be ISSUED; a debit note is not validated until a flow defines its basis | B09-F16; 15 "TaxDocument state machine" ("relationship to the original"); Q-B09-18 |
 | D-LEDGER-B1 | Posting sets sourced by one event or settlement; idempotent by source; balanced per currency at commit; append-only; reversals mirror | 15 "Operational ledger"; reference/HASHING "Ledger posting and reconciliation" |
 | D-LEDGER-B2 | Accounts OPS-1; a capture is contract liability; the actual reported fee is posted, never the illustration | 15 "Revenue recognition…", "actual statement fees replace the illustration" (R2-078) |
@@ -959,7 +1034,7 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-SETTLE-B1 | Bank-available cash requires bank evidence and cannot exceed withdrawals | 15 "Settlement and withdrawal"; CMD034 failure |
 | D-ROUTE-B1 | Merchant and fiscal issuer routes are configuration records qualified with evidence | 15 "Merchant identity and environment are fixed by server configuration"; "Accounting integration decision"; R2-083 |
 | D-RPOL-B1 | Standing refund policies are versioned, step-up-authorized records with explicit applicability | CMD032 failure text |
-| D-FAKE-B1 | Contract fakes are labelled CONTRACT_FAKE in code and evidence; a fake route can never be LIVE; the platform ports of B07 and B08 are bound to fakes declaring `binding: "CONTRACT_FAKE"` until their package is on main | the task's rule; 21 "Evidence classes" |
+| D-FAKE-B1 | Contract fakes are labelled CONTRACT_FAKE in code and evidence; a fake route can never be LIVE; the platform ports of B07 and B08 are bound to fakes declaring `binding: "CONTRACT_FAKE"` until their package is on main; every fake has one owner, the stage-1 mandate M2 | the task's rule; 21 "Evidence classes" |
 | D-BIND-B1 | Binding UNIQUE targets and partial indexes added to B06 tables | 07 "Composite foreign keys … prevent a project … from referencing another agency's revision, quote, package or client" |
 | D-TX-B1 | New transition subjects and the global lock order of §6.2 | B06 D-TX-2 extended |
 | D-RESP-B1 | B09 views derived under B06 D-RESP-1 with provider identifiers and evidence withheld | 10 "Read endpoints return safe projections"; "Raw sensitive provider responses stay in a restricted reconciliation store" |
@@ -968,6 +1043,12 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-CONS-B1 | FINANCE, FISCAL, PAYMENT_SERVICE consumers in the payment service, idempotent by source identity and uniqueness | 07 "Outbox, inbox and event ordering" |
 | D-LABEL-B1 | The refund reason is a label: stored and answered, covered by the authorization digest, never in an event | B06 D-API-1, D-LABEL-1 |
 | D-CASEMAP-B1 | Every DENY and RACE test title of CMD028–CMD034 in the case map states its registry scenario verbatim (foreign tenant, wrong role or service identity, one missing prerequisite; identical retry, same key with another digest → IDEMPOTENCY_CONFLICT, crash at the intent/commit boundary); the RACE of a provider-effect command (CMD028, CMD029, CMD033) injects the crash on both sides of the intent commit and between the claim and the settle, after the provider call, where only an observation by request identity may follow; `tools/test/b09-case-map.test.mjs` enforces both | B09-F7 (its fix names "a crash injected between intent commit and claim, and between claim and settle"); registry cases.json scenarios; 10 "Contract tests and compatibility" (lost response, external uncertainty); 07 "It must not repeat the external effect under a new key" |
+| D-EVT-B3 | An event records one version of one aggregate of its own kind — the state that version reaches or, for a capture version that keeps its status, the one later provider fact it learned (never two) —; the request handlers publish only the event types of their own edges (TENANT: the quote lifecycle, the intent and claim of a provider effect, the refund request; OPERATOR: a refund's review, a case's resolution); a commerce event's outbox records go only to its registered consumers. The database enforces all of it beside B06's event-per-version rule, never by editing B06's or the foundation's objects: `kauro.commerce_event_bindings` and `kauro.commerce_event_subscriptions` (0009), the trigger `domain_events_commerce_kind`, the per-table `*_event_type_per_version` triggers (`kauro.require_commerce_event_type`, KA003), the restrictive policies `domain_events_commerce_request_handlers` and `outbox_records_commerce_subscribers` (42501); the ledger's source binding then trusts the event it names | B09-N1; 07 "Outbox, inbox and event ordering" (an event carries its aggregate ID and version; one event per committed version); 07 "Application checks improve messages but cannot be the sole protection"; 08 "Threat model and assets" (a malicious agency member); registry CaptureFact invariant "Browser claims cannot produce a capture fact"; 15 "Repeated delivery cannot duplicate capture, authorization, refund or commission"; CMD030 failure "duplicates do not add money or commissions"; D-AUTH-B4; FOUNDATION D-AGGK-4 (the binding is not edited) |
+| D-LEDGER-B5 | The money of a capture sits in one provider balance at a time, by its funds state (UNKNOWN → PSP_RECEIVABLE, HELD → PSP_HELD, AVAILABLE → PSP_AVAILABLE); a fee, a refund and a chargeback are taken from the balance their event names (`fundsState` in the payload, read under the capture's row lock), and a funds observation moves the capture's movable balance — its amount less the reported fee and the money returned, never below zero — between the balances; every amount is fixed by its event, so the balances do not depend on the order of delivery; the database admits a FUNDS posting only on the provider balances and bank money only from a settlement | B09-N4; 15 "Operational ledger" (balanced monetary allocations; "Reconciliation checks captured amounts, refunds, disputes, provider fees, settlement and bank receipts"); 15 "Settlement and withdrawal" ("A provider 'completed' withdrawal and an actual bank credit are separately reconciled"); 15 "Disputes and chargebacks" ("tracks processor fees separately from the customer refund"); CMD034 failure "A provider pending/held state is never coerced to settled available cash"; reference/HASHING "Ledger posting and reconciliation"; 07 "Application checks … cannot be the sole protection" |
+| D-FISC-B6 | Every document of a sale takes the version of the sale's tax point, the capture's completion (`saleProfileAt`): the version current then — recorded by then and not superseded by then — while it carries a reviewed treatment, else the latest-recorded reviewed version in force at the tax point (a later review resolving an unknown), else the unknown; the invoice is drafted under it, a credit note carries exactly the invoice's snapshot; an agency's versions form one lineage in which a version is superseded exactly when its successor is recorded (`fiscal_profiles_successor_fk`, `fiscal_profiles_supersession_lineage`), so the version current at an instant is unique | B09-N5; D-FISC-B4, D-FISC-B5; 15 "FiscalProfile" ("Unknown facts remain unresolved and block affected fiscal claims"; effective dates and reviewer evidence); 15 "TaxDocument state machine" ("relationship to the original"); registry TaxDocument DRAFT→VALIDATED guard; the authority is silent on a review that reaches back to a sale (Q-B09-20, Q-B09-22) |
+| D-PROTO-B6 | The claim's deadline is bounded by the database: in the future and at most DISPATCH_DEADLINE_SECONDS (DISPATCH_TIMEOUT_SECONDS + DISPATCH_WATCHDOG_MARGIN_SECONDS = 60) after the claim's transaction instant, whoever claims (`payment_attempts_dispatch_deadline_bound`); the claimant writes it as now() + 60 s in the claim's own statement, so no clock of a process decides it | B09-N7; D-PROTO-B4; 15 "Webhooks and reconciliation" ("The periodic reconciler checks uncertain orders, captures, refunds"); 07 "Application checks … cannot be the sole protection"; the principle of D-AUTH-B4 (the role a gate protects against never sets what protects against it) |
+| D-BIND-B2 | A row that names an attempt and an order names an attempt of that order (UNIQUE `(agency_id, attempt_id, order_id)` on attempts, composite keys from observations, capture facts and provider exceptions); a case that names several subjects names one purchase (its capture and its refund are its order's) | B09-N6; 07 "Composite foreign keys or equivalent enforced constraints prevent … referencing another …"; 08 "Database isolation"; D-ING-B3 ("attributed to the stored operation's order and agency") |
+| D-STAGE-B1 | The implementation runs in two stages of parallel mandates (§14): stage 1 — M1 persistence, M2 the commerce core and every contract fake — from this design's head; stage 2 — M3 the payment service's side, M4 the request side — from the integrator's merge of stage 1 (`b09/impl-stage1`); every fake has one owner (M2); no mandate codes against a port of an unmerged package (B07's CommercialScopeInspector is bound by the integrator to B09's own query, §15 item 6); the cross-mandate scenario tests are the stage-2 integrator's | B09-N8; the task's rule on staged, self-contained mandates; FOUNDATION D-AGGK-5 (never depend on an unmerged package's code); B06's precedent (in-memory ports only for pure orchestration tests, database-backed case tests on real PostgreSQL) |
 
 ## 13. Open questions for the authority
 
@@ -1018,25 +1099,109 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 - **Q-B09-20** A retroactive fiscal re-review (a new version whose validity starts before a sale already invoiced) leaves the sale's
   documents under the version in force at the time (D-FISC-B4); correcting issued documents to the new treatment is a
   professional decision (credit/debit documents, B15).
+- **Q-B09-21** Funds availability is modelled per capture as a whole (UNKNOWN, HELD, AVAILABLE), and a funds observation moves the
+  capture's whole movable balance (D-LEDGER-B5); a provider hold of part of a capture (a dispute holding only the disputed amount)
+  has no representation, like a partial reversal (Q-B09-7). Interim: the capture's funds are HELD while any part is held.
+- **Q-B09-22** A later fiscal review whose validity reaches back to a sale resolves an unknown treatment for that sale (D-FISC-B6);
+  15 "FiscalProfile" asks for effective dates and reviewer evidence but is silent on a review dated before its own recording.
+  Should such a retroactive resolution carry a professional confirmation distinct from an ordinary review?
+- **Q-B09-23** A return larger than the capture's movable balance (a full refund or a chargeback while the provider keeps its fee)
+  is taken from the provider balance its event names and leaves that balance negative for the capture: the provider recovers the
+  difference from the merchant's overall balance (15 "Disputes and chargebacks": processor fees are tracked separately from the
+  customer refund). B15's settlement comparison reconciles it against the statement; whether the operational ledger should
+  instead post the kept fee as a receivable from the provider is the accountant's decision.
 
 ## 14. Implementation mandates and verification
 
-Three parallel mandates from this branch's head, separated by the ports fixed here (the structured handoff carries each one
-self-contained): **M1 persistence** — the `pg` adapters of every commerce port (including `PurchaseRebindingRepository`,
-`ProviderExceptionRepository`, `PricePolicyRepository`, the versioned `observeFunds` / `observeFee`, `fileServerRequest` with ON
-CONFLICT DO NOTHING, `profileInForceAt`), the commerce unit of work (adoptScope, adoptFinanceScope, finance binding, the SERVICE
-factory on the payment pool), the journal's UNCERTAIN path, the harness fixtures, the B06 inspectors' commercial queries and B07's
-`CommercialScopeInspector` query; **M2 domain services and authorization** — `CommerceAuthorizer`, `CommerceReconciler` (§6.3),
-`PurchaseRebinder` (D-QUOTE-B6) and the three `CommerceEventConsumer`s (FINANCE with fee, funds and correction postings; FISCAL
-under the profile in force; PAYMENT_SERVICE), the fiscal treatment and ledger flows, D-AUTH-B3; **M3 application and api** — the
-seven handlers on the provider-effect runtime (T1..T4, T3 in a SERVICE unit of work), the reads, the webhook ingress route, the
-labelled contract fakes (providers, and the platform ports of B07 and B08), serving the routes (OpenAPI `paths`, matrix served
-sections, applicability rows) and the command-level case tests of the case map. Each codes against the ports of this branch; the
-database-backed tests of M2 and M3 run on the integration of M1 (the integrator merges M1, then M2, then M3, as B06 did).
+Two stages of parallel mandates (D-STAGE-B1; B09-N8), separated by the ports fixed here. Each mandate below is self-contained: it
+names its stage, the exact branch it starts from, the fakes it owns (every fake has exactly one owner), its scope, the tests it
+writes and when it is done; none codes against a port of a package that is not on `main` (B07's `CommercialScopeInspector` is the
+integrator's binding, §15 item 6). The structured hand-off of this revision carries the same texts with the head's hash and
+supersedes the pre-review hand-off `.claude/b07-b09-design-review/architect_B09.json` (its mandates start from `8a282bc`, migrations
+0008–0012; no mandate may start from it; §15 item 15). Every mandate works in its own worktree, commits with the required identity
+and trailer, never pushes, and leaves no temporary PostgreSQL cluster running.
+
+**Stage 1** — both mandates start from `b09/design` at the commit that carries this section, in parallel.
+
+- **M1 — persistence adapters** (stage 1; owns no fake). Scope: `packages/persistence` only (`src/repositories/commerce-*.ts`,
+  `src/unit-of-work.ts`, `src/command-journal.ts`, `src/sqlstate.ts`, `src/testing/*`, `test/`). Implement over migrations
+  0009..0013 the `pg` adapters of every port of `packages/domain/src/ports/commerce.ts`, as §3–§7 describe: PaymentRouteRepository;
+  FiscalRepository (`currentProfile`; `saleProfileAt` = the domain's `saleProfileAt` over the agency's versions read after
+  `kauro.await_transition('kauro.fiscal_profiles', agency)`; `recordProfile` writes the predecessor's `superseded_at` and the
+  successor's `created_at` as one instant in one unit of work — `fiscal_profiles_successor_fk`, `fiscal_profiles_supersession_lineage`);
+  CorporateGrantRepository; RefundPolicyRepository; PricePolicyRepository; ScopeIndex; QuoteRepository; PaymentOrderRepository;
+  PaymentAttemptRepository (the claim writes `dispatch_deadline_at = now() + make_interval(secs => DISPATCH_DEADLINE_SECONDS)` in its
+  own statement — `payment_attempts_dispatch_deadline_bound` refuses anything else); CaptureFactRepository (birth with funds
+  UNKNOWN; one edge or one later fact per version; an out-of-order reversal written as COMPLETED then REVERSED; the funds
+  observation's movable balance read after `SELECT … FOR UPDATE` of the capture row); ProviderObservationRepository;
+  CommercialAuthorizationRepository (with `findLiveByRevisionHash`); PurchaseRebindingRepository; RefundRepository
+  (`fileServerRequest` with ON CONFLICT DO NOTHING against `refunds_one_requested_per_origin`; a completion reads the capture's funds
+  state after `FOR SHARE` of the capture row); TaxDocumentRepository; LedgerRepository (`post` idempotent by source, the source
+  reference the event's aggregate); SettlementRepository; ReconciliationCaseRepository (`open` idempotent per kind and subject);
+  PaymentInboxRepository (B06 inbox guards, READ COMMITTED); ProviderExceptionRepository. Every versioned write is compare-and-swap
+  (STALE with the current safe version and state) and publishes, in the same unit of work through B06's `EventPublisher`, the event
+  `commerceVersionEventType` names, with the payload of `COMMERCE_EVENT_PAYLOAD_ALLOWLIST` and outbox records only for the consumers
+  `COMMERCE_EVENT_SUBSCRIPTIONS` lists for that type. The commerce unit of work (`CommerceUnitOfWork`, `CommerceUnitOfWorkFactory`):
+  `adoptScope` once per unit of work (SERVICE binds `kauro.agency_id`, OPERATOR `kauro.finance_agency_id`; an unknown key answers
+  NOT_FOUND and adopts nothing), `adoptFinanceScope` (OPERATOR only), `commerceScope`, SERVICE on a verified `kauro_payment` pool;
+  B06's `bindContext` clears the finance agency on every transaction. `PgCommandJournal.markUncertain` and commit from UNCERTAIN
+  (D-JOURNAL-B1). SQLSTATE translation of `src/sqlstate.ts` (the KP class; unique violations decided by constraint name). The
+  queries behind B06's `CommercialConsequenceInspector` and `ActiveWorkInspector` commercial counts. Replace the raw SQL of
+  `test/commerce-support.ts` with adapter-driven fixtures. Tests: `test/adapters-commerce-*.test.ts` on real PostgreSQL 17
+  (`C:\Tools\pgsql17\bin`) as the runtime logins — a CAS loser answered STALE, finance-scope invisibility without an ACTIVE grant, the
+  approval/reversal race observed waiting in `pg_stat_activity` (no sleep), a replayed post that writes nothing, every published
+  event type equal to `commerceVersionEventType`'s. Done when `pnpm run verify` is green, `test/b09-migrations.test.ts` and
+  `test/b09-critique.test.ts` pass unchanged, `test/fixtures/runtime-boundary.json` is unchanged, and no provider port is called.
+- **M2 — the commerce core and the labelled contract fakes** (stage 1; owns every fake: PaymentProviderAdapter, WebhookVerifier,
+  ProviderEvidenceStore, FiscalDocumentBridge, ServiceAuthenticator, SourceAvailabilityReader, SourceLineageReader,
+  DeliveryCapacityPort). Scope: `packages/application` only (`src/commerce/core/*`, `src/commerce/testing/*` exported through a new
+  `./testing` subpath — a test-only subpath of `architecture.rules.json`, never imported by production source —, `test/`); no `pg`
+  import. Pure planners: `planObservation` (§6.3 steps 3–6 over a facts snapshot and one normalized observation: the writes in the
+  lock order of §6.2, each version's event by `commerceVersionEventType`, `captureStatusStep` including its `then` edges,
+  authorization issue and revocation with its phase, cases, server refund requests, provider exceptions, the observation's effect),
+  `planPostings` (FINANCE: `capturePostings`, `providerFeePostings`, `fundsPostings`, `returnPostings` by the funds state the event
+  names, case corrections; D-LEDGER-B5), `planFiscalDocument` (FISCAL: `saleProfileAt`, `resolveFiscalTreatment`, a credit note's
+  invoice snapshot, blocked drafts' re-evaluation; D-FISC-B6), `nextProtocolStep` (the resume table of §6.1). Executors coded against
+  the repository ports: `CommerceReconciler` (applies a plan in one SERVICE unit of work under the order's row lock), the
+  provider-effect runtime `ProviderCommandPhases` (T1 intent, T2 claim, the call, T3 settle in a SERVICE unit of work under
+  `kauro_payment`, T4 completion; resume by journal entry; 202 with the durable operation), `CommerceAuthorizer`
+  (`authorizeService`, `authorizeOperator`, `assureOperator`; D-AUTHZ-B1..B3). The labelled contract fakes (`integrationClass` or
+  `binding` `CONTRACT_FAKE`; PayPal Orders v2 shapes; a call log; programmable ORDER_CREATED, CAPTURE_OBSERVED, REFUND_OBSERVED,
+  PROVED_NO_EFFECT, AMBIGUOUS and UNRECOGNIZED results; observation by provider id and by request identity `kauro-<attemptId>`) with
+  contract tests. Orchestration tests may use an in-memory commerce store that extends B06's `createInMemoryPorts` under its rule —
+  never a database, never case evidence. Done when `pnpm run verify` is green and no fake is reachable from production wiring.
+
+**Stage 2** — both mandates start from `b09/impl-stage1`: the integrator's merge of M1, then M2, onto the stage-1 base, verify green
+on Windows and Linux. They run in parallel and own no fake (they bind M2's).
+
+- **M3 — the payment service's side** (stage 2). Scope: `apps/api` — the service composition (the `kauro_payment` pool and M1's
+  SERVICE and OPERATOR unit-of-work factory; the payment dispatcher claiming outbox records through B06's `PgOutboxDispatchStore`
+  under `kauro_control` with a lease per consumer, each effect in its own SERVICE unit of work), the webhook route CMD030 (ingress
+  half under `kauro_ingress` with `WebhookVerifier` over the exact raw bytes; application half by M2's reconciler, immediately and by
+  the inbox worker), the service routes CMD033 and CMD034 (`authorizeService`, `adoptScope`, M2's runtime), the consumers FINANCE
+  (`planPostings` → `LedgerRepository.post`), FISCAL (`planFiscalDocument`) and PAYMENT_SERVICE (the watchdog over
+  `payment_attempts_watchdog`, the cancel-before-dispatch sweep over `payment_attempts_unclaimed`, the refund executor with its
+  journal key from the refund and version), `PurchaseRebinder` (D-QUOTE-B6), D-AUTH-B3's honored-after-expiry check. Tests on real
+  PostgreSQL 17 through the routes, under exactly the titles the case map marks PLANNED (M3) (`apps/api/test/cmd030-payment-webhook`,
+  `cmd033-execute-refund`, `cmd034-reconcile-payment`, `b09-ledger`, `b09-fiscal`), preconditions set up through M1's adapters, never
+  through M4's routes. Done when verify is green with M3's operations served (OpenAPI `paths`, the matrix's served sections) and
+  the others still planned.
+- **M4 — the request side** (stage 2). Scope: `apps/api` agency and operator routes — CMD028 and CMD029 (T1, T2 and T4 in the
+  principal's unit of work, T3 through M2's runtime in a SERVICE unit of work), CMD031, CMD032 (`authorizeOperator`,
+  `assureOperator`), the reads GetQuote, GetPaymentOrder, GetRefund and GetRefundReview with the closed views — and
+  `tools/evidence.mjs` reading `docs/design/B09-case-map.md`. Tests on real PostgreSQL 17 through the routes, under exactly the titles
+  the case map marks PLANNED (M4) (`apps/api/test/cmd028-create-payment-order`, `cmd029-capture-payment`, `cmd031-request-refund`,
+  `cmd032-approve-refund`); a capture racing its own webhook applies the webhook through M2's reconciler, not M3's worker. Done when
+  verify is green with M4's operations served.
+
+**Stage-2 integration** (the integrator): merge M3, then M4, onto `b09/impl-stage1`; resolve the files both edit
+(`apps/api/src/composition.ts` and the route registration, `packages/application/src/commerce/index.ts`, the OpenAPI and matrix
+served sections) and regenerate both documents; write the cross-mandate scenario tests the case map marks PLANNED (INT-2)
+(`apps/api/test/b09-scenarios.test.ts`); verify on Windows and Linux.
 
 Verification of this branch: `pnpm run verify` (generate, build, typecheck, test, arch, openapi, matrix, clean-consume) green on
 Windows; the persistence suite applies 0001..0013 from empty on PostgreSQL 17 in every test file through the B06 runner and runs
-the 16 B09 schema tests, the 14 critique tests and every B06 and foundation test; no temporary cluster is left running.
+the 16 B09 schema tests, the 20 critique tests and every B06 and foundation test; no temporary cluster is left running.
 
 ## 15. Integration obligations
 
@@ -1060,20 +1225,23 @@ other's tables; each port below is the seam.
    test proves every outcome names a registered reason).
 5. **B07 → B09 ports**: `SourceAvailabilityReader` (D-QUOTE-B7: B07's retention record of the sealed revision — effective and hard
    deadline) and `SourceLineageReader` (D-QUOTE-B6: B07's lineage with its evidence hash) are implemented by B07's persistence over
-   its `retention_records` and `dataset_revisions` lineage and bound in the api composition; the contract fakes of M3 are removed
+   its `retention_records` and `dataset_revisions` lineage and bound in the api composition; the contract fakes of M2 are removed
    from the product wiring. After both merge, the integrator may add the exact database binding of `quotes.source_available_until`
    to the retention record's effective deadline (a trigger in a new migration reading `retention_records`), keeping
    `quotes_source_binding` as the bound.
-6. **B09 → B07 port**: B07's `CommercialScopeInspector.authorizationsBoundTo(uow, agencyId, revisionId)` (its CMD012 impact map) is
-   implemented by B09's persistence (M1: the live commercial authorizations whose `revision_hash` is the revision's manifest hash) and
-   bound in the composition; B07's case-map row "Commercial authorizations bound to a replaced revision" then cites B09's test.
+6. **B09 → B07 port**: B07's `CommercialScopeInspector.authorizationsBoundTo(uow, agencyId, revisionId)` (its CMD012 impact map;
+   defined on `b07/design` only) is bound by the integrator, in the composition, to B09's own query
+   `CommercialAuthorizationRepository.findLiveByRevisionHash(agencyId, revisionHash)` (M1 implements it on B09's types: the live
+   authorizations whose `revision_hash` is that manifest hash): the adapter reads the revision's manifest hash in B07's unit of work
+   and maps the records to B07's return shape. No B09 mandate codes against a B07 port (D-STAGE-B1; B09-N8); B07's case-map row
+   "Commercial authorizations bound to a replaced revision" then cites the integrator's test of the binding.
 7. **Events one consumes from the other**: `dataset_revision.expired.v1` and `.superseded.v1` (B07) reach EXECUTION_CONTROL (B08);
    B09 needs no subscription (it reads the revision state and deadline in T1 and at issuance under the transition lock). B09's
    `capture.completed.v1` anchors paid retention (policy `retention.paidDaysHardFromCapture`): the retention owner (B07's
    STORAGE_LIFECYCLE, or B08 per its design) subscribes to it when it implements PAID_ORDINARY records; B09 publishes it once per
    capture (D-EVT-B2), so a single subscription suffices.
 8. **Served route inventory, OpenAPI and matrix**: `tools/openapi.mjs` documents B07's served routes under `paths` and B09's planned
-   operations under `x-kauro-planned` (then `paths` when M3 serves them); `tools/matrix.mjs` merges B07's four machines and owner
+   operations under `x-kauro-planned` (then `paths` when M3 and M4 serve them); `tools/matrix.mjs` merges B07's four machines and owner
    rows (the DatasetRevision owners B07 revised) with B09's twelve machines and the CostGrant re-assignment (B09-F17); both
    documents are regenerated (`pnpm run openapi:generate`, `pnpm run matrix:generate`) on the merged tree and checked by verify.
 9. **Persistence harness and fixtures** (`@kauro/persistence/testing`): B07 adds the source-lifecycle fixture (`sealSourceRevision`,
@@ -1096,11 +1264,28 @@ other's tables; each port below is the seam.
     (D-AUTH-B4); B08 implements `DeliveryCapacityPort` (D-CAP-B1).
 12. **B10 ports and commands**: CMD027 issues quotes with `source_available_until` from `SourceAvailabilityReader` and, for the
     included replacement (R2-092), a replacement quote (`replaces_quote_id`) and then calls `PurchaseRebinder`.
+13. **Event bindings and subscriptions** (D-EVT-B3): B08's execution-control role writes the consumption and delivery versions of
+    `commercial_authorizations`, so B08's migration grants that role SELECT on `kauro.commerce_event_bindings` (the deferred
+    `commercial_authorizations_event_type_per_version` check reads it as the writer) and a read policy of its own, and publishes
+    exactly `commercial_authorization.consumed.v1` / `.delivered.v1` for those versions. A package that consumes a commerce event
+    adds its `(event_type, consumer)` rows to `kauro.commerce_event_subscriptions` in its own migration and to
+    `COMMERCE_EVENT_SUBSCRIPTIONS` (the rows of EXECUTION_CONTROL, COMMISSIONS and NOTIFICATIONS are seeded already); an outbox
+    record to an unlisted consumer is refused (42501). B07's own event writer (`kauro_control`, B07 D-CTRL-2) is unaffected: the
+    commerce kind trigger reads no table, and the restrictive policies name `kauro_app` and `kauro_payment` only.
+14. **Renumbering carries the new objects**: B09's 0009 now also creates the two vocabulary tables, the kind trigger, the
+    event-type function and the two restrictive policies; 0010..0013 carry the `*_event_type_per_version` triggers, the fiscal
+    lineage, the attempt order binding, the claim's deadline bound and the ledger's account checks. Renumbering the second package
+    moves them with their files; no object name changes.
+15. **The structured hand-off**: the pre-review hand-off `.claude/b07-b09-design-review/architect_B09.json` (mandates from `8a282bc`,
+    migrations 0008–0012) is superseded by this revision's hand-off (§14 and the workflow result of this revision, which name the
+    head's hash). The workflow that owns that directory replaces the file before any implementer starts; no mandate branches from
+    `8a282bc` (the file lies outside this branch's worktree and is not edited from here).
 
 ## 16. Critique record
 
-Every finding of the adversarial review (`critic_B09.json`, run against `8a282bc`) and what this revision did with it. FIXED
-findings name the files changed and the test that fails without the fix; the tests are in
+Every finding of the adversarial review (`critic_B09.json`, run against `8a282bc`) and of the independent re-check of `30a3202`
+(B09-N1..B09-N8), and what the revisions did with each. FIXED findings name the files changed and the test that fails without the
+fix; the tests are in
 `packages/persistence/test/b09-critique.test.ts` (database, through the runtime login roles), `packages/domain/test/
 commerce-critique.test.ts`, `packages/application/test/commerce-contracts.test.ts` and `tools/test/`.
 
@@ -1109,8 +1294,8 @@ commerce-critique.test.ts`, `packages/application/test/commerce-contracts.test.t
 | B09-F1 request handlers mint provider facts and authority | BLOCKING | FIXED (D-AUTH-B4, D-PROTO-B5) | 0011 policies and column grants (tenant intent/claim only; payment writes captures, observations, results, authorizations), 0012 (no tenant case opening), 0009 scope policies; `protocol.ts` T3/T4, `contracts.ts` `settleRuntimeRole`; fixtures settle T3 as the payment service. Test "B09-F1: the request handlers cannot mint provider facts or execution authority …" performs P1 and every other forbidden write as `kauro_app_test` — the provider identity, an attempt's result, a capture fact, its status, funds and fee, the order's allocation, an observation, a REFUND attempt, a case, a server refund request, a provider scope key, a re-binding, an entitlement's issuance, consumption and revocation (42501, or no row for a result the claim policy does not admit) |
 | B09-F2 a paid, unentitled or refunded purchase locks the project | MAJOR | FIXED (D-QUOTE-B4, D-QUOTE-B6) | 0012 `quotes_release_guard` (closed purchase or re-bound), 0010 replacement quotes, 0011 `purchase_rebindings` + guard + completeness + authorization re-binding; domain `quoteRelease`, `replacementBlockers`; port `PurchaseRebinder`. Tests "B09-F2 (remedy path): …" (P2 reproduced, then released) and "B09-F2 (replacement path): …" |
 | B09-F3 two server refund requests abort the reconcile | MAJOR | FIXED (D-REF-B1) | 0012 `refunds_one_requested_per_origin`; port `fileServerRequest`. Test "B09-F3: an overpaid capture whose subject no longer binds files its EXCESS_CAPTURE and KAURO_REMEDY requests …" (P6 reproduced, committed) |
-| B09-F4 invoice unvalidatable after a re-review | MAJOR | FIXED (D-FISC-B4) | 0013 `tax_documents_validation_guard` (in force at the tax point); domain `profileInForceAt`, `resolveFiscalTreatment`; port `profileInForceAt`. Tests "B09-F4: an invoice validates under the profile version in force …" (P3 reproduced, validates) and domain "B09-F4 (D-FISC-B4): …" |
-| B09-F5 no deliverable-capacity precondition | MAJOR | FIXED (D-CAP-B1) | domain `checkoutBlockers` (DELIVERY_CAPACITY_UNAVAILABLE → CAPACITY_UNAVAILABLE), `DeliveryCapacityPort` (B08 adapter), outcomes of CMD028/CMD029. Tests domain "B09-F5 (D-CAP-B1): …", application "B09-F1/B09-F5/B09-F6: …"; the command DENY test is planned in the case map (M3, labelled fake) |
+| B09-F4 invoice unvalidatable after a re-review | MAJOR | FIXED (D-FISC-B4) | 0013 `tax_documents_validation_guard` (in force at the tax point); domain `profileInForceAt`, `resolveFiscalTreatment`; port `profileInForceAt` (since B09-N5 `saleProfileAt`). Tests "B09-F4: an invoice validates under the profile version in force …" (P3 reproduced, validates) and domain "B09-F4 (D-FISC-B4): …" |
+| B09-F5 no deliverable-capacity precondition | MAJOR | FIXED (D-CAP-B1) | domain `checkoutBlockers` (DELIVERY_CAPACITY_UNAVAILABLE → CAPACITY_UNAVAILABLE), `DeliveryCapacityPort` (B08 adapter), outcomes of CMD028/CMD029. Tests domain "B09-F5 (D-CAP-B1): …", application "B09-F1/B09-F5/B09-F6: …"; the command DENY test is planned in the case map (M4, labelled fake) |
 | B09-F6 partial-refund tax allocation unspecified | MAJOR | FIXED (D-REF-B6) | domain `taxRemainingAfter`, `refundTaxFor`, `checkRefundTax`; 0012 `kauro.refund_tax_remaining` + ceiling (KP012); outcome REFUND_TAX_INCONSISTENT. Tests domain "B09-F6 (D-REF-B6): … 19% rule … one-cent sequence …" and database "B09-F6: an approval whose tax does not follow its service …" |
 | B09-F7 mapped titles miss the registry DENY/RACE scenarios | MAJOR | FIXED (D-CASEMAP-B1) | `docs/design/B09-case-map.md` (every CMD028–CMD034 DENY and RACE title states the scenario; the RACE of CMD028, CMD029 and CMD033 crashes before the intent commits, between the intent commit and the claim, and between the claim and the settle), §8 triads. Tests `tools/test/b09-case-map.test.mjs` "B09-F7: …" (the second fails on the reviewed case map, and on a provider-effect RACE title without the claim/settle crash) |
 | B09-F8 a later fee re-publishes capture.completed.v1 | MAJOR | FIXED (D-EVT-B2) | event types `capture.fee_observed.v1`, `capture.funds_observed.v1` (FINANCE only); 0011 funds no longer version-exempt, `domain_events_capture_completed_once`. Tests "B09-F8/B09-F15: a funds availability and a fee learned after the completion are capture versions …" and domain "B09-F8/B09-F15 (D-EVT-B2): …" |
@@ -1123,6 +1308,14 @@ commerce-critique.test.ts`, `packages/application/test/commerce-contracts.test.t
 | B09-F15 postings without observed date; no funds or correction source | MINOR | FIXED (D-LEDGER-B4, D-EVT-B2); PARTIALLY REJECTED | 0013 `observed_at`, `ledger_entries_source_event`, FUNDS kind; domain `fundsPostings`. Test "B09-F15: every posting carries its observed date …". Rejected in part: the claim that "source_kind CORRECTION is allowed only for settlement sources" does not hold on 8a282bc (`ledger_entries_source_scope` admitted CORRECTION with an event source: `source_kind <> 'SETTLEMENT'`); what was missing was the event that sources it, now `reconciliation_case.resolved.v1` |
 | B09-F16 credit/debit note validation incomplete | MINOR | FIXED (D-FISC-B5, Q-B09-18) | 0013 validation guard (credit note = corrected ISSUED invoice's snapshot; debit note refused). Test "B09-F16: a debit note never validates …" |
 | B09-F17 matrix assigns CostGrant funding to B09 | MINOR | FIXED (Q-B09-9) | `tools/matrix.mjs` owner B03 with the reason, regenerated matrix. Test `tools/test/matrix.test.mjs` "B09-F17: …" |
+| B09-N1 request handlers publish provider-fact event types; the ledger accepts them | MAJOR | FIXED (D-EVT-B3) | 0009 `kauro.commerce_event_bindings`, `kauro.commerce_event_subscriptions`, trigger `domain_events_commerce_kind`, function `kauro.require_commerce_event_type`, restrictive policies `domain_events_commerce_request_handlers` and `outbox_records_commerce_subscribers`; 0010–0013 the `*_event_type_per_version` triggers; 0011 `domain_events_capture_completed_once` keyed on `(aggregate_kind, aggregate_id)`; 0013 `ledger_entries_source_event` checks the event's kind and that its aggregate is the source reference; domain `COMMERCE_STATE_EVENT_TYPES`, `commerceVersionEventType`, `COMMERCE_REQUEST_HANDLER_EVENT_TYPES`. Tests "B09-N1: an event records a version of an aggregate of its own kind …" (the probe reproduced as `kauro_app_test`: `capture.completed.v1` on its quote refused KA003, another state's type refused KA003 at COMMIT, each of the 37 types it does not author refused 42501 on a visible aggregate of its kind, four more as a corporate owner, outbox records of its quote event to FINANCE, FISCAL, COMMISSIONS and EXECUTION_CONTROL refused 42501; the payment service's mislabelled versions refused KA003; a CAPTURE posting of the completion under the quote, the order or another capture refused KP001) and domain "B09-N1 (D-EVT-B3): …" |
+| B09-N2 closed views refuse DELIVERY_CAPACITY_UNAVAILABLE and DISPUTE_OPEN | MINOR | FIXED (B06 D-RESP-1, D-CAP-B1, D-DISPUTE-B1) | `packages/application/src/commerce/response-schemas.ts` derives `CHECKOUT_BLOCKER_TOKENS` from the domain's `CHECKOUT_BLOCKERS` (so `maxItems` is its size) and the `openCases` kind enum from `RECONCILIATION_CASE_KINDS` (`commerce/records.ts`, the 0012 CHECK's order); OpenAPI regenerated. Test application "B09-N2: the closed views admit every token the domain can put in them …" |
+| B09-N3 a capture first observed REVERSED can never be posted and has no tax point | MINOR | FIXED (D-PAY-B5) | domain `captureStatusStep` (a REVERSED observation of an unknown or PENDING capture walks COMPLETED first, `then`), the CaptureFact machine without PENDING → REVERSED, port `NewCaptureFact.status`; 0011 seed without the edge (so `enforce_observed_birth` refuses a REVERSED birth), `capture_facts_completion_time` covers REVERSED, allocation only at the COMPLETED version; matrix regenerated. Tests "B09-N3: a capture first seen REVERSED is recorded COMPLETED and then REVERSED …" (the probe's birth refused KA008; the two-version path posts CAPTURE and CHARGEBACK, nets the receivable to zero and validates the invoice at its completion) and domain "B09-N3 (D-PAY-B5): …" |
+| B09-N4 funds postings drain the receivable fees and returns still credit; FUNDS to BANK_CASH admitted; CMD034-DENY claimed without a test | MINOR | FIXED (D-LEDGER-B5) | domain `commerce/ledger.ts` (`fundsAccountOf`; `providerFeePostings` and `returnPostings` take the funds state their event names; `fundsPostings` moves `movableBalanceOf`; header rewritten), payload `fundsState` on `capture.fee_observed.v1`, `capture.reversed.v1`, `refund.completed.v1`; 0013 `ledger_entries_funds_accounts`, `ledger_entries_bank_accounts`; case map CMD034-DENY now cites "B09-N4: …". Tests "B09-N4: a FUNDS posting moves money only between the provider's receivable, held and available balances …" (the probe's BANK_CASH set refused 23514) and domain "B09-N4 (D-LEDGER-B5): …" (no provider balance of a capture negative across completion, fee, HELD, refund, AVAILABLE) |
+| B09-N5 the fiscal version of a credit note is specified inconsistently | MINOR | FIXED (D-FISC-B4, D-FISC-B6) | domain `commerce/fiscal.ts` (`FiscalTreatmentInput.taxPoint`: the sale's tax point for every document; `profileInForceAt` as the database reads it; `saleProfileAt`, the one rule), `records.ts` `recordedAt`, port `FiscalRepository.saleProfileAt`; 0010 `fiscal_profiles_successor_fk`, `fiscal_profiles_supersession_lineage` (the version current at an instant is unique); design §4.2, §4.5, §8.1, D-FISC-B4. Tests domain "B09-N5 (D-FISC-B4, D-FISC-B6): … a credit note drafted after a re-review keeps the invoice's version …" and "B09-N5: fiscal profile versions form one lineage …" (a credit note of a refund completed after the re-review validates under the invoice's version and is refused under the re-review) |
+| B09-N6 attribution keys do not bind an attempt to the order the row names | MINOR | FIXED (D-BIND-B2) | 0011 `payment_attempts_order_binding` UNIQUE `(agency_id, attempt_id, order_id)`, `provider_observations_attempt_fk`, `capture_facts_attempt_fk`; 0012 `provider_event_exceptions_attempt_fk`, `reconciliation_cases_capture_order_fk`, `…_refund_order_fk`, `…_refund_capture_fk`. Test "B09-N6: an attempt named by a provider exception, an observation or a capture fact is an attempt of the order that row names …" (the probe's exception refused 23503) |
+| B09-N7 the request handlers set an unbounded dispatch deadline | MINOR | FIXED (D-PROTO-B6) | 0011 `payment_attempts_dispatch_deadline_bound` (in the future and at most 60 s after the claim's instant, whoever claims); domain `DISPATCH_DEADLINE_SECONDS`; §6.1 T2. Tests "B09-N7: a claim records a dispatch deadline in the future and at most the protocol's 60 seconds ahead …" (the probe's 876,000-hour deadline refused 23514) and application "B09-N2: … B09-N7: the claim deadline's bound is the protocol's timeout plus the watchdog margin" |
+| B09-N8 the implementation mandates are not self-contained; the stale hand-off | MINOR | FIXED (D-STAGE-B1) | §14 rewritten as staged, self-contained mandates (stage, starting branch, owned fakes, scope, tests, done-when); M1 implements B09's own `CommercialAuthorizationRepository.findLiveByRevisionHash` and the integrator binds B07's `CommercialScopeInspector` to it (§15 item 6); the `observeFunds` / `observeFee` typo gone; the stale `architect_B09.json` is declared superseded (§14, §15 item 15) — the file lies outside this worktree, so the workflow replaces it from this revision's hand-off. Test `tools/test/b09-design.test.mjs` "B09-N8: …" (fails on `30a3202`'s §14) |
 
 Revert proofs (each database fix undone in place in its migration, `dist/test/b09-critique.test.js` run on a fresh PostgreSQL 17
 cluster, the file restored byte for byte and checked by SHA-256): the tenant's capture policy widened to FOR ALL with INSERT and
@@ -1137,3 +1330,13 @@ note validated fails "B09-F16". The case-map test fails on the reviewed case map
 demonstrates the scenario …", and on this revision's first case map (`b6adfdb`, whose provider-effect RACE titles named only the
 crash between the intent commit and the claim) with "CMD028-RACE: no cited test injects the crash on both sides of the intent
 commit and between the claim and the settle of the provider call". Every other critique test stays green under each mutation.
+
+Revert proofs of the re-check's fixes (each database fix undone in place in its migration, `dist/test/b09-critique.test.js` run
+with the finding's test on a fresh PostgreSQL 17 cluster, the file restored and checked by SHA-256): the kind trigger dropped, the
+request-handler policy moved off `kauro_app`, the event-type function returning early, the subscribers' policy moved off the
+writers, or the ledger's source binding reduced to the event type, each fails "B09-N1"; the PENDING → REVERSED edge seeded again
+fails "B09-N3"; `ledger_entries_funds_accounts` or `ledger_entries_bank_accounts` dropped fails "B09-N4"; `fiscal_profiles_successor_fk`
+or the lineage trigger dropped fails "B09-N5"; the exception's or the capture's attempt key narrowed to `(agency_id, attempt_id)`
+fails "B09-N6"; the deadline bound's trigger dropped fails "B09-N7". The domain, application and tools tests of B09-N1..N5, N7 and
+N8 do not compile or fail on `30a3202` (`saleProfileAt`, `movableBalanceOf`, `DISPATCH_DEADLINE_SECONDS`, `RECONCILIATION_CASE_KINDS`
+and the staged §14 do not exist there; `captureStatusStep(null, "REVERSED")` answers a REVERSED insert).

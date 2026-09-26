@@ -1,26 +1,41 @@
 // The domain halves of the fixes to the adversarial review of the B09 design (docs/design/B09-payments-fiscal.md §16 "Critique
 // record"): deliverable capacity at checkout (B09-F5), the cumulative refund tax rule (B09-F6), the fiscal profile in force at the tax
 // point (B09-F4), the quote's settled and re-bound paths (B09-F2), the capture's later facts as events of their own (B09-F8, B09-F15),
-// the exception vocabulary (B09-F9) and the dispute boundary (B09-F14). Each test fails on the design it replaces.
+// the exception vocabulary (B09-F9) and the dispute boundary (B09-F14); and the re-check's residual findings (B09-N1, N3, N4, N5): the
+// event each version publishes, the out-of-order reversal, the provider balance a posting takes money from, the version of a sale.
+// Each test fails on the design it replaces.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CAPTURE_MISMATCHES,
+  COMMERCE_AGGREGATE_KINDS,
+  COMMERCE_PLATFORM_MACHINES,
+  COMMERCE_REQUEST_HANDLER_EVENT_TYPES,
+  COMMERCE_STATE_EVENT_TYPES,
   COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
   COMMERCE_EVENT_SUBSCRIPTIONS,
   COMMERCE_EVENT_TYPES,
+  BANK_ACCOUNTS,
+  PROVIDER_BALANCE_ACCOUNTS,
   PROVIDER_EXCEPTION_KINDS,
   blockerFailure,
+  captureStatusStep,
+  capturePostings,
   checkRefundTax,
+  commerceVersionEventType,
   checkoutBlockers,
   fundsPostings,
   isBalanced,
+  movableBalanceOf,
   profileInForceAt,
+  providerFeePostings,
   quoteRelease,
   refundTaxFor,
   replacementBlockers,
   resolveFiscalTreatment,
+  returnPostings,
   roundHalfUpBps,
+  saleProfileAt,
   taxRemainingAfter,
   type AgencyId,
   type CheckoutFacts,
@@ -28,6 +43,7 @@ import {
   type FiscalIssuerRef,
   type FiscalProfileId,
   type FiscalProfileRecord,
+  type PostingLine,
   type QuoteId,
   type QuoteReleaseFacts,
   type ReplacementFacts,
@@ -52,6 +68,7 @@ const profile: FiscalProfileRecord = {
   evidenceHash: "3".repeat(64),
   reviewedByUserId: "6f1b0d2e-3c4a-5b5c-9d6e-7f8091a2b3c4" as UserId,
   validFrom: "2026-09-01T00:00:00.000Z",
+  recordedAt: "2026-09-01T00:00:00.000Z",
 };
 
 const issuer: FiscalIssuerRecord = {
@@ -211,4 +228,129 @@ test("B09-F9 (D-ING-B3): every capture mismatch matchCapture can answer is a pro
     [...PROVIDER_EXCEPTION_KINDS].sort(),
     ["BODY_CONFLICT", "UNKNOWN_PROVIDER_REFERENCE", "UNRECOGNIZED_PROVIDER_STATE", "WRONG_CURRENCY", "WRONG_ENVIRONMENT", "WRONG_ORDER", "WRONG_PAYEE", "WRONG_PROVIDER"],
   );
+});
+
+// --- the re-check's residual findings (design §16, B09-N1..B09-N8) ------------------------------------------------------------------
+
+test("B09-N1 (D-EVT-B3): a commerce version publishes the event of the state it records — a capture's later fee or funds are one fact per version — and the request handlers may publish only their own edges' events", () => {
+  // every state of every machine a commerce aggregate walks has exactly its event, and every event type is a state's or a later fact's
+  const machineOf: Record<string, string> = { quote: "Quote", payment_order: "PaymentOrder", capture: "CaptureFact", commercial_authorization: "CommercialAuthorization", refund: "Refund", reconciliation_case: "ReconciliationCase" };
+  for (const [kind, machine] of Object.entries(machineOf)) {
+    const m = COMMERCE_PLATFORM_MACHINES.find((x) => x.contract === machine)!;
+    const states = new Set([m.initial, ...m.transitions.flatMap((t) => [t.from, t.to])]);
+    assert.deepEqual([...states].sort(), Object.keys(COMMERCE_STATE_EVENT_TYPES[kind as keyof typeof COMMERCE_STATE_EVENT_TYPES]).sort(), kind);
+  }
+  const covered = new Set([...Object.values(COMMERCE_STATE_EVENT_TYPES).flatMap((byState) => Object.values(byState)), "capture.fee_observed.v1", "capture.funds_observed.v1"]);
+  assert.deepEqual([...covered].sort(), [...COMMERCE_EVENT_TYPES].sort());
+  for (const kind of COMMERCE_AGGREGATE_KINDS) for (const type of Object.values(COMMERCE_STATE_EVENT_TYPES[kind])) assert.ok(type.startsWith(`${kind}.`), type);
+  // the probe's forgeries have no admissible type: a REQUESTED refund is refund.requested.v1, a WITHDRAWN quote quote.withdrawn.v1
+  assert.equal(commerceVersionEventType("refund", { previousState: null, state: "REQUESTED" }), "refund.requested.v1");
+  assert.equal(commerceVersionEventType("quote", { previousState: "ISSUED", state: "WITHDRAWN" }), "quote.withdrawn.v1");
+  assert.equal(commerceVersionEventType("payment_order", { previousState: "CAPTURING", state: "APPROVED" }), "payment_order.approved.v1", "a back edge publishes its target state's type");
+  // a capture: its status versions, and one later provider fact per same-status version
+  assert.equal(commerceVersionEventType("capture", { previousState: null, state: "COMPLETED", feeChanged: true }), "capture.completed.v1", "a fee reported with the completion travels in it");
+  assert.equal(commerceVersionEventType("capture", { previousState: "COMPLETED", state: "COMPLETED", feeChanged: true }), "capture.fee_observed.v1");
+  assert.equal(commerceVersionEventType("capture", { previousState: "COMPLETED", state: "COMPLETED", fundsChanged: true }), "capture.funds_observed.v1");
+  assert.throws(() => commerceVersionEventType("capture", { previousState: "COMPLETED", state: "COMPLETED", feeChanged: true, fundsChanged: true }), RangeError, "two facts are two versions");
+  assert.throws(() => commerceVersionEventType("capture", { previousState: "COMPLETED", state: "COMPLETED" }), RangeError, "a version records something");
+  assert.throws(() => commerceVersionEventType("capture", { previousState: null, state: "COMPLETED", fundsChanged: true }), RangeError, "funds are a version of their own");
+  assert.throws(() => commerceVersionEventType("capture", { previousState: "COMPLETED", state: "REVERSED", feeChanged: true }), RangeError);
+  assert.throws(() => commerceVersionEventType("refund", { previousState: "APPROVED", state: "APPROVED", feeChanged: true }), RangeError);
+  // the request handlers' events: no provider result, capture fact, execution, entitlement, fiscal document or case opening
+  const handlers: ReadonlyArray<string> = [...COMMERCE_REQUEST_HANDLER_EVENT_TYPES.TENANT, ...COMMERCE_REQUEST_HANDLER_EVENT_TYPES.OPERATOR];
+  for (const forbidden of ["refund.completed.v1", "capture.completed.v1", "capture.reversed.v1", "capture.fee_observed.v1", "capture.funds_observed.v1", "commercial_authorization.issued.v1", "commercial_authorization.revoked.v1", "payment_order.created.v1", "payment_order.captured.v1", "payment_attempt.confirmed.v1", "reconciliation_case.opened.v1", "tax_document.validated.v1"]) {
+    assert.ok(!handlers.includes(forbidden), forbidden);
+  }
+  for (const t of COMMERCE_EVENT_TYPES.filter((x) => x.startsWith("quote."))) assert.ok(COMMERCE_REQUEST_HANDLER_EVENT_TYPES.TENANT.includes(t), t);
+  assert.deepEqual([...COMMERCE_REQUEST_HANDLER_EVENT_TYPES.OPERATOR], ["refund.approved.v1", "refund.rejected.v1", "reconciliation_case.resolved.v1"]);
+});
+
+test("B09-N3 (D-PAY-B5): a capture first seen REVERSED, or reversed while known only as PENDING, is recorded as its completion and then its reversal — the CAPTURE posting its completion sources is what the CHARGEBACK returns; the machine has no PENDING → REVERSED edge", () => {
+  assert.deepEqual(captureStatusStep(null, "REVERSED"), { kind: "INSERT", status: "COMPLETED", then: [{ next: "REVERSED", event: "provider_reversed" }] });
+  assert.deepEqual(captureStatusStep("PENDING", "REVERSED"), { kind: "ADVANCE", next: "COMPLETED", event: "provider_completed", then: [{ next: "REVERSED", event: "provider_reversed" }] });
+  const machine = COMMERCE_PLATFORM_MACHINES.find((m) => m.contract === "CaptureFact")!;
+  assert.deepEqual(machine.transitions.filter((t) => t.to === "REVERSED").map((t) => t.from), ["COMPLETED"]);
+  // the two versions publish capture.completed.v1 then capture.reversed.v1
+  assert.equal(commerceVersionEventType("capture", { previousState: null, state: "COMPLETED" }), "capture.completed.v1");
+  assert.equal(commerceVersionEventType("capture", { previousState: "COMPLETED", state: "REVERSED" }), "capture.reversed.v1");
+  // the two posting sets of a born-reversed capture net the receivable to zero: debited by the completion, credited by the chargeback
+  const allocation = { serviceCents: 97125n, taxCents: 0n, excessCents: 0n };
+  const net = [...capturePostings(allocation), ...returnPostings(allocation, "UNKNOWN")]
+    .filter((l) => l.account === "PSP_RECEIVABLE")
+    .reduce((n, l) => n + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents), 0n);
+  assert.equal(net, 0n);
+});
+
+test("B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a time — its fee and every return are taken from the balance of the funds state their event names, and a funds observation moves the movable balance (the amount less the fee and the money returned), so no provider balance of the capture goes negative and none of it is ever bank money", () => {
+  const balances = new Map<string, bigint>();
+  const post = (ls: ReadonlyArray<PostingLine>, step: string): void => {
+    assert.ok(isBalanced(ls), step);
+    for (const l of ls) {
+      assert.ok(!BANK_ACCOUNTS.includes(l.account), `${step}: ${l.account}`);
+      balances.set(l.account, (balances.get(l.account) ?? 0n) + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents));
+    }
+    for (const a of PROVIDER_BALANCE_ACCOUNTS) assert.ok((balances.get(a) ?? 0n) >= 0n, `${step}: ${a} is ${balances.get(a)}`);
+  };
+  const amount = 97125n;
+  const fee = 5275n;
+  post(capturePostings({ serviceCents: amount, taxCents: 0n, excessCents: 0n }), "completion");
+  // the fee reported after the completion, while the funds are still UNKNOWN: taken from the receivable
+  post(providerFeePostings(fee, "UNKNOWN"), "fee");
+  // HELD: the receivable's balance moves, net of the fee — the design before this revision moved the whole 97125 and left the
+  // receivable at -5275
+  const held = movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 0n });
+  assert.equal(held, 91850n, "R2-078: the net of the actual fee");
+  post(fundsPostings("UNKNOWN", "HELD", held), "held");
+  assert.equal(balances.get("PSP_RECEIVABLE"), 0n);
+  // a partial refund completed while the funds are held is returned from the held balance
+  post(returnPostings({ serviceCents: 1000n, taxCents: 0n, excessCents: 0n }, "HELD"), "refund");
+  // AVAILABLE: the held balance moves, net of the fee and of the money returned
+  post(fundsPostings("HELD", "AVAILABLE", movableBalanceOf({ amountCents: amount, providerFeeCents: fee, returnedCents: 1000n })), "available");
+  assert.deepEqual(PROVIDER_BALANCE_ACCOUNTS.map((a) => balances.get(a) ?? 0n), [0n, 0n, 90850n]);
+  assert.equal(balances.get("PROCESSOR_EXPENSE"), fee);
+  // a fee learned while the funds are available is taken from the available balance; nothing left to move posts nothing
+  assert.deepEqual(providerFeePostings(5n, "AVAILABLE").map((l) => [l.account, l.direction]), [["PROCESSOR_EXPENSE", "DEBIT"], ["PSP_AVAILABLE", "CREDIT"]]);
+  assert.equal(movableBalanceOf({ amountCents: 100n, providerFeeCents: 30n, returnedCents: 100n }), 0n);
+  assert.deepEqual(fundsPostings("HELD", "AVAILABLE", 0n), []);
+  // the funds' movements touch the provider balances only
+  for (const [from, to] of [["UNKNOWN", "HELD"], ["UNKNOWN", "AVAILABLE"], ["HELD", "AVAILABLE"], ["AVAILABLE", "HELD"]] as const) {
+    for (const l of fundsPostings(from, to, 1n)) assert.ok(PROVIDER_BALANCE_ACCOUNTS.includes(l.account), `${from} -> ${to}: ${l.account}`);
+  }
+});
+
+test("B09-N5 (D-FISC-B4, D-FISC-B6): every document of a sale takes the version of the sale's tax point — a credit note drafted after a re-review keeps the invoice's version and is judged at the capture's completion, never at the refund's; a later version never replaces a reviewed treatment for the sale, and a later review resolves an unknown one", () => {
+  const saleTaxPoint = "2026-09-20T10:00:00.000Z";
+  const refundCompletedAt = "2026-09-25T10:00:00.000Z";
+  const reReviewedAt = "2026-09-22T00:00:00.000Z";
+  // the version of the sale, superseded by a re-review between the sale and the refund
+  const ofTheSale: FiscalProfileRecord = { ...profile, supersededAt: reReviewedAt };
+  const reReview: FiscalProfileRecord = { ...profile, profileId: "01920000-0000-7000-8000-0000000f0301" as FiscalProfileId, validFrom: reReviewedAt, recordedAt: reReviewedAt, supersedesProfileId: profile.profileId };
+  assert.equal(saleProfileAt([reReview, ofTheSale], saleTaxPoint), ofTheSale, "the invoice's version");
+  assert.equal(saleProfileAt([reReview, ofTheSale], refundCompletedAt), reReview, "the version current at the refund's completion, which a credit note never takes");
+  // the credit note carries the invoice's snapshot and is judged at the sale's tax point
+  assert.deepEqual(resolveFiscalTreatment({ profile: ofTheSale, issuer, taxPoint: saleTaxPoint, serviceCents: 1000n, priced: RULE_19 }), { kind: "TREATMENT", snapshot: RULE_19, taxCents: 190n });
+  // judged at the refund's completion (the reading the domain contract carried before) it is blocked, although the database validates it
+  assert.deepEqual(resolveFiscalTreatment({ profile: ofTheSale, issuer, taxPoint: refundCompletedAt, serviceCents: 1000n, priced: RULE_19 }), { kind: "BLOCKED", blocker: "FISCAL_PROFILE_NOT_EFFECTIVE" });
+  // a retroactive re-review that changes the treatment: in force at the sale's tax point too, but the sale keeps its reviewed version
+  const retroactive: FiscalProfileRecord = {
+    ...profile,
+    profileId: "01920000-0000-7000-8000-0000000f0302" as FiscalProfileId,
+    taxTreatment: "EXEMPT_EXPORT",
+    taxRule: "ZERO_REVIEWED",
+    taxRateBps: 0,
+    exportEvidenceHash: "4".repeat(64),
+    validFrom: "2026-08-21T10:00:00.000Z",
+    recordedAt: reReviewedAt,
+    supersedesProfileId: profile.profileId,
+  };
+  assert.equal(profileInForceAt(retroactive, saleTaxPoint), true);
+  assert.equal(saleProfileAt([retroactive, ofTheSale], saleTaxPoint), ofTheSale);
+  assert.deepEqual(resolveFiscalTreatment({ profile: retroactive, issuer, taxPoint: saleTaxPoint, serviceCents: 97125n, priced: RULE_19 }), { kind: "BLOCKED", blocker: "FISCAL_TREATMENT_CHANGED" });
+  // an unknown treatment at the sale's tax point is resolved by a later review whose validity reaches back to the sale
+  const unknownAtSale: FiscalProfileRecord = { ...profile, taxTreatment: "REVIEW_REQUIRED", taxRule: "UNRESOLVED", taxRateBps: 0, supersededAt: reReviewedAt };
+  const resolving: FiscalProfileRecord = { ...profile, profileId: "01920000-0000-7000-8000-0000000f0303" as FiscalProfileId, recordedAt: reReviewedAt, supersedesProfileId: profile.profileId };
+  assert.equal(saleProfileAt([unknownAtSale, resolving], saleTaxPoint), resolving);
+  assert.deepEqual(resolveFiscalTreatment({ profile: resolving, issuer, taxPoint: saleTaxPoint, serviceCents: 97125n, priced: RULE_19 }), { kind: "TREATMENT", snapshot: RULE_19, taxCents: 18454n });
+  assert.equal(saleProfileAt([unknownAtSale], saleTaxPoint), unknownAtSale, "while unresolved, the unknown records its blocker");
+  assert.equal(saleProfileAt([reReview], saleTaxPoint), null, "nothing in force at the tax point");
 });

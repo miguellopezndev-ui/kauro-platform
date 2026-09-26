@@ -61,11 +61,11 @@ test("S058: a capture of another provider, environment, order, payee or currency
   assert.deepEqual(matchCapture(ORDER, observed({ providerOrderId: null })), { kind: "MATCH" }, "an event naming only the capture matches through the scope index");
 });
 
-test("capture facts only move forward: pending → completed | denied | reversed, completed → reversed; old or contradictory events change nothing", () => {
+test("capture facts only move forward: pending → completed | denied, completed → reversed (a reversal walks the completion first); old or contradictory events change nothing", () => {
   assert.deepEqual(captureStatusStep(null, "PENDING"), { kind: "INSERT", status: "PENDING" });
   assert.deepEqual(captureStatusStep("PENDING", "COMPLETED"), { kind: "ADVANCE", next: "COMPLETED", event: "provider_completed" });
   assert.deepEqual(captureStatusStep("PENDING", "DENIED"), { kind: "ADVANCE", next: "DENIED", event: "provider_denied" });
-  assert.deepEqual(captureStatusStep("PENDING", "REVERSED"), { kind: "ADVANCE", next: "REVERSED", event: "provider_reversed" });
+  assert.deepEqual(captureStatusStep("PENDING", "REVERSED"), { kind: "ADVANCE", next: "COMPLETED", event: "provider_completed", then: [{ next: "REVERSED", event: "provider_reversed" }] });
   assert.deepEqual(captureStatusStep("COMPLETED", "REVERSED"), { kind: "ADVANCE", next: "REVERSED", event: "provider_reversed" });
   assert.deepEqual(captureStatusStep("COMPLETED", "PENDING"), { kind: "STALE" }, "an old pending event cannot roll back a confirmed capture (15)");
   assert.deepEqual(captureStatusStep("REVERSED", "COMPLETED"), { kind: "STALE" }, "S059: a completion arriving after its reversal adds history only");
@@ -114,6 +114,7 @@ const reviewed: FiscalProfileRecord = {
   exportEvidenceHash: "4".repeat(64),
   reviewedByUserId: "6f1b0d2e-3c4a-5b5c-9d6e-7f8091a2b3c4" as UserId,
   validFrom: "2026-09-01T00:00:00.000Z",
+  recordedAt: "2026-09-01T00:00:00.000Z",
 };
 
 function ready(overrides: Partial<CheckoutFacts> = {}): CheckoutFacts {

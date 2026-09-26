@@ -95,26 +95,30 @@ export interface PaymentRouteRepository {
   findQualified(provider: string, environment: PaymentEnvironment): Promise<PaymentRouteRecord | null>;
 }
 
-export interface NewFiscalProfile extends Omit<FiscalProfileRecord, "supersededAt"> {
-  readonly createdAt: UtcInstant;
-}
+/** A reviewed version to record; `recordedAt` is its created_at and exactly the superseded version's superseded_at (fiscal_profiles_successor_fk; B09-N5). */
+export type NewFiscalProfile = Omit<FiscalProfileRecord, "supersededAt">;
 
 export interface FiscalRepository {
   /** The current (unsuperseded) reviewed version of an agency's fiscal profile, read after its transition lock, or null (quotes, checkout). */
   currentProfile(agencyId: AgencyId): Promise<FiscalProfileRecord | null>;
   /**
-   * The version in force at an instant — the latest recorded version whose validity covers it and that was not superseded by then
-   * (commerce/fiscal profileInForceAt; D-FISC-B4) — read after the profile's transition lock; the fiscal drafter picks a document's
-   * profile with it (the tax point: the capture's completion), never the current version (B09-F4). Null when none was in force.
+   * The version every document of a sale takes (commerce/fiscal saleProfileAt; D-FISC-B4, D-FISC-B6; B09-F4, B09-N5), read after the
+   * profile's transition lock: among the agency's versions in force at the sale's tax point — the capture's completion, never a
+   * refund's — the version current then (recorded by the tax point, not superseded by it) when it carries a reviewed treatment,
+   * else the latest-recorded reviewed version in force at it (a later review that resolves the unknown for the sale), else the
+   * unknown, else null. The FISCAL consumer drafts the invoice under it; a credit note carries exactly the fiscal snapshot of the
+   * invoice it corrects (D-FISC-B5) and never asks again. A later version never replaces a reviewed treatment for an earlier sale,
+   * however its validity is dated (a retroactive change is a professional correction, Q-B09-20).
    */
-  profileInForceAt(agencyId: AgencyId, at: UtcInstant): Promise<FiscalProfileRecord | null>;
+  saleProfileAt(agencyId: AgencyId, taxPoint: UtcInstant): Promise<FiscalProfileRecord | null>;
   getProfile(profileId: FiscalProfileId): Promise<FiscalProfileRecord | null>;
   /** An issuer route, read after its transition lock (a suspension orders itself with a checkout in flight). */
   getIssuer(issuerRef: FiscalIssuerRef): Promise<FiscalIssuerRecord | null>;
   /**
    * Records a reviewed version (an OPERATOR with an ACTIVE KAURO_OWNER grant in the agency's finance scope; the database checks
-   * the grant): supersedes the current one once, in the same unit of work (fiscal_profiles_one_current / supersedes_once close the
-   * race of two reviews).
+   * the grant): supersedes the current one once, in the same unit of work, at exactly the new version's recordedAt
+   * (fiscal_profiles_one_current / supersedes_once close the race of two reviews; fiscal_profiles_successor_fk and
+   * fiscal_profiles_supersession_lineage keep the lineage gap-free). To withdraw a treatment, record a REVIEW_REQUIRED version.
    */
   recordProfile(profile: NewFiscalProfile): Promise<FiscalProfileRecord>;
 }
@@ -285,17 +289,22 @@ export interface NewCaptureFact {
   readonly captureId: CaptureId;
   readonly agencyId: AgencyId;
   readonly orderId: PaymentOrderId;
-  /** The status of the first authenticated observation (D-INIT-B1). */
-  readonly status: CaptureStatus;
+  /**
+   * The status of the first authenticated observation (D-INIT-B1): PENDING, COMPLETED or DENIED. A capture first seen REVERSED is
+   * inserted COMPLETED and then advanced to REVERSED in the same unit of work (captureStatusStep; D-PAY-B5; B09-N3).
+   */
+  readonly status: Exclude<CaptureStatus, "REVERSED">;
   readonly provider: string;
   readonly environment: PaymentEnvironment;
   readonly providerCaptureId: string;
   readonly merchantRef: PaymentOrderRecord["merchantRef"];
   readonly payeeDigest: Sha256Hex;
   readonly amountCents: bigint;
-  /** Required for COMPLETED and REVERSED (fixed at completion); zero components otherwise. */
+  /** Required for COMPLETED (fixed at completion); zero components otherwise. */
   readonly allocation: RefundComponents;
-  readonly fundsState: FundsState;
+  /** Always UNKNOWN at birth: an observed availability is the next version's fact (observeFunds, capture.funds_observed.v1; D-EVT-B3). */
+  readonly fundsState: "UNKNOWN";
+  /** Only with a COMPLETED birth (capture.completed.v1 carries it); otherwise learned later (observeFee). */
   readonly providerFeeCents?: bigint;
   readonly providerCompletedAt?: UtcInstant;
   readonly firstObservationSource: ObservationSource;
@@ -306,8 +315,9 @@ export interface NewCaptureFact {
 
 export interface CaptureAdvance {
   readonly status: CaptureStatus;
-  /** Only on PENDING → COMPLETED | REVERSED (the database refuses it anywhere else, KP005 FACT_REGRESSION). */
+  /** Only on PENDING → COMPLETED (the database refuses it anywhere else, KP005 FACT_REGRESSION). */
   readonly allocation?: RefundComponents;
+  /** Only on PENDING → COMPLETED (capture.completed.v1 carries it); a later fee is observeFee's. */
   readonly providerFeeCents?: bigint;
   readonly providerCompletedAt?: UtcInstant;
   readonly observedAt: UtcInstant;
@@ -418,6 +428,12 @@ export interface CommercialAuthorizationRepository {
   findByQuote(quoteId: QuoteId): Promise<CommercialAuthorizationRecord | null>;
   /** The live (non-revoked) entitlement of a capture, if any (commercial_authorizations_one_live_per_capture). */
   findLiveByCapture(captureId: CaptureId): Promise<CommercialAuthorizationRecord | null>;
+  /**
+   * The live (non-revoked) entitlements of an agency bound to a sealed source revision, by its manifest hash
+   * (commercial_authorizations.revision_hash): the B09-owned query behind the source lifecycle's impact map. The integrator binds
+   * B07's CommercialScopeInspector to it when both packages are on main (design §15 item 6); B09 never reads B07's tables.
+   */
+  findLiveByRevisionHash(agencyId: AgencyId, revisionHash: Sha256Hex): Promise<ReadonlyArray<CommercialAuthorizationRecord>>;
   /**
    * Payment service only (B09-F1): inserts ACTIVE at version 1; the database refuses it without a completed capture that alone pays
    * the order (KP004), and a re-bound one without its re-binding and the revocation of the entitlement it replaces.

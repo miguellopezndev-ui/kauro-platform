@@ -327,8 +327,7 @@ platform machine (B09 decision D-MACH-B3); initial PENDING; terminal DENIED, REV
 | — | (initial PENDING) | PENDING | CMD030 ReceivePaymentWebhook (B09); a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too | capture.pending.v1 | database |
 | PENDING | provider_completed | COMPLETED | CMD030 ReceivePaymentWebhook (B09) | capture.completed.v1 | database |
 | PENDING | provider_denied | DENIED | CMD030 ReceivePaymentWebhook (B09) | capture.denied.v1 | database |
-| PENDING | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09) | capture.reversed.v1 | database |
-| COMPLETED | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09) | capture.reversed.v1 | database |
+| COMPLETED | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09); from COMPLETED only: a capture first seen reversed is recorded COMPLETED, then REVERSED, in one transaction (D-PAY-B5) | capture.reversed.v1 | database |
 
 ### CommercialAuthorization
 

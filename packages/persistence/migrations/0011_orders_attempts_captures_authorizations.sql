@@ -14,7 +14,7 @@
 -- purchased entitlement), 10 "Provider adapter contract", registry contracts PaymentOrder, PaymentAttempt, CaptureFact
 -- ("Browser claims cannot produce a capture fact"), CommercialAuthorization; registry machine PaymentAttempt; scenarios S057,
 -- S058, S059, R2-140; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18. Design: docs/design/B09-payments-fiscal.md (D-MACH-B2..B4,
--- D-PROTO-B1..B5, D-INIT-B1, D-PAY-B1..B5, D-AUTH-B1..B4, D-TX-B1, D-QUOTE-B6, D-EVT-B2).
+-- D-PROTO-B1..B6, D-INIT-B1, D-PAY-B1..B5, D-AUTH-B1..B4, D-TX-B1, D-QUOTE-B6, D-EVT-B2, D-EVT-B3, D-BIND-B2).
 --
 -- The role boundary (B09-F1, decision D-AUTH-B4): the request handlers (kauro_app) write only the intent of CMD028 and CMD029 —
 -- an order born INTENT_CREATED with nothing learned from the provider, an attempt born PREPARED, and the two claim edges
@@ -113,6 +113,8 @@ CREATE TRIGGER payment_orders_initial_state BEFORE INSERT ON kauro.payment_order
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('PaymentOrder');
 CREATE CONSTRAINT TRIGGER payment_orders_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.payment_orders
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('payment_order', 'order_id');
+CREATE CONSTRAINT TRIGGER payment_orders_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.payment_orders
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('payment_order', 'order_id', 'state');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('PaymentOrder', 'INTENT_CREATED');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -170,6 +172,8 @@ CREATE TABLE kauro.payment_attempts (
   created_at            timestamptz NOT NULL,
   updated_at            timestamptz NOT NULL,
   UNIQUE (agency_id, attempt_id),
+  -- binding target of every row that names an attempt of an order: the attempt is that order's (D-BIND-B2; B09-N6)
+  CONSTRAINT payment_attempts_order_binding UNIQUE (agency_id, attempt_id, order_id),
   FOREIGN KEY (agency_id, order_id, provider, environment) REFERENCES kauro.payment_orders (agency_id, order_id, provider, environment),
   CONSTRAINT payment_attempts_intent_fk FOREIGN KEY (agency_id, intent_entry_id) REFERENCES kauro.command_journal (agency_id, entry_id),
   CONSTRAINT payment_attempts_operation_subject CHECK ((operation = 'REFUND') = (refund_id IS NOT NULL)),
@@ -220,12 +224,35 @@ BEGIN
 END
 $$;
 CREATE TRIGGER payment_attempts_sequence BEFORE INSERT ON kauro.payment_attempts FOR EACH ROW EXECUTE FUNCTION kauro.payment_attempts_sequence();
+
+-- The claim's deadline is the protocol's (D-PROTO-B4, D-PROTO-B6; B09-N7): the move PREPARED -> DISPATCHING records a deadline in the
+-- future and no further ahead than the bounded call's timeout plus the watchdog's margin (DISPATCH_TIMEOUT_SECONDS 30 +
+-- DISPATCH_WATCHDOG_MARGIN_SECONDS 30 = @kauro/domain DISPATCH_DEADLINE_SECONDS 60, in seconds on the transaction's instant,
+-- D-TIME-B1), whoever claims — the request handlers claim CREATE_ORDER and CAPTURE attempts, and the role a gate protects against
+-- must not set what protects against it: an attempt claimed with a distant deadline would stay out of the watchdog's due set
+-- (payment_attempts_watchdog) while its effect is unknown. The claimant writes the deadline as now() + 60 seconds in the claim's
+-- own statement. Named check violation payment_attempts_dispatch_deadline_bound (23514).
+CREATE OR REPLACE FUNCTION kauro.payment_attempts_dispatch_deadline_bound() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.dispatch_deadline_at IS NULL OR NEW.dispatch_deadline_at <= now() OR NEW.dispatch_deadline_at > now() + interval '60 seconds' THEN
+    RAISE EXCEPTION 'DISPATCH_DEADLINE: attempt % is claimed with a deadline outside (now, now + 60 seconds]', OLD.attempt_id
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'payment_attempts_dispatch_deadline_bound', SCHEMA = 'kauro', TABLE = 'payment_attempts';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER payment_attempts_dispatch_deadline_bound BEFORE UPDATE OF state ON kauro.payment_attempts
+  FOR EACH ROW WHEN (OLD.state = 'PREPARED' AND NEW.state = 'DISPATCHING') EXECUTE FUNCTION kauro.payment_attempts_dispatch_deadline_bound();
 CREATE TRIGGER payment_attempts_transition BEFORE UPDATE OF state ON kauro.payment_attempts
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('PaymentAttempt');
 CREATE TRIGGER payment_attempts_initial_state BEFORE INSERT ON kauro.payment_attempts
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('PaymentAttempt');
 CREATE CONSTRAINT TRIGGER payment_attempts_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.payment_attempts
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('payment_attempt', 'attempt_id');
+CREATE CONSTRAINT TRIGGER payment_attempts_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.payment_attempts
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('payment_attempt', 'attempt_id', 'state');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('PaymentAttempt', 'PREPARED');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -270,7 +297,8 @@ CREATE TABLE kauro.provider_observations (
   created_at         timestamptz NOT NULL,
   UNIQUE (agency_id, observation_id),
   FOREIGN KEY (agency_id, order_id) REFERENCES kauro.payment_orders (agency_id, order_id),
-  FOREIGN KEY (agency_id, attempt_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id),
+  -- a dispatch response is the response of an attempt of the order the observation is applied to (B09-N6)
+  CONSTRAINT provider_observations_attempt_fk FOREIGN KEY (agency_id, attempt_id, order_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id, order_id),
   CONSTRAINT provider_observations_source CHECK (
     (source = 'WEBHOOK') = (inbox_id IS NOT NULL) AND (source <> 'DISPATCH_RESPONSE' OR attempt_id IS NOT NULL) AND (source <> 'PROVIDER_QUERY' OR artifact_ref IS NOT NULL)
   ),
@@ -288,8 +316,11 @@ CREATE TRIGGER provider_observations_append_only BEFORE UPDATE OR DELETE ON kaur
 -- platform, R2-140 "deduplicate repeated events"). The composite key to the order admits only a capture of that order's provider,
 -- environment, merchant, payee and currency (S058: a wrong payee, currency or environment never becomes a capture fact of the
 -- order; it is a provider event exception). A fact is born in the status of its first authenticated observation and moves only
--- forward. When it completes (or is first seen reversed, D-PAY-B5), its amount is allocated once: the part that pays what is
--- still owed on the order (service and tax) and the excess above the obligation (R2-140); the allocation never changes afterwards.
+-- forward: PENDING -> COMPLETED | DENIED, COMPLETED -> REVERSED. A reversal returns money that was captured, so a capture first seen
+-- REVERSED (or reversed while known only as PENDING) had completed at the provider: it is recorded COMPLETED — allocated, published
+-- as capture.completed.v1, which sources its CAPTURE posting — and then REVERSED (capture.reversed.v1, the CHARGEBACK posting), two
+-- versions in one transaction (D-PAY-B5; B09-N3). When it completes, its amount is allocated once: the part that pays what is still
+-- owed on the order (service and tax) and the excess above the obligation (R2-140); the allocation never changes afterwards.
 -- A provider fact learned later — the availability of the funds (HELD, AVAILABLE) or the provider's fee — is a new version of the
 -- capture with an event of its own (capture.funds_observed.v1, capture.fee_observed.v1; D-EVT-B2): the ledger consumer posts it
 -- once, and capture.completed.v1 is published exactly once per capture (domain_events_capture_completed_once, below).
@@ -326,14 +357,16 @@ CREATE TABLE kauro.capture_facts (
   CONSTRAINT capture_facts_provider_identity UNIQUE (provider, environment, provider_capture_id),
   CONSTRAINT capture_facts_order_fk FOREIGN KEY (agency_id, order_id, provider, environment, merchant_ref, payee_digest, currency)
     REFERENCES kauro.payment_orders (agency_id, order_id, provider, environment, merchant_ref, payee_digest, currency),
-  FOREIGN KEY (agency_id, attempt_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id),
+  -- the attempt that observed the capture is an attempt of the capture's own order (B09-N6)
+  CONSTRAINT capture_facts_attempt_fk FOREIGN KEY (agency_id, attempt_id, order_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id, order_id),
   -- a completed (or reversed) capture's amount is exactly its service, tax and excess; pending and denied carry none
   CONSTRAINT capture_facts_allocation CHECK (
     (status IN ('COMPLETED', 'REVERSED') AND allocated_service_cents + allocated_tax_cents + excess_cents = amount_cents)
     OR (status IN ('PENDING', 'DENIED') AND allocated_service_cents = 0 AND allocated_tax_cents = 0 AND excess_cents = 0)
   ),
-  -- the completion instant is the tax point and the price-expiry comparison (07 "a capture completed after price expiry is honored")
-  CONSTRAINT capture_facts_completion_time CHECK (status <> 'COMPLETED' OR provider_completed_at IS NOT NULL),
+  -- the completion instant is the tax point and the price-expiry comparison (07 "a capture completed after price expiry is honored");
+  -- a reversed capture completed first and keeps it (B09-N3)
+  CONSTRAINT capture_facts_completion_time CHECK (status NOT IN ('COMPLETED', 'REVERSED') OR provider_completed_at IS NOT NULL),
   CONSTRAINT capture_facts_observation_order CHECK (observed_at >= first_observed_at)
 );
 CREATE INDEX capture_facts_by_order ON kauro.capture_facts (agency_id, order_id);
@@ -346,14 +379,14 @@ CREATE TRIGGER capture_facts_immutable BEFORE UPDATE ON kauro.capture_facts
 CREATE TRIGGER capture_facts_learned_once BEFORE UPDATE ON kauro.capture_facts
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_reassignment('provider_fee_cents,provider_completed_at,attempt_id');
 
--- facts are added monotonically (15 "Webhooks and reconciliation"): the allocation is fixed by the move into COMPLETED or
--- REVERSED and never changes afterwards; the observation time never goes back; known funds availability never becomes unknown
+-- facts are added monotonically (15 "Webhooks and reconciliation"): the allocation is fixed by the move into COMPLETED and never
+-- changes afterwards; the observation time never goes back; known funds availability never becomes unknown
 CREATE OR REPLACE FUNCTION kauro.capture_facts_monotonic() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
   IF (NEW.allocated_service_cents, NEW.allocated_tax_cents, NEW.excess_cents) IS DISTINCT FROM (OLD.allocated_service_cents, OLD.allocated_tax_cents, OLD.excess_cents)
-     AND NOT (OLD.status = 'PENDING' AND NEW.status IN ('COMPLETED', 'REVERSED')) THEN
+     AND NOT (OLD.status = 'PENDING' AND NEW.status = 'COMPLETED') THEN
     RAISE EXCEPTION 'FACT_REGRESSION: capture % allocation is fixed when it completes', OLD.capture_id USING ERRCODE = 'KP005';
   END IF;
   IF NEW.observed_at < OLD.observed_at THEN
@@ -376,8 +409,11 @@ CREATE TRIGGER capture_facts_transition_lock BEFORE UPDATE OF status ON kauro.ca
   FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status) EXECUTE FUNCTION kauro.take_transition_lock('kauro.capture_facts', 'capture_id');
 CREATE CONSTRAINT TRIGGER capture_facts_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.capture_facts
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('capture', 'capture_id');
+CREATE CONSTRAINT TRIGGER capture_facts_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.capture_facts
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('capture', 'capture_id', 'status');
 
--- The allocation of a completing capture against its order (D-PAY-B1, R2-140): under the order's row lock, the part applied to the
+-- The allocation of a completing capture against its order (D-PAY-B1, R2-140): at its COMPLETED version (a birth at COMPLETED or the
+-- edge PENDING -> COMPLETED; a reversal keeps the allocation, the order is never charged again), under the order's row lock, the part applied to the
 -- obligation is exactly min(amount, still owed), the rest is excess, and the service and tax paid by every completed capture of
 -- the order never exceed the order's service and tax (the domain splits them cumulatively; this is the database's ceiling).
 -- Raises OBLIGATION_OVER_ALLOCATED (KP002) otherwise; it is the only writer of payment_orders.allocated_cents.
@@ -390,7 +426,7 @@ DECLARE
   paid_service bigint;
   paid_tax bigint;
 BEGIN
-  IF NEW.status NOT IN ('COMPLETED', 'REVERSED') OR (TG_OP = 'UPDATE' AND OLD.status IN ('COMPLETED', 'REVERSED')) THEN
+  IF NEW.status <> 'COMPLETED' OR (TG_OP = 'UPDATE' AND OLD.status <> 'PENDING') THEN
     RETURN NULL;
   END IF;
   SELECT p.expected_amount_cents, p.expected_service_cents, p.expected_tax_cents, p.allocated_cents INTO o
@@ -419,7 +455,6 @@ INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('CaptureFact',
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('CaptureFact', 'PENDING', 'COMPLETED'),
   ('CaptureFact', 'PENDING', 'DENIED'),
-  ('CaptureFact', 'PENDING', 'REVERSED'),
   ('CaptureFact', 'COMPLETED', 'REVERSED');
 
 INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package) VALUES ('capture', 'capture_facts', 'capture_id', 'B09');
@@ -428,8 +463,9 @@ INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_
 -- correction, service refund and commission adjustment are separate idempotent effects from the same reconciled financial
 -- event): it is published once per capture, so no later fact of the capture can re-deliver the completion to FINANCE, FISCAL or
 -- COMMISSIONS (15 "Repeated delivery cannot duplicate capture, authorization, refund or commission"; B09-F8). An additive
--- partial unique index on B06's event table (D-BIND-B1).
-CREATE UNIQUE INDEX domain_events_capture_completed_once ON kauro.domain_events (aggregate_id) WHERE event_type = 'capture.completed.v1';
+-- partial unique index on B06's event table (D-BIND-B1), keyed on the capture it records: the type records only a capture's
+-- COMPLETED version (domain_events_commerce_kind, capture_facts_event_type_per_version; B09-N1).
+CREATE UNIQUE INDEX domain_events_capture_completed_once ON kauro.domain_events (aggregate_kind, aggregate_id) WHERE event_type = 'capture.completed.v1';
 
 -- --- approvals: the live approval is a transition subject (D-TX-B1) ----------------------------------------------------------------------
 -- A CommercialAuthorization binds "the current non-withdrawn agency approval" (registry CommercialAuthorization.approvalHash). A
@@ -602,6 +638,8 @@ CREATE TRIGGER commercial_authorizations_transition_lock BEFORE UPDATE OF state 
   FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.take_transition_lock('kauro.commercial_authorizations', 'authorization_id');
 CREATE CONSTRAINT TRIGGER commercial_authorizations_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.commercial_authorizations
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('commercial_authorization', 'authorization_id');
+CREATE CONSTRAINT TRIGGER commercial_authorizations_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.commercial_authorizations
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('commercial_authorization', 'authorization_id', 'state');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('CommercialAuthorization', 'ACTIVE');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES

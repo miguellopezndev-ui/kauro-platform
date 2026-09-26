@@ -28,6 +28,12 @@
         "SELECT",
         "UPDATE"
       ],
+      "kauro.commerce_event_bindings": [
+        "SELECT"
+      ],
+      "kauro.commerce_event_subscriptions": [
+        "SELECT"
+      ],
       "kauro.commerce_scopes": [
         "INSERT",
         "SELECT"
@@ -279,6 +285,12 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.commerce_event_bindings": [
+        "SELECT"
+      ],
+      "kauro.commerce_event_subscriptions": [
+        "SELECT"
       ],
       "kauro.commerce_scopes": [
         "INSERT",
@@ -816,6 +828,24 @@
       "using": "(((agency_id IS NOT NULL) AND (agency_id = kauro.current_agency_id())) OR ((agency_id IS NULL) AND (actor_kind = 'USER'::text) AND (actor_id = (kauro.current_user_id())::text)))",
       "check": "(((agency_id IS NOT NULL) AND (agency_id = kauro.current_agency_id())) OR ((agency_id IS NULL) AND (actor_kind = 'USER'::text) AND (actor_id = (kauro.current_user_id())::text)))"
     },
+    "commerce_event_bindings/commerce_event_bindings_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app",
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "commerce_event_subscriptions/commerce_event_subscriptions_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app",
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
     "commerce_scopes/commerce_scopes_control": {
       "command": "SELECT",
       "roles": [
@@ -935,6 +965,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "domain_events/domain_events_commerce_request_handlers": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(((aggregate_kind <> ALL (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])) AND (split_part(event_type, '.'::text, 1) <> ALL (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text]))) OR (EXISTS ( SELECT 1\n   FROM kauro.commerce_event_bindings b\n  WHERE ((b.event_type = domain_events.event_type) AND (b.aggregate_kind = domain_events.aggregate_kind) AND (((b.request_handler = 'TENANT'::text) AND (domain_events.agency_id = kauro.current_agency_id())) OR ((b.request_handler = 'OPERATOR'::text) AND kauro.in_finance_scope(domain_events.agency_id)))))))"
     },
     "domain_events/domain_events_control_read": {
       "command": "SELECT",
@@ -1185,6 +1223,15 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "outbox_records/outbox_records_commerce_subscribers": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app",
+        "kauro_payment"
+      ],
+      "using": null,
+      "check": "((NOT (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_bindings b ON ((b.event_type = e.event_type)))\n  WHERE (e.event_id = outbox_records.event_id)))) OR (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_subscriptions s ON ((s.event_type = e.event_type)))\n  WHERE ((e.event_id = outbox_records.event_id) AND (s.consumer = outbox_records.consumer)))))"
     },
     "outbox_records/outbox_records_control": {
       "command": "ALL",

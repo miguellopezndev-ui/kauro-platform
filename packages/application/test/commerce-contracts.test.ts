@@ -9,13 +9,17 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
-import { FAILURE_CODES, FAILURE_REASONS, SERVICE_ROLE_TABLE, serviceHoldsRole } from "@kauro/domain";
+import { CHECKOUT_BLOCKERS, DISPATCH_DEADLINE_SECONDS, FAILURE_CODES, FAILURE_REASONS, RECONCILIATION_CASE_KINDS, SERVICE_ROLE_TABLE, serviceHoldsRole } from "@kauro/domain";
 import {
+  CHECKOUT_BLOCKER_TOKENS,
   COMMERCE_COMMAND_OUTCOMES,
   COMMERCE_COMMANDS,
   COMMERCE_READ_OUTCOMES,
   COMMERCE_READ_ROUTES,
   COMMERCE_REQUEST_SCHEMAS,
+  DISPATCH_TIMEOUT_SECONDS,
+  DISPATCH_WATCHDOG_MARGIN_SECONDS,
+  RECONCILIATION_CASE_KIND_TOKENS,
   REQUEST_SCHEMA_PREFIX,
   buildCommerceResponseSchemas,
   commerceCommandResponseSchemaId,
@@ -211,4 +215,23 @@ test("B09-F1/B09-F5/B09-F6: a provider effect is settled by the payment service;
     assert.ok(COMMERCE_COMMAND_OUTCOMES[id].some((o) => o.code === "CAPACITY_UNAVAILABLE" && o.reason === "DELIVERY_CAPACITY_UNAVAILABLE" && o.layer === "COMMAND"), id);
   }
   assert.ok(COMMERCE_COMMAND_OUTCOMES.CMD032.some((o) => o.code === "PRECONDITION_FAILED" && o.reason === "REFUND_TAX_INCONSISTENT"));
+});
+
+test("B09-N2: the closed views admit every token the domain can put in them — checkout and authorization blockers (DELIVERY_CAPACITY_UNAVAILABLE included) and open case kinds (DISPUTE_OPEN included) are the domain's own vocabularies; B09-N7: the claim deadline's bound is the protocol's timeout plus the watchdog margin", () => {
+  assert.deepEqual([...CHECKOUT_BLOCKER_TOKENS], [...CHECKOUT_BLOCKERS]);
+  assert.deepEqual([...RECONCILIATION_CASE_KIND_TOKENS], [...RECONCILIATION_CASE_KINDS]);
+  assert.ok(CHECKOUT_BLOCKERS.includes("DELIVERY_CAPACITY_UNAVAILABLE") && RECONCILIATION_CASE_KINDS.includes("DISPUTE_OPEN"));
+  const { defs, roots } = buildCommerceResponseSchemas(bundle);
+  const compiled = compileSchemaBundle({ defs: { ...bundle.$defs, ...defs }, roots });
+  const ok = (id: string, body: unknown) => assert.deepEqual(compiled.validate(id, body), [], `${id} ${JSON.stringify(body).slice(0, 240)}`);
+  const completed = (data: unknown, version = 1) => ({ kind: "COMPLETED", version, replayed: false, data });
+  // every blocker the domain emits, all at once and in check order, answers through the send guard (maxItems is the vocabulary's size)
+  ok(commerceReadResponseSchemaId("GetQuote"), { kind: "READ", data: { ...quote, checkoutBlockers: [...CHECKOUT_BLOCKERS] } });
+  ok(commerceReadResponseSchemaId("GetQuote"), { kind: "READ", data: { ...quote, checkoutBlockers: ["DELIVERY_CAPACITY_UNAVAILABLE"] } });
+  ok(commerceCommandResponseSchemaId("CMD029"), completed({ order: { ...order, state: "CAPTURED" }, capture, authorizationBlockers: ["DELIVERY_CAPACITY_UNAVAILABLE"] }, 5));
+  for (const kind of RECONCILIATION_CASE_KINDS) {
+    ok(commerceCommandResponseSchemaId("CMD034"), completed({ order: { ...order, state: "CAPTURED" }, captures: [capture], commercialAuthorization: authorization, effects: [{ about: "CAPTURE", effect: "NO_CHANGE" }], openCases: [{ caseId: ID(50), kind }] }, 5));
+  }
+  assert.notDeepEqual(compiled.validate(commerceReadResponseSchemaId("GetQuote"), { kind: "READ", data: { ...quote, checkoutBlockers: ["NOT_A_BLOCKER"] } }), []);
+  assert.equal(DISPATCH_TIMEOUT_SECONDS + DISPATCH_WATCHDOG_MARGIN_SECONDS, DISPATCH_DEADLINE_SECONDS);
 });

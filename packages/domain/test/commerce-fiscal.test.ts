@@ -43,6 +43,7 @@ function profile(overrides: Partial<FiscalProfileRecord>): FiscalProfileRecord {
     evidenceHash: "3".repeat(64),
     reviewedByUserId: "6f1b0d2e-3c4a-5b5c-9d6e-7f8091a2b3c4" as UserId,
     validFrom: "2026-09-01T00:00:00.000Z",
+    recordedAt: "2026-09-01T00:00:00.000Z",
     ...overrides,
   };
 }

@@ -8,6 +8,7 @@ export type { CommerceFailureReason } from "./failure-reasons.js";
 export { COMMERCE_FAILURE_REASONS } from "./failure-reasons.js";
 
 export type * from "./records.js";
+export { RECONCILIATION_CASE_KINDS } from "./records.js";
 
 export type { FeeProfile } from "./money.js";
 export {
@@ -31,12 +32,12 @@ export type { PriceBand, RepeatTier, PricePolicy, DiscountSelection, QuoteAmount
 export { pricePolicyFrom, registryPricePolicy, baseServiceCents, repeatDiscountBps, selectDiscount, quoteAmounts, quoteExpiresAt, lookbackStartsAt, quoteTermsHash, termsMoney } from "./pricing.js";
 
 export type { FiscalBlocker, FiscalTreatmentDecision, FiscalTreatmentInput } from "./fiscal.js";
-export { taxOf, ruleSnapshotOf, sameTaxRule, FISCAL_BLOCKERS, profileInForceAt, resolveFiscalTreatment, quotableTaxRule } from "./fiscal.js";
+export { taxOf, ruleSnapshotOf, sameTaxRule, FISCAL_BLOCKERS, profileInForceAt, saleProfileAt, resolveFiscalTreatment, quotableTaxRule } from "./fiscal.js";
 
 export type { ProviderOutcomeKind, AmbiguityReason, ProviderRequest, ScopeKey, ObservedCapture, ObservedRefund, ObservedDispute, NormalizedProviderEventKind, NormalizedProviderEvent, PaymentIntentPreimage } from "./provider.js";
-export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, providerScopeKey, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
+export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, providerScopeKey, DISPATCH_DEADLINE_SECONDS, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
 
-export type { CaptureMismatch, CaptureMatch, CaptureStatusStep } from "./capture.js";
+export type { CaptureMismatch, CaptureMatch, CaptureEdge, CaptureStatusStep } from "./capture.js";
 export { CAPTURE_MISMATCHES, matchCapture, captureStatusStep, splitObligation, allocateCapture, authorizesObligation, isFullyPaid } from "./capture.js";
 
 export type { CheckoutBlocker, SubjectFacts, CheckoutFacts, QuoteReleaseFacts, QuoteRelease, ReplacementFacts, ReplacementBlocker } from "./authority.js";
@@ -66,13 +67,35 @@ export {
 } from "./refunds.js";
 
 export type { PostingLine } from "./ledger.js";
-export { LEDGER_ACCOUNT_VERSION, LEDGER_POLICY_VERSION, LEDGER_ACCOUNTS, capturePostings, providerFeePostings, fundsPostings, returnPostings, isBalanced } from "./ledger.js";
+export {
+  LEDGER_ACCOUNT_VERSION,
+  LEDGER_POLICY_VERSION,
+  LEDGER_ACCOUNTS,
+  PROVIDER_BALANCE_ACCOUNTS,
+  BANK_ACCOUNTS,
+  fundsAccountOf,
+  capturePostings,
+  providerFeePostings,
+  movableBalanceOf,
+  fundsPostings,
+  returnPostings,
+  isBalanced,
+} from "./ledger.js";
 
 export type { CommercePlatformMachineName } from "./machines.js";
 export { COMMERCE_PLATFORM_MACHINES } from "./machines.js";
 
-export type { CommerceAggregateKind, CommerceEventType, CommerceConsumer } from "./events.js";
-export { COMMERCE_AGGREGATE_KINDS, COMMERCE_EVENT_TYPES, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS } from "./events.js";
+export type { CommerceAggregateKind, CommerceEventType, CommerceConsumer, CommerceVersionChange } from "./events.js";
+export {
+  COMMERCE_AGGREGATE_KINDS,
+  COMMERCE_EVENT_TYPES,
+  COMMERCE_STATE_EVENT_TYPES,
+  COMMERCE_REQUEST_HANDLER_EVENT_TYPES,
+  commerceVersionEventType,
+  COMMERCE_CONSUMERS,
+  COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
+  COMMERCE_EVENT_SUBSCRIPTIONS,
+} from "./events.js";
 
 export type { ServiceRole, ServiceIdentity } from "./principals.js";
 export { SERVICE_ROLE_TABLE, serviceHoldsRole, CORPORATE_ROLES, isCorporateCommandRole, COMMERCE_POLICY_VERSION } from "./principals.js";

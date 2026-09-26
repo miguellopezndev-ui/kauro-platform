@@ -6,18 +6,28 @@
  * refund webhook replay does not post another refund; a corrected amount is a reversal plus a new entry, never an edit).
  *
  * B09 posts only reconciled money movements, each from the domain event that records it (the event id is the idempotency
- * identity of the posting set, migration 0013 ledger_entries UNIQUE (event_id, line_no)):
+ * identity of the posting set, migration 0013 ledger_entries UNIQUE (event_id, line_no); the event is the source's own,
+ * ledger_entries_source_event). The money a capture brought in sits at the provider in exactly one balance at a time — the
+ * balance of the capture's funds state (`fundsAccountOf`: UNKNOWN → PSP_RECEIVABLE, HELD → PSP_HELD, AVAILABLE → PSP_AVAILABLE)
+ * — and every posting that takes money out of it credits that balance as the event names it (D-LEDGER-B5; B09-N4):
  *   capture completed → DEBIT PSP_RECEIVABLE amount / CREDIT CONTRACT_LIABILITY service, TAX_PAYABLE tax,
  *                       CUSTOMER_OVERPAYMENT excess (a capture before delivery is a contract liability, not revenue: 15
- *                       "Revenue recognition follows the actual accounting policy")
- *   provider fee       → DEBIT PROCESSOR_EXPENSE / CREDIT PSP_RECEIVABLE (the actual fee the provider reported)
- *   refund completed   → DEBIT CONTRACT_LIABILITY service, TAX_PAYABLE tax, CUSTOMER_OVERPAYMENT excess / CREDIT PSP_RECEIVABLE
+ *                       "Revenue recognition follows the actual accounting policy"); a capture is born with its funds UNKNOWN
+ *   provider fee       → DEBIT PROCESSOR_EXPENSE / CREDIT the balance of the funds state the fee's event names (the actual fee
+ *                        the provider reported; a fee reported with the completion is credited to PSP_RECEIVABLE)
+ *   funds observed     → the capture's movable balance (`movableBalanceOf`: its amount less the reported fee and the money
+ *                        already returned) moves from the balance of the previous funds state to the balance of the new one —
+ *                        provider balances only, never bank cash (CMD034 failure; migration 0013 ledger_entries_funds_accounts)
+ *   refund completed   → DEBIT CONTRACT_LIABILITY service, TAX_PAYABLE tax, CUSTOMER_OVERPAYMENT excess / CREDIT the balance of
+ *                        the funds state the refund's completion event names
  *   chargeback         → the same shape over the unrefunded components of the reversed capture
- * Settlement movements (receivable → held/available → bank in transit → bank cash) are posted by the settlement reconciler
- * from observed balances (R2-085, fiscal/integration package B15). Zero lines are never written.
+ * Every amount a set posts is fixed by its event, so the balances a capture ends with do not depend on the order in which the
+ * consumer delivers the events. Bank movements (the provider's available balance → bank in transit → bank cash) are posted only
+ * from settlement observations with bank evidence (R2-085, the settlement reconciler of the integration package B15; migration
+ * 0013 ledger_entries_bank_accounts). Zero lines are never written.
  */
 import { assertMoney } from "./money.js";
-import type { LedgerAccount, RefundComponents } from "./records.js";
+import type { FundsState, LedgerAccount, RefundComponents } from "./records.js";
 
 export const LEDGER_ACCOUNT_VERSION = "OPS-1";
 export const LEDGER_POLICY_VERSION = "B09-1";
@@ -40,6 +50,11 @@ export const LEDGER_ACCOUNTS: ReadonlyArray<LedgerAccount> = [
   "OWNER_DISTRIBUTION",
 ];
 
+/** The provider balances a capture's money moves between (a FUNDS posting touches nothing else; migration 0013). */
+export const PROVIDER_BALANCE_ACCOUNTS: ReadonlyArray<LedgerAccount> = ["PSP_RECEIVABLE", "PSP_HELD", "PSP_AVAILABLE"];
+/** The bank accounts only a settlement observation with bank evidence posts to (migration 0013 ledger_entries_bank_accounts). */
+export const BANK_ACCOUNTS: ReadonlyArray<LedgerAccount> = ["BANK_IN_TRANSIT", "BANK_CASH"];
+
 export interface PostingLine {
   readonly account: LedgerAccount;
   readonly direction: "DEBIT" | "CREDIT";
@@ -55,6 +70,18 @@ function lines(...ls: ReadonlyArray<PostingLine | null>): ReadonlyArray<PostingL
   return ls.filter((l): l is PostingLine => l !== null);
 }
 
+/** The provider balance a capture's money sits in while its funds are in this state (D-LEDGER-B5). */
+export function fundsAccountOf(state: FundsState): LedgerAccount {
+  switch (state) {
+    case "UNKNOWN":
+      return "PSP_RECEIVABLE";
+    case "HELD":
+      return "PSP_HELD";
+    case "AVAILABLE":
+      return "PSP_AVAILABLE";
+  }
+}
+
 export function capturePostings(allocation: RefundComponents): ReadonlyArray<PostingLine> {
   const total = allocation.serviceCents + allocation.taxCents + allocation.excessCents;
   return lines(
@@ -65,30 +92,47 @@ export function capturePostings(allocation: RefundComponents): ReadonlyArray<Pos
   );
 }
 
-export function providerFeePostings(feeCents: bigint): ReadonlyArray<PostingLine> {
-  return lines(line("PROCESSOR_EXPENSE", "DEBIT", feeCents), line("PSP_RECEIVABLE", "CREDIT", feeCents));
+/** The provider's reported fee, taken from the balance the capture's money sits in when the fee's event was published. */
+export function providerFeePostings(feeCents: bigint, fundsState: FundsState): ReadonlyArray<PostingLine> {
+  return lines(line("PROCESSOR_EXPENSE", "DEBIT", feeCents), line(fundsAccountOf(fundsState), "CREDIT", feeCents));
 }
 
 /**
- * A provider availability change of captured funds (capture.funds_observed.v1, D-EVT-B2): HELD moves the receivable into the
- * provider's hold, AVAILABLE out of it into the available provider balance — never bank cash (CMD034 failure; bank cash comes only
- * from a settlement with bank evidence).
+ * What of a capture's money is still at the provider to move between its balances: the captured amount less the fee the provider
+ * reported and the money already returned (completed refunds), never below zero — a return beyond it (a refund or chargeback that
+ * returns a fee the provider keeps) is recovered by the provider from the merchant's balance, not from this capture's.
  */
-export function fundsPostings(previous: "UNKNOWN" | "HELD" | "AVAILABLE", next: "HELD" | "AVAILABLE", amountCents: bigint): ReadonlyArray<PostingLine> {
-  const from: LedgerAccount = previous === "HELD" ? "PSP_HELD" : previous === "AVAILABLE" ? "PSP_AVAILABLE" : "PSP_RECEIVABLE";
-  const to: LedgerAccount = next === "HELD" ? "PSP_HELD" : "PSP_AVAILABLE";
-  if (from === to) return [];
-  return lines(line(to, "DEBIT", amountCents), line(from, "CREDIT", amountCents));
+export function movableBalanceOf(capture: { readonly amountCents: bigint; readonly providerFeeCents: bigint; readonly returnedCents: bigint }): bigint {
+  assertMoney(capture.amountCents);
+  assertMoney(capture.providerFeeCents);
+  assertMoney(capture.returnedCents);
+  const left = capture.amountCents - capture.providerFeeCents - capture.returnedCents;
+  return left > 0n ? left : 0n;
 }
 
-/** A completed refund, or a chargeback over the unrefunded components (the provider returned the money in both cases). */
-export function returnPostings(amounts: RefundComponents): ReadonlyArray<PostingLine> {
+/**
+ * A provider availability change of captured funds (capture.funds_observed.v1, D-EVT-B2; its payload's amountCents is the
+ * capture's movable balance at that version): the balance moves from the account of the previous state to the account of the
+ * new one — never bank cash (CMD034 failure; bank cash comes only from a settlement with bank evidence).
+ */
+export function fundsPostings(previous: FundsState, next: Exclude<FundsState, "UNKNOWN">, balanceCents: bigint): ReadonlyArray<PostingLine> {
+  const from = fundsAccountOf(previous);
+  const to = fundsAccountOf(next);
+  if (from === to) return [];
+  return lines(line(to, "DEBIT", balanceCents), line(from, "CREDIT", balanceCents));
+}
+
+/**
+ * A completed refund, or a chargeback over the unrefunded components (the provider returned the money in both cases), taken from
+ * the balance the capture's money sits in when the event was published.
+ */
+export function returnPostings(amounts: RefundComponents, fundsState: FundsState): ReadonlyArray<PostingLine> {
   const total = amounts.serviceCents + amounts.taxCents + amounts.excessCents;
   return lines(
     line("CONTRACT_LIABILITY", "DEBIT", amounts.serviceCents),
     line("TAX_PAYABLE", "DEBIT", amounts.taxCents),
     line("CUSTOMER_OVERPAYMENT", "DEBIT", amounts.excessCents),
-    line("PSP_RECEIVABLE", "CREDIT", total),
+    line(fundsAccountOf(fundsState), "CREDIT", total),
   );
 }
 

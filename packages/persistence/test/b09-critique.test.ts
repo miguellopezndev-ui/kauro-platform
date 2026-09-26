@@ -2,11 +2,20 @@
 // record"), on real PostgreSQL 17 through the runtime login roles. The critic's probes P1..P6 are reproduced here as tests: each
 // attack is performed AS THE RUNTIME ROLE that would perform it and is refused, beside the legitimate write that commits (21
 // "Positive and negative symmetry"; 07 "Application checks improve messages but cannot be the sole protection"). Every test fails on
-// the schema of the reviewed design (8a282bc) and passes on this one.
+// the schema of the reviewed design (8a282bc) and passes on this one; the re-check's probes of the residual findings (B09-N1, N3..N7)
+// follow, each failing on the schema the re-check read (30a3202).
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { PROVIDER_EXCEPTION_KINDS, type UserId } from "@kauro/domain";
+import {
+  COMMERCE_EVENT_SUBSCRIPTIONS,
+  COMMERCE_EVENT_TYPES,
+  COMMERCE_REQUEST_HANDLER_EVENT_TYPES,
+  COMMERCE_STATE_EVENT_TYPES,
+  DISPATCH_DEADLINE_SECONDS,
+  PROVIDER_EXCEPTION_KINDS,
+  type UserId,
+} from "@kauro/domain";
 import { start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import {
   ENVIRONMENT,
@@ -22,6 +31,7 @@ import {
   insertAuthorization,
   insertCapture,
   issuedQuote,
+  journalEntry,
   observedCapture,
   operator,
   qualifiedRoutes,
@@ -235,7 +245,7 @@ test("B09-F1: the request handlers cannot mint provider facts or execution autho
     "SELECT o.state AS order_state, c.funds_state, a.state AS authorization_state, (SELECT count(*)::int FROM kauro.payment_attempts t WHERE t.order_id = o.order_id) AS attempts FROM kauro.payment_orders o JOIN kauro.capture_facts c ON c.order_id = o.order_id JOIN kauro.commercial_authorizations a ON a.capture_id = c.capture_id WHERE o.order_id = $1",
     [order.orderId],
   );
-  assert.deepEqual(facts.rows, [{ order_state: "CAPTURED", funds_state: "HELD", authorization_state: "ACTIVE", attempts: 1 }]);
+  assert.deepEqual(facts.rows, [{ order_state: "CAPTURED", funds_state: "UNKNOWN", authorization_state: "ACTIVE", attempts: 1 }]);
 });
 
 // --- B09-F2 ----------------------------------------------------------------------------------------------------------------------------------
@@ -466,7 +476,7 @@ test("B09-F8/B09-F15: a funds availability and a fee learned after the completio
   const post = (eventId: string, kind: string) =>
     within(payment, service(A.agencyId), async (c) => {
       let lineNo = 1;
-      for (const [account, direction] of [["PSP_AVAILABLE", "DEBIT"], ["PSP_HELD", "CREDIT"]] as const) {
+      for (const [account, direction] of [["PSP_AVAILABLE", "DEBIT"], ["PSP_RECEIVABLE", "CREDIT"]] as const) {
         await c.query(
           `INSERT INTO kauro.ledger_entries (entry_id, agency_id, domain_event_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version)
            VALUES ($1, $2, $3, $4, $5, 'OPS-1', $6, $7, 'USD', $8, $9, now(), now(), now(), $10, 'B09-1')`,
@@ -477,7 +487,7 @@ test("B09-F8/B09-F15: a funds availability and a fee learned after the completio
   await assert.rejects(post(completion, "FUNDS"), refusedWith("KP001"));
   await post(fundsEvent, "FUNDS");
   const held = await h.oracle.query("SELECT account_code, direction, observed_at IS NOT NULL AS observed FROM kauro.ledger_entries WHERE domain_event_id = $1 ORDER BY line_no", [fundsEvent]);
-  assert.deepEqual(held.rows, [{ account_code: "PSP_AVAILABLE", direction: "DEBIT", observed: true }, { account_code: "PSP_HELD", direction: "CREDIT", observed: true }]);
+  assert.deepEqual(held.rows, [{ account_code: "PSP_AVAILABLE", direction: "DEBIT", observed: true }, { account_code: "PSP_RECEIVABLE", direction: "CREDIT", observed: true }]);
 });
 
 // --- B09-F9 ----------------------------------------------------------------------------------------------------------------------------------
@@ -765,4 +775,384 @@ test("B09-F16: a debit note never validates; a credit note validates only agains
     }),
     refusedWith("KP011"),
   );
+});
+
+// --- the re-check's residual findings (design §16, B09-N1..B09-N8) ------------------------------------------------------------------
+
+/** The completion event of a capture (capture.completed.v1 of that capture). */
+async function completionOf(captureId: string): Promise<string> {
+  return (await h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE aggregate_kind = 'capture' AND aggregate_id = $1 AND event_type = 'capture.completed.v1'", [captureId])).rows[0]!.event_id;
+}
+
+async function versionOf(table: string, idColumn: string, id: string): Promise<number> {
+  return Number((await h.oracle.query<{ version: string }>(`SELECT version FROM kauro.${table} WHERE ${idColumn} = $1`, [id])).rows[0]!.version);
+}
+
+/** A balanced posting set of the adopted agency, sourced by a domain event (lines: account, direction, amount). */
+function postSet(ag: AgencyFixture, eventId: string, kind: string, sourceRef: string, lines: ReadonlyArray<readonly [string, "DEBIT" | "CREDIT", number]>) {
+  return within(payment, service(ag.agencyId), async (c) => {
+    let lineNo = 1;
+    for (const [account, direction, amount] of lines) {
+      await c.query(
+        `INSERT INTO kauro.ledger_entries (entry_id, agency_id, domain_event_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version)
+         VALUES ($1, $2, $3, $4, $5, 'OPS-1', $6, $7, 'USD', $8, $9, now(), now(), now(), $10, 'B09-1')`,
+        [ids.next(), ag.agencyId, eventId, lineNo++, account, direction, amount, kind, sourceRef, sha(`posting-${eventId}-${kind}`)],
+      );
+    }
+  });
+}
+
+test("B09-N1: an event records a version of an aggregate of its own kind and the state that version reaches — the request handlers publish only their own edges' events, every other commerce type is refused to them, an outbox record reaches only its event's subscribers, and a posting names its own source's event", async () => {
+  // the database's bindings and subscriptions are the domain's (D-EVT-B3)
+  const bindings = await h.oracle.query<{ event_type: string; aggregate_kind: string; recorded_state: string | null; recorded_fact: string | null; request_handler: string | null }>(
+    "SELECT event_type, aggregate_kind, recorded_state, recorded_fact, request_handler FROM kauro.commerce_event_bindings ORDER BY event_type",
+  );
+  const handlerOf = (type: string): string | null =>
+    (COMMERCE_REQUEST_HANDLER_EVENT_TYPES.TENANT as ReadonlyArray<string>).includes(type) ? "TENANT" : (COMMERCE_REQUEST_HANDLER_EVENT_TYPES.OPERATOR as ReadonlyArray<string>).includes(type) ? "OPERATOR" : null;
+  const expected = [
+    ...Object.entries(COMMERCE_STATE_EVENT_TYPES).flatMap(([kind, byState]) =>
+      Object.entries(byState).map(([state, type]) => ({ event_type: type, aggregate_kind: kind, recorded_state: state, recorded_fact: null, request_handler: handlerOf(type) })),
+    ),
+    { event_type: "capture.fee_observed.v1", aggregate_kind: "capture", recorded_state: null, recorded_fact: "FEE", request_handler: null },
+    { event_type: "capture.funds_observed.v1", aggregate_kind: "capture", recorded_state: null, recorded_fact: "FUNDS", request_handler: null },
+  ].sort((a, b) => (a.event_type < b.event_type ? -1 : 1));
+  assert.deepEqual(bindings.rows, expected);
+  const subscriptions = await h.oracle.query<{ event_type: string; consumer: string }>("SELECT event_type, consumer FROM kauro.commerce_event_subscriptions ORDER BY 1, 2");
+  assert.deepEqual(subscriptions.rows, COMMERCE_EVENT_SUBSCRIPTIONS.map((s) => ({ event_type: s.eventType, consumer: s.consumer })).sort((a, b) => (a.event_type === b.event_type ? (a.consumer < b.consumer ? -1 : 1) : a.event_type < b.event_type ? -1 : 1)));
+
+  // the probe: issuing its own quote, the agency writes the quote's next version as capture.completed.v1 — refused on the kind
+  // (KA003) — and as the event of another state of its own quote (quote.issued.v1 for a WITHDRAWN version) — refused at COMMIT
+  const quote = await quoted(A, "n1-probe");
+  const nextVersionAs = (type: string) =>
+    within(app, tenant(A), async (c) => {
+      await c.query("UPDATE kauro.quotes SET state = 'WITHDRAWN', version = 3 WHERE quote_id = $1 AND version = 2", [quote.quoteId]);
+      await commerceEvent(c, "quote", quote.quoteId, 3, A.agencyId, type, userOf(A));
+    });
+  await assert.rejects(nextVersionAs("capture.completed.v1"), refusedWith("KA003"));
+  await assert.rejects(nextVersionAs("quote.issued.v1"), refusedWith("KA003"));
+  // ... and routes its own legitimate quote.issued.v1 to the ledger, the fiscal drafter, the commission accrual or execution control
+  const issued = (await h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'quote.issued.v1'", [quote.quoteId])).rows[0]!.event_id;
+  const outbox = (eventId: string, consumer: string, as: Client = app, ctx = tenant(A)) =>
+    within(as, ctx, (c) => c.query("INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, next_attempt_at, created_at, updated_at) VALUES ($1, $2, $3, now(), now(), now())", [ids.next(), eventId, consumer]));
+  for (const consumer of ["FINANCE", "FISCAL", "COMMISSIONS", "EXECUTION_CONTROL"]) await assert.rejects(outbox(issued, consumer), refusedWith("42501"), consumer);
+  await outbox(issued, "NOTIFICATIONS");
+
+  // every commerce type the agency's request handlers do not author, published by kauro_app on a visible aggregate of its kind, is
+  // refused (42501): a provider result, a capture fact and its later facts, an entitlement, an execution, a fiscal document, a
+  // case's opening — and an OPERATOR type (a refund's review) as well
+  const sale = await paid(A, "n1");
+  const refundId = await requestRefund(app, A, sale.order, sale.captureId, { serviceCents: 1000, taxCents: 0 });
+  const documentId = await within(payment, service(A.agencyId), async (c) => {
+    const id = ids.next();
+    await c.query(
+      `INSERT INTO kauro.tax_documents (document_id, agency_id, order_id, capture_id, kind, fiscal_profile_id, issuer_ref, tax_treatment, tax_rule, tax_rate_bps, service_cents, tax_cents, currency, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'INVOICE', $5, $6, 'EXEMPT_EXPORT', 'ZERO_REVIEWED', 0, $7, 0, 'USD', now(), now())`,
+      [id, A.agencyId, sale.order.orderId, sale.captureId, profiles.get(A.agencyId), routes.issuerRef, sale.order.quote.serviceCents],
+    );
+    await commerceEvent(c, "tax_document", id, 1, A.agencyId, "tax_document.drafted.v1", PAYMENT_SERVICE);
+    return id;
+  });
+  const caseId = await within(payment, service(A.agencyId), async (c) => {
+    const id = ids.next();
+    await c.query(
+      `INSERT INTO kauro.reconciliation_cases (case_id, agency_id, order_id, capture_id, kind, detail_code, evidence_hash, opened_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'UNCERTAIN_EFFECT', 'WATCHDOG_EXPIRED', $5, now(), now(), now())`,
+      [id, A.agencyId, sale.order.orderId, sale.captureId, sha(`n1-case-${id}`)],
+    );
+    await commerceEvent(c, "reconciliation_case", id, 1, A.agencyId, "reconciliation_case.opened.v1", PAYMENT_SERVICE);
+    return id;
+  });
+  const aggregateOf: Record<string, readonly [string, number]> = {
+    payment_order: [sale.order.orderId, await versionOf("payment_orders", "order_id", sale.order.orderId)],
+    payment_attempt: [sale.order.createAttemptId, await versionOf("payment_attempts", "attempt_id", sale.order.createAttemptId)],
+    capture: [sale.captureId, 1],
+    commercial_authorization: [sale.authorizationId!, 1],
+    refund: [refundId, 1],
+    tax_document: [documentId, 1],
+    reconciliation_case: [caseId, 1],
+  };
+  const refused: string[] = [];
+  for (const b of bindings.rows.filter((x) => x.request_handler !== "TENANT")) {
+    const [id, version] = aggregateOf[b.aggregate_kind]!;
+    await assert.rejects(within(app, tenant(A), (c) => commerceEvent(c, b.aggregate_kind, id, version, A.agencyId, b.event_type, userOf(A))), refusedWith("42501"), b.event_type);
+    refused.push(b.event_type);
+  }
+  assert.equal(refused.length, COMMERCE_EVENT_TYPES.length - COMMERCE_REQUEST_HANDLER_EVENT_TYPES.TENANT.length);
+  // a corporate owner in its finance scope publishes only its review and resolution types
+  for (const [kind, type] of [["capture", "capture.completed.v1"], ["refund", "refund.completed.v1"], ["refund", "refund.requested.v1"], ["reconciliation_case", "reconciliation_case.opened.v1"]] as const) {
+    const [id, version] = aggregateOf[kind]!;
+    await assert.rejects(within(app, operator(kora, A.agencyId), (c) => commerceEvent(c, kind, id, version, A.agencyId, type, { kind: "USER", id: kora })), refusedWith("42501"), type);
+  }
+
+  // the payment service is bound to what each version records (KA003 at COMMIT): a DENIED version published as a completion, a
+  // version recording two facts or none, and a capture born with known funds
+  const bound = (write: (c: Client) => Promise<unknown>) => within(payment, service(A.agencyId), write);
+  await assert.rejects(
+    bound(async (c) => {
+      const pending = await insertCapture(c, A, sale.order, routes, { amountCents: 100, serviceCents: 0, taxCents: 0, excessCents: 0, status: "PENDING" }, PAYMENT_SERVICE);
+      await c.query("UPDATE kauro.capture_facts SET status = 'DENIED', observed_at = now(), version = 2 WHERE capture_id = $1", [pending]);
+      await commerceEvent(c, "capture", pending, 2, A.agencyId, "capture.completed.v1", PAYMENT_SERVICE);
+    }),
+    refusedWith("KA003"),
+  );
+  for (const [change, type] of [
+    ["provider_fee_cents = 5275, funds_state = 'HELD'", "capture.fee_observed.v1"],
+    ["observed_at = now()", "capture.funds_observed.v1"],
+    ["funds_state = 'HELD'", "capture.fee_observed.v1"],
+  ] as const) {
+    await assert.rejects(
+      bound(async (c) => {
+        await c.query(`UPDATE kauro.capture_facts SET ${change}, version = 2 WHERE capture_id = $1 AND version = 1`, [sale.captureId]);
+        await commerceEvent(c, "capture", sale.captureId, 2, A.agencyId, type, PAYMENT_SERVICE);
+      }),
+      refusedWith("KA003"),
+      change,
+    );
+  }
+  await assert.rejects(bound((c) => insertCapture(c, A, sale.order, routes, { amountCents: 100, serviceCents: 0, taxCents: 0, excessCents: 0, status: "PENDING", fundsState: "HELD" }, PAYMENT_SERVICE)), refusedWith("KA003"));
+
+  // the completion reaches its subscribers only, and it is keyed on the capture it records
+  const completion = await completionOf(sale.captureId);
+  await outbox(completion, "FINANCE", payment, service(A.agencyId));
+  await assert.rejects(outbox(completion, "EXECUTION_CONTROL", payment, service(A.agencyId)), refusedWith("42501"));
+  const index = await h.oracle.query<{ def: string }>("SELECT pg_get_indexdef('kauro.domain_events_capture_completed_once'::regclass) AS def");
+  assert.match(index.rows[0]!.def, /\(aggregate_kind, aggregate_id\) WHERE \(event_type = 'capture\.completed\.v1'::text\)$/);
+
+  // a posting names its own source's event: the sale's completion sources the CAPTURE posting of that capture, never of the quote
+  // the agency forged the event on, of the order, or of another capture
+  const other = await paid(A, "n1-other");
+  const capture = [["PSP_RECEIVABLE", "DEBIT", 97125], ["CONTRACT_LIABILITY", "CREDIT", 97125]] as const;
+  for (const sourceRef of [quote.quoteId, sale.order.orderId, other.captureId]) {
+    await assert.rejects(postSet(A, completion, "CAPTURE", sourceRef, capture), refusedWith("KP001"), sourceRef);
+  }
+  await postSet(A, completion, "CAPTURE", sale.captureId, capture);
+});
+
+test("B09-N3: a capture first seen REVERSED is recorded COMPLETED and then REVERSED in one transaction — allocated, its completion sourcing the CAPTURE posting and its reversal the CHARGEBACK posting, its completion instant kept as the tax point; a REVERSED birth and a PENDING → REVERSED edge are refused", async () => {
+  const quote = await quoted(A, "n3");
+  const order = await createdOrder(app, A, quote, routes, { payment });
+  const full = { amountCents: quote.totalCents, serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0 };
+  // the probe: a capture born REVERSED, and a pending capture moved to REVERSED
+  await assert.rejects(within(payment, service(A.agencyId), (c) => insertCapture(c, A, order, routes, { ...full, status: "REVERSED" }, PAYMENT_SERVICE)), refusedWith("KA008"));
+  await assert.rejects(
+    within(payment, service(A.agencyId), async (c) => {
+      const pending = await insertCapture(c, A, order, routes, { ...full, serviceCents: 0, taxCents: 0, status: "PENDING" }, PAYMENT_SERVICE);
+      await c.query("UPDATE kauro.capture_facts SET status = 'REVERSED', observed_at = now(), version = 2 WHERE capture_id = $1", [pending]);
+    }),
+    refusedWith("KA008"),
+  );
+  // the reconciler's record of an out-of-order reversal: its completion (allocated, capture.completed.v1), then its reversal
+  const captureId = await within(payment, service(A.agencyId), async (c) => {
+    const id = await insertCapture(c, A, order, routes, full, PAYMENT_SERVICE);
+    await c.query("UPDATE kauro.capture_facts SET status = 'REVERSED', observed_at = now(), version = 2 WHERE capture_id = $1 AND version = 1", [id]);
+    await commerceEvent(c, "capture", id, 2, A.agencyId, "capture.reversed.v1", PAYMENT_SERVICE);
+    await c.query("UPDATE kauro.payment_orders SET state = 'CAPTURED', version = 4 WHERE order_id = $1 AND version = 3", [order.orderId]);
+    await commerceEvent(c, "payment_order", order.orderId, 4, A.agencyId, "payment_order.captured.v1", PAYMENT_SERVICE);
+    return id;
+  });
+  const facts = await h.oracle.query(
+    "SELECT c.status, c.allocated_service_cents, c.provider_completed_at IS NOT NULL AS has_tax_point, o.allocated_cents FROM kauro.capture_facts c JOIN kauro.payment_orders o ON o.order_id = c.order_id WHERE c.capture_id = $1",
+    [captureId],
+  );
+  assert.deepEqual(facts.rows, [{ status: "REVERSED", allocated_service_cents: "97125", has_tax_point: true, allocated_cents: "97125" }]);
+  const events = await h.oracle.query<{ event_id: string; event_type: string }>("SELECT event_id, event_type FROM kauro.domain_events WHERE aggregate_kind = 'capture' AND aggregate_id = $1 ORDER BY aggregate_version", [captureId]);
+  assert.deepEqual(events.rows.map((e) => e.event_type), ["capture.completed.v1", "capture.reversed.v1"]);
+  // the receipt is posted from the completion and returned by the chargeback: the receivable nets to zero
+  await postSet(A, events.rows[0]!.event_id, "CAPTURE", captureId, [["PSP_RECEIVABLE", "DEBIT", 97125], ["CONTRACT_LIABILITY", "CREDIT", 97125]]);
+  await postSet(A, events.rows[1]!.event_id, "CHARGEBACK", captureId, [["CONTRACT_LIABILITY", "DEBIT", 97125], ["PSP_RECEIVABLE", "CREDIT", 97125]]);
+  const net = await h.oracle.query<{ net: string }>("SELECT sum(CASE direction WHEN 'DEBIT' THEN amount_cents ELSE -amount_cents END)::text AS net FROM kauro.ledger_entries WHERE source_ref = $1 AND account_code = 'PSP_RECEIVABLE'", [captureId]);
+  assert.equal(net.rows[0]!.net, "0");
+  // a reversed capture keeps its completion instant: the tax point of the sale's invoice
+  const def = await h.oracle.query<{ def: string }>("SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'capture_facts_completion_time'");
+  assert.match(def.rows[0]!.def, /'COMPLETED'::text, 'REVERSED'::text/);
+  await within(payment, service(A.agencyId), async (c) => {
+    const id = ids.next();
+    await c.query(
+      `INSERT INTO kauro.tax_documents (document_id, agency_id, order_id, capture_id, kind, fiscal_profile_id, issuer_ref, tax_treatment, tax_rule, tax_rate_bps, service_cents, tax_cents, currency, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'INVOICE', $5, $6, 'EXEMPT_EXPORT', 'ZERO_REVIEWED', 0, $7, 0, 'USD', now(), now())`,
+      [id, A.agencyId, order.orderId, captureId, profiles.get(A.agencyId), routes.issuerRef, quote.serviceCents],
+    );
+    await commerceEvent(c, "tax_document", id, 1, A.agencyId, "tax_document.drafted.v1", PAYMENT_SERVICE);
+    await c.query("UPDATE kauro.tax_documents SET state = 'VALIDATED', version = 2 WHERE document_id = $1", [id]);
+    await commerceEvent(c, "tax_document", id, 2, A.agencyId, "tax_document.validated.v1", PAYMENT_SERVICE);
+  });
+});
+
+test("B09-N4: a FUNDS posting moves money only between the provider's receivable, held and available balances, and bank money is posted only from a settlement; the funds move net of the fee the receivable already gave up, which leaves it at zero", async () => {
+  const sale = await paid(A, "n4");
+  const feeEvent = await within(payment, service(A.agencyId), async (c) => {
+    await c.query("UPDATE kauro.capture_facts SET provider_fee_cents = 5275, version = 2 WHERE capture_id = $1 AND version = 1", [sale.captureId]);
+    return commerceEvent(c, "capture", sale.captureId, 2, A.agencyId, "capture.fee_observed.v1", PAYMENT_SERVICE);
+  });
+  const fundsEvent = await within(payment, service(A.agencyId), async (c) => {
+    await c.query("UPDATE kauro.capture_facts SET funds_state = 'HELD', observed_at = now(), version = 3 WHERE capture_id = $1 AND version = 2", [sale.captureId]);
+    return commerceEvent(c, "capture", sale.captureId, 3, A.agencyId, "capture.funds_observed.v1", PAYMENT_SERVICE);
+  });
+  await postSet(A, await completionOf(sale.captureId), "CAPTURE", sale.captureId, [["PSP_RECEIVABLE", "DEBIT", 97125], ["CONTRACT_LIABILITY", "CREDIT", 97125]]);
+  await postSet(A, feeEvent, "FEE", sale.captureId, [["PROCESSOR_EXPENSE", "DEBIT", 5275], ["PSP_RECEIVABLE", "CREDIT", 5275]]);
+  // the probe: a FUNDS set DEBIT BANK_CASH / CREDIT PSP_RECEIVABLE sourced by a real capture.funds_observed.v1
+  await assert.rejects(postSet(A, fundsEvent, "FUNDS", sale.captureId, [["BANK_CASH", "DEBIT", 91850], ["PSP_RECEIVABLE", "CREDIT", 91850]]), (e) => sqlState(e) === "23514" && ["ledger_entries_bank_accounts", "ledger_entries_funds_accounts"].includes(constraintOf(e) ?? ""));
+  await assert.rejects(postSet(A, fundsEvent, "FUNDS", sale.captureId, [["CONTRACT_LIABILITY", "DEBIT", 91850], ["PSP_RECEIVABLE", "CREDIT", 91850]]), refusedWith("23514", "ledger_entries_funds_accounts"));
+  // no event-sourced set touches bank money, whatever its kind
+  const other = await paid(A, "n4-bank");
+  await assert.rejects(postSet(A, await completionOf(other.captureId), "CAPTURE", other.captureId, [["BANK_IN_TRANSIT", "DEBIT", 97125], ["CONTRACT_LIABILITY", "CREDIT", 97125]]), refusedWith("23514", "ledger_entries_bank_accounts"));
+  // the held funds are the receivable's balance net of the fee (commerce/ledger movableBalanceOf): the receivable ends at zero
+  await postSet(A, fundsEvent, "FUNDS", sale.captureId, [["PSP_HELD", "DEBIT", 91850], ["PSP_RECEIVABLE", "CREDIT", 91850]]);
+  const balances = await h.oracle.query<{ account_code: string; net: string }>(
+    "SELECT account_code, sum(CASE direction WHEN 'DEBIT' THEN amount_cents ELSE -amount_cents END)::text AS net FROM kauro.ledger_entries WHERE source_ref = $1 AND account_code LIKE 'PSP_%' GROUP BY account_code ORDER BY account_code",
+    [sale.captureId],
+  );
+  assert.deepEqual(balances.rows, [{ account_code: "PSP_HELD", net: "91850" }, { account_code: "PSP_RECEIVABLE", net: "0" }]);
+  // bank cash comes from a settlement observation with bank evidence, posted with no agency
+  const settlementId = ids.next();
+  await within(payment, {}, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.settlements (settlement_id, route_id, provider_balance_ref, currency, gross_cents, fee_cents, held_cents, withdrawn_cents, bank_available_cents, bank_evidence_hash, period_start, period_end, observed_at, evidence_hash, created_at)
+       VALUES ($1, $2, $3, 'USD', 97125, 5275, 0, 91850, 91850, $4, now() - interval '24 hours', now(), now(), $5, now())`,
+      [settlementId, routes.routeId, ids.next(), sha("n4-bank-statement"), sha("n4-settlement")],
+    );
+    let lineNo = 1;
+    for (const [account, direction] of [["BANK_CASH", "DEBIT"], ["PSP_AVAILABLE", "CREDIT"]] as const) {
+      await c.query(
+        `INSERT INTO kauro.ledger_entries (entry_id, settlement_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version)
+         VALUES ($1, $2, $3, $4, 'OPS-1', $5, 91850, 'USD', 'SETTLEMENT', $2, now(), now(), now(), $6, 'B09-1')`,
+        [ids.next(), settlementId, lineNo++, account, direction, sha("n4-settlement-posting")],
+      );
+    }
+  });
+});
+
+test("B09-N5: fiscal profile versions form one lineage — a version is superseded only by a successor recorded at that very instant, and only an agency's first version supersedes nothing — so one version is current at a sale's tax point; a credit note of a refund completed after a re-review validates under the invoice's version, judged at the sale's tax point, and never under the re-review", async () => {
+  const G = await agencyWith("Critique G", "EXEMPT_EXPORT");
+  const p1 = profiles.get(G.agencyId)!;
+  const version = (c: Client, supersedes: string | null, createdAt: string) =>
+    c.query(
+      `INSERT INTO kauro.fiscal_profiles (profile_id, agency_id, operator_legal_ref, customer_legal_ref, service_classification, territory, tax_treatment, tax_rule, tax_rate_bps, evidence_hash, export_evidence_hash, reviewed_by_user_id, valid_from, supersedes_profile_id, created_at)
+       VALUES ($1, $2, $3, $4, 'Data services', 'Colombia and abroad', 'EXEMPT_EXPORT', 'ZERO_REVIEWED', 0, $5, $6, $7, now() - interval '24 hours', $8, ${createdAt})`,
+      [ids.next(), G.agencyId, routes.issuerRef, ids.next(), sha(`n5-evidence-${ids.next()}`), sha(`n5-export-${ids.next()}`), kora, supersedes],
+    );
+  const asOwner = (fn: (c: Client) => Promise<unknown>) => within(app, operator(kora, G.agencyId), fn);
+  // a version superseded without a successor; a successor recorded at another instant; a second version that supersedes nothing
+  await assert.rejects(asOwner((c) => c.query("UPDATE kauro.fiscal_profiles SET superseded_at = now() WHERE profile_id = $1", [p1])), refusedWith("23514", "fiscal_profiles_supersession_lineage"));
+  await assert.rejects(
+    asOwner(async (c) => {
+      await c.query("UPDATE kauro.fiscal_profiles SET superseded_at = now() WHERE profile_id = $1", [p1]);
+      await version(c, p1, "now() + interval '1 second'");
+    }),
+    refusedWith("23503", "fiscal_profiles_successor_fk"),
+  );
+  await assert.rejects(
+    asOwner(async (c) => {
+      await c.query("UPDATE kauro.fiscal_profiles SET superseded_at = now() WHERE profile_id = $1", [p1]);
+      await version(c, null, "now()");
+    }),
+    refusedWith("23514", "fiscal_profiles_supersession_lineage"),
+  );
+  // the sale under p1: its invoice validated and issued
+  const sale = await paid(G, "n5");
+  const draftAndValidate = (fields: { kind: string; serviceCents: number; profileId: string; refundId?: string; corrects?: string }) =>
+    within(payment, service(G.agencyId), async (c) => {
+      const id = ids.next();
+      await c.query(
+        `INSERT INTO kauro.tax_documents (document_id, agency_id, order_id, capture_id, refund_id, kind, fiscal_profile_id, issuer_ref, tax_treatment, tax_rule, tax_rate_bps, service_cents, tax_cents, currency, corrects_document_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'EXEMPT_EXPORT', 'ZERO_REVIEWED', 0, $9, 0, 'USD', $10, now(), now())`,
+        [id, G.agencyId, sale.order.orderId, sale.captureId, fields.refundId ?? null, fields.kind, fields.profileId, routes.issuerRef, fields.serviceCents, fields.corrects ?? null],
+      );
+      await commerceEvent(c, "tax_document", id, 1, G.agencyId, "tax_document.drafted.v1", PAYMENT_SERVICE);
+      await c.query("UPDATE kauro.tax_documents SET state = 'VALIDATED', version = 2 WHERE document_id = $1", [id]);
+      await commerceEvent(c, "tax_document", id, 2, G.agencyId, "tax_document.validated.v1", PAYMENT_SERVICE);
+      return id;
+    });
+  const invoice = await draftAndValidate({ kind: "INVOICE", serviceCents: sale.order.quote.serviceCents, profileId: p1 });
+  await within(payment, service(G.agencyId), async (c) => {
+    await c.query("UPDATE kauro.tax_documents SET state = 'SUBMITTING', issue_request_hash = $2, version = 3 WHERE document_id = $1", [invoice, sha(`issue-${invoice}`)]);
+    await commerceEvent(c, "tax_document", invoice, 3, G.agencyId, "tax_document.submitting.v1", PAYMENT_SERVICE);
+    await c.query("UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = $2, legal_number = 'SETP-990005', evidence_hash = $3, issued_at = now(), version = 4 WHERE document_id = $1", [invoice, `DOC-${invoice.slice(-12)}`, sha(`issued-${invoice}`)]);
+    await commerceEvent(c, "tax_document", invoice, 4, G.agencyId, "tax_document.issued.v1", PAYMENT_SERVICE);
+  });
+  // the owner re-reviews (supersession and successor at one instant), and only then is a refund of the sale requested and completed
+  const p2 = await fiscalProfile(app, kora, G, routes.issuerRef, "EXEMPT_EXPORT", p1);
+  const refundId = await requestRefund(app, G, sale.order, sale.captureId, { serviceCents: 1000, taxCents: 0 });
+  await approveRefund(app, assurance, kora, G, refundId, { serviceCents: 1000, taxCents: 0 });
+  await executeRefund(G, sale.order, refundId, 2);
+  // at the refund's completion the current version is p2; the credit note is not judged there: under p2 it is refused, under the
+  // invoice's version — current at the sale's tax point — it validates
+  await assert.rejects(draftAndValidate({ kind: "CREDIT_NOTE", serviceCents: 1000, profileId: p2, refundId, corrects: invoice }), refusedWith("KP011"));
+  await draftAndValidate({ kind: "CREDIT_NOTE", serviceCents: 1000, profileId: p1, refundId, corrects: invoice });
+  // exactly one version was current at the sale's tax point and one is current now
+  const currentAt = async (at: string) =>
+    Number((await h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM kauro.fiscal_profiles WHERE agency_id = $1 AND created_at <= $2::timestamptz AND (superseded_at IS NULL OR superseded_at > $2::timestamptz)", [G.agencyId, at])).rows[0]!.n);
+  const taxPoint = (await h.oracle.query<{ t: Date }>("SELECT provider_completed_at AS t FROM kauro.capture_facts WHERE capture_id = $1", [sale.captureId])).rows[0]!.t.toISOString();
+  assert.deepEqual([await currentAt(taxPoint), await currentAt(new Date(Date.now() + 1000).toISOString())], [1, 1]);
+});
+
+test("B09-N6: an attempt named by a provider exception, an observation or a capture fact is an attempt of the order that row names, and a case's capture and refund are its order's", async () => {
+  const x = await paid(A, "n6-x");
+  const y = await paid(A, "n6-y");
+  const as = (sql: string, params: unknown[]) => within(payment, service(A.agencyId), (c) => c.query(sql, params));
+  const exception = (orderId: string, attemptId: string) =>
+    as(
+      `INSERT INTO kauro.provider_event_exceptions (exception_id, source, agency_id, order_id, attempt_id, provider, environment, kind, provider_ref, evidence_hash, observed_at, created_at)
+       VALUES ($1, 'DISPATCH_RESPONSE', $2, $3, $4, $5, $6, 'WRONG_PAYEE', 'CAP-N6', $7, now(), now())`,
+      [ids.next(), A.agencyId, orderId, attemptId, PROVIDER, ENVIRONMENT, sha(`n6-${orderId}-${attemptId}`)],
+    );
+  // the probe: a DISPATCH_RESPONSE exception naming order X and the CREATE_ORDER attempt of order Y
+  await assert.rejects(exception(x.order.orderId, y.order.createAttemptId), refusedWith("23503", "provider_event_exceptions_attempt_fk"));
+  await exception(x.order.orderId, x.order.createAttemptId);
+  const observation = (orderId: string, attemptId: string) =>
+    as(
+      `INSERT INTO kauro.provider_observations (observation_id, agency_id, order_id, source, attempt_id, subject_kind, provider_ref, observed_status, observed_at, evidence_hash, effect, created_at)
+       VALUES ($1, $2, $3, 'DISPATCH_RESPONSE', $4, 'ORDER', 'PO-N6', 'CREATED', now(), $5, 'NO_CHANGE', now())`,
+      [ids.next(), A.agencyId, orderId, attemptId, sha(`n6-observation-${orderId}-${attemptId}`)],
+    );
+  await assert.rejects(observation(x.order.orderId, y.order.createAttemptId), refusedWith("23503", "provider_observations_attempt_fk"));
+  await observation(x.order.orderId, x.order.createAttemptId);
+  await assert.rejects(
+    within(payment, service(A.agencyId), (c) => insertCapture(c, A, x.order, routes, { amountCents: 100, serviceCents: 0, taxCents: 0, excessCents: 0, status: "PENDING", attemptId: y.order.createAttemptId }, PAYMENT_SERVICE)),
+    refusedWith("23503", "capture_facts_attempt_fk"),
+  );
+  const openCase = (orderId: string, captureId: string | null, refundId: string | null) =>
+    within(payment, service(A.agencyId), async (c) => {
+      const id = ids.next();
+      await c.query(
+        `INSERT INTO kauro.reconciliation_cases (case_id, agency_id, order_id, capture_id, refund_id, kind, detail_code, evidence_hash, opened_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'PROVIDER_INCONSISTENCY', 'PROVIDER_CONTRADICTION', $6, now(), now(), now())`,
+        [id, A.agencyId, orderId, captureId, refundId, sha(`n6-case-${id}`)],
+      );
+      await commerceEvent(c, "reconciliation_case", id, 1, A.agencyId, "reconciliation_case.opened.v1", PAYMENT_SERVICE);
+    });
+  await assert.rejects(openCase(x.order.orderId, y.captureId, null), refusedWith("23503", "reconciliation_cases_capture_order_fk"));
+  const refundOfY = await requestRefund(app, A, y.order, y.captureId, { serviceCents: 1000, taxCents: 0 });
+  await assert.rejects(openCase(x.order.orderId, null, refundOfY), refusedWith("23503", "reconciliation_cases_refund_order_fk"));
+  await assert.rejects(openCase(y.order.orderId, x.captureId, refundOfY), (e) => sqlState(e) === "23503" && ["reconciliation_cases_capture_order_fk", "reconciliation_cases_refund_capture_fk"].includes(constraintOf(e) ?? ""));
+  await openCase(y.order.orderId, y.captureId, refundOfY);
+});
+
+test("B09-N7: a claim records a dispatch deadline in the future and at most the protocol's 60 seconds ahead — a century-long deadline written by the request handlers is refused, so no claimed attempt stays out of the watchdog's due set", async () => {
+  const quote = await quoted(A, "n7");
+  const order = await createdOrder(app, A, quote, routes, { payment });
+  const attemptId = ids.next();
+  // CMD029's intent (T1): the CAPTURE attempt PREPARED
+  await within(app, tenant(A), async (c) => {
+    const entryId = await journalEntry(c, A, "CMD029");
+    await c.query(
+      `INSERT INTO kauro.payment_attempts (attempt_id, agency_id, order_id, operation, ordinal, provider, environment, request_hash, provider_request_id, started_at, last_observed_at, intent_entry_id, created_at, updated_at)
+       VALUES ($1, $2, $3, 'CAPTURE', 1, $4, $5, $6, $7, now(), now(), $8, now(), now())`,
+      [attemptId, A.agencyId, order.orderId, PROVIDER, ENVIRONMENT, sha(`capture-request-${order.orderId}`), `kauro-${attemptId}`, entryId],
+    );
+    await commerceEvent(c, "payment_attempt", attemptId, 1, A.agencyId, "payment_attempt.prepared.v1", userOf(A));
+  });
+  // T2 as the request handlers write it, with the deadline under test
+  const claim = (deadline: string) =>
+    within(app, tenant(A), async (c) => {
+      await c.query(`UPDATE kauro.payment_attempts SET state = 'DISPATCHING', dispatch_deadline_at = ${deadline}, version = 2 WHERE attempt_id = $1 AND version = 1`, [attemptId]);
+      await commerceEvent(c, "payment_attempt", attemptId, 2, A.agencyId, "payment_attempt.dispatching.v1", userOf(A));
+    });
+  // the probe: a deadline 876,000 hours ahead; and one just past the protocol's bound, one that is not in the future
+  for (const deadline of ["now() + interval '876000 hours'", `now() + make_interval(secs => ${DISPATCH_DEADLINE_SECONDS} + 0.001)`, "now()", "now() - interval '1 second'"]) {
+    await assert.rejects(claim(deadline), refusedWith("23514", "payment_attempts_dispatch_deadline_bound"), deadline);
+  }
+  await claim(`now() + make_interval(secs => ${DISPATCH_DEADLINE_SECONDS})`);
+  const row = await h.oracle.query<{ state: string; ahead: string }>("SELECT state, extract(epoch FROM dispatch_deadline_at - updated_at)::text AS ahead FROM kauro.payment_attempts WHERE attempt_id = $1", [attemptId]);
+  assert.deepEqual(row.rows, [{ state: "DISPATCHING", ahead: `${DISPATCH_DEADLINE_SECONDS}.000000` }]);
 });

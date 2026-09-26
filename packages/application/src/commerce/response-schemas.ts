@@ -12,7 +12,7 @@
  * route list), which makes the api's send guard, tools/openapi.mjs and the OpenAPI check cover them exactly as the B06 routes.
  */
 import type { ContractName } from "@kauro/contracts";
-import { DomainFailure, SERVICE_MODES } from "@kauro/domain";
+import { CHECKOUT_BLOCKERS, DomainFailure, RECONCILIATION_CASE_KINDS, SERVICE_MODES } from "@kauro/domain";
 import { LABEL_PATTERN } from "../api/request-schemas.js";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
@@ -52,10 +52,13 @@ const NARROW_MONEY = Object.freeze({ maxLength: 16 });
 export const QUOTE_STATES = ["DRAFT", "ISSUED", "ACCEPTED_FOR_CHECKOUT", "EXPIRED", "SUPERSEDED", "WITHDRAWN"] as const;
 export const PAYMENT_STATUSES = ["NOT_STARTED", "PENDING", "CONFIRMED", "FAILED", "CHECKING"] as const;
 export const PAYMENT_NEXT_ACTIONS = ["APPROVE_AT_PROVIDER", "CAPTURE", "REFRESH_STATUS", "CONTACT_SUPPORT", "REQUEST_NEW_QUOTE", "REQUEST_NEW_REVIEW"] as const;
-export const CHECKOUT_BLOCKER_TOKENS = [
-  "AGENCY_NOT_ACTIVE", "QUOTE_NOT_ACTIVE", "QUOTE_EXPIRED", "ALREADY_PAID", "PAYMENT_UNCERTAIN", "PAYMENT_IN_PROGRESS", "SOURCE_EXPIRED", "APPROVAL_NOT_CURRENT",
-  "TARGET_STALE", "CAPABILITY_RESTRICTED", "PAYMENT_ROUTE_UNQUALIFIED", "FISCAL_ROUTE_UNQUALIFIED", "FISCAL_TREATMENT_UNREVIEWED", "FISCAL_TREATMENT_CHANGED",
-] as const;
+/**
+ * The checkout blockers the domain emits (commerce/authority CHECKOUT_BLOCKERS, in check order), taken from the domain list itself
+ * so the closed view schema admits every token the typed view carries (B06 D-RESP-1; B09-N2: DELIVERY_CAPACITY_UNAVAILABLE, D-CAP-B1).
+ */
+export const CHECKOUT_BLOCKER_TOKENS = CHECKOUT_BLOCKERS;
+/** The reconciliation case kinds (commerce/records RECONCILIATION_CASE_KINDS, the 0012 kind CHECK; B09-N2: DISPUTE_OPEN, D-DISPUTE-B1). */
+export const RECONCILIATION_CASE_KIND_TOKENS = RECONCILIATION_CASE_KINDS;
 export const COMMERCE_RESOURCE_ACTIONS = ["CMD028", "CMD029", "CMD031"] as const;
 
 const COMPONENTS = platform(true, ref("MoneyComponents"), "Service, tax and excess amounts in exact minor units.");
@@ -341,7 +344,7 @@ export const COMMERCE_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.f
       captures: platform(true, { type: "array", maxItems: 20, items: ref("CaptureView") }, "Every capture fact of the order."),
       commercialAuthorization: platform(false, ref("CommercialAuthorizationView"), "The order's authorization, if any."),
       effects: platform(true, { type: "array", maxItems: 50, items: { type: "object", additionalProperties: false, required: ["about", "effect"], properties: { about: enumOf(["ORDER", "CAPTURE", "REFUND"]), effect: enumOf(["ADVANCED", "NO_CHANGE", "STALE_IGNORED", "DUPLICATE", "MISMATCH", "UNRECOGNIZED"]) } } }, "What the observation did, per fact it was about (the member is not named subject: that name is reserved for the provider subject of the authenticator)."),
-      openCases: platform(true, { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false, required: ["caseId", "kind"], properties: { caseId: ID, kind: enumOf(["AMOUNT_MISMATCH", "EXCESS_CAPTURE", "CAPTURE_WITHOUT_VALID_SUBJECT", "UNCERTAIN_EFFECT", "UNRECOGNIZED_PROVIDER_STATE", "PROVIDER_INCONSISTENCY", "REVERSAL", "FEE_MISMATCH"]) } } }, "Reconciliation cases still open for the order."),
+      openCases: platform(true, { type: "array", maxItems: 20, items: { type: "object", additionalProperties: false, required: ["caseId", "kind"], properties: { caseId: ID, kind: enumOf(RECONCILIATION_CASE_KIND_TOKENS) } } }, "Reconciliation cases still open for the order."),
     },
   },
   {

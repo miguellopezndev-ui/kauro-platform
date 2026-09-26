@@ -7,12 +7,13 @@
 -- (withdrawn funds are not bank cash until an observed statement shows them), reference/HASHING_AND_ACCOUNTING_RULES "Ledger
 -- posting and reconciliation" (each balanced transaction balances within its currency; a replayed refund webhook does not post
 -- another refund), registry contracts TaxDocument, LedgerEntry, Settlement; registry machine TaxDocument; scenarios R2-128, R2-078,
--- R2-140. Design: docs/design/B09-payments-fiscal.md (D-FISC-B1..B5, D-LEDGER-B1..B4, D-SETTLE-B1).
+-- R2-140. Design: docs/design/B09-payments-fiscal.md (D-FISC-B1..B6, D-LEDGER-B1..B5, D-SETTLE-B1, D-EVT-B3).
 
 -- --- fiscal documents (registry machine TaxDocument) ------------------------------------------------------------------------------------
 -- The fiscal document of a sale (INVOICE of a capture), of a refund (CREDIT_NOTE correcting the invoice) or of an upward
 -- correction (DEBIT_NOTE; no B09 flow creates one). Drafted by the fiscal consumer from the reconciled financial event with the
--- collected amounts and the agency's current reviewed profile; a draft whose treatment is not reviewed, not effective, not the one
+-- collected amounts under the sale's profile version (the version of the capture's completion, commerce/fiscal saleProfileAt; a
+-- credit note takes the corrected invoice's snapshot; D-FISC-B4..B6); a draft whose treatment is not reviewed, not effective, not the one
 -- the sale was priced with, or whose issuer facts are unconfirmed stays DRAFT with the concrete blocker (R2-128: never an
 -- exemption inferred from a currency or an email; the capture's reconciliation is unaffected). DRAFT -> VALIDATED is re-checked
 -- here (KP011); issuance (CMD035, the fiscal integration package B15) submits once and records the legal number only on
@@ -110,10 +111,12 @@ CREATE TRIGGER tax_documents_draft_only BEFORE UPDATE ON kauro.tax_documents FOR
 
 -- DRAFT -> VALIDATED ("Actual operator/customer/tax/numbering fields pass reviewed rules"; commerce/fiscal resolveFiscalTreatment),
 -- read after the transition locks of the agency's profile versions and of the issuer route. FISCAL_VALIDATION_REFUSED (KP011):
---  * the document's profile is the version in force at the tax point (D-FISC-B4; B09-F4): its validity window covers the tax point
---    and it had not been superseded by then — a re-review recorded after the sale does not make the sale's invoice unvalidatable,
---    and a version recorded later is effective for the tax point only if its own window covers it; "current" is required only of
---    a new quote (quotableTaxRule) and of a new draft's choice;
+--  * the document's profile is a version in force at the sale's tax point, the capture's completion (D-FISC-B4; B09-F4): its
+--    validity window covers the tax point and it had not been superseded by then — a re-review recorded after the sale does not
+--    make the sale's invoice unvalidatable; a version recorded later is in force for the tax point only if its own window reaches
+--    back to it, and then admitted only with the rule the sale was priced with (below), so it can resolve an unknown treatment for
+--    the sale but never change a known one (the drafter's choice is commerce/fiscal saleProfileAt, D-FISC-B6; B09-N5); "current"
+--    is required only of a new quote (quotableTaxRule);
 --  * the treatment is reviewed, the issuer's legal facts observed or professionally confirmed with a numbering authorization;
 --  * an INVOICE carries the collected amounts (the capture's allocation) and the rule the sale was priced with; its tax point is
 --    the capture's completion;
@@ -192,6 +195,8 @@ CREATE TRIGGER tax_documents_initial_state BEFORE INSERT ON kauro.tax_documents
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('TaxDocument');
 CREATE CONSTRAINT TRIGGER tax_documents_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.tax_documents
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('tax_document', 'document_id');
+CREATE CONSTRAINT TRIGGER tax_documents_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.tax_documents
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('tax_document', 'document_id', 'state');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('TaxDocument', 'DRAFT');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
@@ -248,12 +253,18 @@ CREATE TRIGGER settlements_append_only BEFORE UPDATE OR DELETE ON kauro.settleme
 -- 15 "Operational ledger": "Every posting includes event ID, source object, amount/currency, effective date, observed date,
 -- policy version and reversal relationship if applicable. Corrections add reversing/adjusting entries" (B09-F15, D-LEDGER-B4):
 -- effective_at is the economic date of the movement, observed_at the instant the platform observed the fact it posts (never after
--- the posting), posted_at the instant of the posting. The source kind names the event that may source it
--- (ledger_entries_source_event): CAPTURE a capture's completion, FEE a fee learned after it (capture.fee_observed.v1), FUNDS a
--- change of the provider's availability of the captured funds (capture.funds_observed.v1: PSP_HELD to PSP_AVAILABLE), CHARGEBACK a
--- reversal, REFUND a refund's completion, CORRECTION the reviewed resolution of a reconciliation case
--- (reconciliation_case.resolved.v1: the decision whose reversing and adjusting entries correct an event-sourced posting) or a
--- settlement observation's own correction; SETTLEMENT a settlement observation.
+-- the posting), posted_at the instant of the posting. The source kind names the event that may source it and the source reference is
+-- that event's own aggregate (ledger_entries_source_event; B09-N1): CAPTURE a capture's completion, FEE a fee learned after it
+-- (capture.fee_observed.v1), FUNDS a change of the provider's availability of the captured funds (capture.funds_observed.v1), and
+-- CHARGEBACK a reversal (capture.reversed.v1) — each sourced by an event of the capture named as the source; REFUND a refund's
+-- completion (refund.completed.v1 of that refund); CORRECTION the reviewed resolution of a reconciliation case
+-- (reconciliation_case.resolved.v1 of that case: the decision whose reversing and adjusting entries correct an event-sourced
+-- posting) or a settlement observation's own correction; SETTLEMENT a settlement observation. The accounts follow the source (15
+-- "Settlement and withdrawal": a provider "completed" withdrawal and an actual bank credit are separately reconciled; CMD034 failure
+-- "A provider pending/held state is never coerced to settled available cash"; D-LEDGER-B5; B09-N4): a FUNDS set moves money only
+-- between the provider's receivable, held and available balances (ledger_entries_funds_accounts), and bank money — in transit or
+-- cash — is posted only from a settlement observation, whose bank-available amount needs bank evidence (ledger_entries_bank_accounts,
+-- settlements_bank_evidence).
 ALTER TABLE kauro.domain_events ADD CONSTRAINT domain_events_agency_binding UNIQUE (event_id, agency_id);
 
 CREATE TABLE kauro.ledger_entries (
@@ -283,7 +294,9 @@ CREATE TABLE kauro.ledger_entries (
     (domain_event_id IS NOT NULL AND agency_id IS NOT NULL AND source_kind <> 'SETTLEMENT')
     OR (settlement_id IS NOT NULL AND agency_id IS NULL AND source_kind IN ('SETTLEMENT', 'CORRECTION'))
   ),
-  CONSTRAINT ledger_entries_observed_before_posting CHECK (observed_at <= posted_at)
+  CONSTRAINT ledger_entries_observed_before_posting CHECK (observed_at <= posted_at),
+  CONSTRAINT ledger_entries_funds_accounts CHECK (source_kind <> 'FUNDS' OR account_code IN ('PSP_RECEIVABLE', 'PSP_HELD', 'PSP_AVAILABLE')),
+  CONSTRAINT ledger_entries_bank_accounts CHECK (account_code NOT IN ('BANK_IN_TRANSIT', 'BANK_CASH') OR settlement_id IS NOT NULL)
 );
 CREATE UNIQUE INDEX ledger_entries_reversed_once ON kauro.ledger_entries (reverses_entry_id) WHERE reverses_entry_id IS NOT NULL;
 CREATE INDEX ledger_entries_by_source ON kauro.ledger_entries (source_kind, source_ref);
@@ -309,24 +322,34 @@ $$;
 CREATE TRIGGER ledger_entries_reversal_mirrors BEFORE INSERT ON kauro.ledger_entries
   FOR EACH ROW WHEN (NEW.reverses_entry_id IS NOT NULL) EXECUTE FUNCTION kauro.ledger_entries_reversal_mirrors();
 
--- an event-sourced posting's source kind names the event it records (D-LEDGER-B4): the ledger never posts a movement from an
--- event that did not record it — a correction is sourced by the reviewed resolution of its case (B09-F15)
+-- an event-sourced posting's source kind names the event it records, and its source reference is that event's aggregate
+-- (D-LEDGER-B4; B09-F15, B09-N1): the ledger never posts a movement from an event that did not record it, nor attributes a
+-- movement recorded by one aggregate to another — a CAPTURE posting of capture X is sourced by capture X's own completion, a
+-- correction by the reviewed resolution of its own case. The event's type is bound to its aggregate's kind and to the state of the
+-- version it records (0009 domain_events_commerce_kind, the *_event_type_per_version triggers), so the source is the fact itself.
 CREATE OR REPLACE FUNCTION kauro.ledger_entries_source_event() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 DECLARE
-  source_type text;
-BEGIN
-  SELECT e.event_type INTO source_type FROM kauro.domain_events e WHERE e.event_id = NEW.domain_event_id AND e.agency_id = NEW.agency_id;
-  IF source_type IS DISTINCT FROM (CASE NEW.source_kind
+  src record;
+  expected_type text := CASE NEW.source_kind
        WHEN 'CAPTURE' THEN 'capture.completed.v1'
        WHEN 'FEE' THEN 'capture.fee_observed.v1'
        WHEN 'FUNDS' THEN 'capture.funds_observed.v1'
        WHEN 'CHARGEBACK' THEN 'capture.reversed.v1'
        WHEN 'REFUND' THEN 'refund.completed.v1'
        WHEN 'CORRECTION' THEN 'reconciliation_case.resolved.v1'
-     END) THEN
-    RAISE EXCEPTION 'LEDGER_UNBALANCED: a % posting cannot be sourced by event % (%)', NEW.source_kind, NEW.domain_event_id, coalesce(source_type, 'not visible') USING ERRCODE = 'KP001';
+     END;
+  expected_kind text := CASE WHEN NEW.source_kind IN ('CAPTURE', 'FEE', 'FUNDS', 'CHARGEBACK') THEN 'capture'
+       WHEN NEW.source_kind = 'REFUND' THEN 'refund'
+       WHEN NEW.source_kind = 'CORRECTION' THEN 'reconciliation_case'
+     END;
+BEGIN
+  SELECT e.event_type, e.aggregate_kind, e.aggregate_id INTO src
+    FROM kauro.domain_events e WHERE e.event_id = NEW.domain_event_id AND e.agency_id = NEW.agency_id;
+  IF src.event_type IS DISTINCT FROM expected_type OR src.aggregate_kind IS DISTINCT FROM expected_kind OR src.aggregate_id IS DISTINCT FROM NEW.source_ref THEN
+    RAISE EXCEPTION 'LEDGER_UNBALANCED: a % posting of % cannot be sourced by event % (% of % %)', NEW.source_kind, NEW.source_ref, NEW.domain_event_id,
+      coalesce(src.event_type, 'not visible'), coalesce(src.aggregate_kind, '-'), coalesce(src.aggregate_id::text, '-') USING ERRCODE = 'KP001';
   END IF;
   RETURN NEW;
 END

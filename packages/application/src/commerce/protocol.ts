@@ -10,7 +10,9 @@
  *               request hash and provider request identity, the platform scope rows) → events → COMMIT. The journal entry stays
  *               RESERVED: a duplicate with the same key and body is answered from the durable operation (202, or the final answer).
  *   T2 claim    one short unit of work of the same principal: CAS the attempt PREPARED → DISPATCHING (dispatch_intent_committed)
- *               with its dispatch deadline, and the aggregate's own dispatch edge. The single serialization point of "dispatch at
+ *               with its dispatch deadline — now() + DISPATCH_DEADLINE_SECONDS on the database's clock, the only deadline the
+ *               database admits (payment_attempts_dispatch_deadline_bound, D-PROTO-B6) —, and the aggregate's own dispatch edge.
+ *               The single serialization point of "dispatch at
  *               most once": a second claimant loses the CAS and never calls the provider.
  *   call        outside any transaction: exactly the prepared request under the attempt's provider request identity, bounded
  *               by the deadline (DISPATCH_TIMEOUT_SECONDS).
@@ -91,7 +93,10 @@ export interface ProviderCommandPhases<Body, View> {
   resume(uow: CommerceUnitOfWork, journalEntryId: JournalEntryId): Promise<DurableOperation | null>;
 }
 
-/** Deadline arithmetic of a dispatch: the call's bounded timeout plus a margin after which a watchdog observes (D-PROTO-B4). */
+/**
+ * Deadline arithmetic of a dispatch: the call's bounded timeout plus a margin after which a watchdog observes (D-PROTO-B4). Their sum
+ * is @kauro/domain DISPATCH_DEADLINE_SECONDS, the bound the database puts on a claim's deadline (D-PROTO-B6; B09-N7).
+ */
 export const DISPATCH_TIMEOUT_SECONDS = 30;
 export const DISPATCH_WATCHDOG_MARGIN_SECONDS = 30;
 /** A logical operation makes at most this many attempts, each after a proved no-effect of the previous one (D-PROTO-B3). */

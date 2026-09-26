@@ -9717,7 +9717,7 @@
           },
           "authorizationBlockers": {
             "type": "array",
-            "maxItems": 14,
+            "maxItems": 15,
             "items": {
               "type": "string",
               "enum": [
@@ -9731,6 +9731,7 @@
                 "APPROVAL_NOT_CURRENT",
                 "TARGET_STALE",
                 "CAPABILITY_RESTRICTED",
+                "DELIVERY_CAPACITY_UNAVAILABLE",
                 "PAYMENT_ROUTE_UNQUALIFIED",
                 "FISCAL_ROUTE_UNQUALIFIED",
                 "FISCAL_TREATMENT_UNREVIEWED",
@@ -11673,7 +11674,7 @@
           },
           "checkoutBlockers": {
             "type": "array",
-            "maxItems": 14,
+            "maxItems": 15,
             "items": {
               "type": "string",
               "enum": [
@@ -11687,6 +11688,7 @@
                 "APPROVAL_NOT_CURRENT",
                 "TARGET_STALE",
                 "CAPABILITY_RESTRICTED",
+                "DELIVERY_CAPACITY_UNAVAILABLE",
                 "PAYMENT_ROUTE_UNQUALIFIED",
                 "FISCAL_ROUTE_UNQUALIFIED",
                 "FISCAL_TREATMENT_UNREVIEWED",
@@ -11885,7 +11887,8 @@
                     "UNRECOGNIZED_PROVIDER_STATE",
                     "PROVIDER_INCONSISTENCY",
                     "REVERSAL",
-                    "FEE_MISMATCH"
+                    "FEE_MISMATCH",
+                    "DISPUTE_OPEN"
                   ]
                 }
               }

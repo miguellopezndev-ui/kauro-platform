@@ -323,21 +323,33 @@ export interface CaptureInput {
   readonly serviceCents: number;
   readonly taxCents: number;
   readonly excessCents: number;
+  /**
+   * The first authenticated observation: PENDING, or one edge from it. A capture first seen REVERSED is born COMPLETED and then
+   * reversed (D-PAY-B5); REVERSED here only shows that the database refuses such a birth (B09-N3).
+   */
   readonly status?: "COMPLETED" | "PENDING" | "DENIED" | "REVERSED";
   readonly payeeDigest?: string;
   readonly feeCents?: number;
+  /** UNKNOWN at birth (an availability is a version of its own); another value only shows that the database refuses it (B09-N1). */
+  readonly fundsState?: "UNKNOWN" | "HELD" | "AVAILABLE";
+  /** The attempt whose response observed the capture (capture_facts_attempt_fk binds it to the capture's order; B09-N6). */
+  readonly attemptId?: string;
 }
 
-/** A capture fact of the order, born in the status of its first authenticated observation (D-INIT-B1), with its event. */
+/**
+ * A capture fact of the order, born in the status of its first authenticated observation (D-INIT-B1) with its funds UNKNOWN (an
+ * availability is a version of its own, capture.funds_observed.v1; D-EVT-B3), with the event of that status.
+ */
 export async function insertCapture(c: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, actor: Actor): Promise<string> {
   const captureId = ids.next();
   const status = input.status ?? "COMPLETED";
   await c.query(
-    `INSERT INTO kauro.capture_facts (capture_id, agency_id, order_id, status, provider, environment, provider_capture_id, merchant_ref, payee_digest, amount_cents, currency, allocated_service_cents, allocated_tax_cents, excess_cents, funds_state, provider_fee_cents, provider_completed_at, first_observation_source, first_observed_at, observed_at, evidence_hash, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'USD', $11, $12, $13, 'HELD', $14, $15, 'WEBHOOK', now(), now(), $16, now(), now())`,
+    `INSERT INTO kauro.capture_facts (capture_id, agency_id, order_id, status, provider, environment, provider_capture_id, merchant_ref, payee_digest, amount_cents, currency, allocated_service_cents, allocated_tax_cents, excess_cents, funds_state, provider_fee_cents, provider_completed_at, first_observation_source, first_observed_at, observed_at, evidence_hash, attempt_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'USD', $11, $12, $13, $17, $14, $15, 'WEBHOOK', now(), now(), $16, $18, now(), now())`,
     [
       captureId, ag.agencyId, order.orderId, status, PROVIDER, ENVIRONMENT, `CAP-${captureId.slice(-12)}`, routes.merchantRef, input.payeeDigest ?? routes.payeeDigest, input.amountCents,
-      input.serviceCents, input.taxCents, input.excessCents, input.feeCents ?? null, status === "COMPLETED" ? new Date() : null, sha(`capture-evidence-${captureId}`),
+      input.serviceCents, input.taxCents, input.excessCents, input.feeCents ?? null, status === "COMPLETED" || status === "REVERSED" ? new Date() : null, sha(`capture-evidence-${captureId}`),
+      input.fundsState ?? "UNKNOWN", input.attemptId ?? null,
     ],
   );
   await commerceEvent(c, "capture", captureId, 1, ag.agencyId, `capture.${status.toLowerCase()}.v1`, actor);

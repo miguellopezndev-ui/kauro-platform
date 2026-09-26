@@ -79,8 +79,7 @@ export const COMMERCE_PLATFORM_MACHINES: ReadonlyArray<StateMachine> = Object.fr
     transitions: [
       { from: "PENDING", event: "provider_completed", to: "COMPLETED", guard: "Authenticated completion of the same provider capture identity.", effect: "Fix the obligation allocation and the excess." },
       { from: "PENDING", event: "provider_denied", to: "DENIED", guard: "Authenticated denial.", effect: "No money was captured." },
-      { from: "PENDING", event: "provider_reversed", to: "REVERSED", guard: "The next authenticated observation after pending is already a reversal.", effect: "Record the reversal; no authority." },
-      { from: "COMPLETED", event: "provider_reversed", to: "REVERSED", guard: "Authenticated reversal (chargeback) of the same capture identity.", effect: "Revoke the authorization with its phase; reverse the unrefunded components; never charge again." },
+      { from: "COMPLETED", event: "provider_reversed", to: "REVERSED", guard: "Authenticated reversal (chargeback) of the same capture identity; a capture first seen reversed, or reversed while known only as pending, completed at the provider and is recorded COMPLETED then REVERSED in one transaction (D-PAY-B5).", effect: "Revoke the authorization with its phase; reverse the unrefunded components; never charge again." },
     ],
     unlistedTransition: POLICY,
   },

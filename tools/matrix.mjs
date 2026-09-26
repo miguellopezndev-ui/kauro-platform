@@ -216,7 +216,7 @@ export const EDGE_OWNERS = {
     "(initial PENDING)": { command: "CMD030", event: "capture.pending.v1", note: "a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too" },
     provider_completed: { command: "CMD030", event: "capture.completed.v1" },
     provider_denied: { command: "CMD030", event: "capture.denied.v1" },
-    provider_reversed: { command: "CMD030", event: "capture.reversed.v1" },
+    provider_reversed: { command: "CMD030", event: "capture.reversed.v1", note: "from COMPLETED only: a capture first seen reversed is recorded COMPLETED, then REVERSED, in one transaction (D-PAY-B5)" },
   },
   CommercialAuthorization: {
     "(initial ACTIVE)": { command: "CMD029", event: "commercial_authorization.issued.v1", note: "or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction" },

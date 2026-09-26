@@ -13,7 +13,7 @@
 -- verified event no order can take is kept for review), TRANSITIONS "Cross-aggregate finalization" (capture confirmation can create
 -- financial facts even when source expiry prevents execution; offer the documented reupload/reapproval or refund path), registry
 -- contract Refund; scenarios S058, S059, R2-081, R2-140. Design: docs/design/B09-payments-fiscal.md (D-MACH-B5, D-MACH-B6,
--- D-REF-B1..B6, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2).
+-- D-REF-B1..B6, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2, D-EVT-B3, D-BIND-B2).
 
 -- --- refunds (platform machine Refund, D-MACH-B5) ---------------------------------------------------------------------------------------
 -- A refund of one capture: requested by the agency (CUSTOMER_REQUEST, CMD031), by the reconciler for an overpayment
@@ -260,6 +260,8 @@ CREATE TRIGGER refunds_initial_state BEFORE INSERT ON kauro.refunds
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('Refund');
 CREATE CONSTRAINT TRIGGER refunds_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.refunds
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('refund', 'refund_id');
+CREATE CONSTRAINT TRIGGER refunds_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.refunds
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('refund', 'refund_id', 'state');
 
 -- A completed refund that leaves no service basis revokes the entitlement it paid for (CommercialAuthorization authority_revoked:
 -- "Reversal or full service refund"), in the same transaction, checked at COMMIT. AUTHORITY_OUTLIVES_REVERSAL (KP006).
@@ -397,6 +399,11 @@ CREATE TABLE kauro.reconciliation_cases (
   FOREIGN KEY (agency_id, order_id) REFERENCES kauro.payment_orders (agency_id, order_id),
   FOREIGN KEY (agency_id, capture_id) REFERENCES kauro.capture_facts (agency_id, capture_id),
   FOREIGN KEY (agency_id, refund_id) REFERENCES kauro.refunds (agency_id, refund_id),
+  -- a case that names several subjects names one purchase: its capture is a capture of its order, its refund a refund of its order
+  -- and of its capture (07 "Composite foreign keys"; B09-N6; each key applies when the columns it binds are all named)
+  CONSTRAINT reconciliation_cases_capture_order_fk FOREIGN KEY (agency_id, capture_id, order_id) REFERENCES kauro.capture_facts (agency_id, capture_id, order_id),
+  CONSTRAINT reconciliation_cases_refund_order_fk FOREIGN KEY (agency_id, refund_id, order_id) REFERENCES kauro.refunds (agency_id, refund_id, order_id),
+  CONSTRAINT reconciliation_cases_refund_capture_fk FOREIGN KEY (agency_id, refund_id, order_id, capture_id) REFERENCES kauro.refunds (agency_id, refund_id, order_id, capture_id),
   CONSTRAINT reconciliation_cases_subject CHECK (num_nonnulls(order_id, capture_id, refund_id) >= 1),
   -- a dispute is about a capture and names the disputed amount (15 "Dispute records contain ... amount")
   CONSTRAINT reconciliation_cases_dispute_subject CHECK (kind <> 'DISPUTE_OPEN' OR (capture_id IS NOT NULL AND amount_cents IS NOT NULL)),
@@ -422,6 +429,8 @@ CREATE TRIGGER reconciliation_cases_initial_state BEFORE INSERT ON kauro.reconci
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('ReconciliationCase');
 CREATE CONSTRAINT TRIGGER reconciliation_cases_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.reconciliation_cases
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('reconciliation_case', 'case_id');
+CREATE CONSTRAINT TRIGGER reconciliation_cases_event_type_per_version AFTER INSERT OR UPDATE OF version ON kauro.reconciliation_cases
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_commerce_event_type('reconciliation_case', 'case_id', 'state');
 
 INSERT INTO kauro.state_machines (machine, initial_state) VALUES ('ReconciliationCase', 'OPEN');
 INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES ('ReconciliationCase', 'OPEN', 'RESOLVED');
@@ -434,7 +443,8 @@ INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_
 -- an unrecognized status, a conflicting body — is kept for the owner's finance review and never applied: no money, no commission,
 -- no authority. The source is exactly one of: a verified webhook (its inbox record; it may name no agency when it could not be
 -- attributed), a dispatch response of a stored operation (its attempt) or a stored provider query (its artifact) — the latter two
--- are attributed to the stored operation's order and agency. One row per source and kind; append-only.
+-- are attributed to the stored operation's order and agency, and a dispatch response's attempt is an attempt of exactly the order
+-- the row names (provider_event_exceptions_attempt_fk; D-ING-B3, B09-N6). One row per source and kind; append-only.
 ALTER TABLE kauro.inbox_records ADD CONSTRAINT inbox_records_provider_binding UNIQUE (inbox_id, provider, environment);
 
 CREATE TABLE kauro.provider_event_exceptions (
@@ -459,7 +469,7 @@ CREATE TABLE kauro.provider_event_exceptions (
   CONSTRAINT provider_event_exceptions_artifact_once UNIQUE (artifact_ref, kind),
   FOREIGN KEY (inbox_id, provider, environment) REFERENCES kauro.inbox_records (inbox_id, provider, environment),
   FOREIGN KEY (agency_id, order_id) REFERENCES kauro.payment_orders (agency_id, order_id),
-  FOREIGN KEY (agency_id, attempt_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id),
+  CONSTRAINT provider_event_exceptions_attempt_fk FOREIGN KEY (agency_id, attempt_id, order_id) REFERENCES kauro.payment_attempts (agency_id, attempt_id, order_id),
   CONSTRAINT provider_event_exceptions_one_source CHECK (
     (source = 'WEBHOOK' AND inbox_id IS NOT NULL AND attempt_id IS NULL AND artifact_ref IS NULL)
     OR (source = 'DISPATCH_RESPONSE' AND attempt_id IS NOT NULL AND inbox_id IS NULL AND artifact_ref IS NULL)

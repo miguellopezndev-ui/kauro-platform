@@ -63,7 +63,7 @@ test("B09-F7: every B09 case has exactly one row with its registry expectation; 
         assert.ok(readFileSync(path, "utf8").includes(`test(${JSON.stringify(title)}`), `${row.caseId}: ${file} has no test titled ${title.slice(0, 90)}`);
       } else {
         assert.match(file, /^apps\/api\/test\/(cmd0(2[89]|3[0-4])-[a-z-]+|b09-[a-z]+)\.test\.ts$/, `${row.caseId}: ${file} is neither on the branch nor a planned api test`);
-        assert.match(row.status, /PLANNED \(M[23]\)/, `${row.caseId}: a planned citation needs a PLANNED status`);
+        assert.match(row.status, /PLANNED \((M3|M4|INT-2)\)/, `${row.caseId}: a planned citation needs a PLANNED status of a stage-2 mandate or the stage-2 integrator (design §14)`);
       }
     }
   }
