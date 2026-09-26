@@ -77,10 +77,14 @@ export function applied<T>(write: VersionedWrite<T>, what: string): T {
   return write.record;
 }
 
-/** Whether an error means the control plane's attempt lost (a stale fence, KA071; or SettledElsewhere): DONE, not a failure. */
+/**
+ * Whether an error means the control plane's attempt lost (a stale fence, KA071; or SettledElsewhere, which the unit of work hands
+ * back as the cause of its INTERNAL_ERROR): DONE, not a failure.
+ */
 export function lostTheSubject(e: unknown): boolean {
   if (e instanceof SettledElsewhere) return true;
-  return isDomainFailure(e) && e.reason === "FENCE_DISCIPLINE";
+  if (!isDomainFailure(e)) return false;
+  return e.reason === "FENCE_DISCIPLINE" || e.cause instanceof SettledElsewhere;
 }
 
 const INSTANT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/;

@@ -18,6 +18,7 @@
  * records, then the inventory and the deletion retries. Each piece is also usable alone (the tests drive them one by one).
  */
 import { randomBytes } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { UtcInstant } from "@kauro/contracts";
 import type {
@@ -70,7 +71,9 @@ export interface ControlParsers {
 
 /** The isolated container inspector and selection evaluator of @kauro/data-plane (D-ISO-1), attempts under `scratchRoot`. */
 export function platformParsers(scratchRoot: string): ControlParsers {
-  return { inspector: new IsolatedContainerInspector(), evaluator: new IsolatedSelectionEvaluator({ scratchRoot: join(scratchRoot, "evaluation") }) };
+  const evaluationRoot = join(scratchRoot, "evaluation");
+  mkdirSync(evaluationRoot, { recursive: true });
+  return { inspector: new IsolatedContainerInspector(), evaluator: new IsolatedSelectionEvaluator({ scratchRoot: evaluationRoot }) };
 }
 
 export interface ControlPlaneOptions {
