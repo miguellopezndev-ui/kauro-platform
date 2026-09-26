@@ -225,6 +225,12 @@ export interface InspectionReceiptRecord {
     readonly signatureMaxAgeSeconds: number;
     readonly configHash: Sha256Hex;
     readonly scannedAt: UtcInstant;
+    /**
+     * The engine's own summary, recorded as evidence and never decisive (D-SCAN-1; S054: a zero exit code alone is not admission
+     * evidence; inspection_receipts.scanner_exit_code / scanner_verdict). Optional: an engine that reported none records none.
+     */
+    readonly exitCode?: number;
+    readonly verdict?: "CLEAN" | "INFECTED" | "ERROR";
   };
   readonly expectedParts: number;
   readonly expectedBytes: number;

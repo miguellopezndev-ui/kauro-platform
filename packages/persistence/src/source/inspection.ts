@@ -64,6 +64,8 @@ const RECEIPT_COLUMNS = [
   exact("signatures_published_at"),
   "signature_max_age_seconds",
   "scanner_config_hash",
+  "scanner_exit_code",
+  "scanner_verdict",
   exact("scanned_at"),
   "expected_parts",
   "expected_bytes::text AS expected_bytes",
@@ -115,6 +117,8 @@ function receiptRecord(r: Row): InspectionReceiptRecord {
             signatureMaxAgeSeconds: int(r["signature_max_age_seconds"]),
             configHash: str<Sha256Hex>(r["scanner_config_hash"]),
             scannedAt: instantText(r["scanned_at"]),
+            ...opt("exitCode", optionalInt(r["scanner_exit_code"])),
+            ...opt("verdict", optionalString<"CLEAN" | "INFECTED" | "ERROR">(r["scanner_verdict"])),
           },
     ),
     expectedParts: int(r["expected_parts"]),
@@ -151,9 +155,9 @@ export class PgInspectionReceiptRepository implements InspectionReceiptRepositor
       `INSERT INTO kauro.inspection_receipts (receipt_id, agency_id, upload_id, revision_id, receipt_hash, inspection_fence, quarantine_object_id, observed_generation, observed_bytes, sha256,
           completion_claim_digest, claim_consistent, declared_format, detected_format, structure_status, scan_state, semantic_status, scanner_engine, scanner_engine_version, signature_version,
           signatures_published_at, signature_max_age_seconds, scanner_config_hash, scanned_at, expected_parts, expected_bytes, scanned_parts, scanned_bytes, coverage, problems,
-          parser_profile_hash, inspector_version, outcome, rejection_class, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, created_at)
+          parser_profile_hash, inspector_version, outcome, rejection_class, accepted_object_id, accepted_generation, accepted_sha256, started_at, completed_at, scanner_exit_code, scanner_verdict, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21::timestamptz, $22, $23, $24::timestamptz, $25, $26, $27, $28, $29::jsonb, $30::jsonb,
-          $31, $32, $33, $34, $35, $36, $37, $38::timestamptz, $39::timestamptz, kauro.server_now())`,
+          $31, $32, $33, $34, $35, $36, $37, $38::timestamptz, $39::timestamptz, $40, $41, kauro.server_now())`,
       [
         receipt.receiptId,
         receipt.agencyId,
@@ -194,6 +198,8 @@ export class PgInspectionReceiptRepository implements InspectionReceiptRepositor
         receipt.accepted?.sha256 ?? null,
         receipt.startedAt,
         receipt.completedAt,
+        s?.exitCode ?? null,
+        s?.verdict ?? null,
       ],
     );
   }

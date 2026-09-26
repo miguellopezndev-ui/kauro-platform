@@ -417,7 +417,7 @@ async function admitVia(s: SourceStore, emit: Emit, t: Tenant, up: Reserved, cla
     structureStatus: "STRUCTURE_VALID",
     scanState: "COVERED_CLEAN",
     semanticStatus: "SEMANTIC_NOT_YET_PROFILED",
-    scanner: { engine: "contract-fake-scanner", engineVersion: "SIMULATED-1", signatureVersion: "SIG-1", signaturesPublishedAt: new Date(Date.parse(now) - HOUR_MS).toISOString(), signatureMaxAgeSeconds: 86_400, configHash: textDigest("contract-fake-scanner-config"), scannedAt: now },
+    scanner: { engine: "contract-fake-scanner", engineVersion: "SIMULATED-1", signatureVersion: "SIG-1", signaturesPublishedAt: new Date(Date.parse(now) - HOUR_MS).toISOString(), signatureMaxAgeSeconds: 86_400, configHash: textDigest("contract-fake-scanner-config"), scannedAt: now, exitCode: 0, verdict: "CLEAN" },
     expectedParts: 1,
     expectedBytes: bytes,
     scannedParts: 1,
@@ -881,7 +881,7 @@ test("the upload lifecycle through every UploadSessionRepository, SessionSecretR
   await h.app.runSource(asOwner(t), async (uow) => {
     const receipt = await uow.sources.inspections.getByHash(admitted.receiptHash);
     assert.ok(receipt);
-    assert.deepEqual([receipt.outcome, receipt.startedAt, receipt.scanState, receipt.accepted?.generation, receipt.scanner?.signatureMaxAgeSeconds], ["ADMITTED", claim.claimedAt, "COVERED_CLEAN", admitted.acceptedGeneration, 86_400]);
+    assert.deepEqual([receipt.outcome, receipt.startedAt, receipt.scanState, receipt.accepted?.generation, receipt.scanner?.signatureMaxAgeSeconds, receipt.scanner?.exitCode, receipt.scanner?.verdict], ["ADMITTED", claim.claimedAt, "COVERED_CLEAN", admitted.acceptedGeneration, 86_400, 0, "CLEAN"]);
     assert.deepEqual((await uow.sources.inspections.forUpload(reserved.uploadId)).map((r) => r.receiptHash), [admitted.receiptHash]);
     const file = await uow.sources.files.get(admitted.fileId);
     assert.ok(file);
