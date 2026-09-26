@@ -17,22 +17,38 @@
  * log; the SQL text never reaches a response (10 "Responses and safe errors"). serialization_failure / deadlock_detected are
  * retried up to `maxRetries` times with a fresh transaction (the work function must therefore be repeatable, which the seven
  * database-only commands are).
+ *
+ * The commerce unit of work (package B09; docs/design/B09-payments-fiscal.md §2, §3.2, §3.3, §5; D-CTX-B1, D-CTX-B2, D-SCOPE-B1)
+ * IS this unit of work — the same transaction, context binding, publisher, journal and security events — with the commerce
+ * repositories on the same connection and the adoption of a stored operation's scope: a SERVICE context (kauro_payment) adopts the
+ * one agency of the operation it acts on (kauro.agency_id), an OPERATOR context (kauro_app) the finance scope of an agency
+ * (kauro.finance_agency_id, admitted by the database only while its person holds an ACTIVE KAURO_OWNER grant). Its factory routes
+ * each context to the verified pool of its runtime group (one login per group).
  */
 import { randomBytes } from "node:crypto";
 import type { Id } from "@kauro/contracts";
 import {
   DomainFailure,
+  actorOf,
   createIdGenerator,
   isDomainFailure,
   isUuidV7,
   userIdOf,
   type AgencyId,
+  type CausationId,
   type Clock,
+  type CommerceRepositories,
+  type CommerceUnitOfWork,
+  type CommerceUnitOfWorkFactory,
+  type EventProvenance,
   type ExecutionContext,
   type IdGenerator,
   type IsolationLevel,
+  type JournalEntryId,
   type MembershipId,
   type RandomBytes,
+  type ScopeIndex,
+  type ScopeKind,
   type UnitOfWork,
   type UnitOfWorkFactory,
   type UnitOfWorkOptions,
@@ -44,6 +60,8 @@ import { PgEventPublisher } from "./event-publisher.js";
 import { PgInboxConsumerStore, PgOutboxDispatchStore } from "./inbox-outbox.js";
 import { PgLeaseStore } from "./lease-store.js";
 import type { KauroPool, RuntimeRole } from "./pool.js";
+import { PgCommercialInspections } from "./repositories/commerce-inspections.js";
+import { createCommerceRepositories } from "./repositories/commerce-repositories.js";
 import { PgApprovalRepository, PgPlanRepository, PgValidationReceiptRepository } from "./repositories/plans.js";
 import { PgAgencyRepository, PgIdentityRepository, PgInvitationRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 import { PgCapabilityRepository, PgDatasetRevisionRepository, PgEndClientRepository, PgProcessingAuthorityRepository, PgProjectRepository, PgTargetContractRepository } from "./repositories/workspace.js";
@@ -78,7 +96,7 @@ function roleFor(context: ExecutionContext): RuntimeRole {
 }
 
 /** An id generator that remembers what it minted, so adoptTenant can prove the agency id was minted here. */
-class TrackingIdGenerator implements IdGenerator {
+export class TrackingIdGenerator implements IdGenerator {
   readonly minted = new Set<string>();
   constructor(private readonly inner: IdGenerator) {}
   next(): Id {
@@ -111,11 +129,17 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly requestJournal: PgRequestJournal;
   readonly outboxDispatch: PgOutboxDispatchStore;
   readonly inbox: PgInboxConsumerStore;
+  /**
+   * The commerce queries behind B06's inspectors (package B09; D-INSP-B1): the commercial consequences a revision of an APPROVED plan
+   * would strand (CommercialConsequenceInspector) and a client's live commercial authorizations (ActiveWorkInspector); read through
+   * commercialInspectionsOf(uow) by the api composition.
+   */
+  readonly commercialInspections: PgCommercialInspections;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
 
   constructor(
-    private readonly client: PoolClient,
+    protected readonly client: PoolClient,
     context: ExecutionContext,
     ids: TrackingIdGenerator,
     clock: Clock,
@@ -137,11 +161,17 @@ export class PgUnitOfWork implements UnitOfWork {
     this.capabilities = new PgCapabilityRepository(client);
     this.securityEvents = new PgSecurityEventRepository(client, ids);
     this.events = new PgEventPublisher(client, ids, clock);
-    this.journal = new PgCommandJournal(client, ids, clock);
+    this.journal = new PgCommandJournal(client, ids, clock, (entryId) => this.onJournalEntry(entryId));
     this.leases = new PgLeaseStore(client);
     this.requestJournal = new PgRequestJournal(client);
     this.outboxDispatch = new PgOutboxDispatchStore(client);
     this.inbox = new PgInboxConsumerStore(client);
+    this.commercialInspections = new PgCommercialInspections(client);
+  }
+
+  /** The journal entry this unit of work reserved or resumed (a subclass causes its events by it). */
+  protected onJournalEntry(_entryId: JournalEntryId): void {
+    // the B06 handlers pass their causation explicitly (withProvenance); nothing to remember here
   }
 
   get userId(): UserId | null {
@@ -218,6 +248,16 @@ export class PgUnitOfWorkFactory implements UnitOfWorkFactory {
     this.#defaultStatementTimeoutMs = deps.defaultStatementTimeoutMs ?? 10_000;
   }
 
+  /** The pool a context runs on (B06: the one pool of this factory; the commerce factory routes by runtime group). */
+  protected poolFor(_context: ExecutionContext): KauroPool {
+    return this.pool;
+  }
+
+  /** The unit of work handed to `work` (the commerce factory hands its commerce unit of work). */
+  protected createUnitOfWork(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock): PgUnitOfWork {
+    return new PgUnitOfWork(client, context, ids, clock);
+  }
+
   async run<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, options: UnitOfWorkOptions = {}): Promise<T> {
     const isolation = options.isolation ?? "READ_COMMITTED";
     const maxRetries = options.maxRetries ?? (isolation === "READ_COMMITTED" ? 0 : 2);
@@ -236,7 +276,7 @@ export class PgUnitOfWorkFactory implements UnitOfWorkFactory {
   async #once<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, isolation: IsolationLevel, statementTimeoutMs: number): Promise<T> {
     let acquired: Awaited<ReturnType<KauroPool["acquire"]>>;
     try {
-      acquired = await this.pool.acquire();
+      acquired = await this.poolFor(context).acquire();
     } catch (e) {
       if (e instanceof Error && e.name === "PrivilegedRoleError") throw e;
       const failure = new DomainFailure("CAPACITY_UNAVAILABLE", `no database connection available; correlation ${context.correlationId}`, { retryAfterSeconds: 1 }, true);
@@ -255,7 +295,7 @@ export class PgUnitOfWorkFactory implements UnitOfWorkFactory {
       await execute(client, `SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
       await bindContext(client, context);
       const ids = new TrackingIdGenerator(createIdGenerator(this.deps.clock, this.#random));
-      const uow = new PgUnitOfWork(client, context, ids, this.deps.clock);
+      const uow = this.createUnitOfWork(client, context, ids, this.deps.clock);
       const out = await work(uow);
       // COMMIT inside an aborted transaction block does not fail: the server answers with the ROLLBACK tag and a WARNING.
       // A handler that caught a database refusal and carried on would otherwise "succeed" having persisted nothing.
@@ -281,4 +321,152 @@ export class PgUnitOfWorkFactory implements UnitOfWorkFactory {
 
 export function createUnitOfWorkFactory(pool: KauroPool, deps: UnitOfWorkDependencies): PgUnitOfWorkFactory {
   return new PgUnitOfWorkFactory(pool, deps);
+}
+
+/**
+ * The commerce queries behind B06's inspectors for a unit of work of this package (D-INSP-B1). The api composition binds
+ * CommercialConsequenceInspector.unreconciledForPlan(uow, planId) to commercialInspectionsOf(uow).unreconciledForPlan(planId) and
+ * ActiveWorkSummary.liveCommercialAuthorizations to commercialInspectionsOf(uow).liveAuthorizationsOfClient(clientId).
+ */
+export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspections {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the commercial inspections read a unit of work of @kauro/persistence");
+  return uow.commercialInspections;
+}
+
+// --- the commerce unit of work (package B09) ------------------------------------------------------------------------------------------
+
+/**
+ * A unit of work of the payments and fiscal workflow (@kauro/domain CommerceUnitOfWork): B06's unit of work plus the commerce
+ * repositories and the scope index on the same connection, and the adoption of one scope per unit of work (D-SCOPE-B1).
+ *
+ * The events its repositories publish carry the provenance of the unit of work (D-EVT-B4): the actor of its context (a person for
+ * TENANT and OPERATOR, the verified service for SERVICE), its correlation id, and as causation the causation its caller named with
+ * causedBy (a consumer's source event, the reconciler's inbox record), else the command journal entry it reserved or resumed, else
+ * its correlation id.
+ */
+export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOfWork {
+  readonly commerce: CommerceRepositories;
+  readonly scopes: ScopeIndex;
+  #scopeAgencyId: AgencyId | null = null;
+  #financeAgencyId: AgencyId | null = null;
+  #causation: CausationId | null = null;
+  #journalCausation: CausationId | null = null;
+
+  constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
+    super(client, context, ids, clock);
+    const built = createCommerceRepositories({ db: client, ids, clock, events: this.events, provenance: () => this.provenance() });
+    this.commerce = built.repositories;
+    this.scopes = built.scopes;
+  }
+
+  protected override onJournalEntry(entryId: JournalEntryId): void {
+    this.#journalCausation = entryId as Id as CausationId;
+  }
+
+  /** The agency adopted through adoptScope (SERVICE) or the finance scope (OPERATOR), or the TENANT agency; null before adoption. */
+  get commerceScope(): AgencyId | null {
+    if (this.context.kind === "TENANT") return this.context.agencyId;
+    return this.#scopeAgencyId ?? this.#financeAgencyId;
+  }
+
+  /** Names the causation of the events published from here on (a consumer's source event, an inbox record, a stored operation). */
+  causedBy(causationId: CausationId): void {
+    if (!isUuidV7(causationId)) throw new DomainFailure("INTEGRITY_FAILURE", "a causation is a platform id (UUIDv7)");
+    this.#causation = causationId;
+  }
+
+  /** The actor, causation and correlation of the events this unit of work publishes. */
+  provenance(): EventProvenance {
+    const context = this.context;
+    if (context.kind === "ANONYMOUS") throw new DomainFailure("INTEGRITY_FAILURE", "an anonymous context publishes no commerce event");
+    return {
+      actor: actorOf(context),
+      causationId: this.#causation ?? this.#journalCausation ?? (context.correlationId as Id as CausationId),
+      correlationId: context.correlationId,
+    };
+  }
+
+  /**
+   * SERVICE and OPERATOR contexts, at most once: resolves the stored operation through the scope index and binds its agency —
+   * kauro.agency_id for SERVICE, kauro.finance_agency_id for OPERATOR (which reads REFUND rows only while its person holds an ACTIVE
+   * KAURO_OWNER grant). An unknown key (a foreign and a nonexistent one look alike) answers null and adopts nothing.
+   */
+  async adoptScope(kind: ScopeKind, key: string): Promise<AgencyId | null> {
+    const context = this.context;
+    if (context.kind !== "SERVICE" && context.kind !== "OPERATOR") throw new DomainFailure("INTEGRITY_FAILURE", "only a SERVICE or OPERATOR context adopts the scope of a stored operation");
+    if (this.#scopeAgencyId !== null || this.#financeAgencyId !== null) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit of work adopts one scope at most once");
+    const entry = await this.scopes.resolve(kind, key);
+    if (entry === null) return null;
+    if (context.kind === "SERVICE") {
+      await execute(this.client, "SELECT set_config('kauro.agency_id', $1, true)", [entry.agencyId]);
+      this.#scopeAgencyId = entry.agencyId;
+    } else {
+      await execute(this.client, "SELECT set_config('kauro.finance_agency_id', $1, true)", [entry.agencyId]);
+      this.#financeAgencyId = entry.agencyId;
+    }
+    return entry.agencyId;
+  }
+
+  /**
+   * OPERATOR contexts only, at most once and never after adoptScope: the finance scope of an agency the corporate owner names for a
+   * review not keyed by a stored operation (a fiscal profile version, a case's resolution). Naming an agency grants nothing by
+   * itself: the database admits the scope's rows only while the person's KAURO_OWNER grant is ACTIVE (kauro.in_finance_scope).
+   */
+  async adoptFinanceScope(agencyId: AgencyId): Promise<void> {
+    if (this.context.kind !== "OPERATOR") throw new DomainFailure("INTEGRITY_FAILURE", "only an OPERATOR context adopts a finance scope");
+    if (this.#scopeAgencyId !== null || this.#financeAgencyId !== null) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit of work adopts one scope at most once");
+    if (!isUuidV7(agencyId)) throw new DomainFailure("INTEGRITY_FAILURE", "a finance scope names an agency id (UUIDv7)");
+    await execute(this.client, "SELECT set_config('kauro.finance_agency_id', $1, true)", [agencyId]);
+    this.#financeAgencyId = agencyId;
+  }
+}
+
+/** The verified pools a commerce factory routes to, one per runtime group (B06's pool verification: one login per group). */
+export interface CommercePools {
+  /** kauro_app: TENANT, IDENTITY, ANONYMOUS and OPERATOR contexts (the request handlers, the corporate operator). */
+  readonly app?: KauroPool;
+  /** kauro_payment: SERVICE contexts (the payment service; D-CTX-B1). */
+  readonly payment?: KauroPool;
+  /** kauro_control: SYSTEM contexts. */
+  readonly control?: KauroPool;
+}
+
+/**
+ * Runs commerce units of work (@kauro/domain CommerceUnitOfWorkFactory): each context on the pool of its runtime group — a SERVICE
+ * context on the verified kauro_payment pool, TENANT and OPERATOR on kauro_app — so one factory serves the request side (T1, T2, T4)
+ * and the payment service's settle step (T3) of a provider command. A context whose group has no pool here is INTEGRITY_FAILURE, and
+ * the pool's verified role is checked against the context as for every unit of work (D-CTX-1).
+ */
+export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements CommerceUnitOfWorkFactory {
+  readonly #pools: Readonly<Partial<Record<RuntimeRole, KauroPool>>>;
+
+  constructor(pools: CommercePools, deps: UnitOfWorkDependencies) {
+    const any = pools.app ?? pools.payment ?? pools.control;
+    if (any === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit-of-work factory needs at least one verified pool");
+    super(any, deps);
+    const routes: Partial<Record<RuntimeRole, KauroPool>> = {};
+    if (pools.app !== undefined) routes.kauro_app = pools.app;
+    if (pools.payment !== undefined) routes.kauro_payment = pools.payment;
+    if (pools.control !== undefined) routes.kauro_control = pools.control;
+    this.#pools = routes;
+  }
+
+  protected override poolFor(context: ExecutionContext): KauroPool {
+    const role = roleFor(context);
+    const pool = this.#pools[role];
+    if (pool === undefined) throw new DomainFailure("INTEGRITY_FAILURE", `no ${role} pool is bound to this commerce unit-of-work factory (08 Database isolation)`);
+    return pool;
+  }
+
+  protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock): PgCommerceUnitOfWork {
+    return new PgCommerceUnitOfWork(client, context, ids, clock);
+  }
+
+  override run<T>(context: ExecutionContext, work: (uow: CommerceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    return super.run(context, (uow) => work(uow as PgCommerceUnitOfWork), options);
+  }
+}
+
+export function createCommerceUnitOfWorkFactory(pools: CommercePools, deps: UnitOfWorkDependencies): PgCommerceUnitOfWorkFactory {
+  return new PgCommerceUnitOfWorkFactory(pools, deps);
 }

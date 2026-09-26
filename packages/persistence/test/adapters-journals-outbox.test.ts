@@ -147,7 +147,7 @@ test("a concurrent duplicate waits on the identity index until the first transac
   assert.equal(rows.rows[0].n, 1);
 });
 
-test("a RESERVED or UNCERTAIN entry that outlives its transaction replays as PENDING; commit() completes only a RESERVED entry; a committed entry is final", async () => {
+test("a RESERVED or UNCERTAIN entry that outlives its transaction replays as PENDING; commit() completes a RESERVED entry or the UNCERTAIN entry of a provider effect (package B09, D-JOURNAL-B1); a committed entry is final", async () => {
   const key = "k_pending_entry_0001";
   const digest = sha("pending");
   const entryId = await h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
@@ -162,10 +162,14 @@ test("a RESERVED or UNCERTAIN entry that outlives its transaction replays as PEN
   const uncertain = await h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.reserve(identity(key), digest, uow.context.correlationId));
   assert.equal(uncertain.kind, "PENDING");
   if (uncertain.kind === "PENDING") assert.equal(uncertain.entry.state, "UNCERTAIN");
+  // the resume that learns the outcome of the provider effect completes the UNCERTAIN entry (D-JOURNAL-B1); the completion is final
+  const committed = await h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.commit(entryId, { responseStatus: 200, responseBody: {}, resourceKind: "end_client", resourceId: uow.ids.next() }));
+  assert.equal(committed.state, "COMMITTED");
   await assert.rejects(
     h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.commit(entryId, { responseStatus: 200, responseBody: {}, resourceKind: "end_client", resourceId: uow.ids.next() })),
     (e: unknown) => failure(e).code === "INTEGRITY_FAILURE",
   );
+  await assert.rejects(h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.markUncertain(entryId)), (e: unknown) => failure(e).code === "INTEGRITY_FAILURE", "a committed entry never becomes uncertain");
   await assert.rejects(
     h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
       const r = await uow.journal.reserve(identity("k_status_check_00001"), digest, uow.context.correlationId);

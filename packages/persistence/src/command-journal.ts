@@ -10,6 +10,11 @@
  * the duplicate becomes the first request (decision D-IDEM-2: rejections leave no row). A row still RESERVED or UNCERTAIN
  * with the same digest is PENDING (a multi-transaction operation of a later package); a FAILED row is final and replays as
  * FAILED so the client sees the recorded outcome rather than repeating the effect.
+ *
+ * A provider effect of unknown outcome (package B09, decision D-JOURNAL-B1 of docs/design/B09-payments-fiscal.md) leaves its entry
+ * UNCERTAIN (markUncertain: RESERVED -> UNCERTAIN, an entry already UNCERTAIN stays so) and answers 202; the resume that learns the
+ * outcome commits it from UNCERTAIN (commit: RESERVED or UNCERTAIN -> COMMITTED). The database's guard admits exactly this path
+ * (migration 0006 command_journal_guard: COMMITTED and FAILED are final).
  */
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import {
@@ -83,11 +88,15 @@ function entryOf(r: JournalRow): CommandJournalEntry {
   return withOptional(d, "committedAt", optionalInstant(r.committed_at));
 }
 
+/** Told the entry a reservation resolved to (RESERVED, or PENDING on a resume), so a unit of work can cause its events by it. */
+export type ReservationObserver = (entryId: JournalEntryId) => void;
+
 export class PgCommandJournal implements CommandJournal {
   constructor(
     private readonly db: Queryable,
     private readonly ids: IdGenerator,
     private readonly clock: Clock,
+    private readonly onReservation?: ReservationObserver,
   ) {}
 
   async reserve(identity: IdempotencyIdentity, requestDigest: Sha256Hex, correlationId: string): Promise<ReservationOutcome> {
@@ -102,17 +111,24 @@ export class PgCommandJournal implements CommandJournal {
        RETURNING entry_id`,
       [entryId, identity.environment, actor.kind, actor.id, identity.agencyId, identity.operation, identity.key, requestDigest, correlationId, now],
     );
-    if (inserted.rows[0]) return { kind: "RESERVED", entryId };
+    if (inserted.rows[0]) {
+      this.onReservation?.(entryId);
+      return { kind: "RESERVED", entryId };
+    }
     const existing = await this.find(identity);
     if (!existing) throw new DomainFailure("INTEGRITY_FAILURE", "idempotency identity is reserved by a row this context cannot read");
     if (existing.requestDigest !== requestDigest) return { kind: "CONFLICT", entry: existing };
-    if (existing.state === "RESERVED" || existing.state === "UNCERTAIN") return { kind: "PENDING", entry: existing };
+    if (existing.state === "RESERVED" || existing.state === "UNCERTAIN") {
+      this.onReservation?.(existing.entryId);
+      return { kind: "PENDING", entry: existing };
+    }
     return { kind: "REPLAY", entry: existing };
   }
 
   /**
-   * Completes the RESERVED entry and returns the row as stored (RETURNING): the response body comes back through the same
-   * jsonb decoding a replay uses, so the first answer and every later replay serialize to the same bytes (D-PORT-2).
+   * Completes the RESERVED entry — or the UNCERTAIN one a provider effect left (D-JOURNAL-B1) — and returns the row as stored
+   * (RETURNING): the response body comes back through the same jsonb decoding a replay uses, so the first answer and every later
+   * replay serialize to the same bytes (D-PORT-2).
    */
   async commit(entryId: JournalEntryId, result: JournalCommit): Promise<CommandJournalEntry> {
     if (!Number.isInteger(result.responseStatus) || result.responseStatus < 200 || result.responseStatus > 299) throw new DomainFailure("INTEGRITY_FAILURE", "a committed command records a 2xx status");
@@ -120,18 +136,27 @@ export class PgCommandJournal implements CommandJournal {
     const r = await execute<JournalRow>(
       this.db,
       `UPDATE kauro.command_journal SET state = 'COMMITTED', response_status = $2, response_body = $3::jsonb, resource_kind = $4, resource_id = $5, committed_at = $6
-       WHERE entry_id = $1 AND state = 'RESERVED'
+       WHERE entry_id = $1 AND state IN ('RESERVED', 'UNCERTAIN')
        RETURNING ${JOURNAL_COLUMNS}`,
       [entryId, result.responseStatus, JSON.stringify(result.responseBody), result.resourceKind, result.resourceId, this.clock.now()],
     );
     const row = r.rows[0];
-    if (r.rowCount !== 1 || !row) throw new DomainFailure("INTEGRITY_FAILURE", "journal commit found no RESERVED entry to complete");
+    if (r.rowCount !== 1 || !row) throw new DomainFailure("INTEGRITY_FAILURE", "journal commit found no RESERVED or UNCERTAIN entry to complete");
     return entryOf(row);
   }
 
+  /**
+   * RESERVED -> UNCERTAIN: the command's provider effect is unknown and its answer is a 202 with the durable operation (D-PROTO-B2,
+   * D-JOURNAL-B1). An entry already UNCERTAIN (a resume that still cannot conclude) stays UNCERTAIN; a final entry is refused.
+   */
   async markUncertain(entryId: JournalEntryId): Promise<void> {
-    const r = await execute(this.db, "UPDATE kauro.command_journal SET state = 'UNCERTAIN' WHERE entry_id = $1 AND state = 'RESERVED'", [entryId]);
-    if (r.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "journal markUncertain found no RESERVED entry");
+    const r = await execute<{ state: JournalState }>(
+      this.db,
+      `WITH marked AS (UPDATE kauro.command_journal SET state = 'UNCERTAIN' WHERE entry_id = $1 AND state = 'RESERVED' RETURNING state)
+       SELECT state FROM marked UNION ALL SELECT state FROM kauro.command_journal WHERE entry_id = $1 AND state = 'UNCERTAIN'`,
+      [entryId],
+    );
+    if (r.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "journal markUncertain found no RESERVED or UNCERTAIN entry");
   }
 
   async find(identity: IdempotencyIdentity): Promise<CommandJournalEntry | null> {
