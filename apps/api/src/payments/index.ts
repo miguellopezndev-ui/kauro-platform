@@ -68,7 +68,7 @@ export { NotDueYet, recordServiceDenial, storeProviderQuery, watchAttempt } from
 export type { ServiceCommandRequest } from "./service-commands.js";
 export { AWAIT_INVOICE_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, paymentServiceEffect, recordedAtOf, reevaluateBlockedDrafts, refundExecutionKey, unitOfWorkEffect } from "./consumers.js";
 export type { ConsumerOutcome, DeliveryEffect, PaymentConsumerName } from "./consumers.js";
-export { DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, leaseResourceOf } from "./dispatcher.js";
+export { DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, createPaymentDispatcher, leaseResourceOf } from "./dispatcher.js";
 export type { DispatchPass, PaymentDispatcher } from "./dispatcher.js";
 export { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, cancelUnclaimed } from "./sweep.js";
 export type { SweepPass } from "./sweep.js";
