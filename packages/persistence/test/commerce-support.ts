@@ -18,7 +18,7 @@
 // What no adapter writes stays SQL of its owner: the control plane's configuration (@kauro/persistence/testing commerce-fixtures),
 // a replacement revision's lineage (the source lifecycle's, B07) and the raw event of a probe (commerceEvent).
 import type { Client } from "pg";
-import type { Sha256Hex } from "@kauro/contracts";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   assertAllowlistedPayload,
   isDomainFailure,
@@ -94,6 +94,12 @@ export async function within<T>(client: Client, ctx: CommerceContext, fn: (c: Cl
     await client.query("ROLLBACK");
     throw e;
   }
+}
+
+/** The instant of the connection's open transaction (the database's now(), which pg reads to the millisecond, never above it). */
+async function transactionInstant(c: Client): Promise<UtcInstant> {
+  const r = await c.query<{ at: Date }>("SELECT now() AS at");
+  return toUtcInstant(r.rows[0]!.at.getTime());
 }
 
 export type Actor = { readonly kind: "USER"; readonly id: string } | { readonly kind: "SERVICE"; readonly id: string };
@@ -498,11 +504,18 @@ export interface CaptureInput {
  * (D-INIT-B1) with its funds UNKNOWN (an availability is a version of its own, capture.funds_observed.v1; D-EVT-B3), publishing the
  * event of that status. The input may carry what the database must refuse (a REVERSED birth, known funds): the adapter writes it
  * as given and the database answers.
+ *
+ * The observation instant is the transaction's own (the database's now(), to the millisecond), as the raw fixture stamped it: a test
+ * that then records the capture's next version in the same transaction with observed_at = now() writes a later or equal instant, so
+ * capture_facts_monotonic ("observation time cannot go back", KP005) never answers in place of the refusal under test — a
+ * process-clock instant read after BEGIN would lie ahead of now() whenever the machine is loaded. The completion instant (the tax
+ * point) stays the process clock's, as it was.
  */
 export async function insertCapture(c: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, actor: Actor): Promise<string> {
   const captureId = ids.next() as CaptureId;
   const status = input.status ?? "COMPLETED";
   const now = clock.now();
+  const observedAt = await transactionInstant(c);
   await asDatabase(() =>
     adapters(c, actor).commerce.captures.insert({
       captureId,
@@ -520,7 +533,7 @@ export async function insertCapture(c: Client, ag: AgencyFixture, order: OrderFi
       ...(input.feeCents === undefined ? {} : { providerFeeCents: BigInt(input.feeCents) }),
       ...(status === "COMPLETED" || status === "REVERSED" ? { providerCompletedAt: now } : {}),
       firstObservationSource: "WEBHOOK",
-      observedAt: now,
+      observedAt,
       evidenceHash: sha(`capture-evidence-${captureId}`),
       ...(input.attemptId === undefined ? {} : { attemptId: input.attemptId as PaymentAttemptId }),
     }),
