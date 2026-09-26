@@ -250,7 +250,8 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
     async commit(entryId, result: JournalCommit) {
       for (const [k, e] of s.journal) {
         if (e.entryId === entryId) {
-          if (e.state !== "RESERVED") throw new DomainFailure("INTEGRITY_FAILURE", "journal entry is final");
+          // RESERVED → COMMITTED, and the provider-effect path RESERVED → UNCERTAIN → COMMITTED (package B09, D-JOURNAL-B1)
+          if (e.state !== "RESERVED" && e.state !== "UNCERTAIN") throw new DomainFailure("INTEGRITY_FAILURE", "journal entry is final");
           const committed: CommandJournalEntry = { ...e, state: "COMMITTED", responseStatus: result.responseStatus, responseBody: structuredClone(result.responseBody), resourceKind: result.resourceKind, resourceId: result.resourceId, committedAt: clock.now() };
           s.journal.set(k, committed);
           return committed;
