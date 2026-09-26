@@ -156,7 +156,7 @@ async function quoteState(quoteId: string): Promise<string> {
 
 // --- B09-F1 ----------------------------------------------------------------------------------------------------------------------------------
 
-test("B09-F1: the request handlers cannot mint provider facts or execution authority — a capture fact, an observation, an attempt's result, a REFUND attempt, a learned provider identity, a CAPTURED order, available funds, a case, a server refund request, a provider scope key and an entitlement written as kauro_app are refused; the payment service writes each", async () => {
+test("B09-F1: the request handlers cannot mint provider facts or execution authority — a capture fact, an observation, an attempt's result, a REFUND attempt, a learned provider identity, a CAPTURED order, available funds, a fee, a capture's status, an allocation, a case, a server refund request, a provider scope key, a re-binding and an entitlement written as kauro_app are refused; the payment service writes each", async () => {
   const quote = await quoted(A, "f1");
   // T1 and T2 only: the order CREATING, the CREATE_ORDER attempt DISPATCHING (the request handlers' own writes commit)
   const order = await createdOrder(app, A, quote, routes);
@@ -201,6 +201,12 @@ test("B09-F1: the request handlers cannot mint provider facts or execution autho
     await assert.rejects(as(`UPDATE kauro.commercial_authorizations SET ${change} WHERE authorization_id = $1`, change.includes("$2") ? [authorizationId, ids.next()] : [authorizationId]), refusedWith("42501"), change);
   }
   await assert.rejects(as("UPDATE kauro.capture_facts SET funds_state = 'AVAILABLE' WHERE capture_id = $1", [captureId]), refusedWith("42501"));
+  // the provider-reported fee, the capture's status and the obligation's allocation are provider facts too; a re-binding moves an
+  // entitlement, so it is the payment service's alone as well (D-AUTH-B4, D-QUOTE-B6)
+  await assert.rejects(as("UPDATE kauro.capture_facts SET provider_fee_cents = 1, version = version + 1 WHERE capture_id = $1", [captureId]), refusedWith("42501"));
+  await assert.rejects(as("UPDATE kauro.capture_facts SET status = 'REVERSED', version = version + 1 WHERE capture_id = $1", [captureId]), refusedWith("42501"));
+  await assert.rejects(as("UPDATE kauro.payment_orders SET allocated_cents = 0 WHERE order_id = $1", [order.orderId]), refusedWith("42501"));
+  await assert.rejects(as("INSERT INTO kauro.purchase_rebindings (rebinding_id, agency_id) VALUES ($1, $2)", [ids.next(), A.agencyId]), refusedWith("42501"));
   const forgedAttempt = ids.next();
   await assert.rejects(
     as("INSERT INTO kauro.payment_attempts (attempt_id, agency_id, order_id, refund_id, operation, ordinal, provider, environment, request_hash, provider_request_id, started_at, last_observed_at, created_at, updated_at) VALUES ($1, $2, $3, $4, 'REFUND', 1, $5, $6, $7, $8, now(), now(), now(), now())", [

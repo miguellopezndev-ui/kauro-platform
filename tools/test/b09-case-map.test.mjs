@@ -69,7 +69,7 @@ test("B09-F7: every B09 case has exactly one row with its registry expectation; 
   }
 });
 
-test("B09-F7: every DENY row of CMD028..CMD034 names a foreign tenant, a wrong role or service identity and one missing prerequisite; every RACE row names the identical retry, the same key with another digest (IDEMPOTENCY_CONFLICT) and a crash at the intent/commit boundary", () => {
+test("B09-F7: every DENY row of CMD028..CMD034 names a foreign tenant, a wrong role or service identity and one missing prerequisite; every RACE row names the identical retry, the same key with another digest (IDEMPOTENCY_CONFLICT) and a crash at the intent/commit boundary; a provider-effect RACE crashes on both sides of the intent commit and between the claim and the settle", () => {
   const map = rows();
   const triads = map.filter((r) => /^CMD0(2[89]|3[0-4])-(DENY|RACE)$/.test(r.caseId));
   assert.equal(triads.length, 14);
@@ -85,6 +85,23 @@ test("B09-F7: every DENY row of CMD028..CMD034 names a foreign tenant, a wrong r
         titles.some((t) => /identical retry/.test(t) && /IDEMPOTENCY_CONFLICT/.test(t) && /crash/.test(t)),
         `${row.caseId}: no cited test demonstrates the scenario "Identical retry, conflicting same-key request and crash at the intent/commit boundary"`,
       );
+      // A provider-effect command (CMD028 create order, CMD029 capture, CMD033 refund; design §6.1) has two sides to its intent/commit
+      // boundary and a provider call after it: the RACE test injects the crash before the intent commits, between the intent commit
+      // and the claim, and between the claim and the settle — after the call, where only an observation by request identity, never a
+      // second dispatch, may follow (07 "The client recovers the same command result by its idempotency identity. It must not repeat
+      // the external effect under a new key"; 10 "An ambiguous external effect requires reconciliation, not blind retry").
+      if (/^CMD0(28|29|33)-RACE$/.test(row.caseId)) {
+        assert.ok(
+          titles.some(
+            (t) =>
+              /crash before the intent commits/.test(t) &&
+              /crash between the intent commit and the claim/.test(t) &&
+              /between the claim and the settle/.test(t) &&
+              /(never creates a second|never dispatched again|never dispatches it again)/.test(t),
+          ),
+          `${row.caseId}: no cited test injects the crash on both sides of the intent commit and between the claim and the settle of the provider call`,
+        );
+      }
     }
   }
   // CMD034-OK maps an incident CMD034 itself raises, never the settlement comparison's FEE_MISMATCH (B09-F13)

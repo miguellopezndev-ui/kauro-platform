@@ -595,7 +595,9 @@ conflicting same-key request and crash at the intent/commit boundary"; 10 "Contr
 agency, stale version, duplicate request, changed-body same key, lost response, external uncertainty; D-CASEMAP-B1, B09-F7). For
 every command the RACE triad demonstrates: the identical retry replays (or resumes) the one operation; the same key with another
 request digest is 409 IDEMPOTENCY_CONFLICT and writes nothing; a crash injected at the intent/commit boundary (before T1 commits)
-leaves nothing and one after it converges to one effect under the same key — exactly as B06's journal and D-PROTO-B2 define.
+leaves nothing and one after it converges to one effect under the same key — exactly as B06's journal and D-PROTO-B2 define. A
+provider-effect command (CMD028, CMD029, CMD033) also injects the crash between the claim (T2) and the settle (T3), after the
+provider call, where the resume may only observe by the attempt's request identity and never dispatch again (D-CASEMAP-B1).
 
 ### CMD028 CreatePaymentOrder — POST /api/v1/quotes/{quoteId}/payment-orders — AGENCY_BILLING — scope AGENCY_HEADER — provider effect CREATE_ORDER
 
@@ -632,8 +634,10 @@ deliberate attempt.
   after it (transition lock); authority is only ever issued at capture under the same checks (KP004), so the order may exist and
   still never carry authority.
 - **RACE**: the identical retry replays or resumes the one operation; the same key with another termsHash is 409
-  IDEMPOTENCY_CONFLICT with no effect; a crash injected between T1's commit and T2 resumes to one provider order; two keys: the
-  second T1 fails `payment_orders_one_open_per_project` → PAYMENT_PENDING; an ambiguous creation is reconciled by request identity.
+  IDEMPOTENCY_CONFLICT with no effect; a crash injected before T1 commits leaves nothing; one between T1's commit and T2 resumes to
+  one provider order; one between T2 and T3 — after the provider call — resumes by observing the order under the attempt's request
+  identity and never creates a second one; two keys: the second T1 fails `payment_orders_one_open_per_project` → PAYMENT_PENDING;
+  an ambiguous creation is reconciled by request identity.
 
 ### CMD029 CapturePayment — POST /api/v1/payment-orders/{orderId}/capture — AGENCY_BILLING — scope AGENCY_HEADER — provider effect CAPTURE
 
@@ -661,7 +665,9 @@ filed. **T4**: 200 `CapturePaymentView { order, capture, commercialAuthorization
   result is UNCERTAIN (202), never authority; the request handlers' role cannot write a capture or an authorization at all
   (D-AUTH-B4); the database refuses any authorization without a completed capture that alone pays the obligation (KP004).
 - **RACE**: the identical retry replays or resumes; the same key with another providerApprovalRef is 409 IDEMPOTENCY_CONFLICT with
-  no effect; a crash between T1's commit and T2 and one between T3 and T4 converge to one capture and one authorization; capture
+  no effect; a crash before T1 commits leaves nothing; a crash between T1's commit and T2, one between T2 and T3 (after the provider
+  call: the resume observes the capture by the attempt's request identity and never dispatches again) and one between T3 and T4
+  converge to one capture and one authorization; capture
   vs webhook of the same capture: both serialize on the order row; the second sees the first's fact (DUPLICATE), one authorization
   (`one_per_quote`, `one_live_per_capture`). Two capture commands: one live CAPTURE attempt per order (unique) → PAYMENT_PENDING.
   Capture vs quote supersession: `quotes_release_guard` waits and refuses the release.
@@ -754,8 +760,9 @@ same SERVICE principal).
   capture lapses it); "Timeout stays UNCERTAIN with no blind duplicate financial effect": a second execute while UNCERTAIN is
   refused until reconciled; the one-live-attempt index and the request identity make a duplicate dispatch impossible.
 - **RACE**: the identical retry resumes the same operation; the same key with another expectedVersion is 409
-  IDEMPOTENCY_CONFLICT with no effect; a crash between T1's commit and T2 resumes to one provider refund; two executes: T2's CAS
-  admits one claimant; the other observes the live attempt (PAYMENT_PENDING).
+  IDEMPOTENCY_CONFLICT with no effect; a crash before T1 commits leaves nothing; one between T1's commit and T2 resumes to one
+  provider refund; one between T2 and T3 (after the provider call) observes the refund by the attempt's request identity and never
+  dispatches it again; two executes: T2's CAS admits one claimant; the other observes the live attempt (PAYMENT_PENDING).
 
 ### CMD034 ReconcilePayment — POST /api/v1/payment-orders/{orderId}/reconcile — PAYMENT_SERVICE — scope STORED_OPERATION
 
@@ -960,7 +967,7 @@ documented as served, a duplicate operationId and a forbidden member (`tools/tes
 | D-API-B1 | Designed routes are documented as planned operations until served | 10 "OpenAPI is generated from the owning contract registry and checked against actual routes" — a planned route is not an actual route |
 | D-CONS-B1 | FINANCE, FISCAL, PAYMENT_SERVICE consumers in the payment service, idempotent by source identity and uniqueness | 07 "Outbox, inbox and event ordering" |
 | D-LABEL-B1 | The refund reason is a label: stored and answered, covered by the authorization digest, never in an event | B06 D-API-1, D-LABEL-1 |
-| D-CASEMAP-B1 | Every DENY and RACE test title of CMD028–CMD034 in the case map states its registry scenario verbatim (foreign tenant, wrong role or service identity, one missing prerequisite; identical retry, same key with another digest → IDEMPOTENCY_CONFLICT, crash at the intent/commit boundary); `tools/test/b09-case-map.test.mjs` enforces it | B09-F7; registry cases.json scenarios; 10 "Contract tests and compatibility" |
+| D-CASEMAP-B1 | Every DENY and RACE test title of CMD028–CMD034 in the case map states its registry scenario verbatim (foreign tenant, wrong role or service identity, one missing prerequisite; identical retry, same key with another digest → IDEMPOTENCY_CONFLICT, crash at the intent/commit boundary); the RACE of a provider-effect command (CMD028, CMD029, CMD033) injects the crash on both sides of the intent commit and between the claim and the settle, after the provider call, where only an observation by request identity may follow; `tools/test/b09-case-map.test.mjs` enforces both | B09-F7 (its fix names "a crash injected between intent commit and claim, and between claim and settle"); registry cases.json scenarios; 10 "Contract tests and compatibility" (lost response, external uncertainty); 07 "It must not repeat the external effect under a new key" |
 
 ## 13. Open questions for the authority
 
@@ -1070,9 +1077,17 @@ other's tables; each port below is the seam.
    rows (the DatasetRevision owners B07 revised) with B09's twelve machines and the CostGrant re-assignment (B09-F17); both
    documents are regenerated (`pnpm run openapi:generate`, `pnpm run matrix:generate`) on the merged tree and checked by verify.
 9. **Persistence harness and fixtures** (`@kauro/persistence/testing`): B07 adds the source-lifecycle fixture (`sealSourceRevision`,
-   …) and B09 the payment login, pool and contexts; both extend `harness.ts`, `temporary-postgres.ts` (logins) and `index.ts`. B09's
-   commerce fixtures (`test/commerce-support.ts`) seal sources through B06's `sealedSource` and `replacementSource`; after the merge
-   they should seal through B07's fixture so that the retention record exists (the exact source binding of item 5 needs it).
+   `sealReadyRevision`, `expireSealedRevision`, …) and B09 the payment login, pool and contexts; both extend `harness.ts`,
+   `temporary-postgres.ts` (logins) and `index.ts` — the merge keeps both sets of logins and contexts. B07 changes the shared test
+   helpers of `packages/persistence/test/support.ts`: `sealedSource(clients: SourceClients, …)` and `plan(clients, …)` take
+   `{ app, control }` and seal through the lifecycle (its restrictive tenant target states, D-ROLE-2, and the lifecycle guard refuse
+   a tenant that walks a revision to SEALED by itself). B09's commerce fixtures (`test/commerce-support.ts`: `approvedSubject`,
+   `replacementSource`, and the `b09-migrations` / `b09-critique` call sites) call `sealedSource(app, …)` and `plan(app, …)` and walk
+   the replacement revision directly; on the merged tree the integrator passes `{ app, control }`, creates the replacement as B07's
+   CMD012 does (a DRAFT naming `supersedes_revision_id`, the predecessor SEALED → SUPERSEDED in the same transaction) and seals it
+   through B07's fixture, so the retention record exists (the exact source binding of item 5 needs it) and the re-binding's lineage
+   check (`purchase_rebindings_guard`, which reads only `supersedes_revision_id` and the replacement's SEALED state) sees the
+   lifecycle's own rows. The B09 assertions are unchanged; only the fixtures move.
 10. **Runtime boundary matrix** (`test/fixtures/runtime-boundary.json`): regenerated from the merged catalog and reviewed; every
     entry of each package must be unchanged except the ones item 2 names.
 11. **B08 edges and ports**: B08's migration grants its execution-control role the consumption edges of
@@ -1091,13 +1106,13 @@ commerce-critique.test.ts`, `packages/application/test/commerce-contracts.test.t
 
 | finding | severity | disposition | evidence |
 |---|---|---|---|
-| B09-F1 request handlers mint provider facts and authority | BLOCKING | FIXED (D-AUTH-B4, D-PROTO-B5) | 0011 policies and column grants (tenant intent/claim only; payment writes captures, observations, results, authorizations), 0012 (no tenant case opening), 0009 scope policies; `protocol.ts` T3/T4, `contracts.ts` `settleRuntimeRole`; fixtures settle T3 as the payment service. Test "B09-F1: the request handlers cannot mint provider facts or execution authority …" performs P1 and every other forbidden write as `kauro_app_test` (42501 or no row) |
+| B09-F1 request handlers mint provider facts and authority | BLOCKING | FIXED (D-AUTH-B4, D-PROTO-B5) | 0011 policies and column grants (tenant intent/claim only; payment writes captures, observations, results, authorizations), 0012 (no tenant case opening), 0009 scope policies; `protocol.ts` T3/T4, `contracts.ts` `settleRuntimeRole`; fixtures settle T3 as the payment service. Test "B09-F1: the request handlers cannot mint provider facts or execution authority …" performs P1 and every other forbidden write as `kauro_app_test` — the provider identity, an attempt's result, a capture fact, its status, funds and fee, the order's allocation, an observation, a REFUND attempt, a case, a server refund request, a provider scope key, a re-binding, an entitlement's issuance, consumption and revocation (42501, or no row for a result the claim policy does not admit) |
 | B09-F2 a paid, unentitled or refunded purchase locks the project | MAJOR | FIXED (D-QUOTE-B4, D-QUOTE-B6) | 0012 `quotes_release_guard` (closed purchase or re-bound), 0010 replacement quotes, 0011 `purchase_rebindings` + guard + completeness + authorization re-binding; domain `quoteRelease`, `replacementBlockers`; port `PurchaseRebinder`. Tests "B09-F2 (remedy path): …" (P2 reproduced, then released) and "B09-F2 (replacement path): …" |
 | B09-F3 two server refund requests abort the reconcile | MAJOR | FIXED (D-REF-B1) | 0012 `refunds_one_requested_per_origin`; port `fileServerRequest`. Test "B09-F3: an overpaid capture whose subject no longer binds files its EXCESS_CAPTURE and KAURO_REMEDY requests …" (P6 reproduced, committed) |
 | B09-F4 invoice unvalidatable after a re-review | MAJOR | FIXED (D-FISC-B4) | 0013 `tax_documents_validation_guard` (in force at the tax point); domain `profileInForceAt`, `resolveFiscalTreatment`; port `profileInForceAt`. Tests "B09-F4: an invoice validates under the profile version in force …" (P3 reproduced, validates) and domain "B09-F4 (D-FISC-B4): …" |
 | B09-F5 no deliverable-capacity precondition | MAJOR | FIXED (D-CAP-B1) | domain `checkoutBlockers` (DELIVERY_CAPACITY_UNAVAILABLE → CAPACITY_UNAVAILABLE), `DeliveryCapacityPort` (B08 adapter), outcomes of CMD028/CMD029. Tests domain "B09-F5 (D-CAP-B1): …", application "B09-F1/B09-F5/B09-F6: …"; the command DENY test is planned in the case map (M3, labelled fake) |
 | B09-F6 partial-refund tax allocation unspecified | MAJOR | FIXED (D-REF-B6) | domain `taxRemainingAfter`, `refundTaxFor`, `checkRefundTax`; 0012 `kauro.refund_tax_remaining` + ceiling (KP012); outcome REFUND_TAX_INCONSISTENT. Tests domain "B09-F6 (D-REF-B6): … 19% rule … one-cent sequence …" and database "B09-F6: an approval whose tax does not follow its service …" |
-| B09-F7 mapped titles miss the registry DENY/RACE scenarios | MAJOR | FIXED (D-CASEMAP-B1) | `docs/design/B09-case-map.md` (every CMD028–CMD034 DENY and RACE title states the scenario), §8 triads. Test `tools/test/b09-case-map.test.mjs` "B09-F7: …" (fails on the reviewed case map) |
+| B09-F7 mapped titles miss the registry DENY/RACE scenarios | MAJOR | FIXED (D-CASEMAP-B1) | `docs/design/B09-case-map.md` (every CMD028–CMD034 DENY and RACE title states the scenario; the RACE of CMD028, CMD029 and CMD033 crashes before the intent commits, between the intent commit and the claim, and between the claim and the settle), §8 triads. Tests `tools/test/b09-case-map.test.mjs` "B09-F7: …" (the second fails on the reviewed case map, and on a provider-effect RACE title without the claim/settle crash) |
 | B09-F8 a later fee re-publishes capture.completed.v1 | MAJOR | FIXED (D-EVT-B2) | event types `capture.fee_observed.v1`, `capture.funds_observed.v1` (FINANCE only); 0011 funds no longer version-exempt, `domain_events_capture_completed_once`. Tests "B09-F8/B09-F15: a funds availability and a fee learned after the completion are capture versions …" and domain "B09-F8/B09-F15 (D-EVT-B2): …" |
 | B09-F9 mismatches outside the webhook have no exception; vocabularies differ | MAJOR | FIXED (D-ING-B3) | 0012 `provider_event_exceptions` source-agnostic (webhook, attempt or artifact; attribution), kinds + WRONG_PROVIDER, WRONG_ORDER; domain `PROVIDER_EXCEPTION_KINDS`, `CAPTURE_MISMATCHES`; port `ProviderExceptionRepository`. Tests "B09-F9: a mismatched capture response …" and domain "B09-F9 (D-ING-B3): …" |
 | B09-F10 quote under an unknown policy unchecked | MINOR | FIXED (D-QUOTE-B5, D-QUOTE-B7) | 0010 `price_policies`, policy foreign keys, `quotes_source_window`, `quotes_source_binding`, snapshot `as_of` = `issued_at`; ports `SourceAvailabilityReader`. Test "B09-F10: a quote under an unknown price policy …" (P4 reproduced, refused) |
@@ -1119,4 +1134,6 @@ fails "B09-F8/B09-F15"; WRONG_PROVIDER and WRONG_ORDER removed from the exceptio
 dropped fails "B09-F10"; the scope key binding disabled fails "B09-F11"; `interval '336 hours'` back to `'14 days'` fails
 "B09-F12"; DISPUTE_OPEN removed fails "B09-F14"; the ledger source binding disabled fails "B09-F15" and "B09-F8/B09-F15"; a debit
 note validated fails "B09-F16". The case-map test fails on the reviewed case map (`8a282bc`) with "CMD028-DENY: no cited test
-demonstrates the scenario …". Every other critique test stays green under each mutation.
+demonstrates the scenario …", and on this revision's first case map (`b6adfdb`, whose provider-effect RACE titles named only the
+crash between the intent commit and the claim) with "CMD028-RACE: no cited test injects the crash on both sides of the intent
+commit and between the claim and the settle of the provider call". Every other critique test stays green under each mutation.
