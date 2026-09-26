@@ -163,6 +163,15 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/agencies/:agencyId/members", "ListMembers", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListMembers" } }],
       ["GET", "/api/v1/agencies/:agencyId/clients", "ListClients", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListClients" } }],
       ["GET", "/api/v1/projects/:projectId", "GetProject", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetProject" } }],
+      // package B09's request side (M4, D-REQ-B7): a provider command declares its 202 accepted observation beside its success
+      ["POST", "/api/v1/quotes/:quoteId/payment-orders", "CreatePaymentOrder", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD028" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/capture", "CapturePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD029" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/projects/:projectId/refund-requests", "RequestRefund", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD031" } }],
+      ["POST", "/api/v1/refunds/:refundId/approve", "ApproveRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD032" } }],
+      ["GET", "/api/v1/quotes/:quoteId", "GetQuote", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetQuote" } }],
+      ["GET", "/api/v1/payment-orders/:orderId", "GetPaymentOrder", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetPaymentOrder" } }],
+      ["GET", "/api/v1/refunds/:refundId", "GetRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefund" } }],
+      ["GET", "/api/v1/operations/refunds/:refundId", "GetRefundReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefundReview" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request
