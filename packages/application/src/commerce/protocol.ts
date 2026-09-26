@@ -36,9 +36,12 @@
  * crash at the intent/commit boundary (before T1 commits) leaves nothing, and the retry is a new execution.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { CausationId, CommerceUnitOfWork, JournalEntryId, PaymentAttemptRecord } from "@kauro/domain";
+import type { CausationId, CommerceUnitOfWork, JournalEntryId, PaymentAttemptRecord, ProviderRequest } from "@kauro/domain";
 import type { CommandResult } from "../api/envelope.js";
-import type { ProviderDispatchResult } from "./ports.js";
+import type { ProviderDispatchResult, ProviderOrderObservation } from "./ports.js";
+
+/** The provider effect of a command (the attempt's operation). */
+export type ProviderEffect = "CREATE_ORDER" | "CAPTURE" | "REFUND";
 
 /** The durable operation a T1 created: what a retry with the same key resumes. */
 export interface DurableOperation {
@@ -46,6 +49,12 @@ export interface DurableOperation {
   readonly attempt: PaymentAttemptRecord;
   /** The aggregate the command answers about (order or refund), for the 202 operation reference and status path. */
   readonly resource: { readonly kind: "payment_order" | "refund"; readonly id: string; readonly statusPath: string };
+  /**
+   * The provider identities a read-only observation of the operation needs outside any transaction (D-CORE-B4): the provider order
+   * of a capture, the provider capture of a refund. The runtime's `operationOf` fills them from durable facts.
+   */
+  readonly providerOrderId?: string;
+  readonly providerCaptureId?: string;
 }
 
 /** What T1 decided: a durable operation to dispatch, or a final answer that needs no provider call (e.g. already settled). */
@@ -57,12 +66,20 @@ export type IntentOutcome<View> =
 export interface DispatchTicket {
   readonly attempt: PaymentAttemptRecord;
   readonly deadline: UtcInstant;
+  /**
+   * The exact request the attempt may send, re-prepared from durable facts in the claim's unit of work and checked against the
+   * attempt's recorded request hash (a request whose digest differs is never sent; D-CORE-B4).
+   */
+  readonly request: ProviderRequest;
 }
 
 export interface SettleInput {
   readonly operation: DurableOperation;
-  /** A dispatch result, or an observation turned into the same shape by the reconciler; null when nothing conclusive is known. */
-  readonly result: ProviderDispatchResult | null;
+  /**
+   * A dispatch result, or a read-only observation of the provider's view of the order (the resume's read by the attempt's request
+   * identity or of the provider order; applied by the same reconciler); null when nothing conclusive is known.
+   */
+  readonly result: ProviderDispatchResult | ProviderOrderObservation | null;
   readonly now: UtcInstant;
   readonly causationId: CausationId;
 }
@@ -84,8 +101,8 @@ export interface ProviderCommandPhases<Body, View> {
   intent(uow: CommerceUnitOfWork, body: Body, causationId: CausationId, now: UtcInstant): Promise<IntentOutcome<View>>;
   claim(uow: CommerceUnitOfWork, operation: DurableOperation, now: UtcInstant): Promise<DispatchTicket | null>;
   dispatch(ticket: DispatchTicket): Promise<ProviderDispatchResult>;
-  /** A read-only provider observation of the operation, classified into a dispatch result when conclusive. */
-  observe(operation: DurableOperation): Promise<ProviderDispatchResult | null>;
+  /** A read-only provider observation of the operation (by the attempt's request identity or the provider order), or null when inconclusive. */
+  observe(operation: DurableOperation): Promise<ProviderDispatchResult | ProviderOrderObservation | null>;
   /** T3, in a SERVICE unit of work under kauro_payment that adopted the operation's agency (adoptScope PAYMENT_ORDER / REFUND). */
   settle(serviceUow: CommerceUnitOfWork, input: SettleInput): Promise<SettleOutcome<View>>;
   /** T4, in the principal's unit of work: completes the journal entry (COMMITTED or UNCERTAIN) from the settled facts; idempotent. */

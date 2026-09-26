@@ -98,6 +98,11 @@ export type ProviderDispatchResult =
 /** An authenticated read of the provider's current state of an order (the reconciler's only instrument). */
 export interface ProviderOrderObservation {
   readonly providerOrderId: string | null;
+  /**
+   * The provider-hosted approval page of the order, when the provider's view names one (the order's approve link); a creation whose
+   * response was lost is learned from this view with it (the reconciler keeps it only on an allowlisted host; D-CORE-B3).
+   */
+  readonly approvalUrl?: string;
   readonly orderStatus: "CREATED" | "APPROVED" | "VOIDED" | "EXPIRED" | "COMPLETED" | "NOT_FOUND" | "UNRECOGNIZED";
   readonly captures: ReadonlyArray<ObservedCapture>;
   readonly refunds: ReadonlyArray<ObservedRefund>;
@@ -256,7 +261,11 @@ export type ServiceDecision = { readonly kind: "ALLOW"; readonly serviceId: stri
  * Every DENY is recorded as a durable security fact by the runtime (B06 D-FACT-1; D-FACT-B1 for the new streams).
  */
 export interface CommerceAuthorizer {
-  authorizeOperator(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts; readonly role: "KAURO_OWNER" }): Promise<OperatorDecision>;
+  /**
+   * `storedOperation`, when the command is keyed by one (CMD032: the refund; GetRefundReview), is resolved through the scope index
+   * after the grant and adopted as the operator's finance scope — NOT_FOUND alike for a foreign and an unknown key (design §3.4).
+   */
+  authorizeOperator(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts; readonly role: "KAURO_OWNER"; readonly storedOperation?: { readonly kind: "REFUND"; readonly key: string } }): Promise<OperatorDecision>;
   assureOperator(uow: CommerceUnitOfWork, request: { readonly userId: string; readonly authorizationRef: string; readonly covers: (policyId: RefundPolicyId) => Promise<boolean> }): Promise<OperatorAssurance>;
   authorizeService(request: { readonly identity: ServiceIdentity; readonly role: ServiceRole; readonly deploymentEnvironment: "LOCAL" | "SANDBOX" | "LIVE" }): ServiceDecision;
 }
@@ -275,6 +284,12 @@ export interface ReconcileResult {
   readonly authorizationIssued: CommercialAuthorizationId | null;
   /** The event of the first fact the observation changed (the inbox record's result event when it is APPLIED), or null. */
   readonly resultEventId: EventId | null;
+  /**
+   * D-PAY-B6 (residual FINAL-N2): the observation reported a completion without the provider's completion instant — the sale's tax
+   * point — so nothing of it was applied; the caller obtains a stored provider query of the order and applies it (CMD034). A stored
+   * query that lacks the instant too opens PROVIDER_INCONSISTENCY instead, and this stays false.
+   */
+  readonly providerQueryRequired: boolean;
 }
 
 /**
@@ -387,7 +402,7 @@ export interface SourceLineageReader {
 
 /**
  * The included pre-execution source replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18; registry
- * R2-092, owned by the recurrence package B10): implemented by B09 (mandate M2) and called by B10's replacement flow once the new
+ * R2-092, owned by the recurrence package B10): implemented by B09 (the stage-2 mandate M3, design §14) and called by B10's replacement flow once the new
  * revision is sealed, its plan approved and the replacement quote issued. It runs in a SERVICE unit of work under kauro_payment (only
  * the payment service revokes and issues entitlements, B09-F1): records the re-binding, revokes the replaced entitlement
  * (SOURCE_REPLACED, PRE_EXECUTION), supersedes the replaced quote, accepts the replacement and issues its entitlement bound to the same

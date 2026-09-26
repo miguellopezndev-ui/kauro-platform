@@ -13,6 +13,10 @@
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
+    "./testing": {
+      "types": "./dist/src/commerce/testing/index.d.ts",
+      "default": "./dist/src/commerce/testing/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

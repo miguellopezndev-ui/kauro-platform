@@ -110,6 +110,13 @@ changed-body same key, lost response, external uncertainty).
   ledger post that write nothing, cases — "B09-FINAL-N1 (D-BIND-B2): …" —, fiscal documents, the payment inbox). The fixtures of
   `test/commerce-support.ts` write every aggregate that has an adapter through it; `b09-migrations` (16) and `b09-critique` (20)
   pass unchanged.
+- The commerce core and its contract fakes (stage 1, mandate M2; design §14, D-CORE-B1..B5, D-PAY-B6): `packages/application/test/commerce-planners.test.ts`
+  (the pure planners — planObservation, planPostings, planFiscalDocument, nextProtocolStep — as units),
+  `packages/application/test/commerce-core.test.ts` (the reconciler, the provider-effect runtime with crash injection at every
+  protocol point, and the commerce authorizer, over the in-memory commerce store: pure orchestration under B06's rule, never case
+  evidence) and `packages/application/test/commerce-fakes.test.ts` (contract tests of every labelled contract fake, SIMULATED, and
+  the proof that no fake is reachable from production wiring). No case row cites them: the case evidence is the database level
+  above and the stage-2 command tests through the routes, which bind these executors and fakes.
 - The foundation's registry: `packages/persistence/test/aggregate-kinds.test.ts` :: "only the migration owner writes the registry:
   every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the event inserters (the request handlers; package B09's
   payment service) read it, and the owner can register but never rewrite or remove a kind" (FOUNDATION §4, extended by B09).

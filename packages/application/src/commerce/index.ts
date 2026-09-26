@@ -1,8 +1,10 @@
 /**
  * Application contracts of the payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md): the seven command
  * specs, the DTO views and their closed response schemas, the closed request schemas, the outcome catalogues, the
- * provider/fiscal/evidence/service ports, the commerce authorizer port and the provider-effect protocol. The handlers, the
- * runtime and the routes are implementation mandates M2 and M3.
+ * provider/fiscal/evidence/service ports, the commerce authorizer port and the provider-effect protocol; and the commerce core
+ * (implementation mandate M2: the planners, the reconciler, the provider-effect runtime, the commerce authorizer). The command
+ * halves, the consumers and the routes are implementation mandates M3 and M4; the labelled contract fakes are the test-only subpath
+ * @kauro/application/testing.
  */
 export type {
   CommerceCommandId,
@@ -100,5 +102,8 @@ export type {
   SourceLineageReader,
   PurchaseRebinder,
 } from "./ports.js";
-export type { DurableOperation, IntentOutcome, DispatchTicket, SettleInput, SettleOutcome, ProviderCommandPhases } from "./protocol.js";
+export type { ProviderEffect, DurableOperation, IntentOutcome, DispatchTicket, SettleInput, SettleOutcome, ProviderCommandPhases } from "./protocol.js";
 export { DISPATCH_TIMEOUT_SECONDS, DISPATCH_WATCHDOG_MARGIN_SECONDS, MAX_ATTEMPTS_PER_OPERATION, PENDING_POLL_AFTER_SECONDS } from "./protocol.js";
+
+// the commerce core (implementation mandate M2; design §5, §6, §8.1)
+export * from "./core/index.js";
