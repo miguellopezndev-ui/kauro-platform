@@ -107,3 +107,16 @@ export { DISPATCH_TIMEOUT_SECONDS, DISPATCH_WATCHDOG_MARGIN_SECONDS, MAX_ATTEMPT
 
 // the commerce core (implementation mandate M2; design §5, §6, §8.1)
 export * from "./core/index.js";
+
+// the served B09 routes and the request side (implementation mandate M4; design §8, §8.3, §10, §14; D-REQ-B1..B7)
+export type { CommerceServedRouteCommandId } from "./served.js";
+export {
+  COMMERCE_SERVED_COMMAND_IDS,
+  COMMERCE_SERVED_READ_IDS,
+  COMMERCE_COMMAND_EVENTS,
+  isServedCommerceCommand,
+  isServedCommerceRead,
+  commerceCommandRouteResponses,
+  commerceReadRouteResponses,
+} from "./served.js";
+export * from "./request/index.js";

@@ -13,6 +13,8 @@ import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
 import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
+import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
+import { buildCommerceResponseSchemas } from "../commerce/response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -91,10 +93,21 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  // package B09: the payment commands' closed request schemas and the envelopes of their replies and reads (D-REQ-B7), derived
+  // under the same rules; an id or a view that collided with a B06 one would be an integrity failure
+  for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 request schema ${id} collides with a B06 one`);
+    roots[id] = schema;
+  }
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
+  const commerce = buildCommerceResponseSchemas(bundle);
+  for (const id of Object.keys(commerce.roots)) if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 response schema ${id} collides with a B06 one`);
+  for (const name of Object.keys(commerce.defs)) if (name in responses.defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 view ${name} collides with a B06 one`);
+  Object.assign(roots, commerce.roots);
   roots["Problem"] = PROBLEM_SCHEMA;
-  const compiled: CompiledSchemaSet = compileSchemaBundle({ defs: { ...bundle.$defs, ...responses.defs }, roots });
+  const compiled: CompiledSchemaSet = compileSchemaBundle({ defs: { ...bundle.$defs, ...responses.defs, ...commerce.defs }, roots });
   const known = compiled.ids as ReadonlyArray<KnownSchemaId>;
   return {
     knownSchemaIds: known,
