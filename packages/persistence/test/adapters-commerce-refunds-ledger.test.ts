@@ -297,6 +297,30 @@ test("reconciliation cases open once per kind and subject: a repeated opening an
   await assert.rejects(adopted(orderId, (uow) => uow.commerce.cases.open(entry(ids.next() as ReconciliationCaseId, other.captureId))), (e: unknown) => failure(e).code === "INTEGRITY_FAILURE");
 });
 
+test("B09-FINAL-N1 (D-BIND-B2): a case that names a refund and a capture names the refund's own capture even when it names no order — the refund of one purchase beside the capture of another is refused as an integrity failure and writes nothing; the refund with its own capture opens", async () => {
+  const { h, A } = env;
+  const x = await paid(env, A, "cases-final-n1-x");
+  const y = await paid(env, A, "cases-final-n1-y");
+  const refundX = (await requestRefund(env.app, A, x.order, x.captureId, { serviceCents: 1000, taxCents: 0 })) as RefundId;
+  const orderless = (caseId: ReconciliationCaseId, captureId: string) => ({
+    caseId,
+    agencyId: A.agencyId,
+    captureId: captureId as CaptureId,
+    refundId: refundX,
+    kind: "PROVIDER_INCONSISTENCY" as const,
+    detailCode: "REFUND_CAPTURE_CONTRADICTION",
+    evidenceHash: sha(`final-n1-${caseId}`),
+    openedAt: clock.now(),
+  });
+  // every key of the migration's first form carried the order, so a NULL order skipped all three (MATCH SIMPLE) and this committed
+  const crossed = ids.next() as ReconciliationCaseId;
+  await assert.rejects(adopted(y.order.orderId, (uow) => uow.commerce.cases.open(orderless(crossed, y.captureId))), (e: unknown) => failure(e).code === "INTEGRITY_FAILURE");
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.reconciliation_cases WHERE case_id = $1", [crossed])).rows[0].n, 0);
+  const own = ids.next() as ReconciliationCaseId;
+  const opened = await adopted(x.order.orderId, (uow) => uow.commerce.cases.open(orderless(own, x.captureId)));
+  assert.deepEqual([opened.opened, opened.record.caseId, opened.record.captureId, opened.record.refundId, opened.record.orderId], [true, own, x.captureId, refundX, undefined]);
+});
+
 test("fiscal documents: the drafter reads the sale's profile version at the capture's completion (saleProfileAt keeps the reviewed version current then, whatever was recorded later), a blocked draft is listed and re-drafted under the reviewed version (tax_document.drafted.v1 again), validated with the database's re-check and issued; a credit note of a completed refund carries the invoice's snapshot, is found by its refund and validates against the ISSUED invoice", async () => {
   const { h } = env;
   const E = await h.createAgency(await h.person("ernesto-fiscal"), "Fiscal E");

@@ -13,7 +13,7 @@
 -- verified event no order can take is kept for review), TRANSITIONS "Cross-aggregate finalization" (capture confirmation can create
 -- financial facts even when source expiry prevents execution; offer the documented reupload/reapproval or refund path), registry
 -- contract Refund; scenarios S058, S059, R2-081, R2-140. Design: docs/design/B09-payments-fiscal.md (D-MACH-B5, D-MACH-B6,
--- D-REF-B1..B6, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2, D-EVT-B3, D-BIND-B2).
+-- D-REF-B1..B6, D-AUTHZ-B2, D-ING-B2, D-ING-B3, D-QUOTE-B4, D-DISPUTE-B1, D-SCOPE-B2, D-EVT-B3, D-BIND-B2, D-BIND-B3).
 
 -- --- refunds (platform machine Refund, D-MACH-B5) ---------------------------------------------------------------------------------------
 -- A refund of one capture: requested by the agency (CUSTOMER_REQUEST, CMD031), by the reconciler for an overpayment
@@ -69,6 +69,8 @@ CREATE TABLE kauro.refunds (
   -- binding targets of payment_attempts_refund_fk, commerce_scopes_refund_fk and tax_documents_refund_fk
   CONSTRAINT refunds_order_binding UNIQUE (agency_id, refund_id, order_id),
   CONSTRAINT refunds_document_binding UNIQUE (agency_id, refund_id, order_id, capture_id),
+  -- binding target of reconciliation_cases_refund_own_capture_fk (a case naming a refund and a capture without its order)
+  CONSTRAINT refunds_capture_binding UNIQUE (agency_id, refund_id, capture_id),
   -- the refunded capture is a capture of the order, and the order is the project's, under the terms it was sold with
   FOREIGN KEY (agency_id, capture_id, order_id) REFERENCES kauro.capture_facts (agency_id, capture_id, order_id),
   CONSTRAINT refunds_order_fk FOREIGN KEY (agency_id, order_id, project_id, terms_hash, provider, environment)
@@ -410,7 +412,10 @@ CREATE TABLE kauro.reconciliation_cases (
   CONSTRAINT reconciliation_cases_amount_currency CHECK ((amount_cents IS NULL) = (currency IS NULL)),
   CONSTRAINT reconciliation_cases_resolution CHECK (
     (state = 'RESOLVED') = (resolved_at IS NOT NULL) AND (resolved_at IS NULL) = (resolution_code IS NULL) AND (resolved_at IS NULL) = (resolved_by_user_id IS NULL)
-  )
+  ),
+  -- the keys above all carry the order, so a case that names no order skips them (MATCH SIMPLE): its refund is still a refund of
+  -- its capture whenever it names both (re-check residual FINAL-N1; implementation mandate M1, D-BIND-B2)
+  CONSTRAINT reconciliation_cases_refund_own_capture_fk FOREIGN KEY (agency_id, refund_id, capture_id) REFERENCES kauro.refunds (agency_id, refund_id, capture_id)
 );
 CREATE UNIQUE INDEX reconciliation_cases_one_open ON kauro.reconciliation_cases (
   agency_id, kind,

@@ -191,7 +191,7 @@ test("SQLSTATE translation of the commerce constraints: a second open checkout i
     assert.deepEqual([f?.code, f?.details.reason], [failureCode, reason], code);
   }
   const checks = ["payment_attempts_dispatch_deadline_bound", "fiscal_profiles_supersession_lineage", "ledger_entries_funds_accounts", "ledger_entries_bank_accounts"];
-  const keys = ["fiscal_profiles_successor_fk", "provider_observations_attempt_fk", "capture_facts_attempt_fk", "provider_event_exceptions_attempt_fk", "reconciliation_cases_capture_order_fk", "reconciliation_cases_refund_order_fk", "reconciliation_cases_refund_capture_fk"];
+  const keys = ["fiscal_profiles_successor_fk", "provider_observations_attempt_fk", "capture_facts_attempt_fk", "provider_event_exceptions_attempt_fk", "reconciliation_cases_capture_order_fk", "reconciliation_cases_refund_order_fk", "reconciliation_cases_refund_capture_fk", "reconciliation_cases_refund_own_capture_fk"];
   for (const c of checks) assert.equal(failureOfSqlState(SQLSTATE.CHECK_VIOLATION, c)?.code, "INTEGRITY_FAILURE", c);
   for (const c of keys) assert.equal(failureOfSqlState(SQLSTATE.FOREIGN_KEY_VIOLATION, c)?.code, "INTEGRITY_FAILURE", c);
   // B06's own translation is unchanged: another check is a request error, another key an unknown reference

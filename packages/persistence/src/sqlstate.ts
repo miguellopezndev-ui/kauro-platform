@@ -154,6 +154,7 @@ export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
   "reconciliation_cases_capture_order_fk",
   "reconciliation_cases_refund_order_fk",
   "reconciliation_cases_refund_capture_fk",
+  "reconciliation_cases_refund_own_capture_fk",
 ]);
 
 /**
