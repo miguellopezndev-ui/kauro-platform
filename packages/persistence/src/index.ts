@@ -26,7 +26,7 @@ export { SQLSTATE, failureOfSqlState, commerceReplayOf, COMMERCE_REPLAY_CONSTRAI
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -48,3 +48,11 @@ export { PgRefundRepository, PgReconciliationCaseRepository, PgProviderException
 export { PgTaxDocumentRepository, PgLedgerRepository, PgSettlementRepository, PgPaymentInboxRepository } from "./repositories/commerce-finance.js";
 export { PgCommercialInspections } from "./repositories/commerce-inspections.js";
 export type { CommercialConsequence } from "./repositories/commerce-inspections.js";
+// the payment service's side (package B09, stage-2 mandate M3): the column-scoped purchased subject (D-CORE-B2), the periodic
+// pass's queries (D-PROTO-B4) and the provider ingress's own security facts (D-FACT-B1)
+export { PgPurchasedSubjects } from "./repositories/commerce-subject.js";
+export type { PurchasedSubjectFacts, QuotedSubject } from "./repositories/commerce-subject.js";
+export { PgPaymentSweeps } from "./repositories/commerce-sweeps.js";
+export type { AgencyWithPayments, SweptAttempt } from "./repositories/commerce-sweeps.js";
+export { PgIngressFactRecorder } from "./ingress-facts.js";
+export type { IngressFact, IngressFactRecorder } from "./ingress-facts.js";

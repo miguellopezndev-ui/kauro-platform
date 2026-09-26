@@ -147,6 +147,20 @@ export interface ApiServerOptions {
   /** Key of the client-address hash; a fresh random key per process when absent (the admission limiter is process-local). */
   readonly clientAddressKey?: Uint8Array;
   readonly limits?: HttpLimits;
+  /**
+   * Registers the payment service's routes (package B09, stage-2 mandate M3: CMD030, CMD033, CMD034; payments/routes.ts) on the
+   * server, with the same transport pieces the command routes use (the problem sender, the single-valued header view, the
+   * internal-error sink and the framework-error answer). Every route declares its replies and passes the send guard.
+   */
+  readonly paymentRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
+}
+
+/** The transport pieces a route registered outside this module answers with (package B09's payment routes). */
+export interface RouteKit {
+  sendProblem(reply: FastifyReply, problem: Problem): FastifyReply;
+  singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>>;
+  readonly sink: (correlationId: string, error: unknown) => void;
+  answerFrameworkError(error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply;
 }
 
 export type CommandReply<View> = CompletedResponse<View> | AcceptedResponse | Problem;
@@ -410,6 +424,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
     registerRead(app, options, handler, sink);
   }
+  options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   return app;
 }
 

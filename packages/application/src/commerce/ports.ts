@@ -183,6 +183,12 @@ export interface ProviderEvidenceStore {
   readonly integrationClass: IntegrationClass;
   put(evidence: Omit<StoredEvidence, "artifactRef" | "sha256"> & { readonly bytes: Uint8Array }): Promise<{ readonly artifactRef: string; readonly sha256: Sha256Hex }>;
   get(artifactRef: string): Promise<StoredEvidence | null>;
+  /**
+   * The evidence stored under a content digest (the store is content-addressed): how the payment service's inbox worker finds the
+   * verified body of an inbox record, which keeps only the body's SHA-256 (B06 inbox_records.body_hash), to apply it after a crash
+   * between the ingress commit and the application (design §8 CMD030 RACE; decision D-M3-B2).
+   */
+  findByDigest(sha256: Sha256Hex): Promise<StoredEvidence | null>;
 }
 
 // --- fiscal document adapter / bridge ------------------------------------------------------------------------------------------------

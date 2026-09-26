@@ -48,3 +48,8 @@ export {
 export type { DatabaseHandle, DatabaseConfig, DatabaseDependencies, ApiAssembly, StartOptions, StartedApi } from "./composition.js";
 export { bootstrap, authenticatorOf, shutdownWithin } from "./bootstrap.js";
 export type { BootstrappedApi, BootstrapOptions, ShutdownOutcome } from "./bootstrap.js";
+// the payment service's side of package B09 (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8.2, §14)
+export * from "./payments/index.js";
+export { registerPaymentRoutes } from "./payments/routes.js";
+export type { PaymentRouteDependencies } from "./payments/routes.js";
+export type { RouteKit } from "./server.js";

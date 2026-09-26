@@ -33,6 +33,8 @@ import { activeWorkInspector, commercialConsequencesInspector, noExternalActions
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
+import type { PaymentService } from "./payments/index.js";
+import { registerPaymentRoutes } from "./payments/routes.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -189,9 +191,16 @@ export interface ApiAssembly {
    */
   readonly cursorKey?: Uint8Array;
   readonly limits?: HttpLimits;
+  /**
+   * The payment service of package B09 (payments/index.ts createPaymentService; stage-2 mandate M3): its routes — the provider
+   * webhook (CMD030), ExecuteRefund (CMD033), ReconcilePayment (CMD034) — are registered in every edition; without a bound payment
+   * service the webhook knows no provider and the service routes find no verified service identity (D-FAKE-B1: nothing in the
+   * product wiring binds a contract fake; the provider adapters are the integration package's, B15).
+   */
+  readonly payments?: PaymentService;
 }
 
-/** Binds the authorizer, the seven command handlers, the five reads and the HTTP server over an open unit-of-work factory. */
+/** Binds the authorizer, the seven command handlers, the five reads, the payment service's routes and the HTTP server over an open unit-of-work factory. */
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
@@ -211,15 +220,17 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const cursorKey = assembly.cursorKey ?? systemRandom(32);
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
+  const validator = assembly.validator ?? loadContractSchemas();
   return createApiServer({
     environment: assembly.environment,
     handlers: createB06Handlers(runtime, collaborators),
     reads: createReadHandlers({ unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey }),
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
-    validator: assembly.validator ?? loadContractSchemas(),
+    validator,
     clock,
     ids,
+    paymentRoutes: (app, kit) => registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) }),
     health: { readiness: () => assembly.database.readiness(), codeSchemaVersion: assembly.database.codeSchemaVersion, onNotReady: assembly.onNotReady ?? writeNotReady },
     ...(assembly.logger !== undefined ? { logger: assembly.logger } : {}),
     ...(assembly.onInternalError !== undefined ? { onInternalError: assembly.onInternalError } : {}),

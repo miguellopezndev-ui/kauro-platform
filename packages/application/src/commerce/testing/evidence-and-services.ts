@@ -59,6 +59,11 @@ export function createEvidenceStoreFake(options: { readonly clock: Clock }): Evi
       calls.push(Object.freeze({ port: "ProviderEvidenceStore", operation: "GET", identity: artifactRef, at: options.clock.now(), sent: true }));
       return stored.get(artifactRef)?.evidence ?? null;
     },
+    async findByDigest(sha256) {
+      // content-addressed: the reference is a function of the digest (stage-2 mandate M3, decision D-M3-B2)
+      calls.push(Object.freeze({ port: "ProviderEvidenceStore", operation: "FIND_BY_DIGEST", identity: sha256, at: options.clock.now(), sent: true }));
+      return stored.get(uuidV8Of(sha256))?.evidence ?? null;
+    },
     bytesOf(artifactRef) {
       const s = stored.get(artifactRef);
       return s === undefined ? null : Uint8Array.from(s.bytes);
