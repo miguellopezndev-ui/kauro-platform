@@ -880,6 +880,63 @@ VERIFY EXIT 0
 - When a stage-2 mandate writes a cited test, the integrator of `b07/integration` moves that row from SPECIFIED to EXECUTED_LOCAL
   or SIMULATED and updates the status table.
 
+### 16.3 Mandate B07-CONTROL on `b07/control`
+
+`b07/control` branches from `b07/stage-1` (`cfaf7a4`) and adds `apps/control` (`@kauro/control`, layer entrypoint): the outbox
+dispatcher over B06's `PgOutboxDispatchStore` and OUTBOX_DISPATCH leases (D-CTRL-4); the consumers UPLOAD_INSPECTION (§12.1,
+D-CTRL-6), SELECTION_EVALUATION (§12.2), STORAGE_LIFECYCLE (§12.3, D-CTRL-7) and AUTHORITY_JOURNAL (§12.4, D-CTRL-8); the six
+sweepers of `SOURCE_SWEEPERS` (§12.5); and the composition root (`assembleControlPlane`, `openControlDatabase`, `platformParsers`),
+which binds the verified `kauro_control` pool and the platform's own parsers and takes the provider ports from its caller. No
+production source of the package imports a test-only subpath (checked by `composition.test.ts` and the architecture gate). The tests
+bind the scanner fake of `@kauro/data-plane/testing` and the storage, vault and journal fakes of `@kauro/application/testing`
+(SIMULATED); no fake is created (`tools/test/b07-stage-one.test.mjs` passes unchanged).
+
+Edits outside `apps/control`, each recorded in the register:
+
+- `packages/domain/src/ports/source-store.ts` and `packages/persistence/src/source/inspection.ts`: the discovery reads
+  `SourceFileRepository.findRetentionEnded` and `admittedGenerations` (D-CTRL-5). Additive; no migration or grant changes.
+- `packages/persistence/src/source/objects.ts`: the retained check of `requestDeletion` also follows `source_files.accepted_object_id`
+  (D-CTRL-3). Revert proof: with the check joined on the object's own file link only, `apps/control/test/upload-inspection.test.ts`
+  "OK: …" fails (the control plane's request to delete the accepted generation of a standing admission commits); restored byte for
+  byte (SHA-256 `bff05e41…`), it passes.
+- `tools/evidence.mjs`: the `control` suite, as `tools/test/evidence.test.mjs` requires for every workspace package with tests.
+- `README.md`: the `@kauro/control` row. `pnpm-lock.yaml`: the new importer (workspace links and the already pinned `@types/node`
+  and `typescript`; no new external dependency).
+- `docs/design/B07-case-map.md`: supporting-evidence citations of the control tests without a case row of their own (the RETENTION
+  sweeper, the unobserved completion, the D-LOCK-2 pipeline race, OBJECT_INVENTORY with DELETION_RETRIES, the composition root). The
+  six SPECIFIED (B07-CONTROL) rows now name tests that exist under exactly those titles and pass; they stay SPECIFIED for the
+  integrator of `b07/integration` to move (§16.2) with the status table.
+
+Migrations `0009`–`0012` and `runtime-boundary.json` are unchanged.
+
+`pnpm run verify`:
+
+- **Windows 11** (Node 24, pnpm 10.16.1, `C:\Tools\pgsql17\bin`) at `d4720fe`: exit 0. Tests: contracts 12/12, domain 64/64,
+  application 73/73, persistence 159/159, authorization 11/11, data-plane 12/12, control 11/11, api 117 passed and 1 skipped (B06's
+  Linux-only test), tools 29/29. Architecture gate 8 packages and 21 edges with no violation; OpenAPI 14 registered and 14 planned
+  operations; matrix 18 machines; clean-consume 13 typed entry points. No `postgres.exe` was left running.
+- **Linux** (WSL Ubuntu 24.04, a fresh clone of `b07/control` at `d4720fe`, `PGBIN=/usr/lib/postgresql/17/bin`): exit 0, the same
+  counts except api 118/118 (the Linux-only test runs); no `postgres` process was left and the clone was removed. The head
+  `bfb879c` adds one assertion to the OK test of `upload-inspection.test.ts` (the revert proof of D-CTRL-3); the control suite
+  passed 11/11 there on Linux, and `pnpm run verify` of the branch head on Windows exits 0 with the counts above.
+
+```
+apps/control test: ℹ tests 11
+apps/control test: ℹ pass 11
+apps/control test: ℹ fail 0
+architecture gate: 8 package(s), 21 edge(s), no violation
+openapi: the document is the generated one and matches the 14 registered routes (14 operations, every operationId present, response schemas equal to the ones the routes validate with, every problem st…
+matrix: the document is the generated one (18 machines, 185 edges and initial states each owned, 7 commands and 5 reads with their catalogues, every applicability citation resolved)
+clean consumer ok: @kauro/application/testing 19 exports
+clean consumer ok: @kauro/data-plane 24 exports
+clean consumer ok: @kauro/data-plane/testing 6 exports
+clean consumer ok: @kauro/persistence 69 exports
+clean consumer ok: @kauro/persistence/testing 32 exports
+clean consumer ok: 13 typed entry points (@kauro/application, @kauro/application/testing, @kauro/authorization, @kauro/contracts, @kauro/contracts/canonical, @kauro/contracts/digest, @kauro/contracts/…
+clean-consume: every publishable package installs and works from its tarball alone
+VERIFY EXIT 0
+```
+
 ## 17. Integration obligations (B07 and B09 on main)
 
 B07 and B09 were designed in parallel on the same base (`ac44af6`). Neither references the other's tables; they touch through
