@@ -27,9 +27,10 @@
  *
  * D-PAY-B6 (the residual finding FINAL-N2; decisions register §12): a completion — a capture observed COMPLETED, or REVERSED while
  * unknown or PENDING (D-PAY-B5) — is recorded only with the provider's completion instant, which is the sale's tax point and the
- * price-expiry comparison. When an observation lacks it, nothing is applied and the plan asks for a stored provider query of the
- * order (`providerQueryRequired`); when a stored query lacks it as well, a PROVIDER_INCONSISTENCY case (COMPLETION_TIME_UNKNOWN)
- * is opened and nothing is applied — a tax point is never invented.
+ * price-expiry comparison. When an observation lacks it, nothing is applied (no fact and no observation row, so a webhook's inbox
+ * record can be applied once the instant is known) and the plan asks for a stored provider query of the order
+ * (`providerQueryRequired`); when a stored query lacks it as well, a PROVIDER_INCONSISTENCY case (COMPLETION_TIME_UNKNOWN) is opened
+ * and nothing is applied — a tax point is never invented.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
@@ -923,10 +924,13 @@ class Planner {
     if (step.kind === "INSERT" || step.kind === "ADVANCE") {
       const completes = (step.kind === "INSERT" ? step.status : step.next) === "COMPLETED";
       if (completes && observed.providerCompletedAt === null) {
-        // D-PAY-B6 (FINAL-N2): the completion instant is the sale's tax point; it is never invented
+        // D-PAY-B6 (FINAL-N2): the completion instant is the sale's tax point; it is never invented. Nothing is applied and no
+        // observation row is appended: a webhook's record stays applicable once a stored provider query recorded the completion
+        // (an observation row would make its retry a DUPLICATE of the event and drop what it adds, e.g. the reversal)
         if (this.source !== "PROVIDER_QUERY") {
           this.providerQueryRequired = true;
-          return obs(observed.status, "NO_CHANGE");
+          this.effects.push({ about: "CAPTURE", effect: "NO_CHANGE" });
+          return;
         }
         this.openCase("PROVIDER_INCONSISTENCY", current !== null ? { captureId: current.captureId } : {}, "COMPLETION_TIME_UNKNOWN", observed.evidenceHash, observed.amountCents);
         return obs(observed.status, "NO_CHANGE");
