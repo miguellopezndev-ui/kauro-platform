@@ -11,7 +11,7 @@ import { after, before, test } from "node:test";
 import type { ScriptedCancellation } from "@kauro/application/testing";
 import { isDomainFailure, textDigest, type CausationId, type CorrelationId, type UploadId } from "@kauro/domain";
 import { clock, ids, startControlEnv, type ControlEnv } from "./support/env.js";
-import { asRequestHandler, cancel, eventsOf, issue, oracle, oracleRows, project, reserve, setSessionLimit, tenant, uploadThrough, type Upload } from "./support/fixtures.js";
+import { asRequestHandler, cancel, eventsOf, issue, oracle, oracleRows, project, reserve, setSessionLimit, tenant, uploadAndReport, uploadThrough, type Upload } from "./support/fixtures.js";
 import { buildCsv } from "./support/workbook.js";
 
 let env: ControlEnv;
@@ -249,4 +249,45 @@ test("OK: STORAGE_LIFECYCLE cancels the provider session, records the result, pu
     { kind: "DEAD_LETTER", reason: "SUBJECT_NOT_TOMBSTONED" },
   );
   assert.equal((await uploadRow(young.uploadId)).state, "RESERVED");
+});
+
+test("OBJECT_INVENTORY and DELETION_RETRIES: an admitted generation the provider no longer holds is revoked GENERATION_MISSING and its registry row closed by its absence; a deletion the provider failed is recorded DELETION_FAILED and completed by DELETION_RETRIES under its exact generation", { timeout: 300_000 }, async () => {
+  const t = await tenant(env, "inventory");
+  const p = await project(env, t);
+  const lost = await uploadAndReport(env, t, p, csv("lost"), "CSV");
+  assert.equal((await env.plane.drain(env.plane.consumers.uploadInspection, clock.now())).deadLettered, 0);
+  const admitted = await oracle<{ file_id: string; object_id: string; object_name: string; generation: string }>(
+    env,
+    "SELECT f.file_id, o.object_id, o.object_name, o.generation FROM kauro.source_files f JOIN kauro.stored_objects o ON o.object_id = f.accepted_object_id WHERE f.origin_upload_id = $1",
+    [lost.up.uploadId],
+  );
+  // the provider loses the accepted generation outside the platform
+  assert.equal(env.storage.deleteOutOfBand(env.storage.location("ACCEPTED"), admitted.object_name)?.generation, admitted.generation);
+  const inventory = await env.plane.sweepers.objectInventory.sweep(env.plane.units, 100);
+  assert.deepEqual([inventory.admissionsRevoked, inventory.failed], [1, []]);
+  const revoked = await oracle<{ state: string; revocation_reason: string; object_state: string; deletion_result: string }>(
+    env,
+    "SELECT f.state, f.revocation_reason, o.state AS object_state, o.deletion_result FROM kauro.source_files f JOIN kauro.stored_objects o ON o.object_id = f.accepted_object_id WHERE f.file_id = $1",
+    [admitted.file_id],
+  );
+  assert.deepEqual(revoked, { state: "ADMISSION_REVOKED", revocation_reason: "GENERATION_MISSING", object_state: "DELETED", deletion_result: "ALREADY_ABSENT" });
+  const event = (await eventsOf(env, admitted.file_id)).at(-1);
+  assert.deepEqual([event?.event_type, event?.actor_kind, event?.actor_id], ["source_file.admission_revoked.v1", "SERVICE", "object-inventory"]);
+  assert.equal((await env.plane.sweepers.objectInventory.sweep(env.plane.units, 100)).acted, 0, "a second inventory finds nothing new");
+
+  // a deletion the provider fails: recorded DELETION_FAILED, then retried by DELETION_RETRIES to DELETED
+  const up = await reserve(env, t, p, csv("retried").length, "CSV");
+  const ref = await issue(env, t, up);
+  const written = uploadThrough(env, ref, csv("retried"));
+  await cancel(env, t, up);
+  env.storage.failNext("delete", { code: "UNAVAILABLE" });
+  await env.plane.drain(env.plane.consumers.storageLifecycle, clock.now());
+  const failed = await oracle<{ state: string; deletion_result: string; deletion_attempts: number; generation: string }>(env, "SELECT state, deletion_result, deletion_attempts, generation FROM kauro.stored_objects WHERE upload_id = $1", [up.uploadId]);
+  assert.deepEqual([failed.state, failed.deletion_result, failed.deletion_attempts, failed.generation], ["DELETION_FAILED", "PROVIDER_ERROR", 1, written.generation]);
+  const retried = await env.plane.sweepers.deletionRetries.sweep(env.plane.units, 100);
+  assert.deepEqual([retried.acted, retried.failed], [1, []]);
+  const deleted = await oracle<{ state: string; deletion_result: string; deletion_attempts: number }>(env, "SELECT state, deletion_result, deletion_attempts FROM kauro.stored_objects WHERE upload_id = $1", [up.uploadId]);
+  assert.deepEqual([deleted.state, deleted.deletion_result, deleted.deletion_attempts], ["DELETED", "DELETED", 2]);
+  assert.equal(env.storage.generationsOf(env.storage.location("QUARANTINE"), up.objectName).find((g) => g.generation === written.generation)?.status, "SOFT_DELETED");
+  assert.equal((await env.plane.sweepers.deletionRetries.sweep(env.plane.units, 100)).examined, 0);
 });
