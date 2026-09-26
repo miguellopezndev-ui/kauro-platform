@@ -124,6 +124,12 @@ function refundHooks(rt: PaymentRuntime, refundId: RefundId): ProviderCommandHoo
       const capture = await c.captures.get(unlocked.captureId);
       const order = await c.orders.get(unlocked.orderId);
       if (capture === null || order === null) throw new DomainFailure("INTEGRITY_FAILURE", "a refund's capture and order are visible to its scope");
+      // a refund awaiting (or refused) review is the reviewer's, never the payment service's: its row admits no update — and so no
+      // row lock — by the payment service (0012 refunds_payment_execute), and it is answered from what was read
+      if (unlocked.state === "REQUESTED" || unlocked.state === "REJECTED") {
+        if (unlocked.version !== body.expectedVersion) throw new StaleVersionFailure(unlocked.version, unlocked.state);
+        throw new DomainFailure("PRECONDITION_FAILED", "only an approved refund is executed", { reason: "REFUND_NOT_APPROVED", currentVersion: unlocked.version, currentState: unlocked.state });
+      }
       const refund = await c.refunds.lock(refundId);
       if (refund === null) throw new NotFoundFailure("refund");
       if (refund.version !== body.expectedVersion) throw new StaleVersionFailure(refund.version, refund.state);
