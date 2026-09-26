@@ -43,8 +43,11 @@ export interface UploadSessionRecord extends Omit<UploadSession, "providerSessio
   readonly agencyId: AgencyId;
   readonly projectId: ProjectId;
   readonly revisionId: RevisionId;
-  /** Untrusted display filename; tenant reads only; never in an event, a log or a storage path. */
-  readonly displayName: string;
+  /**
+   * Untrusted display filename; tenant reads only; never in an event, a log or a storage path. Present on every record a request
+   * handler reads; absent when the control plane reads the upload, which holds no grant on customer text (D-CTRL-1, D-PERS-2).
+   */
+  readonly displayName?: string;
   readonly declaredFormat: DeclaredFormat;
   readonly quarantineObjectId: StoredObjectId;
   readonly requestedByMembershipId: MembershipId;
