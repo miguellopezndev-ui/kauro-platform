@@ -207,8 +207,13 @@ test("PayPal Orders v2 contract fake: a refund is dispatched once per request id
   assert.deepEqual(await p.observeRefund({ providerRefundId: done.refund.providerRefundId }), done.refund);
   const elsewhere = await p.observeRefund({ providerCaptureId: "PPC99999999999999", providerRequestId: providerRequestIdOf(attemptId) });
   assert.ok("kind" in elsewhere && elsewhere.kind === "NOT_FOUND" && elsewhere.absenceIsProof);
+  // a programmed answer: the provider accepted the refund but has not completed it yet (PENDING)
+  p.program("CAPTURES_V2_REFUND", { kind: "REFUND_OBSERVED", status: "PENDING" });
+  const pendingAttempt = w.ids.next();
+  const pending = await p.dispatch(p.prepareRefund({ refundId: w.ids.next(), attemptId: pendingAttempt, providerRequestId: providerRequestIdOf(pendingAttempt), providerCaptureId: captureId, amountCents: 500n, currency: "USD" }), inFuture(w));
+  assert.deepEqual(pending.kind === "REFUND_OBSERVED" ? [pending.refund.status, pending.refund.amountCents] : pending.kind, ["PENDING", 500n]);
   const view = await p.observeOrder({ providerOrderId: orderId });
-  assert.deepEqual(view.refunds.map((r) => r.providerRefundId), [done.refund.providerRefundId]);
+  assert.deepEqual(view.refunds.map((r) => [r.providerRefundId, r.status]), [[done.refund.providerRefundId, "COMPLETED"], [pending.kind === "REFUND_OBSERVED" ? pending.refund.providerRefundId : "", "PENDING"]]);
 
   const stored = { artifactRef: "a", kind: "PROVIDER_QUERY" as const, provider: "paypal", environment: "SANDBOX" as const, sha256: sha("q"), capturedAt: w.clock.now(), authenticatedBy: "PROVIDER_API_RESPONSE" as const, normalized: view, integrationClass: CONTRACT_FAKE };
   assert.deepEqual(p.classifyOrderObservation(stored), view);

@@ -457,6 +457,27 @@ test("planObservation — the protocol's own results: an ambiguous capture makes
   assert.deepEqual(find(spent, "ORDER_TRANSITION").map((s) => s.change.state), ["FAILED"]);
 });
 
+test("planObservation — 15 \"Unknown provider statuses become UNRECOGNIZED_PROVIDER_STATE\": an unrecognized capture result is never coerced — the attempt UNCERTAIN, the order CAPTURE_UNCERTAIN, an UNRECOGNIZED_PROVIDER_STATE case and the observation recorded as UNRECOGNIZED; an unrecognized provider event of the order opens the same case and changes no fact", async () => {
+  const w = commerceWorld();
+  const order = await w.seedOrder("CAPTURING");
+  const attempt = w.seedAttempt(order, "CAPTURE", "DISPATCHING");
+  const plan = planObservation(factsOf(w, order), { origin: { source: "DISPATCH_RESPONSE", attemptId: attempt.attemptId }, content: { kind: "DISPATCH_RESULT", result: { kind: "UNRECOGNIZED", evidenceHash: sha("odd") } }, mint: mint(w) });
+  assert.deepEqual(types(plan), ["payment_order.capture_uncertain.v1", "payment_attempt.uncertain.v1", "reconciliation_case.opened.v1"]);
+  assert.equal(find(plan, "ATTEMPT_TRANSITION")[0]!.change.outcomeCode, "UNRECOGNIZED_PROVIDER_STATE");
+  assert.deepEqual(find(plan, "CASE_OPEN").map((c) => [c.entry.kind, c.entry.orderId]), [["UNRECOGNIZED_PROVIDER_STATE", order.orderId]]);
+  assert.deepEqual(find(plan, "OBSERVATION").map((o) => [o.observation.observedStatus, o.observation.effect]), [["UNRECOGNIZED", "UNRECOGNIZED"]]);
+  assert.equal(find(plan, "CAPTURE_INSERT").length, 0);
+
+  const captured = await w.seedOrder("CAPTURED");
+  const event = planObservation(factsOf(w, captured), {
+    origin: { source: "WEBHOOK", inboxId: w.ids.next() as InboxId },
+    content: { kind: "PROVIDER_EVENT", event: { kind: "UNRECOGNIZED", provider: "paypal", environment: "SANDBOX", externalEventId: "WH-U", providerOrderId: captured.providerOrderId!, bodyHash: sha("u") } },
+    mint: mint(w),
+  });
+  assert.deepEqual(ops(event), ["CASE_OPEN", "OBSERVATION"]);
+  assert.deepEqual([find(event, "CASE_OPEN")[0]!.entry.kind, find(event, "OBSERVATION")[0]!.observation.effect], ["UNRECOGNIZED_PROVIDER_STATE", "UNRECOGNIZED"]);
+});
+
 test("planObservation — an absence proves no effect only when the view can prove absence and was taken after the attempt's dispatch deadline (D-PROTO-B6): before it, a call may still be in flight", async () => {
   const w = commerceWorld();
   const creating = await w.seedOrder("CREATING");
@@ -510,6 +531,22 @@ test("planPostings — R2-078 and D-LEDGER-B5: the completion posts the contract
 
   assert.equal(planPostings(source("capture.pending.v1", {})).kind, "NOT_APPLICABLE");
   assert.throws(() => planPostings(source("refund.completed.v1", { serviceCents: 1000, taxCents: 190, excessCents: 0 })), /fundsState/);
+});
+
+test("planPostings — Q-B09-23 (the re-check's residual N4, open for the design owner): a full refund after a reported fee returns the whole amount from the balance its event names, which leaves that provider balance negative for the capture by exactly the fee the provider kept; every set still balances and no bank account is touched", () => {
+  // the capture (fee reported while funds were UNKNOWN), then the whole capture refunded while funds are still UNKNOWN
+  const sets = [
+    planPostings(source("capture.completed.v1", { allocatedServiceCents: 97125, allocatedTaxCents: 18454, excessCents: 0, evidenceHash: "a".repeat(64) })),
+    planPostings(source("capture.fee_observed.v1", { providerFeeCents: 5275, fundsState: "UNKNOWN", evidenceHash: "b".repeat(64) })),
+    planPostings(source("refund.completed.v1", { serviceCents: 97125, taxCents: 18454, excessCents: 0, fundsState: "UNKNOWN", evidenceHash: "c".repeat(64) }, "01920000-0000-7000-8000-000000000f02")),
+  ];
+  const lines = sets.flatMap((p) => (p.kind === "POST" ? [...p.set.lines] : []));
+  assert.equal(lines.length, 8, "zero lines are never written");
+  for (const p of sets) assert.ok(p.kind === "POST" && isBalanced(p.set.lines));
+  const net = (account: string) => lines.filter((l) => l.account === account).reduce((n, l) => n + (l.direction === "DEBIT" ? l.amountCents : -l.amountCents), 0n);
+  assert.equal(net("PSP_RECEIVABLE"), -5275n, "the receivable the capture debited is credited the fee and the whole return (Q-B09-23)");
+  assert.deepEqual([net("CONTRACT_LIABILITY"), net("TAX_PAYABLE"), net("PROCESSOR_EXPENSE")], [0n, 0n, 5275n]);
+  assert.ok(lines.every((l) => l.account !== "BANK_CASH" && l.account !== "BANK_IN_TRANSIT"));
 });
 
 test("planPostings — D-LEDGER-B4: a case's reviewed resolution posts mirroring reversals of the entries it corrects, keyed by line position, and its adjusting lines; without the resolution nothing posts", () => {
