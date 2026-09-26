@@ -12,7 +12,7 @@
 //
 // Sources (nothing in the document is written by hand except the owner table below, which the check keeps complete): the
 // registry's state_transitions.json (via @kauro/contracts STATE_MACHINES, provenance-verified) and commands.json/cases.json, the
-// platform machines of @kauro/domain (EndClient, Project), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and
+// platform machines of @kauro/domain (EndClient, Project; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and
 // their outcome catalogues of @kauro/application, the transition seeds of the migrations, the events each handler publishes (read
 // from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -106,17 +106,19 @@ export const EDGE_OWNERS = {
     fatal_resource_or_integrity_error: { owner: "B08", why: "fenced execution", event: null },
     verification_failure: { owner: "B08", why: "verification", event: null },
   },
+  // package B09 (docs/design/B09-payments-fiscal.md §4): the provider-effect protocol of CMD028 (CREATE_ORDER), CMD029 (CAPTURE)
+  // and CMD033 (REFUND) — intent, dispatch, settle — and the reconciliation of CMD030/CMD034
   PaymentAttempt: {
-    "(initial PREPARED)": { command: "CMD028", event: null },
-    dispatch_intent_committed: { command: "CMD029", event: null },
-    cancel_before_dispatch: { owner: "B09", why: "payment intent cancellation", event: null },
-    authenticated_pending: { command: "CMD030", event: null },
-    authenticated_completed: { command: "CMD030", event: null },
-    ambiguous_transport_result: { owner: "B09", why: "provider adapter result classification", event: null },
-    proved_no_effect: { command: "CMD034", event: null },
-    observation_lost: { owner: "B09", why: "provider adapter result classification", event: null },
-    reconciliation_completed: { command: "CMD034", event: null },
-    reconciliation_proves_no_effect: { command: "CMD034", event: null },
+    "(initial PREPARED)": { command: "CMD028", event: "payment_attempt.prepared.v1", note: "CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1)" },
+    dispatch_intent_committed: { command: "CMD029", event: "payment_attempt.dispatching.v1", note: "CMD028 and CMD033 commit their attempts' dispatch intent the same way" },
+    cancel_before_dispatch: { owner: "B09", why: "the payment service's resume of an intent whose dispatch never committed: no provider call was possible (D-PROTO-B2)", event: "payment_attempt.cancelled_before_dispatch.v1" },
+    authenticated_pending: { command: "CMD030", event: "payment_attempt.provider_pending.v1" },
+    authenticated_completed: { command: "CMD030", event: "payment_attempt.confirmed.v1", note: "the dispatching command's own settle step records an authenticated response the same way" },
+    ambiguous_transport_result: { owner: "B09", why: "the settle step of the provider-effect protocol classifies a timeout, reset or unreadable response (D-PROTO-B1)", event: "payment_attempt.uncertain.v1" },
+    proved_no_effect: { command: "CMD034", event: "payment_attempt.failed_no_effect.v1" },
+    observation_lost: { owner: "B09", why: "the payment service's watchdog past the dispatch deadline (D-PROTO-B4)", event: "payment_attempt.uncertain.v1" },
+    reconciliation_completed: { command: "CMD034", event: "payment_attempt.confirmed.v1" },
+    reconciliation_proves_no_effect: { command: "CMD034", event: "payment_attempt.failed_no_effect.v1" },
   },
   ImportStage: {
     "(initial PREPARED)": { owner: "B08", why: "fenced staging prepares the stage", event: null },
@@ -150,16 +152,16 @@ export const EDGE_OWNERS = {
     all_effects_reconciled: { owner: "B03", why: "grant closure", event: null },
   },
   TaxDocument: {
-    "(initial DRAFT)": { owner: "B09", why: "fiscal-document workflow", event: null },
-    fiscal_profile_validated: { owner: "B09", why: "fiscal-document workflow", event: null },
-    issue_intent_committed: { command: "CMD035", event: null },
-    authenticated_issuance: { command: "CMD035", event: null },
-    ambiguous_result: { command: "CMD035", event: null },
-    authenticated_rejection: { command: "CMD035", event: null },
-    issued_document_found: { command: "CMD035", event: null },
-    no_effect_and_rejection_proved: { command: "CMD035", event: null },
-    corrected_draft_version: { owner: "B09", why: "fiscal correction", event: null },
-    lawful_credit_or_correction_issued: { owner: "B09", why: "fiscal correction", event: null },
+    "(initial DRAFT)": { owner: "B09", why: "the fiscal consumer drafts the invoice of a completed capture and the credit note of a completed refund, blocked when the treatment is not reviewed (D-FISC-B1)", event: "tax_document.drafted.v1" },
+    fiscal_profile_validated: { owner: "B09", why: "the fiscal consumer validates a draft whose reviewed treatment resolves; the database re-checks it (KP011, D-FISC-B1)", event: "tax_document.validated.v1" },
+    issue_intent_committed: { command: "CMD035", event: "tax_document.submitting.v1" },
+    authenticated_issuance: { command: "CMD035", event: "tax_document.issued.v1" },
+    ambiguous_result: { command: "CMD035", event: "tax_document.uncertain.v1" },
+    authenticated_rejection: { command: "CMD035", event: "tax_document.rejected.v1" },
+    issued_document_found: { command: "CMD035", event: "tax_document.issued.v1" },
+    no_effect_and_rejection_proved: { command: "CMD035", event: "tax_document.rejected.v1" },
+    corrected_draft_version: { owner: "B09", why: "the fiscal consumer drafts the corrected successor naming the rejected document (D-FISC-B3)", event: "tax_document.corrected.v1" },
+    lawful_credit_or_correction_issued: { command: "CMD035", event: "tax_document.corrected.v1", note: "the authenticated issuance of the credit note that corrects the invoice" },
   },
   CommissionLine: {
     "(initial ACCRUED_PENDING)": { owner: "B10", why: "commission accrual", event: null },
@@ -183,6 +185,96 @@ export const EDGE_OWNERS = {
     request_deletion: { command: "CMD042", event: null },
     deletion_verified: { owner: "B16", why: "verified managed deletion", event: null },
   },
+  // package B09's platform machines (decisions D-MACH-B1..B10 of docs/design/B09-payments-fiscal.md)
+  Quote: {
+    "(initial DRAFT)": { command: "CMD027", event: "quote.drafted.v1", note: "drafted and issued in one transaction" },
+    issue_quote: { command: "CMD027", event: "quote.issued.v1" },
+    withdraw_quote: { owner: "B10", why: "the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it", event: "quote.withdrawn.v1" },
+    accept_terms_for_checkout: { command: "CMD028", event: "quote.accepted_for_checkout.v1" },
+    price_expiry_reached: { owner: "B10", why: "the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED)", event: "quote.expired.v1" },
+    superseding_quote_issued: { command: "CMD027", event: "quote.superseded.v1", note: "the new binding quote supersedes the previous one before it is created" },
+  },
+  PaymentOrder: {
+    "(initial INTENT_CREATED)": { command: "CMD028", event: "payment_order.intent_created.v1" },
+    dispatch_intent_committed: { command: "CMD028", event: "payment_order.creating.v1" },
+    cancel_before_dispatch: { owner: "B09", why: "the payment service's resume of a CMD028 intent whose dispatch never committed (D-PROTO-B2)", event: "payment_order.cancelled.v1" },
+    provider_order_created: { command: "CMD028", event: "payment_order.created.v1" },
+    creation_proved_no_effect: { command: "CMD034", event: "payment_order.failed.v1" },
+    buyer_approval_observed: { command: "CMD030", event: "payment_order.approved.v1" },
+    capture_dispatch_committed: { command: "CMD029", event: "payment_order.capturing.v1" },
+    capture_observed: { command: "CMD030", event: "payment_order.captured.v1", note: "CMD029's settle step and CMD034 record an observed capture the same way" },
+    capture_ambiguous: { command: "CMD029", event: "payment_order.capture_uncertain.v1" },
+    capture_proved_no_effect: { command: "CMD029", event: "payment_order.approved.v1" },
+    capture_proved_no_effect_unapproved: { command: "CMD029", event: "payment_order.created.v1" },
+    reconciliation_proves_no_capture: { command: "CMD034", event: "payment_order.approved.v1" },
+    reconciliation_proves_no_capture_unapproved: { command: "CMD034", event: "payment_order.created.v1" },
+    order_voided: { command: "CMD030", event: "payment_order.cancelled.v1" },
+    order_expired: { command: "CMD030", event: "payment_order.expired.v1", note: "or CMD034 when a provider query shows the expiry" },
+  },
+  CaptureFact: {
+    "(initial PENDING)": { command: "CMD030", event: "capture.pending.v1", note: "a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too" },
+    provider_completed: { command: "CMD030", event: "capture.completed.v1" },
+    provider_denied: { command: "CMD030", event: "capture.denied.v1" },
+    provider_reversed: { command: "CMD030", event: "capture.reversed.v1" },
+  },
+  CommercialAuthorization: {
+    "(initial ACTIVE)": { command: "CMD029", event: "commercial_authorization.issued.v1", note: "or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction" },
+    execution_admitted: { command: "CMD036", event: "commercial_authorization.consumed.v1" },
+    package_published: { owner: "B08", why: "atomic publication of the purchased package", event: "commercial_authorization.delivered.v1" },
+    authority_revoked: { command: "CMD030", event: "commercial_authorization.revoked.v1", note: "a reversal; CMD033 revokes it when a completed refund leaves no service basis" },
+  },
+  Refund: {
+    "(initial REQUESTED)": { command: "CMD031", event: "refund.requested.v1", note: "the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way" },
+    approve_refund: { command: "CMD032", event: "refund.approved.v1" },
+    reject_refund: { owner: "B12", why: "the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3)", event: "refund.rejected.v1" },
+    dispatch_intent_committed: { command: "CMD033", event: "refund.submitting.v1" },
+    authorization_lapsed: { owner: "B09", why: "the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch", event: "refund.failed.v1" },
+    authenticated_completed: { command: "CMD033", event: "refund.completed.v1" },
+    ambiguous_transport_result: { command: "CMD033", event: "refund.uncertain.v1" },
+    proved_no_effect: { command: "CMD033", event: "refund.approved.v1" },
+    provider_refused: { command: "CMD033", event: "refund.failed.v1" },
+    reconciliation_completed: { command: "CMD034", event: "refund.completed.v1" },
+    reconciliation_proves_no_effect: { command: "CMD034", event: "refund.approved.v1" },
+    reconciliation_proves_refusal: { command: "CMD034", event: "refund.failed.v1" },
+  },
+  ReconciliationCase: {
+    "(initial OPEN)": { command: "CMD034", event: "reconciliation_case.opened.v1", note: "CMD029 and CMD030 open cases the same way" },
+    case_resolved: { owner: "B12", why: "the owner's finance review records the explaining facts or decision; no registry command names it (Q-B09-3)", event: "reconciliation_case.resolved.v1" },
+  },
+  PaymentRoute: {
+    "(initial CONFIGURED)": { owner: "B15", why: "the payment integration configures the merchant route (owner action: merchant and KYC identity)", event: null },
+    route_qualified: { owner: "B15", why: "merchant eligibility, environment, capture, refund and settlement verified with live evidence (G-PAYMENT)", event: null },
+    route_suspended: { owner: "B16", why: "an incident or account fact invalidates the route", event: null },
+  },
+  FiscalIssuerRoute: {
+    "(initial CONFIGURED)": { owner: "B15", why: "the fiscal integration configures the issuer route (owner action: fiscal identity and numbering authorization)", event: null },
+    route_qualified: { owner: "B15", why: "observed or professionally confirmed legal facts, a numbering authorization and verified issuance entitlement", event: null },
+    route_suspended: { owner: "B16", why: "an incident or legal fact invalidates the route", event: null },
+  },
+  CorporateGrant: {
+    "(initial ACTIVE)": { owner: "B12", why: "the owner application provisions an individually managed corporate identity's grant (08)", event: null },
+    grant_revoked: { owner: "B12", why: "the owner application revokes it", event: null },
+  },
+  RefundPolicy: {
+    "(initial ACTIVE)": { owner: "B12", why: "a KAURO_OWNER records a standing refund policy under a fresh step-up; no registry command names it (Q-B09-3)", event: null },
+    policy_retired: { owner: "B12", why: "the owner retires it", event: null },
+  },
+};
+
+/** Which decision declares each platform machine (the registry machines are the registry's). */
+const PLATFORM_DECISIONS = {
+  EndClient: "decisions D-AGG-1, D-AGG-2",
+  Project: "decisions D-AGG-1, D-AGG-2",
+  Quote: "B09 decision D-MACH-B1",
+  PaymentOrder: "B09 decision D-MACH-B2",
+  CaptureFact: "B09 decision D-MACH-B3",
+  CommercialAuthorization: "B09 decision D-MACH-B4",
+  Refund: "B09 decision D-MACH-B5",
+  ReconciliationCase: "B09 decision D-MACH-B6",
+  PaymentRoute: "B09 decision D-MACH-B7",
+  FiscalIssuerRoute: "B09 decision D-MACH-B8",
+  CorporateGrant: "B09 decision D-MACH-B9",
+  RefundPolicy: "B09 decision D-MACH-B10",
 };
 
 // --- the contract-test applicability record (10 "Contract tests and compatibility") -------------------------------------------
@@ -368,13 +460,14 @@ export function generateMatrix(s) {
   line("## 1. Every edge of every machine");
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
-  line("edge, the owning package and why. `B06` says what this package serves: **route** — a served command performs it;");
-  line("**database** — the B06 schema stores the aggregate and seeds the edge in `kauro.state_transitions` (every other edge is");
-  line("refused, SQLSTATE KA008), so the owning package's writer is admitted and checked; **—** — the aggregate is not stored by B06.");
+  line("edge, the owning package and why. `B06` says what the platform serves: **route** — a served command performs it;");
+  line("**database** — the schema (B06's migrations, or package B09's 0008..0012) stores the aggregate and seeds the edge in");
+  line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and checked;");
+  line("**—** — the aggregate is not stored yet.");
   line();
   for (const m of s.machines) {
     const table = EDGE_OWNERS[m.contract];
-    const kind = s.registryMachines.has(m.contract) ? "registry machine" : "platform machine (decisions D-AGG-1, D-AGG-2)";
+    const kind = s.registryMachines.has(m.contract) ? "registry machine" : `platform machine (${PLATFORM_DECISIONS[m.contract] ?? "undeclared"})`;
     line(`### ${m.contract}`);
     line();
     line(`${kind}; initial ${m.initial}; terminal ${m.terminal.join(", ")}; unlisted edges: ${m.unlistedTransition}.`);

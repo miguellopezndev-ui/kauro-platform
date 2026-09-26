@@ -76,8 +76,11 @@ test("every B09 event type is registered with a non-empty allowlist; every comme
     assert.ok(COMMERCE_EVENT_TYPES.some((t) => t.startsWith(`${kind}.`)), `${kind} has events`);
   }
   for (const s of EVENT_SUBSCRIPTIONS) assert.ok((EVENT_TYPES as ReadonlyArray<string>).includes(s.eventType), s.eventType);
-  assert.deepEqual(consumersOf("capture.completed.v1"), ["COMMISSIONS", "FINANCE"]);
-  assert.deepEqual(consumersOf("commercial_authorization.revoked.v1"), ["EXECUTION_CONTROL", "NOTIFICATIONS", "FINANCE"]);
+  // one reconciled financial event, separate idempotent effects (TRANSITIONS "Cross-aggregate finalization")
+  assert.deepEqual(consumersOf("capture.completed.v1"), ["FINANCE", "FISCAL", "COMMISSIONS"]);
+  assert.deepEqual(consumersOf("refund.completed.v1"), ["FINANCE", "FISCAL", "COMMISSIONS", "NOTIFICATIONS"]);
+  assert.deepEqual(consumersOf("commercial_authorization.revoked.v1"), ["EXECUTION_CONTROL", "NOTIFICATIONS"]);
+  assert.deepEqual(consumersOf("refund.approved.v1"), ["PAYMENT_SERVICE"]);
   assert.deepEqual(consumersOf("payment_attempt.dispatching.v1"), ["PAYMENT_SERVICE"]);
 });
 
@@ -87,7 +90,9 @@ test("commerce payloads carry ids, hashes, tokens and minor-unit counts — neve
   assert.throws(() => assertAllowlistedPayload("capture.completed.v1", { ...ids, providerCaptureId: "3C679366HH908993F" }), /not allowlisted/);
   assert.throws(() => assertAllowlistedPayload("capture.completed.v1", { ...ids, amountCents: "97125" }), /not a safe reference/);
   assert.throws(() => assertAllowlistedPayload("capture.completed.v1", { ...ids, amountCents: -1 }), /not a safe reference/);
-  assert.throws(() => assertAllowlistedPayload("refund.requested.v1", { refundId: ids.captureId, reasonCode: "the customer is unhappy" }), /not a safe reference/);
+  // the refund's reasonCode is a label (CMD031; B06 D-API-1): no refund event may carry it, whatever its words
+  for (const t of COMMERCE_EVENT_TYPES) assert.equal(EVENT_PAYLOAD_ALLOWLIST[t].includes("reasonCode"), false, t);
+  assert.throws(() => assertAllowlistedPayload("refund.requested.v1", { refundId: ids.captureId, reasonCode: "THE_CUSTOMER_IS_UNHAPPY" }), /not allowlisted/);
 });
 
 test("the B09 failure reasons are appended to the closed taxonomy exactly once", () => {

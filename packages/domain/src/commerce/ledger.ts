@@ -6,7 +6,7 @@
  * refund webhook replay does not post another refund; a corrected amount is a reversal plus a new entry, never an edit).
  *
  * B09 posts only reconciled money movements, each from the domain event that records it (the event id is the idempotency
- * identity of the posting set, migration 0011 ledger_entries UNIQUE (event_id, line_no)):
+ * identity of the posting set, migration 0012 ledger_entries UNIQUE (event_id, line_no)):
  *   capture completed → DEBIT PSP_RECEIVABLE amount / CREDIT CONTRACT_LIABILITY service, TAX_PAYABLE tax,
  *                       CUSTOMER_OVERPAYMENT excess (a capture before delivery is a contract liability, not revenue: 15
  *                       "Revenue recognition follows the actual accounting policy")
@@ -80,7 +80,7 @@ export function returnPostings(amounts: RefundComponents): ReadonlyArray<Posting
   );
 }
 
-/** Debits equal credits (one currency per posting set; the database re-checks at commit, KA009). */
+/** Debits equal credits (one currency per posting set; the database re-checks at commit, SQLSTATE KP001). */
 export function isBalanced(ls: ReadonlyArray<PostingLine>): boolean {
   let net = 0n;
   for (const l of ls) net += l.direction === "DEBIT" ? l.amountCents : -l.amountCents;

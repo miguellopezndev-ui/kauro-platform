@@ -15,9 +15,10 @@ Registry: commands.json `6fa1a124821609a5ac911779304e8876df1a6954c530e895604da10
 ## 1. Every edge of every machine
 
 `Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the
-edge, the owning package and why. `B06` says what this package serves: **route** — a served command performs it;
-**database** — the B06 schema stores the aggregate and seeds the edge in `kauro.state_transitions` (every other edge is
-refused, SQLSTATE KA008), so the owning package's writer is admitted and checked; **—** — the aggregate is not stored by B06.
+edge, the owning package and why. `B06` says what the platform serves: **route** — a served command performs it;
+**database** — the schema (B06's migrations, or package B09's 0008..0012) stores the aggregate and seeds the edge in
+`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and checked;
+**—** — the aggregate is not stored yet.
 
 ### Agency
 
@@ -149,18 +150,18 @@ registry machine; initial PREPARED; terminal CONFIRMED, FAILED_NO_EFFECT, CANCEL
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial PREPARED) | PREPARED | CMD028 CreatePaymentOrder (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| PREPARED | dispatch_intent_committed | DISPATCHING | CMD029 CapturePayment (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| PREPARED | cancel_before_dispatch | CANCELLED_BEFORE_DISPATCH | B09: payment intent cancellation | — (no event type registered: the owning package registers it with the edge) | — |
-| DISPATCHING | authenticated_pending | PROVIDER_PENDING | CMD030 ReceivePaymentWebhook (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| DISPATCHING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| DISPATCHING | ambiguous_transport_result | UNCERTAIN | B09: provider adapter result classification | — (no event type registered: the owning package registers it with the edge) | — |
-| DISPATCHING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| PROVIDER_PENDING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| PROVIDER_PENDING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| PROVIDER_PENDING | observation_lost | UNCERTAIN | B09: provider adapter result classification | — (no event type registered: the owning package registers it with the edge) | — |
-| UNCERTAIN | reconciliation_completed | CONFIRMED | CMD034 ReconcilePayment (B09) | — (no event type registered: the owning package registers it with the edge) | — |
-| UNCERTAIN | reconciliation_proves_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | — (no event type registered: the owning package registers it with the edge) | — |
+| — | (initial PREPARED) | PREPARED | CMD028 CreatePaymentOrder (B09); CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1) | payment_attempt.prepared.v1 | database |
+| PREPARED | dispatch_intent_committed | DISPATCHING | CMD029 CapturePayment (B09); CMD028 and CMD033 commit their attempts' dispatch intent the same way | payment_attempt.dispatching.v1 | database |
+| PREPARED | cancel_before_dispatch | CANCELLED_BEFORE_DISPATCH | B09: the payment service's resume of an intent whose dispatch never committed: no provider call was possible (D-PROTO-B2) | payment_attempt.cancelled_before_dispatch.v1 | database |
+| DISPATCHING | authenticated_pending | PROVIDER_PENDING | CMD030 ReceivePaymentWebhook (B09) | payment_attempt.provider_pending.v1 | database |
+| DISPATCHING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | database |
+| DISPATCHING | ambiguous_transport_result | UNCERTAIN | B09: the settle step of the provider-effect protocol classifies a timeout, reset or unreadable response (D-PROTO-B1) | payment_attempt.uncertain.v1 | database |
+| DISPATCHING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
+| PROVIDER_PENDING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | database |
+| PROVIDER_PENDING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
+| PROVIDER_PENDING | observation_lost | UNCERTAIN | B09: the payment service's watchdog past the dispatch deadline (D-PROTO-B4) | payment_attempt.uncertain.v1 | database |
+| UNCERTAIN | reconciliation_completed | CONFIRMED | CMD034 ReconcilePayment (B09) | payment_attempt.confirmed.v1 | database |
+| UNCERTAIN | reconciliation_proves_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
 
 ### ImportStage
 
@@ -221,16 +222,16 @@ registry machine; initial DRAFT; terminal CORRECTED; unlisted edges: REJECT_UNLE
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial DRAFT) | DRAFT | B09: fiscal-document workflow | — (no event type registered: the owning package registers it with the edge) | — |
-| DRAFT | fiscal_profile_validated | VALIDATED | B09: fiscal-document workflow | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATED | issue_intent_committed | SUBMITTING | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| SUBMITTING | authenticated_issuance | ISSUED | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| SUBMITTING | ambiguous_result | UNCERTAIN | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| SUBMITTING | authenticated_rejection | REJECTED | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| UNCERTAIN | issued_document_found | ISSUED | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| UNCERTAIN | no_effect_and_rejection_proved | REJECTED | CMD035 IssueTaxDocument (B15) | — (no event type registered: the owning package registers it with the edge) | — |
-| REJECTED | corrected_draft_version | CORRECTED | B09: fiscal correction | — (no event type registered: the owning package registers it with the edge) | — |
-| ISSUED | lawful_credit_or_correction_issued | CORRECTED | B09: fiscal correction | — (no event type registered: the owning package registers it with the edge) | — |
+| — | (initial DRAFT) | DRAFT | B09: the fiscal consumer drafts the invoice of a completed capture and the credit note of a completed refund, blocked when the treatment is not reviewed (D-FISC-B1) | tax_document.drafted.v1 | database |
+| DRAFT | fiscal_profile_validated | VALIDATED | B09: the fiscal consumer validates a draft whose reviewed treatment resolves; the database re-checks it (KP011, D-FISC-B1) | tax_document.validated.v1 | database |
+| VALIDATED | issue_intent_committed | SUBMITTING | CMD035 IssueTaxDocument (B15) | tax_document.submitting.v1 | database |
+| SUBMITTING | authenticated_issuance | ISSUED | CMD035 IssueTaxDocument (B15) | tax_document.issued.v1 | database |
+| SUBMITTING | ambiguous_result | UNCERTAIN | CMD035 IssueTaxDocument (B15) | tax_document.uncertain.v1 | database |
+| SUBMITTING | authenticated_rejection | REJECTED | CMD035 IssueTaxDocument (B15) | tax_document.rejected.v1 | database |
+| UNCERTAIN | issued_document_found | ISSUED | CMD035 IssueTaxDocument (B15) | tax_document.issued.v1 | database |
+| UNCERTAIN | no_effect_and_rejection_proved | REJECTED | CMD035 IssueTaxDocument (B15) | tax_document.rejected.v1 | database |
+| REJECTED | corrected_draft_version | CORRECTED | B09: the fiscal consumer drafts the corrected successor naming the rejected document (D-FISC-B3) | tax_document.corrected.v1 | database |
+| ISSUED | lawful_credit_or_correction_issued | CORRECTED | CMD035 IssueTaxDocument (B15); the authenticated issuance of the credit note that corrects the invoice | tax_document.corrected.v1 | database |
 
 ### CommissionLine
 
@@ -271,6 +272,144 @@ platform machine (decisions D-AGG-1, D-AGG-2); initial OPEN; terminal DELETED; u
 | OPEN | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
 | CLOSED | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
 | DELETION_REQUESTED | deletion_verified | DELETED | B16: verified managed deletion | — (no event type registered: the owning package registers it with the edge) | database |
+
+### Quote
+
+platform machine (B09 decision D-MACH-B1); initial DRAFT; terminal EXPIRED, SUPERSEDED, WITHDRAWN; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial DRAFT) | DRAFT | CMD027 CreateQuote (B10); drafted and issued in one transaction | quote.drafted.v1 | database |
+| DRAFT | issue_quote | ISSUED | CMD027 CreateQuote (B10) | quote.issued.v1 | database |
+| DRAFT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
+| ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09) | quote.accepted_for_checkout.v1 | database |
+| ISSUED | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
+| ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created | quote.superseded.v1 | database |
+| ISSUED | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
+| ACCEPTED_FOR_CHECKOUT | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
+| ACCEPTED_FOR_CHECKOUT | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created | quote.superseded.v1 | database |
+| ACCEPTED_FOR_CHECKOUT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
+
+### PaymentOrder
+
+platform machine (B09 decision D-MACH-B2); initial INTENT_CREATED; terminal CAPTURED, FAILED, CANCELLED, EXPIRED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial INTENT_CREATED) | INTENT_CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.intent_created.v1 | database |
+| INTENT_CREATED | dispatch_intent_committed | CREATING | CMD028 CreatePaymentOrder (B09) | payment_order.creating.v1 | database |
+| INTENT_CREATED | cancel_before_dispatch | CANCELLED | B09: the payment service's resume of a CMD028 intent whose dispatch never committed (D-PROTO-B2) | payment_order.cancelled.v1 | database |
+| CREATING | provider_order_created | CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.created.v1 | database |
+| CREATING | creation_proved_no_effect | FAILED | CMD034 ReconcilePayment (B09) | payment_order.failed.v1 | database |
+| CREATED | buyer_approval_observed | APPROVED | CMD030 ReceivePaymentWebhook (B09) | payment_order.approved.v1 | database |
+| CREATED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
+| APPROVED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
+| CREATED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
+| APPROVED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
+| CAPTURING | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
+| CAPTURING | capture_ambiguous | CAPTURE_UNCERTAIN | CMD029 CapturePayment (B09) | payment_order.capture_uncertain.v1 | database |
+| CAPTURING | capture_proved_no_effect | APPROVED | CMD029 CapturePayment (B09) | payment_order.approved.v1 | database |
+| CAPTURING | capture_proved_no_effect_unapproved | CREATED | CMD029 CapturePayment (B09) | payment_order.created.v1 | database |
+| CAPTURE_UNCERTAIN | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
+| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture | APPROVED | CMD034 ReconcilePayment (B09) | payment_order.approved.v1 | database |
+| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture_unapproved | CREATED | CMD034 ReconcilePayment (B09) | payment_order.created.v1 | database |
+| CREATED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | database |
+| APPROVED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | database |
+| CREATED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | database |
+| APPROVED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | database |
+
+### CaptureFact
+
+platform machine (B09 decision D-MACH-B3); initial PENDING; terminal DENIED, REVERSED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial PENDING) | PENDING | CMD030 ReceivePaymentWebhook (B09); a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too | capture.pending.v1 | database |
+| PENDING | provider_completed | COMPLETED | CMD030 ReceivePaymentWebhook (B09) | capture.completed.v1 | database |
+| PENDING | provider_denied | DENIED | CMD030 ReceivePaymentWebhook (B09) | capture.denied.v1 | database |
+| PENDING | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09) | capture.reversed.v1 | database |
+| COMPLETED | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09) | capture.reversed.v1 | database |
+
+### CommercialAuthorization
+
+platform machine (B09 decision D-MACH-B4); initial ACTIVE; terminal REVOKED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial ACTIVE) | ACTIVE | CMD029 CapturePayment (B09); or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction | commercial_authorization.issued.v1 | database |
+| ACTIVE | execution_admitted | CONSUMED | CMD036 ExecuteProject (B08) | commercial_authorization.consumed.v1 | database |
+| CONSUMED | package_published | DELIVERED | B08: atomic publication of the purchased package | commercial_authorization.delivered.v1 | database |
+| ACTIVE | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
+| CONSUMED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
+| DELIVERED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
+
+### Refund
+
+platform machine (B09 decision D-MACH-B5); initial REQUESTED; terminal COMPLETED, FAILED, REJECTED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial REQUESTED) | REQUESTED | CMD031 RequestRefund (B09); the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way | refund.requested.v1 | database |
+| REQUESTED | approve_refund | APPROVED | CMD032 ApproveRefund (B09) | refund.approved.v1 | database |
+| REQUESTED | reject_refund | REJECTED | B12: the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3) | refund.rejected.v1 | database |
+| APPROVED | dispatch_intent_committed | SUBMITTING | CMD033 ExecuteRefund (B09) | refund.submitting.v1 | database |
+| APPROVED | authorization_lapsed | FAILED | B09: the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch | refund.failed.v1 | database |
+| SUBMITTING | authenticated_completed | COMPLETED | CMD033 ExecuteRefund (B09) | refund.completed.v1 | database |
+| SUBMITTING | ambiguous_transport_result | UNCERTAIN | CMD033 ExecuteRefund (B09) | refund.uncertain.v1 | database |
+| SUBMITTING | proved_no_effect | APPROVED | CMD033 ExecuteRefund (B09) | refund.approved.v1 | database |
+| SUBMITTING | provider_refused | FAILED | CMD033 ExecuteRefund (B09) | refund.failed.v1 | database |
+| UNCERTAIN | reconciliation_completed | COMPLETED | CMD034 ReconcilePayment (B09) | refund.completed.v1 | database |
+| UNCERTAIN | reconciliation_proves_no_effect | APPROVED | CMD034 ReconcilePayment (B09) | refund.approved.v1 | database |
+| UNCERTAIN | reconciliation_proves_refusal | FAILED | CMD034 ReconcilePayment (B09) | refund.failed.v1 | database |
+
+### ReconciliationCase
+
+platform machine (B09 decision D-MACH-B6); initial OPEN; terminal RESOLVED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial OPEN) | OPEN | CMD034 ReconcilePayment (B09); CMD029 and CMD030 open cases the same way | reconciliation_case.opened.v1 | database |
+| OPEN | case_resolved | RESOLVED | B12: the owner's finance review records the explaining facts or decision; no registry command names it (Q-B09-3) | reconciliation_case.resolved.v1 | database |
+
+### PaymentRoute
+
+platform machine (B09 decision D-MACH-B7); initial CONFIGURED; terminal SUSPENDED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial CONFIGURED) | CONFIGURED | B15: the payment integration configures the merchant route (owner action: merchant and KYC identity) | — (no event type registered: the owning package registers it with the edge) | database |
+| CONFIGURED | route_qualified | QUALIFIED | B15: merchant eligibility, environment, capture, refund and settlement verified with live evidence (G-PAYMENT) | — (no event type registered: the owning package registers it with the edge) | database |
+| CONFIGURED | route_suspended | SUSPENDED | B16: an incident or account fact invalidates the route | — (no event type registered: the owning package registers it with the edge) | database |
+| QUALIFIED | route_suspended | SUSPENDED | B16: an incident or account fact invalidates the route | — (no event type registered: the owning package registers it with the edge) | database |
+
+### FiscalIssuerRoute
+
+platform machine (B09 decision D-MACH-B8); initial CONFIGURED; terminal SUSPENDED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial CONFIGURED) | CONFIGURED | B15: the fiscal integration configures the issuer route (owner action: fiscal identity and numbering authorization) | — (no event type registered: the owning package registers it with the edge) | database |
+| CONFIGURED | route_qualified | QUALIFIED | B15: observed or professionally confirmed legal facts, a numbering authorization and verified issuance entitlement | — (no event type registered: the owning package registers it with the edge) | database |
+| CONFIGURED | route_suspended | SUSPENDED | B16: an incident or legal fact invalidates the route | — (no event type registered: the owning package registers it with the edge) | database |
+| QUALIFIED | route_suspended | SUSPENDED | B16: an incident or legal fact invalidates the route | — (no event type registered: the owning package registers it with the edge) | database |
+
+### CorporateGrant
+
+platform machine (B09 decision D-MACH-B9); initial ACTIVE; terminal REVOKED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial ACTIVE) | ACTIVE | B12: the owner application provisions an individually managed corporate identity's grant (08) | — (no event type registered: the owning package registers it with the edge) | database |
+| ACTIVE | grant_revoked | REVOKED | B12: the owner application revokes it | — (no event type registered: the owning package registers it with the edge) | database |
+
+### RefundPolicy
+
+platform machine (B09 decision D-MACH-B10); initial ACTIVE; terminal RETIRED; unlisted edges: REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED.
+
+| From | Event | To | Performed by | Event type | B06 |
+| --- | --- | --- | --- | --- | --- |
+| — | (initial ACTIVE) | ACTIVE | B12: a KAURO_OWNER records a standing refund policy under a fresh step-up; no registry command names it (Q-B09-3) | — (no event type registered: the owning package registers it with the edge) | database |
+| ACTIVE | policy_retired | RETIRED | B12: the owner retires it | — (no event type registered: the owning package registers it with the edge) | database |
 
 Approval has no registry machine: CMD025 ApprovePlan creates it (`approval.created.v1`); CMD026 WithdrawApproval and a
 CMD023 RevisePlan of an APPROVED plan withdraw it once (`approval.withdrawn.v1`); the database keeps a live approval and an

@@ -58,6 +58,7 @@ export {
   READINESS_RESPONSE_SCHEMA,
   FORBIDDEN_RESPONSE_FIELDS,
   buildResponseSchemas,
+  viewSchemaOf,
   commandResponseSchemaId,
   operationalResponseSchemaId,
   declaredMembers,
@@ -65,7 +66,7 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, ROUTE_OUTCOME_FRAGMENTS, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,

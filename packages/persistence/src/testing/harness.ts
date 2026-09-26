@@ -29,6 +29,8 @@ import {
   type CorrelationId,
   type IdGenerator,
   type IdentityContext,
+  type OperatorContext,
+  type ServiceContext,
   type InvitationId,
   type MembershipId,
   type MembershipRole,
@@ -80,11 +82,18 @@ export interface Harness {
   readonly ingressPool: KauroPool;
   /** The inbox ingress over the ingress pool (CMD030's recorder; package B09 binds it to the webhook route). */
   readonly inboxIngress: PgInboxIngress;
+  /** Payment-service pool (login role in kauro_payment; package B09, D-CTX-B1) and its unit-of-work factory: SERVICE contexts only. */
+  readonly paymentPool: KauroPool;
+  readonly payment: PgUnitOfWorkFactory;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
   identity(userId: UserId): IdentityContext;
   system(serviceId?: string): SystemContext;
+  /** A verified service identity of the payment boundary (package B09): runs under kauro_payment and binds no agency until it adopts one. */
+  service(serviceId?: string): ServiceContext;
+  /** A corporate person acting under a corporate role (package B09, D-CTX-B2): runs under kauro_app with its own user bound. */
+  operator(userId: UserId): OperatorContext;
   /** Syncs an identity (verified email + MFA unless told otherwise) under its own context. */
   person(subject: string, verified?: boolean): Promise<UserId>;
   /** CreateAgency as the handler performs it: IDENTITY context, adoptTenant, agency + owner membership + events + journal. */
@@ -163,9 +172,11 @@ export async function start(): Promise<Harness> {
   const assurancePool = createPool({ ...base, max: 2, user: ROLES.assuranceLogin, applicationName: "kauro-test-assurance" });
   const validatorPool = createPool({ ...base, max: 2, user: ROLES.validatorLogin, applicationName: "kauro-test-validator" });
   const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
+  const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
+  const payment = createUnitOfWorkFactory(paymentPool, { clock });
   const proofs = new PgAssuranceProofRecorder(assurancePool);
   const receipts = new PgValidationReceiptRecorder(validatorPool);
   const oracle = await pg.connect("postgres");
@@ -203,10 +214,14 @@ export async function start(): Promise<Harness> {
     validatorPool,
     ingressPool,
     inboxIngress,
+    paymentPool,
+    payment,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
     system: (serviceId = "control-plane") => ({ kind: "SYSTEM", serviceId, correlationId: correlation() }),
+    service: (serviceId = "payment-service") => ({ kind: "SERVICE", serviceId, correlationId: correlation() }),
+    operator: (userId) => ({ kind: "OPERATOR", userId, correlationId: correlation() }),
 
     async person(subject, verified = true) {
       const userId = identityUserId("identity-platform", subject);
@@ -379,6 +394,7 @@ export async function start(): Promise<Harness> {
       await assurancePool.end();
       await validatorPool.end();
       await ingressPool.end();
+      await paymentPool.end();
       await pg.stop();
     },
   };

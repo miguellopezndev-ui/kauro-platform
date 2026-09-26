@@ -1,27 +1,30 @@
 /**
  * The provider-effect protocol (design §6; decisions D-PROTO-B1..B4): how a command with an external effect (CMD028 create
- * order, CMD029 capture, CMD033 refund) keeps every B06 guarantee — one logical operation per idempotency identity, the intent
- * durable before the effect, atomic state + event + outbox, a lost response recovered by the same key — while "no database
- * transaction remains open across ... payment API calls" (07).
+ * order, CMD029 capture, CMD033 refund) keeps every B06 guarantee — the access decision before the journal reservation, one
+ * logical operation per idempotency identity, the intent durable before the effect, state + event + outbox atomic, a lost
+ * response recovered by the same key — while "no database transaction remains open across ... payment API calls" (07).
  *
- *   T1 intent   one unit of work: journal reserve (RESERVED) → authorization → locked preconditions → durable intent (order /
- *               refund rows, the attempt PREPARED with its request hash and provider request identity) → events → COMMIT.
- *               The journal entry stays RESERVED: a duplicate with the same key and body now gets the durable operation.
- *   T2 claim    one short unit of work: CAS the attempt PREPARED → DISPATCHING (event dispatch_intent_committed) with its
- *               dispatch deadline. The single serialization point of "dispatch at most once": a second claimant loses the CAS
- *               and never calls the provider.
+ *   T1 intent   one unit of work in the B06 pipeline order: access decision → journal reserve (RESERVED) → assurance →
+ *               locked preconditions → durable intent (order / refund rows, the attempt PREPARED with its request hash and
+ *               provider request identity, the scope index rows) → events → COMMIT. The journal entry stays RESERVED: a
+ *               duplicate with the same key and body is answered from the durable operation (202, or the final answer).
+ *   T2 claim    one short unit of work: CAS the attempt PREPARED → DISPATCHING (dispatch_intent_committed) with its dispatch
+ *               deadline, and the aggregate's own dispatch edge. The single serialization point of "dispatch at most once": a
+ *               second claimant loses the CAS and never calls the provider.
  *   call        outside any transaction: exactly the prepared request under the attempt's provider request identity, bounded
- *               by the deadline.
- *   T3 settle   one unit of work: lock the attempt and its aggregates, apply the authenticated result monotonically through the
- *               same reconciler the webhook and ReconcilePayment use, then complete the journal: COMMITTED with the 2xx answer,
- *               or UNCERTAIN when the effect is unknown (the answer is 202 with the operation reference; 10 "The API indicates
- *               whether the operation is pending, rejected or uncertain").
+ *               by the deadline (DISPATCH_TIMEOUT_SECONDS).
+ *   T3 settle   one unit of work: lock the aggregate, then the attempt; apply the authenticated result monotonically through the
+ *               same reconciler the webhook and ReconcilePayment use; complete the journal: COMMITTED with the 2xx answer when the
+ *               result is conclusive, UNCERTAIN (answer 202 with the operation reference) when the effect is unknown — 10 "The
+ *               API indicates whether the operation is pending, rejected or uncertain".
  *
- * Resume (same key, journal RESERVED or UNCERTAIN, same digest — B06 answers PENDING): the runtime finds the operation by the
- * journal entry id (orders/attempts carry intent_entry_id) and continues from its durable state: PREPARED → claim and call;
- * DISPATCHING / PROVIDER_PENDING / UNCERTAIN → observe (a read, never a second create) and settle when the observation is
- * conclusive, else answer 202 with the current state; terminal → settle the journal and answer. A crash at any point therefore
- * leaves a state from which the same key converges to one effect.
+ * Resume (same key, journal RESERVED or UNCERTAIN, same digest — the B06 journal answers PENDING): the runtime re-runs the
+ * access decision (B06 D-PIPE-1: a pending entry is answered only to a caller authorized now), finds the operation by the
+ * journal entry id (orders, refunds and attempts carry intent_entry_id) and continues from its durable state: PREPARED → claim
+ * and call; DISPATCHING / PROVIDER_PENDING / UNCERTAIN → observe (a read, never a second create) and settle when the observation
+ * is conclusive, else answer 202 with the current state; a proved no-effect permits a new deliberate attempt of the same logical
+ * operation (ordinal + 1, a new provider request identity), at most MAX_ATTEMPTS_PER_OPERATION (D-PROTO-B3); terminal → settle
+ * the journal and answer. A crash at any point therefore leaves a state from which the same key converges to one effect.
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { CausationId, CommerceUnitOfWork, JournalEntryId, PaymentAttemptRecord } from "@kauro/domain";
@@ -57,7 +60,7 @@ export interface SettleInput {
 
 /**
  * The phases a provider command implements; `runProviderCommand` (implementation mandate M3) sequences them with the journal,
- * the authorizer and the security-event recording of the B06 runtime.
+ * the authorizers and the security-event recording of the B06 runtime.
  */
 export interface ProviderCommandPhases<Body, View> {
   intent(uow: CommerceUnitOfWork, body: Body, causationId: CausationId, now: UtcInstant): Promise<IntentOutcome<View>>;
@@ -69,6 +72,10 @@ export interface ProviderCommandPhases<Body, View> {
   resume(uow: CommerceUnitOfWork, journalEntryId: JournalEntryId): Promise<DurableOperation | null>;
 }
 
-/** Deadline arithmetic of a dispatch: the call's bounded timeout plus a margin after which a watchdog observes (D-PROTO-B3). */
+/** Deadline arithmetic of a dispatch: the call's bounded timeout plus a margin after which a watchdog observes (D-PROTO-B4). */
 export const DISPATCH_TIMEOUT_SECONDS = 30;
 export const DISPATCH_WATCHDOG_MARGIN_SECONDS = 30;
+/** A logical operation makes at most this many attempts, each after a proved no-effect of the previous one (D-PROTO-B3). */
+export const MAX_ATTEMPTS_PER_OPERATION = 3;
+/** The polling guidance of a 202 answer (10 "allowed polling guidance"). */
+export const PENDING_POLL_AFTER_SECONDS = 5;

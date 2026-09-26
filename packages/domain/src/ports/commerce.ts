@@ -1,15 +1,18 @@
 /**
- * Commerce ports (package B09; docs/design/B09-payments-fiscal.md §5): the repositories of migrations 0008..0011, the scope index
- * and the commerce unit of work. They extend the B06 foundation, never fork it: a CommerceUnitOfWork IS a UnitOfWork (same
- * transaction, same context binding, same event publisher, command journal and security events), with the commerce
- * repositories on the same connection and one more capability — adopting the scope of a stored operation (D-CTX-B3).
+ * Commerce ports (package B09; docs/design/B09-payments-fiscal.md §5): the repositories of migrations 0008..0012, the scope
+ * index and the commerce unit of work. They extend the B06 foundation, never fork it: a CommerceUnitOfWork IS a UnitOfWork (the
+ * same transaction on the same connection, the same context binding, event publisher, command journal and security events),
+ * with the commerce repositories on that connection and one more capability — adopting the scope of a stored operation
+ * (`adoptScope`, D-SCOPE-B1), as B06's CreateAgency adopts the agency it mints.
  *
  * Every repository lives inside the unit of work and its context: a read returns null for a row the policies hide, a write
- * outside the context fails at the database. Versioned writes are compare-and-swap on the aggregate version and answer STALE
- * with the current safe version and state (B06 D-VER-1). Money crosses these ports as `bigint` minor units. Implementations
- * belong to @kauro/persistence (implementation mandate M1).
+ * outside the context fails at the database. Versioned writes are compare-and-swap on the aggregate version and answer STALE with
+ * the current safe version and state (B06 D-VER-1). A read of a fact a command relies on without changing it (a route's state,
+ * a corporate grant, the current fiscal profile) happens after that fact's transition lock (B06 D-TX-2). Money crosses these
+ * ports as `bigint` minor units. The `pg` implementations belong to @kauro/persistence (implementation mandate M1).
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { PostingLine } from "../commerce/ledger.js";
 import type {
   CaptureFactRecord,
   CaptureId,
@@ -17,20 +20,20 @@ import type {
   CommercialAuthorizationId,
   CommercialAuthorizationRecord,
   CommercialAuthorizationState,
-  CorporateRoleRecord,
+  CorporateGrantRecord,
+  CorporateRole,
   DeliveryPhase,
   EligibilitySnapshotId,
+  EvidenceArtifactRef,
   EvidenceRef,
   FiscalIssuerRecord,
   FiscalIssuerRef,
   FiscalProfileId,
   FiscalProfileRecord,
   FundsState,
-  InboxId,
   JobRef,
   LedgerEntryRecord,
   LedgerSourceKind,
-  MerchantRef,
   ObservationEffect,
   ObservationSource,
   PaymentAttemptId,
@@ -45,7 +48,6 @@ import type {
   PaymentRouteRecord,
   PriceEligibilitySnapshotRecord,
   ProviderEventExceptionRecord,
-  ProviderExceptionKind,
   ProviderObservationRecord,
   QuoteId,
   QuoteRecord,
@@ -53,7 +55,7 @@ import type {
   ReconciliationCaseId,
   ReconciliationCaseKind,
   ReconciliationCaseRecord,
-  RefundAuthorizationKind,
+  RefundApprovalRecord,
   RefundComponents,
   RefundId,
   RefundOrigin,
@@ -62,7 +64,9 @@ import type {
   RefundRecord,
   RefundState,
   RevocationPhase,
+  ScopeEntry,
   ScopeKind,
+  SettlementId,
   SettlementRecord,
   TaxDocumentId,
   TaxDocumentKind,
@@ -71,18 +75,20 @@ import type {
   TaxRuleSnapshot,
   TaxTreatment,
 } from "../commerce/records.js";
-import type { PostingLine } from "../commerce/ledger.js";
 import type { ServiceMode } from "../model/aggregates.js";
-import type { AgencyId, ApprovalId, AssuranceProofId, CapabilityId, JournalEntryId, MembershipId, PlanId, ProjectId, UserId } from "../model/ids.js";
+import type { AgencyId, ApprovalId, CapabilityId, EventId, InboxId, JournalEntryId, MembershipId, PlanId, ProjectId, UserId } from "../model/ids.js";
 import type { ExecutionContext } from "../model/tenant.js";
 import type { VersionedWrite } from "./repositories.js";
 import type { UnitOfWork, UnitOfWorkFactory, UnitOfWorkOptions } from "./unit-of-work.js";
 
-// --- platform configuration ----------------------------------------------------------------------------------------------------
+// --- platform configuration and principals ---------------------------------------------------------------------------------------
 
 export interface PaymentRouteRepository {
   get(routeId: PaymentRouteId): Promise<PaymentRouteRecord | null>;
-  /** The one QUALIFIED route of a provider and environment (unique by index), or null. */
+  /**
+   * The one QUALIFIED route of a provider and environment (unique by index), read after the route's transition lock (a
+   * suspension issued while a checkout is in flight waits for it; one committed first is read), or null.
+   */
   findQualified(provider: string, environment: PaymentEnvironment): Promise<PaymentRouteRecord | null>;
 }
 
@@ -91,20 +97,25 @@ export interface NewFiscalProfile extends Omit<FiscalProfileRecord, "supersededA
 }
 
 export interface FiscalRepository {
-  /** The current (unsuperseded) reviewed version of an agency's fiscal profile, or null. */
+  /** The current (unsuperseded) reviewed version of an agency's fiscal profile, read after its transition lock, or null. */
   currentProfile(agencyId: AgencyId): Promise<FiscalProfileRecord | null>;
   getProfile(profileId: FiscalProfileId): Promise<FiscalProfileRecord | null>;
+  /** An issuer route, read after its transition lock (a suspension orders itself with a checkout in flight). */
   getIssuer(issuerRef: FiscalIssuerRef): Promise<FiscalIssuerRecord | null>;
   /**
-   * Records a reviewed version (OPERATOR finance scope or control plane): supersedes the current one once, in the same unit of
-   * work (fiscal_profiles_one_current / supersedes_once close the race of two reviews).
+   * Records a reviewed version (an OPERATOR with an ACTIVE KAURO_OWNER grant in the agency's finance scope; the database checks
+   * the grant): supersedes the current one once, in the same unit of work (fiscal_profiles_one_current / supersedes_once close the
+   * race of two reviews).
    */
   recordProfile(profile: NewFiscalProfile): Promise<FiscalProfileRecord>;
 }
 
-export interface CorporateRoleRepository {
-  /** The caller's own ACTIVE corporate grants (self policy); never another person's. */
-  activeRolesOf(userId: UserId): Promise<ReadonlyArray<CorporateRoleRecord>>;
+export interface CorporateGrantRepository {
+  /**
+   * The caller's own ACTIVE grant of `role` (self policy), read after the grant's transition lock so a revocation issued while
+   * a command is in flight waits for it and one committed first is read (B06 D-TX-2); null when absent. Never another person's.
+   */
+  activeGrant(userId: UserId, role: CorporateRole): Promise<CorporateGrantRecord | null>;
 }
 
 export interface RefundPolicyRepository {
@@ -113,17 +124,13 @@ export interface RefundPolicyRepository {
 
 // --- scope index (D-SCOPE-B1) -----------------------------------------------------------------------------------------------------
 
-export interface ScopeEntry {
-  readonly kind: ScopeKind;
-  readonly key: string;
-  readonly agencyId: AgencyId;
-  readonly orderId: PaymentOrderId | null;
-}
-
 export interface ScopeIndex {
-  /** Appends the scope of a new stored operation or a newly learned provider identity (the agency's own context writes it). */
+  /** Appends the scope of a new stored operation or of a newly learned provider identity (written by the operation's writer). */
   record(entry: ScopeEntry, now: UtcInstant): Promise<void>;
-  /** Reads one entry: the owning tenant, or a SERVICE/OPERATOR principal before it adopts a scope; null when unknown. */
+  /**
+   * Reads one entry: the owning tenant (its own rows), the payment service (any row) or an operator holding an ACTIVE corporate
+   * grant (REFUND rows) before it adopts a scope; null when unknown to this reader (a foreign and a nonexistent key look alike).
+   */
   resolve(kind: ScopeKind, key: string): Promise<ScopeEntry | null>;
 }
 
@@ -147,6 +154,7 @@ export interface NewQuote {
   readonly discountCents: bigint;
   readonly serviceCents: bigint;
   readonly fiscalProfileId: FiscalProfileId;
+  readonly issuerRef: FiscalIssuerRef;
   readonly tax: TaxRuleSnapshot;
   readonly taxCents: bigint;
   readonly totalCents: bigint;
@@ -164,7 +172,10 @@ export interface QuoteRepository {
   lock(quoteId: QuoteId): Promise<QuoteRecord | null>;
   /** The eligibility snapshot of a quote (immutable). */
   snapshot(quoteId: QuoteId): Promise<PriceEligibilitySnapshotRecord | null>;
-  /** Inserts an ISSUED quote at version 1 with its snapshot (the caller publishes quote.issued.v1); the database re-checks the arithmetic. */
+  /**
+   * Births the quote DRAFT (version 1) and issues it (issue_quote, version 2) with its snapshot in the caller's transaction; the
+   * caller publishes quote.drafted.v1 and quote.issued.v1. The database re-checks the arithmetic and the bindings.
+   */
   issue(quote: NewQuote, snapshot: PriceEligibilitySnapshotRecord): Promise<QuoteRecord>;
   transition(quoteId: QuoteId, expectedVersion: number, change: { readonly state: QuoteState; readonly supersededByQuoteId?: QuoteId }, now: UtcInstant): Promise<VersionedWrite<QuoteRecord>>;
 }
@@ -188,6 +199,13 @@ export interface NewPaymentOrder {
   readonly createdAt: UtcInstant;
 }
 
+export interface PaymentOrderChange {
+  readonly state: PaymentOrderState;
+  /** Learned once (provider_order_created); never re-pointed (the database refuses a change, KA004). */
+  readonly providerOrderId?: string;
+  readonly providerApprovalUrl?: string;
+}
+
 export interface PaymentOrderRepository {
   get(orderId: PaymentOrderId): Promise<PaymentOrderRecord | null>;
   lock(orderId: PaymentOrderId): Promise<PaymentOrderRecord | null>;
@@ -195,9 +213,9 @@ export interface PaymentOrderRepository {
   findByIntentEntry(entryId: JournalEntryId): Promise<PaymentOrderRecord | null>;
   /** The open (non-terminal) order of a project, if any (payment_orders_one_open_per_project guarantees at most one). */
   findOpenForProject(projectId: ProjectId): Promise<PaymentOrderRecord | null>;
-  /** Inserts INTENT_CREATED at version 1; a second open order of the project fails the unique index (ORDER_ALREADY_OPEN). */
+  /** Inserts INTENT_CREATED at version 1; a second open order of the project fails the unique index (PAYMENT_PENDING). */
   insert(order: NewPaymentOrder): Promise<PaymentOrderRecord>;
-  transition(orderId: PaymentOrderId, expectedVersion: number, change: { readonly state: PaymentOrderState; readonly providerOrderId?: string }, now: UtcInstant): Promise<VersionedWrite<PaymentOrderRecord>>;
+  transition(orderId: PaymentOrderId, expectedVersion: number, change: PaymentOrderChange, now: UtcInstant): Promise<VersionedWrite<PaymentOrderRecord>>;
 }
 
 export interface NewPaymentAttempt {
@@ -206,6 +224,8 @@ export interface NewPaymentAttempt {
   readonly orderId: PaymentOrderId;
   readonly refundId?: RefundId;
   readonly operation: Exclude<PaymentOperation, "WITHDRAW">;
+  /** 1 for the first attempt of the logical operation; a later attempt follows only a proved no-effect (D-PROTO-B3). */
+  readonly ordinal: number;
   readonly provider: string;
   readonly environment: PaymentEnvironment;
   readonly requestHash: Sha256Hex;
@@ -216,10 +236,12 @@ export interface NewPaymentAttempt {
 
 export interface AttemptChange {
   readonly state: PaymentAttemptState;
+  /** Set once, with dispatch_intent_committed: the bounded call's deadline after which the watchdog observes (D-PROTO-B4). */
   readonly dispatchDeadlineAt?: UtcInstant;
   readonly lastObservedAt: UtcInstant;
   readonly evidenceHash?: Sha256Hex;
-  readonly outcomeReason?: string;
+  /** A server token (PROVIDER_DECLINED, TIMEOUT, NOT_FOUND_BY_REQUEST_ID, ...); never provider prose. */
+  readonly outcomeCode?: string;
 }
 
 export interface PaymentAttemptRepository {
@@ -228,6 +250,8 @@ export interface PaymentAttemptRepository {
   findByIntentEntry(entryId: JournalEntryId): Promise<PaymentAttemptRecord | null>;
   /** The live (PREPARED, DISPATCHING, PROVIDER_PENDING, UNCERTAIN) attempt of an order operation or of a refund. */
   findLive(target: { readonly orderId: PaymentOrderId; readonly operation: "CREATE_ORDER" | "CAPTURE" } | { readonly refundId: RefundId }): Promise<PaymentAttemptRecord | null>;
+  /** How many attempts the logical operation already has (the next ordinal; the database bounds it). */
+  countFor(target: { readonly orderId: PaymentOrderId; readonly operation: "CREATE_ORDER" | "CAPTURE" } | { readonly refundId: RefundId }): Promise<number>;
   listForOrder(orderId: PaymentOrderId): Promise<ReadonlyArray<PaymentAttemptRecord>>;
   /** Inserts PREPARED at version 1: the durable intent, before any provider call is possible. */
   prepare(attempt: NewPaymentAttempt): Promise<PaymentAttemptRecord>;
@@ -240,11 +264,12 @@ export interface NewCaptureFact {
   readonly captureId: CaptureId;
   readonly agencyId: AgencyId;
   readonly orderId: PaymentOrderId;
+  /** The status of the first authenticated observation (D-INIT-B1). */
   readonly status: CaptureStatus;
   readonly provider: string;
   readonly environment: PaymentEnvironment;
   readonly providerCaptureId: string;
-  readonly merchantRef: MerchantRef;
+  readonly merchantRef: PaymentOrderRecord["merchantRef"];
   readonly payeeDigest: Sha256Hex;
   readonly amountCents: bigint;
   /** Required for COMPLETED and REVERSED (fixed at completion); zero components otherwise. */
@@ -252,6 +277,7 @@ export interface NewCaptureFact {
   readonly fundsState: FundsState;
   readonly providerFeeCents?: bigint;
   readonly providerCompletedAt?: UtcInstant;
+  readonly firstObservationSource: ObservationSource;
   readonly observedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
   readonly attemptId?: PaymentAttemptId;
@@ -259,8 +285,9 @@ export interface NewCaptureFact {
 
 export interface CaptureAdvance {
   readonly status: CaptureStatus;
-  /** Only on PENDING → COMPLETED | REVERSED (the database refuses it anywhere else, KA012). */
+  /** Only on PENDING → COMPLETED | REVERSED (the database refuses it anywhere else, KP005 FACT_REGRESSION). */
   readonly allocation?: RefundComponents;
+  readonly providerFeeCents?: bigint;
   readonly providerCompletedAt?: UtcInstant;
   readonly observedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
@@ -270,15 +297,17 @@ export interface CaptureAdvance {
 export interface CaptureFactRepository {
   get(captureId: CaptureId): Promise<CaptureFactRecord | null>;
   lock(captureId: CaptureId): Promise<CaptureFactRecord | null>;
-  /** The fact of a provider capture identity in the current scope (the economic identity; R2-140). */
+  /** The fact of a provider capture identity in the current scope (the economic identity of R2-140). */
   findByProviderCapture(provider: string, environment: PaymentEnvironment, providerCaptureId: string): Promise<CaptureFactRecord | null>;
   listForOrder(orderId: PaymentOrderId): Promise<ReadonlyArray<CaptureFactRecord>>;
-  /** Inserts the fact at its first observed status (version 1); an over-allocation fails KA011. */
+  /** What the refunds of a capture commit (APPROVED, SUBMITTING, UNCERTAIN, COMPLETED), summed per component. */
+  committedRefunds(captureId: CaptureId): Promise<RefundComponents>;
+  /** Inserts the fact at its first observed status (version 1); an over-allocation of the order fails KP002. */
   insert(fact: NewCaptureFact): Promise<CaptureFactRecord>;
-  /** A listed status move at expectedVersion + 1 (KA008 for an unlisted one, KA012 for a regression). */
+  /** A listed status move at expectedVersion + 1 (KA008 for an unlisted one, KP005 for a regression). */
   advance(captureId: CaptureId, expectedVersion: number, change: CaptureAdvance, now: UtcInstant): Promise<VersionedWrite<CaptureFactRecord>>;
-  /** Observation-only facts without a new version: provider-reported funds availability, the reported fee (once), the time. */
-  observeFunds(captureId: CaptureId, change: { readonly fundsState: FundsState; readonly providerFeeCents?: bigint; readonly observedAt: UtcInstant }): Promise<CaptureFactRecord>;
+  /** Observation-only facts without a new version: provider-reported funds availability and the latest observation time. */
+  observeFunds(captureId: CaptureId, change: { readonly fundsState: FundsState; readonly observedAt: UtcInstant }): Promise<CaptureFactRecord>;
 }
 
 export interface NewProviderObservation {
@@ -287,6 +316,7 @@ export interface NewProviderObservation {
   readonly source: ObservationSource;
   readonly inboxId?: InboxId;
   readonly attemptId?: PaymentAttemptId;
+  readonly artifactRef?: EvidenceArtifactRef;
   readonly subjectKind: "ORDER" | "CAPTURE" | "REFUND";
   readonly providerRef: string;
   readonly observedStatus: string;
@@ -302,6 +332,8 @@ export interface NewProviderObservation {
 export interface ProviderObservationRepository {
   append(observation: NewProviderObservation): Promise<ProviderObservationRecord>;
   listForOrder(orderId: PaymentOrderId): Promise<ReadonlyArray<ProviderObservationRecord>>;
+  /** The latest observation time already applied to a subject (a staler observation is kept as history only). */
+  latestAppliedAt(orderId: PaymentOrderId, subjectKind: "ORDER" | "CAPTURE" | "REFUND", providerRef: string): Promise<UtcInstant | null>;
 }
 
 // --- commercial authorizations -------------------------------------------------------------------------------------------------------
@@ -332,7 +364,7 @@ export interface AuthorizationChange {
   readonly jobRef?: JobRef;
   readonly consumedAt?: UtcInstant;
   readonly deliveredAt?: UtcInstant;
-  readonly revocation?: { readonly at: UtcInstant; readonly phase: RevocationPhase; readonly reason: string };
+  readonly revocation?: { readonly at: UtcInstant; readonly phase: RevocationPhase; readonly code: string };
 }
 
 export interface CommercialAuthorizationRepository {
@@ -340,7 +372,7 @@ export interface CommercialAuthorizationRepository {
   lock(authorizationId: CommercialAuthorizationId): Promise<CommercialAuthorizationRecord | null>;
   findByQuote(quoteId: QuoteId): Promise<CommercialAuthorizationRecord | null>;
   findByCapture(captureId: CaptureId): Promise<CommercialAuthorizationRecord | null>;
-  /** Inserts ACTIVE at version 1; the database refuses it without a completed capture that pays the order in full (KA013). */
+  /** Inserts ACTIVE at version 1; the database refuses it without a completed capture that alone pays the order (KP004). */
   issue(authorization: NewCommercialAuthorization): Promise<CommercialAuthorizationRecord>;
   transition(authorizationId: CommercialAuthorizationId, expectedVersion: number, change: AuthorizationChange, now: UtcInstant): Promise<VersionedWrite<CommercialAuthorizationRecord>>;
 }
@@ -354,25 +386,15 @@ export interface NewRefundRequest {
   readonly orderId: PaymentOrderId;
   readonly captureId: CaptureId;
   readonly origin: RefundOrigin;
+  /** A label (CMD031) or a server token (the reconciler's EXCESS_CAPTURE request); stored, never copied into an event. */
   readonly reasonCode: string;
   readonly evidenceRef?: EvidenceRef;
   readonly termsHash: Sha256Hex;
   readonly deliveryPhase: DeliveryPhase;
   readonly proposed: RefundComponents;
   readonly requestedByMembershipId?: MembershipId;
+  readonly requestedByUserId?: UserId;
   readonly requestedAt: UtcInstant;
-}
-
-export interface RefundApproval {
-  readonly amounts: RefundComponents;
-  readonly authorizationKind: RefundAuthorizationKind;
-  readonly authorizationProofRef?: AssuranceProofId;
-  readonly authorizationPolicyId?: RefundPolicyId;
-  readonly authorizationHash: Sha256Hex;
-  readonly effectsHash: Sha256Hex;
-  readonly creditNoteRequired: boolean;
-  readonly approvedByUserId: UserId;
-  readonly approvedAt: UtcInstant;
 }
 
 export interface RefundChange {
@@ -380,18 +402,25 @@ export interface RefundChange {
   readonly providerRefundId?: string;
   readonly evidenceHash?: Sha256Hex;
   readonly completedAt?: UtcInstant;
-  readonly failedReason?: string;
-  readonly rejected?: { readonly reason: string; readonly byUserId: UserId; readonly at: UtcInstant };
+  readonly failureCode?: string;
+  readonly rejected?: { readonly code: string; readonly byUserId: UserId; readonly at: UtcInstant };
 }
 
 export interface RefundRepository {
   get(refundId: RefundId): Promise<RefundRecord | null>;
   lock(refundId: RefundId): Promise<RefundRecord | null>;
   listForCapture(captureId: CaptureId): Promise<ReadonlyArray<RefundRecord>>;
-  /** Inserts REQUESTED at version 1; a second open request of the capture fails refunds_one_requested_per_capture. */
+  /** The REQUESTED refund of a capture, if any (refunds_one_requested_per_capture guarantees at most one). */
+  findOpenForCapture(captureId: CaptureId): Promise<RefundRecord | null>;
+  /** Inserts REQUESTED at version 1; a second open request of the capture fails the unique index (REFUND_REQUEST_OPEN). */
   request(refund: NewRefundRequest): Promise<RefundRecord>;
-  /** REQUESTED → APPROVED with the immutable intent; the capture ceiling is enforced under its row lock (KA010). */
-  approve(refundId: RefundId, expectedVersion: number, approval: RefundApproval, now: UtcInstant): Promise<VersionedWrite<RefundRecord>>;
+  /**
+   * REQUESTED → APPROVED with the immutable intent. The database takes the capture's commitment lock and refuses an amount
+   * above the remaining components (KP003 → REFUND_EXCEEDS_REMAINING; READ COMMITTED only, KP009), an approver without an ACTIVE
+   * KAURO_OWNER grant (KP007), an approver who requested the refund (segregation, KP008, D-AUTHZ-B2), and a cited standing
+   * policy that does not cover the refund (KP010).
+   */
+  approve(refundId: RefundId, expectedVersion: number, approval: RefundApprovalRecord, now: UtcInstant): Promise<VersionedWrite<RefundRecord>>;
   transition(refundId: RefundId, expectedVersion: number, change: RefundChange, now: UtcInstant): Promise<VersionedWrite<RefundRecord>>;
 }
 
@@ -420,7 +449,7 @@ export interface TaxDocumentChange {
   readonly issueRequestHash?: Sha256Hex;
   readonly providerDocumentId?: string;
   readonly legalNumber?: string;
-  readonly rejectionReason?: string;
+  readonly rejectionCode?: string;
   readonly evidenceHash?: Sha256Hex;
   readonly issuedAt?: UtcInstant;
 }
@@ -430,18 +459,21 @@ export interface TaxDocumentRepository {
   lock(documentId: TaxDocumentId): Promise<TaxDocumentRecord | null>;
   findLiveInvoice(captureId: CaptureId): Promise<TaxDocumentRecord | null>;
   findLiveCreditNote(refundId: RefundId): Promise<TaxDocumentRecord | null>;
+  /** Blocked DRAFT documents of an agency (the fiscal consumer re-evaluates them when the reviewed facts change). */
+  listBlockedDrafts(limit: number): Promise<ReadonlyArray<TaxDocumentRecord>>;
   draft(document: NewTaxDocument): Promise<TaxDocumentRecord>;
   /** DRAFT only: re-points the draft at the reviewed profile, issuer and tax, or records why it stays blocked (version + 1). */
   redraft(documentId: TaxDocumentId, expectedVersion: number, change: { readonly fiscalProfileId: FiscalProfileId; readonly issuerRef: FiscalIssuerRef; readonly taxTreatment: TaxTreatment; readonly taxCents: bigint; readonly blockedReason: string | null }, now: UtcInstant): Promise<VersionedWrite<TaxDocumentRecord>>;
   transition(documentId: TaxDocumentId, expectedVersion: number, change: TaxDocumentChange, now: UtcInstant): Promise<VersionedWrite<TaxDocumentRecord>>;
 }
 
-// --- ledger, settlements, cases, provider ingress -------------------------------------------------------------------------------------
+// --- ledger, settlements, cases, provider inbox ----------------------------------------------------------------------------------------
 
 export interface PostingSet {
-  readonly agencyId: AgencyId;
-  /** The domain event whose economic fact the set records (its idempotency identity). */
-  readonly eventId: string;
+  /** The agency of the source event, or null for a platform-level movement (a settlement observation). */
+  readonly agencyId: AgencyId | null;
+  /** The source: exactly one of a domain event (capture, fee, refund, chargeback) or a settlement observation. */
+  readonly source: { readonly kind: "EVENT"; readonly eventId: EventId } | { readonly kind: "SETTLEMENT"; readonly settlementId: SettlementId };
   readonly sourceKind: LedgerSourceKind;
   readonly sourceRef: string;
   readonly currency: string;
@@ -451,13 +483,16 @@ export interface PostingSet {
 }
 
 export interface LedgerRepository {
-  /** Appends a balanced set (checked in code and at commit, KA009); a second set for the same event fails its unique key. */
-  post(set: PostingSet, now: UtcInstant): Promise<ReadonlyArray<LedgerEntryRecord>>;
+  /**
+   * Appends a balanced set (checked in code and at commit, KP001). The source is the idempotency identity: a second set for the
+   * same source returns the entries already posted and writes nothing (a replayed consumer delivery posts once).
+   */
+  post(set: PostingSet, now: UtcInstant): Promise<{ readonly posted: boolean; readonly entries: ReadonlyArray<LedgerEntryRecord> }>;
   listForSource(sourceKind: LedgerSourceKind, sourceRef: string): Promise<ReadonlyArray<LedgerEntryRecord>>;
 }
 
 export interface SettlementRepository {
-  /** SERVICE principal (the settlement reconciler): appends a balance observation; bank-available needs bank evidence. */
+  /** SERVICE principal without an agency scope: appends a balance observation; bank-available needs bank evidence. */
   record(settlement: SettlementRecord): Promise<SettlementRecord>;
   latest(routeId: PaymentRouteId): Promise<SettlementRecord | null>;
 }
@@ -482,12 +517,12 @@ export interface ReconciliationCaseRepository {
    * adds history, never a second case. `opened` tells whether this call created it (and must publish its event).
    */
   open(entry: NewReconciliationCase): Promise<{ readonly opened: boolean; readonly record: ReconciliationCaseRecord }>;
-  resolve(caseId: ReconciliationCaseId, expectedVersion: number, resolution: string, now: UtcInstant): Promise<VersionedWrite<ReconciliationCaseRecord>>;
+  resolve(caseId: ReconciliationCaseId, expectedVersion: number, resolutionCode: string, now: UtcInstant): Promise<VersionedWrite<ReconciliationCaseRecord>>;
   listOpenForOrder(orderId: PaymentOrderId): Promise<ReadonlyArray<ReconciliationCaseRecord>>;
 }
 
-/** An inbox row of a provider event (B06 table inbox_records; contract InboxRecord). */
-export interface ProviderInboxEntry {
+/** An inbox row of a payment provider's event (B06 table inbox_records; contract InboxRecord), as its consumer sees it. */
+export interface PaymentInboxEntry {
   readonly inboxId: InboxId;
   readonly provider: string;
   readonly environment: "LOCAL" | "SANDBOX" | "LIVE";
@@ -496,23 +531,23 @@ export interface ProviderInboxEntry {
   readonly state: "RECEIVED" | "PROCESSING" | "APPLIED" | "IGNORED" | "RETRYABLE" | "REJECTED";
   readonly receivedAt: UtcInstant;
   readonly appliedAt?: UtcInstant;
-  readonly resultEventId?: string;
+  readonly resultEventId?: EventId;
+  /** Deliveries of the same event carried other bodies: the record cannot be APPLIED before reconciliation (B06 D-ING-1). */
+  readonly conflictingBodies: number;
 }
 
-export type InboxReceipt =
-  | { readonly kind: "NEW"; readonly entry: ProviderInboxEntry }
-  /** Same provider event id and body: a repeated delivery (no new effect; the recorded outcome answers). */
-  | { readonly kind: "DUPLICATE"; readonly entry: ProviderInboxEntry }
-  /** Same provider event id, another body: never applied (forged or broken provider event). */
-  | { readonly kind: "CONFLICT"; readonly entry: ProviderInboxEntry };
-
-export interface ProviderInboxRepository {
-  /** INSERT ... ON CONFLICT (provider, environment, external_event_id) DO NOTHING, then the durable answer (07 inbox identity). */
-  receive(entry: Omit<ProviderInboxEntry, "inboxId" | "state" | "appliedAt" | "resultEventId">): Promise<InboxReceipt>;
-  /** The consumer outcome, once: APPLIED (with its result event), IGNORED, REJECTED or RETRYABLE. */
-  complete(inboxId: InboxId, outcome: { readonly state: "APPLIED" | "IGNORED" | "REJECTED" | "RETRYABLE"; readonly resultEventId?: string }, now: UtcInstant): Promise<ProviderInboxEntry>;
-  /** A verified event no order of any agency can take (platform finance review; S058, CMD030-DENY). */
-  recordException(exception: Omit<ProviderEventExceptionRecord, "exceptionId"> & { readonly kind: ProviderExceptionKind }): Promise<ProviderEventExceptionRecord>;
+/**
+ * The payment service's consumer side of the B06 inbox (D-ING-B1): the payment service is the consumer of the events of payment
+ * providers and settles them in the transaction that applies them, so an application and its inbox settlement commit together.
+ * The ingress half stays B06's InboxIngress (kauro_ingress).
+ */
+export interface PaymentInboxRepository {
+  /** Locks the record FOR UPDATE (a concurrent delivery of the same event waits here) and returns it, or null when unknown. */
+  lockForApply(inboxId: InboxId): Promise<PaymentInboxEntry | null>;
+  /** The consumer outcome, once: APPLIED (with its result event), IGNORED, REJECTED or RETRYABLE (B06 guards apply). */
+  settle(inboxId: InboxId, outcome: { readonly state: "APPLIED" | "IGNORED" | "REJECTED" | "RETRYABLE"; readonly resultEventId?: EventId }, now: UtcInstant): Promise<PaymentInboxEntry>;
+  /** A verified event no order of any agency can take (the owner's finance review; S058, CMD030-DENY). */
+  recordException(exception: Omit<ProviderEventExceptionRecord, "exceptionId">): Promise<ProviderEventExceptionRecord>;
 }
 
 // --- the commerce unit of work -----------------------------------------------------------------------------------------------------
@@ -520,7 +555,7 @@ export interface ProviderInboxRepository {
 export interface CommerceRepositories {
   readonly routes: PaymentRouteRepository;
   readonly fiscal: FiscalRepository;
-  readonly corporateRoles: CorporateRoleRepository;
+  readonly corporateGrants: CorporateGrantRepository;
   readonly refundPolicies: RefundPolicyRepository;
   readonly quotes: QuoteRepository;
   readonly orders: PaymentOrderRepository;
@@ -533,20 +568,29 @@ export interface CommerceRepositories {
   readonly ledger: LedgerRepository;
   readonly settlements: SettlementRepository;
   readonly cases: ReconciliationCaseRepository;
-  readonly inbox: ProviderInboxRepository;
+  readonly inbox: PaymentInboxRepository;
 }
 
 export interface CommerceUnitOfWork extends UnitOfWork {
   readonly commerce: CommerceRepositories;
   readonly scopes: ScopeIndex;
   /**
-   * SERVICE and OPERATOR contexts only, at most once per unit of work (D-CTX-B3, like B06 adoptTenant): resolves the stored
-   * operation through the scope index and binds its agency — kauro.agency_id for SERVICE (tenant scope, one agency),
-   * kauro.finance_agency_id for OPERATOR (finance scope: commerce rows only). Returns null when the key is unknown (the
+   * SERVICE and OPERATOR contexts only, at most once per unit of work (D-SCOPE-B1, like B06 adoptTenant): resolves the stored
+   * operation through the scope index and binds its agency — kauro.agency_id for SERVICE (one agency, commerce rows and the
+   * column-scoped prerequisites only, by the grants of kauro_payment), kauro.finance_agency_id for OPERATOR (finance scope:
+   * commerce rows only, while the operator's corporate grant is ACTIVE). Returns null when the key is unknown to the reader (the
    * command answers NOT_FOUND: foreign and nonexistent look alike). Any other use is INTEGRITY_FAILURE.
    */
   adoptScope(kind: ScopeKind, key: string): Promise<AgencyId | null>;
-  /** The agency adopted by adoptScope, or the TENANT agency; null before adoption. */
+  /**
+   * OPERATOR contexts only, at most once per unit of work, and never after adoptScope: binds kauro.finance_agency_id to an
+   * agency the corporate owner names for a review that is not keyed by a stored operation — recording a reviewed fiscal profile
+   * version (FiscalRepository.recordProfile) or resolving a reconciliation case. The finance scope admits rows only while the
+   * session's person holds an ACTIVE KAURO_OWNER grant (kauro.in_finance_scope), so naming an agency grants nothing by itself; no
+   * catalogue command of B09 uses it (open question Q-B09-3). Any other use is INTEGRITY_FAILURE.
+   */
+  adoptFinanceScope(agencyId: AgencyId): Promise<void>;
+  /** The agency adopted by adoptScope, or the TENANT agency; null before adoption and for platform-level SERVICE work. */
   readonly commerceScope: AgencyId | null;
 }
 

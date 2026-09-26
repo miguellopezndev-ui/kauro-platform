@@ -15,6 +15,7 @@ import {
   isServiceMode,
   statesOf,
   transition,
+  COMMERCE_PLATFORM_MACHINES,
 } from "../src/index.js";
 import { NOW, activeAgency, agency, at, authority, capability, client, id, membership, refused, users } from "./fixtures.js";
 
@@ -166,7 +167,9 @@ test("CMD011 guards: archived client, agency not open, unoffered mode before any
 });
 
 test("platform machines EndClient (D-AGG-2) and Project (D-AGG-1) obey the registry's unlisted-transition policy", () => {
-  assert.deepEqual(PLATFORM_STATE_MACHINES.map((m) => m.contract), ["EndClient", "Project"]);
+  // B06 declares EndClient and Project; the payments package appends its platform machines after them (B09 D-MACH-B1..B10)
+  assert.deepEqual(PLATFORM_STATE_MACHINES.slice(0, 2).map((m) => m.contract), ["EndClient", "Project"]);
+  assert.deepEqual(PLATFORM_STATE_MACHINES.slice(2).map((m) => m.contract), COMMERCE_PLATFORM_MACHINES.map((m) => m.contract));
   for (const m of PLATFORM_STATE_MACHINES) assert.equal(m.unlistedTransition, "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED");
   assert.deepEqual([...statesOf("EndClient")].sort(), ["ACTIVE", "ARCHIVED"]);
   assert.equal(transition("EndClient", "ACTIVE", "archive_client"), "ARCHIVED");

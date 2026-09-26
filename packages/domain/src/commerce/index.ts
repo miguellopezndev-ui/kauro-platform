@@ -1,7 +1,8 @@
 /**
  * The commerce domain of package B09 (payments and fiscal workflow; docs/design/B09-payments-fiscal.md): exact money, the
  * offer arithmetic, fiscal treatment, capture matching and allocation, commercial authority predicates, refund arithmetic and
- * authority, ledger postings, the normalized provider vocabulary, the platform machines, the event vocabulary and the records.
+ * authority, ledger postings, the normalized provider vocabulary, the platform machines, the event vocabulary, the principals
+ * beyond agency membership and the records.
  */
 export type { CommerceFailureReason } from "./failure-reasons.js";
 export { COMMERCE_FAILURE_REASONS } from "./failure-reasons.js";
@@ -36,19 +37,20 @@ export type { ProviderOutcomeKind, AmbiguityReason, ProviderRequest, ScopeKey, O
 export { providerRequestHash, providerRequestIdOf, providerScopeKey, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
 
 export type { CaptureMismatch, CaptureMatch, CaptureStatusStep } from "./capture.js";
-export { matchCapture, captureStatusStep, splitObligation, allocateCapture, isFullyPaid } from "./capture.js";
+export { matchCapture, captureStatusStep, splitObligation, allocateCapture, authorizesObligation, isFullyPaid } from "./capture.js";
 
 export type { CheckoutBlocker, SubjectFacts, CheckoutFacts } from "./authority.js";
 export { CHECKOUT_BLOCKERS, checkoutBlockers, authorizationBlockers, honoredAfterPriceExpiry, blockerFailure, revocationPhaseOf, deliveryPhaseOf } from "./authority.js";
 
-export type { RefundReasonCode, RefundAmountCheck, RefundEffects, RefundAuthorizationPreimage } from "./refunds.js";
+export type { RefundAmountCheck, RefundEffects, RefundAuthorizationPreimage } from "./refunds.js";
 export {
-  REFUND_REASON_CODES,
-  isRefundReasonCode,
   ZERO_COMPONENTS,
+  COMMITTING_REFUND_STATES,
   componentsTotal,
+  addComponents,
   refundableBalance,
   proposeRefund,
+  approvedComponents,
   checkRefundAmounts,
   policyCovers,
   REFUND_AUTHORIZATION_DOMAIN,
@@ -67,3 +69,6 @@ export { COMMERCE_PLATFORM_MACHINES } from "./machines.js";
 
 export type { CommerceAggregateKind, CommerceEventType, CommerceConsumer } from "./events.js";
 export { COMMERCE_AGGREGATE_KINDS, COMMERCE_EVENT_TYPES, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS } from "./events.js";
+
+export type { ServiceRole, ServiceIdentity } from "./principals.js";
+export { SERVICE_ROLE_TABLE, serviceHoldsRole, CORPORATE_ROLES, isCorporateCommandRole, COMMERCE_POLICY_VERSION } from "./principals.js";

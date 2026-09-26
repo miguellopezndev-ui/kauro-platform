@@ -5,9 +5,10 @@
  * prerequisite binds the same source and policy. 15 "Price and source expiry races". S060: a price-valid quote whose source was
  * deleted blocks checkout).
  *
- * The facts are read by the command inside its unit of work (row locks where the command edits); these functions only decide.
- * Every blocker is a stable token (QuoteView.checkoutBlockers) and maps to the failure a command answers (`blockerFailure`).
- * The order of the list is the order of the checks: the first blocker is the answer of a command.
+ * The facts are read by the command inside its unit of work — the rows it edits under row locks, the facts it relies on without
+ * changing them after their transition locks (B06 D-TX-2) — and these functions only decide. Every blocker is a stable token
+ * (QuoteView.checkoutBlockers) and maps to the failure a command answers (`blockerFailure`). The order of the list is the order
+ * of the checks: the first blocker is the answer of a command.
  */
 import type { Capability, UtcInstant } from "@kauro/contracts";
 import type { AgencyState } from "../model/agency.js";
@@ -32,6 +33,7 @@ export const CHECKOUT_BLOCKERS = [
   "PAYMENT_ROUTE_UNQUALIFIED",
   "FISCAL_ROUTE_UNQUALIFIED",
   "FISCAL_TREATMENT_UNREVIEWED",
+  "FISCAL_TREATMENT_CHANGED",
 ] as const;
 export type CheckoutBlocker = (typeof CHECKOUT_BLOCKERS)[number];
 
@@ -44,11 +46,11 @@ export interface SubjectFacts {
   readonly plan: Pick<PlanRecord, "state" | "approvalId" | "bodyHash"> | null;
   /** The quoted approval (null when not visible). */
   readonly approval: { readonly withdrawnAt?: UtcInstant } | null;
-  /** The revision whose manifest hash is the quoted revisionHash (null when none exists any more). */
+  /** The revision of the quoted project whose manifest hash is the quoted revisionHash (null when none exists any more). */
   readonly revision: { readonly state: string } | null;
-  /** The target contract whose body hash is the quoted targetContractHash. */
+  /** The target contract of the quoted project whose body hash is the quoted targetContractHash. */
   readonly target: { readonly confirmed: boolean; readonly superseded: boolean } | null;
-  /** The mode capability of the project. */
+  /** The project's own capability (the one its creation snapshotted and a CommercialAuthorization binds). */
   readonly capability: Pick<Capability, "state"> | null;
 }
 
@@ -59,7 +61,7 @@ export interface CheckoutFacts extends SubjectFacts {
   readonly fiscalProfile: FiscalProfileRecord | null;
   /** The open (non-terminal) payment order of the project, if any. */
   readonly openOrder: { readonly state: PaymentOrderState } | null;
-  /** True when a live CommercialAuthorization already exists for this quote. */
+  /** True when a CommercialAuthorization already exists for this quote, or a completed capture already pays an order of it. */
   readonly paid: boolean;
 }
 
@@ -94,17 +96,18 @@ export function checkoutBlockers(f: CheckoutFacts): ReadonlyArray<CheckoutBlocke
   if (f.paymentRoute === null || f.paymentRoute.state !== "QUALIFIED") out.push("PAYMENT_ROUTE_UNQUALIFIED");
   if (f.fiscalIssuerRoute === null || f.fiscalIssuerRoute.state !== "QUALIFIED") out.push("FISCAL_ROUTE_UNQUALIFIED");
   const rule = quotableTaxRule(f.fiscalProfile, f.now);
-  if (rule.kind === "BLOCKED" || !sameTaxRule(rule.snapshot, f.quote.tax)) out.push("FISCAL_TREATMENT_UNREVIEWED");
+  if (rule.kind === "BLOCKED") out.push("FISCAL_TREATMENT_UNREVIEWED");
+  else if (!sameTaxRule(rule.snapshot, f.quote.tax)) out.push("FISCAL_TREATMENT_CHANGED");
   return out;
 }
 
 /**
  * The prerequisites a completed capture must still meet for the server to create the CommercialAuthorization in the same
- * transaction (07 "CommercialAuthorization"; transitions "Cross-aggregate finalization": capture confirmation can create
+ * transaction (07 "CommercialAuthorization"; TRANSITIONS "Cross-aggregate finalization": capture confirmation can create
  * financial facts even when source expiry prevents execution). Price expiry is not a blocker here: a capture completed after
- * the price expiry is honored when the same scope is still valid (07 "Quote and checkout states"), and the authorization
- * records it (`honoredAfterPriceExpiry`). Fiscal treatment is not a blocker either: TaxDocument is independent of payment
- * confirmation (07 "Aggregate ownership"; R2-128 "preserving capture reconciliation").
+ * the price expiry is honored when the same scope is still valid (07 "Quote and checkout states"; 15 "Price and source expiry
+ * races"), and the authorization records it (`honoredAfterPriceExpiry`). Fiscal treatment is not a blocker either: TaxDocument
+ * is independent of payment confirmation (07 "Aggregate ownership"; R2-128 "preserving capture reconciliation").
  */
 export function authorizationBlockers(f: SubjectFacts): ReadonlyArray<CheckoutBlocker> {
   const out: CheckoutBlocker[] = [];
@@ -118,26 +121,27 @@ export function honoredAfterPriceExpiry(quote: Pick<QuoteRecord, "expiresAt">, p
   return instantMs(providerCompletedAt) >= instantMs(quote.expiresAt);
 }
 
-const BLOCKER_FAILURE: Readonly<Record<CheckoutBlocker, { readonly code: FailureCode; readonly reason: FailureReason }>> = Object.freeze({
+const BLOCKER_FAILURE: Readonly<Record<CheckoutBlocker, { readonly code: FailureCode; readonly reason: FailureReason | null }>> = Object.freeze({
   AGENCY_NOT_ACTIVE: { code: "PRECONDITION_FAILED", reason: "AGENCY_NOT_ACTIVE" },
   QUOTE_NOT_ACTIVE: { code: "PRECONDITION_FAILED", reason: "QUOTE_NOT_ACTIVE" },
   QUOTE_EXPIRED: { code: "PRECONDITION_FAILED", reason: "QUOTE_EXPIRED" },
   ALREADY_PAID: { code: "PRECONDITION_FAILED", reason: "ALREADY_PAID" },
   PAYMENT_UNCERTAIN: { code: "PAYMENT_UNCERTAIN", reason: "CAPTURE_UNCERTAIN" },
   PAYMENT_IN_PROGRESS: { code: "PAYMENT_PENDING", reason: "CAPTURE_IN_PROGRESS" },
-  SOURCE_EXPIRED: { code: "SOURCE_EXPIRED", reason: "REVISION_NOT_AVAILABLE" },
+  SOURCE_EXPIRED: { code: "SOURCE_EXPIRED", reason: null },
   APPROVAL_NOT_CURRENT: { code: "PRECONDITION_FAILED", reason: "APPROVAL_NOT_CURRENT" },
-  TARGET_STALE: { code: "TARGET_STALE", reason: "HASH_MISMATCH" },
+  TARGET_STALE: { code: "TARGET_STALE", reason: null },
   CAPABILITY_RESTRICTED: { code: "CAPABILITY_UNAVAILABLE", reason: "MODE_NOT_OFFERED" },
   PAYMENT_ROUTE_UNQUALIFIED: { code: "CAPABILITY_UNAVAILABLE", reason: "PAYMENT_ROUTE_UNQUALIFIED" },
   FISCAL_ROUTE_UNQUALIFIED: { code: "CAPABILITY_UNAVAILABLE", reason: "FISCAL_ROUTE_UNQUALIFIED" },
   FISCAL_TREATMENT_UNREVIEWED: { code: "PRECONDITION_FAILED", reason: "FISCAL_TREATMENT_UNREVIEWED" },
+  FISCAL_TREATMENT_CHANGED: { code: "PRECONDITION_FAILED", reason: "FISCAL_TREATMENT_CHANGED" },
 });
 
 /** The failure a command answers for its first blocker (PAYMENT_PENDING is the one retryable answer). */
 export function blockerFailure(blocker: CheckoutBlocker): DomainFailure {
   const f = BLOCKER_FAILURE[blocker];
-  return new DomainFailure(f.code, `commercial prerequisite not met: ${blocker}`, { reason: f.reason });
+  return new DomainFailure(f.code, `commercial prerequisite not met: ${blocker}`, f.reason === null ? {} : { reason: f.reason }, f.code === "PAYMENT_PENDING");
 }
 
 /** The phase a revocation happens in is the state it leaves (07 "CommercialAuthorization"). */

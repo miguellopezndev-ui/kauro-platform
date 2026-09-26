@@ -6,7 +6,7 @@
  * the discount amount rounded once in minor units → net service → the reviewed tax treatment → total and currency. Every
  * function here is pure over the registry policy; the quote issuance command (CMD027, package B10) supplies the eligibility
  * facts it read at the issuance instant and persists the result through the QuoteRepository of this package, where the
- * database re-checks the arithmetic (migration 0009 quotes_*_arithmetic, price_eligibility_*).
+ * database re-checks the arithmetic (migration 0009 quotes_*_arithmetic, price_eligibility_*; D-QUOTE-B1).
  */
 import { DOMAINS, policy, structuredDigest, type MoneyMinorUnits, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import type { ServiceMode } from "../model/aggregates.js";
@@ -192,6 +192,8 @@ export interface QuoteTermsPreimage {
   readonly discountCents: MoneyMinorUnits;
   readonly serviceCents: MoneyMinorUnits;
   readonly fiscalProfileId: string;
+  /** The legal issuer the fiscal snapshot names (16 "The quote records ... tax profile, legal issuer"). */
+  readonly issuerRef: string;
   readonly taxTreatment: TaxRuleSnapshot["treatment"];
   readonly taxRule: TaxRuleSnapshot["rule"];
   readonly taxRateBps: number;

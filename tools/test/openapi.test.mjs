@@ -150,3 +150,34 @@ test("a registered route without a declared response contract and a stale docume
   stale.paths["/api/v1/agencies"].post.summary = "edited by hand";
   assert.deepEqual(check({ document: stale }), ["apps/api/openapi.json is not the generated document (run pnpm run openapi:generate); it differs at /paths/~1api~1v1~1agencies/post/summary"]);
 });
+
+test("B09: the payment routes are documented from their contracts as planned operations, never registered and never also served; a registered planned route, a repeated operationId and a forbidden DTO member fail the check", () => {
+  const planned = expected["x-kauro-planned"];
+  const commands = Object.values(sources.application.COMMERCE_COMMANDS);
+  const reads = Object.values(sources.application.COMMERCE_READ_ROUTES);
+  assert.deepEqual(Object.keys(planned).sort(), [...commands.map((c) => `${c.method} ${c.path}`), ...reads.map((r) => `GET ${r.path}`)].sort());
+  for (const spec of commands) {
+    const op = planned[`${spec.method} ${spec.path}`];
+    assert.equal(op.operationId, spec.name);
+    assert.equal(op["x-kauro-role"], spec.role);
+    assert.equal(op["x-kauro-package"], "B09");
+    const reply = sources.application.COMMERCE_COMMAND_RESPONSES[spec.id];
+    const problemStatuses = sources.application.outcomesByStatus(sources.application.COMMERCE_COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), [String(reply.status), ...(reply.accepted ? ["202"] : []), ...problemStatuses].sort(), spec.id);
+  }
+  // the webhook takes no idempotency key and no bearer token: its identity is the provider inbox, its authentication the signature
+  const webhook = planned["POST /api/v1/payments/webhooks/{provider}"];
+  assert.deepEqual(webhook.security, []);
+  assert.equal(webhook.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"), false);
+  // the payment service authenticates as a service identity, never as a person
+  assert.deepEqual(planned["POST /api/v1/refunds/{refundId}/execute"].security, [{ serviceAuth: [] }]);
+  // a planned route the api registers must be served from paths
+  const registeredPlanned = [...inventory, { method: "POST", url: "/api/v1/refunds/:refundId/approve", responses: inventory[0].responses }];
+  assert.ok(check({ inventory: registeredPlanned }).includes("planned route is registered: POST /api/v1/refunds/{refundId}/approve (a served route is documented under paths)"));
+  const duplicate = clone(committed);
+  duplicate["x-kauro-planned"]["POST /api/v1/refunds/{refundId}/approve"].operationId = "ApprovePlan";
+  assert.ok(check({ document: duplicate }).some((f) => f.startsWith("duplicate operationId ApprovePlan")));
+  const leaking = clone(committed);
+  leaking.components.schemas.RefundView.properties.tokenHash = { type: "string", pattern: "^[0-9a-f]{64}$" };
+  assert.ok(check({ document: leaking }).some((f) => f.startsWith("DTO exposes a forbidden field: planned POST /api/v1/projects/{projectId}/refund-requests 201")));
+});

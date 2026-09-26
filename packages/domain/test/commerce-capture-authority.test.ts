@@ -21,6 +21,7 @@ import {
   type AgencyId,
   type ObservedCapture,
   type PaymentOrderRecord,
+  type UserId,
 } from "../src/index.js";
 
 const ORDER = {
@@ -111,7 +112,7 @@ const reviewed: FiscalProfileRecord = {
   taxRateBps: 0,
   evidenceHash: "3".repeat(64),
   exportEvidenceHash: "4".repeat(64),
-  reviewedByRef: "01920000-0000-7000-8000-0000000e0001",
+  reviewedByUserId: "6f1b0d2e-3c4a-5b5c-9d6e-7f8091a2b3c4" as UserId,
   validFrom: "2026-09-01T00:00:00.000Z",
 };
 

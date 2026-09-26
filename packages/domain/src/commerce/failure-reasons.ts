@@ -1,56 +1,62 @@
 /**
  * Safe reason codes of the payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2). They narrow
  * the stable failure codes of manual 10 exactly like the B06 reasons do — machine tokens that never carry a customer value —
- * and are appended to the closed FAILURE_REASONS list of model/errors.ts, so the Problem schema and the acceptance harness
- * enumerate them. This module imports nothing: the failure taxonomy depends on it, never the reverse.
+ * and are appended to the closed FAILURE_REASONS list of model/errors.ts, so the Problem schema, the outcome catalogues and the
+ * acceptance harness enumerate them. This module imports nothing: the failure taxonomy depends on it, never the reverse.
  */
 export const COMMERCE_FAILURE_REASONS = [
   // principals beyond agency membership (08 "Identity is not permission"; COMMAND_CATALOGUE "Shared execution contract")
   "CORPORATE_ROLE_MISSING",
   "SELF_APPROVAL_FORBIDDEN",
   "SERVICE_NOT_PERMITTED",
-  "SERVICE_SCOPE_MISMATCH",
+  "SERVICE_ENVIRONMENT_MISMATCH",
   "POLICY_NOT_APPLICABLE",
-  // provider ingress (15 "Webhooks and reconciliation"; 10 "Quote and payment routes")
+  // provider ingress and evidence (15 "Webhooks and reconciliation"; 10 "Quote and payment routes", "Provider adapter contract")
   "PROVIDER_UNKNOWN",
   "PROVIDER_SIGNATURE_INVALID",
   "PROVIDER_EVENT_STALE",
   "PROVIDER_ENVIRONMENT_MISMATCH",
-  "PROVIDER_EVENT_BODY_DIFFERS",
+  "PROVIDER_BODY_TOO_LARGE",
+  "EVIDENCE_NOT_FOUND",
   "PROVIDER_SERVICES_UNAVAILABLE",
-  // quotes and checkout readiness (07 "Quote and checkout states"; 16 "Quote calculation")
+  // quotes and checkout readiness (07 "Quote and checkout states"; 16 "Quote calculation"; CMD028 precondition)
   "QUOTE_NOT_ACTIVE",
   "QUOTE_EXPIRED",
   "APPROVAL_NOT_CURRENT",
-  "REVISION_NOT_AVAILABLE",
   "PAYMENT_ROUTE_UNQUALIFIED",
   "FISCAL_ROUTE_UNQUALIFIED",
   "FISCAL_TREATMENT_UNREVIEWED",
   "FISCAL_PROFILE_NOT_EFFECTIVE",
   "FISCAL_TREATMENT_CHANGED",
-  "ORDER_ALREADY_OPEN",
   "ALREADY_PAID",
-  // orders, captures and observations (15 "PaymentOrder and intent", "Capture and authority")
-  "ORDER_NOT_CAPTURABLE",
+  // orders, attempts, captures and observations (15 "PaymentOrder and intent", "Capture and authority", "Payment state transitions")
+  "CREATION_IN_PROGRESS",
   "CAPTURE_IN_PROGRESS",
   "CAPTURE_UNCERTAIN",
+  "ORDER_NOT_CAPTURABLE",
+  "PROVIDER_REFERENCE_MISMATCH",
   "OBSERVATION_STALE",
   "OBSERVATION_SUBJECT_MISMATCH",
   "UNRECOGNIZED_PROVIDER_STATE",
-  // refunds (15 "Refund policy and calculation")
+  // refunds (15 "Refund policy and calculation"; CMD031..CMD033)
   "NOTHING_TO_REFUND",
   "REFUND_REQUEST_OPEN",
   "REFUND_EXCEEDS_REMAINING",
+  "REFUND_COMPONENT_INVALID",
   "REFUND_NOT_REQUESTED",
   "REFUND_NOT_APPROVED",
+  "REFUND_IN_PROGRESS",
   "REFUND_UNCERTAIN",
   "CAPTURE_NOT_REFUNDABLE",
-  // integrity (the SQLSTATEs KA009..KA014 of migrations 0008..0011)
+  // integrity (the SQLSTATEs KP001..KP011 of migrations 0008..0012; a handler that respects the schema never meets them)
   "LEDGER_UNBALANCED",
   "OBLIGATION_OVER_ALLOCATED",
   "FACT_REGRESSION",
   "AUTHORITY_WITHOUT_CAPTURE",
   "AUTHORITY_OUTLIVES_REVERSAL",
+  "FINANCE_SCOPE_MISSING",
+  "COMMITMENT_ISOLATION",
+  "FISCAL_VALIDATION_REFUSED",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

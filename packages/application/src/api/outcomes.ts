@@ -239,6 +239,21 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetProject: readCatalogueOf("GetProject"),
 });
 
+/**
+ * The route-level fragments later packages compose their catalogues from (package B09: the payment routes; design
+ * docs/design/B09-payments-fiscal.md §10.4): the outcomes every route answers, those of a path id, of a tenant's membership, of
+ * the agency selector, and their read-side forms. A composed catalogue is still closed and duplicate-free.
+ */
+export const ROUTE_OUTCOME_FRAGMENTS = Object.freeze({
+  EVERY_ROUTE,
+  PATH_IDS,
+  TENANT,
+  AGENCY_HEADER,
+  EVERY_READ,
+  TENANT_READ,
+  NO_QUERY: Object.freeze([NO_QUERY]) as ReadonlyArray<ProblemOutcome>,
+});
+
 /** The catalogue entry a problem is an instance of, or null. */
 export function outcomeOf(outcomes: ReadonlyArray<ProblemOutcome>, code: string, reason: string | undefined): ProblemOutcome | null {
   return outcomes.find((o) => o.code === code && o.reason === (reason ?? null)) ?? null;

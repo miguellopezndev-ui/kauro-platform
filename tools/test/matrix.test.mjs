@@ -10,10 +10,10 @@ import { APPLICABILITY, EDGE_OWNERS, MATRIX_PATH, checkSources, generateMatrix, 
 const sources = await loadMatrixSources();
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-test("the committed matrix is the generated one and every source check passes: every edge of the 12 registry and 2 platform machines is owned, every served command has its catalogue and its applicability row", () => {
+test("the committed matrix is the generated one and every source check passes: every edge of the 12 registry and 12 platform machines (B06: 2, B09: 10) is owned, every served command has its catalogue and its applicability row", () => {
   assert.deepEqual(checkSources(sources), []);
   assert.equal(readFileSync(MATRIX_PATH, "utf8"), generateMatrix(sources));
-  assert.equal(sources.machines.length, 14);
+  assert.equal(sources.machines.length, 24);
   for (const id of sources.served) assert.ok(generateMatrix(sources).includes(`### ${id} `), id);
 });
 

@@ -1,14 +1,14 @@
 /**
- * Commerce records as the domain sees them (package B09; migrations 0008..0011): the registry contracts Quote,
+ * Commerce records as the domain sees them (package B09; migrations 0008..0012): the registry contracts Quote,
  * PriceEligibilitySnapshot, PaymentOrder, PaymentAttempt, CaptureFact, CommercialAuthorization, Refund, Settlement,
  * FiscalProfile, TaxDocument and LedgerEntry plus the columns the platform needs for concurrency, lineage and exact bindings,
- * and the platform records (payment routes, fiscal issuers, corporate roles, refund policies, provider observations,
- * reconciliation cases, provider event exceptions). Amounts are `bigint` minor units inside the domain (commerce/money); the
- * wire DTOs of @kauro/application carry them as MoneyMinorUnits strings.
+ * and the platform records (payment routes, fiscal issuers, corporate grants, standing refund policies, the scope index,
+ * provider observations, reconciliation cases, provider event exceptions). Amounts are `bigint` minor units inside the domain
+ * (commerce/money); the wire DTOs of @kauro/application carry them as MoneyMinorUnits strings.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { ServiceMode } from "../model/aggregates.js";
-import type { AgencyId, ApprovalId, AssuranceProofId, Branded, CapabilityId, JournalEntryId, MembershipId, PlanId, ProjectId, UserId } from "../model/ids.js";
+import type { AgencyId, ApprovalId, AssuranceProofId, Branded, CapabilityId, EventId, InboxId, JournalEntryId, MembershipId, PlanId, ProjectId, UserId } from "../model/ids.js";
 
 // --- ids --------------------------------------------------------------------------------------------------------------------
 
@@ -31,15 +31,17 @@ export type SettlementId = Branded<string, "SettlementId">;
 export type ReconciliationCaseId = Branded<string, "ReconciliationCaseId">;
 export type CorporateGrantId = Branded<string, "CorporateGrantId">;
 export type ProviderExceptionId = Branded<string, "ProviderExceptionId">;
-export type InboxId = Branded<string, "InboxId">;
+/** A stored provider evidence artifact (the restricted reconciliation store; CMD030 providerEventArtifactRef, CMD034 observationRef). */
+export type EvidenceArtifactRef = Branded<string, "EvidenceArtifactRef">;
 /** A job of the processing package (B08); B09 records it opaquely on the authorization it consumes. */
 export type JobRef = Branded<string, "JobRef">;
-/** An evidence artifact of the agency's scope (a refund request's evidenceRef). */
+/** An evidence reference of the agency's scope (a refund request's evidenceRef; its store is the support/upload package's). */
 export type EvidenceRef = Branded<string, "EvidenceRef">;
 
 // --- vocabularies ------------------------------------------------------------------------------------------------------------
 
 export type PaymentEnvironment = "SANDBOX" | "LIVE";
+/** A route or adapter is the real provider, or a labelled contract fake that can never carry money (D-FAKE-B1). */
 export type IntegrationClass = "PROVIDER" | "CONTRACT_FAKE";
 export type Currency = "USD";
 
@@ -49,23 +51,27 @@ export type TaxRule = "UNRESOLVED" | "RATE_HALF_UP" | "ZERO_REVIEWED";
 
 export type QuoteState = "DRAFT" | "ISSUED" | "ACCEPTED_FOR_CHECKOUT" | "EXPIRED" | "SUPERSEDED" | "WITHDRAWN";
 export type PaymentOrderState = "INTENT_CREATED" | "CREATING" | "CREATED" | "APPROVED" | "CAPTURING" | "CAPTURE_UNCERTAIN" | "CAPTURED" | "FAILED" | "CANCELLED" | "EXPIRED";
+/** WITHDRAW is in the registry vocabulary; merchant withdrawals are the settlement integration's (B15) and B09 creates none. */
 export type PaymentOperation = "CREATE_ORDER" | "CAPTURE" | "REFUND" | "WITHDRAW";
 export type PaymentAttemptState = "PREPARED" | "DISPATCHING" | "PROVIDER_PENDING" | "CONFIRMED" | "FAILED_NO_EFFECT" | "UNCERTAIN" | "CANCELLED_BEFORE_DISPATCH";
 export type CaptureStatus = "COMPLETED" | "PENDING" | "DENIED" | "REVERSED";
+/** Provider-reported availability of captured funds; AVAILABLE only from the provider, never derived from a status (CMD034). */
 export type FundsState = "UNKNOWN" | "HELD" | "AVAILABLE";
 export type CommercialAuthorizationState = "ACTIVE" | "CONSUMED" | "DELIVERED" | "REVOKED";
 export type RevocationPhase = "PRE_EXECUTION" | "DURING_EXECUTION" | "POST_DELIVERY";
 export type RefundState = "REQUESTED" | "APPROVED" | "SUBMITTING" | "UNCERTAIN" | "COMPLETED" | "FAILED" | "REJECTED";
+/** Who asked: the agency (CMD031), the reconciler for an excess capture (R2-140), or Kauro's own remedy of a verified defect. */
 export type RefundOrigin = "CUSTOMER_REQUEST" | "EXCESS_CAPTURE" | "KAURO_REMEDY";
 export type DeliveryPhase = RevocationPhase | "NO_AUTHORIZATION";
+/** A refund intent is authorized by the approving owner's fresh step-up or by a standing policy that applies (CMD032). */
 export type RefundAuthorizationKind = "OWNER_STEP_UP" | "STANDING_POLICY";
 export type TaxDocumentKind = "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE";
 export type TaxDocumentState = "DRAFT" | "VALIDATED" | "SUBMITTING" | "UNCERTAIN" | "ISSUED" | "REJECTED" | "CORRECTED";
 export type RouteState = "CONFIGURED" | "QUALIFIED" | "SUSPENDED";
+/** 19 "BusinessProfile and legal facts": every fact carries its status. */
 export type LegalFactStatus = "OBSERVED" | "OWNER_DECLARED" | "PROFESSIONALLY_CONFIRMED" | "PENDING" | "EXPIRED";
 export type ReconciliationCaseKind =
   | "AMOUNT_MISMATCH"
-  | "UNDERPAYMENT"
   | "EXCESS_CAPTURE"
   | "CAPTURE_WITHOUT_VALID_SUBJECT"
   | "UNCERTAIN_EFFECT"
@@ -73,9 +79,13 @@ export type ReconciliationCaseKind =
   | "PROVIDER_INCONSISTENCY"
   | "REVERSAL"
   | "FEE_MISMATCH";
-export type ProviderExceptionKind = "UNKNOWN_PROVIDER_REFERENCE" | "WRONG_PAYEE" | "WRONG_CURRENCY" | "UNRECOGNIZED_PROVIDER_STATE";
+export type ProviderExceptionKind = "UNKNOWN_PROVIDER_REFERENCE" | "WRONG_PAYEE" | "WRONG_CURRENCY" | "WRONG_ENVIRONMENT" | "UNRECOGNIZED_PROVIDER_STATE" | "BODY_CONFLICT";
 export type ObservationSource = "DISPATCH_RESPONSE" | "WEBHOOK" | "PROVIDER_QUERY";
 export type ObservationEffect = "ADVANCED" | "NO_CHANGE" | "STALE_IGNORED" | "DUPLICATE" | "MISMATCH" | "UNRECOGNIZED";
+/** The scope index kinds (migration 0008 commerce_scopes; D-SCOPE-B1). */
+export type ScopeKind = "PAYMENT_ORDER" | "REFUND" | "PROVIDER_ORDER" | "PROVIDER_CAPTURE" | "PROVIDER_REFUND";
+/** Corporate roles of the command catalogue this package authorizes (the catalogue's owner role, brand-mapped by amendment A2). */
+export type CorporateRole = "KAURO_OWNER";
 
 // --- platform records ----------------------------------------------------------------------------------------------------------
 
@@ -84,7 +94,7 @@ export interface PaymentRouteRecord {
   readonly provider: string;
   readonly environment: PaymentEnvironment;
   readonly merchantRef: MerchantRef;
-  /** SHA-256 of the provider merchant/payee id; an observed payee is compared by digest. */
+  /** SHA-256 of the provider merchant/payee id; an observed payee is compared by digest (S058). */
   readonly payeeDigest: Sha256Hex;
   readonly currency: Currency;
   readonly integrationClass: IntegrationClass;
@@ -107,10 +117,10 @@ export interface FiscalIssuerRecord {
   readonly validUntil?: UtcInstant;
 }
 
-export interface CorporateRoleRecord {
+export interface CorporateGrantRecord {
   readonly grantId: CorporateGrantId;
   readonly userId: UserId;
-  readonly role: "KAURO_OWNER";
+  readonly role: CorporateRole;
   readonly state: "ACTIVE" | "REVOKED";
   readonly evidenceHash: Sha256Hex;
   readonly grantedAt: UtcInstant;
@@ -121,9 +131,11 @@ export interface RefundPolicyRecord {
   readonly policyId: RefundPolicyId;
   readonly policyKind: "PRE_EXECUTION_CANCELLATION" | "UNREMEDIED_KAURO_DEFECT" | "EXCESS_CAPTURE_RETURN";
   readonly policyVersion: string;
+  /** What the policy authorizes: the whole remaining service and tax, only an excess return, or an amount up to a ceiling. */
   readonly refundScope: "FULL_REMAINING" | "EXCESS_ONLY" | "BOUNDED";
   readonly maxRefundCents?: bigint;
   readonly appliesToPhase: "PRE_EXECUTION" | "ANY";
+  readonly appliesToOrigin: RefundOrigin;
   readonly conditionsHash: Sha256Hex;
   readonly authorizedByUserId: UserId;
   readonly authorizationProofRef: AssuranceProofId;
@@ -132,8 +144,13 @@ export interface RefundPolicyRecord {
   readonly validUntil?: UtcInstant;
 }
 
-/** One row of the scope index (migration 0008): the agency of a stored operation or of a provider identity. */
-export type ScopeKind = "QUOTE" | "PAYMENT_ORDER" | "REFUND" | "TAX_DOCUMENT" | "PROVIDER_ORDER" | "PROVIDER_CAPTURE" | "PROVIDER_REFUND";
+/** One row of the scope index: the agency of a stored operation or of a provider identity (identifiers only). */
+export interface ScopeEntry {
+  readonly kind: ScopeKind;
+  readonly key: string;
+  readonly agencyId: AgencyId;
+  readonly orderId: PaymentOrderId | null;
+}
 
 // --- fiscal profile ---------------------------------------------------------------------------------------------------------------
 
@@ -141,6 +158,7 @@ export interface FiscalProfileRecord {
   readonly profileId: FiscalProfileId;
   readonly agencyId: AgencyId;
   readonly operatorLegalRef: FiscalIssuerRef;
+  /** The purchaser identity (the agency's reviewed billing profile, Agency.legalProfileRef); opaque here. */
   readonly customerLegalRef: string;
   readonly serviceClassification: string;
   readonly territory: string;
@@ -148,8 +166,9 @@ export interface FiscalProfileRecord {
   readonly taxRule: TaxRule;
   readonly taxRateBps: number;
   readonly evidenceHash: Sha256Hex;
+  /** Required for EXEMPT_EXPORT: the reviewed export facts (use abroad), never a currency or an email address (R2-128). */
   readonly exportEvidenceHash?: Sha256Hex;
-  readonly reviewedByRef?: string;
+  readonly reviewedByUserId?: UserId;
   readonly validFrom: UtcInstant;
   readonly validUntil?: UtcInstant;
   readonly supersedesProfileId?: FiscalProfileId;
@@ -185,6 +204,7 @@ export interface QuoteRecord {
   readonly discountCents: bigint;
   readonly serviceCents: bigint;
   readonly fiscalProfileId: FiscalProfileId;
+  readonly issuerRef: FiscalIssuerRef;
   readonly tax: TaxRuleSnapshot;
   readonly taxCents: bigint;
   readonly totalCents: bigint;
@@ -233,13 +253,15 @@ export interface PaymentOrderRecord {
   readonly merchantRef: MerchantRef;
   readonly payeeDigest: Sha256Hex;
   readonly providerOrderId?: string;
+  /** The provider-hosted approval page of the buyer (host allowlisted by the adapter); present once the provider order exists. */
+  readonly providerApprovalUrl?: string;
   readonly expectedAmountCents: bigint;
   readonly expectedServiceCents: bigint;
   readonly expectedTaxCents: bigint;
   readonly currency: Currency;
   readonly termsHash: Sha256Hex;
   readonly idempotencyHash: Sha256Hex;
-  /** Sum of the obligation allocations of COMPLETED captures (maintained by the database; never above the obligation). */
+  /** Obligation allocated by COMPLETED captures (maintained by the database's single writer; never above the obligation). */
   readonly allocatedCents: bigint;
   readonly createdByMembershipId: MembershipId;
   readonly intentEntryId: JournalEntryId;
@@ -252,7 +274,9 @@ export interface PaymentAttemptRecord {
   readonly agencyId: AgencyId;
   readonly orderId: PaymentOrderId;
   readonly refundId?: RefundId;
-  readonly operation: PaymentOperation;
+  readonly operation: Exclude<PaymentOperation, "WITHDRAW">;
+  /** The ordinal of this attempt among the attempts of its logical operation (1, 2, ...; bounded, D-PROTO-B3). */
+  readonly ordinal: number;
   readonly version: number;
   readonly state: PaymentAttemptState;
   readonly provider: string;
@@ -263,7 +287,7 @@ export interface PaymentAttemptRecord {
   readonly startedAt: UtcInstant;
   readonly lastObservedAt: UtcInstant;
   readonly evidenceHash?: Sha256Hex;
-  readonly outcomeReason?: string;
+  readonly outcomeCode?: string;
   readonly intentEntryId?: JournalEntryId;
 }
 
@@ -280,15 +304,13 @@ export interface CaptureFactRecord {
   readonly payeeDigest: Sha256Hex;
   readonly amountCents: bigint;
   readonly currency: Currency;
-  readonly allocatedServiceCents: bigint;
-  readonly allocatedTaxCents: bigint;
-  readonly excessCents: bigint;
-  readonly refundedServiceCents: bigint;
-  readonly refundedTaxCents: bigint;
-  readonly refundedExcessCents: bigint;
+  /** Fixed when the capture is first observed COMPLETED (or REVERSED): service and tax paid toward the obligation, and excess. */
+  readonly allocation: RefundComponents;
   readonly fundsState: FundsState;
   readonly providerFeeCents?: bigint;
   readonly providerCompletedAt?: UtcInstant;
+  /** The source of the first authenticated observation the fact was born from (D-INIT-B1). */
+  readonly firstObservationSource: ObservationSource;
   readonly firstObservedAt: UtcInstant;
   readonly observedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
@@ -302,6 +324,7 @@ export interface ProviderObservationRecord {
   readonly source: ObservationSource;
   readonly inboxId?: InboxId;
   readonly attemptId?: PaymentAttemptId;
+  readonly artifactRef?: EvidenceArtifactRef;
   readonly subjectKind: "ORDER" | "CAPTURE" | "REFUND";
   readonly providerRef: string;
   readonly observedStatus: string;
@@ -341,17 +364,30 @@ export interface CommercialAuthorizationRecord {
   readonly deliveredAt?: UtcInstant;
   readonly revokedAt?: UtcInstant;
   readonly revocationPhase?: RevocationPhase;
-  readonly revocationReason?: string;
+  /** A server token (CAPTURE_REVERSED, SERVICE_FULLY_REFUNDED); never customer text. */
+  readonly revocationCode?: string;
   readonly createdAt: UtcInstant;
 }
 
 // --- refunds ------------------------------------------------------------------------------------------------------------------------
 
-/** The three refundable components of a capture: its allocated service and tax, and its excess over the obligation. */
+/** The three refundable components of a capture: its allocated service, its allocated tax, and its excess over the obligation. */
 export interface RefundComponents {
   readonly serviceCents: bigint;
   readonly taxCents: bigint;
   readonly excessCents: bigint;
+}
+
+export interface RefundApprovalRecord {
+  readonly amounts: RefundComponents;
+  readonly authorizationKind: RefundAuthorizationKind;
+  readonly authorizationProofRef?: AssuranceProofId;
+  readonly authorizationPolicyId?: RefundPolicyId;
+  readonly authorizationHash: Sha256Hex;
+  readonly effectsHash: Sha256Hex;
+  readonly creditNoteRequired: boolean;
+  readonly approvedByUserId: UserId;
+  readonly approvedAt: UtcInstant;
 }
 
 export interface RefundRecord {
@@ -363,30 +399,22 @@ export interface RefundRecord {
   readonly version: number;
   readonly state: RefundState;
   readonly origin: RefundOrigin;
+  /** CMD031 reasonCode: a registry label (customer text, decision D-API-1 of B06); stored here, never in an event payload. */
   readonly reasonCode: string;
   readonly evidenceRef?: EvidenceRef;
   readonly termsHash: Sha256Hex;
   readonly deliveryPhase: DeliveryPhase;
   readonly proposed: RefundComponents;
   readonly requestedByMembershipId?: MembershipId;
+  readonly requestedByUserId?: UserId;
   readonly requestedAt: UtcInstant;
   /** The immutable intent, present from APPROVED on. */
-  readonly approved?: {
-    readonly amounts: RefundComponents;
-    readonly authorizationKind: RefundAuthorizationKind;
-    readonly authorizationProofRef?: AssuranceProofId;
-    readonly authorizationPolicyId?: RefundPolicyId;
-    readonly authorizationHash: Sha256Hex;
-    readonly effectsHash: Sha256Hex;
-    readonly creditNoteRequired: boolean;
-    readonly approvedByUserId: UserId;
-    readonly approvedAt: UtcInstant;
-  };
-  readonly rejected?: { readonly reason: string; readonly byUserId: UserId; readonly at: UtcInstant };
+  readonly approved?: RefundApprovalRecord;
+  readonly rejected?: { readonly code: string; readonly byUserId: UserId; readonly at: UtcInstant };
   readonly providerRefundId?: string;
   readonly evidenceHash?: Sha256Hex;
   readonly completedAt?: UtcInstant;
-  readonly failedReason?: string;
+  readonly failureCode?: string;
 }
 
 // --- fiscal documents, ledger, settlements, cases ----------------------------------------------------------------------------------
@@ -412,7 +440,7 @@ export interface TaxDocumentRecord {
   readonly issueRequestHash?: Sha256Hex;
   readonly providerDocumentId?: string;
   readonly legalNumber?: string;
-  readonly rejectionReason?: string;
+  readonly rejectionCode?: string;
   readonly evidenceHash?: Sha256Hex;
   readonly issuedAt?: UtcInstant;
 }
@@ -437,8 +465,11 @@ export type LedgerSourceKind = "CAPTURE" | "REFUND" | "FEE" | "CHARGEBACK" | "SE
 
 export interface LedgerEntryRecord {
   readonly entryId: LedgerEntryId;
-  readonly agencyId: AgencyId;
-  readonly eventId: string;
+  /** The agency whose commercial event the posting records; null for platform-level movements (settlement, withdrawal). */
+  readonly agencyId: AgencyId | null;
+  /** The source domain event (the posting set's idempotency identity); null for a settlement observation's posting. */
+  readonly eventId: EventId | null;
+  readonly settlementId?: SettlementId;
   readonly lineNo: number;
   readonly accountCode: LedgerAccount;
   readonly accountVersion: string;
@@ -463,6 +494,7 @@ export interface SettlementRecord {
   readonly feeCents: bigint;
   readonly heldCents: bigint;
   readonly withdrawnCents: bigint;
+  /** Actually available under an observed bank statement; never derived from a provider balance or a capture status. */
   readonly bankAvailableCents: bigint;
   readonly bankEvidenceHash?: Sha256Hex;
   readonly fxRate?: string;
@@ -487,7 +519,7 @@ export interface ReconciliationCaseRecord {
   readonly evidenceHash: Sha256Hex;
   readonly openedAt: UtcInstant;
   readonly resolvedAt?: UtcInstant;
-  readonly resolution?: string;
+  readonly resolutionCode?: string;
 }
 
 export interface ProviderEventExceptionRecord {

@@ -151,6 +151,7 @@ test("quote terms hash: KAURO_QUOTE_TERMS_V1 over the named preimage; any amount
     eligibilitySnapshotId: "01920000-0000-7000-8000-00000000a006",
     ...termsMoney(amounts),
     fiscalProfileId: "01920000-0000-7000-8000-00000000a007",
+    issuerRef: "01920000-0000-7000-8000-0000000f0001",
     taxTreatment: "EXEMPT_EXPORT",
     taxRule: "ZERO_REVIEWED",
     taxRateBps: 0,

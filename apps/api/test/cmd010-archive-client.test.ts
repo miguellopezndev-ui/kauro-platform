@@ -114,9 +114,13 @@ test("DENY: OPERATOR → 403; foreign client → 404; stale expectedVersion → 
   assert.deepEqual(denials.filter((d) => d.reason === "ROLE_INSUFFICIENT").map((d) => d.agencyId), [w.A.agencyId, w.A.agencyId, w.A.agencyId]);
   // the owner of A selecting B is no member of B: the fact is the owner's own, never B's (review R2, R26)
   assert.deepEqual(denials.filter((d) => d.reason === "NOT_A_MEMBER").map((d) => [d.agencyId, d.actorId]), [[null, w.owner.userId]]);
-  // no deletion request, refund or job aggregate exists in this schema for a handler to write as a side effect
-  const tables = await w.h.oracle.query<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema = 'kauro' AND (table_name LIKE '%deletion%' OR table_name LIKE '%refund%' OR table_name LIKE '%job%')");
-  assert.deepEqual(tables.rows, []);
+  // no deletion request, refund or job is written as a side effect: the tables that store them (package B09 adds refunds and
+  // standing refund policies; B06 stores none) hold no row
+  const tables = await w.h.oracle.query<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema = 'kauro' AND (table_name LIKE '%deletion%' OR table_name LIKE '%refund%' OR table_name LIKE '%job%') ORDER BY 1");
+  for (const t of tables.rows) {
+    const rows = await w.h.oracle.query<{ n: number }>(`SELECT count(*)::int AS n FROM kauro.${t.table_name}`);
+    assert.equal(rows.rows[0]?.n, 0, `${t.table_name} holds no row`);
+  }
 });
 
 test("RACE: two archive calls with the same expectedVersion → one 200, one 409; identical retry replays; the same key with another expectedVersion or another client → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the client ACTIVE and the same key then archives it; a response lost after COMMIT is recovered by the key", async () => {
