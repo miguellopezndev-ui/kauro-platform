@@ -69,3 +69,51 @@ export function buildZip(items: ReadonlyArray<ZipItem>): Buffer {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, cd, end]);
 }
+
+function localHeader(name: Buffer, data: Buffer, crc: number): Buffer {
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(0, 8);
+  local.writeUInt32LE(crc >>> 0, 14);
+  local.writeUInt32LE(data.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(name.length, 26);
+  return local;
+}
+
+function centralEntry(name: Buffer, data: Buffer, crc: number, offset: number): Buffer {
+  const entry = Buffer.alloc(46);
+  entry.writeUInt32LE(0x02014b50, 0);
+  entry.writeUInt16LE(20, 4);
+  entry.writeUInt16LE(20, 6);
+  entry.writeUInt32LE(crc >>> 0, 16);
+  entry.writeUInt32LE(data.length, 20);
+  entry.writeUInt32LE(data.length, 24);
+  entry.writeUInt16LE(name.length, 28);
+  entry.writeUInt32LE(offset, 42);
+  return Buffer.concat([entry, name]);
+}
+
+/**
+ * Overlapping entries (the construction of a "better zip bomb"): entry B's local header and data lie inside entry A's stored
+ * data, so the same bytes are expanded twice. Every header is internally consistent; only the layout is hostile.
+ */
+export function buildOverlappingZip(): Buffer {
+  const nameA = Buffer.from("xl/media/a.bin");
+  const nameB = Buffer.from("xl/media/b.bin");
+  const dataB = Buffer.from("shared kernel bytes");
+  const crcB = crc32(dataB);
+  const embedded = Buffer.concat([localHeader(nameB, dataB, crcB), nameB, dataB]);
+  const crcA = crc32(embedded);
+  const offsetB = 30 + nameA.length;
+  const body = Buffer.concat([localHeader(nameA, embedded, crcA), nameA, embedded]);
+  const cd = Buffer.concat([centralEntry(nameA, embedded, crcA, 0), centralEntry(nameB, dataB, crcB, offsetB)]);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(2, 8);
+  end.writeUInt16LE(2, 10);
+  end.writeUInt32LE(cd.length, 12);
+  end.writeUInt32LE(body.length, 16);
+  return Buffer.concat([body, cd, end]);
+}

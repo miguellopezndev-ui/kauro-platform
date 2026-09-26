@@ -16,11 +16,11 @@ import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import { createDeflateRaw, deflateRawSync } from "node:zlib";
 import type { ContainerInspection } from "@kauro/application";
-import { INPUT_ENVELOPE } from "@kauro/domain";
-import { ARCHIVE_BOUNDS, IsolatedContainerInspector, IsolatedTablePreviewReader, PreviewFailure, inspectionLimits, partDigestOf, runIsolated, sandboxFlags } from "../src/index.js";
+import { INPUT_ENVELOPE, parserProfileHashOf } from "@kauro/domain";
+import { ARCHIVE_BOUNDS, INSPECTOR_VERSION, IsolatedContainerInspector, IsolatedTablePreviewReader, PreviewFailure, inspectionLimits, parserProfileHashOfInspection, partDigestOf, runIsolated, sandboxFlags } from "../src/index.js";
 import { freshDir, listener, removeDir, sentinel, source, type Listener, type Sentinel } from "./support/harness.js";
 import { REL, buildWorkbook, workbookItems, type Cell, type SheetSpec } from "./support/workbook.js";
-import { buildZip, type ZipItem } from "./support/zip.js";
+import { buildOverlappingZip, buildZip, type ZipItem } from "./support/zip.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GIB = 1_073_741_824;
@@ -135,16 +135,43 @@ test("S024: an XLSX with a traversal entry, duplicate entries, an XML entity or 
     assertIsolated(r, 0);
   }
 
-  // duplicate entries: the same name twice, and two names that collide once normalized (case-folded)
+  // duplicate entries: the same name twice, and names that collide once normalized (case-folded; NFC against NFD)
   const items = workbookItems({ sheets: BENIGN });
   const sheet = items.find((i) => i.name === "xl/worksheets/sheet1.xml") as ZipItem;
-  for (const extra of [[{ ...sheet }], [{ ...sheet, name: "XL/Worksheets/Sheet1.xml" }]]) {
+  for (const extra of [[{ ...sheet }], [{ ...sheet, name: "XL/Worksheets/Sheet1.xml" }], [{ name: "xl/café.xml", data: "<x/>" }, { name: "xl/café.xml", data: "<x/>" }]]) {
     const bytes = buildZip([...items, ...extra]);
     const r = await inspect(bytes);
     assertRefused(r, "CORRUPT_STRUCTURE", "DUPLICATE_ENTRY", bytes.length);
     assert.equal(r.isolation.decompressedBytes, 0);
     assertIsolated(r, 0);
   }
+
+  // hostile layout and entry kinds, refused on the metadata alone: overlapping entries (the same bytes expanded twice), a symlink
+  const overlapping = buildOverlappingZip();
+  const overlapResult = await inspect(overlapping);
+  assertRefused(overlapResult, "CORRUPT_STRUCTURE", "OVERLAPPING_ENTRIES", overlapping.length);
+  assert.equal(overlapResult.isolation.decompressedBytes, 0);
+  assertIsolated(overlapResult, 0);
+  const symlink = withExtra([{ name: "xl/link.xml", data: "/etc/passwd", method: 0, versionMadeBy: (3 << 8) | 20, externalAttributes: (0o120777 << 16) >>> 0 }]);
+  const symlinkResult = await inspect(symlink);
+  assertRefused(symlinkResult, "CORRUPT_STRUCTURE", "SYMLINK_ENTRY", symlink.length);
+  assertIsolated(symlinkResult, 0);
+  // a relationship whose internal target climbs out of the package root
+  const escaping = buildWorkbook({ sheets: [{ ...(BENIGN[0] as SheetSpec), rels: [{ id: "rId9", type: REL.oleObject.replace("oleObject", "image"), target: "../../../outside.xml" }] }] });
+  const escapingResult = await inspect(escaping);
+  assertRefused(escapingResult, "CORRUPT_STRUCTURE", "RELATIONSHIP_TARGET_TRAVERSAL", escaping.length);
+  assertIsolated(escapingResult, totalBound);
+  // active content by part name: a macro project
+  const macro = withExtra([{ name: "xl/vbaProject.bin", data: Buffer.alloc(64, 7) }]);
+  const macroResult = await inspect(macro);
+  assertRefused(macroResult, "ACTIVE_CONTENT", "MACRO_PROJECT", macro.length);
+  assertIsolated(macroResult, 0);
+  // XML nested beyond the depth bound (a depth bomb inside a worksheet)
+  const deep = `${"<g>".repeat(limits.maxXmlDepth)}${"</g>".repeat(limits.maxXmlDepth)}`;
+  const depthBomb = buildWorkbook({ sheets: [{ ...(BENIGN[0] as SheetSpec), after: `<extLst>${deep}</extLst>` }] });
+  const depthResult = await inspect(depthBomb);
+  assertRefused(depthResult, "RESOURCE_LIMIT", "XML_DEPTH_LIMIT", depthBomb.length);
+  assertIsolated(depthResult, totalBound);
 
   // an XML DTD with entities (the billion laughs), an external entity aimed at the test's listener, an undefined entity
   const lol = `<!DOCTYPE worksheet [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">]>`;
@@ -367,6 +394,14 @@ test("the worksheet inventory reports visibility, formulas and their caches, mer
   for (const check of ["READ_COMPLETE", "SHA256", "OBSERVED_LENGTH", "FORMAT_DETECTED", "ARCHIVE_METADATA", "WORKBOOK_STRUCTURE", "ARCHIVE_ENTRIES_EXPANDED", "ARCHIVE_CRC", "XML_WELL_FORMED_NO_DTD", "ACTIVE_CONTENT_ABSENT", "WORKSHEET_INVENTORY"]) {
     assert.ok(r.checksCompleted.includes(check), check);
   }
+  // the parser profile hash (KAURO_PARSER_PROFILE_V1) digests the pinned configuration and the detected facts: the same file and
+  // configuration give the same hash whatever the chunking; another pinned bound gives another profile
+  const hash = parserProfileHashOfInspection(r);
+  assert.equal(hash, parserProfileHashOf(r.parserProfile));
+  assert.equal(r.parserProfile["inspectorVersion"], INSPECTOR_VERSION);
+  assert.equal(parserProfileHashOfInspection(await inspect(bytes, "XLSX", { chunk: 997 })), hash);
+  const otherBound = await inspector.inspect({ open: source(bytes), declaredFormat: "XLSX", observedBytes: bytes.length, limits: { ...limits, maxXmlDepth: 32 }, scratchDir: scratch });
+  assert.notEqual(parserProfileHashOfInspection(otherBound), hash);
 });
 
 test("CSV dialect facts: encoding by byte-order mark or validity (Windows-1252 ambiguity reported), delimiter by consistency (ambiguity reported, never the widest), line endings, blank lines, ragged rows and embedded line breaks; an unclosed quote, a NUL or an oversized cell is refused; the SHA-256 streams over any chunking", async () => {
