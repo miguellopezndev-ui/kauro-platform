@@ -108,3 +108,28 @@ test("B09-F7: every DENY row of CMD028..CMD034 names a foreign tenant, a wrong r
   const reconcileOk = map.find((r) => r.caseId === "CMD034-OK");
   assert.ok(reconcileOk.citations.every((c) => !/FEE_MISMATCH|fee mismatch/.test(c.title)));
 });
+
+test("stage-1 closure status: every row opens with EXECUTED_LOCAL, PARTIAL or MISSING; an EXECUTED_LOCAL row cites only tests on the branch and nothing planned or simulated; a PARTIAL row cites a test on the branch and names what remains with its mandate or package and case; a MISSING row cites no test on the branch and names the mandate and case that deliver it", () => {
+  const map = rows();
+  for (const row of map) {
+    const m = /^\*\*(EXECUTED_LOCAL|PARTIAL|MISSING)\*\* \(stage 1: (.*?)\) — /.exec(row.status);
+    assert.ok(m, `${row.caseId}: the status opens with its closure status at stage 1`);
+    const [, closure, detail] = m;
+    const onBranch = row.citations.filter((c) => existsSync(join(root, c.file)));
+    // every planned mandate the row names owns this very case in the row's detail (e.g. "M4 CMD028-OK", "INT-2 S057")
+    for (const [, mandate] of row.status.matchAll(/PLANNED \((M3|M4|INT-2)\)/g)) {
+      assert.ok(detail.includes(`${mandate} ${row.caseId}`), `${row.caseId}: the detail names ${mandate} ${row.caseId}`);
+    }
+    if (closure === "EXECUTED_LOCAL") {
+      assert.equal(onBranch.length, row.citations.length, `${row.caseId}: an EXECUTED_LOCAL row cites only tests on the branch`);
+      assert.doesNotMatch(row.status, /PLANNED|SIMULATED/, `${row.caseId}: an EXECUTED_LOCAL row has no planned or simulated clause`);
+    } else if (closure === "PARTIAL") {
+      assert.ok(onBranch.length > 0, `${row.caseId}: a PARTIAL row cites a test on the branch`);
+      assert.match(detail, /^remaining: /, `${row.caseId}: a PARTIAL row names what remains`);
+      assert.match(detail, /\b(M3|M4|INT-2|B\d{2}) (S\d{3}|R2-\d{3}|CMD\d{3}(-(OK|DENY|RACE))?)\b|\bB\d{2}\b/, `${row.caseId}: what remains names its mandate or package`);
+    } else {
+      assert.equal(onBranch.length, 0, `${row.caseId}: a MISSING row cites no test on the branch (move it once one exists)`);
+      assert.match(detail, new RegExp(`\\b(M3|M4|INT-2) ${row.caseId}(?![\\w-])`), `${row.caseId}: a MISSING row names the mandate and case that deliver it`);
+    }
+  }
+});

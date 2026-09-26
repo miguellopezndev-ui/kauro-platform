@@ -29,7 +29,7 @@ import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/
 import { applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
+import { activeWorkInspector, commercialConsequencesInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
@@ -203,9 +203,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const collaborators: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
-    activeWork: openProjectsInspector,
+    activeWork: activeWorkInspector,
     externalActions: noExternalActionsInThisEdition,
-    commercialConsequences: noCommercialConsequencesInThisEdition,
+    commercialConsequences: commercialConsequencesInspector,
     ...unavailablePlanServices(),
     ...assembly.collaborators,
   };
