@@ -41,6 +41,24 @@ The application layer of the Kauro platform: the contracts of the public command
 - `api/projections` — record → view projections and `readinessBlockersOf`.
 - `testing/in-memory-ports` — the in-memory implementation of the domain ports for pure orchestration tests only.
 
+The labelled contract fakes of three provider ports of the source lifecycle (B07 mandate B07-PROVIDER-FAKES; design
+`docs/design/B07-upload-source-lifecycle.md` §2, §15, D-FAKE-1) are the separate, TEST-ONLY export subpath
+`@kauro/application/testing` (`src/testing/index.ts`; architecture rule `testOnlySubpaths`: importable only from a `test/`
+directory, so no composition root can bind one). Each reports `evidenceClass: "SIMULATED"` and a `contract-fake-*` provider token
+and is never counted as real integration (B15 binds the real adapters):
+
+- `ContractFakeObjectStorage` (`contract-fake-storage`) — `ObjectStoragePort`: generations with no-overwrite preconditions,
+  resumable sessions usable until a configurable provider horizon (the application deadline is unknown to the provider),
+  cancellation answering CONFIRMED, UNSUPPORTED or UNCERTAIN as scripted, stat, exact-generation read and copy, delete by
+  generation, soft delete with a configurable retention read-back, listings, a call log without bearer references, hold points
+  and scripted faults; the browser side of a session (`writeThroughSession`) and `completionRefOf` for forged claims (S053).
+- `ContractFakeSessionVault` (`contract-fake-vault`) — `SessionVaultPort`: AES-256-GCM under a labelled test key, the binding
+  (agency, upload, requester, attempt) as associated data.
+- `ContractFakeAuthorityJournal` (`contract-fake-journal`) — `AuthorityJournalPort`: an append-only file outside the database,
+  idempotent by event id, the port's tombstone contract checked, listed per agency in sequence order.
+
+The malware scanner's fake is `@kauro/data-plane/testing` (B07-DATA-PLANE). Tests: `test/source-provider-fakes.test.ts`.
+
 The authorizer implementation is `@kauro/authorization`; the HTTP adapter is `apps/api`; the PostgreSQL adapters of the ports
 are `@kauro/persistence`; the B06 case tests against real PostgreSQL live in `apps/api/test` and `packages/persistence/test`
 (`docs/design/B06-case-map.md`). Depends on `@kauro/contracts` and `@kauro/domain`.
