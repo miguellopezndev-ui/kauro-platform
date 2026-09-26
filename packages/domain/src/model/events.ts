@@ -62,6 +62,12 @@ export const EVENT_TYPES = [
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
+/**
+ * The aggregate kinds an event may name. The database registry `kauro.aggregate_kinds` (migration 0008, the foundation shared by
+ * every package: docs/design/FOUNDATION-aggregate-kinds.md) holds the same kinds, each bound to its table and uuid primary-key
+ * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
+ * its own migration and adds it here.
+ */
 export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 

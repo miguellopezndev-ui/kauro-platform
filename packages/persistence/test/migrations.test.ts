@@ -1,13 +1,14 @@
 // The migrations against a real PostgreSQL 17 (07 "Acceptance obligations"): they apply in order, re-apply as a no-op,
 // refuse drift, and the schema they build agrees with the vendored registry (state vocabularies, listed transitions, event
-// types) and with the isolation rules (runtime roles are not owners/superusers/BYPASSRLS; every kauro table has RLS forced).
+// types, aggregate kinds) and with the isolation rules (runtime roles are not owners/superusers/BYPASSRLS; every kauro table
+// has RLS forced).
 import assert from "node:assert/strict";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { EVENT_TYPES, PLATFORM_STATE_MACHINES } from "@kauro/domain";
+import { AGGREGATE_KINDS, EVENT_TYPES, PLATFORM_STATE_MACHINES } from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
@@ -21,7 +22,17 @@ after(async () => {
 
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
-  assert.equal(files.length, 7);
+  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md)
+  assert.deepEqual(files.map((f) => f.file), [
+    "0001_schema_roles_helpers.sql",
+    "0002_identity_agencies_memberships.sql",
+    "0003_capabilities_clients_projects.sql",
+    "0004_plans_receipts_approvals.sql",
+    "0005_events_outbox_inbox.sql",
+    "0006_journals_leases.sql",
+    "0007_security_events.sql",
+    "0008_aggregate_kind_registry.sql",
+  ]);
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
   const owner = await pg.connect("kauro_owner");
   try {
@@ -196,6 +207,48 @@ test("registered event types in the database are exactly the domain EVENT_TYPES"
   try {
     const r = await su.query<{ event_type: string }>("SELECT event_type FROM kauro.event_types ORDER BY 1");
     assert.deepEqual(r.rows.map((x) => x.event_type), [...EVENT_TYPES].sort());
+  } finally {
+    await su.end();
+  }
+});
+
+test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's seven with their exact tables and id columns, each bound to the table and id column its event-per-version trigger names", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const r = await su.query<{ aggregate_kind: string; table_name: string; id_column: string; owner_package: string }>(
+      "SELECT aggregate_kind, table_name, id_column, owner_package FROM kauro.aggregate_kinds ORDER BY aggregate_kind",
+    );
+    assert.deepEqual(r.rows.map((x) => x.aggregate_kind), [...AGGREGATE_KINDS].sort());
+    // the kinds, tables and id columns of B06's former CHECK list and CASE arms (0005), owned by B06
+    assert.deepEqual(
+      r.rows.filter((x) => x.owner_package === "B06").map((x) => [x.aggregate_kind, x.table_name, x.id_column]),
+      [
+        ["agency", "agencies", "agency_id"],
+        ["approval", "approvals", "approval_id"],
+        ["dataset_revision", "dataset_revisions", "revision_id"],
+        ["end_client", "end_clients", "client_id"],
+        ["membership", "memberships", "membership_id"],
+        ["plan", "plans", "plan_id"],
+        ["project", "projects", "project_id"],
+      ],
+    );
+    // D-EVT-1 over the registry: every registered kind's table carries require_event_for_version(kind, id column), and every such
+    // trigger names a registered kind with that table and column — the event-per-version rule and the binding agree on each kind
+    const triggers = await su.query<{ table_name: string; def: string }>(
+      `SELECT c.relname AS table_name, pg_get_triggerdef(t.oid) AS def FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'kauro' AND NOT t.tgisinternal AND t.tgfoid = 'kauro.require_event_for_version()'::regprocedure ORDER BY 1`,
+    );
+    const perVersion = triggers.rows.map((t) => {
+      const m = /EXECUTE FUNCTION kauro\.require_event_for_version\('([a-z_]+)', '([a-z_]+)'\)/.exec(t.def);
+      assert.ok(m, t.def);
+      return [m[1], t.table_name, m[2]];
+    });
+    assert.deepEqual(perVersion.sort(), r.rows.map((x) => [x.aggregate_kind, x.table_name, x.id_column]).sort());
+    // the former CHECK list is gone; a foreign key to the registry stands in its place
+    const constraints = await su.query<{ conname: string; def: string }>(
+      `SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conrelid = 'kauro.domain_events'::regclass AND conname LIKE 'domain_events_aggregate_kind%' ORDER BY 1`,
+    );
+    assert.deepEqual(constraints.rows, [{ conname: "domain_events_aggregate_kind_fkey", def: "FOREIGN KEY (aggregate_kind) REFERENCES kauro.aggregate_kinds(aggregate_kind)" }]);
   } finally {
     await su.end();
   }

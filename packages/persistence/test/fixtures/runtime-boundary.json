@@ -6,6 +6,9 @@
         "SELECT",
         "UPDATE"
       ],
+      "kauro.aggregate_kinds": [
+        "SELECT"
+      ],
       "kauro.approvals": [
         "INSERT",
         "SELECT",
@@ -251,6 +254,22 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "aggregate_kinds/aggregate_kinds_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "aggregate_kinds/aggregate_kinds_register": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": null,
+      "check": "true"
     },
     "approvals/approvals_act": {
       "command": "INSERT",

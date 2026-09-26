@@ -2,10 +2,13 @@
 
 PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements the ports of `@kauro/domain`).
 
-- `migrations/0001..0007_*.sql` — the ordered schema: roles and helpers, identities/agencies/memberships, capabilities/
+- `migrations/0001..0008_*.sql` — the ordered schema: roles and helpers, identities/agencies/memberships, capabilities/
   clients/projects/revisions/target contracts, plans/receipts/approvals, event types/domain events/outbox/inbox, command
-  journal/request journal/leases, security events. Every tenant table has row-level security enabled and forced; every
-  tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
+  journal/request journal/leases, security events (0001–0007, B06), and the shared aggregate-kind registry (0008,
+  `docs/design/FOUNDATION-aggregate-kinds.md`): `kauro.aggregate_kinds` names each kind's table and uuid key column, the events
+  refer to it by a foreign key, and `kauro.domain_events_bind_aggregate` reads the registered table; a later package registers
+  its kinds with one INSERT in its own migration, numbered from 0009. Every tenant table has row-level security enabled and
+  forced; every tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
   (an event of its own agency, bound to an aggregate of that agency at or below its version); every aggregate is born in its
   machine's initial state (`kauro.state_machines`, seeded from the registry) and changes state only along a listed edge.
   Four runtime groups, one per writer: `kauro_app` (request handlers), `kauro_control` (control plane; safe technical
@@ -79,7 +82,7 @@ import graph carries process-spawning test code.
   acceptance tests, never wired into a deployment.
 
 Tests (`test/*.test.ts`) start a real cluster each; there is no fake of PostgreSQL anywhere. `migrations`, `tenant-isolation`,
-`discipline`, `last-owner`, `journals-leases`, `integrity-guards` and `security-events` review the SQL directly;
+`discipline`, `last-owner`, `journals-leases`, `integrity-guards`, `security-events` and `aggregate-kinds` review the SQL directly;
 `adapters-unit-of-work`, `adapters-tenant-isolation`, `adapters-journals-outbox` and `adapters-leases` review the adapters;
 `migration-runner`, `pool-diagnostics`, `schema-readiness` and `package-surface` review the runner under concurrency and
 failure, the pool's diagnostics, the readiness ledger read and the published surface.

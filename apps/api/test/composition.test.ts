@@ -9,7 +9,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { MigratorRoleError, PrivilegedRoleError } from "@kauro/persistence";
+import { MigratorRoleError, PrivilegedRoleError, listMigrations } from "@kauro/persistence";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 
@@ -141,8 +141,8 @@ test("bootstrap on a real cluster: migrations on start as the owner (idempotent)
   let closed = false;
   try {
     assert.equal(api.address, `http://127.0.0.1:${port}`);
-    // the seven migrations were applied by the cluster helper: applying on start is idempotent and applies nothing new
-    assert.deepEqual(api.database.migrations && { applied: api.database.migrations.applied.length, skipped: api.database.migrations.skipped.length }, { applied: 0, skipped: 7 });
+    // every shipped migration was applied by the cluster helper: applying on start is idempotent and applies nothing new
+    assert.deepEqual(api.database.migrations && { applied: api.database.migrations.applied.length, skipped: api.database.migrations.skipped.length }, { applied: 0, skipped: listMigrations().length });
     // one command over the network, through the composition root, into the database
     const res = await fetch(`${api.address}/api/v1/agencies`, {
       method: "POST",

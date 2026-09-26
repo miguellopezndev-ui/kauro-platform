@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STATE_MACHINES } from "@kauro/contracts";
 import {
+  AGGREGATE_KINDS,
   DomainFailure,
   EVENT_PAYLOAD_ALLOWLIST,
   EVENT_SUBSCRIPTIONS,
@@ -50,6 +51,13 @@ test("every subscription names a registered event type and every event type has 
   for (const t of EVENT_TYPES) assert.ok(EVENT_PAYLOAD_ALLOWLIST[t].length > 0, t);
   assert.deepEqual(consumersOf("approval.withdrawn.v1"), ["NOTIFICATIONS", "EXECUTION_CONTROL"]);
   assert.deepEqual(consumersOf("end_client.created.v1"), []);
+});
+
+test("aggregate kinds are distinct lower snake case identifiers, the shape the database registry admits (migration 0008)", () => {
+  // the CHECK aggregate_kinds_kind_lower_snake of kauro.aggregate_kinds; the persistence test proves the registry rows equal this list
+  assert.equal(new Set(AGGREGATE_KINDS).size, AGGREGATE_KINDS.length);
+  for (const kind of AGGREGATE_KINDS) assert.match(kind, /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/, kind);
+  for (const kind of AGGREGATE_KINDS) assert.ok(kind.length <= 63, kind);
 });
 
 test("payload allowlist refuses labels, unknown keys, nested objects and negative counts", () => {

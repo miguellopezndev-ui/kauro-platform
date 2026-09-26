@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { DomainFailure, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
-import { PrivilegedRoleError, createPool } from "../src/index.js";
+import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
@@ -28,7 +28,7 @@ function failure(e: unknown): DomainFailure {
 }
 
 test("the harness applied every migration from an empty cluster and the pools run as unprivileged members of one runtime group", async () => {
-  assert.equal(h.pg.migrations.applied.length, 7);
+  assert.equal(h.pg.migrations.applied.length, listMigrations().length);
   assert.equal(h.pg.migrations.skipped.length, 0);
   const app = await h.appPool.acquire();
   assert.deepEqual(app.connection, { role: "kauro_app", loginRole: ROLES.appLogin });
