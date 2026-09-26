@@ -187,7 +187,11 @@ export interface StoredObjectRepository {
   observe(objectId: StoredObjectId, observed: { readonly generation: string; readonly bytes: number; readonly observedAt: UtcInstant; readonly late: boolean }): Promise<StoredObjectRecord>;
   /** PRESENT -> VERIFIED with the SHA-256 the server recomputed over the complete generation. */
   verify(objectId: StoredObjectId, sha256: Sha256Hex, verifiedAt: UtcInstant): Promise<StoredObjectRecord>;
-  /** -> DELETION_REQUESTED for each object (a VERIFIED object retained by a sealed revision is refused, design §7.4). */
+  /**
+   * -> DELETION_REQUESTED for each object not already requested or deleted, at the server's transaction time; returns how many moved.
+   * An accepted generation whose file's admission still stands — retained by a seal's record or by its intake window — is refused
+   * (PRECONDITION_FAILED): its admission is revoked first (decision D-PERS-4).
+   */
   requestDeletion(objectIds: ReadonlyArray<StoredObjectId>, reason: string, at: UtcInstant): Promise<number>;
   /**
    * Records the provider result at the server's transaction time: DELETED / ALREADY_ABSENT -> DELETED with the provider residual
@@ -299,7 +303,12 @@ export type RevisionTransition =
   | { readonly event: "seal_command"; readonly manifestHash: Sha256Hex; readonly projectionHash: Sha256Hex; readonly sealedFileCount: number; readonly sealedBytes: number }
   | { readonly event: "new_revision_explicitly_supersedes"; readonly successorRevisionId: RevisionId }
   | { readonly event: "cancel_revision"; readonly reason: string; readonly successorRevisionId?: RevisionId }
-  /** SEALED -> EXPIRED once no governing record is ACTIVE ahead of the server clock; REJECTED -> EXPIRED once every intake window closed. */
+  /**
+   * SEALED -> EXPIRED once no governing record is ACTIVE ahead of the server clock; REJECTED -> EXPIRED once every intake window
+   * closed. A revision's terminal facts are set once (KA004): `reason` is recorded only by an expiry of a revision that has no
+   * terminal reason yet (SEALED -> EXPIRED); from REJECTED the rejection's reason stays and `reason` is not recorded (re-check
+   * residual FINAL-N2, decision D-PERS-3).
+   */
   | { readonly event: "retention_expires"; readonly reason: string }
   | { readonly event: "managed_cleanup_verified" };
 

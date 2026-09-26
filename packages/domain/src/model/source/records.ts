@@ -43,8 +43,11 @@ export interface UploadSessionRecord extends Omit<UploadSession, "providerSessio
   readonly agencyId: AgencyId;
   readonly projectId: ProjectId;
   readonly revisionId: RevisionId;
-  /** Untrusted display filename; tenant reads only; never in an event, a log or a storage path. */
-  readonly displayName: string;
+  /**
+   * Untrusted display filename; tenant reads only; never in an event, a log or a storage path. Present on every record a request
+   * handler reads; absent when the control plane reads the upload, which holds no grant on customer text (D-CTRL-1, D-PERS-2).
+   */
+  readonly displayName?: string;
   readonly declaredFormat: DeclaredFormat;
   readonly quarantineObjectId: StoredObjectId;
   readonly requestedByMembershipId: MembershipId;
@@ -222,6 +225,12 @@ export interface InspectionReceiptRecord {
     readonly signatureMaxAgeSeconds: number;
     readonly configHash: Sha256Hex;
     readonly scannedAt: UtcInstant;
+    /**
+     * The engine's own summary, recorded as evidence and never decisive (D-SCAN-1; S054: a zero exit code alone is not admission
+     * evidence; inspection_receipts.scanner_exit_code / scanner_verdict). Optional: an engine that reported none records none.
+     */
+    readonly exitCode?: number;
+    readonly verdict?: "CLEAN" | "INFECTED" | "ERROR";
   };
   readonly expectedParts: number;
   readonly expectedBytes: number;

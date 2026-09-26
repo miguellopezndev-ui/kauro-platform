@@ -82,11 +82,34 @@ export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.
 });
 
 /**
+ * B07's refusal translation (docs/design/B07-upload-source-lifecycle.md §3.3): the constraints of the source lifecycle whose
+ * refusal is a business outcome a request can meet — the intake envelope and the agency's session limit decided on the committed
+ * ledgers (R2-052), a project's one mutable revision and a predecessor replaced once — and the deadline checks a writer on the
+ * wrong side of the server clock meets (D-EXP-1: the same class as KA072, "a deadline edge on the wrong side of its deadline").
+ * Keyed by the constraint (or unique index) name the error carries, for its SQLSTATE.
+ */
+export const SOURCE_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason: FailureReason; readonly retryable?: boolean }>> = Object.freeze({
+  revision_quota_bytes_within_envelope: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "REVISION_QUOTA_EXCEEDED" },
+  revision_quota_files_within_envelope: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "REVISION_FILE_LIMIT" },
+  upload_sessions_reserved_bytes_check: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "FILE_TOO_LARGE" },
+  // a slot frees when a live session ends: the caller may retry later (429)
+  upload_capacity_within_limit: { sqlState: "23514", code: "ADMISSION_LIMITED", reason: "UPLOAD_CONCURRENCY_LIMITED", retryable: true },
+  dataset_revisions_one_mutable_per_project: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "REVISION_NOT_MUTABLE" },
+  dataset_revisions_supersedes_once: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "PREDECESSOR_NOT_CURRENT" },
+  retention_records_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+  upload_sessions_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+});
+
+/**
  * Translates a database error code into a DomainFailure, or null when the adapter must decide by context (a unique violation
  * is IDEMPOTENCY replay, LAST-approval race or DRAFT_AGENCY_EXISTS depending on the constraint name it carries).
  */
 export function failureOfSqlState(sqlState: string | undefined, constraint?: string): DomainFailure | null {
   if (!sqlState) return null;
+  const source = constraint === undefined ? undefined : SOURCE_CONSTRAINT_FAILURES[constraint];
+  if (source !== undefined && source.sqlState === sqlState) {
+    return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
+  }
   if (sqlState === SQLSTATE.UNIQUE_VIOLATION) {
     if (constraint === "agencies_one_draft_per_creator") return new DomainFailure("ADMISSION_LIMITED", "one draft agency per identity", { reason: "DRAFT_AGENCY_EXISTS" });
     // command_journal_identity (concurrent duplicate), approvals_one_live_per_plan (lost approval race) and
