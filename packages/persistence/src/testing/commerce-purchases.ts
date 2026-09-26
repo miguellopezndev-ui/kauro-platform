@@ -10,6 +10,7 @@
  * observation would carry (the labelled contract fakes are @kauro/application/testing's, for the tests that dispatch).
  */
 import { createHash } from "node:crypto";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   baseServiceCents,
   quoteAmounts,
@@ -17,6 +18,7 @@ import {
   toUtcInstant,
   type AgencyId,
   type ApprovalId,
+  type CapabilityId,
   type CaptureId,
   type CausationId,
   type CommercialAuthorizationId,
@@ -28,7 +30,9 @@ import {
   type PaymentAttemptId,
   type PaymentOrderId,
   type PlanId,
+  type ProjectId,
   type QuoteId,
+  type ServiceMode,
   type TaxRuleSnapshot,
   type UserId,
   type VersionedWrite,
@@ -101,13 +105,12 @@ export async function recordReviewedFiscalProfile(h: Harness, input: { readonly 
   });
 }
 
-export interface PurchaseInput {
-  /** The agency (ACTIVE) and its owner, who issues the quote and creates the order under TENANT contexts. */
+export interface QuoteInput {
+  /** The agency (ACTIVE) and its owner, who issues the quote under a TENANT context. */
   readonly agency: AgencyFixture;
   /** An APPROVED plan with its live approval (the api's CMD025, or the persistence fixtures); its project names the mode. */
   readonly planId: PlanId;
-  /** The QUALIFIED merchant route (Harness.qualifiedPaymentRoute) and the qualified fiscal issuer route. */
-  readonly route: QualifiedRoute;
+  /** The qualified fiscal issuer route. */
   readonly issuerRef: FiscalIssuerRef;
   /** The agency's reviewed fiscal profile (recordReviewedFiscalProfile) and the treatment it records. */
   readonly profileId: FiscalProfileId;
@@ -115,34 +118,46 @@ export interface PurchaseInput {
   readonly billableUnits?: number;
 }
 
-export interface PaidPurchase {
+export interface PurchaseInput extends QuoteInput {
+  /** The QUALIFIED merchant route (Harness.qualifiedPaymentRoute). */
+  readonly route: QualifiedRoute;
+}
+
+/** An ISSUED quote over an approved plan, with the facts a checkout of it binds. */
+export interface IssuedQuote {
   readonly quoteId: QuoteId;
-  readonly orderId: PaymentOrderId;
-  readonly captureId: CaptureId;
-  readonly authorizationId: CommercialAuthorizationId;
-  readonly projectId: string;
-  readonly providerOrderId: string;
+  readonly projectId: ProjectId;
+  readonly planId: PlanId;
+  readonly approvalId: ApprovalId;
+  readonly approvalHash: Sha256Hex;
+  readonly revisionHash: Sha256Hex;
+  readonly targetContractHash: Sha256Hex;
+  readonly planHash: Sha256Hex;
+  readonly capabilityId: CapabilityId;
+  readonly capabilityVersion: string;
+  readonly mode: ServiceMode;
+  readonly billableUnits: number;
   readonly serviceCents: bigint;
   readonly taxCents: bigint;
   readonly totalCents: bigint;
-  readonly termsHash: string;
+  readonly termsHash: Sha256Hex;
+  readonly issuedAt: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly sourceAvailableUntil: UtcInstant;
 }
 
 /**
- * A purchase paid by one capture that alone pays it, with its CommercialAuthorization ACTIVE: the quote issued at R2-INITIAL with
- * the founding rate (2500 bps, never stacked), accepted for checkout by the first order; the order and its CREATE_ORDER attempt
- * (T1, with a command journal entry of CMD028), the claim (T2), the provider's creation (T3); then the payment service records the
- * authenticated completion, the order CAPTURED and the entitlement, in one transaction under the agency it adopted.
+ * CMD027 as the recurrence package (B10) writes it (D-QUOTE-B1), through the commerce adapters in the agency owner's TENANT unit of
+ * work: a quote of the approved plan issued at R2-INITIAL with the founding rate (2500 bps, never stacked), its eligibility snapshot
+ * evaluated at the issuance instant, the reviewed tax rule of the agency's profile, the price expiry 336 hours after issuance and the
+ * source promised for 168 hours (quote.drafted.v1, quote.issued.v1). The request-side tests check out from it; paidPurchase pays it.
  */
-export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<PaidPurchase> {
-  const { agency, route } = input;
-  const owner = { kind: "USER", userId: agency.ownerUserId } as const;
+export async function issueQuote(h: Harness, input: QuoteInput): Promise<IssuedQuote> {
+  const { agency } = input;
   const treatment = input.treatment ?? "EXEMPT_EXPORT";
   const tax: TaxRuleSnapshot = treatment === "DOMESTIC_TAXABLE" ? { treatment: "DOMESTIC_TAXABLE", rule: "RATE_HALF_UP", rateBps: 1900 } : { treatment: "EXEMPT_EXPORT", rule: "ZERO_REVIEWED", rateBps: 0 };
   const units = input.billableUnits ?? 40_000;
-
-  // the quote over the approved subject (CMD027 as the recurrence package writes it)
-  const quote = await h.commerce.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
+  return h.commerce.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
     const plan = await uow.plans.get(input.planId);
     if (plan === null || plan.state !== "APPROVED" || plan.approvalId === undefined) throw new Error(`plan ${input.planId} is not an approved plan of the agency`);
     const approval = await uow.approvals.get(plan.approvalId);
@@ -157,6 +172,8 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
     const issuedAt = clock.now();
     const issuedMs = Date.parse(issuedAt);
     const termsHash = sha(`terms-${quoteId}`);
+    const expiresAt = toUtcInstant(issuedMs + 336 * HOUR_MS);
+    const sourceAvailableUntil = toUtcInstant(issuedMs + 168 * HOUR_MS);
     await uow.commerce.quotes.issue(
       {
         quoteId,
@@ -184,8 +201,8 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
         termsHash,
         termsVersion: "TERMS-2026-01",
         issuedAt,
-        expiresAt: toUtcInstant(issuedMs + 336 * HOUR_MS),
-        sourceAvailableUntil: toUtcInstant(issuedMs + 168 * HOUR_MS),
+        expiresAt,
+        sourceAvailableUntil,
         createdByMembershipId: agency.ownerMembershipId as MembershipId,
       },
       {
@@ -204,8 +221,64 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
         policyVersion: "R2-INITIAL",
       },
     );
-    return { quoteId, plan, approval, project, amounts, termsHash };
+    return {
+      quoteId,
+      projectId: plan.projectId,
+      planId: plan.planId,
+      approvalId: approval.approvalId as ApprovalId,
+      approvalHash: approval.approvalHash,
+      revisionHash: plan.revisionHash,
+      targetContractHash: plan.targetContractHash,
+      planHash: plan.bodyHash,
+      capabilityId: project.capabilityId,
+      capabilityVersion: project.capabilityVersion,
+      mode: project.mode,
+      billableUnits: units,
+      serviceCents: amounts.serviceCents,
+      taxCents: amounts.taxCents,
+      totalCents: amounts.totalCents,
+      termsHash,
+      issuedAt,
+      expiresAt,
+      sourceAvailableUntil,
+    };
   });
+}
+
+export interface PaidPurchase {
+  readonly quoteId: QuoteId;
+  readonly orderId: PaymentOrderId;
+  readonly captureId: CaptureId;
+  readonly authorizationId: CommercialAuthorizationId;
+  readonly projectId: string;
+  readonly providerOrderId: string;
+  readonly serviceCents: bigint;
+  readonly taxCents: bigint;
+  readonly totalCents: bigint;
+  readonly termsHash: string;
+}
+
+/**
+ * A purchase paid by one capture that alone pays it, with its CommercialAuthorization ACTIVE: the quote issued at R2-INITIAL with
+ * the founding rate (2500 bps, never stacked), accepted for checkout by the first order; the order and its CREATE_ORDER attempt
+ * (T1, with a command journal entry of CMD028), the claim (T2), the provider's creation (T3); then the payment service records the
+ * authenticated completion, the order CAPTURED and the entitlement, in one transaction under the agency it adopted.
+ */
+export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<PaidPurchase> {
+  const { agency, route } = input;
+  const owner = { kind: "USER", userId: agency.ownerUserId } as const;
+
+  // the quote over the approved subject (CMD027 as the recurrence package writes it)
+  const issued = await issueQuote(h, input);
+  const units = issued.billableUnits;
+  const quote = {
+    quoteId: issued.quoteId,
+    plan: { projectId: issued.projectId, planId: issued.planId, bodyHash: issued.planHash, revisionHash: issued.revisionHash, targetContractHash: issued.targetContractHash },
+    approval: { approvalId: issued.approvalId, approvalHash: issued.approvalHash },
+    project: { capabilityId: issued.capabilityId, capabilityVersion: issued.capabilityVersion, mode: issued.mode },
+    amounts: { serviceCents: issued.serviceCents, taxCents: issued.taxCents, totalCents: issued.totalCents },
+    termsHash: issued.termsHash,
+  };
 
   // T1: the checkout intent — the quote accepted, the order and its CREATE_ORDER attempt, the stored operation's scope row
   const created = await h.commerce.run(h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {

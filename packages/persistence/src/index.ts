@@ -26,7 +26,7 @@ export { SQLSTATE, failureOfSqlState, commerceReplayOf, COMMERCE_REPLAY_CONSTRAI
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, commerceRequestReadsOf } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -48,3 +48,6 @@ export { PgRefundRepository, PgReconciliationCaseRepository, PgProviderException
 export { PgTaxDocumentRepository, PgLedgerRepository, PgSettlementRepository, PgPaymentInboxRepository } from "./repositories/commerce-finance.js";
 export { PgCommercialInspections } from "./repositories/commerce-inspections.js";
 export type { CommercialConsequence } from "./repositories/commerce-inspections.js";
+// the request side's reads (implementation mandate M4; D-REQ-B2, D-CORE-B2)
+export { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
+export type { PurchasedSubjectRow, RequestTransitionSubject } from "./repositories/commerce-request-reads.js";

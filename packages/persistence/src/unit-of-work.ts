@@ -62,6 +62,7 @@ import { PgLeaseStore } from "./lease-store.js";
 import type { KauroPool, RuntimeRole } from "./pool.js";
 import { PgCommercialInspections } from "./repositories/commerce-inspections.js";
 import { createCommerceRepositories } from "./repositories/commerce-repositories.js";
+import { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
 import { PgApprovalRepository, PgPlanRepository, PgValidationReceiptRepository } from "./repositories/plans.js";
 import { PgAgencyRepository, PgIdentityRepository, PgInvitationRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 import { PgCapabilityRepository, PgDatasetRevisionRepository, PgEndClientRepository, PgProcessingAuthorityRepository, PgProjectRepository, PgTargetContractRepository } from "./repositories/workspace.js";
@@ -348,6 +349,8 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOfWork {
   readonly commerce: CommerceRepositories;
   readonly scopes: ScopeIndex;
+  /** The request side's reads (implementation mandate M4, D-REQ-B2): the purchased subject, shared halves, order and capture queries. */
+  readonly requestReads: PgCommerceRequestReads;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -358,6 +361,7 @@ export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOf
     const built = createCommerceRepositories({ db: client, ids, clock, events: this.events, provenance: () => this.provenance() });
     this.commerce = built.repositories;
     this.scopes = built.scopes;
+    this.requestReads = new PgCommerceRequestReads(client);
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {
@@ -470,4 +474,14 @@ export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements 
 
 export function createCommerceUnitOfWorkFactory(pools: CommercePools, deps: UnitOfWorkDependencies): PgCommerceUnitOfWorkFactory {
   return new PgCommerceUnitOfWorkFactory(pools, deps);
+}
+
+/**
+ * The request side's reads of a commerce unit of work of this package (implementation mandate M4; D-REQ-B2, D-CORE-B2): the api
+ * composition binds the application's PurchasedSubjectReader and the request queries to them. A unit of work of another adapter is
+ * refused (INTEGRITY_FAILURE), as commercialInspectionsOf refuses it.
+ */
+export function commerceRequestReadsOf(uow: UnitOfWork): PgCommerceRequestReads {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the request side's reads need a commerce unit of work of @kauro/persistence");
+  return uow.requestReads;
 }
