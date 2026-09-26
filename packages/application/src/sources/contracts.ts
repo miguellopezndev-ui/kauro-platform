@@ -191,7 +191,9 @@ export interface SealRevisionView {
   readonly revision: SourceRevisionView;
   readonly manifestHash: string;
   readonly projectionHash: string;
-  /** The UNPAID record anchored on the seal: hard deadline fourteen days from the seal (D-RET-2). */
+  /** KAURO_SOURCE_SEALED_SUBJECT_V1 digest binding this revision and its frozen counts to the manifest (D-HASH-4, B07-F12). */
+  readonly sealedSubjectHash: string;
+  /** The UNPAID record anchored on the first seal of the bytes: hard deadline fourteen days from it (D-RET-2, D-RET-3). */
   readonly retention: RetentionView;
 }
 export const SEAL_REVISION: CommandSpec<SealRevisionBody> = spec<SealRevisionBody>({

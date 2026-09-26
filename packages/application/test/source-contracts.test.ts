@@ -5,8 +5,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
-import { DomainFailure, FAILURE_REASONS } from "@kauro/domain";
+import { DomainFailure, EVENT_SUBSCRIPTIONS, FAILURE_REASONS } from "@kauro/domain";
 import {
+  AUTHORITY_TOMBSTONES,
   B07_COMMANDS,
   PROBLEM_STATUS,
   REQUEST_SCHEMA_PREFIX,
@@ -20,8 +21,12 @@ import {
   SOURCE_REQUEST_SCHEMA_IDS,
   SOURCE_ROUTES,
   SOURCE_ROUTE_OUTCOMES,
+  SOURCE_SWEEPERS,
   SOURCE_VIEW_DEFINITIONS,
   buildResponseSchemas,
+  buildSourceResponseSchemas,
+  sourceCommandResponseSchemaId,
+  sourceRouteResponseSchemaId,
   buildSourceViewSchemas,
   compileSchemaBundle,
   declaredMembers,
@@ -245,4 +250,37 @@ test("the closed outcome catalogues of the B07 routes: registered codes and reas
   assert.ok(!SOURCE_ROUTE_OUTCOMES.GetUpload.some((o) => o.reason === "ROLE_INSUFFICIENT"));
   assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
   assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "UPLOAD_NOT_OWNED"));
+});
+
+test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombstone kind and a terminal state — an expired and a rejected revision included — and nothing else produces one", () => {
+  const routed = EVENT_SUBSCRIPTIONS.filter((s) => s.consumer === "AUTHORITY_JOURNAL").map((s) => s.eventType).sort();
+  assert.deepEqual(Object.keys(AUTHORITY_TOMBSTONES).sort(), routed);
+  assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.expired.v1"], { kind: "REVISION_EXPIRED", state: "EXPIRED" });
+  assert.deepEqual(AUTHORITY_TOMBSTONES["dataset_revision.rejected.v1"], { kind: "REVISION_REJECTED", state: "REJECTED" });
+  const terminal = new Set(["CANCELLED", "EXPIRED", "REJECTED", "SUPERSEDED", "DELETED"]);
+  for (const [eventType, t] of Object.entries(AUTHORITY_TOMBSTONES)) assert.ok(terminal.has(t.state), `${eventType} records a terminal state`);
+});
+
+test("B07-F13: the sweepers of the contracts are exactly the sweepers of design §12.5, LOCATION_POLICY and RETENTION included", () => {
+  const design = readFileSync(new URL("../../../../docs/design/B07-upload-source-lifecycle.md", import.meta.url), "utf8");
+  const line = /^Sweepers \(SOURCE_SWEEPERS\): (.+)\.$/m.exec(design);
+  assert.ok(line, "design §12.5 names the sweepers in one line");
+  assert.deepEqual(line[1]!.split(", "), [...SOURCE_SWEEPERS]);
+  assert.ok(SOURCE_SWEEPERS.includes("RETENTION") && SOURCE_SWEEPERS.includes("LOCATION_POLICY"));
+});
+
+test("B07-F13: the planned reply envelopes of the source routes build closed from the views — a COMPLETED envelope per command but CMD014 (ACCEPTED), a READ envelope per read, a STORED envelope for the selection manifest intake", () => {
+  const b06 = buildResponseSchemas(bundle);
+  const planned = buildSourceResponseSchemas(bundle, new Set(Object.keys(b06.defs)), SOURCE_ROUTES);
+  const expected = [
+    ...(["CMD012", "CMD013", "CMD015", "CMD016", "CMD017"] as const).map((c) => sourceCommandResponseSchemaId(c)),
+    ...Object.keys(SOURCE_ROUTES).map((op) => sourceRouteResponseSchemaId(op as keyof typeof SOURCE_ROUTES)),
+  ].sort();
+  assert.deepEqual(Object.keys(planned.roots).sort(), expected);
+  for (const id of Object.keys(b06.roots)) assert.ok(!(id in planned.roots), `${id} is a served schema, never shadowed`);
+  const roots: Record<string, unknown> = { ...planned.roots };
+  const compiled = compileSchemaBundle({ defs: { ...bundle.$defs, ...b06.defs, ...planned.defs }, roots });
+  const intake = { selectionManifestId: "0190c7a2-0000-7000-8000-00000000000a", revisionId: "0190c7a2-0000-7000-8000-00000000000b", bodyHash: "a".repeat(64), created: true };
+  assert.deepEqual(compiled.validate(sourceRouteResponseSchemaId("SubmitSelectionManifest"), { kind: "STORED", data: intake }), []);
+  assert.ok(compiled.validate(sourceRouteResponseSchemaId("SubmitSelectionManifest"), { kind: "STORED", data: intake, replayed: false }).length > 0, "the envelope is closed");
 });

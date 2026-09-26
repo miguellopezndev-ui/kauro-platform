@@ -18,7 +18,7 @@ Registry: commands.json `6fa1a124821609a5ac911779304e8876df1a6954c530e895604da10
 
 `Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the
 edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;
-**database** — the schema (migrations 0001–0007 of B06, 0008–0011 of B07) stores the aggregate and seeds the edge in
+**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07) stores the aggregate and seeds the edge in
 `kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and
 checked; **—** — the aggregate is not stored yet.
 
@@ -60,7 +60,7 @@ registry machine; initial DRAFT; terminal SUPERSEDED, DELETED; unlisted edges: R
 | --- | --- | --- | --- | --- | --- |
 | — | (initial DRAFT) | DRAFT | CMD011 CreateProject (B06); CMD012 CreateRevision (B07) creates every later revision, with explicit lineage (D-REV-1) | dataset_revision.created.v1 | route |
 | DRAFT | upload_reserved | UPLOADING | CMD013 ReserveUpload (B07); the first reservation, in its intent unit of work (D-RUN-2) | dataset_revision.uploading.v1 | database |
-| UPLOADING | all_uploads_completed | INSPECTING | CMD014 CompleteUpload (B07); taken asynchronously by CMD014's continuation, the UPLOAD_INSPECTION consumer (control plane), once no reservation, session or unobserved completion of the revision remains (D-RUN-1) | dataset_revision.inspecting.v1 | database |
+| UPLOADING | all_uploads_completed | INSPECTING | CMD016 SelectInputTables (B07); the agency's explicit closing of the intake: CMD016 binds its selection on the UPLOADING revision once no upload of it is RESERVED, UPLOADING or VERIFYING (D-INTAKE-1, B07-F1); no observation, inspection outcome, cancellation or deadline takes it | dataset_revision.selection_changed.v1 | database |
 | DRAFT | previously_admitted_inputs_selected | INSPECTING | CMD016 SelectInputTables (B07); a selection that reuses admitted files of the project binds on a DRAFT revision | dataset_revision.selection_changed.v1 | database |
 | INSPECTING | all_selected_inputs_admitted | READY_TO_SEAL | B07: the SELECTION_EVALUATION consumer (control plane) records a complete evaluation of the bound selection and binds its counts | dataset_revision.ready_to_seal.v1 | database |
 | INSPECTING | fatal_input_rejection | REJECTED | B07: the SELECTION_EVALUATION consumer (control plane) records an ADMISSION_FAILED evaluation of the bound selection (no silent removal) | dataset_revision.rejected.v1 | database |
@@ -317,8 +317,8 @@ platform machine of the source lifecycle (B07 decision D-FILE-1); initial ADMITT
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial ADMITTED) | ADMITTED | B07: the UPLOAD_INSPECTION consumer admits a file only while its upload is VERIFYING under the current attempt (control plane) | — (no event type registered: the owning package registers it with the edge) | database |
-| ADMITTED | admission_revoked | ADMISSION_REVOKED | B07: the upload-deadline sweeper (INTAKE_EXPIRED, refused while a sealed revision retains the file) or object inventory (GENERATION_MISSING, GENERATION_CHANGED) (D-FILE-1) | — (no event type registered: the owning package registers it with the edge) | database |
+| — | (initial ADMITTED) | ADMITTED | B07: the UPLOAD_INSPECTION consumer admits a file only while its upload is VERIFYING under the current attempt (control plane); an aggregate since B07-F9 | source_file.admitted.v1 | database |
+| ADMITTED | admission_revoked | ADMISSION_REVOKED | B07: the upload-deadline sweeper (INTAKE_EXPIRED, only for a file no seal ever included, once its intake window closed), the retention sweeper (RETENTION_EXPIRED, once no including revision holds an ACTIVE record ahead, D-RET-3) or object inventory (GENERATION_MISSING, GENERATION_CHANGED) (D-FILE-1) | source_file.admission_revoked.v1 | database |
 
 ### RetentionRecord
 
@@ -326,7 +326,7 @@ platform machine of the source lifecycle (B07 decision D-RET-2); initial ACTIVE;
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial ACTIVE) | ACTIVE | CMD017 SealRevision (B07); the UNPAID record anchored on the seal: hard deadline fourteen days after it (D-RET-2); later packages create the paid classes | retention_record.created.v1 | database |
+| — | (initial ACTIVE) | ACTIVE | CMD017 SealRevision (B07); the UNPAID record anchored on the first seal of its bytes: hard deadline fourteen days after it, never restarted by a re-seal (D-RET-2, D-RET-3); later packages create the paid classes | retention_record.created.v1 | database |
 | ACTIVE | effective_deadline_reached | EXPIRED | B07: the retention sweeper (control plane), never before the effective deadline | retention_record.expired.v1 | database |
 | ACTIVE | early_deletion_requested | DELETING | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
 | EXPIRED | cleanup_started | DELETING | B16: managed deletion of expired data | — (no event type registered: the owning package registers it with the edge) | database |
@@ -358,9 +358,9 @@ when they join the served commands above (the api's send guard, the OpenAPI docu
 | --- | --- | --- | --- | --- | --- | --- |
 | CMD012 CreateRevision | POST /api/v1/projects/{projectId}/revisions | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision new_revision_explicitly_supersedes; DatasetRevision cancel_revision | 201 COMPLETED |
 | CMD013 ReserveUpload | POST /api/v1/revisions/{revisionId}/uploads | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision upload_reserved; UploadSession (initial RESERVED); UploadSession session_issued | 201 COMPLETED |
-| CMD014 CompleteUpload | POST /api/v1/uploads/{uploadId}/complete | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision all_uploads_completed; UploadSession completion_reported | 202 ACCEPTED (B06 envelope) |
+| CMD014 CompleteUpload | POST /api/v1/uploads/{uploadId}/complete | AGENCY_OPERATOR | AGENCY_HEADER | — | UploadSession completion_reported | 202 ACCEPTED (B06 envelope) |
 | CMD015 CancelUpload | POST /api/v1/uploads/{uploadId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | UploadSession cancel_upload | 200 COMPLETED |
-| CMD016 SelectInputTables | POST /api/v1/revisions/{revisionId}/selection | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision previously_admitted_inputs_selected; DatasetRevision selection_changes | 200 COMPLETED |
+| CMD016 SelectInputTables | POST /api/v1/revisions/{revisionId}/selection | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision all_uploads_completed; DatasetRevision previously_admitted_inputs_selected; DatasetRevision selection_changes | 200 COMPLETED |
 | CMD017 SealRevision | POST /api/v1/revisions/{revisionId}/seal | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision seal_command; RetentionRecord (initial ACTIVE) | 200 COMPLETED |
 
 | Route | Operation | Role | Success view | Authority |
@@ -581,11 +581,11 @@ when they join the served commands above (the api's send guard, the OpenAPI docu
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the revision's current version; the current safe version and state come back |
-| 409 | PRECONDITION_FAILED | REVISION_NOT_SELECTABLE | — | always | COMMAND | the revision is not DRAFT, INSPECTING or READY_TO_SEAL |
+| 409 | PRECONDITION_FAILED | REVISION_NOT_SELECTABLE | — | always | COMMAND | the revision is not DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL (on an UPLOADING revision the selection closes the intake: all_uploads_completed, D-INTAKE-1) |
 | 409 | PRECONDITION_FAILED | UPLOADS_UNRESOLVED | — | always | COMMAND | a reservation, session or verification of the revision is still open: selection and seal need a settled inventory (D-SEL-3) |
 | 409 | PRECONDITION_FAILED | SELECTION_STALE | — | always | COMMAND | the manifest was made against another inventory: a missing or newly changed table invalidates it (catalogue CMD016 failure) |
 | 409 | PRECONDITION_FAILED | SELECTION_BYTES_LIMIT | — | — | COMMAND | the selected files exceed the revision envelope (50 files, 5,000,000,000 bytes) |
-| 409 | PRECONDITION_FAILED | REUSE_NOT_AVAILABLE | — | — | COMMAND | a reused file is no longer an admitted file of this project (its intake expired or its generation was lost) |
+| 409 | PRECONDITION_FAILED | REUSE_NOT_AVAILABLE | — | — | COMMAND | a reused file is no longer an admitted file of this project (its intake expired, the retention of its sealed bytes ended, or its generation was lost), or its bytes were first sealed more than fourteen days ago (the hard cap belongs to the bytes, D-RET-3) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -663,7 +663,7 @@ when they join the served commands above (the api's send guard, the OpenAPI docu
 | 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
 | 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
 | 404 | NOT_FOUND | — | — | — | COMMAND | the revision is not visible to the caller's agency |
-| 409 | PRECONDITION_FAILED | REVISION_NOT_SELECTABLE | — | always | COMMAND | the revision takes no new selection (not DRAFT, INSPECTING or READY_TO_SEAL) |
+| 409 | PRECONDITION_FAILED | REVISION_NOT_SELECTABLE | — | always | COMMAND | the revision takes no new selection (not DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |

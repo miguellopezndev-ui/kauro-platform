@@ -11,7 +11,7 @@
  * production source file (architecture.rules.json `testOnlySubpaths`). Tests of this package and of the entrypoints import
  * it; nothing is ever wired into a deployment.
  */
-export { startTemporaryPostgres, ROLES } from "./temporary-postgres.js";
+export { startTemporaryPostgres, ROLES, TEST_CLOCK_OFFSET_SETTING, TEST_CLOCK_FUNCTION, TEST_CLOCK_COMMENT } from "./temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions, LoginRole } from "./temporary-postgres.js";
 export { start as startHarness, waitForLockWait, settlesOrWaits, backendPid, barrier, CAPABILITY_PUBLICATION_PATH } from "./harness.js";
 export type { Harness, AgencyFixture, CapabilityPublicationState, LockObservation } from "./harness.js";
@@ -26,6 +26,10 @@ export {
   sealSourceRevision,
   expireSealedRevision,
   appendFixtureEvent,
+  appendFixtureAnchor,
+  fixtureSelection,
+  clockAt,
+  serverInstant,
   FIXTURE_SERVICE,
   FIXTURE_STORAGE_PROVIDER,
   FIXTURE_SCANNER,

@@ -161,10 +161,42 @@ export interface DetectedTable {
 }
 
 /**
+ * How one inspection was isolated and what its observers recorded (decision D-ISO-1, B07-F6; S024 "Reject without outside writes,
+ * network access or unbounded decompression"; 09 "Scanner coverage": a restricted environment without customer-triggered network
+ * fetching). The mechanism is observable on every host the platform verifies on, Windows included:
+ *
+ * - NODE_PERMISSION_CHILD: @kauro/data-plane runs the inspection in a child process started with the Node permission model
+ *   (`node --permission --allow-fs-read=<the attempt input and the inspector's own code> --allow-fs-write=<the attempt scratch>`;
+ *   no `--allow-child-process`, `--allow-worker`, `--allow-addons` or `--allow-wasi`), so a write outside the scratch, a child
+ *   process, a worker or a native addon is refused by Node itself (ERR_ACCESS_DENIED) and counted here; and with a preload module
+ *   that replaces every network entry point (net and tls connections, dgram sockets, dns lookups and resolvers, http(s) requests,
+ *   fetch, WebSocket) by a function that records the attempt and throws — Node 24's permission model does not govern the network,
+ *   so the hook is the observer, and a probe that tries to connect is its negative control.
+ * - The OS-level network denial of the worker host (an egress-denied sandbox, a network namespace or firewall) is not observable
+ *   on the Windows verify host: it is qualified with the cloud host (LATER: B15, EXECUTED_PROVIDER) and reported as
+ *   `osNetworkDenied` only where the host measured it.
+ */
+export interface InspectionIsolation {
+  readonly mechanism: "NODE_PERMISSION_CHILD";
+  /** Writes outside the attempt scratch that the permission model refused, as the child recorded them (0 for a clean run). */
+  readonly outsideWriteAttempts: number;
+  /** Connections or name resolutions the network hooks refused (0 for a clean run). */
+  readonly networkAttempts: number;
+  /** Child processes, workers, addons or WASI the permission model refused. */
+  readonly processAttempts: number;
+  /** Bytes decompressed in total, never above InspectionLimits.xlsxExpandedTotalBytes (the bound stopped the rest). */
+  readonly decompressedBytes: number;
+  /** Measured OS-level egress denial of the host; absent where the host cannot measure it (a development or verify host). */
+  readonly osNetworkDenied?: boolean;
+}
+
+/**
  * The result of one bounded structural inspection (04 inspectContainer: "Inspection alone does not certify the entire source as
  * parsed or virus-free. ... The result identifies which checks completed").
  */
 export interface ContainerInspection {
+  /** The isolation of this inspection and its observers (D-ISO-1): a result without it is not admission evidence. */
+  readonly isolation: InspectionIsolation;
   readonly detectedFormat: DeclaredFormat | "UNSUPPORTED";
   readonly structureStatus: "STRUCTURE_VALID" | "STRUCTURE_INVALID";
   /** SHA-256 recomputed over every byte read; the byte count actually read. */
@@ -184,11 +216,12 @@ export interface ContainerInspection {
 export interface ContainerInspectorPort {
   readonly version: string;
   /**
-   * Inspects one immutable generation under hard limits, without network access and without writing outside its attempt scratch
-   * (S024: reject traversal, duplicate entries, XML entities or excessive expansion without outside writes, network access or
-   * unbounded decompression). `open` streams the exact generation; the inspector must read it to the end to report sha256.
+   * Inspects one immutable generation under hard limits, isolated as InspectionIsolation describes (S024: reject traversal,
+   * duplicate entries, XML entities or excessive expansion without outside writes, network access or unbounded decompression).
+   * `open` streams the exact generation; the inspector must read it to the end to report sha256. `scratchDir` is the attempt-owned
+   * scratch (09 "Derived data and worker scratch": cleanup targets only that ownership scope) and the only writable path.
    */
-  inspect(input: { readonly open: () => AsyncIterable<Uint8Array>; readonly declaredFormat: DeclaredFormat; readonly observedBytes: number; readonly limits: InspectionLimits }): Promise<ContainerInspection>;
+  inspect(input: { readonly open: () => AsyncIterable<Uint8Array>; readonly declaredFormat: DeclaredFormat; readonly observedBytes: number; readonly limits: InspectionLimits; readonly scratchDir: string }): Promise<ContainerInspection>;
 }
 
 // --- selection evaluation (the counting pass; @kauro/data-plane) ------------------------------------------------------------------
@@ -248,7 +281,38 @@ export interface SessionVaultPort {
 
 // --- external authority journal (tombstones outside the restore boundary) -------------------------------------------------------
 
-export type AuthorityTombstoneKind = "UPLOAD_ACCEPTANCE_REVOKED" | "REVISION_CANCELLED" | "REVISION_SUPERSEDED" | "REVISION_DELETED";
+/**
+ * The terminal authority facts of the source lifecycle that must survive a database restore (09 "Deletion receipts and
+ * restoration": restoration applies tombstones and current revocation facts before traffic; the registry's SEALED -> EXPIRED
+ * effect "Revoke reads/execution"). B07-F8: an expired revision (and a rejected one, whose selected input failed the admission
+ * contract) is a tombstone like a cancelled, superseded or deleted one — a restore must not re-enable any of them.
+ */
+export type AuthorityTombstoneKind =
+  | "UPLOAD_ACCEPTANCE_REVOKED"
+  | "REVISION_CANCELLED"
+  | "REVISION_SUPERSEDED"
+  | "REVISION_REJECTED"
+  | "REVISION_EXPIRED"
+  | "REVISION_DELETED";
+
+/** The terminal state a tombstoned subject reached (closed: a tombstone never records a live state). */
+export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED";
+
+/**
+ * Which tombstone each event routed to AUTHORITY_JOURNAL produces (EVENT_SUBSCRIPTIONS): the AUTHORITY_JOURNAL consumer appends
+ * exactly this kind and state; the application test proves the keys are exactly the routed event types, so an event routed there
+ * without a tombstone kind (the gap of B07-F8) fails the build's tests.
+ */
+export const AUTHORITY_TOMBSTONES = Object.freeze({
+  "upload_session.cancelled.v1": { kind: "UPLOAD_ACCEPTANCE_REVOKED", state: "CANCELLED" },
+  "upload_session.expired.v1": { kind: "UPLOAD_ACCEPTANCE_REVOKED", state: "EXPIRED" },
+  "upload_session.rejected.v1": { kind: "UPLOAD_ACCEPTANCE_REVOKED", state: "REJECTED" },
+  "dataset_revision.cancelled.v1": { kind: "REVISION_CANCELLED", state: "CANCELLED" },
+  "dataset_revision.superseded.v1": { kind: "REVISION_SUPERSEDED", state: "SUPERSEDED" },
+  "dataset_revision.rejected.v1": { kind: "REVISION_REJECTED", state: "REJECTED" },
+  "dataset_revision.expired.v1": { kind: "REVISION_EXPIRED", state: "EXPIRED" },
+  "dataset_revision.deleted.v1": { kind: "REVISION_DELETED", state: "DELETED" },
+} as const satisfies Readonly<Record<string, { readonly kind: AuthorityTombstoneKind; readonly state: AuthorityTombstoneState }>>);
 
 /** A minimal durable fact (14: scoped ids, deadlines, sequence and evidence hashes; no CRM payload). */
 export interface AuthorityTombstone {
@@ -258,8 +322,8 @@ export interface AuthorityTombstone {
   readonly agencyId: AgencyId;
   readonly revisionId: RevisionId;
   readonly subjectId: Id;
-  /** The terminal state the subject reached (CANCELLED, EXPIRED, REJECTED, SUPERSEDED, DELETED). */
-  readonly state: string;
+  /** The terminal state the subject reached. */
+  readonly state: AuthorityTombstoneState;
   readonly occurredAt: UtcInstant;
   /** The domain event sequence: restore reconciliation applies tombstones in this order. */
   readonly sequence: number;

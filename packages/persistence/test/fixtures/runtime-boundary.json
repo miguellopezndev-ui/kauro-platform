@@ -417,7 +417,8 @@
           "revocation_reason",
           "revoked_at",
           "state",
-          "updated_at"
+          "updated_at",
+          "version"
         ]
       },
       "kauro.source_table_columns": {
@@ -569,6 +570,14 @@
       "using": "true",
       "check": null
     },
+    "aggregate_kinds/aggregate_kinds_read_b07_control": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true",
+      "check": null
+    },
     "aggregate_kinds/aggregate_kinds_register": {
       "command": "INSERT",
       "roles": [
@@ -663,7 +672,7 @@
         "kauro_control"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['INSPECTING'::text, 'READY_TO_SEAL'::text, 'REJECTED'::text, 'EXPIRED'::text])))"
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['READY_TO_SEAL'::text, 'REJECTED'::text, 'EXPIRED'::text])))"
     },
     "dataset_revisions/dataset_revisions_tenant": {
       "command": "ALL",
@@ -695,7 +704,7 @@
         "kauro_control"
       ],
       "using": null,
-      "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (aggregate_kind = ANY (ARRAY['upload_session'::text, 'dataset_revision'::text, 'retention_record'::text])) AND (event_type = ANY (ARRAY['upload_session.completion_observed.v1'::text, 'upload_session.completion_not_observed.v1'::text, 'upload_session.admitted.v1'::text, 'upload_session.rejected.v1'::text, 'upload_session.expired.v1'::text, 'upload_session.provider_cancellation_recorded.v1'::text, 'dataset_revision.inspecting.v1'::text, 'dataset_revision.ready_to_seal.v1'::text, 'dataset_revision.rejected.v1'::text, 'dataset_revision.expired.v1'::text, 'retention_record.expired.v1'::text])))"
+      "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (aggregate_kind = ANY (ARRAY['upload_session'::text, 'dataset_revision'::text, 'retention_record'::text, 'source_file'::text])) AND (event_type = ANY (ARRAY['upload_session.completion_observed.v1'::text, 'upload_session.completion_not_observed.v1'::text, 'upload_session.admitted.v1'::text, 'upload_session.rejected.v1'::text, 'upload_session.expired.v1'::text, 'upload_session.provider_cancellation_recorded.v1'::text, 'dataset_revision.ready_to_seal.v1'::text, 'dataset_revision.rejected.v1'::text, 'dataset_revision.expired.v1'::text, 'retention_record.expired.v1'::text, 'source_file.admitted.v1'::text, 'source_file.admission_revoked.v1'::text])))"
     },
     "domain_events/domain_events_tenant": {
       "command": "ALL",
@@ -929,7 +938,7 @@
         "kauro_control"
       ],
       "using": null,
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": "((agency_id = kauro.current_agency_id()) AND (anchor_kind = ANY (ARRAY['INPUT_ADMITTED'::text, 'INTAKE_REJECTED'::text, 'INTAKE_EXPIRED'::text])))"
     },
     "retention_anchors/retention_anchors_control_read": {
       "command": "SELECT",
@@ -939,13 +948,21 @@
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
       "check": null
     },
-    "retention_anchors/retention_anchors_tenant": {
-      "command": "ALL",
+    "retention_anchors/retention_anchors_tenant_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (anchor_kind = ANY (ARRAY['UPLOAD_INITIATED'::text, 'INTAKE_CANCELLED'::text, 'REVISION_SEALED'::text])))"
+    },
+    "retention_anchors/retention_anchors_tenant_read": {
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": null
     },
     "retention_records/retention_records_control_expire": {
       "command": "UPDATE",
@@ -969,7 +986,7 @@
         "kauro_app"
       ],
       "using": null,
-      "check": "(agency_id = kauro.current_agency_id())"
+      "check": "((agency_id = kauro.current_agency_id()) AND (class = 'UNPAID'::text) AND (revision_id IS NOT NULL) AND (soft_deadline IS NULL) AND (effective_deadline = hard_deadline) AND (EXISTS ( SELECT 1\n   FROM kauro.retention_anchors a\n  WHERE ((a.agency_id = retention_records.agency_id) AND (a.anchor_id = retention_records.anchor_id) AND (a.anchor_kind = 'REVISION_SEALED'::text) AND (a.project_id = retention_records.project_id) AND (retention_records.hard_deadline = (a.occurred_at + '336:00:00'::interval))))) AND (EXISTS ( SELECT 1\n   FROM kauro.retention_anchors s\n  WHERE ((s.agency_id = retention_records.agency_id) AND (s.revision_id = retention_records.revision_id) AND (s.anchor_kind = 'REVISION_SEALED'::text) AND (s.occurred_at = kauro.server_now())))))"
     },
     "retention_records/retention_records_tenant_read": {
       "command": "SELECT",
@@ -1280,7 +1297,7 @@
       "roles": [
         "kauro_app"
       ],
-      "using": "((agency_id = kauro.current_agency_id()) AND (requested_by_user_id = kauro.current_user_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.upload_sessions u\n  WHERE ((u.agency_id = upload_session_secrets.agency_id) AND (u.upload_id = upload_session_secrets.upload_id) AND (u.state = 'UPLOADING'::text) AND (u.application_expires_at > now())))))",
+      "using": "((agency_id = kauro.current_agency_id()) AND (requested_by_user_id = kauro.current_user_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.upload_sessions u\n  WHERE ((u.agency_id = upload_session_secrets.agency_id) AND (u.upload_id = upload_session_secrets.upload_id) AND (u.state = 'UPLOADING'::text) AND (u.application_expires_at > kauro.server_now())))))",
       "check": null
     },
     "upload_sessions/upload_sessions_control_read": {

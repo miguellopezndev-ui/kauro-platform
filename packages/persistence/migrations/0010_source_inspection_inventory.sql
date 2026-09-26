@@ -1,4 +1,4 @@
--- 0009 — B07 source lifecycle, part 2: inspection receipts, admitted source files (FileManifest) and the detected table
+-- 0010 — B07 source lifecycle, part 2: inspection receipts, admitted source files (FileManifest) and the detected table
 -- inventory (worksheets, CSV tables, positional columns).
 --
 -- Authority: 09 "Completion and inspection" (CompleteUpload reads provider metadata, records actual size and schedules server
@@ -15,6 +15,34 @@
 -- decision a browser cannot set), SourceField, UploadSession (inspectionReceiptHash: full coverage and parser checks); S053,
 -- S054. B06 foundation: D-INIT-1 (initial states), D-TX-2 (transition locks), D-EVID-1 (evidence is written by its producer,
 -- never by the request handlers whose gate it satisfies).
+
+-- --- scan coverage tied to the object (S054; B07-F4) --------------------------------------------------------------------------
+-- Whether a receipt's per-part coverage demonstrates complete coverage of THIS object (09 "Scanner coverage": compare expected parts
+-- and bytes to actual coverage; demonstrate coverage for every admitted container and expanded part; splitting into chunks is not
+-- equivalent): exactly one CONTAINER part whose expected and scanned bytes are the observed length of the object, every part
+-- CLEAN and read completely, part digests distinct, and the counts and byte sums of the receipt equal the parts it lists. A writer
+-- choosing "expected 1 byte" for a 100-byte object, or listing parts that do not add up, cannot store COVERED_CLEAN. NULL-safe:
+-- a missing member or a non-number compares false, never unknown.
+CREATE OR REPLACE FUNCTION kauro.scan_coverage_complete(
+  p_coverage jsonb, p_observed_bytes bigint, p_expected_parts integer, p_expected_bytes bigint, p_scanned_parts integer, p_scanned_bytes bigint
+) RETURNS boolean
+  LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$
+  SELECT coalesce((
+    SELECT count(*) >= 1
+       AND count(*) = p_expected_parts AND count(*) = p_scanned_parts
+       AND count(DISTINCT e ->> 'partDigest') = count(*)
+       AND bool_and(jsonb_typeof(e -> 'expectedBytes') = 'number' AND jsonb_typeof(e -> 'scannedBytes') = 'number' AND jsonb_typeof(e -> 'partDigest') = 'string')
+       AND bool_and(e ->> 'outcome' = 'CLEAN' AND e ->> 'partKind' IS NOT NULL AND e ->> 'partKind' NOT IN ('UNEXPECTED') AND (e -> 'scannedBytes') = (e -> 'expectedBytes'))
+       AND sum(CASE WHEN jsonb_typeof(e -> 'expectedBytes') = 'number' THEN (e ->> 'expectedBytes')::numeric END) = p_expected_bytes
+       AND sum(CASE WHEN jsonb_typeof(e -> 'scannedBytes') = 'number' THEN (e ->> 'scannedBytes')::numeric END) = p_scanned_bytes
+       AND count(*) FILTER (WHERE e ->> 'partKind' = 'CONTAINER') = 1
+       AND bool_or(e ->> 'partKind' = 'CONTAINER'
+                   AND CASE WHEN jsonb_typeof(e -> 'expectedBytes') = 'number' THEN (e ->> 'expectedBytes')::numeric = p_observed_bytes ELSE false END
+                   AND CASE WHEN jsonb_typeof(e -> 'scannedBytes') = 'number' THEN (e ->> 'scannedBytes')::numeric = p_observed_bytes ELSE false END)
+      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_coverage) = 'array' THEN p_coverage ELSE '[]'::jsonb END) e
+  ), false) AND coalesce(p_expected_bytes >= p_observed_bytes, false)
+$$;
 
 -- --- inspection receipts (append-only evidence of one completed inspection attempt) --------------------------------------------
 CREATE TABLE kauro.inspection_receipts (
@@ -44,7 +72,9 @@ CREATE TABLE kauro.inspection_receipts (
   scanner_engine_version      text CHECK (scanner_engine_version IS NULL OR kauro.is_label(scanner_engine_version)),
   signature_version           text CHECK (signature_version IS NULL OR kauro.is_label(signature_version)),
   signatures_published_at     timestamptz,
-  signature_max_age_seconds   integer CHECK (signature_max_age_seconds IS NULL OR signature_max_age_seconds BETWEEN 1 AND 604800),
+  -- the signature-freshness policy is pinned here, not chosen per receipt (B07-F4; D-SCAN-2: 86,400 s, open question Q-B07-3): a
+  -- receipt recording another maximum age is refused, so a writer cannot widen freshness to admit six-day-old signatures
+  signature_max_age_seconds   integer CHECK (signature_max_age_seconds IS NULL OR signature_max_age_seconds = 86400),
   scanner_config_hash         text CHECK (scanner_config_hash IS NULL OR kauro.is_sha256_hex(scanner_config_hash)),
   -- the scanner's own summary, recorded as evidence and never decisive (S054: a zero exit code alone is not admission evidence)
   scanner_exit_code           integer,
@@ -81,12 +111,14 @@ CREATE TABLE kauro.inspection_receipts (
   FOREIGN KEY (agency_id, revision_id, upload_id) REFERENCES kauro.upload_sessions (agency_id, revision_id, upload_id),
   FOREIGN KEY (agency_id, quarantine_object_id) REFERENCES kauro.stored_objects (agency_id, object_id),
   FOREIGN KEY (agency_id, accepted_object_id, accepted_generation) REFERENCES kauro.stored_objects (agency_id, object_id, generation),
-  -- S054 at the database: COVERED_CLEAN is a coverage claim — every expected part and byte was scanned, at least one part was
-  -- expected, the scanner configuration is pinned and the signatures were fresh under the recorded policy. A skip that the
-  -- engine reported as clean cannot be stored as COVERED_CLEAN.
+  -- S054 at the database: COVERED_CLEAN is a coverage claim about THIS object — every expected part and byte was scanned, the
+  -- expected set contains the container at its observed length (B07-F4), the scanner configuration is pinned and the signatures
+  -- were fresh under the pinned policy. A skip that the engine reported as clean, or an expected set the writer shrank, cannot be
+  -- stored as COVERED_CLEAN.
   CONSTRAINT inspection_receipts_clean_means_covered CHECK (
     scan_state <> 'COVERED_CLEAN' OR (
       expected_parts >= 1 AND scanned_parts = expected_parts AND scanned_bytes = expected_bytes
+      AND kauro.scan_coverage_complete(coverage, observed_bytes, expected_parts, expected_bytes, scanned_parts, scanned_bytes)
       AND scanner_engine IS NOT NULL AND scanner_engine_version IS NOT NULL AND signature_version IS NOT NULL
       AND scanner_config_hash IS NOT NULL AND signatures_published_at IS NOT NULL AND scanned_at IS NOT NULL
       AND signature_max_age_seconds IS NOT NULL AND signatures_published_at <= scanned_at
@@ -118,7 +150,9 @@ CREATE TRIGGER inspection_receipts_append_only BEFORE UPDATE OR DELETE ON kauro.
 -- A receipt is written only by the current inspection attempt of an upload that is still being verified: a late or stale
 -- worker cannot attach evidence to a cancelled, expired or already decided upload (late uploads cannot resurrect cancelled
 -- data), and the receipt's observation is the one recorded on the upload. The upload row is locked: the inspection's decision
--- and a concurrent cancellation are ordered on it (cancellation remains valid while verification races, CMD015).
+-- and a concurrent cancellation are ordered on it (cancellation remains valid while verification races, CMD015). The control-plane
+-- unit of work has already taken the revision row (FOR NO KEY UPDATE) before any upload row, the order of the commands (D-LOCK-2,
+-- B07-F14), so this upload lock never inverts it.
 CREATE OR REPLACE FUNCTION kauro.inspection_receipts_current_attempt() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -151,11 +185,14 @@ CREATE TRIGGER inspection_receipts_current_attempt BEFORE INSERT ON kauro.inspec
 -- A file belongs to its project (reusable by a later revision of the same project while its generation exists and its admission
 -- stands, registry edge previously_admitted_inputs_selected); its identity is not the display name. The composite key to the
 -- admitting receipt makes "only provider-observed bytes and generations may be admitted" a foreign key rather than an
--- application check.
+-- application check. Since B07-F9 the file is an aggregate (SourceFile, kind source_file): it carries a version and every version
+-- its event (B06 D-VER-1, D-EVT-1), so an admission revoked under a READY_TO_SEAL or sealed revision reaches its consumers
+-- (source_file.admission_revoked.v1 → EXECUTION_CONTROL, NOTIFICATIONS).
 CREATE TABLE kauro.source_files (
   file_id                  uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(file_id)),
   agency_id                uuid NOT NULL REFERENCES kauro.agencies (agency_id),
   project_id               uuid NOT NULL,
+  version                  bigint NOT NULL DEFAULT 1 CHECK (version >= 1),
   origin_revision_id       uuid NOT NULL,
   origin_upload_id         uuid NOT NULL UNIQUE,
   accepted_object_id       uuid NOT NULL,
@@ -166,13 +203,13 @@ CREATE TABLE kauro.source_files (
   scan_state               text NOT NULL CHECK (scan_state IN ('COVERED_CLEAN', 'BLOCKED', 'NOT_SCANNED', 'ERROR')),
   parser_profile_hash      text NOT NULL CHECK (kauro.is_sha256_hex(parser_profile_hash)),
   inspection_receipt_hash  text NOT NULL CHECK (kauro.is_sha256_hex(inspection_receipt_hash)),
-  -- FileManifest.admitted: derived by the server; false once admission is revoked (the accepted generation was lost or the
-  -- unsealed intake expired)
+  -- FileManifest.admitted: derived by the server; false once admission is revoked (the accepted generation was lost, the unsealed
+  -- intake expired, or every retention record of the sealed revisions that retained the bytes expired, B07-F5)
   admitted                 boolean NOT NULL,
   state                    text NOT NULL DEFAULT 'ADMITTED' CHECK (state IN ('ADMITTED', 'ADMISSION_REVOKED')),
   admitted_at              timestamptz NOT NULL,
   revoked_at               timestamptz,
-  revocation_reason        text CHECK (revocation_reason IS NULL OR revocation_reason IN ('INTAKE_EXPIRED', 'GENERATION_MISSING', 'GENERATION_CHANGED')),
+  revocation_reason        text CHECK (revocation_reason IS NULL OR revocation_reason IN ('INTAKE_EXPIRED', 'RETENTION_EXPIRED', 'GENERATION_MISSING', 'GENERATION_CHANGED')),
   created_at               timestamptz NOT NULL,
   updated_at               timestamptz NOT NULL,
   UNIQUE (agency_id, file_id),
@@ -196,8 +233,16 @@ CREATE TRIGGER source_files_transition BEFORE UPDATE OF state ON kauro.source_fi
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_listed_transition('SourceFile');
 CREATE TRIGGER source_files_initial_state BEFORE INSERT ON kauro.source_files
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('SourceFile');
+CREATE TRIGGER source_files_version BEFORE UPDATE ON kauro.source_files FOR EACH ROW EXECUTE FUNCTION kauro.enforce_version_bump();
+CREATE CONSTRAINT TRIGGER source_files_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.source_files
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('source_file', 'file_id');
 
--- a file is admitted only while its upload is being admitted by the current attempt (never for a cancelled or expired upload)
+-- SourceFile is an aggregate kind of the shared registry (0008, D-AGGK-1; B07-F9)
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package) VALUES
+  ('source_file', 'source_files', 'file_id', 'B07');
+
+-- a file is admitted only while its upload is being admitted by the current attempt (never for a cancelled or expired upload),
+-- at the server's transaction time (D-CLOCK-1)
 CREATE OR REPLACE FUNCTION kauro.source_files_admitting_upload() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -214,28 +259,55 @@ BEGIN
   IF NOT NEW.admitted THEN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: a source file is born admitted' USING ERRCODE = 'KA072';
   END IF;
+  IF NEW.admitted_at IS DISTINCT FROM kauro.server_now() THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: file % is admitted at the server''s transaction time', NEW.file_id USING ERRCODE = 'KA072';
+  END IF;
   RETURN NEW;
 END
 $$;
 CREATE TRIGGER source_files_admitting_upload BEFORE INSERT ON kauro.source_files
   FOR EACH ROW EXECUTE FUNCTION kauro.source_files_admitting_upload();
 
--- A file's admission is a transition subject (B06 D-TX-2): a seal reads it after the shared transition lock (0010,
+-- A file's admission is a transition subject (B06 D-TX-2): a seal reads it after the shared transition lock (0011,
 -- kauro.sealed_revision_files_admitted), and a revocation takes the exclusive lock before it applies and only then, in the next
--- statement, re-checks what a revocation for an expired intake must not overturn: a sealed revision that retains the file (D-RET-1:
--- sealing moves the data under the sealed revision's retention record). A seal in flight therefore commits first and refuses
--- the revocation, or waits for a revocation committed first and reads the file revoked. A lost generation is revoked whatever
--- retains it: the bytes are gone, and the sealed revision that named them is an incident for the deletion package, not data.
+-- statement, re-checks what its reason must not overturn. A seal in flight therefore commits first and refuses the revocation,
+-- or waits for a revocation committed first and reads the file revoked. The reasons (D-FILE-1, B07-F5):
+--   INTAKE_EXPIRED    unsealed intake data follows its upload's window (D-RET-1): refused once any seal ever included the file —
+--                     sealing moved the bytes under that seal's retention record;
+--   RETENTION_EXPIRED the bytes' retention ended: allowed only for a file some seal included and whose including revisions have no
+--                     ACTIVE retention record with an effective deadline still ahead (so a SUPERSEDED revision, which never
+--                     expires itself, does not keep the bytes admitted and reusable forever);
+--   GENERATION_MISSING / GENERATION_CHANGED  the bytes are gone or not the admitted ones: revoked whatever retains them (an incident
+--                     for the deletion package, not data).
+-- The revocation is recorded at the server's transaction time (D-CLOCK-1).
 CREATE OR REPLACE FUNCTION kauro.source_files_revocation_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
   PERFORM pg_advisory_xact_lock(kauro.transition_key('kauro.source_files', OLD.file_id::text));
+  IF NEW.revoked_at IS DISTINCT FROM kauro.server_now() THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the admission of file % is revoked at the server''s transaction time', OLD.file_id USING ERRCODE = 'KA072';
+  END IF;
   IF NEW.revocation_reason = 'INTAKE_EXPIRED' AND EXISTS (
-    SELECT 1 FROM kauro.sealed_revision_files s JOIN kauro.dataset_revisions r ON r.agency_id = s.agency_id AND r.revision_id = s.revision_id
-     WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED' AND r.state IN ('SEALED', 'SUPERSEDED')
+    SELECT 1 FROM kauro.sealed_revision_files s WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED'
   ) THEN
-    RAISE EXCEPTION 'LIFECYCLE_BINDING: file % is retained by a sealed revision; its intake cannot expire', OLD.file_id USING ERRCODE = 'KA072';
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: file % was sealed; its bytes follow the seal''s retention, not the intake window', OLD.file_id USING ERRCODE = 'KA072';
+  END IF;
+  -- the intake window is its upload's, closed on the server clock only (D-RET-1, D-CLOCK-1): never early
+  IF NEW.revocation_reason = 'INTAKE_EXPIRED' AND EXISTS (
+    SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = OLD.agency_id AND u.upload_id = OLD.origin_upload_id AND u.application_expires_at > kauro.server_now()
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the intake window of file % is still open', OLD.file_id USING ERRCODE = 'KA072';
+  END IF;
+  IF NEW.revocation_reason = 'RETENTION_EXPIRED' AND (
+    NOT EXISTS (SELECT 1 FROM kauro.sealed_revision_files s WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED')
+    OR EXISTS (
+      SELECT 1 FROM kauro.sealed_revision_files s JOIN kauro.retention_records rr ON rr.agency_id = s.agency_id AND rr.revision_id = s.revision_id
+       WHERE s.agency_id = OLD.agency_id AND s.file_id = OLD.file_id AND s.disposition = 'INCLUDED'
+         AND rr.state = 'ACTIVE' AND rr.effective_deadline > kauro.server_now()
+    )
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: file % is still retained by a sealed revision whose retention has not ended', OLD.file_id USING ERRCODE = 'KA072';
   END IF;
   RETURN NEW;
 END
@@ -307,6 +379,38 @@ CREATE TABLE kauro.source_table_columns (
 CREATE TRIGGER source_table_columns_append_only BEFORE UPDATE OR DELETE ON kauro.source_table_columns
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
 
+-- B07-F11: the inventory of an admitted generation is written only by the attempt that admits it, while the file's upload is still
+-- VERIFYING (the file, its tables and its columns commit together with ADMITTED); once the upload left VERIFYING no table or column
+-- can be appended, so the inventory a selection was reviewed against — and a sealed generation's — never grows. The upload row is
+-- read FOR SHARE: an admission in flight is ordered before or after the append.
+CREATE OR REPLACE FUNCTION kauro.source_inventory_frozen() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  upload_state text;
+BEGIN
+  IF TG_TABLE_NAME = 'source_tables' THEN
+    SELECT u.state INTO upload_state FROM kauro.source_files f JOIN kauro.upload_sessions u ON u.agency_id = f.agency_id AND u.upload_id = f.origin_upload_id
+     WHERE f.agency_id = NEW.agency_id AND f.file_id = NEW.file_id FOR SHARE OF u;
+  ELSE
+    SELECT u.state INTO upload_state FROM kauro.source_tables t JOIN kauro.source_files f ON f.agency_id = t.agency_id AND f.file_id = t.file_id
+      JOIN kauro.upload_sessions u ON u.agency_id = f.agency_id AND u.upload_id = f.origin_upload_id
+     WHERE t.agency_id = NEW.agency_id AND t.table_id = NEW.table_id FOR SHARE OF u;
+  END IF;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CONTEXT: the file of this inventory row is not visible in this transaction' USING ERRCODE = 'KA006';
+  END IF;
+  IF upload_state <> 'VERIFYING' THEN
+    RAISE EXCEPTION 'FENCE_DISCIPLINE: the inventory of an admitted file is frozen (its upload is %)', upload_state USING ERRCODE = 'KA071';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER source_tables_inventory_frozen BEFORE INSERT ON kauro.source_tables
+  FOR EACH ROW EXECUTE FUNCTION kauro.source_inventory_frozen();
+CREATE TRIGGER source_table_columns_inventory_frozen BEFORE INSERT ON kauro.source_table_columns
+  FOR EACH ROW EXECUTE FUNCTION kauro.source_inventory_frozen();
+
 -- --- row-level security ----------------------------------------------------------------------------------------------------------
 -- The inspection pipeline (control plane, bound to the agency, D-CTRL-1) writes the evidence; the request handlers only read it
 -- (B06 D-EVID-1: evidence is written by its producer, never by the request handlers whose gate it satisfies — CMD014 failure:
@@ -353,7 +457,7 @@ CREATE POLICY source_table_columns_control_insert ON kauro.source_table_columns 
 GRANT SELECT ON kauro.inspection_receipts, kauro.source_files, kauro.source_tables, kauro.source_table_columns TO kauro_app;
 GRANT SELECT, INSERT ON kauro.inspection_receipts TO kauro_control;
 GRANT SELECT, INSERT ON kauro.source_files TO kauro_control;
-GRANT UPDATE (state, admitted, revoked_at, revocation_reason, updated_at) ON kauro.source_files TO kauro_control;
+GRANT UPDATE (version, state, admitted, revoked_at, revocation_reason, updated_at) ON kauro.source_files TO kauro_control;
 -- customer text (worksheet names, header labels) is written by the inspection pipeline but never read back by the control plane
 GRANT INSERT ON kauro.source_tables, kauro.source_table_columns TO kauro_control;
 GRANT SELECT (

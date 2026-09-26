@@ -1,6 +1,7 @@
--- 0008 — B07 source lifecycle, part 1: the aggregate-kind registry and its event binding, the dataset revision lifecycle
--- columns and lineage, the object registry (deletion inventory) with the provider retention read-back, upload sessions, the
--- byte/file/concurrency quota ledgers, the encrypted provider-session record, and the control plane's bounded event stream.
+-- 0009 — B07 source lifecycle, part 1: the server clock of every lifecycle instant, the dataset revision lifecycle columns and
+-- lineage, the object registry (deletion inventory) with the provider retention read-back, upload sessions (registered as an
+-- aggregate kind in the shared registry of 0008), the byte/file/concurrency quota ledgers, the encrypted provider-session record,
+-- and the control plane's bounded event stream.
 --
 -- Authority: 09 "Storage zones and object registry" (every object is registered with agency, project, revision or case scope,
 -- class, provider location, opaque object name, generation, byte count, content hash when complete, creator, state, retention
@@ -17,13 +18,30 @@
 -- versions), 07 "Transaction discipline" (unique constraints and row locks close races; application checks cannot be the sole
 -- protection), registry contracts UploadSession, DatasetRevision, TenantScope; R2-051, R2-052. Design:
 -- docs/design/B07-upload-source-lifecycle.md (decisions D-*); B06 foundation: D-INIT-1 (initial states), D-TX-2 (transition
--- locks), D-EVT-2 (events bound to their aggregate), D-RLS-1/D-RLS-2 (forced RLS, no DELETE for request handlers).
+-- locks), D-EVT-2 (events bound to their aggregate), D-RLS-1/D-RLS-2 (forced RLS, no DELETE for request handlers); the shared
+-- aggregate-kind registry of 0008 (docs/design/FOUNDATION-aggregate-kinds.md, D-AGGK-1..5: B07 registers its kinds with one
+-- INSERT each and never edits 0008, the foreign key or kauro.domain_events_bind_aggregate).
 --
 -- SQLSTATE vocabulary added by B07 (a range of its own, decision D-SQL-1, so packages built in parallel cannot collide; mapped
 -- by @kauro/persistence sqlstate.ts):
 --   KA070 QUOTA_LEDGER (a quota ledger disagrees with the upload sessions it summarizes)
 --   KA071 FENCE_DISCIPLINE (a session-issue or inspection fence moved backwards, or a stale attempt wrote)
---   KA072 LIFECYCLE_BINDING (a lifecycle transition lacks the facts its target state requires, or leaves its scope inconsistent)
+--   KA072 LIFECYCLE_BINDING (a lifecycle transition lacks the facts its target state requires, or leaves its scope inconsistent —
+--         including an instant that is not the server's transaction time, or a deadline edge taken on the wrong side of its
+--         deadline, decision D-CLOCK-1)
+
+-- --- the server clock (decision D-CLOCK-1) ------------------------------------------------------------------------------------
+-- Every instant a deadline is computed from or compared with (an upload's creation, a session issue, a completion report or
+-- observation, an admission, a rejection, a cancellation, an expiry, a seal, a retention anchor, a deletion) is the database's
+-- transaction time, never a value the writer supplies (09 "Upload reservation": twenty-four hours from initiation, polling never
+-- extends it; HASHING "Retention formulas": nothing moves a source retention anchor or resets a hard clock; 07: application checks
+-- cannot be the sole protection). The guards read it through this one function. A deployment runs exactly this body; the test
+-- harness of @kauro/persistence/testing (a test-only subpath the architecture gate keeps out of production) replaces it in its
+-- temporary clusters by a labelled test clock that adds a transaction-local offset, so fixtures can stand in the past without any
+-- production role back-dating a row (the migrations test proves the shipped body).
+CREATE OR REPLACE FUNCTION kauro.server_now() RETURNS timestamptz
+  LANGUAGE sql STABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$ SELECT transaction_timestamp() $$;
 
 -- --- field vocabulary ----------------------------------------------------------------------------------------------------------
 -- Provider object generation: a positive decimal integer (Cloud Storage int64 generation; the contract fake uses the same form).
@@ -38,30 +56,9 @@ CREATE OR REPLACE FUNCTION kauro.is_object_name(v text) RETURNS boolean
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE SET search_path = pg_catalog AS
 $$ SELECT v ~ '^(quarantine|accepted|profile|minimized|staging|delivery|import-receipt|legal-finance|security)(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}){2,5}$' $$;
 
--- --- aggregate kinds (decision D-MIG-1) ------------------------------------------------------------------------------------------
--- B06 constrained domain_events.aggregate_kind with a CHECK list. Every package that adds an aggregate would have to rewrite that
--- list, and two packages rewriting it independently lose each other's kinds. The list becomes a registered table (like
--- event_types): a package inserts its kinds, nobody rewrites anybody else's. The persistence test proves the seed equals the
--- domain AGGREGATE_KINDS and that every registered kind is bound by kauro.domain_events_bind_aggregate below.
-CREATE TABLE kauro.aggregate_kinds (
-  aggregate_kind  text PRIMARY KEY CHECK (aggregate_kind ~ '^[a-z][a-z_]{2,63}$'),
-  registered_at   timestamptz NOT NULL DEFAULT now()
-);
-INSERT INTO kauro.aggregate_kinds (aggregate_kind) VALUES
-  ('agency'), ('membership'), ('end_client'), ('project'), ('dataset_revision'), ('plan'), ('approval'),
-  ('upload_session'), ('retention_record');
-ALTER TABLE kauro.domain_events DROP CONSTRAINT domain_events_aggregate_kind_check;
-ALTER TABLE kauro.domain_events ADD CONSTRAINT domain_events_aggregate_kind_fkey
-  FOREIGN KEY (aggregate_kind) REFERENCES kauro.aggregate_kinds (aggregate_kind);
-
-ALTER TABLE kauro.aggregate_kinds ENABLE ROW LEVEL SECURITY;
-ALTER TABLE kauro.aggregate_kinds FORCE ROW LEVEL SECURITY;
-CREATE POLICY aggregate_kinds_read ON kauro.aggregate_kinds FOR SELECT TO kauro_app, kauro_control USING (true);
-GRANT SELECT ON kauro.aggregate_kinds TO kauro_app, kauro_control;
-
 -- --- dataset revisions: lifecycle columns and lineage (B06 created identity and bindings; B07 owns the lifecycle) --------------
 -- Every added column is nullable: rows written by B06 paths (CreateProject's DRAFT revision) stay valid. The facts a target state
--- requires are enforced when the state is entered (trigger kauro.dataset_revisions_lifecycle_guard, migration 0010).
+-- requires are enforced when the state is entered (trigger kauro.dataset_revisions_lifecycle_guard, migration 0011).
 ALTER TABLE kauro.dataset_revisions
   ADD COLUMN created_by_membership_id   uuid,
   ADD COLUMN selection_manifest_id      uuid,
@@ -277,6 +274,10 @@ $$
 DECLARE
   retention_seconds bigint;
 BEGIN
+  -- the deletion is recorded at the server's transaction time (D-CLOCK-1): a back-dated deletion would shorten the residual
+  IF NEW.deleted_at IS DISTINCT FROM kauro.server_now() THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the deletion of object % is recorded at the server''s transaction time', NEW.object_id USING ERRCODE = 'KA072';
+  END IF;
   SELECT p.soft_delete_retention_seconds INTO retention_seconds FROM kauro.storage_location_policies p
    WHERE p.provider = NEW.provider AND p.location_ref = NEW.location_ref AND p.observed_at <= NEW.deleted_at
    ORDER BY p.observed_at DESC LIMIT 1;
@@ -410,9 +411,9 @@ CREATE TABLE kauro.upload_sessions (
   FOREIGN KEY (agency_id, quarantine_object_id) REFERENCES kauro.stored_objects (agency_id, object_id),
   FOREIGN KEY (agency_id, requested_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
   FOREIGN KEY (agency_id, cancelled_by_membership_id) REFERENCES kauro.memberships (agency_id, membership_id),
-  CONSTRAINT upload_sessions_deadline_policy CHECK (
-    application_expires_at > created_at AND application_expires_at <= created_at + interval '86400 seconds'
-  ),
+  -- UploadSession.applicationExpiresAt: exactly twenty-four hours from initiation (policy retention.uploadReservationSeconds);
+  -- created_at is the server's transaction time (upload_sessions_window_clock, D-CLOCK-1)
+  CONSTRAINT upload_sessions_deadline_policy CHECK (application_expires_at = created_at + interval '86400 seconds'),
   CONSTRAINT upload_sessions_issued_binding CHECK (
     state IN ('RESERVED', 'CANCELLED', 'EXPIRED') OR (session_issued_at IS NOT NULL AND provider_session_digest IS NOT NULL AND provider_session_expires_at IS NOT NULL)
   ),
@@ -461,6 +462,52 @@ CREATE TRIGGER upload_sessions_initial_state BEFORE INSERT ON kauro.upload_sessi
   FOR EACH ROW EXECUTE FUNCTION kauro.enforce_initial_state('UploadSession');
 CREATE CONSTRAINT TRIGGER upload_sessions_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.upload_sessions
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('upload_session', 'upload_id');
+
+-- UploadSession is an aggregate kind of the shared registry (0008, D-AGGK-1): its events bind through the unchanged
+-- kauro.domain_events_bind_aggregate (B07-F7: no CASE rewrite, no CHECK list; the foundation's catalog trigger checks the shape)
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package) VALUES
+  ('upload_session', 'upload_sessions', 'upload_id', 'B07');
+
+-- D-CLOCK-1 (B07-F2): every lifecycle instant of an upload is the server's transaction time, and the application deadline is
+-- decided by the server clock, never by a writer-supplied instant: nothing is accepted at or after the deadline (09 "Resumable
+-- session security": refusing acceptance after expiry — no session issue, completion report, retry of an unobserved completion or
+-- admission), and nothing expires before it (09 "Upload reservation"). Named to fire after B06's listed-transition and version
+-- triggers (triggers fire by name), so an unlisted edge is still answered KA008.
+CREATE OR REPLACE FUNCTION kauro.upload_sessions_window_clock() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  clock timestamptz := kauro.server_now();
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.created_at IS DISTINCT FROM clock THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: upload % is created at the server''s transaction time, not %', NEW.upload_id, NEW.created_at USING ERRCODE = 'KA072';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF (NEW.session_issued_at IS DISTINCT FROM OLD.session_issued_at AND NEW.session_issued_at IS DISTINCT FROM clock)
+     OR (NEW.completion_reported_at IS DISTINCT FROM OLD.completion_reported_at AND NEW.completion_reported_at IS NOT NULL AND NEW.completion_reported_at IS DISTINCT FROM clock)
+     OR (NEW.completion_observed_at IS DISTINCT FROM OLD.completion_observed_at AND NEW.completion_observed_at IS DISTINCT FROM clock)
+     OR (NEW.admitted_at IS DISTINCT FROM OLD.admitted_at AND NEW.admitted_at IS DISTINCT FROM clock)
+     OR (NEW.rejected_at IS DISTINCT FROM OLD.rejected_at AND NEW.rejected_at IS DISTINCT FROM clock)
+     OR (NEW.cancelled_at IS DISTINCT FROM OLD.cancelled_at AND NEW.cancelled_at IS DISTINCT FROM clock)
+     OR (NEW.expired_at IS DISTINCT FROM OLD.expired_at AND NEW.expired_at IS DISTINCT FROM clock)
+     OR (NEW.provider_cancellation_at IS DISTINCT FROM OLD.provider_cancellation_at AND NEW.provider_cancellation_at IS NOT NULL AND NEW.provider_cancellation_at IS DISTINCT FROM clock) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: upload % records a lifecycle instant other than the server''s transaction time', OLD.upload_id USING ERRCODE = 'KA072';
+  END IF;
+  IF NEW.state IS DISTINCT FROM OLD.state THEN
+    IF NEW.state IN ('UPLOADING', 'VERIFYING', 'ADMITTED') AND clock >= OLD.application_expires_at THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: upload % passed its application deadline; acceptance is refused after expiry', OLD.upload_id USING ERRCODE = 'KA072';
+    END IF;
+    IF NEW.state = 'EXPIRED' AND clock < OLD.application_expires_at THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: upload % expires no earlier than its application deadline', OLD.upload_id USING ERRCODE = 'KA072';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER upload_sessions_window_clock BEFORE INSERT OR UPDATE ON kauro.upload_sessions
+  FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_window_clock();
 
 -- A reservation enters only a revision that accepts uploads (registry: DRAFT permits adding upload sessions; UPLOADING means
 -- sessions are in progress; nothing enters INSPECTING, READY_TO_SEAL or a sealed or terminal revision — "adding a file after
@@ -606,31 +653,31 @@ CREATE TRIGGER upload_sessions_quota AFTER INSERT OR UPDATE OF state, observed_b
   FOR EACH ROW EXECUTE FUNCTION kauro.upload_sessions_quota();
 
 -- The ledgers equal what the upload sessions hold, at commit, whoever wrote them (a direct write to a ledger row is refused too).
+-- B07-F10: the uploads and the ledger row are read by ONE statement, i.e. in one snapshot under READ COMMITTED: a concurrent
+-- reservation that commits while this check runs is seen in both or in neither, so it can never raise a false KA070 (which B06
+-- D-ERR makes nonretryable) on an unrelated transaction.
 CREATE OR REPLACE FUNCTION kauro.check_upload_ledgers(p_agency uuid, p_revision uuid) RETURNS void
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 DECLARE
-  expected_bytes bigint;
-  expected_files integer;
-  expected_slots integer;
-  ledger_bytes   bigint;
-  ledger_files   integer;
-  ledger_slots   integer;
+  r record;
 BEGIN
   IF p_revision IS NOT NULL THEN
-    SELECT coalesce(sum(kauro.upload_held_bytes(u.state, u.reserved_bytes, u.observed_bytes)), 0), coalesce(sum(kauro.upload_holds_file(u.state)), 0)
-      INTO expected_bytes, expected_files
-      FROM kauro.upload_sessions u WHERE u.agency_id = p_agency AND u.revision_id = p_revision;
-    SELECT q.reserved_bytes, q.file_count INTO ledger_bytes, ledger_files FROM kauro.revision_quota q WHERE q.revision_id = p_revision;
-    IF coalesce(ledger_bytes, 0) <> expected_bytes OR coalesce(ledger_files, 0) <> expected_files THEN
+    SELECT (SELECT coalesce(sum(kauro.upload_held_bytes(u.state, u.reserved_bytes, u.observed_bytes)), 0) FROM kauro.upload_sessions u WHERE u.agency_id = p_agency AND u.revision_id = p_revision) AS expected_bytes,
+           (SELECT coalesce(sum(kauro.upload_holds_file(u.state)), 0) FROM kauro.upload_sessions u WHERE u.agency_id = p_agency AND u.revision_id = p_revision) AS expected_files,
+           coalesce((SELECT q.reserved_bytes FROM kauro.revision_quota q WHERE q.revision_id = p_revision), 0) AS ledger_bytes,
+           coalesce((SELECT q.file_count FROM kauro.revision_quota q WHERE q.revision_id = p_revision), 0) AS ledger_files
+      INTO r;
+    IF r.ledger_bytes <> r.expected_bytes OR r.ledger_files <> r.expected_files THEN
       RAISE EXCEPTION 'QUOTA_LEDGER: revision % ledger (% bytes, % files) disagrees with its uploads (% bytes, % files)',
-        p_revision, coalesce(ledger_bytes, 0), coalesce(ledger_files, 0), expected_bytes, expected_files USING ERRCODE = 'KA070';
+        p_revision, r.ledger_bytes, r.ledger_files, r.expected_bytes, r.expected_files USING ERRCODE = 'KA070';
     END IF;
   END IF;
-  SELECT coalesce(sum(kauro.upload_holds_slot(u.state)), 0) INTO expected_slots FROM kauro.upload_sessions u WHERE u.agency_id = p_agency;
-  SELECT c.active_sessions INTO ledger_slots FROM kauro.upload_capacity c WHERE c.agency_id = p_agency;
-  IF coalesce(ledger_slots, 0) <> expected_slots THEN
-    RAISE EXCEPTION 'QUOTA_LEDGER: agency % capacity ledger (% sessions) disagrees with its uploads (% sessions)', p_agency, coalesce(ledger_slots, 0), expected_slots USING ERRCODE = 'KA070';
+  SELECT (SELECT coalesce(sum(kauro.upload_holds_slot(u.state)), 0) FROM kauro.upload_sessions u WHERE u.agency_id = p_agency) AS expected_slots,
+         coalesce((SELECT c.active_sessions FROM kauro.upload_capacity c WHERE c.agency_id = p_agency), 0) AS ledger_slots
+    INTO r;
+  IF r.ledger_slots <> r.expected_slots THEN
+    RAISE EXCEPTION 'QUOTA_LEDGER: agency % capacity ledger (% sessions) disagrees with its uploads (% sessions)', p_agency, r.ledger_slots, r.expected_slots USING ERRCODE = 'KA070';
   END IF;
 END
 $$;
@@ -647,8 +694,19 @@ BEGIN
   RETURN NULL;
 END
 $$;
-CREATE CONSTRAINT TRIGGER upload_sessions_ledgers AFTER INSERT OR UPDATE OF state, observed_bytes ON kauro.upload_sessions
+-- B07-F10: the check is queued only by a write that changed what the upload holds (a reservation, or a transition that moves
+-- bytes, a file or a slot); a ledger-neutral edge (a session issue, a completion report, an observation of a live upload) never
+-- evaluates the ledgers, so it is never refused for a ledger it did not touch
+CREATE CONSTRAINT TRIGGER upload_sessions_ledgers_reserved AFTER INSERT ON kauro.upload_sessions
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.upload_ledgers_consistent();
+CREATE CONSTRAINT TRIGGER upload_sessions_ledgers AFTER UPDATE OF state, observed_bytes ON kauro.upload_sessions
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+  WHEN (
+    kauro.upload_held_bytes(OLD.state, OLD.reserved_bytes, OLD.observed_bytes) IS DISTINCT FROM kauro.upload_held_bytes(NEW.state, NEW.reserved_bytes, NEW.observed_bytes)
+    OR kauro.upload_holds_file(OLD.state) IS DISTINCT FROM kauro.upload_holds_file(NEW.state)
+    OR kauro.upload_holds_slot(OLD.state) IS DISTINCT FROM kauro.upload_holds_slot(NEW.state)
+  )
+  EXECUTE FUNCTION kauro.upload_ledgers_consistent();
 CREATE CONSTRAINT TRIGGER revision_quota_ledgers AFTER INSERT OR UPDATE ON kauro.revision_quota
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.upload_ledgers_consistent();
 CREATE CONSTRAINT TRIGGER upload_capacity_ledgers AFTER INSERT OR UPDATE OF active_sessions ON kauro.upload_capacity
@@ -702,60 +760,28 @@ CREATE TRIGGER upload_session_secrets_no_update BEFORE UPDATE ON kauro.upload_se
 -- nothing else: bound to the agency of the work item (D-CTRL-1), as a service actor, of a B07 aggregate kind, one of the listed
 -- event types. kauro.domain_events_bind_aggregate still requires the aggregate to be visible to the writer in that agency at or
 -- above the event's version, so no tenant's next version can be occupied, and an unbound control unit of work writes nothing.
+-- Since B07-F1 the control plane never closes intake (all_uploads_completed is the agency's explicit act, CMD016), so
+-- dataset_revision.inspecting.v1 is not among its events; since B07-F9 the admitted file is an aggregate whose birth and revocation
+-- the control plane records (source_file.admitted.v1, source_file.admission_revoked.v1).
 CREATE POLICY domain_events_control_source_lifecycle ON kauro.domain_events FOR INSERT TO kauro_control
   WITH CHECK (
     agency_id = kauro.current_agency_id()
     AND actor_kind = 'SERVICE'
-    AND aggregate_kind IN ('upload_session', 'dataset_revision', 'retention_record')
+    AND aggregate_kind IN ('upload_session', 'dataset_revision', 'retention_record', 'source_file')
     AND event_type IN (
       'upload_session.completion_observed.v1', 'upload_session.completion_not_observed.v1', 'upload_session.admitted.v1',
       'upload_session.rejected.v1', 'upload_session.expired.v1', 'upload_session.provider_cancellation_recorded.v1',
-      'dataset_revision.inspecting.v1', 'dataset_revision.ready_to_seal.v1', 'dataset_revision.rejected.v1',
-      'dataset_revision.expired.v1', 'retention_record.expired.v1'
+      'dataset_revision.ready_to_seal.v1', 'dataset_revision.rejected.v1', 'dataset_revision.expired.v1',
+      'retention_record.expired.v1', 'source_file.admitted.v1', 'source_file.admission_revoked.v1'
     )
   );
 GRANT INSERT ON kauro.domain_events TO kauro_control;
 GRANT USAGE ON SEQUENCE kauro.domain_events_sequence_seq TO kauro_control;
-
--- The event binding learns the B07 aggregate kinds (every registered kind has an arm; the persistence test proves it).
-CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
-  LANGUAGE plpgsql SET search_path = pg_catalog AS
-$$
-DECLARE
-  current_version bigint;
-BEGIN
-  CASE NEW.aggregate_kind
-    WHEN 'agency' THEN
-      SELECT a.version INTO current_version FROM kauro.agencies a WHERE a.agency_id = NEW.aggregate_id AND a.agency_id = NEW.agency_id;
-    WHEN 'membership' THEN
-      SELECT m.version INTO current_version FROM kauro.memberships m WHERE m.membership_id = NEW.aggregate_id AND m.agency_id = NEW.agency_id;
-    WHEN 'end_client' THEN
-      SELECT c.version INTO current_version FROM kauro.end_clients c WHERE c.client_id = NEW.aggregate_id AND c.agency_id = NEW.agency_id;
-    WHEN 'project' THEN
-      SELECT p.version INTO current_version FROM kauro.projects p WHERE p.project_id = NEW.aggregate_id AND p.agency_id = NEW.agency_id;
-    WHEN 'dataset_revision' THEN
-      SELECT r.version INTO current_version FROM kauro.dataset_revisions r WHERE r.revision_id = NEW.aggregate_id AND r.agency_id = NEW.agency_id;
-    WHEN 'plan' THEN
-      SELECT p.version INTO current_version FROM kauro.plans p WHERE p.plan_id = NEW.aggregate_id AND p.agency_id = NEW.agency_id;
-    WHEN 'approval' THEN
-      SELECT a.version INTO current_version FROM kauro.approvals a WHERE a.approval_id = NEW.aggregate_id AND a.agency_id = NEW.agency_id;
-    WHEN 'upload_session' THEN
-      SELECT u.version INTO current_version FROM kauro.upload_sessions u WHERE u.upload_id = NEW.aggregate_id AND u.agency_id = NEW.agency_id;
-    WHEN 'retention_record' THEN
-      -- retention_records is created by 0011; until then no row can name it (the function body is resolved at execution)
-      SELECT r.version INTO current_version FROM kauro.retention_records r WHERE r.retention_id = NEW.aggregate_id AND r.agency_id = NEW.agency_id;
-    ELSE
-      RAISE EXCEPTION 'CONTEXT: aggregate kind % has no binding', NEW.aggregate_kind USING ERRCODE = 'KA006';
-  END CASE;
-  IF current_version IS NULL THEN
-    RAISE EXCEPTION 'CONTEXT: % % is not an aggregate of agency % visible in this transaction', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
-  END IF;
-  IF NEW.aggregate_version > current_version THEN
-    RAISE EXCEPTION 'VERSION_DISCIPLINE: an event of % % records version % ahead of the aggregate (version %)', NEW.aggregate_kind, NEW.aggregate_id, NEW.aggregate_version, current_version USING ERRCODE = 'KA002';
-  END IF;
-  RETURN NEW;
-END
-$$;
+-- The shared binding (0008, SECURITY INVOKER) reads the registry as the writer: the control plane, which now appends events, reads
+-- it too (FOUNDATION-aggregate-kinds.md §4: "a runtime group the package lets append events gets SELECT and a read policy of its
+-- own", package-prefixed so B09's kauro_payment policy cannot collide at integration). Nothing else of 0008 is touched.
+GRANT SELECT ON kauro.aggregate_kinds TO kauro_control;
+CREATE POLICY aggregate_kinds_read_b07_control ON kauro.aggregate_kinds FOR SELECT TO kauro_control USING (true);
 
 -- --- row-level security --------------------------------------------------------------------------------------------------------
 -- Request handlers (kauro_app) see their tenant. The control plane (kauro_control) runs SYSTEM units of work: bound to one agency
@@ -819,7 +845,7 @@ CREATE POLICY upload_session_secrets_requester_read ON kauro.upload_session_secr
     AND EXISTS (
       SELECT 1 FROM kauro.upload_sessions u
       WHERE u.agency_id = upload_session_secrets.agency_id AND u.upload_id = upload_session_secrets.upload_id
-        AND u.state = 'UPLOADING' AND u.application_expires_at > now()
+        AND u.state = 'UPLOADING' AND u.application_expires_at > kauro.server_now()
     )
   );
 CREATE POLICY upload_session_secrets_control_read ON kauro.upload_session_secrets FOR SELECT TO kauro_control
@@ -827,15 +853,17 @@ CREATE POLICY upload_session_secrets_control_read ON kauro.upload_session_secret
 CREATE POLICY upload_session_secrets_control_delete ON kauro.upload_session_secrets FOR DELETE TO kauro_control
   USING (agency_id = kauro.current_agency_id());
 
--- dataset revisions: request handlers take the edges their commands own (CMD012, CMD013, CMD015, CMD016, CMD017); the control
--- plane advances the edges it owns (inspection, evaluation, rejection, retention expiry) in the agency it is bound to (D-ROLE-2)
+-- dataset revisions: request handlers take the edges their commands own (CMD012, CMD013, CMD015, CMD016 — including
+-- all_uploads_completed, the agency's explicit closing of the intake, B07-F1 — and CMD017); the control plane advances the edges it
+-- owns (evaluation, rejection, retention expiry) in the agency it is bound to (D-ROLE-2). The control plane never enters INSPECTING:
+-- no observation, inspection outcome, cancellation or deadline closes a revision's intake by itself (D-INTAKE-1).
 CREATE POLICY dataset_revisions_tenant_edges ON kauro.dataset_revisions AS RESTRICTIVE FOR UPDATE TO kauro_app
   USING (true) WITH CHECK (state IN ('UPLOADING', 'INSPECTING', 'SEALED', 'SUPERSEDED', 'CANCELLED'));
 CREATE POLICY dataset_revisions_control_read ON kauro.dataset_revisions FOR SELECT TO kauro_control
   USING (kauro.current_agency_id() IS NULL OR agency_id = kauro.current_agency_id());
 CREATE POLICY dataset_revisions_control_update ON kauro.dataset_revisions FOR UPDATE TO kauro_control
   USING (agency_id = kauro.current_agency_id())
-  WITH CHECK (agency_id = kauro.current_agency_id() AND state IN ('INSPECTING', 'READY_TO_SEAL', 'REJECTED', 'EXPIRED'));
+  WITH CHECK (agency_id = kauro.current_agency_id() AND state IN ('READY_TO_SEAL', 'REJECTED', 'EXPIRED'));
 
 -- --- grants (still no DELETE for request handlers anywhere) ------------------------------------------------------------------------
 GRANT SELECT, INSERT ON kauro.stored_objects TO kauro_app;

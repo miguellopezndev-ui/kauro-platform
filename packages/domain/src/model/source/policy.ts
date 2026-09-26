@@ -3,7 +3,7 @@
  * provenance-checked by @kauro/contracts; the domain test compares every copy with the registry) or a recorded decision where the
  * authority names the rule but not the number (docs/design/B07-upload-source-lifecycle.md §1 and §12, open questions).
  *
- * The database repeats the envelope as CHECK constraints (migration 0008: upload_sessions.reserved_bytes, revision_quota,
+ * The database repeats the envelope as CHECK constraints (migration 0009: upload_sessions.reserved_bytes, revision_quota,
  * upload_capacity), so a handler that skipped a check still cannot oversubscribe a revision (07: application checks improve
  * messages but cannot be the sole protection).
  */
@@ -60,7 +60,9 @@ export const PROVIDER_SESSION_LIFETIME_SECONDS = 604_800;
 
 /**
  * Decision D-SCAN-2 (open question Q-B07-3): malware signatures older than this at scan time do not produce COVERED_CLEAN
- * (09: "Stale signatures beyond the recorded policy block new admission until refreshed"; the registry records no value).
+ * (09: "Stale signatures beyond the recorded policy block new admission until refreshed"; the registry records no value). Pinned,
+ * never chosen per scan: evaluateScanCoverage uses it, and the database refuses a receipt recording any other maximum age
+ * (inspection_receipts.signature_max_age_seconds = 86400, migration 0010; B07-F4).
  */
 export const SIGNATURE_MAX_AGE_SECONDS = 86_400;
 

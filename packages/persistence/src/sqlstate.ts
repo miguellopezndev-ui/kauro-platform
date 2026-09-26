@@ -24,7 +24,7 @@ export const SQLSTATE = Object.freeze({
   // a live approval on a plan that is not APPROVED under it (migration 0004, the deferred constraint triggers
   // plans_live_approval_binding and approvals_live_approval_binding; decision D-PLAN-4)
   LIVE_APPROVAL_UNBOUND: "KA020",
-  // B07 source lifecycle (migrations 0008..0011; decision D-SQL-1: a range of its own): a quota ledger that disagrees with its
+  // B07 source lifecycle (migrations 0009..0012; decision D-SQL-1: a range of its own): a quota ledger that disagrees with its
   // uploads, a fence that moved backwards or a stale attempt that wrote, a lifecycle transition without the facts its state needs
   QUOTA_LEDGER: "KA070",
   FENCE_DISCIPLINE: "KA071",
@@ -77,7 +77,7 @@ export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.
   end_clients_display_name_label: "displayName",
   projects_purpose_label: "purpose",
   approvals_withdraw_reason_label: "reasonCode",
-  // B07: CMD013 ReserveUpload displayName (migration 0008)
+  // B07: CMD013 ReserveUpload displayName (migration 0009)
   upload_sessions_display_name_label: "displayName",
 });
 

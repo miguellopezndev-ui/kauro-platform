@@ -10,7 +10,7 @@
  */
 import type { Sha256Hex } from "@kauro/contracts";
 import { DOMAINS, canonicalBytes, rawDigest, structuredDigest } from "@kauro/contracts";
-import type { SealedManifestDocument } from "./records.js";
+import type { SealedSubjectDocument, SourceRevisionManifest } from "./records.js";
 import type { SelectionManifestDocument } from "./selection.js";
 
 export const SOURCE_DIGEST_DOMAINS = Object.freeze({
@@ -32,6 +32,11 @@ export const SOURCE_DIGEST_DOMAINS = Object.freeze({
   RETENTION_ANCHOR: "KAURO_RETENTION_ANCHOR_V1",
   /** One external authority tombstone (upload acceptance, revision, deletion). */
   AUTHORITY_TOMBSTONE: "KAURO_AUTHORITY_TOMBSTONE_V1",
+  /**
+   * The sealed subject (decision D-HASH-4, B07-F12): the revision, its lineage and frozen counts bound to the authority-exact
+   * manifest hash. The manifest hash itself stays exactly the HASHING preimage (KAURO_SOURCE_REVISION_V1).
+   */
+  SEALED_SUBJECT: "KAURO_SOURCE_SEALED_SUBJECT_V1",
 } as const);
 
 export type SourceDigestDomain = (typeof SOURCE_DIGEST_DOMAINS)[keyof typeof SOURCE_DIGEST_DOMAINS];
@@ -46,18 +51,22 @@ export function selectionHashOf(body: SelectionManifestDocument): Sha256Hex {
   return sourceDigest(SOURCE_DIGEST_DOMAINS.SELECTION, body);
 }
 
-/** manifestHash of a sealed revision (authority domain KAURO_SOURCE_REVISION_V1). */
-export function sourceRevisionManifestHashOf(manifest: SealedManifestDocument): Sha256Hex {
+/**
+ * manifestHash of a sealed revision: authority domain KAURO_SOURCE_REVISION_V1 over exactly HASHING's payload — the ordered
+ * accepted files, the table selection, the parser profile and the projection (B07-F12). No revision id, no population.
+ */
+export function sourceRevisionManifestHashOf(manifest: SourceRevisionManifest): Sha256Hex {
   return structuredDigest(DOMAINS.SOURCE_REVISION, 1, manifest);
 }
 
-/** projectionHash: the sealed projections and associations under the pricing definition that decides billable units. */
-export function projectionHashOf(projection: {
-  readonly projections: SealedManifestDocument["projections"];
-  readonly associations: SealedManifestDocument["associations"];
-  readonly pricingDefinition: string;
-}): Sha256Hex {
+/** projectionHash (DatasetRevision.projectionHash, "Exact billable object interpretation"): the manifest's projection member. */
+export function projectionHashOf(projection: SourceRevisionManifest["projection"]): Sha256Hex {
   return sourceDigest(SOURCE_DIGEST_DOMAINS.PROJECTION, projection);
+}
+
+/** subjectHash of a sealed revision (platform domain KAURO_SOURCE_SEALED_SUBJECT_V1, D-HASH-4). */
+export function sealedSubjectHashOf(subject: SealedSubjectDocument): Sha256Hex {
+  return sourceDigest(SOURCE_DIGEST_DOMAINS.SEALED_SUBJECT, subject);
 }
 
 /** The inventory a selection is made against: the revision's own uploads (with their outcome) and the detected tables of its files. */

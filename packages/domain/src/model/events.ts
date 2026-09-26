@@ -79,6 +79,10 @@ export const EVENT_TYPES = [
   // retention records (platform machine RetentionRecord, decision D-RET-2)
   "retention_record.created.v1",
   "retention_record.expired.v1",
+  // admitted source files (platform machine SourceFile, decision D-FILE-1; an aggregate since B07-F9): the admission recorded by
+  // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of
+  "source_file.admitted.v1",
+  "source_file.admission_revoked.v1",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -88,7 +92,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here.
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "retention_record"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -150,6 +154,9 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "project.current_revision_changed.v1": ["projectId", "agencyId", "currentRevisionId", "previousRevisionId", "changedByMembershipId"],
   "retention_record.created.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass", "anchorEvidenceHash", "policyVersion"],
   "retention_record.expired.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass"],
+  "source_file.admitted.v1": ["fileId", "agencyId", "projectId", "originRevisionId", "originUploadId", "inspectionReceiptHash", "bytes", "format"],
+  // the revisions whose selection or seal names the file travel as ids so EXECUTION_CONTROL (B08) can revoke stale authority
+  "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
 });
 
 /**
@@ -184,6 +191,12 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.selection_changed.v1", consumer: "SELECTION_EVALUATION" },
   { eventType: "dataset_revision.ready_to_seal.v1", consumer: "NOTIFICATIONS" },
   { eventType: "dataset_revision.rejected.v1", consumer: "NOTIFICATIONS" },
+  // a rejection is a terminal authority fact too: a restore must not bring back an INSPECTING revision whose selected input failed
+  // the admission contract (B07-F8, D-RESTORE-1)
+  { eventType: "dataset_revision.rejected.v1", consumer: "AUTHORITY_JOURNAL" },
+  // an admission revoked under a selection or a seal reaches the execution consumer and the agency (B07-F9)
+  { eventType: "source_file.admission_revoked.v1", consumer: "EXECUTION_CONTROL" },
+  { eventType: "source_file.admission_revoked.v1", consumer: "NOTIFICATIONS" },
   { eventType: "dataset_revision.sealed.v1", consumer: "NOTIFICATIONS" },
   { eventType: "dataset_revision.superseded.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "dataset_revision.superseded.v1", consumer: "AUTHORITY_JOURNAL" },

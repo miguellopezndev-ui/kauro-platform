@@ -68,7 +68,7 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
   CMD016: [
     NOT_VISIBLE("the revision"),
     STALE("revision"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SELECTABLE", "the revision is not DRAFT, INSPECTING or READY_TO_SEAL", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SELECTABLE", "the revision is not DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL (on an UPLOADING revision the selection closes the intake: all_uploads_completed, D-INTAKE-1)", { current: "ALWAYS" }),
     UPLOADS_UNRESOLVED,
     outcome("COMMAND", "INVALID_REQUEST", "UNKNOWN_REFERENCE", "selectionManifestRef is not a selection manifest of this revision", { fieldCodes: ["UNKNOWN_REFERENCE"] }),
     outcome("COMMAND", "PRECONDITION_FAILED", "SELECTION_STALE", "the manifest was made against another inventory: a missing or newly changed table invalidates it (catalogue CMD016 failure)", { current: "ALWAYS" }),
@@ -83,7 +83,7 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
     outcome("COMMAND", "INVALID_REQUEST", "PROJECTION_KEY_NOT_CONFIRMED", "a referenced-entity projection's key is not confirmed (03 Count the correct population)"),
     outcome("COMMAND", "INVALID_REQUEST", "SELECTED_COLUMNS_LIMIT", "a table selects more than 800 columns (policy input.columns)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "SELECTION_BYTES_LIMIT", "the selected files exceed the revision envelope (50 files, 5,000,000,000 bytes)"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "REUSE_NOT_AVAILABLE", "a reused file is no longer an admitted file of this project (its intake expired or its generation was lost)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "REUSE_NOT_AVAILABLE", "a reused file is no longer an admitted file of this project (its intake expired, the retention of its sealed bytes ended, or its generation was lost), or its bytes were first sealed more than fourteen days ago (the hard cap belongs to the bytes, D-RET-3)"),
   ],
   CMD017: [
     NOT_VISIBLE("the revision"),
@@ -135,7 +135,7 @@ const ROUTE_SPECIFIC: Readonly<Record<SourceRouteId, ReadonlyArray<ProblemOutcom
     ...TENANT,
     ...AGENCY_HEADER,
     NOT_VISIBLE("the revision"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SELECTABLE", "the revision takes no new selection (not DRAFT, INSPECTING or READY_TO_SEAL)", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SELECTABLE", "the revision takes no new selection (not DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL)", { current: "ALWAYS" }),
     ...SELECTION_DOCUMENT,
   ],
   GetSelectionManifest: [...EVERY_READ, ...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the selection manifest")],

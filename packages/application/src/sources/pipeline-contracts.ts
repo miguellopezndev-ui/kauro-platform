@@ -102,8 +102,32 @@ export interface OutboxDispatcher {
   dispatchBatch(consumer: OutboxConsumer, limit: number, now: UtcInstant): Promise<{ readonly delivered: number; readonly retried: number; readonly deadLettered: number }>;
 }
 
-/** Periodic control-plane work with no triggering event (deadlines, provider reconciliation, inventory, deletion retries). */
+/**
+ * The sweepers of design §12.5 (B07-F13: this list and the design's are the same, the application test compares them):
+ * UPLOAD_DEADLINES (live uploads past their deadline -> EXPIRED; admitted uploads past it whose file no seal ever included ->
+ * EXPIRED with the file revoked INTAKE_EXPIRED), PROVIDER_SESSION_RECONCILIATION (UNCERTAIN or REQUESTED cancellations until the
+ * provider horizon), RETENTION (ACTIVE records past their effective deadline -> EXPIRED; SEALED revisions with no ACTIVE record ahead
+ * and REJECTED revisions whose windows closed -> EXPIRED; files whose including revisions' retention ended revoked
+ * RETENTION_EXPIRED), OBJECT_INVENTORY (provider listing against the registry), DELETION_RETRIES, and LOCATION_POLICY (reads back
+ * every location's soft-delete retention and versioning at start and daily; a deletion cannot be recorded at a location never read
+ * back, D-OBJ-2, so this sweeper is load-bearing).
+ */
+export const SOURCE_SWEEPERS = Object.freeze([
+  "UPLOAD_DEADLINES",
+  "PROVIDER_SESSION_RECONCILIATION",
+  "RETENTION",
+  "OBJECT_INVENTORY",
+  "DELETION_RETRIES",
+  "LOCATION_POLICY",
+] as const);
+export type SourceSweeperName = (typeof SOURCE_SWEEPERS)[number];
+
+/**
+ * Periodic control-plane work with no triggering event. Every sweep runs on the server clock (D-CLOCK-1: the database decides what is
+ * due, never a caller's `now`) in SYSTEM units of work bound to each work item's agency (D-CTRL-1), taking the revision row before
+ * any upload or file of it (D-LOCK-2).
+ */
 export interface SourceSweeper {
-  readonly name: "UPLOAD_DEADLINES" | "PROVIDER_SESSION_RECONCILIATION" | "INTAKE_WINDOWS" | "OBJECT_INVENTORY" | "DELETION_RETRIES";
-  sweep(units: SourceUnitOfWorkFactory, now: UtcInstant, limit: number): Promise<{ readonly examined: number; readonly acted: number }>;
+  readonly name: SourceSweeperName;
+  sweep(units: SourceUnitOfWorkFactory, limit: number): Promise<{ readonly examined: number; readonly acted: number }>;
 }

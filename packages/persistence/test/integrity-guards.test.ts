@@ -487,9 +487,9 @@ test("R20: every aggregate is born in its machine's initial state — a row inse
   assert.deepEqual(counts.rows[0], { agencies: 0, memberships: 0, archived: 0, projects: 0, sealed: 0, hubspot: 0 });
   // the positive symmetry: born in the initial state and walked along the listed edges, the same aggregates commit
   const walked = await h.sealedRevision(A, projectA as never, "SEALED");
-  // since B07 the walk is the source lifecycle's own: upload_reserved, all_uploads_completed, the selection bound in place (a
-  // version without a state change), all_selected_inputs_admitted, seal_command
-  assert.equal(walked.version, 6, "DRAFT v1 -> UPLOADING v2 -> INSPECTING v3 -> selection v4 -> READY_TO_SEAL v5 -> SEALED v6");
+  // since B07 the walk is the source lifecycle's own: upload_reserved, all_uploads_completed (the agency's selection closes the
+  // intake, B07 D-INTAKE-1), all_selected_inputs_admitted, seal_command
+  assert.equal(walked.version, 5, "DRAFT v1 -> UPLOADING v2 -> INSPECTING v3 (with the selection) -> READY_TO_SEAL v4 -> SEALED v5");
   const capabilityId = await h.offeredCapability("HUBSPOT", "AVAILABLE_LIMITED", { version: "R2-WALKED" });
   const published = await h.oracle.query("SELECT state FROM kauro.capabilities WHERE capability_id = $1", [capabilityId]);
   assert.deepEqual(published.rows[0], { state: "AVAILABLE_LIMITED" });

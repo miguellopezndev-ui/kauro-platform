@@ -17,9 +17,12 @@
  */
 import { SELECTION_MANIFEST_SCHEMA } from "./request-schemas.js";
 import { SOURCE_BLOCKERS } from "./views.js";
+import type { SourceRouteSpec } from "./contracts.js";
+import type { SourceRouteId } from "./outcomes.js";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
   RESPONSE_FIELD_VOCABULARY,
+  RESPONSE_SCHEMA_PREFIX,
   VIEW_MEMBER_KIT,
   declaredMembers,
   openObjects,
@@ -365,8 +368,9 @@ export const SOURCE_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.fre
     withheld: {},
     members: {
       revision: platform(true, ref("SourceRevisionView"), "The SEALED revision."),
-      manifestHash: platform(true, HASH, "KAURO_SOURCE_REVISION_V1 digest of the sealed manifest."),
+      manifestHash: platform(true, HASH, "KAURO_SOURCE_REVISION_V1 digest of the sealed manifest: exactly HASHING's preimage (accepted files, table selection, parser profile, projection; B07-F12)."),
       projectionHash: platform(true, HASH, "Digest of the sealed projection and pricing interpretation."),
+      sealedSubjectHash: platform(true, HASH, "KAURO_SOURCE_SEALED_SUBJECT_V1 digest of the sealed subject: this revision, its lineage, the manifest and the frozen counts (D-HASH-4). Named apart from the forbidden identity member subjectHash (B06 FORBIDDEN_RESPONSE_FIELDS)."),
       retention: platform(true, ref("RetentionView"), "The UNPAID record: hard deadline fourteen days from the seal."),
     },
   },
@@ -413,6 +417,87 @@ export const SOURCE_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.fre
 
 function refuse(message: string): never {
   throw new DomainFailure("INTEGRITY_FAILURE", `source response views: ${message}`);
+}
+
+// --- the planned reply envelopes (B07-F13): generated into OpenAPI as x-kauro-planned until mandate B07-COMMANDS serves them ------
+
+const DIALECT = "https://json-schema.org/draft/2020-12/schema";
+
+/** The COMPLETED reply of a B07 command (CMD014 answers B06's ACCEPTED envelope instead, D-RUN-1). */
+export function sourceCommandResponseSchemaId(command: Exclude<keyof typeof SOURCE_COMMAND_RESPONSES, "CMD014">): string {
+  return `${RESPONSE_SCHEMA_PREFIX}${command}`;
+}
+
+/** The reply of an auxiliary source route (a read, or the selection manifest intake). */
+export function sourceRouteResponseSchemaId(operationId: SourceRouteId): string {
+  return `${RESPONSE_SCHEMA_PREFIX}source:${operationId}`;
+}
+
+function sourceCompletedEnvelope(command: Exclude<keyof typeof SOURCE_COMMAND_RESPONSES, "CMD014">, view: string): JsonSchema {
+  return {
+    $schema: DIALECT,
+    $id: sourceCommandResponseSchemaId(command),
+    title: `${command} COMPLETED`,
+    description: "Synchronous success: the validated DTO and the version of the aggregate the command edited or created (10 \"Responses and safe errors\"); replayed is true when an idempotent replay returned the journaled result (10 \"Idempotency contract\").",
+    type: "object",
+    additionalProperties: false,
+    required: ["kind", "version", "replayed", "data"],
+    properties: {
+      kind: { type: "string", const: "COMPLETED" },
+      version: VERSION,
+      replayed: { type: "boolean" },
+      data: ref(view),
+    },
+  };
+}
+
+function sourceRouteEnvelope(operationId: SourceRouteId, route: SourceRouteSpec): JsonSchema {
+  const intake = route.method === "POST";
+  return {
+    $schema: DIALECT,
+    $id: sourceRouteResponseSchemaId(operationId),
+    title: `${operationId} ${intake ? "STORED" : "READ"}`,
+    description: intake
+      ? "The selection manifest intake (D-SEL-2): the stored document's identity; created false (200) when the same body was already stored for this revision (content-idempotent, no journal entry, no aggregate version)."
+      : "A read: the safe projection the caller may see (10 \"Read endpoints return safe projections\").",
+    type: "object",
+    additionalProperties: false,
+    required: ["kind", "data"],
+    properties: {
+      kind: { type: "string", const: intake ? "STORED" : "READ" },
+      data: ref(route.view),
+    },
+  };
+}
+
+/**
+ * Every schema the planned B07 routes reply with, built exactly as B06 builds its served ones (views over the registry bundle,
+ * closed envelopes that reference them): `defs` are the source views, `roots` the envelopes by schema id. `existing` are the served
+ * (B06) view names the source views may reference and must not redefine. tools/openapi.mjs documents the routes from these as
+ * x-kauro-planned operations (B07-F13); when B07-COMMANDS serves them, the views join VIEW_DEFINITIONS and the envelopes the
+ * served roots, and the routes move to `paths`.
+ */
+export function buildSourceResponseSchemas(bundle: RegistryBundle, existing: ReadonlySet<string>, routes: Readonly<Record<SourceRouteId, SourceRouteSpec>>): { readonly defs: Readonly<Record<string, JsonSchema>>; readonly roots: Readonly<Record<string, JsonSchema>> } {
+  const defs = buildSourceViewSchemas(bundle, existing);
+  const known = (view: string): boolean => view in defs || existing.has(view);
+  const roots: Record<string, JsonSchema> = {};
+  for (const [command, reply] of Object.entries(SOURCE_COMMAND_RESPONSES) as Array<[keyof typeof SOURCE_COMMAND_RESPONSES, (typeof SOURCE_COMMAND_RESPONSES)[keyof typeof SOURCE_COMMAND_RESPONSES]]>) {
+    if (command === "CMD014" || reply.view === null) continue;
+    if (!known(reply.view)) refuse(`${command} names an unknown view ${reply.view}`);
+    roots[sourceCommandResponseSchemaId(command)] = sourceCompletedEnvelope(command, reply.view);
+  }
+  for (const [operationId, route] of Object.entries(routes) as Array<[SourceRouteId, SourceRouteSpec]>) {
+    if (!known(route.view)) refuse(`${operationId} names an unknown view ${route.view}`);
+    roots[sourceRouteResponseSchemaId(operationId)] = sourceRouteEnvelope(operationId, route);
+  }
+  for (const [where, schema] of Object.entries(roots)) {
+    for (const member of declaredMembers(schema)) {
+      if (member.name in FORBIDDEN_RESPONSE_FIELDS) refuse(`${where}${member.path} declares the forbidden member ${member.name}`);
+    }
+    const open = openObjects(schema);
+    if (open.length > 0) refuse(`${where} is not closed at ${open.join(", ")}`);
+  }
+  return { defs, roots };
 }
 
 /**

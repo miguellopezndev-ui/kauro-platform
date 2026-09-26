@@ -150,3 +150,33 @@ test("a registered route without a declared response contract and a stale docume
   stale.paths["/api/v1/agencies"].post.summary = "edited by hand";
   assert.deepEqual(check({ document: stale }), ["apps/api/openapi.json is not the generated document (run pnpm run openapi:generate); it differs at /paths/~1api~1v1~1agencies/post/summary"]);
 });
+
+test("B07-F13: the source-lifecycle routes are documented from their contracts as planned operations — every specified command and route, never registered, never also served; a missing planned route, a registered planned route, a repeated operationId and a forbidden DTO member fail the check", () => {
+  const planned = committed["x-kauro-planned"];
+  const commands = Object.values(sources.application.B07_COMMANDS);
+  const routes = Object.values(sources.application.SOURCE_ROUTES);
+  assert.deepEqual(Object.keys(planned).sort(), [...commands.map((c) => `${c.method} ${c.path}`), ...routes.map((r) => `${r.method} ${r.path}`)].sort());
+  for (const spec of commands) {
+    const op = planned[`${spec.method} ${spec.path}`];
+    assert.equal(op.operationId, spec.name);
+    assert.equal(op["x-kauro-package"], "B07");
+    const reply = sources.application.SOURCE_COMMAND_RESPONSES[spec.id];
+    const problemStatuses = sources.application.outcomesByStatus(sources.application.SOURCE_COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), [String(reply.status), ...problemStatuses].sort(), spec.id);
+  }
+  // CompleteUpload answers the ACCEPTED envelope (completion remains asynchronous, D-RUN-1)
+  assert.deepEqual(planned["POST /api/v1/uploads/{uploadId}/complete"].responses["202"].content["application/json"].schema, { $ref: "#/components/schemas/AcceptedResponse" });
+  // a specified route missing from the document is not the generated document
+  const missing = clone(committed);
+  delete missing["x-kauro-planned"]["POST /api/v1/revisions/{revisionId}/seal"];
+  assert.ok(check({ document: missing }).some((f) => f.startsWith("apps/api/openapi.json is not the generated document")));
+  // a planned route the api registers must be served from paths
+  const registeredPlanned = [...inventory, { method: "POST", url: "/api/v1/revisions/:revisionId/seal", responses: inventory[0].responses }];
+  assert.ok(check({ inventory: registeredPlanned }).includes("planned route is registered: POST /api/v1/revisions/{revisionId}/seal (a served route is documented under paths)"));
+  const duplicate = clone(committed);
+  duplicate["x-kauro-planned"]["POST /api/v1/revisions/{revisionId}/seal"].operationId = "ApprovePlan";
+  assert.ok(check({ document: duplicate }).some((f) => f.startsWith("duplicate operationId ApprovePlan")));
+  const leaking = clone(committed);
+  leaking.components.schemas.UploadView.properties.sessionUri = { type: "string" };
+  assert.ok(check({ document: leaking }).some((f) => f.startsWith("DTO exposes a forbidden field: planned ") && f.includes("sessionUri")));
+});

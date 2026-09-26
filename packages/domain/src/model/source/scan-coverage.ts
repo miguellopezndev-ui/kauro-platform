@@ -12,6 +12,7 @@
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { instantMs } from "../fields.js";
+import { SIGNATURE_MAX_AGE_SECONDS } from "./policy.js";
 
 /** Part kinds of the expected scan set (tokens; the part's archive path is never stored, only its digest). */
 export type ScanPartKind = "CONTAINER" | "CSV_BODY" | "WORKBOOK_PART" | "WORKSHEET_PART" | "SHARED_STRINGS_PART" | "STYLES_PART" | "RELATIONSHIPS_PART" | "OTHER_PART";
@@ -57,14 +58,23 @@ export interface ScannerReport {
   readonly parts: ReadonlyArray<ScannedPart>;
 }
 
+/**
+ * The accepted scanner configuration (09: pinned engine, signatures, limits, recursion, timeout, memory envelope). The signature
+ * age limit is not a per-call choice: it is the pinned SIGNATURE_MAX_AGE_SECONDS (D-SCAN-2), which the database pins too
+ * (inspection_receipts.signature_max_age_seconds = 86400; B07-F4).
+ */
 export interface ScanCoveragePolicy {
-  /** The accepted scanner configuration (09: pinned engine, signatures, limits, recursion, timeout, memory envelope). */
   readonly pinnedConfigHash: Sha256Hex;
-  readonly signatureMaxAgeSeconds: number;
+}
+
+/** The object the expected parts must describe: its observed length (the provider's, S053), which the container part must equal. */
+export interface ScannedObject {
+  readonly observedBytes: number;
 }
 
 export type ScanCoverageReason =
   | "NO_EXPECTED_PARTS"
+  | "CONTAINER_NOT_COVERED"
   | "DETECTED"
   | "ENGINE_ERROR"
   | "TIMEOUT"
@@ -102,6 +112,7 @@ const SKIPS: ReadonlySet<ScanPartOutcome> = new Set(["SKIPPED_SIZE_LIMIT", "SKIP
 
 const REASON_ORDER: ReadonlyArray<ScanCoverageReason> = [
   "NO_EXPECTED_PARTS",
+  "CONTAINER_NOT_COVERED",
   "DETECTED",
   "ENGINE_ERROR",
   "TIMEOUT",
@@ -123,9 +134,16 @@ function isCount(n: unknown): n is number {
  * Derives the scan state. Precedence: a detection is a fact whatever else happened (BLOCKED); an engine failure or timeout, or an
  * accounting the platform cannot reconcile, is ERROR (a transient infrastructure failure may be retried within the original
  * deadline); anything short of full coverage by a pinned, fresh engine is NOT_SCANNED; only then COVERED_CLEAN.
+ *
+ * Coverage is judged against THIS object (B07-F4; 09 "demonstrate coverage for every admitted container"): the expected parts must
+ * contain exactly one CONTAINER part whose length is the object's observed length — an expected list without the container, or
+ * with the container at another length (a caller that expects "1 byte" of a 100-byte object), is CONTAINER_NOT_COVERED, never
+ * clean.
  */
-export function evaluateScanCoverage(expected: ReadonlyArray<ExpectedScanPart>, report: ScannerReport, policy: ScanCoveragePolicy): ScanCoverage {
+export function evaluateScanCoverage(expected: ReadonlyArray<ExpectedScanPart>, report: ScannerReport, policy: ScanCoveragePolicy, object: ScannedObject): ScanCoverage {
   const reasons = new Set<ScanCoverageReason>();
+  const containers = expected.filter((p) => p.partKind === "CONTAINER");
+  if (containers.length !== 1 || containers[0]?.bytes !== object.observedBytes || !isCount(object.observedBytes)) reasons.add("CONTAINER_NOT_COVERED");
   const byDigest = new Map<string, ScannedPart>();
   for (const p of report.parts) {
     if (!isCount(p.scannedBytes) || byDigest.has(p.partDigest)) {
@@ -191,7 +209,7 @@ export function evaluateScanCoverage(expected: ReadonlyArray<ExpectedScanPart>, 
   const published = instantMs(report.signaturesPublishedAt);
   const scannedAt = instantMs(report.scannedAt);
   if (published > scannedAt) reasons.add("SIGNATURES_FROM_THE_FUTURE");
-  else if (scannedAt - published > policy.signatureMaxAgeSeconds * 1000) reasons.add("STALE_SIGNATURES");
+  else if (scannedAt - published > SIGNATURE_MAX_AGE_SECONDS * 1000) reasons.add("STALE_SIGNATURES");
 
   let scanState: ScanCoverage["scanState"];
   if (reasons.has("DETECTED")) scanState = "BLOCKED";

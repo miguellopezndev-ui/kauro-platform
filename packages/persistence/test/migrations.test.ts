@@ -14,7 +14,8 @@ import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/i
 
 let pg: TemporaryPostgres;
 before(async () => {
-  pg = await startTemporaryPostgres();
+  // the shipped schema exactly as the runner leaves it: no labelled TEST CLOCK in this cluster (B07 decision D-CLOCK-1)
+  pg = await startTemporaryPostgres({ testClock: false });
 });
 after(async () => {
   await pg.stop();
@@ -260,5 +261,34 @@ test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's s
     assert.deepEqual(constraints.rows, [{ conname: "domain_events_aggregate_kind_fkey", def: "FOREIGN KEY (aggregate_kind) REFERENCES kauro.aggregate_kinds(aggregate_kind)" }]);
   } finally {
     await su.end();
+  }
+});
+
+test("B07 D-CLOCK-1: the shipped kauro.server_now() is the transaction time and nothing else — no setting, no offset — and no runtime role can redefine it", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const f = await su.query<{ body: string; owner: string; volatility: string; comment: string | null }>(
+      "SELECT prosrc AS body, pg_get_userbyid(proowner) AS owner, provolatile AS volatility, obj_description(oid, 'pg_proc') AS comment FROM pg_proc WHERE oid = 'kauro.server_now()'::regprocedure",
+    );
+    assert.deepEqual(f.rows, [{ body: " SELECT transaction_timestamp() ", owner: "kauro_owner", volatility: "s", comment: null }]);
+    // within one transaction it is constant and equal to now(); a transaction-local test-clock setting changes nothing here
+    await su.query("BEGIN");
+    try {
+      await su.query("SELECT set_config('kauro_test.clock_offset_seconds', '-1296000', true)");
+      const r = await su.query<{ same: boolean }>("SELECT kauro.server_now() = now() AS same");
+      assert.deepEqual(r.rows, [{ same: true }]);
+    } finally {
+      await su.query("ROLLBACK");
+    }
+  } finally {
+    await su.end();
+  }
+  for (const login of ["kauro_app_test", "kauro_control_test", "kauro_assurance_test", "kauro_validator_test", "kauro_ingress_test"] as const) {
+    const c = await pg.connect(login);
+    try {
+      await assert.rejects(c.query("CREATE OR REPLACE FUNCTION kauro.server_now() RETURNS timestamptz LANGUAGE sql AS $$ SELECT now() - interval '15 days' $$"), (e: unknown) => (e as { code?: string }).code === "42501", login);
+    } finally {
+      await c.end();
+    }
   }
 });

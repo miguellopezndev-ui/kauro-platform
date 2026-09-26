@@ -1,5 +1,5 @@
 /**
- * Records of the source lifecycle as the domain sees them (B07; tables of migrations 0008..0011). A record is the registry
+ * Records of the source lifecycle as the domain sees them (B07; tables of migrations 0009..0012). A record is the registry
  * contract (UploadSession, FileManifest, DatasetRevision, RetentionRecord) plus the columns the platform needs for tenancy,
  * concurrency, lineage and evidence. Wire DTOs select from these (application views), never the reverse; customer text
  * (display names, worksheet names, header labels) appears only in the records that the tenant reads, never in events.
@@ -244,6 +244,8 @@ export interface SourceFileRecord extends Omit<FileManifest, "fileId" | "storage
   readonly originRevisionId: RevisionId;
   readonly originUploadId: UploadId;
   readonly inspectionReceiptHash: Sha256Hex;
+  /** Aggregate version (B07-F9: SourceFile is an aggregate; every version has its source_file.* event). */
+  readonly version: number;
   readonly state: "ADMITTED" | "ADMISSION_REVOKED";
   readonly admittedAt: UtcInstant;
   readonly revokedAt?: UtcInstant;
@@ -251,10 +253,11 @@ export interface SourceFileRecord extends Omit<FileManifest, "fileId" | "storage
 }
 
 /**
- * Why an admission was revoked (D-FILE-1): the unsealed intake window closed (refused while a sealed revision retains the file,
- * D-RET-1), or the accepted generation is gone or not the admitted one any more (inventory; never restored).
+ * Why an admission was revoked (D-FILE-1): the unsealed intake window closed (refused once any seal included the file, D-RET-1),
+ * the retention of the sealed bytes ended (allowed only once no including revision has an ACTIVE record ahead, D-RET-3, B07-F5),
+ * or the accepted generation is gone or not the admitted one any more (inventory; never restored).
  */
-export type AdmissionRevocationReason = "INTAKE_EXPIRED" | "GENERATION_MISSING" | "GENERATION_CHANGED";
+export type AdmissionRevocationReason = "INTAKE_EXPIRED" | "RETENTION_EXPIRED" | "GENERATION_MISSING" | "GENERATION_CHANGED";
 
 export type TableVisibility = "VISIBLE" | "HIDDEN" | "VERY_HIDDEN";
 export type FormulaCacheState = "NOT_APPLICABLE" | "ALL_PRESENT" | "SOME_MISSING" | "ERROR_VALUES" | "EXTERNAL_DEPENDENCY";
@@ -362,7 +365,7 @@ export interface SelectionEvaluationRecord {
   readonly completedAt: UtcInstant;
 }
 
-/** DatasetRevisionRecord + the B07 lifecycle columns (migration 0008). */
+/** DatasetRevisionRecord + the B07 lifecycle columns (migration 0009). */
 export interface SourceRevisionRecord extends DatasetRevisionRecord {
   readonly createdByMembershipId?: MembershipId;
   readonly selectionManifestId?: SelectionManifestId;
@@ -397,27 +400,35 @@ export interface SealedProjection {
   readonly billable: boolean;
 }
 
+/** A sealed association between two sealed projections of one table (counted as edges, never as billable units). */
+export interface SealedAssociation {
+  readonly associationKey: string;
+  readonly tableId: SourceTableId;
+  readonly fromProjectionId: ProjectionId;
+  readonly toProjectionId: ProjectionId;
+  readonly relationType: string;
+}
+
 /**
- * The sealed manifest document (table kauro.sealed_manifests.manifest), hashed under KAURO_SOURCE_REVISION_V1
- * (reference/HASHING_AND_ACCOUNTING_RULES: ordered accepted file ids, generations, hashes, lengths, table selection, parser profile
- * and projection; excluded: UI labels, mutable upload states and audit status). The revision id is part of the payload
- * (decision D-HASH-1): identical bytes sealed again in a new revision are a new authority chain with a distinct manifest hash.
+ * The revision manifest — exactly the preimage reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation" gives the manifest
+ * hash (KAURO_SOURCE_REVISION_V1, amendment A2 of KAVO_SOURCE_REVISION_V1): "Ordered accepted file IDs/generations/hashes/lengths,
+ * table selection, parser profile and projection"; excluded: "UI labels, mutable upload states and audit status" (B07-F12). It
+ * carries no revision id and no population: those belong to the sealed subject (SealedSubjectDocument). Stored as
+ * kauro.sealed_manifests.manifest, whose CHECK admits exactly these four members.
+ *
+ * Why two seals of identical bytes still have distinct manifest hashes (B06's unique (agency, manifest_hash) — the source hash plans
+ * bind — would otherwise refuse the second): the projection carries the ProjectionIds the seal mints (SourceLocator.projectionId:
+ * "Declared object projection within the physical row" — an identity of this seal's declaration, UUIDv7), so each seal's projection
+ * is its own. Whether the authority intends a content-only projection is open question Q-B07-18.
  */
-export interface SealedManifestDocument {
-  readonly canonicalVersion: 1;
-  readonly revisionId: RevisionId;
-  readonly projectId: ProjectId;
-  readonly supersedesRevisionId: RevisionId | null;
-  readonly files: ReadonlyArray<{
+export interface SourceRevisionManifest {
+  /** The accepted (included) files in sealed order: identity, exact generation, raw-byte digest and length. */
+  readonly files: ReadonlyArray<{ readonly fileId: SourceFileId; readonly providerGeneration: string; readonly sha256: Sha256Hex; readonly bytes: number }>;
+  /** Every candidate file and each of its tables with its disposition and, for an exclusion, its reason (03 "Source identity"). */
+  readonly tableSelection: ReadonlyArray<{
     readonly fileId: SourceFileId;
     readonly disposition: "INCLUDED" | "EXCLUDED";
     readonly exclusionReason: string | null;
-    readonly providerGeneration: string;
-    readonly sha256: Sha256Hex;
-    readonly bytes: number;
-    readonly format: DeclaredFormat;
-    readonly parserProfileHash: Sha256Hex;
-    readonly inspectionReceiptHash: Sha256Hex;
     readonly tables: ReadonlyArray<{
       readonly tableId: SourceTableId;
       readonly ordinal: number;
@@ -425,21 +436,45 @@ export interface SealedManifestDocument {
       readonly visibility: TableVisibility;
       readonly disposition: "INCLUDED" | "EXCLUDED";
       readonly exclusionReason: string | null;
-      /** The selected parser choice as the selection manifest stated it (null for an excluded table). */
-      readonly parser: unknown;
       readonly selectedColumns: ReadonlyArray<number> | null;
-      readonly physicalRows: number | null;
     }>;
   }>;
-  /** Uploads of this revision that inspection rejected: listed with their class, never silently dropped (07). */
-  readonly rejectedUploads: ReadonlyArray<{ readonly uploadId: UploadId; readonly rejectionClass: RejectionClass }>;
-  readonly projections: ReadonlyArray<SealedProjection>;
-  readonly associations: ReadonlyArray<{ readonly associationKey: string; readonly tableId: SourceTableId; readonly fromProjectionId: ProjectionId; readonly toProjectionId: ProjectionId; readonly relationType: string; readonly edges: number }>;
-  readonly populations: SourcePopulations;
+  /** The pinned parser configuration of every accepted file and the parser choice of every included table (FileManifest.parserProfileHash). */
+  readonly parserProfile: ReadonlyArray<{
+    readonly fileId: SourceFileId;
+    readonly format: DeclaredFormat;
+    readonly parserProfileHash: Sha256Hex;
+    readonly tables: ReadonlyArray<{ readonly tableId: SourceTableId; readonly parser: unknown }>;
+  }>;
+  /** The object projection and associations under the pricing definition that decides billable units (DatasetRevision.projectionHash). */
+  readonly projection: {
+    readonly projections: ReadonlyArray<Omit<SealedProjection, "logicalRecords">>;
+    readonly associations: ReadonlyArray<SealedAssociation>;
+    readonly pricingDefinition: string;
+  };
+}
+
+/**
+ * The sealed subject (kauro.sealed_manifests.subject, platform domain KAURO_SOURCE_SEALED_SUBJECT_V1, decision D-HASH-4; B07-F12):
+ * what binds the manifest to this revision and freezes its counts — the revision and its lineage, the manifest, projection,
+ * selection and evaluation hashes, the four populations with the per-table and per-projection counts, the admitting receipts,
+ * the uploads inspection rejected (listed, never silently dropped, 07) and the input envelope. Identical bytes sealed in two
+ * revisions have two subjects (two authority chains, 09 "Quotes, reuploads and retention").
+ */
+export interface SealedSubjectDocument {
+  readonly canonicalVersion: 1;
+  readonly revisionId: RevisionId;
+  readonly projectId: ProjectId;
+  readonly supersedesRevisionId: RevisionId | null;
+  readonly manifestHash: Sha256Hex;
+  readonly projectionHash: Sha256Hex;
   readonly selectionHash: Sha256Hex;
   readonly evaluationHash: Sha256Hex;
-  readonly projectionHash: Sha256Hex;
-  readonly pricingDefinition: string;
+  readonly populations: SourcePopulations;
+  readonly files: ReadonlyArray<{ readonly fileId: SourceFileId; readonly inspectionReceiptHash: Sha256Hex; readonly tables: ReadonlyArray<{ readonly tableId: SourceTableId; readonly physicalRows: number | null }> }>;
+  readonly projections: ReadonlyArray<{ readonly projectionId: ProjectionId; readonly logicalRecords: number; readonly billable: boolean }>;
+  readonly associations: ReadonlyArray<{ readonly associationKey: string; readonly edges: number }>;
+  readonly rejectedUploads: ReadonlyArray<{ readonly uploadId: UploadId; readonly rejectionClass: RejectionClass }>;
   readonly inputEnvelope: { readonly files: number; readonly fileBytes: number; readonly revisionBytes: number };
 }
 
@@ -451,7 +486,9 @@ export interface SealedManifestRecord {
   readonly projectionHash: Sha256Hex;
   readonly selectionHash: Sha256Hex;
   readonly evaluationHash: Sha256Hex;
-  readonly manifest: SealedManifestDocument;
+  readonly subjectHash: Sha256Hex;
+  readonly manifest: SourceRevisionManifest;
+  readonly subject: SealedSubjectDocument;
   readonly sealedAt: UtcInstant;
 }
 

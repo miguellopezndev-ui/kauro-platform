@@ -34,10 +34,23 @@ export function effectiveDeadline(hard: UtcInstant, soft?: UtcInstant): UtcInsta
  * failure and no later than fourteen days from sealing). At seal the ready/terminal anchor does not exist yet, so the record has
  * only its hard deadline; the audit package sets the soft deadline from its own anchor, and the effective deadline can then only
  * move earlier.
+ *
+ * The argument is the first seal of the BYTES (decision D-RET-3, B07-F5): for new bytes this seal, for reused bytes the earliest
+ * seal that ever included any of the included files (firstSealOfBytes) — a re-seal never starts a new fourteen days (HASHING
+ * "Retention formulas": extensions never revive an expired source or reset a hard clock). The database checks the same formula
+ * at commit (dataset_revisions_sealed_subject).
  */
-export function unpaidSealedDeadlines(sealedAt: UtcInstant): { readonly hardDeadline: UtcInstant; readonly effectiveDeadline: UtcInstant } {
-  const hard = toUtcInstant(instantMs(sealedAt) + SOURCE_RETENTION.unpaidDaysHardFromSeal * DAY_MS);
+export function unpaidSealedDeadlines(firstSealOfBytes: UtcInstant): { readonly hardDeadline: UtcInstant; readonly effectiveDeadline: UtcInstant } {
+  const hard = toUtcInstant(instantMs(firstSealOfBytes) + SOURCE_RETENTION.unpaidDaysHardFromSeal * DAY_MS);
   return { hardDeadline: hard, effectiveDeadline: hard };
+}
+
+/**
+ * D-RET-3: the first seal of a revision's bytes — the earliest of this seal and every earlier seal that included any of its included
+ * files. A seal whose bytes' hard cap is already behind it is refused (unpaidSealedDeadlines(first).hardDeadline <= this seal).
+ */
+export function firstSealOfBytes(thisSeal: UtcInstant, earlierSealsOfIncludedFiles: ReadonlyArray<UtcInstant>): UtcInstant {
+  return earlierSealsOfIncludedFiles.reduce<UtcInstant>((min, s) => (instantMs(s) < instantMs(min) ? s : min), thisSeal);
 }
 
 /** The soft deadline an unpaid source gets from its ready or terminal anchor, never beyond the hard cap. */

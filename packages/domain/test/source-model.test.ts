@@ -11,6 +11,8 @@ import {
   EVENT_TYPES,
   INPUT_ENVELOPE,
   PRICING_DEFINITION,
+  REVISION_SELECTABLE_STATES,
+  SIGNATURE_MAX_AGE_SECONDS,
   SOURCE_DIGEST_DOMAINS,
   SOURCE_LIFECYCLE_STATE_MACHINES,
   SOURCE_RETENTION,
@@ -18,11 +20,14 @@ import {
   UPLOAD_SLOT_HOLDING_STATES,
   acceptedObjectName,
   agencyPrefix,
+  consumersOf,
   evaluateScanCoverage,
+  firstSealOfBytes,
   isListed,
   isObjectName,
   isTerminal,
   quarantineObjectName,
+  sealedSubjectHashOf,
   selectionHashOf,
   sourceDigest,
   sourceRevisionManifestHashOf,
@@ -34,11 +39,14 @@ import {
   type AgencyId,
   type ExpectedScanPart,
   type ProjectId,
+  type ProjectionId,
   type RevisionId,
   type ScannerReport,
-  type SealedManifestDocument,
+  type SealedSubjectDocument,
   type SelectionManifestDocument,
   type SourceFileId,
+  type SourceRevisionManifest,
+  type SourceTableId,
   type UploadId,
 } from "../src/index.js";
 
@@ -92,7 +100,7 @@ test("the platform machines are well formed, terminal states have no outgoing ed
   assert.equal(transition("RetentionRecord", "ACTIVE", "effective_deadline_reached"), "EXPIRED");
   for (const s of ["DELETED", "DELETED_WITH_RESIDUALS"]) assert.ok(isTerminal("RetentionRecord", s), s);
   assert.ok(SOURCE_LIFECYCLE_STATE_MACHINES.find((m) => m.contract === "RetentionRecord")!.transitions.every((t) => t.to !== "ACTIVE"), "no edge returns to ACTIVE");
-  // quota holding mirrors the SQL functions kauro.upload_holds_file / kauro.upload_holds_slot (migration 0008)
+  // quota holding mirrors the SQL functions kauro.upload_holds_file / kauro.upload_holds_slot (migration 0009)
   assert.deepEqual([...UPLOAD_QUOTA_HOLDING_STATES].sort(), ["ADMITTED", "RESERVED", "UPLOADING", "VERIFYING"]);
   assert.deepEqual([...UPLOAD_SLOT_HOLDING_STATES].sort(), ["RESERVED", "UPLOADING", "VERIFYING"]);
   // the registry DatasetRevision machine drives the revision (no platform copy): the edges B07 relies on are listed
@@ -112,6 +120,8 @@ test("the platform machines are well formed, terminal states have no outgoing ed
   }
   assert.equal(isListed("DatasetRevision", "INSPECTING", "upload_reserved"), false, "no upload enters an INSPECTING revision");
   assert.equal(isListed("DatasetRevision", "SEALED", "selection_changes"), false, "a sealed selection never changes");
+  // D-INTAKE-1 (B07-F1): binding a selection on an UPLOADING revision is the agency's explicit all_uploads_completed
+  assert.deepEqual([...REVISION_SELECTABLE_STATES].sort(), ["DRAFT", "INSPECTING", "READY_TO_SEAL", "UPLOADING"]);
 });
 
 const parts: ReadonlyArray<ExpectedScanPart> = [
@@ -136,51 +146,81 @@ function report(over: Partial<ScannerReport> = {}): ScannerReport {
     ...over,
   };
 }
-const policyOf = { pinnedConfigHash: pinned, signatureMaxAgeSeconds: 86_400 };
+const policyOf = { pinnedConfigHash: pinned };
+/** The object the parts describe: the container part is its observed length (B07-F4). */
+const container = { observedBytes: 10_000 };
 
 test("S054: a fully covered harmless file is COVERED_CLEAN; the engine's exit code and verdict never decide", () => {
-  const ok = evaluateScanCoverage(parts, report(), policyOf);
+  const ok = evaluateScanCoverage(parts, report(), policyOf, container);
   assert.equal(ok.scanState, "COVERED_CLEAN");
   assert.deepEqual(ok.reasons, []);
   assert.deepEqual([ok.expectedParts, ok.expectedBytes, ok.scannedParts, ok.scannedBytes], [2, 60_000, 2, 60_000]);
   // a nonzero exit code or an ERROR verdict on a report whose parts are all covered and clean does not flip the decision either
-  assert.equal(evaluateScanCoverage(parts, report({ exitCode: 2, verdict: "ERROR" }), policyOf).scanState, "COVERED_CLEAN");
+  assert.equal(evaluateScanCoverage(parts, report({ exitCode: 2, verdict: "ERROR" }), policyOf, container).scanState, "COVERED_CLEAN");
 });
 
 test("S054: the scanner skipped an oversized part and exited clean -> NOT_SCANNED, never clean with a warning (21: a scanner skip labelled clean)", () => {
   // ClamAV's default: the part above MaxFileSize is skipped and the process exits 0 with a CLEAN verdict
-  const skipped = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "SKIPPED_SIZE_LIMIT" }] }), policyOf);
+  const skipped = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "SKIPPED_SIZE_LIMIT" }] }), policyOf, container);
   assert.equal(skipped.scanState, "NOT_SCANNED");
   assert.deepEqual(skipped.reasons, ["PART_SKIPPED"]);
   assert.equal(skipped.scannedBytes, 10_000);
   // the sabotaged adapter labels the skipped part CLEAN: the byte accounting still exposes it
-  const labelledClean = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "CLEAN" }] }), policyOf);
+  const labelledClean = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "CLEAN" }] }), policyOf, container);
   assert.equal(labelledClean.scanState, "NOT_SCANNED");
   assert.deepEqual(labelledClean.reasons, ["BYTES_SHORT"]);
   // a part the engine never mentions is missing coverage
-  const missing = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }] }), policyOf);
+  const missing = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }] }), policyOf, container);
   assert.deepEqual([missing.scanState, missing.reasons], ["NOT_SCANNED", ["PART_MISSING"]]);
   // nothing expected is not coverage
-  assert.equal(evaluateScanCoverage([], report({ parts: [] }), policyOf).scanState, "NOT_SCANNED");
+  assert.equal(evaluateScanCoverage([], report({ parts: [] }), policyOf, container).scanState, "NOT_SCANNED");
 });
 
 test("S054 neighbours: detection is BLOCKED whatever else happened; engine failures are ERROR; stale or unpinned engines are NOT_SCANNED", () => {
-  const detected = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "DETECTED" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "SKIPPED_SIZE_LIMIT" }] }), policyOf);
+  const detected = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "DETECTED" }, { partDigest: hex("b"), scannedBytes: 0, outcome: "SKIPPED_SIZE_LIMIT" }] }), policyOf, container);
   assert.equal(detected.scanState, "BLOCKED");
   assert.deepEqual(detected.reasons, ["DETECTED", "PART_SKIPPED"]);
-  const timeout = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 1, outcome: "TIMEOUT" }] }), policyOf);
+  const timeout = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 10_000, outcome: "CLEAN" }, { partDigest: hex("b"), scannedBytes: 1, outcome: "TIMEOUT" }] }), policyOf, container);
   assert.equal(timeout.scanState, "ERROR");
-  const unexpected = evaluateScanCoverage(parts, report({ parts: [...report().parts, { partDigest: hex("d"), scannedBytes: 5, outcome: "CLEAN" }] }), policyOf);
+  const unexpected = evaluateScanCoverage(parts, report({ parts: [...report().parts, { partDigest: hex("d"), scannedBytes: 5, outcome: "CLEAN" }] }), policyOf, container);
   assert.deepEqual([unexpected.scanState, unexpected.reasons], ["ERROR", ["UNEXPECTED_PART"]]);
-  const stale = evaluateScanCoverage(parts, report({ signaturesPublishedAt: "2026-09-22T11:59:59.000Z" }), policyOf);
+  const stale = evaluateScanCoverage(parts, report({ signaturesPublishedAt: "2026-09-22T11:59:59.000Z" }), policyOf, container);
   assert.deepEqual([stale.scanState, stale.reasons], ["NOT_SCANNED", ["STALE_SIGNATURES"]]);
-  const unpinned = evaluateScanCoverage(parts, report({ configHash: hex("e") }), policyOf);
+  const unpinned = evaluateScanCoverage(parts, report({ configHash: hex("e") }), policyOf, container);
   assert.deepEqual([unpinned.scanState, unpinned.reasons], ["NOT_SCANNED", ["CONFIG_NOT_PINNED"]]);
-  const encrypted = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 0, outcome: "ENCRYPTED" }, { partDigest: hex("b"), scannedBytes: 50_000, outcome: "CLEAN" }] }), policyOf);
+  const encrypted = evaluateScanCoverage(parts, report({ parts: [{ partDigest: hex("a"), scannedBytes: 0, outcome: "ENCRYPTED" }, { partDigest: hex("b"), scannedBytes: 50_000, outcome: "CLEAN" }] }), policyOf, container);
   assert.deepEqual([encrypted.scanState, encrypted.reasons], ["NOT_SCANNED", ["PART_ENCRYPTED"]]);
 });
 
-test("digests are domain separated: the same payload under two domains never collides; the manifest hash binds the revision id", () => {
+test("B07-F4: scan coverage is judged against the object — an expected list without the container, or with the container at another length than observed, is never clean", () => {
+  // the critic's receipt: the writer expected 1 byte of a 100-byte object and the engine read that byte
+  const oneOfHundred = evaluateScanCoverage(
+    [{ partDigest: hex("a"), partKind: "CONTAINER", bytes: 1 }],
+    report({ parts: [{ partDigest: hex("a"), scannedBytes: 1, outcome: "CLEAN" }] }),
+    policyOf,
+    { observedBytes: 100 },
+  );
+  assert.deepEqual([oneOfHundred.scanState, oneOfHundred.reasons], ["NOT_SCANNED", ["CONTAINER_NOT_COVERED"]]);
+  // only expanded parts, no container: every listed part covered, still not the object
+  const partsOnly = evaluateScanCoverage([{ partDigest: hex("b"), partKind: "WORKSHEET_PART", bytes: 50_000 }], report({ parts: [{ partDigest: hex("b"), scannedBytes: 50_000, outcome: "CLEAN" }] }), policyOf, container);
+  assert.deepEqual([partsOnly.scanState, partsOnly.reasons], ["NOT_SCANNED", ["CONTAINER_NOT_COVERED"]]);
+  // two containers are not one object either
+  const twoContainers = evaluateScanCoverage(
+    [...parts, { partDigest: hex("f"), partKind: "CONTAINER", bytes: 10_000 }],
+    report({ parts: [...report().parts, { partDigest: hex("f"), scannedBytes: 10_000, outcome: "CLEAN" }] }),
+    policyOf,
+    container,
+  );
+  assert.deepEqual([twoContainers.scanState, twoContainers.reasons], ["NOT_SCANNED", ["CONTAINER_NOT_COVERED"]]);
+  // the signature age is pinned (86,400 s), never widened by a caller: six-day-old signatures are stale
+  assert.equal(SIGNATURE_MAX_AGE_SECONDS, 86_400);
+  const sixDays = evaluateScanCoverage(parts, report({ signaturesPublishedAt: "2026-09-18T12:00:00.000Z" }), policyOf, container);
+  assert.deepEqual([sixDays.scanState, sixDays.reasons], ["NOT_SCANNED", ["STALE_SIGNATURES"]]);
+  // positive neighbour: the container at its observed length and every part covered
+  assert.equal(evaluateScanCoverage(parts, report(), policyOf, container).scanState, "COVERED_CLEAN");
+});
+
+test("digests are domain separated; the manifest hash is exactly HASHING's KAURO_SOURCE_REVISION_V1 preimage and the sealed subject binds the revision (B07-F12)", () => {
   const payload = { a: 1 };
   const domains = Object.values(SOURCE_DIGEST_DOMAINS);
   assert.equal(new Set(domains.map((d) => sourceDigest(d, payload))).size, domains.length);
@@ -188,24 +228,39 @@ test("digests are domain separated: the same payload under two domains never col
   const selection: SelectionManifestDocument = { schemaVersion: 1, revisionId: "0190c7a2-0000-7000-8000-000000000001" as RevisionId, inventoryHash: hex("1"), files: [], tables: [], projections: [], associations: [] };
   assert.match(selectionHashOf(selection), /^[0-9a-f]{64}$/);
   assert.equal(selectionHashOf(selection), selectionHashOf({ ...selection }), "key order and object identity do not change the digest");
-  const manifest = (revisionId: string): SealedManifestDocument => ({
+  const file = "0190c7a2-0000-7000-8000-0000000000f1" as SourceFileId;
+  const table = "0190c7a2-0000-7000-8000-0000000000f2" as SourceTableId;
+  const manifest = (projectionId: string): SourceRevisionManifest => ({
+    files: [{ fileId: file, providerGeneration: "1700000000000001", sha256: hex("5"), bytes: 1234 }],
+    tableSelection: [{ fileId: file, disposition: "INCLUDED", exclusionReason: null, tables: [{ tableId: table, ordinal: 0, structureHash: hex("6"), visibility: "VISIBLE", disposition: "INCLUDED", exclusionReason: null, selectedColumns: null }] }],
+    parserProfile: [{ fileId: file, format: "CSV", parserProfileHash: hex("7"), tables: [{ tableId: table, parser: { kind: "CSV" } }] }],
+    projection: { projections: [{ projectionId: projectionId as ProjectionId, projectionKey: "CONTACT", tableId: table, objectKind: "CONTACT", kind: "ROW", fieldOrdinals: [0, 1], billable: true }], associations: [], pricingDefinition: "R2-INITIAL" },
+  });
+  // the preimage has exactly HASHING's four members: ordered accepted files, table selection, parser profile, projection
+  assert.deepEqual(Object.keys(manifest("0190c7a2-0000-7000-8000-0000000000a1")).sort(), ["files", "parserProfile", "projection", "tableSelection"]);
+  // the same preimage is the same manifest hash (authority-exact: no revision id, no population inside)
+  assert.equal(sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a1")), sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a1")));
+  // two seals mint two projection identities (SourceLocator.projectionId), so identical bytes sealed twice are two manifests
+  assert.notEqual(sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a1")), sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a2")));
+  const subject = (revisionId: string): SealedSubjectDocument => ({
     canonicalVersion: 1,
     revisionId: revisionId as RevisionId,
     projectId: "0190c7a2-0000-7000-8000-00000000000a" as ProjectId,
     supersedesRevisionId: null,
-    files: [],
-    rejectedUploads: [],
-    projections: [],
-    associations: [],
-    populations: { physicalSourceRows: 0, logicalSourceRecords: 0, billableSourceUnits: 0, associationEdges: 0 },
+    manifestHash: sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a1")),
+    projectionHash: hex("4"),
     selectionHash: hex("2"),
     evaluationHash: hex("3"),
-    projectionHash: hex("4"),
-    pricingDefinition: "R2-INITIAL",
+    populations: { physicalSourceRows: 120, logicalSourceRecords: 120, billableSourceUnits: 120, associationEdges: 0 },
+    files: [{ fileId: file, inspectionReceiptHash: hex("8"), tables: [{ tableId: table, physicalRows: 120 }] }],
+    projections: [{ projectionId: "0190c7a2-0000-7000-8000-0000000000a1" as ProjectionId, logicalRecords: 120, billable: true }],
+    associations: [],
+    rejectedUploads: [],
     inputEnvelope: { files: 50, fileBytes: 2_000_000_000, revisionBytes: 5_000_000_000 },
   });
-  // identical bytes and selection sealed in two revisions are two authority chains (D-HASH-1)
-  assert.notEqual(sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-000000000001")), sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-000000000002")));
+  // the revision and the populations live in the sealed subject: the same manifest in two revisions is two subjects (D-HASH-4)
+  assert.notEqual(sealedSubjectHashOf(subject("0190c7a2-0000-7000-8000-000000000001")), sealedSubjectHashOf(subject("0190c7a2-0000-7000-8000-000000000002")));
+  assert.notEqual(sealedSubjectHashOf(subject("0190c7a2-0000-7000-8000-000000000001")), sourceRevisionManifestHashOf(manifest("0190c7a2-0000-7000-8000-0000000000a1")));
 });
 
 test("deadlines: the reservation lasts exactly 24 h from initiation; an unpaid seal is capped at 14 days and a ready anchor only moves it earlier", () => {
@@ -214,6 +269,11 @@ test("deadlines: the reservation lasts exactly 24 h from initiation; an unpaid s
   assert.deepEqual(sealed, { hardDeadline: "2026-10-08T00:00:00.000Z", effectiveDeadline: "2026-10-08T00:00:00.000Z" });
   assert.equal(unpaidSoftDeadline("2026-09-25T00:00:00.000Z", sealed.hardDeadline), "2026-10-02T00:00:00.000Z");
   assert.equal(unpaidSoftDeadline("2026-10-05T00:00:00.000Z", sealed.hardDeadline), sealed.hardDeadline, "a late ready anchor never extends past the hard cap");
+  // D-RET-3 (B07-F5): the hard cap belongs to the bytes — a re-seal of reused bytes keeps the first seal's fourteen days
+  const first = firstSealOfBytes("2026-10-01T00:00:00.000Z", ["2026-09-24T00:00:00.000Z", "2026-09-28T00:00:00.000Z"]);
+  assert.equal(first, "2026-09-24T00:00:00.000Z");
+  assert.equal(unpaidSealedDeadlines(first).hardDeadline, "2026-10-08T00:00:00.000Z", "not 2026-10-15, fourteen days from the re-seal");
+  assert.equal(firstSealOfBytes("2026-10-01T00:00:00.000Z", []), "2026-10-01T00:00:00.000Z", "new bytes: this seal");
 });
 
 test("object names are opaque, zone-prefixed and scoped to one agency; a prefix of one agency never matches another", () => {
@@ -231,17 +291,25 @@ test("object names are opaque, zone-prefixed and scoped to one agency; a prefix 
 });
 
 test("every B07 event type carries an allowlist without customer-text keys, and every B07 consumer subscription names a registered type", () => {
-  const b07 = EVENT_TYPES.filter((t) => t.startsWith("upload_session.") || t.startsWith("retention_record.") || t === "project.current_revision_changed.v1" || (t.startsWith("dataset_revision.") && t !== "dataset_revision.created.v1"));
-  // the ten upload-session edges, the retention record's creation and expiry, the project pointer, the selection binding and the
-  // nine DatasetRevision lifecycle events B06 registered with the machine (B07 publishes them; migration 0011 seeds the other 14)
+  const b07 = EVENT_TYPES.filter((t) => t.startsWith("upload_session.") || t.startsWith("retention_record.") || t.startsWith("source_file.") || t === "project.current_revision_changed.v1" || (t.startsWith("dataset_revision.") && t !== "dataset_revision.created.v1"));
+  // the ten upload-session edges, the retention record's creation and expiry, the source file's admission and revocation (B07-F9),
+  // the project pointer, the selection binding and the nine DatasetRevision lifecycle events B06 registered with the machine (B07
+  // publishes them; migration 0012 seeds the other 16)
   assert.deepEqual([...b07].sort(), [
     "dataset_revision.cancelled.v1", "dataset_revision.deleted.v1", "dataset_revision.expired.v1", "dataset_revision.inspecting.v1", "dataset_revision.ready_to_seal.v1",
     "dataset_revision.rejected.v1", "dataset_revision.sealed.v1", "dataset_revision.selection_changed.v1", "dataset_revision.superseded.v1", "dataset_revision.uploading.v1",
     "project.current_revision_changed.v1", "retention_record.created.v1", "retention_record.expired.v1",
+    "source_file.admission_revoked.v1", "source_file.admitted.v1",
     "upload_session.admitted.v1", "upload_session.cancelled.v1", "upload_session.completion_not_observed.v1", "upload_session.completion_observed.v1",
     "upload_session.completion_reported.v1", "upload_session.expired.v1", "upload_session.provider_cancellation_recorded.v1", "upload_session.rejected.v1",
     "upload_session.reserved.v1", "upload_session.session_issued.v1",
   ]);
+  // B07-F9: an admission revoked under a selection or a seal reaches the execution consumer and the agency
+  assert.deepEqual([...consumersOf("source_file.admission_revoked.v1")].sort(), ["EXECUTION_CONTROL", "NOTIFICATIONS"]);
+  // B07-F8: every terminal authority fact of the source lifecycle is tombstoned outside the restore boundary
+  for (const t of ["upload_session.cancelled.v1", "upload_session.expired.v1", "upload_session.rejected.v1", "dataset_revision.cancelled.v1", "dataset_revision.superseded.v1", "dataset_revision.rejected.v1", "dataset_revision.expired.v1", "dataset_revision.deleted.v1"] as const) {
+    assert.ok(consumersOf(t).includes("AUTHORITY_JOURNAL"), t);
+  }
   for (const t of b07) {
     const keys = EVENT_PAYLOAD_ALLOWLIST[t];
     assert.ok(keys.length > 0, t);

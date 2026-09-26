@@ -136,8 +136,8 @@ export const SOURCE_LIFECYCLE_STATE_MACHINES: ReadonlyArray<StateMachine> = Obje
         from: "ADMITTED",
         event: "admission_revoked",
         to: "ADMISSION_REVOKED",
-        guard: "The accepted generation is missing, differs from the admitted one, or its intake expired unsealed.",
-        effect: "The file can no longer enter a selection or a seal; a replacement is a new upload and generation.",
+        guard: "The accepted generation is missing or differs from the admitted one; or its intake expired and no seal ever included it; or every seal that included it has no ACTIVE retention record ahead (the bytes' retention ended).",
+        effect: "The file can no longer enter a selection or a seal (source_file.admission_revoked.v1 reaches the execution consumer and the agency); a replacement is a new upload and generation.",
       },
     ],
     unlistedTransition: UNLISTED,
@@ -204,5 +204,9 @@ export const UPLOAD_TOMBSTONE_STATES: ReadonlySet<string> = new Set(["CANCELLED"
 export const REVISION_MUTABLE_STATES: ReadonlySet<string> = new Set(["DRAFT", "UPLOADING", "INSPECTING", "READY_TO_SEAL"]);
 /** DatasetRevision states that accept a new upload reservation (DRAFT -> UPLOADING, or UPLOADING itself). */
 export const REVISION_UPLOAD_STATES: ReadonlySet<string> = new Set(["DRAFT", "UPLOADING"]);
-/** DatasetRevision states in which a selection can be bound (previously_admitted_inputs_selected, selection_changes, or in place). */
-export const REVISION_SELECTABLE_STATES: ReadonlySet<string> = new Set(["DRAFT", "INSPECTING", "READY_TO_SEAL"]);
+/**
+ * DatasetRevision states in which a selection can be bound: previously_admitted_inputs_selected (DRAFT), all_uploads_completed
+ * (UPLOADING: binding the selection is the agency's explicit closing of the intake, D-INTAKE-1, B07-F1), in place (INSPECTING) and
+ * selection_changes (READY_TO_SEAL). A selection is bound only when no upload of the revision is RESERVED, UPLOADING or VERIFYING.
+ */
+export const REVISION_SELECTABLE_STATES: ReadonlySet<string> = new Set(["DRAFT", "UPLOADING", "INSPECTING", "READY_TO_SEAL"]);

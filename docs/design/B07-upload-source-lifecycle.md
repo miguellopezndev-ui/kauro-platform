@@ -1,67 +1,81 @@
 # B07 — Upload, inspection and source lifecycle: design
 
-Branch `b07/design`, built on `main` at `02c0bd2` (B05 and the final B06). Package B07 of the build program (22 "B07 — Upload,
-inspection and source lifecycle": implement upload reservations, resumable cancellation, scan coverage, immutable accepted
-generations, selection, projection, sealing and deletion inventory; prove late uploads cannot resurrect cancelled data, scanner
-skips do not pass, all selected files and tables are counted and retention anchors survive failure). Gate G-UPLOAD (owner 09).
-Owning manuals 03, 04, 08, 09, 10, with 07 (aggregates, transaction discipline, outbox) and 21 (evidence). Contracts and cases
-come from the vendored R2 registry under `packages/contracts/registry` (provenance-checked; quoted, never edited).
+Branch `b07/design`, rebased on `main` at `ac44af6` (B05, the final B06, and the shared aggregate-kind registry of
+`docs/design/FOUNDATION-aggregate-kinds.md`, migration 0008). Package B07 of the build program (22 "B07 — Upload, inspection and
+source lifecycle": implement upload reservations, resumable cancellation, scan coverage, immutable accepted generations,
+selection, projection, sealing and deletion inventory; prove late uploads cannot resurrect cancelled data, scanner skips do not
+pass, all selected files and tables are counted and retention anchors survive failure). Gate G-UPLOAD (owner 09). Owning manuals
+03, 04, 08, 09, 10, with 07 (aggregates, transaction discipline, outbox) and 21 (evidence). Contracts and cases come from the
+vendored R2 registry under `packages/contracts/registry` (provenance-checked; quoted, never edited).
 
 This design **extends** the B06 foundation and does not fork it: the pipeline order of D-PIPE-1 (authenticate → access decision →
 journal reserve → execute), the runtime roles and their verified pools (`kauro_app`, `kauro_control`, `kauro_assurance`,
 `kauro_validator`, `kauro_ingress`), forced RLS, initial-state guards and listed transitions (D-INIT-1, KA008), version and event
-discipline (D-VER-1, D-EVT-1, D-EVT-2), transition locks (D-TX-2), the command journal (D-IDEM-1..3), security facts (D-FACT-1),
-the closed response contract and outcome catalogues (D-RESP-1, D-OUT-1) and the test helpers of `@kauro/persistence/testing`.
-Everything here is either quoted from the authority (section named) or a recorded decision (`D-*`); where the authority is silent
-the decision states its rationale and §14 lists the question for the authority. English only; the brand is Kauro (amendment A2).
+discipline (D-VER-1, D-EVT-1, D-EVT-2 — through the foundation's table-driven binding), transition locks (D-TX-2), the command
+journal (D-IDEM-1..3), security facts (D-FACT-1), the closed response contract and outcome catalogues (D-RESP-1, D-OUT-1) and the
+test helpers of `@kauro/persistence/testing`. Everything here is either quoted from the authority (section named) or a recorded
+decision (`D-*`); where the authority is silent the decision states its rationale and §14 lists the question for the authority.
+English only; the brand is Kauro (amendment A2). This revision applies the adversarial critique of `bfac6b1` (findings B07-F1 …
+B07-F14); §18 records the disposition of every finding.
 
 | delivered on this branch | left to the implementation mandates (§15) |
 |---|---|
-| `packages/persistence/migrations/0008..0011` — the complete B07 schema on PostgreSQL 17: revision lifecycle and lineage, upload sessions, quota and capacity ledgers, the object registry with the retention read-back, encrypted session secrets, inspection receipts, admitted files and table inventory, selection manifests and evaluations, sealed manifests and file sets, retention anchors and records, the B07 event types; RLS under the B06 roles; applied from empty by the B06 runner | the `pg` adapters of the source store (`SourceUnitOfWorkFactory.runSource`) and the SQLSTATE translation of the B07 refusals (B07-PERSISTENCE) |
-| `packages/persistence/test/source-migrations.test.ts` — 21 real-database tests of the B07 schema through the runtime login roles (R2-052, S053, S054 and R2-051 at the database, cancellation races, lock-order interleavings, role boundaries, NULL-safety) | the bounded container inspector, the selection evaluator and the preview reader of `@kauro/data-plane` (B07-DATA-PLANE) |
-| `@kauro/persistence/testing` — the shared source-lifecycle fixture (`admitSourceFile`, `bindSourceSelection`, `countSourceSelection`, `readySourceRevision`, `sealStatements`, `sealReadyRevision`, `sealSourceRevision`, `expireSealedRevision`): a revision sealed through the real pipeline, each write by the role that owns it; B06's plan and approval tests use it | the six handlers, the two-phase runtime, the auxiliary routes and their api tests (B07-COMMANDS) |
-| `@kauro/domain` — ids, records, the four platform machines, policy values, the selection manifest document, scan-coverage evaluation, digests, deadline arithmetic, object names; the source-store ports | the control-plane consumers and sweepers and the labelled contract fakes of the provider ports (B07-CONTROL) |
-| `@kauro/application` — the six command contracts, closed request schemas, the selection manifest document schema, the response views (registry-derived) and the closed outcome catalogues of every B07 route, the provider ports, the orchestration contracts | the 23 cases end to end (`docs/design/B07-case-map.md` names each test) |
-| `tools/matrix.mjs` — the state/command/event matrix covers the four B07 machines, the revised DatasetRevision owners and the specified B07 commands and routes with their catalogues | OpenAPI for the B07 routes: generated from the same objects once the routes are registered (§9.5) |
+| `packages/persistence/migrations/0009..0012` — the complete B07 schema on PostgreSQL 17: the server clock of every lifecycle instant, revision lifecycle and lineage, upload sessions, quota and capacity ledgers, the object registry with the retention read-back, encrypted session secrets, inspection receipts, admitted files (an aggregate) and their frozen table inventory, selection manifests and evaluations, the sealed manifest (HASHING's exact preimage) and sealed subject, retention anchors (owned and bound) and records (the hard cap of the bytes), the B07 event types; B07's aggregate kinds as rows of the foundation registry; RLS under the B06 roles; applied from empty by the B06 runner | the `pg` adapters of the source store (`SourceUnitOfWorkFactory.runSource`) and the SQLSTATE translation of the B07 refusals (B07-PERSISTENCE) |
+| `packages/persistence/test/source-migrations.test.ts` — 30 real-database tests of the B07 schema through the runtime login roles, among them one per observable critique finding (F1 ×2, F2, F3, F4, F5, F9, F10, F11, F14) reproducing the critic's attack and showing it refused | the bounded container inspector in its isolated child process, the selection evaluator and the preview reader of `@kauro/data-plane` (B07-DATA-PLANE) |
+| `@kauro/persistence/testing` — the labelled TEST CLOCK of the temporary clusters (D-CLOCK-1) and the source-lifecycle fixture (`admitSourceFile`, `bindSourceSelection`, `countSourceSelection`, `readySourceRevision`, `sealStatements`, `sealReadyRevision`, `sealSourceRevision`, `expireSealedRevision`, `clockAt`): a revision sealed through the real pipeline, each write by the role that owns it, never back-dated | the six handlers, the two-phase runtime, the auxiliary routes and their api tests (B07-COMMANDS) |
+| `@kauro/domain` — ids, records, the four platform machines, policy values, the selection manifest document, scan-coverage evaluation against the object, digests (the authority manifest preimage and the sealed subject), deadline arithmetic of the bytes' first seal, object names; the source-store ports and the read ports B09/B10 consume (`SourceAvailabilityReader`, `RevisionLineageReader`) | the control-plane consumers and sweepers and the labelled contract fakes of the provider ports (B07-CONTROL) |
+| `@kauro/application` — the six command contracts, closed request schemas, the selection manifest document schema, the response views and planned reply envelopes, the closed outcome catalogues of every B07 route, the provider ports (the inspection isolation contract, the tombstone kinds of every AUTHORITY_JOURNAL event), the orchestration contracts (`SOURCE_SWEEPERS`) | the 23 cases end to end (`docs/design/B07-case-map.md` names each test) |
+| `tools/matrix.mjs` and `tools/openapi.mjs` — the matrix covers the four B07 machines and the specified B07 commands and routes; the OpenAPI document lists every B07 route as an `x-kauro-planned` operation generated from the same contracts (D-API-1) | serving the routes moves them into `paths` (B07-COMMANDS) |
 
 ## 1. Decisions register
 
 | id | decision | why (authority) |
 |---|---|---|
-| D-SQL-1 | B07 raises its own SQLSTATE range: KA070 QUOTA_LEDGER (a quota ledger disagrees with the uploads it summarizes), KA071 FENCE_DISCIPLINE (a fence moved backwards or a stale attempt wrote), KA072 LIFECYCLE_BINDING (a transition lacks the facts its target state requires, or leaves its scope inconsistent). Mapped in `@kauro/persistence` `sqlstate.ts` to INTEGRITY_FAILURE / QUOTA_LEDGER, PRECONDITION_FAILED / FENCE_DISCIPLINE and INTEGRITY_FAILURE / LIFECYCLE_BINDING_MISSING. A range of its own means packages built in parallel (B09 also starts at 0008) cannot collide. | 07 "Command outcomes and error taxonomy" (authentication, authorization, stale version, invalid input and integrity are distinct); B06 D-ERR-1..3. |
-| D-MIG-1 | Aggregate kinds become a registered table (`kauro.aggregate_kinds`, FK from `domain_events`) instead of B06's CHECK list; `kauro.domain_events_bind_aggregate` gains the arms `upload_session` and `retention_record`; retention anchor kinds are registered the same way. A later package inserts its kinds; nobody rewrites another package's list. The persistence test proves the seed equals the domain's `AGGREGATE_KINDS` and that every registered kind has an arm. | 07 "Outbox, inbox and event ordering" (registered, versioned event types); B06 D-EVT-2 (an event names an aggregate of its own agency). |
+| D-SQL-1 | B07 raises its own SQLSTATE range: KA070 QUOTA_LEDGER (a quota ledger disagrees with the uploads it summarizes), KA071 FENCE_DISCIPLINE (a fence moved backwards or a stale attempt wrote, including an inventory append after admission), KA072 LIFECYCLE_BINDING (a transition lacks the facts its target state requires, leaves its scope inconsistent, records an instant other than the server's, or takes a deadline edge on the wrong side of its deadline). Mapped in `@kauro/persistence` `sqlstate.ts` to INTEGRITY_FAILURE / QUOTA_LEDGER, PRECONDITION_FAILED / FENCE_DISCIPLINE and INTEGRITY_FAILURE / LIFECYCLE_BINDING_MISSING. B09 uses the KP class, so the two packages cannot collide. | 07 "Command outcomes and error taxonomy" (authentication, authorization, stale version, invalid input and integrity are distinct); B06 D-ERR-1..3. |
+| D-KIND-1 | B07's aggregate kinds are rows of the foundation registry `kauro.aggregate_kinds` (0008): `upload_session` (0009), `source_file` (0010), `retention_record` (0012), each registered with one INSERT by the migration that creates its table, owner `B07`. B07 never edits 0008, the foreign key or `kauro.domain_events_bind_aggregate`. The control plane, which appends events (D-CTRL-2), gets `SELECT` on the registry and its own read policy `aggregate_kinds_read_b07_control`; the foundation test's list of event inserters is extended to it. (Replaces the former D-MIG-1, which created a competing registry: B07-F7.) | FOUNDATION-aggregate-kinds.md D-AGGK-1..5 and §4 "How a package registers its kinds"; 07 "Outbox, inbox and event ordering"; B06 D-EVT-2. |
+| D-CLOCK-1 | Every instant a deadline is computed from or compared with — an upload's creation, a session issue, a completion report or observation, an admission, a rejection, a cancellation, an expiry, a seal, a supersession, a selection, a retention anchor, a record expiry, a revocation, a deletion — is the database's transaction time, read through `kauro.server_now()` (defined `transaction_timestamp()`); the guards refuse any other value (KA072) and decide every deadline on it: nothing is accepted at or after an upload's application deadline (no session issue, completion report, retried observation or admission), nothing expires before its deadline, a revision expires only when no governing record is ACTIVE ahead of the server clock. Temporary test clusters replace the function, as the migration owner, by a labelled TEST CLOCK that adds a transaction-local offset (`@kauro/persistence/testing`), so fixtures stand in the past without any production role back-dating a row; the migrations test proves the shipped body. (B07-F2.) | 09 "Upload reservation" (twenty-four hours from initiation; polling and browser refresh do not extend it); 09 "Resumable session security" (refusing acceptance after expiry); HASHING "Retention formulas" (price validity, retries, support activity or a display label cannot move a source retention anchor; extensions never reset a hard clock); registry RetentionRecord.anchorEvidenceHash ("Actual seal/capture/ready/stage/terminal facts"); 07 "Transaction discipline" (application checks cannot be the sole protection). |
 | D-UP-1 | UploadSession is a platform machine (the registry contract has states, no machine): RESERVED → UPLOADING (session_issued) → VERIFYING (completion_reported) → ADMITTED (inspection_admitted) or REJECTED (inspection_rejected); VERIFYING → UPLOADING (completion_not_observed); RESERVED/UPLOADING/VERIFYING → CANCELLED (cancel_upload) or EXPIRED (reservation_expired); ADMITTED → EXPIRED (intake_deadline_reached). Initial RESERVED; CANCELLED, EXPIRED and REJECTED are terminal: nothing leaves an acceptance tombstone. | registry UploadSession ("Application acceptance and provider session lifetime are independent"); 09 "Upload reservation", "Resumable session security", "Completion and inspection". |
-| D-UP-2 | Byte and file quota is a per-revision ledger (`revision_quota`: bytes ≤ 5,000,000,000, files ≤ 50) maintained only by the `upload_sessions` trigger. An upload holds its reservation while in flight, its observed bytes once admitted and nothing once acceptance is tombstoned, so freed quota is released exactly once. The ledger UPDATE takes the row lock: two reservations that each fit alone serialize there, and the CHECK refuses the combination on the committed total. A direct edit of a ledger is refused at COMMIT (KA070). | R2-052 ("the aggregate transaction admits only the combination within five billion bytes"); 09 "Initial intake envelope" (conjunctive limits); 07 "Transaction discipline" (unique constraints and row locks close races; application checks cannot be the sole protection); CMD015 failure ("consume freed quota twice"). |
+| D-UP-2 | Byte and file quota is a per-revision ledger (`revision_quota`: bytes ≤ 5,000,000,000, files ≤ 50) maintained only by the `upload_sessions` trigger. An upload holds its reservation while in flight, its observed bytes once admitted and nothing once acceptance is tombstoned, so freed quota is released exactly once. The ledger UPDATE takes the row lock: two reservations that each fit alone serialize there, and the CHECK refuses the combination on the committed total. A direct edit of a ledger is refused at COMMIT (KA070). The deferred check is queued only by a write that changed what an upload holds, and reads the uploads and the ledger in one statement, i.e. one snapshot, so a concurrent reservation can never make it raise a false, nonretryable KA070 on an unrelated transaction (B07-F10). | R2-052 ("the aggregate transaction admits only the combination within five billion bytes"); 09 "Initial intake envelope" (conjunctive limits); 07 "Transaction discipline" (unique constraints and row locks close races; typed conflicts); CMD015 failure ("consume freed quota twice"); B06 D-ERR (INTEGRITY_FAILURE is nonretryable). |
 | D-UP-3 | Concurrency is an agency ledger (`upload_capacity`: active sessions ≤ `session_limit`, default 2 = policy `capacity.agencyUploads`); a session slot is held while RESERVED, UPLOADING or VERIFYING. Only the control plane (operations) writes the limit; request handlers hold column grants on the counter only. | 09 "Upload reservation" (the initial concurrent limit is two sessions per agency). |
-| D-SESSION-1 | The provider session reference is sealed (AEAD, key reference, nonce, bound to agency, upload, requester and issuance attempt by the vault port) in `upload_session_secrets`, apart from the upload row. The requester reads it only while the upload is UPLOADING and before the application deadline; the control plane reads it only bound to that agency (to cancel it) and deletes it once the cancellation resolved or the provider lifetime ended; nobody updates it. | 09 "Resumable session security" (a bearer credential; stored encrypted in the temporary control record, bound to one destination, returned only through the authenticated upload flow). |
+| D-INTAKE-1 | all_uploads_completed (UPLOADING → INSPECTING) is the agency's explicit act, never a side effect: CMD016 SelectInputTables binds its selection on the UPLOADING revision — once no upload of it is RESERVED, UPLOADING or VERIFYING and every included file is admitted — and takes the edge in the same update. No observation, inspection outcome, cancellation or deadline closes the intake (the control plane cannot enter INSPECTING at all): a revision fed by two concurrent sessions stays UPLOADING across the gaps between reservations, up to fifty files. The edge is serialized: CMD016 locks the revision row first (D-LOCK-1) and the guard reads the sibling uploads after the revision's transition lock; every settle point — CMD015, the deadline sweeper, an inspection outcome — takes the same revision row first (D-LOCK-1, D-LOCK-2), so the selection always reads a settled result, and after any of them the revision is closable by the selection of what was admitted. (B07-F1.) | registry DatasetRevision all_uploads_completed guard ("Actual provider completion is observed for selected uploads"); 09 "Accepted immutability and sealing" ("The agency selects tables and confirms parsing and projection"); 09 "Initial intake envelope" (fifty files per revision) with 09 "Upload reservation" (two concurrent sessions per agency); CMD013 precondition ("Revision is mutable"); 07 "Transaction discipline" (multi-row invariants use explicit locking). Open question Q-B07-19. |
+| D-SESSION-1 | The provider session reference is sealed (AEAD, key reference, nonce, bound to agency, upload, requester and issuance attempt by the vault port) in `upload_session_secrets`, apart from the upload row. The requester reads it only while the upload is UPLOADING and before the application deadline on the server clock; the control plane reads it only bound to that agency (to cancel it) and deletes it once the cancellation resolved or the provider lifetime ended; nobody updates it. | 09 "Resumable session security" (a bearer credential; stored encrypted in the temporary control record, bound to one destination, returned only through the authenticated upload flow). |
 | D-SESSION-2 | The command journal never stores the session: CMD013's journaled view carries a placeholder the transport hydrates for the requester (answer and replay); any other reader gets `UNAVAILABLE`. `GET /api/v1/uploads/{uploadId}/session` re-delivers it to the requester under the same rule. | 09 (never in logs, email, error reports or executor handoffs); 10 "Upload and target routes" (through the protected response; GET progress never exposes the session URI to unrelated readers); 10 "Idempotency contract" (a lost response is recovered by the same key). |
 | D-SESSION-3 | A provider session lifetime the adapter does not report is taken as 604,800 s; reconciliation of an UNCERTAIN or UNSUPPORTED cancellation runs until that horizon. | 09: a Cloud Storage resumable session URI can remain usable for up to a week unless cancelled. Open question Q-B07-4. |
 | D-SESSION-4 | Delivering a provider session (the CMD013 answer, its replay, the session read) records an ALLOW security fact in the agency's stream (action `CMD013` or `READ_UPLOAD_SESSION`, reason `SESSION_DELIVERED`, assurance SESSION); a refused delivery is a DENY fact like every other (D-FACT-1). | 08 "Audit events and retention" (every trust boundary has an audit event); 09 (the session is a bearer credential). |
 | D-RUN-1 | CompleteUpload answers 202 with B06's ACCEPTED envelope (operationId = the upload id, state VERIFYING, statusPath `/api/v1/uploads/{uploadId}`, pollAfterSeconds 5): the request records the browser's claim and schedules verification; the provider observation, hashing, inspection and scan run in the control plane (UPLOAD_INSPECTION). The journal stores the 202 and a replay answers it again. | catalogue CMD014 effect ("completion remains asynchronous"); 10 "Responses and safe errors" (long work returns 202 with operationId, state, status URL and polling guidance); 07 (no transaction spans an external call). 09 says CompleteUpload "reads provider metadata" — open question Q-B07-1. |
-| D-RUN-2 | ReserveUpload is a two-phase command: unit of work 1 (access decision, journal reserve, the revision row lock, the intent: quarantine object INTENDED, upload RESERVED holding issuance fence 1, the initiation anchor, DRAFT → UPLOADING for the first upload; the journal entry stays RESERVED, linked to the upload) → one bounded provider call outside any transaction (10 s) → unit of work 2 (access decision again, fence and state check, the sealed secret, RESERVED → UPLOADING, journal commit). A retry with the same key finds the entry PENDING: younger than 30 s it answers OPERATION_PENDING; older, it resumes under a new fence (a stale attempt cannot issue a session, KA071), or — when the upload is already terminal — commits the journal with the terminal upload view. A session created by an abandoned attempt was never delivered and is cancelled best-effort. | catalogue shared contract (external calls through recoverable intent/journal boundaries); 10 "Idempotency contract" (intent before external dispatch; pending, rejected or uncertain is reported); 07 (no transaction across an external call); 10 "Provider adapter contract" (prepared intent is durable before dispatch). |
+| D-RUN-2 | ReserveUpload is a two-phase command: unit of work 1 (access decision, journal reserve, the revision row lock, the intent: quarantine object INTENDED, upload RESERVED holding issuance fence 1, the initiation anchor, DRAFT → UPLOADING for the first upload; the journal entry stays RESERVED, linked to the upload) → one bounded provider call outside any transaction (10 s) → unit of work 2 (access decision again, fence and state check, the sealed secret, RESERVED → UPLOADING, journal commit). A retry with the same key finds the entry PENDING: younger than 30 s it answers OPERATION_PENDING; older, it resumes under a new fence (a stale attempt cannot issue a session, KA071), or — when the upload is already terminal or its deadline passed on the server clock — commits the journal with the terminal upload view. A session created by an abandoned attempt was never delivered and is cancelled best-effort. | catalogue shared contract (external calls through recoverable intent/journal boundaries); 10 "Idempotency contract" (intent before external dispatch; pending, rejected or uncertain is reported); 07 (no transaction across an external call); 10 "Provider adapter contract" (prepared intent is durable before dispatch). |
 | D-CTRL-1 | Control-plane work runs in SYSTEM units of work bound to the agency of the work item (`kauro.agency_id` set, no user). Bound, it writes that agency's rows only; unbound it only discovers work through the columns granted to it, which never include customer text (display names, worksheet names, header labels). | 08 "Database isolation" (tenant context transaction-local; fail closed); 07 "The sweeper repairs ... stale inspection and overdue deletion". |
-| D-CTRL-2 | The control plane appends exactly the events of the edges it owns — completion observed or not observed, admitted, rejected, expired, provider cancellation recorded, revision inspecting / ready to seal / rejected / expired, retention record expired — bound to the agency, as a SERVICE actor, of a B07 aggregate kind (policy `domain_events_control_source_lifecycle`). This is a narrow amendment of B06 review R3 (the control plane appended no event) for the source lifecycle only: a new aggregate version cannot commit without its event (D-EVT-1), and these edges have no request. | 07 "A successful command commits state, domain event and outbox record atomically"; 09 "Completion and inspection". Open question Q-B07-13. |
-| D-ROLE-2 | The role boundary of the source lifecycle is in the database: request handlers enter only RESERVED, UPLOADING, VERIFYING and CANCELLED uploads and UPLOADING, INSPECTING, SEALED, SUPERSEDED and CANCELLED revisions (restrictive policies); the control plane enters INSPECTING, READY_TO_SEAL, REJECTED and EXPIRED revisions; request handlers hold column grants on uploads that exclude the provider observation, the inspection fence and outcome and the deadline expiry; they cannot insert receipts, files, tables or evaluations, or write retention records after creating them. | 08 "Role and capability model"; B06 D-EVID-1 (evidence is written by its producer, never by the request handlers whose gate it satisfies); catalogue CMD014 failure ("declared size/hash or browser completion alone cannot mark the file ready"). |
-| D-LOCK-1 | Lock order: project row → revision row (`FOR NO KEY UPDATE`) → revision transition lock → upload rows → quota ledgers (revision, then agency capacity) → object registry rows → a file's transition lock. A reservation reads its revision under the revision's row lock (the BEFORE INSERT trigger), and the revision lifecycle guard takes the revision's transition lock before it reads any fact (B06's trigger takes the same lock but fires after the guard). A transition in flight makes a reservation wait and read its result; a reservation in flight makes a transition wait and then see it; a guard never decides on a view taken before it waited. A command that changes a revision's intake takes the revision row first (CMD013 before its reservation, CMD015, CMD016, CMD017, CMD012 on the predecessor), so two first reservations of a DRAFT revision serialize instead of deadlocking on the transition lock. | 07 "Transaction discipline" (preconditions rechecked inside the transaction; multi-row invariants use explicit locking; the chosen isolation is documented); B06 D-TX-2. |
+| D-CTRL-2 | The control plane appends exactly the events of the edges it owns — completion observed or not observed, admitted, rejected, expired, provider cancellation recorded, a file admitted or its admission revoked, revision ready to seal / rejected / expired, retention record expired — bound to the agency, as a SERVICE actor, of a B07 aggregate kind or `dataset_revision` (policy `domain_events_control_source_lifecycle`). It never appends `dataset_revision.inspecting.v1` (D-INTAKE-1). A narrow amendment of B06 review R3 (the control plane appended no event) for the source lifecycle only: a new aggregate version cannot commit without its event (D-EVT-1), and these edges have no request. | 07 "A successful command commits state, domain event and outbox record atomically"; 09 "Completion and inspection". Open question Q-B07-13. |
+| D-ROLE-2 | The role boundary of the source lifecycle is in the database: request handlers enter only RESERVED, UPLOADING, VERIFYING and CANCELLED uploads and UPLOADING, INSPECTING, SEALED, SUPERSEDED and CANCELLED revisions (restrictive policies); the control plane enters READY_TO_SEAL, REJECTED and EXPIRED revisions — never INSPECTING; request handlers hold column grants on uploads that exclude the provider observation, the inspection fence and outcome and the deadline expiry; they cannot insert receipts, files, tables or evaluations, write the control plane's retention anchors, or create any retention record but the UNPAID one of their own seal (D-ANCH-2). | 08 "Role and capability model"; B06 D-EVID-1 (evidence is written by its producer, never by the request handlers whose gate it satisfies); catalogue CMD014 failure ("declared size/hash or browser completion alone cannot mark the file ready"). |
+| D-LOCK-1 | Lock order: project row → revision row (`FOR NO KEY UPDATE`) → revision transition lock → upload rows → quota ledgers (revision, then agency capacity) → object registry rows → a file's transition lock. A reservation reads its revision under the revision's row lock (the BEFORE INSERT trigger), and the revision lifecycle guard takes the revision's transition lock before it reads any fact (B06's trigger takes the same lock but fires after the guard). A transition in flight makes a reservation wait and read its result; a reservation in flight makes a transition wait and then see it; a guard never decides on a view taken before it waited. A command that changes a revision's intake takes the revision row first (CMD013 before its reservation, CMD015, CMD016, CMD017, CMD012 on the predecessor). | 07 "Transaction discipline" (preconditions rechecked inside the transaction; multi-row invariants use explicit locking; the chosen isolation is documented); B06 D-TX-2. |
+| D-LOCK-2 | The control plane follows the same order: a unit of work that changes an upload, a file or the revision — the observation, an admission or rejection, a completion not observed, an expiry, a provider cancellation record, a revocation, an evaluation, a retention expiry — locks the revision row (`FOR NO KEY UPDATE`) first, then the upload, never an upload before its revision. A cancellation (CMD015) and an inspection outcome of one revision therefore serialize on the revision row in either order and neither deadlocks; the triggers that lock an upload (the receipt's current-attempt check, the file's admitting-upload check) re-lock what the unit of work already holds. (B07-F14.) | 07 "Transaction discipline" (the chosen isolation and locking are documented); B06 D-TX-2. |
 | D-OBJ-1 | The object registry (`stored_objects`) is a platform machine StoredObject: INTENDED → PRESENT → VERIFIED; INTENDED/PRESENT/VERIFIED → DELETION_REQUESTED → DELETED or DELETION_FAILED → DELETION_REQUESTED. Every row is born INTENDED (a name is reserved before any provider write; an object found by a stat or by inventory is registered and observed in one unit of work). A generation, its length and its digest are set once; a late object is RESIDUAL for good; a provider generation is registered once; rows are never deleted (DELETED is the absence evidence a DeletionReceipt enumerates). Names are opaque — a zone prefix and two to five canonical UUIDs, the zone and the owning agency checked against the row. | 09 "Storage zones and object registry" (every object registered with scope, class, location, opaque name, generation, bytes, hash, creator, state, retention anchor and deletion status; never a filename in a path; generation preconditions; the registry is authoritative for intended objects); 08 (a prefix of one scope never matches another). |
-| D-OBJ-2 | The effective soft-delete retention and versioning of every storage location are read back from the provider and recorded (`storage_location_policies`, append-only, evidence class SIMULATED for a contract fake). A deletion cannot be recorded at a location never read back; a deletion the platform performs records the residual the latest read-back implies (`LOCATION_POLICY`: deletion + retention, NULL when retention is 0), and a generation inventory finds already soft-deleted records the provider's own reported expiry (`PROVIDER_REPORTED`). | 09 "Soft delete, versioning and holds" (the effective setting is verified after provisioning; record the actual expiry rather than claiming the object vanished; a policy change does not shorten retention already applied). Open question Q-B07-12. |
-| D-FILE-1 | An admitted file is a platform machine SourceFile: born ADMITTED only while its upload is VERIFYING under the current inspection attempt, with the exact accepted generation, digest and length its receipt promoted (composite key to the receipt); ADMITTED → ADMISSION_REVOKED with reason INTAKE_EXPIRED (the unsealed intake window closed), GENERATION_MISSING or GENERATION_CHANGED (inventory). The revocation takes the file's transition lock and refuses INTAKE_EXPIRED for a file a SEALED or SUPERSEDED revision includes; a seal reads the admission after the same lock. | registry FileManifest ("Only provider-observed bytes and generations may be admitted"; admitted is a derived server decision); 09 "Accepted immutability and sealing". |
+| D-OBJ-2 | The effective soft-delete retention and versioning of every storage location are read back from the provider and recorded (`storage_location_policies`, append-only, evidence class SIMULATED for a contract fake). A deletion cannot be recorded at a location never read back; a deletion the platform performs records, at the server's transaction time, the residual the latest read-back implies (`LOCATION_POLICY`: deletion + retention, NULL when retention is 0), and a generation inventory finds already soft-deleted records the provider's own reported expiry (`PROVIDER_REPORTED`). | 09 "Soft delete, versioning and holds" (the effective setting is verified after provisioning; record the actual expiry rather than claiming the object vanished; a policy change does not shorten retention already applied). Open question Q-B07-12. |
+| D-OBJ-3 | Registry rows are not aggregates: `stored_objects` carries no version and publishes no domain event. Its consumer is the deletion inventory (B16), which reads the registry itself; a lost or changed accepted generation reaches the execution consumer and the agency through the SourceFile aggregate it revokes (D-FILE-2). (B07-F9, the StoredObject half.) | 09 "Storage zones and object registry" (the registry is authoritative for intended objects); 07 "Aggregate ownership" (one table per noun is not required); B06 D-VER-1 applies to aggregates. |
+| D-FILE-1 | An admitted file is a platform machine SourceFile: born ADMITTED only while its upload is VERIFYING under the current inspection attempt, at the server's transaction time, with the exact accepted generation, digest and length its receipt promoted (composite key to the receipt); ADMITTED → ADMISSION_REVOKED for INTAKE_EXPIRED (a file no seal ever included, once its upload's window closed on the server clock), RETENTION_EXPIRED (a sealed file whose including revisions hold no ACTIVE record ahead, D-RET-3), GENERATION_MISSING or GENERATION_CHANGED (inventory). The revocation takes the file's transition lock and re-checks its reason after it; a seal reads the admission after the same lock. | registry FileManifest ("Only provider-observed bytes and generations may be admitted"; admitted is a derived server decision); 09 "Accepted immutability and sealing". |
+| D-FILE-2 | The admitted file is an aggregate (kind `source_file`, D-KIND-1): it carries a version, and its birth and its revocation each commit with their event — `source_file.admitted.v1` and `source_file.admission_revoked.v1` (routed to EXECUTION_CONTROL and NOTIFICATIONS, naming the revisions whose selection or seal named the file) — so a READY_TO_SEAL or sealed revision that lost a generation is surfaced. (B07-F9.) | B06 D-VER-1, D-EVT-1; 07 "A successful command commits state, domain event and outbox record atomically"; registry DatasetRevision SEALED effect (revoke execution on stale authority). |
 | D-SEL-1 | The selection is a closed document (`SelectionManifestDocument`): every candidate file and table with an explicit disposition (INCLUDE/EXCLUDE with a reason), the parser choice of every included table (CSV dialect and header, worksheet header row, formula policy, hidden rows and columns, merged cells as observed), selected columns (≤ 800), the object projections (row or referenced entity, field ordinals, confirmed keys) and the associations — ids, digests, tokens and positions only, never customer text. | catalogue CMD016 (explicit selected/excluded tables and parser choices; no hidden-sheet silent inclusion); 03 "Source identity" and "Count the correct population"; 04 "XLSX parser requirements"; 09 "Accepted immutability and sealing". |
 | D-SEL-2 | The document is stored by an auxiliary, non-journaled, content-idempotent route (`POST /api/v1/revisions/{revisionId}/selection-manifests`: the same body again answers the stored manifest with `created: false`); CMD016 binds it by the reference its catalogue field names. The intake changes no aggregate, so it needs no command journal entry (whose operation is a catalogue id, B06 `command_journal.operation ^CMD[0-9]{3}$`) and no version. | catalogue CMD016 fields (`selectionManifestRef: id`); 10 "Upload and target routes" (selection edits require the revision version — the version is compared by CMD016). Open question Q-B07-10. |
-| D-SEL-3 | A selection binds only a settled inventory: no reservation, session or verification of the revision is open, and the revision records the inventory hash (KAURO_SOURCE_INVENTORY_V1 over its uploads, files and detected tables) that the manifest names; a manifest made against another inventory is SELECTION_STALE. Binding a selection always leaves the revision INSPECTING and uncounted; only SELECTION_EVALUATION binds counts. | catalogue CMD016 failure ("Missing or newly changed tables invalidate previous selection"); registry selection_changes ("invalidate selected-scope readiness and recompute affected facts"). |
+| D-SEL-3 | A selection binds only a settled inventory: no reservation, session or verification of the revision is open, and the revision records the inventory hash (KAURO_SOURCE_INVENTORY_V1 over its uploads, files and detected tables) that the manifest names; a manifest made against another inventory is SELECTION_STALE (the handler compares the hash). Binding a selection always leaves the revision INSPECTING and uncounted; only SELECTION_EVALUATION binds counts. | catalogue CMD016 failure ("Missing or newly changed tables invalidate previous selection"); registry selection_changes ("invalidate selected-scope readiness and recompute affected facts"). |
+| D-SEL-4 | The database compares the manifest with the inventory row by row at binding (`kauro.check_selection_inventory`), the backstop a handler cannot skip: every admitted file of the revision's own uploads is disposed; every file named is a file of the project of the origin stated (THIS_REVISION ⇔ admitted from this revision) and an included one is ADMITTED now; at least one file is included; the tables listed are exactly the detected tables of the files named at their current structure hash, every table of an included file disposed. The inventory of an admitted generation is frozen: tables and columns are appended only while the file's upload is VERIFYING (KA071 afterwards). (B07-F11.) | catalogue CMD016 failure; 21 "Evidence classes" (claims name what they prove); 07 "application checks cannot be the sole protection". |
 | D-REV-1 | Lineage stays inside the project: a predecessor is a revision of the same project (`dataset_revisions_lineage_in_project`), a superseded revision names the successor that names it (deferred `dataset_revisions_successor_fk`), a predecessor is replaced at most once (`dataset_revisions_supersedes_once`), and the project's current revision is one of its own (deferred `projects_current_revision_in_project_fk`). CMD012 requires `supersedesRevisionId` to be the project's current revision, so lineage is linear. | registry DatasetRevision ("Sealing is immutable; replacement creates lineage and invalidates dependent authority"; supersedesRevisionId "Explicit predecessor, never an in-place overwrite"); 10 "Client and project routes" (no in-place edit of sealed source bytes). |
 | D-REV-2 | A project holds at most one mutable revision (DRAFT, UPLOADING, INSPECTING, READY_TO_SEAL; partial unique index). CMD012 replacing a mutable predecessor cancels it (cancel_revision) together with its uploads in flight; replacing a SEALED one supersedes it. | registry DatasetRevision cancel_revision and new_revision_explicitly_supersedes; 07 "Transaction discipline". |
-| D-RET-1 | Unsealed intake data follows its upload's window: an admitted file that no sealed revision includes expires with its upload at the application deadline (upload ADMITTED → EXPIRED, file revoked INTAKE_EXPIRED, objects deleted); a REJECTED revision expires once every intake window of it closed. Sealing moves the data under the sealed revision's record. | HASHING "Retention formulas" ("abandoned unsealed upload data follows its independent session/inspection cleanup policy rather than waiting forever for a seal"); 09 "Retention schedule" (incomplete upload and quarantine: twenty-four hours from initiation); registry REJECTED retention_expires ("Rejected-input cleanup deadline"). Open question Q-B07-11. |
-| D-RET-2 | RetentionRecord is a platform machine (ACTIVE → EXPIRED, ACTIVE/EXPIRED → DELETING → DELETED or DELETED_WITH_RESIDUALS). SealRevision creates the UNPAID record anchored on the seal: hard deadline = sealed_at + 1,209,600 s (fourteen exact days), effective deadline = the hard deadline until the audit package sets the soft deadline (only earlier). The hard deadline never moves; a record expires no earlier than its effective deadline; a sealed revision expires only when no governing record is ACTIVE with a later effective deadline. | 09 "Retention schedule" (unpaid audit sources: seven days after DRAFT_READY or terminal failure, no later than fourteen days from sealing); registry RetentionRecord ("The effective deadline is a minimum of named anchors; retries do not extend it"); policy `retention.unpaidDaysHardFromSeal`, `retention.extendHardCap = false`; HASHING (a day is an exact 86,400-second duration). |
-| D-HASH-1 | The manifest hash (KAURO_SOURCE_REVISION_V1, amendment A2 of the R2 domain) binds the revision id: identical bytes sealed again in a new revision are a new authority chain with a distinct manifest hash. | 09 "Quotes, reuploads and retention" ("a new authority chain, not restoration"); HASHING "Hash domain separation". |
+| D-RET-1 | Unsealed intake data follows its upload's window: an admitted file that no seal ever included expires with its upload at the application deadline (upload ADMITTED → EXPIRED, file revoked INTAKE_EXPIRED, objects deleted); a REJECTED revision expires once every intake window of it closed on the server clock. Sealing moves the data under the retention of the sealed bytes (D-RET-3). | HASHING "Retention formulas" ("abandoned unsealed upload data follows its independent session/inspection cleanup policy rather than waiting forever for a seal"); 09 "Retention schedule" (incomplete upload and quarantine: twenty-four hours from initiation); registry REJECTED retention_expires ("Rejected-input cleanup deadline"). Open question Q-B07-11. |
+| D-RET-2 | RetentionRecord is a platform machine (ACTIVE → EXPIRED, ACTIVE/EXPIRED → DELETING → DELETED or DELETED_WITH_RESIDUALS). SealRevision creates the UNPAID record: hard deadline = the bytes' first seal + 1,209,600 s (fourteen exact days, D-RET-3), effective deadline = the hard deadline until the audit package sets the soft deadline (only earlier). The hard deadline never moves; a record expires no earlier than its effective deadline, at the server's transaction time; a sealed revision expires only when no governing record is ACTIVE with a later effective deadline than the server clock. | 09 "Retention schedule" (unpaid audit sources: seven days after DRAFT_READY or terminal failure, no later than fourteen days from sealing); registry RetentionRecord ("The effective deadline is a minimum of named anchors; retries do not extend it"); policy `retention.unpaidDaysHardFromSeal`, `retention.extendHardCap = false`; HASHING (a day is an exact 86,400-second duration). |
+| D-RET-3 | The unpaid hard cap belongs to the bytes, not to each seal: the UNPAID record of a seal is anchored on the REVISION_SEALED anchor of the first seal that ever included any of its included files (this seal for new bytes, an earlier revision's for reused ones), with hard deadline = that first seal + fourteen days — checked at COMMIT (`dataset_revisions_sealed_subject`). A seal whose bytes' window already closed is refused (the record would be born expired): reuse after the window needs a new upload. The retention sweeper revokes the admission of a sealed file once no including revision holds an ACTIVE record ahead (RETENTION_EXPIRED), so a SUPERSEDED revision, which never expires itself, does not keep the bytes admitted and reusable. (B07-F5.) | 09 "Retention schedule" (no later than fourteen days from sealing); 09 "Quotes, reuploads and retention" (a new revision is "a new authority chain, not restoration"; extensions "never beyond the original hard cap"); HASHING "Retention formulas" ("Extensions never ... revive an expired source or reset a hard clock"); registry previously_admitted_inputs_selected ("immutable generations still exist"). Open question Q-B07-20. |
+| D-ANCH-1 | Retention anchor kinds are rows of `kauro.retention_anchor_kinds` (a table, not a CHECK list), so later packages add AUDIT_READY, CAPTURE_CONFIRMED, … without rewriting 0012 — the pattern of the foundation's aggregate-kind registry. | 07 "Outbox, inbox and event ordering" (registered vocabularies); FOUNDATION-aggregate-kinds.md D-AGGK-1. |
+| D-ANCH-2 | Retention evidence is written by its producer and bound to the transition it records: the request handlers write UPLOAD_INITIATED, INTAKE_CANCELLED and REVISION_SEALED; the control plane INPUT_ADMITTED, INTAKE_REJECTED and INTAKE_EXPIRED (row policies per role and kind). An anchor records the server's transaction time and, at COMMIT, its subject must have taken that transition in the same transaction (the stamp equals the anchor's instant; `retention_anchors_bound`). The request handlers insert only the UNPAID record of the seal they commit — no soft deadline, effective = hard = a REVISION_SEALED anchor of the project + fourteen days, for a revision whose own seal anchor is this transaction's; every other class belongs to its producer (the audit, payment, delivery and deletion packages). (B07-F3.) | B06 D-EVID-1 (evidence is written by its producer, never by the request handlers whose gate it satisfies); policy `retention.extendHardCap = false`; 09 "Retention schedule"; HASHING "Retention formulas". |
+| D-HASH-1 | The manifest hash is exactly HASHING's KAURO_SOURCE_REVISION_V1 preimage (amendment A2 of KAVO_SOURCE_REVISION_V1): the ordered accepted files (ids, generations, hashes, lengths), the table selection, the parser profile and the projection — no revision id, no population, no mutable upload state; `sealed_manifests.manifest` admits exactly these four members (CHECK). Two seals of identical bytes still have distinct manifest hashes, as B06's unique source hash requires, because the projection carries the ProjectionIds each seal mints (SourceLocator.projectionId). (B07-F12; replaces the former revision-bound preimage.) | HASHING "Hash domain separation" (exact payload and excluded envelope); BRAND_AMENDMENT_A2 rule 2 (one-to-one rename, same semantics); registry SourceLocator.projectionId ("Declared object projection within the physical row"). Open question Q-B07-18. |
 | D-HASH-2 | Platform digest domains for what the authority names no domain for, in the same `{domain, version, payload}` wrapper: KAURO_SOURCE_SELECTION_V1, KAURO_SOURCE_PROJECTION_V1, KAURO_SOURCE_INVENTORY_V1, KAURO_SOURCE_TABLE_V1, KAURO_PARSER_PROFILE_V1. | HASHING (every structured digest uses a named domain and version); B06 D-IDEM-1 (KAURO_COMMAND_REQUEST_V1). |
-| D-HASH-3 | Evidence digests: KAURO_INSPECTION_RECEIPT_V1, KAURO_SELECTION_EVALUATION_V1, KAURO_RETENTION_ANCHOR_V1, KAURO_AUTHORITY_TOMBSTONE_V1. | as D-HASH-2. |
-| D-SCAN-1 | The scan state is derived by the domain (`evaluateScanCoverage`) from what the scanner reports per expected part — the container and every allowed part the bounded preflight expanded, with their verified lengths; the engine's exit code and verdict are recorded as evidence and never decide. COVERED_CLEAN needs every expected part and byte scanned (at least one part) by a pinned configuration with fresh signatures published before the scan; a skip, a short read, a limit or a timeout is NOT_SCANNED (INCOMPLETE_SCAN), a detection BLOCKED. The database repeats the rule (`inspection_receipts_clean_means_covered`). | 09 "Scanner coverage" (a zero exit code alone is not admission evidence; expected parts and bytes are compared to actual coverage; incomplete coverage is rejection, not "clean with warning"); S054; 21 (a scanner skip labelled clean must be detected). |
-| D-SCAN-2 | Signatures older than 86,400 s at scan time are stale (STALE_SIGNATURES, NOT_SCANNED). | 09 ("stale signatures beyond the recorded policy block new admission"); the registry records no value — open question Q-B07-3. |
-| D-INSP-1 | UPLOAD_INSPECTION runs, under one attempt fence: observe the object (stat) → record the observation → read the exact generation, recomputing SHA-256 → bounded container inspection → scan coverage → promotion (copy with a generation precondition, re-read and compare the digest) → one receipt → admit or reject. | 09 "Completion and inspection", "Scanner coverage", "Accepted immutability and sealing"; 04 inspectContainer. |
+| D-HASH-3 | Evidence digests: KAURO_INSPECTION_RECEIPT_V1, KAURO_SELECTION_EVALUATION_V1, KAURO_RETENTION_ANCHOR_V1 (over the anchor's exact server instant), KAURO_AUTHORITY_TOMBSTONE_V1. | as D-HASH-2. |
+| D-HASH-4 | The sealed subject — the revision, its predecessor, the manifest, projection, selection and evaluation hashes, the frozen populations with the per-table and per-projection counts, the admitting receipts, the uploads inspection rejected and the input envelope — is its own document (`sealed_manifests.subject`) under the platform domain KAURO_SOURCE_SEALED_SUBJECT_V1 (`subject_hash`, unique per agency; served as `sealedSubjectHash`). It binds the manifest to the revision: identical bytes sealed in two revisions are two subjects. (B07-F12.) | 09 "Quotes, reuploads and retention" ("a new authority chain, not restoration"); HASHING "Hash domain separation" (a domain per authority class). |
+| D-SCAN-1 | The scan state is derived by the domain (`evaluateScanCoverage`) from what the scanner reports per expected part — the container at the object's observed length and every allowed part the bounded preflight expanded, with their verified lengths; the engine's exit code and verdict are recorded as evidence and never decide. COVERED_CLEAN needs exactly one CONTAINER part whose length is the observed length, every expected part and byte scanned by a pinned configuration with fresh signatures published before the scan; a skip, a short read, a limit, a timeout or an expected set that is not the object's is NOT_SCANNED (INCOMPLETE_SCAN, CONTAINER_NOT_COVERED), a detection BLOCKED. The database repeats the rule against the receipt's own coverage document (`kauro.scan_coverage_complete`, `inspection_receipts_clean_means_covered`). (B07-F4.) | 09 "Scanner coverage" (a zero exit code alone is not admission evidence; expected parts and bytes are compared to actual coverage; demonstrate coverage for every admitted container; splitting into chunks is not equivalent; incomplete coverage is rejection, not "clean with warning"); S054; 21 (a scanner skip labelled clean must be detected). |
+| D-SCAN-2 | Signatures older than 86,400 s at scan time are stale (STALE_SIGNATURES, NOT_SCANNED). The age is pinned, never chosen per scan: the domain uses `SIGNATURE_MAX_AGE_SECONDS`, and the database admits only 86,400 as a receipt's recorded maximum age. (B07-F4.) | 09 ("stale signatures beyond the recorded policy block new admission"); the registry records no value — open question Q-B07-3. |
+| D-INSP-1 | UPLOAD_INSPECTION runs, under one attempt fence: observe the object (stat) → record the observation → read the exact generation, recomputing SHA-256 → bounded container inspection (D-ISO-1) → scan coverage → promotion (copy with a generation precondition, re-read and compare the digest) → one receipt → admit or reject. It never moves the revision (D-INTAKE-1). | 09 "Completion and inspection", "Scanner coverage", "Accepted immutability and sealing"; 04 inspectContainer. |
 | D-INSP-2 | The inspection fence: an attempt claims `inspection_fence + 1` while the upload is VERIFYING; a receipt is accepted only from the current attempt of a VERIFYING upload and only if it describes the recorded observation (KA071, KA072); one receipt per attempt. A cancellation that won the upload row leaves a stale attempt nothing to attach. | catalogue CMD015 ("cancellation remains valid while verification races"; "late finalization cannot resurrect the cancelled file"); 07 "Job and attempt states" (fences). |
 | D-INSP-3 | Rejection classes: the nine of 09 (UNSUPPORTED_FORMAT, CORRUPT_STRUCTURE, ACTIVE_CONTENT, DETECTED_MALWARE, INCOMPLETE_SCAN, STALE_SIGNATURES, RESOURCE_LIMIT, TRANSIENT_INFRASTRUCTURE, CANCELLED_AUTHORITY) plus FORMAT_MISMATCH, CLAIM_MISMATCH, SIZE_EXCEEDS_RESERVATION, EMPTY_OBJECT and PROMOTION_UNVERIFIED. Only TRANSIENT_INFRASTRUCTURE retries, inside the deadline. | 09 "Completion and inspection" (the precise classes; only genuinely transient failures retry within the original deadline). |
-| D-RESTORE-1 | Terminal authority facts (upload acceptance revoked, revision cancelled, superseded, expired, deleted) are appended as minimal tombstones to an external journal (`AuthorityJournalPort`, idempotent by event) by the AUTHORITY_JOURNAL consumer; restore reconciliation applies them in sequence order before traffic resumes. | 09 "Deletion receipts and restoration" (tombstones survive separately; restoration applies them first); 14 (restore). |
+| D-ISO-1 | The container inspection runs isolated, with observers that work on every verify host: `@kauro/data-plane` starts a child process under the Node permission model (`node --permission`, `--allow-fs-read` = the attempt input and the inspector's code, `--allow-fs-write` = the attempt scratch; no child processes, workers, addons or WASI), so any write outside the scratch is refused by Node (ERR_ACCESS_DENIED) and counted; a preload module replaces every network entry point (net/tls connections, dgram, dns, http(s), fetch, WebSocket) by a recording refusal, because Node 24's permission model does not govern the network. The result carries `InspectionIsolation` (outside-write, network and process attempts, bytes decompressed). The tests prove the observers with negative controls: a probe that writes outside the scratch is refused and counted, a probe that connects is recorded and refused. The OS-level egress denial of the worker host (network namespace, firewall) is not observable on the Windows verify host and is LATER: B15 (EXECUTED_PROVIDER); nothing here claims it. (B07-F6.) | S024 ("Reject without outside writes, network access or unbounded decompression"); 09 "Scanner coverage" (restricted environment without customer-triggered network fetching); 09 "Derived data and worker scratch" (each attempt owns a scratch; cleanup targets only that scope); 21 evidence rule (independent truth, meaningful negative control). |
+| D-RESTORE-1 | Terminal authority facts — upload acceptance revoked (cancelled, expired, rejected), revision cancelled, superseded, rejected, expired, deleted — are appended as minimal tombstones to an external journal (`AuthorityJournalPort`, idempotent by event) by the AUTHORITY_JOURNAL consumer, one closed kind and terminal state per routed event (`AUTHORITY_TOMBSTONES`, tested equal to the routing); restore reconciliation applies them in sequence order before traffic resumes. (B07-F8.) | 09 "Deletion receipts and restoration" (tombstones survive separately; restoration applies them first; must not re-enable deleted data); 14 (restore); registry SEALED → EXPIRED effect ("Revoke reads/execution"). |
 | D-SRC-1 | CMD013 requires an ACTIVE agency, an OPEN project and the project's mode still offered; CMD012 requires the agency DRAFT or ACTIVE and the project OPEN. | B06 D-CMD-2 ("uploads and execution require ACTIVE"); 07 (DRAFT permits no customer-data execution); 09 "Upload reservation" (checks project capability). Open question Q-B07-16. |
 | D-SRC-2 | CompleteUpload and CancelUpload act only on the caller's own upload (UPLOAD_NOT_OWNED otherwise); an abandoned upload of another member is tombstoned by the deadline sweeper. CMD012 cancels a replaced revision's uploads whoever requested them. | catalogue CMD014 ("the upload belongs to the caller"), CMD015 ("the operation belongs to the caller"). Open question Q-B07-6. |
 | D-SAPI-1 | The source reads (revision, inspection, uploads, upload, selection manifest, preview) need a live ACTIVE membership in the selected agency (AGENCY_READER); the selection intake and the session read follow the commands' role (AGENCY_OPERATOR); every route is scope AGENCY_HEADER (B06 D-SCOPE-1). | 10 "Upload and target routes"; B06 D-READ-1, D-AUTHZ-1. |
@@ -71,7 +85,8 @@ the decision states its rationale and §14 lists the question for the authority.
 | D-SAPI-5 | CompleteUpload is idempotent by upload and claim: the same claim on a VERIFYING upload answers the same 202 without a new effect; another claim is COMPLETION_CLAIM_CONFLICT. | 09 ("CompleteUpload is idempotent by upload ID and observed generation"; duplicate completion is a qualification case). |
 | D-SAPI-6 | Until an object-storage adapter is bound, a command that needs it answers INTEGRITY_FAILURE / SOURCE_SERVICES_UNAVAILABLE; a deployment binds no fake. | 21 "Evidence classes" (a contract fake is SIMULATED, never EXECUTED_PROVIDER); B06 I-INT-2. |
 | D-SAPI-7 | The preview route returns at most 20 rows of at most 50 columns, each cell at most 200 characters of decoded text the UI escapes, only to the agency's members, never cached (Cache-Control no-store, B06 E-CACHE-1) or logged. | 10 "Upload and target routes" (a bounded authorized sample with safe display escaping and no shared caching). Open question Q-B07-9. |
-| D-EXP-1 | Nothing expires early: an upload expires no earlier than its application deadline (`upload_sessions_expiry_not_early`), a retention record no earlier than its effective deadline (`retention_records_expiry_not_early`); a CHECK never passes on a missing member (every B07 CHECK is written NULL-safe; tests prove the refusals). | 09 "Upload reservation" (twenty-four hours from initiation); registry RetentionRecord; 07 (application checks cannot be the sole protection). |
+| D-API-1 | The specified B07 routes are documented now, as `x-kauro-planned` operations of `apps/api/openapi.json` (keyed "METHOD path") generated from the same request schemas, planned reply envelopes (`buildSourceResponseSchemas`) and outcome catalogues; the check refuses a planned route that is registered or also served, a repeated operationId and a forbidden member, and a specified route missing from the document fails the generated-document comparison. B09 plans its payment routes with the same mechanism (one copy at integration, §17). The sweepers of §12.5 are one list in the contracts (`SOURCE_SWEEPERS`), tested equal to §12.5. (B07-F13.) | 10 "OpenAPI is generated from the owning contract registry and checked against actual routes" (a planned route is not an actual route); engineering rules (the openapi and matrix checks in verify cover the new routes); D-OBJ-2 (LOCATION_POLICY is load-bearing). |
+| D-EXP-1 | Nothing expires early, on the server clock (D-CLOCK-1): an upload expires no earlier than its application deadline, a retention record no earlier than its effective deadline, a revision only when no governing record is ahead, an intake revocation only after its window closed; a CHECK never passes on a missing member (every B07 CHECK is written NULL-safe; tests prove the refusals). | 09 "Upload reservation" (twenty-four hours from initiation); registry RetentionRecord; 07 (application checks cannot be the sole protection). |
 
 ## 2. Packages and ports
 
@@ -79,11 +94,12 @@ Dependencies flow as in B06 (contracts → domain ports → application → adap
 
 ```
 @kauro/domain        model/source/{ids, records, machines, policy, selection, scan-coverage, digests, retention, object-names}
-                     ports/source-store (SourceUnitOfWorkFactory.runSource and the source repositories)
+                     ports/source-store (SourceUnitOfWorkFactory.runSource, the source repositories, and the read ports
+                     SourceAvailabilityReader and RevisionLineageReader the commercial packages consume)
 @kauro/application   sources/{contracts, request-schemas, views, response-views, outcomes, pipeline-contracts}
-                     ports/source-providers (ObjectStoragePort, MalwareScannerPort, ContainerInspectorPort, SelectionEvaluatorPort,
-                     SessionVaultPort, AuthorityJournalPort, CommercialScopeInspector)
-@kauro/persistence   migrations/0008..0011, sqlstate (KA070..KA072), testing/source-lifecycle (the shared fixture)
+                     ports/source-providers (ObjectStoragePort, MalwareScannerPort, ContainerInspectorPort with InspectionIsolation,
+                     SelectionEvaluatorPort, SessionVaultPort, AuthorityJournalPort with AUTHORITY_TOMBSTONES, CommercialScopeInspector)
+@kauro/persistence   migrations/0009..0012, sqlstate (KA070..KA072), testing/{temporary-postgres (the TEST CLOCK), source-lifecycle}
 ```
 
 External providers — object storage, the malware scanner, the key service that seals session references, the external authority
@@ -91,48 +107,53 @@ journal — are reached only through `@kauro/application` ports. Until the integ
 bind contract-faithful fakes that report `evidenceClass: "SIMULATED"` and carry `contract-fake-*` provider tokens in every record
 they produce (21 "Evidence classes"); they are never counted as real integration. The container inspector and the selection
 evaluator are not providers: they are the platform's own bounded parsers (`@kauro/data-plane`), always real in tests — S024 is
-decided by them.
+decided by them, isolated as D-ISO-1 describes.
 
-`SourceUnitOfWork` is the B06 `UnitOfWork` plus `sources: SourceStore`; the factory gains `runSource` next to `run`, so every B06
-handler and adapter compiles untouched; at integration `sources` folds into the unit of work.
+`SourceUnitOfWork` is the B06 `UnitOfWork` plus `sources: SourceStore` and `serverInstant()` (the database's transaction time,
+exact to the microsecond, D-CLOCK-1); the factory gains `runSource` next to `run`, so every B06 handler and adapter compiles
+untouched; at integration `sources` folds into the unit of work. The ports take no caller instant for anything a deadline depends
+on: the adapter writes `kauro.server_now()` in SQL and returns the stored value.
 
 ## 3. Aggregates, contracts and tables
 
 Schema `kauro`, PostgreSQL 17, the B06 conventions: `agency_id` on every tenant row; composite foreign keys bind tenant, project
-and revision; uniqueness includes scope; server ids are UUIDv7 (CHECK); instants are `timestamptz`; byte counts and populations
-BIGINT (B07 stores no money; B06's BIGINT minor units apply to the packages that do); JSONB only
-for closed-schema documents (selection manifests, evaluations' per-file/table/projection facts, sealed manifests, coverage and
-problem lists); every aggregate carries `version` (D-VER-1) and every version its event (D-EVT-1).
+and revision; uniqueness includes scope; server ids are UUIDv7 (CHECK); instants are `timestamptz`, the lifecycle ones the
+server's (D-CLOCK-1); byte counts and populations BIGINT (B07 stores no money); JSONB only for closed-schema documents (selection
+manifests, evaluations' per-file/table/projection facts, the sealed manifest and subject, coverage and problem lists); every
+aggregate carries `version` (D-VER-1) and every version its event (D-EVT-1); B07's aggregate kinds are rows of the foundation
+registry (D-KIND-1).
 
 ### 3.1 Tables
 
 | table (migration) | aggregate / contract | key columns and constraints | RLS |
 |---|---|---|---|
-| `aggregate_kinds` (0008) | registered aggregate kinds (D-MIG-1) | PK kind; FK from `domain_events.aggregate_kind` | read for app and control |
-| `dataset_revisions` (+ 0008) | DatasetRevision lifecycle and lineage | B06 identity plus selection (manifest id, hash, inventory hash, time — all or none), evaluation id/hash and the four populations (all or none; billable ≤ logical), sealed counts, successor, terminal instants and reason; READY_TO_SEAL and later need selection, evaluation and counts; SEALED/SUPERSEDED need sealed counts; `(agency, project, revision)` and `(agency, revision, supersedes)` unique; lineage in project, successor FK (deferred), one mutable per project, supersedes once; the lifecycle guard (0010) and the deferred sealed-subject and closed-without-live-uploads checks | B06 tenant; restrictive tenant target states (D-ROLE-2); control read (bound or discovery) and update of its target states and columns |
-| `stored_objects` (0008) | object registry, StoredObject (D-OBJ-1) | UUIDv7 PK; zone, data class (RAW, DERIVED, RESIDUAL), provider token, location key, opaque name (`kauro.is_object_name`, zone and agency bound: `stored_objects_name_scope`), generation (set once), bytes, sha256, state, late (RESIDUAL for good), creator (membership or service), observation/verification/deletion stamps, deletion result (never a failure recorded as a deletion), attempts (never decrease), provider residual and its basis (D-OBJ-2); a provider generation registered once; one open intent per name; FKs to project, revision, upload (deferred), file (deferred) | tenant read; tenant insert of exactly the CMD013 quarantine intent; control read, insert (SERVICE), update — bound |
-| `storage_location_policies` (0008) | retention read-back (D-OBJ-2) | provider, location, soft-delete retention seconds, versioning, evidence hash and class, observed at; append-only | control only |
-| `revision_quota`, `upload_capacity` (0008) | quota ledgers (D-UP-2, D-UP-3) | bytes 0..5e9 and files 0..50 per revision; sessions 0..limit per agency, limit default 2; deferred ledger checks (KA070) | tenant and control, bound; the limit is the control plane's column |
-| `upload_sessions` (0008) | UploadSession (D-UP-1) | UUIDv7 PK; revision and project scope; display name (label), declared format, reserved bytes 1..2e9, quarantine object, requester (membership and user), application deadline (exactly creation + 86,400 s, deferred check with the anchor), issuance fence, session stamps and digest, provider cancellation state (forward only) and time, completion claim (set only by the report), observation (set once), inspection fence (forward only, only while VERIFYING), receipt hash and file (set once), terminal instants and reason; no early expiry; the revision-accepts-uploads trigger (revision row lock, DRAFT/UPLOADING only, KA072); quota trigger; initial-state, listed-transition, version and event triggers | tenant (column grants, D-ROLE-2) with restrictive target states; control read of non-text columns and update of its columns, bound |
-| `upload_session_secrets` (0008) | sealed session reference (D-SESSION-1) | PK upload; FK `(agency, upload, requester)`; key reference, 12-byte nonce, ciphertext; never updated | requester insert and read (UPLOADING and unexpired only); control read and delete, bound |
-| `inspection_receipts` (0009) | one completed inspection attempt | receipt hash; fence ≥ 1 (one per attempt); observation (must equal the upload's), sha256, claim digest and consistency, declared/detected format, structure status, scan state, semantic status (always SEMANTIC_NOT_YET_PROFILED), scanner engine/version/signatures/config/exit code/verdict (evidence), expected and scanned parts and bytes, coverage and problems (digests and tokens), parser profile hash, outcome and rejection class, accepted object/generation/digest; CHECKs: clean means covered, admission needs every separate result, rejections classified, BLOCKED iff detection, incomplete/stale is NOT_SCANNED; append-only; the current-attempt trigger (KA071, KA072) | tenant read; control insert and read, bound |
-| `source_files` (0009) | FileManifest, SourceFile (D-FILE-1) | UUIDv7 PK; one per upload; accepted object, generation, sha256, bytes 1..2e9, format, scan state, parser profile, receipt; admitted ⇔ ADMITTED; composite key to the receipt's promoted generation, digest and length; born admitted only while the upload is VERIFYING; revocation guard (file transition lock) | tenant read; control insert, read, update of the revocation columns |
-| `source_tables`, `source_table_columns` (0009) | detected inventory | table (file, ordinal), kind, name display (label or NULL) and digest, visibility, columns, row estimate, formulas and cache state, merged/hidden counts, issue codes, structure hash; column ordinal, label display and digest, label state; append-only | tenant read; control insert, reads without the display text |
-| `selection_manifests` (0010) | the selection document (D-SEL-1) | UUIDv7 PK; body (closed, ≤ 512 KiB) naming its revision, schema version, inventory hash and files (NULL-safe CHECK); body hash; unique per (revision, body hash); creator membership; append-only | tenant read; insert by the session's own ACTIVE membership; control read, bound |
-| `selection_evaluations` (0010) | one counting pass | result COMPLETE (every count, 1..50 files, 1..5e9 bytes, edges ≤ 5e6, no failures), ADMISSION_FAILED or ERROR (failures explained, no counts); per-file generations, per-table and per-projection facts; FK to its manifest; append-only | tenant read; control insert and read |
-| `sealed_manifests`, `sealed_revision_files` (0010) | the sealed subject | manifest document (names its revision), manifest, projection, selection and evaluation hashes, sealed at; file set: ordinal, disposition and exclusion reason, the exact generation/digest/length of a file of the same project (FK); admitted-at-seal trigger (file transition lock); append-only | tenant read and insert; control read |
-| `retention_anchor_kinds`, `retention_anchors` (0011) | anchor facts | kinds registered (D-MIG-1); anchor: revision scope, upload for intake kinds and none for REVISION_SEALED, occurred at, evidence hash; once per (upload, kind) and per (revision, kind); append-only | tenant read and insert; control read and insert, bound |
-| `retention_records` (0011) | RetentionRecord (D-RET-2) | class (registry enum), anchor and its evidence hash (FK), soft/hard/effective deadlines (effective = minimum), policy version, provider residuals, state, expiry (never early); one per (revision, class); hard deadline, anchor, class immutable | tenant read and insert; control read and the expiry update, bound |
+| `aggregate_kinds` (0008, foundation) | registered aggregate kinds | B07 inserts `upload_session`, `source_file`, `retention_record` (owner B07) | foundation's; B07 adds `aggregate_kinds_read_b07_control` (control plane reads, it appends events) |
+| `dataset_revisions` (+ 0009) | DatasetRevision lifecycle and lineage | B06 identity plus selection (manifest id, hash, inventory hash, time — all or none), evaluation id/hash and the four populations (all or none; billable ≤ logical), sealed counts, successor, terminal instants and reason; READY_TO_SEAL and later need selection, evaluation and counts; SEALED/SUPERSEDED need sealed counts; `(agency, project, revision)` and `(agency, revision, supersedes)` unique; lineage in project, successor FK (deferred), one mutable per project, supersedes once; the lifecycle guard (0011: server clock, the explicit intake closure, the inventory comparison) and the deferred sealed-subject and closed-without-live-uploads checks | B06 tenant; restrictive tenant target states (D-ROLE-2); control read (bound or discovery) and update of READY_TO_SEAL, REJECTED, EXPIRED and its columns |
+| `stored_objects` (0009) | object registry, StoredObject (D-OBJ-1, D-OBJ-3: not an aggregate) | UUIDv7 PK; zone, data class (RAW, DERIVED, RESIDUAL), provider token, location key, opaque name (`kauro.is_object_name`, zone and agency bound), generation (set once), bytes, sha256, state, late (RESIDUAL for good), creator, observation/verification/deletion stamps, deletion result (never a failure recorded as a deletion), attempts (never decrease), provider residual and its basis (D-OBJ-2), the deletion at the server's time; a provider generation registered once; one open intent per name; FKs to project, revision, upload (deferred), file (deferred) | tenant read; tenant insert of exactly the CMD013 quarantine intent; control read, insert (SERVICE), update — bound |
+| `storage_location_policies` (0009) | retention read-back (D-OBJ-2) | provider, location, soft-delete retention seconds, versioning, evidence hash and class, observed at; append-only | control only |
+| `revision_quota`, `upload_capacity` (0009) | quota ledgers (D-UP-2, D-UP-3) | bytes 0..5e9 and files 0..50 per revision; sessions 0..limit per agency, limit default 2; deferred ledger checks (KA070), queued only by a holding change, one snapshot | tenant and control, bound; the limit is the control plane's column |
+| `upload_sessions` (0009) | UploadSession (D-UP-1) | UUIDv7 PK; revision and project scope; display name (label), declared format, reserved bytes 1..2e9, quarantine object, requester (membership and user), application deadline (exactly creation + 86,400 s, creation the server's time), issuance fence, session stamps and digest, provider cancellation state (forward only) and time, completion claim (set only by the report), observation (set once), inspection fence (forward only, only while VERIFYING), receipt hash and file (set once), terminal instants and reason; the server clock and the deadline window (`upload_sessions_window_clock`); the revision-accepts-uploads trigger (revision row lock, DRAFT/UPLOADING only, KA072); quota trigger; initial-state, listed-transition, version and event triggers; aggregate kind `upload_session` | tenant (column grants, D-ROLE-2) with restrictive target states; control read of non-text columns and update of its columns, bound |
+| `upload_session_secrets` (0009) | sealed session reference (D-SESSION-1) | PK upload; FK `(agency, upload, requester)`; key reference, 12-byte nonce, ciphertext; never updated | requester insert and read (UPLOADING and unexpired on the server clock only); control read and delete, bound |
+| `inspection_receipts` (0010) | one completed inspection attempt | receipt hash; fence ≥ 1 (one per attempt); observation (must equal the upload's), sha256, claim digest and consistency, declared/detected format, structure status, scan state, semantic status (always SEMANTIC_NOT_YET_PROFILED), scanner engine/version/signatures/config/exit code/verdict (evidence), the pinned signature age (= 86,400), expected and scanned parts and bytes, coverage and problems (digests and tokens), parser profile hash, outcome and rejection class, accepted object/generation/digest; CHECKs: clean means the object covered (`kauro.scan_coverage_complete`), admission needs every separate result, rejections classified, BLOCKED iff detection, incomplete/stale is NOT_SCANNED; append-only; the current-attempt trigger (KA071, KA072) | tenant read; control insert and read, bound |
+| `source_files` (0010) | FileManifest, SourceFile (D-FILE-1, D-FILE-2) | UUIDv7 PK; version (an aggregate, kind `source_file`, event per version); one per upload; accepted object, generation, sha256, bytes 1..2e9, format, scan state, parser profile, receipt; admitted ⇔ ADMITTED; composite key to the receipt's promoted generation, digest and length; born admitted, at the server's time, only while the upload is VERIFYING; revocation guard (file transition lock; INTAKE_EXPIRED, RETENTION_EXPIRED, GENERATION_* rules) | tenant read; control insert, read, update of the revocation columns and version |
+| `source_tables`, `source_table_columns` (0010) | detected inventory | table (file, ordinal), kind, name display (label or NULL) and digest, visibility, columns, row estimate, formulas and cache state, merged/hidden counts, issue codes, structure hash; column ordinal, label display and digest, label state; append-only; appended only while the file's upload is VERIFYING (D-SEL-4) | tenant read; control insert, reads without the display text |
+| `selection_manifests` (0011) | the selection document (D-SEL-1) | UUIDv7 PK; body (closed, ≤ 512 KiB) naming its revision, schema version, inventory hash and files (NULL-safe CHECK); body hash; unique per (revision, body hash); creator membership; append-only | tenant read; insert by the session's own ACTIVE membership; control read, bound |
+| `selection_evaluations` (0011) | one counting pass | result COMPLETE (every count, 1..50 files, 1..5e9 bytes, edges ≤ 5e6, no failures), ADMISSION_FAILED or ERROR (failures explained, no counts); per-file generations, per-table and per-projection facts; FK to its manifest; append-only | tenant read; control insert and read |
+| `sealed_manifests`, `sealed_revision_files` (0011) | the sealed manifest and subject | `manifest` = exactly HASHING's four members (CHECK `sealed_manifests_authority_preimage`), `manifest_hash`; `subject` naming the revision and this row's hashes (CHECK `sealed_manifests_names_revision`), `subject_hash` (unique per agency); projection, selection and evaluation hashes; sealed at; file set: ordinal, disposition and exclusion reason, the exact generation/digest/length of a file of the same project (FK); admitted-at-seal trigger (file transition lock); append-only | tenant read and insert; control read |
+| `retention_anchor_kinds`, `retention_anchors` (0012) | anchor facts | kinds registered (D-ANCH-1); anchor: revision scope, upload for intake kinds and none for REVISION_SEALED, occurred at (the server's time), evidence hash; once per (upload, kind) and per (revision, kind); bound at COMMIT to its transition (D-ANCH-2); append-only | tenant read, tenant insert of UPLOAD_INITIATED, INTAKE_CANCELLED, REVISION_SEALED; control read and insert of INPUT_ADMITTED, INTAKE_REJECTED, INTAKE_EXPIRED, bound |
+| `retention_records` (0012) | RetentionRecord (D-RET-2, D-RET-3) | aggregate kind `retention_record`; class (registry enum), anchor and its evidence hash (FK), soft/hard/effective deadlines (effective = minimum), policy version, provider residuals, state, expiry (at the server's time, never early); one per (revision, class); hard deadline, anchor, class immutable | tenant read and insert of exactly the UNPAID record of its own seal (D-ANCH-2); control read and the expiry update, bound |
 
 ### 3.2 Roles, grants, context
 
 No new runtime role: the source lifecycle runs under the B06 groups. `kauro_app` gains the tenant grants above (never DELETE);
-`kauro_control` gains the source-lifecycle writes of D-CTRL-1/D-CTRL-2 and DELETE on `upload_session_secrets` only (besides
-B06's leases). `kauro_assurance`, `kauro_validator` and `kauro_ingress` gain nothing; provider notifications (a generation or
-metadata event, 09: "a notice to inspect current authority, not an instruction to accept the file") arrive through B06's
-`kauro_ingress` inbox and are handled by UPLOAD_INSPECTION like a reported completion. The whole matrix is pinned in
-`packages/persistence/test/fixtures/runtime-boundary.json`; the B07 diff against B06 changed exactly one B06 entry
-(`kauro_control` on `kauro.domain_events`: SELECT → INSERT, SELECT, D-CTRL-2) and added the B07 tables, column grants and policies.
+`kauro_control` gains the source-lifecycle writes of D-CTRL-1/D-CTRL-2, SELECT on the aggregate-kind registry with its own read
+policy (D-KIND-1), and DELETE on `upload_session_secrets` only (besides B06's leases). `kauro_assurance`, `kauro_validator` and
+`kauro_ingress` gain nothing; provider notifications (a generation or metadata event, 09: "a notice to inspect current authority,
+not an instruction to accept the file") arrive through B06's `kauro_ingress` inbox and are handled by UPLOAD_INSPECTION like a
+reported completion. The whole matrix is pinned in `packages/persistence/test/fixtures/runtime-boundary.json`; against the
+foundation it changes exactly one B06 entry (`kauro_control` on `kauro.domain_events`: SELECT → INSERT, SELECT, D-CTRL-2) and
+adds the B07 tables, column grants and policies and `aggregate_kinds_read_b07_control`; this revision's diff against `bfac6b1`
+was reviewed entry by entry (§16).
 
 Context binding is B06's (`set_config(..., true)` inside the transaction). A SYSTEM unit of work of the control plane binds
 `kauro.agency_id` to the work item's agency and no user (D-CTRL-1); `SystemContext` carries the agency.
@@ -149,7 +170,7 @@ Context binding is B06's (`set_config(..., true)` inside the transaction). A SYS
 | `dataset_revisions_one_mutable_per_project`, `dataset_revisions_supersedes_once` | PRECONDITION_FAILED / REVISION_NOT_MUTABLE, PREDECESSOR_NOT_CURRENT |
 | KA070 | INTEGRITY_FAILURE / QUOTA_LEDGER |
 | KA071 | PRECONDITION_FAILED / FENCE_DISCIPLINE (a handler that checked its fence never meets it; the control plane treats it as "the attempt lost": DONE) |
-| KA072 | INTEGRITY_FAILURE / LIFECYCLE_BINDING_MISSING (a handler that checked its preconditions first never meets it) |
+| KA072 | INTEGRITY_FAILURE / LIFECYCLE_BINDING_MISSING (a handler that checked its preconditions first and writes the server's instants never meets it; a request that raced a deadline on the server clock is answered with the command's own precondition reason — RESERVATION_EXPIRED — when the handler re-reads the upload) |
 
 ## 4. State machines
 
@@ -160,38 +181,44 @@ with the command or control-plane owner that performs it and its event.
 
 - **DatasetRevision** (registry machine, initial DRAFT; B06 seeds the edges). What each target state requires is checked by
   `dataset_revisions_lifecycle_guard` after the revision's transition lock (D-LOCK-1): upload_reserved needs the reservation in the
-  same unit of work; all_uploads_completed needs no reservation or session open and every reported completion observed, with one
-  observed input; previously_admitted_inputs_selected and selection_changes need a new selection; all_selected_inputs_admitted needs
-  a complete evaluation of the bound selection, no upload in flight and every included file admitted in the project and counted at
-  its exact generation, digest and length; fatal_input_rejection needs the failed evaluation of the bound selection; seal_command
-  needs the manifest of exactly the scope READY_TO_SEAL exposed and no upload in flight, and at COMMIT the sealed manifest, the file
-  set equal to the selection's dispositions with the frozen counts, and the UNPAID record anchored on the seal
-  (`dataset_revisions_sealed_subject`); retention_expires needs every governing deadline reached (SEALED) or every intake window
-  closed (REJECTED); every closing edge needs, at COMMIT, no upload in flight. A sealed subject never changes (KA004).
-- **UploadSession** (D-UP-1), **StoredObject** (D-OBJ-1), **SourceFile** (D-FILE-1), **RetentionRecord** (D-RET-2): platform
-  machines of `@kauro/domain` (`SOURCE_LIFECYCLE_STATE_MACHINES`) in the registry's shape and unlisted-transition policy.
+  same unit of work; all_uploads_completed needs the agency's selection bound in the same update, with no reservation, session or
+  verification open and the manifest matching the inventory (D-INTAKE-1, D-SEL-4) — nothing else takes it; previously_admitted_inputs_selected
+  and selection_changes need a new selection; all_selected_inputs_admitted needs a complete evaluation of the bound selection, no
+  upload in flight and every included file admitted in the project and counted at its exact generation, digest and length;
+  fatal_input_rejection needs the failed evaluation of the bound selection; seal_command needs the manifest of exactly the scope
+  READY_TO_SEAL exposed and no upload in flight, and at COMMIT the sealed manifest and subject, the file set equal to the
+  selection's dispositions with the frozen counts, the seal's own anchor and the UNPAID record of the bytes' first seal
+  (`dataset_revisions_sealed_subject`); retention_expires needs every governing deadline reached on the server clock (SEALED) or
+  every intake window closed (REJECTED); every closing edge needs, at COMMIT, no upload in flight. Every lifecycle instant is the
+  server's (D-CLOCK-1). A sealed subject never changes (KA004).
+- **UploadSession** (D-UP-1), **StoredObject** (D-OBJ-1), **SourceFile** (D-FILE-1, D-FILE-2), **RetentionRecord** (D-RET-2):
+  platform machines of `@kauro/domain` (`SOURCE_LIFECYCLE_STATE_MACHINES`) in the registry's shape and unlisted-transition policy.
 
 ## 5. Transaction discipline and lock order
 
-Every command runs B06's pipeline (D-PIPE-1) in READ COMMITTED; CMD013 runs it in two units of work (D-RUN-2). Lock order D-LOCK-1.
-Why READ COMMITTED is enough: every multi-row invariant is closed by a lock, a unique index or a deferred check —
+Every command runs B06's pipeline (D-PIPE-1) in READ COMMITTED; CMD013 runs it in two units of work (D-RUN-2). Lock order
+D-LOCK-1 for the commands and D-LOCK-2 for the control plane. Why READ COMMITTED is enough: every multi-row invariant is closed by
+a lock, a unique index or a deferred check —
 
 | invariant | closed by |
 |---|---|
-| a revision's bytes ≤ 5e9 and files ≤ 50 across concurrent reservations (R2-052) | the revision row lock of the reservation trigger, then the ledger row lock and its CHECK on the committed total; KA070 at COMMIT for any disagreement |
+| a revision's bytes ≤ 5e9 and files ≤ 50 across concurrent reservations (R2-052) | the revision row lock of the reservation trigger, then the ledger row lock and its CHECK on the committed total; KA070 at COMMIT for any disagreement, read in one snapshot and queued only by a holding change (B07-F10) |
 | at most two live sessions per agency | the capacity row lock and its CHECK (RACE test: two reservations for the last slot) |
 | freed quota released exactly once | held bytes are a function of the upload's state; the quota trigger applies deltas under the ledger locks |
-| a late completion never resurrects cancelled data | CANCELLED/EXPIRED/REJECTED are terminal (KA008); a receipt and a file only for the current attempt of a VERIFYING upload (KA071, the upload row lock of the receipt trigger); the claim cannot be recorded on a tombstone (KA004); a late object is RESIDUAL for good |
+| a late completion never resurrects cancelled data | CANCELLED/EXPIRED/REJECTED are terminal (KA008); a receipt and a file only for the current attempt of a VERIFYING upload (KA071, the upload row lock of the receipt trigger); the claim cannot be recorded on a tombstone (KA004); nothing is accepted after the deadline on the server clock (KA072); a late object is RESIDUAL for good |
 | a reservation never enters a revision a concurrent transition is closing or sealing | the revision row lock taken by the reservation trigger and by every transition (D-LOCK-1; RACE test, both interleavings) |
+| the intake closes only by the agency's selection, on a settled inventory | the control plane cannot enter INSPECTING; the guard requires the binding and no live upload after the transition lock; every settle point takes the revision row first (D-INTAKE-1, D-LOCK-2; tests: the three-file intake, the last open upload cancelled, expired or rejected) |
+| a cancellation and an inspection outcome never deadlock | both take the revision row first (D-LOCK-2; RACE test, both interleavings) |
 | a seal never includes a file whose intake expired, and an expiry never revokes a sealed file | the file's transition lock: shared by the seal's file-set insert, exclusive by the revocation, which re-checks after it (RACE test, both interleavings) |
-| a selection binds a settled inventory | the lifecycle guard after the revision's transition lock: no upload in flight, the manifest's inventory hash recorded |
+| a selection binds the current inventory | the lifecycle guard after the revision's transition lock: no upload in flight, the manifest's inventory hash recorded, the manifest's files and tables equal to the detected inventory (D-SEL-4); the inventory of an admitted file never grows |
 | one mutable revision per project; a predecessor replaced once; linear lineage | `dataset_revisions_one_mutable_per_project`, `dataset_revisions_supersedes_once`, the successor FK, CMD012's project CAS |
-| every upload commits with its initiation anchor and a deadline exactly 24 h after it | `upload_sessions_initiation_anchored` (deferred) |
-| every seal commits with its manifest, file set and UNPAID record | `dataset_revisions_sealed_subject` (deferred) |
+| every upload commits with its initiation anchor and a deadline exactly 24 h after it | `upload_sessions_initiation_anchored` (deferred), `upload_sessions_deadline_policy`, the server clock |
+| every anchor is its own transition's, written by its producer | the per-role, per-kind anchor policies and `retention_anchors_bound` (deferred) |
+| every seal commits with its manifest, subject, file set, anchor and the UNPAID record of the bytes | `dataset_revisions_sealed_subject` (deferred) |
 | no revision closes with an upload in flight | `dataset_revisions_closed_without_live_uploads` (deferred) |
 | one receipt per inspection attempt; a fence never moves backwards | `(upload_id, inspection_fence)` unique; `upload_sessions_guard` (KA071) |
 | a provider generation is registered once; one open intent per name | `stored_objects_provider_generation`, `stored_objects_one_intent_per_name` |
-| every version has its event, in its own agency | B06 `require_event_for_version`, `domain_events_bind_aggregate` |
+| every version has its event, in its own agency | B06 `require_event_for_version`, the foundation's `domain_events_bind_aggregate` |
 
 No transaction spans a provider call, a scan or a parse: CMD013's provider call sits between its two units of work; the control
 plane reads, hashes, inspects, scans and promotes outside a transaction and records the result in one unit of work under the
@@ -199,23 +226,27 @@ attempt fence it claimed. A lost response after COMMIT is recovered by the same 
 
 ## 6. Outbox, inbox and consumers
 
-B07 registers 14 event types (0011) and publishes the nine DatasetRevision lifecycle events B06 registered with the machine.
-Payloads are allowlisted (`EVENT_PAYLOAD_ALLOWLIST`): ids, hashes, tokens, counts — never a display name, a worksheet name, a
-label, an object name, a generation or a session reference (domain test). Fan-out (`EVENT_SUBSCRIPTIONS`):
+B07 registers 16 event types (0012) and publishes the DatasetRevision lifecycle events B06 registered with the machine (all but
+`dataset_revision.inspecting.v1`, which no B07 edge publishes since D-INTAKE-1: all_uploads_completed publishes
+`dataset_revision.selection_changed.v1` with `previousState: UPLOADING`). Payloads are allowlisted (`EVENT_PAYLOAD_ALLOWLIST`): ids,
+hashes, tokens, counts — never a display name, a worksheet name, a label, an object name, a generation or a session reference
+(domain test). Fan-out (`EVENT_SUBSCRIPTIONS`):
 
 | event | consumers |
 |---|---|
 | `upload_session.completion_reported.v1` | UPLOAD_INSPECTION |
 | `upload_session.cancelled.v1`, `.expired.v1` | STORAGE_LIFECYCLE, AUTHORITY_JOURNAL |
 | `upload_session.rejected.v1` | STORAGE_LIFECYCLE, AUTHORITY_JOURNAL, NOTIFICATIONS |
+| `source_file.admission_revoked.v1` | EXECUTION_CONTROL (B08), NOTIFICATIONS |
 | `dataset_revision.selection_changed.v1` | SELECTION_EVALUATION |
-| `dataset_revision.ready_to_seal.v1`, `.rejected.v1`, `.sealed.v1` | NOTIFICATIONS |
+| `dataset_revision.ready_to_seal.v1`, `.sealed.v1` | NOTIFICATIONS |
+| `dataset_revision.rejected.v1` | NOTIFICATIONS, AUTHORITY_JOURNAL |
 | `dataset_revision.superseded.v1` | EXECUTION_CONTROL (B08), AUTHORITY_JOURNAL |
 | `dataset_revision.cancelled.v1` | STORAGE_LIFECYCLE, AUTHORITY_JOURNAL |
 | `dataset_revision.expired.v1` | STORAGE_LIFECYCLE, EXECUTION_CONTROL (B08), AUTHORITY_JOURNAL |
 | `dataset_revision.deleted.v1` | AUTHORITY_JOURNAL |
 
-The consumers are control-plane pipelines (§11) dispatched by B06's `PgOutboxDispatchStore` under OUTBOX_DISPATCH leases, at
+The consumers are control-plane pipelines (§12) dispatched by B06's `PgOutboxDispatchStore` under OUTBOX_DISPATCH leases, at
 least once; each is idempotent by its own fences and by the listed transitions (a second delivery finds the state already
 moved and is DONE). Provider notifications enter through B06's inbox (`kauro_ingress`), deduplicated by provider event id, and
 become an inspection of current authority, never an acceptance.
@@ -245,7 +276,7 @@ Steps 1–7 of B06 §6.1 (identity ACTIVE and verified — the launch policy's v
 then the journal, then the command. No B07 command names `assuranceProofRef` (the catalogue carries none), so none takes a
 step-up. A foreign and a nonexistent resource answer alike (NOT_FOUND); every DENY is a durable fact; a session delivery is an
 ALLOW fact (D-SESSION-4). The database repeats the boundary (D-ROLE-2): a request handler that computed an admission, an expiry or
-READY_TO_SEAL cannot commit it.
+READY_TO_SEAL cannot commit it, and no role can back-date an instant (D-CLOCK-1).
 
 ## 9. API routes, DTOs, response schemas and safe errors (10)
 
@@ -259,7 +290,7 @@ READY_TO_SEAL cannot commit it.
 | POST /api/v1/uploads/{uploadId}/cancel | CMD015 CancelUpload | AGENCY_OPERATOR | 200 COMPLETED | CancelUploadView |
 | POST /api/v1/revisions/{revisionId}/selection | CMD016 SelectInputTables | AGENCY_OPERATOR | 200 COMPLETED | SelectInputTablesView |
 | POST /api/v1/revisions/{revisionId}/seal | CMD017 SealRevision | AGENCY_OPERATOR | 200 COMPLETED | SealRevisionView |
-| POST /api/v1/revisions/{revisionId}/selection-manifests | SubmitSelectionManifest (D-SEL-2) | AGENCY_OPERATOR | 201 (200 with `created: false` for a body already stored) | SelectionManifestIntakeView |
+| POST /api/v1/revisions/{revisionId}/selection-manifests | SubmitSelectionManifest (D-SEL-2) | AGENCY_OPERATOR | 201 (200 with `created: false` for a body already stored), STORED envelope | SelectionManifestIntakeView |
 | GET /api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId} | GetSelectionManifest | AGENCY_READER | 200 | SelectionManifestView |
 | GET /api/v1/revisions/{revisionId} | GetRevision | AGENCY_READER | 200 | SourceRevisionView |
 | GET /api/v1/revisions/{revisionId}/inspection | GetInspection | AGENCY_READER | 200 | InspectionView |
@@ -289,10 +320,12 @@ class), UploadPage, ProtectedSessionView (the only view that carries the session
 RevisionQuotaView, ReserveUploadView, RetentionView (RetentionRecord), SourceRevisionView (DatasetRevision — `manifestHash` and
 `projectionHash` withheld because a mutable revision has none and served in `seal`; `scope` and `files` withheld), the inspection
 views (InspectionFileView projects FileManifest — `storageRef` and `providerGeneration` withheld), RevisionImpactView,
-ProjectRevisionPointerView, the four command results, SelectionManifestIntakeView, SelectionManifestView and TablePreviewView.
-Every view is closed; every registry member of a projected contract is selected or withheld with its reason; the test builds and
-compiles them with the strict validator and validates samples. Views carry `permittedActions` over the six B07 operations
-(informative, never authority).
+ProjectRevisionPointerView, the four command results (SealRevisionView carries `manifestHash`, `projectionHash` and
+`sealedSubjectHash`), SelectionManifestIntakeView, SelectionManifestView and TablePreviewView. Every view is closed; every registry
+member of a projected contract is selected or withheld with its reason; the test builds and compiles them with the strict
+validator and validates samples. Views carry `permittedActions` over the six B07 operations (informative, never authority). The
+planned reply envelopes (`buildSourceResponseSchemas`): a COMPLETED envelope per command but CMD014 (B06's ACCEPTED), a READ
+envelope per read, a STORED envelope for the selection manifest intake.
 
 ### 9.4 Safe errors
 
@@ -304,32 +337,38 @@ existence.
 
 ### 9.5 OpenAPI
 
-`tools/openapi.mjs` documents exactly the routes the api registers, from the objects its validator compiles; the B07 routes join
-the document when mandate B07-COMMANDS registers them (their request schemas, response views and outcome catalogues are the ones
-above, joined to `COMMAND_RESPONSES`, `VIEW_DEFINITIONS`, `COMMAND_OUTCOMES` and `READ_OUTCOMES`), and the check then fails on any
-B07 route left undocumented. The matrix already covers the B07 machines, commands and routes (verify).
+`tools/openapi.mjs` documents the routes the api registers under `paths` and every specified B07 route under `x-kauro-planned`
+(D-API-1), both from the objects the validator compiles: request schemas, the planned reply envelopes and views, the outcome
+catalogues per status, role, scope, idempotency, gate and cases. The check refuses a planned route that is registered or also
+served, a repeated operationId and a forbidden member; a specified route missing from the document fails the generated-document
+comparison. When mandate B07-COMMANDS registers a route, its views join `VIEW_DEFINITIONS`, its replies `COMMAND_RESPONSES` /
+`READ_RESPONSES`, its catalogue `COMMAND_OUTCOMES` / `READ_OUTCOMES`, and it moves from `x-kauro-planned` to `paths`. The matrix
+already covers the B07 machines, commands and routes (verify).
 
 ## 10. Deadlines and retention anchors
 
-| anchor | written with | deadline it governs |
+| anchor | written with (producer) | deadline it governs |
 |---|---|---|
-| UPLOAD_INITIATED | CMD013's reservation, at `created_at` (deferred check) | the application deadline, exactly 86,400 s later (quarantine and incomplete upload) |
-| INPUT_ADMITTED | the admission | — (evidence; the file follows its upload's window until sealed) |
-| INTAKE_CANCELLED / INTAKE_REJECTED / INTAKE_EXPIRED | the tombstone of the upload | cleanup of its quarantine and accepted objects |
-| REVISION_SEALED | CMD017, at `sealed_at` | the UNPAID record: hard deadline sealed_at + 14 × 86,400 s |
+| UPLOAD_INITIATED | CMD013's reservation (request handler), at the upload's `created_at` | the application deadline, exactly 86,400 s later (quarantine and incomplete upload) |
+| INPUT_ADMITTED | the admission (control plane) | — (evidence; the file follows its upload's window until sealed) |
+| INTAKE_CANCELLED | the cancellation (request handler: CMD015, CMD012) | cleanup of its quarantine objects |
+| INTAKE_REJECTED / INTAKE_EXPIRED | the rejection / the expiry (control plane) | cleanup of its quarantine and accepted objects |
+| REVISION_SEALED | CMD017 (request handler), at `sealed_at` | the UNPAID record of every seal whose bytes this seal sealed first: hard deadline = this instant + 14 × 86,400 s (D-RET-3) |
 
-An anchor is written in the transaction of the transition it records, so it survives any later failure; one anchor of a kind per
-subject, so a retry, a second report or a replay never moves it; the hard deadline never moves; nothing expires early (D-EXP-1).
-The deletion inventory is `stored_objects`: every generation of every zone and class with its state, result and provider
-residual, enumerable by project, revision or upload (`StoredObjectRepository.inventory`); a DeletionReceipt (B16) is composed from
-it and the provider inventory comparison.
+Every anchor records the server's transaction time — the instant of the transition it is written with — and is bound to that
+transition at COMMIT, so it survives any later failure and can neither move nor pre-empt another producer's; one anchor of a kind
+per subject, so a retry, a second report or a replay never moves it; the hard deadline never moves and belongs to the bytes;
+nothing expires early (D-EXP-1). The deletion inventory is `stored_objects`: every generation of every zone and class with its
+state, result and provider residual, enumerable by project, revision or upload (`StoredObjectRepository.inventory`); a
+DeletionReceipt (B16) is composed from it and the provider inventory comparison.
 
 ## 11. The six commands
 
 Common to all (B06 D-PIPE-1): the access decision (nothing written), then the journal reservation (first write), then the
 command's steps below; `expectedVersion` compared on the locked row (STALE_VERSION with `current`); every new version publishes its
-event; identical replay answers the journaled result (`replayed: true`); another digest under the key is IDEMPOTENCY_CONFLICT with
-no effect; a crash before COMMIT leaves nothing; every DENY is a durable fact.
+event; every instant is the server's (D-CLOCK-1: the adapter writes `kauro.server_now()`); identical replay answers the journaled
+result (`replayed: true`); another digest under the key is IDEMPOTENCY_CONFLICT with no effect; a crash before COMMIT leaves
+nothing; every DENY is a durable fact.
 
 ### CMD012 CreateRevision — POST /api/v1/projects/{projectId}/revisions
 
@@ -342,9 +381,10 @@ UNKNOWN_REFERENCE) that is the project's current revision (PRECONDITION_FAILED /
 — identified and recorded in `dataset_revision.superseded.v1`, never transferred; B08's EXECUTION_CONTROL routes them, and CMD025
 already refuses an approval over a source that is not SEALED: SOURCE_EXPIRED); predecessor mutable → CANCELLED (cancel_revision,
 reason REPLACED_BY_NEW_REVISION) with every upload in flight CANCELLED (reason REVISION_REPLACED; provider cancellation REQUESTED
-where a session was issued) and their quota released; predecessor terminal → unchanged (lineage only);
+where a session was issued; INTAKE_CANCELLED anchors) and their quota released; predecessor terminal → unchanged (lineage only);
 6. INSERT the new DRAFT revision (v1, `supersedes_revision_id`, creator) — `dataset_revision.created.v1`; 7. move the project's
-current revision (version + 1) — `project.current_revision_changed.v1`; 8. journal commit, 201 CreateRevisionView.
+current revision (version + 1) — `project.current_revision_changed.v1`; 8. journal commit, 201 CreateRevisionView. The
+replacement allowance is evaluated separately, by the commercial package, through `RevisionLineageReader` (Q-B07-17, §17).
 
 OK: a new mutable input identity with explicit lineage; the sealed predecessor's bytes, manifest and record stay (history).
 DENY: VIEWER/APPROVER/BILLING → 403 ROLE_INSUFFICIENT; foreign project → 404; stale project version → 409; predecessor of another
@@ -364,17 +404,17 @@ lock (AGENCY_NOT_ACTIVE), project OPEN (PROJECT_NOT_OPEN), the project's mode st
 (EMPTY_DECLARATION on the field), ≤ 2,000,000,000 (FILE_TOO_LARGE); the ledger read for the messages REVISION_QUOTA_EXCEEDED,
 REVISION_FILE_LIMIT, UPLOAD_CONCURRENCY_LIMITED — "The server rejects a declared size above the remaining project allowance before
 creating the provider session" (09), and the database decides on the committed ledger (R2-052); 6. register the quarantine intent
-(INTENDED, `quarantine/{agency}/{project}/{revision}/{upload}`), insert the upload RESERVED (fence 1, deadline creation + 86,400 s),
-the UPLOAD_INITIATED anchor, `upload_session.reserved.v1`; a DRAFT revision → UPLOADING (`dataset_revision.uploading.v1`);
-7. attach the journal entry to the upload; COMMIT with the entry RESERVED.
+(INTENDED, `quarantine/{agency}/{project}/{revision}/{upload}`), insert the upload RESERVED (fence 1; created at the server's time,
+deadline + 86,400 s), the UPLOAD_INITIATED anchor, `upload_session.reserved.v1`; a DRAFT revision → UPLOADING
+(`dataset_revision.uploading.v1`); 7. attach the journal entry to the upload; COMMIT with the entry RESERVED.
 Provider call: `ObjectStoragePort.createResumableSession` (exact name, no-overwrite precondition, declared length, origin; 10 s);
 a failure answers 503 CAPACITY_UNAVAILABLE / SESSION_ISSUE_FAILED and the reservation stays pending for a retry with the key.
-Unit of work 2: 8. the access decision again (a revoked membership ends it); 9. lock the upload: still RESERVED, still this
-attempt's fence, deadline not passed — otherwise the attempt is abandoned, the new session cancelled best-effort, and the journal
-committed with the upload's current (terminal) view; 10. seal the session reference (`SessionVaultPort.seal`, bound to agency,
-upload, requester, attempt) into `upload_session_secrets`; RESERVED → UPLOADING (issued at, SHA-256 of the reference, provider
-horizon) — `upload_session.session_issued.v1`; 11. journal commit, 201 ReserveUploadView with the placeholder, hydrated for the
-requester (ALLOW fact D-SESSION-4).
+Unit of work 2: 8. the access decision again (a revoked membership ends it); 9. lock the revision row, then the upload: still
+RESERVED, still this attempt's fence, deadline not passed on the server clock — otherwise the attempt is abandoned, the new session
+cancelled best-effort, and the journal committed with the upload's current (terminal) view; 10. seal the session reference
+(`SessionVaultPort.seal`, bound to agency, upload, requester, attempt) into `upload_session_secrets`; RESERVED → UPLOADING (issued at
+the server's time, SHA-256 of the reference, provider horizon) — `upload_session.session_issued.v1`; 11. journal commit, 201
+ReserveUploadView with the placeholder, hydrated for the requester (ALLOW fact D-SESSION-4).
 
 OK: reserved bytes and one slot, a narrowly scoped resumable session for exactly one opaque destination, the 24-hour deadline.
 DENY: VIEWER → 403; foreign revision → 404; INSPECTING revision → 409 REVISION_NOT_ACCEPTING_UPLOADS; 2e9 + 1 bytes → 409
@@ -388,20 +428,21 @@ session and the undelivered one is cancelled.
 ### CMD014 CompleteUpload — POST /api/v1/uploads/{uploadId}/complete
 
 Body `{providerCompletionRef}`.
-1. lock the upload (NOT_FOUND); requested by the caller (NOT_AUTHORIZED / UPLOAD_NOT_OWNED); 2. state: RESERVED → 409
-SESSION_NOT_ISSUED; CANCELLED → UPLOAD_CANCELLED; EXPIRED, or UPLOADING past its deadline → RESERVATION_EXPIRED; REJECTED →
-UPLOAD_TERMINAL; ADMITTED → UPLOAD_ADMITTED; VERIFYING under the same claim → the same 202 without effect, under another claim →
-COMPLETION_CLAIM_CONFLICT (D-SAPI-5); 3. parse the reference into a claim (`ObjectStoragePort.parseCompletionClaim`, pure; MALFORMED
-→ 400 COMPLETION_REF_MALFORMED) and digest it; 4. UPLOADING → VERIFYING with the claim — `upload_session.completion_reported.v1`
-(→ UPLOAD_INSPECTION); 5. journal commit, 202 ACCEPTED (operationId = uploadId, VERIFYING, `/api/v1/uploads/{uploadId}`, 5 s).
+1. lock the revision row, then the upload (NOT_FOUND); requested by the caller (NOT_AUTHORIZED / UPLOAD_NOT_OWNED); 2. state:
+RESERVED → 409 SESSION_NOT_ISSUED; CANCELLED → UPLOAD_CANCELLED; EXPIRED, or UPLOADING past its deadline on the server clock →
+RESERVATION_EXPIRED; REJECTED → UPLOAD_TERMINAL; ADMITTED → UPLOAD_ADMITTED; VERIFYING under the same claim → the same 202 without
+effect, under another claim → COMPLETION_CLAIM_CONFLICT (D-SAPI-5); 3. parse the reference into a claim
+(`ObjectStoragePort.parseCompletionClaim`, pure; MALFORMED → 400 COMPLETION_REF_MALFORMED) and digest it; 4. UPLOADING → VERIFYING
+with the claim (the database refuses it at or after the deadline, KA072) — `upload_session.completion_reported.v1` (→
+UPLOAD_INSPECTION); 5. journal commit, 202 ACCEPTED (operationId = uploadId, VERIFYING, `/api/v1/uploads/{uploadId}`, 5 s).
 
 OK: verification scheduled; the provider generation, length and hash, the scan coverage and the structure are observed before
 admission by UPLOAD_INSPECTION (§12.1); completion remains asynchronous.
 DENY: another member's upload → 403 UPLOAD_NOT_OWNED; a declared size or hash never marks a file ready — the request handler
 cannot write the observation, the fence, a receipt, a file or ADMITTED (D-ROLE-2; database tests).
 RACE: identical retry → the same 202; same key, another reference → 409 IDEMPOTENCY_CONFLICT; a duplicate completion under another
-key → the same 202 (D-SAPI-5); CompleteUpload and CancelUpload serialize on the upload row: a cancellation that commits first is
-answered UPLOAD_CANCELLED; a crash before COMMIT leaves the upload UPLOADING.
+key → the same 202 (D-SAPI-5); CompleteUpload and CancelUpload serialize on the revision row, then the upload row: a cancellation
+that commits first is answered UPLOAD_CANCELLED; a crash before COMMIT leaves the upload UPLOADING.
 
 ### CMD015 CancelUpload — POST /api/v1/uploads/{uploadId}/cancel
 
@@ -411,36 +452,42 @@ Body `{expectedVersion (the upload's)}`.
 revision), a tombstone → UPLOAD_TERMINAL; 4. → CANCELLED (reason CANCELLED_BY_REQUESTER; provider cancellation REQUESTED when a
 session was issued): bytes, file and slot released exactly once by the quota trigger; the INTAKE_CANCELLED anchor;
 `upload_session.cancelled.v1` (→ STORAGE_LIFECYCLE cancels the provider session and deletes the quarantine objects,
-AUTHORITY_JOURNAL records the tombstone); 5. journal commit, 200 CancelUploadView (releasedBytes).
+AUTHORITY_JOURNAL records the tombstone); the revision stays UPLOADING — when this was its last open upload, the agency closes the
+intake with its selection (D-INTAKE-1); 5. journal commit, 200 CancelUploadView (releasedBytes).
 
 OK: acceptance tombstoned, the provider session cancelled where supported (the result recorded: CONFIRMED, UNSUPPORTED or
 UNCERTAIN, reconciled until the provider horizon), late objects cleaned (§12.3).
 DENY: another member → 403; admitted → 409; a late completion never resurrects the upload (terminal state, KA008; no claim on a
 tombstone, KA004; a stale inspection attempt attaches no receipt and admits no file, KA071) and freed quota is never consumed
 twice (database tests).
-RACE: cancellation while verification races → the cancellation wins the upload row, the stale attempt is refused; two cancels
-with one version → one 200, one 409 STALE_VERSION; identical retry → replay; same key, another version → 409.
+RACE: cancellation while verification races → the cancellation and the inspection outcome serialize on the revision row
+(D-LOCK-2), the stale attempt is refused; two cancels with one version → one 200, one 409 STALE_VERSION; identical retry → replay;
+same key, another version → 409.
 
 ### CMD016 SelectInputTables — POST /api/v1/revisions/{revisionId}/selection
 
 Body `{expectedVersion, selectionManifestRef}` (the document stored by the intake, D-SEL-2; the intake validates it structurally
 and for internal consistency, and refuses a document naming another revision).
-1. lock the revision (NOT_FOUND); 2. version (STALE_VERSION); 3. DRAFT, INSPECTING or READY_TO_SEAL (REVISION_NOT_SELECTABLE);
-4. no upload in flight (UPLOADS_UNRESOLVED); 5. the manifest is one of this revision's (UNKNOWN_REFERENCE); 6. the revision's
-current inventory hash equals the manifest's (SELECTION_STALE); 7. the manifest against the inventory: every candidate file and
-table disposed (SELECTION_INCOMPLETE), known (SELECTION_UNKNOWN_TABLE), included files admitted in the project
-(SELECTION_FILE_NOT_ADMITTED, REUSE_NOT_AVAILABLE), hidden sheets acknowledged (HIDDEN_SHEET_NOT_ACKNOWLEDGED), formula policy
-named (FORMULA_POLICY_REQUIRED), exclusions with reasons, parser choices that fit, projections over included columns with
-confirmed keys, ≤ 800 columns, ≤ 50 files and 5e9 bytes (SELECTION_BYTES_LIMIT); 8. bind (manifest id, selection hash = the body's
-KAURO_SOURCE_SELECTION_V1 digest, inventory hash, time; version + 1); DRAFT → INSPECTING (previously_admitted_inputs_selected),
-READY_TO_SEAL → INSPECTING with the counts cleared (selection_changes), INSPECTING stays — `dataset_revision.selection_changed.v1`
-(→ SELECTION_EVALUATION); 9. journal commit, 200 SelectInputTablesView.
+1. lock the revision (NOT_FOUND); 2. version (STALE_VERSION); 3. DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL
+(REVISION_NOT_SELECTABLE); 4. no upload in flight (UPLOADS_UNRESOLVED); 5. the manifest is one of this revision's
+(UNKNOWN_REFERENCE); 6. the revision's current inventory hash equals the manifest's (SELECTION_STALE); 7. the manifest against the
+inventory: every candidate file and table disposed (SELECTION_INCOMPLETE), known (SELECTION_UNKNOWN_TABLE), included files admitted
+in the project (SELECTION_FILE_NOT_ADMITTED; a reused file whose bytes' retention ended or whose first seal is more than fourteen
+days old: REUSE_NOT_AVAILABLE, D-RET-3), hidden sheets acknowledged (HIDDEN_SHEET_NOT_ACKNOWLEDGED), formula policy named
+(FORMULA_POLICY_REQUIRED), exclusions with reasons, parser choices that fit, projections over included columns with confirmed keys,
+≤ 800 columns, ≤ 50 files and 5e9 bytes (SELECTION_BYTES_LIMIT); 8. bind (manifest id, selection hash = the body's
+KAURO_SOURCE_SELECTION_V1 digest, inventory hash, the server's time; version + 1): UPLOADING → INSPECTING (all_uploads_completed:
+the agency's explicit closing of the intake, D-INTAKE-1), DRAFT → INSPECTING (previously_admitted_inputs_selected), READY_TO_SEAL →
+INSPECTING with the counts cleared (selection_changes), INSPECTING stays — `dataset_revision.selection_changed.v1` with
+`previousState` (→ SELECTION_EVALUATION); the database repeats step 7's file-and-table comparison row by row (D-SEL-4); 9. journal
+commit, 200 SelectInputTablesView.
 
 OK: explicit selected and excluded tables and parser choices persisted in the mutable revision; detected worksheets, hidden tables,
 formulas, parser issues and projections were visible for review (GetInspection, PreviewTable).
 DENY: foreign → 404; VIEWER → 403; a changed inventory → 409 SELECTION_STALE; a hidden sheet included without acknowledgement → 400.
-RACE: two selections on one version → one 200, one 409; identical retry → replay; same key, another manifest → 409; a crash
-leaves the previous selection bound.
+RACE: two selections on one version → one 200, one 409; a selection racing an inspection outcome of the revision's last open upload
+→ ordered by the revision row: a selection that waits reads the settled upload (D-INTAKE-1); identical retry → replay; same key,
+another manifest → 409; a crash leaves the previous selection bound.
 
 ### CMD017 SealRevision — POST /api/v1/revisions/{revisionId}/seal
 
@@ -449,13 +496,16 @@ Body `{expectedVersion, selectionHash}`.
 REVISION_NOT_READY_TO_SEAL; 4. `selectionHash` is the bound selection's (STALE_VERSION / HASH_MISMATCH, `mismatch:
 ["selectionHash"]`); 5. no upload in flight (UPLOADS_UNRESOLVED); 6. the complete evaluation of the bound selection and every
 included file: ADMITTED, at the generation, digest and length the evaluation counted (INPUT_NOT_ADMITTED, GENERATION_CHANGED);
-7. compose the sealed manifest (files with generations, digests, lengths, formats, parser profiles and receipts; tables with
-dispositions, exclusion reasons, parser choices, selected columns and physical rows; the uploads inspection rejected, with their
-classes; projections with the projection ids the seal mints and their logical records; associations; populations; selection,
-evaluation and projection hashes; pricing definition; the input envelope) and its hashes; 8. insert the sealed manifest and file
-set (each included file read after its transition lock), the REVISION_SEALED anchor, the UNPAID record (hard = seal + 14 days) —
-`retention_record.created.v1`; READY_TO_SEAL → SEALED with the manifest, projection and counts — `dataset_revision.sealed.v1`;
-9. journal commit, 200 SealRevisionView. At COMMIT the database checks the whole sealed subject (§4).
+7. compose the revision manifest — HASHING's exact preimage: the accepted files (generations, digests, lengths), the table
+selection with dispositions and exclusion reasons, the parser profile and choices, the projection with the projection ids the
+seal mints — and its hash (D-HASH-1); compose the sealed subject (the revision and its predecessor, the manifest, projection,
+selection and evaluation hashes, the populations with per-table and per-projection counts, the admitting receipts, the uploads
+inspection rejected with their classes, the input envelope) and its hash (D-HASH-4); 8. the first seal of the bytes
+(`SealedManifestRepository.firstSeals`: this seal, or an earlier seal of a reused file) — a hard cap already behind this seal →
+409 REUSE_NOT_AVAILABLE (D-RET-3); insert the sealed manifest and subject and the file set (each included file read after its
+transition lock), the REVISION_SEALED anchor, the UNPAID record anchored on the first seal (hard = first seal + 14 days) —
+`retention_record.created.v1`; READY_TO_SEAL → SEALED with the manifest, projection and counts at the server's time —
+`dataset_revision.sealed.v1`; 9. journal commit, 200 SealRevisionView. At COMMIT the database checks the whole sealed subject (§4).
 
 OK: manifest, bytes, parser settings and billable-unit interpretation sealed atomically; only this manifest can be profiled and
 quoted.
@@ -468,22 +518,24 @@ retry → replay; same key, another hash → 409; a crash leaves the revision RE
 ## 12. Control-plane pipelines (mandate B07-CONTROL)
 
 Each runs in SYSTEM units of work bound to the work item's agency (D-CTRL-1), at least once, idempotent by fences and listed
-transitions; provider calls sit outside transactions.
+transitions, on the server clock (D-CLOCK-1), taking the revision row before any upload or file of it (D-LOCK-2); provider calls
+sit outside transactions.
 
 ### 12.1 UPLOAD_INSPECTION (`upload_session.completion_reported.v1`, provider notifications)
 
-1. claim the attempt: `inspection_fence + 1` while VERIFYING (anything else: DONE). 2. `stat` the quarantine name: absent → VERIFYING
-→ UPLOADING, claim cleared — `completion_not_observed.v1` (the requester may report again before the deadline); present → record
-the observation (set once) with the claim's consistency — `completion_observed.v1`; the quarantine object INTENDED → PRESENT; if
-the revision is UPLOADING and no reservation, session or unobserved completion remains, UPLOADING → INSPECTING —
-`dataset_revision.inspecting.v1`. 3. Outside any transaction: read the exact generation, recomputing SHA-256; the bounded container
-inspection (`ContainerInspectorPort`, S024: no outside write, no network, no unbounded decompression); scan the container and every
-allowed part (`MalwareScannerPort`), derive the scan state (D-SCAN-1). 4. Admissible → promote: register the accepted intent
-(`accepted/{agency}/{project}/{file}`), copy the exact generation with a no-overwrite precondition, observe and re-read, compare the
-digest (else PROMOTION_UNVERIFIED). 5. One unit of work: the receipt of this attempt (KA071 if a cancellation won; KA072 if it does
-not describe the observation) and either the file, its tables and columns, ADMITTED — `upload_session.admitted.v1`, INPUT_ADMITTED
-— or REJECTED with its class — `upload_session.rejected.v1`, INTAKE_REJECTED; then the revision's progress. A TRANSIENT_INFRASTRUCTURE
-failure retries within the deadline; the deadline sweeper ends what never finishes.
+1. lock the revision row, then claim the attempt: `inspection_fence + 1` while VERIFYING (anything else: DONE). 2. `stat` the
+quarantine name: absent → VERIFYING → UPLOADING, claim cleared — `completion_not_observed.v1` (the requester may report again before
+the deadline; refused after it); present → record the observation (set once) with the claim's consistency —
+`completion_observed.v1`; the quarantine object INTENDED → PRESENT. The revision is never moved (D-INTAKE-1). 3. Outside any
+transaction: read the exact generation, recomputing SHA-256; the bounded container inspection (`ContainerInspectorPort`, isolated
+per D-ISO-1: no write outside the attempt scratch, no network, no unbounded decompression, with the isolation evidence in the
+result); scan the container at its observed length and every allowed part (`MalwareScannerPort`), derive the scan state against
+the object (D-SCAN-1). 4. Admissible → promote: register the accepted intent (`accepted/{agency}/{project}/{file}`), copy the exact
+generation with a no-overwrite precondition, observe and re-read, compare the digest (else PROMOTION_UNVERIFIED). 5. One unit of
+work (revision row first): the receipt of this attempt (KA071 if a cancellation won; KA072 if it does not describe the observation)
+and either the file (`source_file.admitted.v1`), its tables and columns, ADMITTED — `upload_session.admitted.v1`, INPUT_ADMITTED — or
+REJECTED with its class — `upload_session.rejected.v1`, INTAKE_REJECTED. An admission at or after the deadline is refused by the
+database; the deadline sweeper expires the upload instead. A TRANSIENT_INFRASTRUCTURE failure retries within the deadline.
 
 ### 12.2 SELECTION_EVALUATION (`dataset_revision.selection_changed.v1`)
 
@@ -499,43 +551,54 @@ REJECTED — `dataset_revision.rejected.v1` (no silent removal); ERROR → retry
 Open the sealed secret and cancel the provider session (`cancelResumableSession` → CONFIRMED, UNSUPPORTED or UNCERTAIN, recorded
 with `upload_session.provider_cancellation_recorded.v1`; UNCERTAIN is reconciled until the provider horizon; the secret is purged
 once resolved); request deletion of the upload's quarantine objects and, for expired unsealed intake or an expired revision, its
-accepted generations; delete each exact generation and record the result with its residual (D-OBJ-2). A late object observed after
-the tombstone (a stat, a notification or inventory) is registered RESIDUAL, late, and deleted the same way — it never enters a
-revision.
+accepted generations; delete each exact generation and record the result with its residual at the server's time (D-OBJ-2). A late
+object observed after the tombstone (a stat, a notification or inventory) is registered RESIDUAL, late, and deleted the same way —
+it never enters a revision.
 
 ### 12.4 AUTHORITY_JOURNAL
 
-Appends the tombstone of every terminal authority fact to `AuthorityJournalPort` (idempotent by event id, KAURO_AUTHORITY_TOMBSTONE_V1)
-(D-RESTORE-1).
+Appends the tombstone of every terminal authority fact to `AuthorityJournalPort` (idempotent by event id, KAURO_AUTHORITY_TOMBSTONE_V1):
+exactly the kind and state `AUTHORITY_TOMBSTONES` names for the routed event — upload acceptance revoked (cancelled, expired,
+rejected), revision cancelled, superseded, rejected, expired, deleted (D-RESTORE-1).
 
 ### 12.5 Sweepers
 
-UPLOAD_DEADLINES (live uploads past their deadline → EXPIRED with INTAKE_EXPIRED, provider cancellation REQUESTED when a session
-was issued; admitted uploads past it whose file no sealed revision includes → EXPIRED and the file revoked INTAKE_EXPIRED — the
-database refuses the revocation of a sealed file); PROVIDER_SESSION_RECONCILIATION; RETENTION (ACTIVE records past their effective
-deadline → EXPIRED; SEALED revisions with no ACTIVE record ahead and REJECTED revisions whose windows closed → EXPIRED); OBJECT_INVENTORY
-(provider listing against the registry: orphans registered RESIDUAL and deleted; soft-deleted generations recorded with the
-provider's expiry; a missing or changed accepted generation revokes its file — GENERATION_MISSING, GENERATION_CHANGED);
-DELETION_RETRIES; LOCATION_POLICY (reads back every location's retention and versioning at start and daily). 09 "Acceptance and
-operating checks": overdue inspection, abandoned reservations, unknown provider sessions, orphan blobs, unregistered generations,
-failed deletion and retained bytes by class are each one of these sweeps' reports.
+Sweepers (SOURCE_SWEEPERS): UPLOAD_DEADLINES, PROVIDER_SESSION_RECONCILIATION, RETENTION, OBJECT_INVENTORY, DELETION_RETRIES, LOCATION_POLICY.
+
+UPLOAD_DEADLINES (live uploads past their deadline on the server clock → EXPIRED with INTAKE_EXPIRED, provider cancellation
+REQUESTED when a session was issued; admitted uploads past it whose file no seal ever included → EXPIRED and the file revoked
+INTAKE_EXPIRED — the database refuses the revocation of a sealed file and of a window still open; the revision stays as it is,
+D-INTAKE-1); PROVIDER_SESSION_RECONCILIATION (REQUESTED or UNCERTAIN cancellations until the provider horizon); RETENTION (ACTIVE
+records past their effective deadline → EXPIRED; SEALED revisions with no ACTIVE record ahead and REJECTED revisions whose windows
+closed → EXPIRED; sealed files whose including revisions hold no ACTIVE record ahead → revoked RETENTION_EXPIRED, D-RET-3);
+OBJECT_INVENTORY (provider listing against the registry: orphans registered RESIDUAL and deleted; soft-deleted generations recorded
+with the provider's expiry; a missing or changed accepted generation revokes its file — GENERATION_MISSING, GENERATION_CHANGED);
+DELETION_RETRIES; LOCATION_POLICY (reads back every location's retention and versioning at start and daily; load-bearing, since a
+deletion cannot be recorded at a location never read back, D-OBJ-2). 09 "Acceptance and operating checks": overdue inspection,
+abandoned reservations, unknown provider sessions, orphan blobs, unregistered generations, failed deletion and retained bytes by
+class are each one of these sweeps' reports.
 
 ## 13. The scenario cases in B07 terms
 
 - **S024** (XLSX with traversal, duplicate entries, XML entities or excessive expansion → reject without outside writes, network
   access or unbounded decompression): decided by the container inspector under the conjunctive limits (1 GiB per part, 20 GiB
   total, entries, ratio, XML depth, no DTD/entities, no external relationships, normalized paths inside the archive root); the
-  receipt records CORRUPT_STRUCTURE / ACTIVE_CONTENT / RESOURCE_LIMIT with problem tokens; nothing is written outside the attempt
-  scratch and no network is used (the inspector runs sandboxed; the test observes the scratch and the network namespace).
+  receipt records CORRUPT_STRUCTURE / ACTIVE_CONTENT / RESOURCE_LIMIT with problem tokens. The isolation is D-ISO-1: the test
+  observes, on the Windows verify host as on Linux, the attempt scratch (nothing outside it), the permission model's refusal count,
+  the network hooks' attempt log (empty) and the decompressed-byte counter (≤ the bound), each with its negative control (a probe
+  that writes outside is refused and counted, a probe that connects is recorded). The OS-level network denial of the worker host is
+  LATER: B15 — not claimed here.
 - **S053** (a false size/hash or another generation → observe actual bytes/generation before admission or sealing): the claim is a
   claim; the server's stat is the observation (set once); a receipt must describe that observation and a file names exactly the
   promoted generation, digest and length of its receipt (database tests); the seal re-checks the evaluation's generations.
 - **S054** (the antivirus exits clean because the file exceeded its scan limit → NOT_SCANNED/BLOCKED; a fully covered harmless file
-  passes): D-SCAN-1 in the domain (tests) and in the database (`inspection_receipts_clean_means_covered`, tests: skipped part, short
-  read, stale or future signatures, nothing expected, unpinned configuration; the covered neighbour).
+  passes): D-SCAN-1/D-SCAN-2 in the domain (tests: skipped part, short read, stale or future signatures, nothing expected, unpinned
+  configuration, a container missing or at another length than observed) and in the database (`inspection_receipts_clean_means_covered`
+  over the receipt's own coverage document, the pinned signature age; the covered neighbour).
 - **R2-051** (the reservation expires at twenty-four hours while the provider session stays usable → tombstone acceptance, cancel
-  the provider session where supported, late objects stay quarantined and are cleaned): the deadline sweeper, STORAGE_LIFECYCLE and
-  the registry (database test: no early expiry, the late report refused, the late object RESIDUAL and deleted with its residual).
+  the provider session where supported, late objects stay quarantined and are cleaned): the deadline sweeper on the server clock,
+  STORAGE_LIFECYCLE and the registry (database test: no early expiry, no acceptance after the deadline, the late report refused,
+  the late object RESIDUAL and deleted with its residual at the server's time).
 - **R2-052** (two files each fit → only the combination within 5e9 bytes): D-UP-2 (database test with the lock-wait interleaving).
 
 ## 14. Open questions for the authority
@@ -544,7 +607,7 @@ failed deletion and retained bytes by class are each one of these sweeps' report
 |---|---|---|
 | Q-B07-1 | 09 says CompleteUpload "reads provider metadata, verifies no-overwrite behavior, records actual size"; the catalogue says completion remains asynchronous. Must the request read the provider synchronously? | D-RUN-1: the request records the claim and answers 202; the control plane observes. The observation columns and event exist, so a synchronous stat can move into the command without a schema change. |
 | Q-B07-2 | Manual 10 names `POST /revisions/{revisionId}/supersede`; the catalogue has no supersede command and gives lineage to CMD012. | CMD012 carries lineage (supersede or cancel the predecessor); no supersede route. |
-| Q-B07-3 | The signature freshness policy (09 "stale signatures beyond the recorded policy") has no registry value. | 86,400 s (D-SCAN-2). |
+| Q-B07-3 | The signature freshness policy (09 "stale signatures beyond the recorded policy") has no registry value. | 86,400 s, pinned in the domain and the database (D-SCAN-2). |
 | Q-B07-4 | The provider session lifetime when the adapter reports none. | 604,800 s (D-SESSION-3). |
 | Q-B07-5 | Is 09's "checks MFA" the launch policy's enrolled MFA, or a fresh step-up? The catalogue CMD013 names no proof. | Enrolled MFA and verified email (B06 VERIFIED_USER); no step-up. |
 | Q-B07-6 | May an OWNER cancel another member's upload? | Requester only (D-SRC-2); the deadline sweeper tombstones abandoned uploads within 24 h. |
@@ -553,39 +616,179 @@ failed deletion and retained bytes by class are each one of these sweeps' report
 | Q-B07-9 | The preview bounds (09/10 give none). | 20 rows × 50 columns × 200 characters (D-SAPI-7). |
 | Q-B07-10 | CMD016 names a `selectionManifestRef`, but no catalogue command stores the manifest. | The non-journaled, content-idempotent intake route (D-SEL-2). |
 | Q-B07-11 | The registry's "Rejected-input cleanup deadline" has no value. | The upload's own 24-hour window (D-RET-1). |
-| Q-B07-12 | How a soft-deleted generation's expiry is recorded when the policy changed after its deletion. | The provider-reported expiry (PROVIDER_REPORTED); our own deletions use the latest read-back (D-OBJ-2). |
-| Q-B07-13 | B06 review R3 kept the control plane from appending events; the source lifecycle's control-plane edges need them. | D-CTRL-2 (listed types, SERVICE actor, bound agency, B07 kinds only). |
+| Q-B07-12 | How a soft-deleted generation's expiry is recorded when the location policy changed after its deletion. | The provider-reported expiry (PROVIDER_REPORTED); our own deletions use the latest read-back (D-OBJ-2). |
+| Q-B07-13 | B06 review R3 kept the control plane from appending events; the source lifecycle's control-plane edges need them. | D-CTRL-2 (listed types, SERVICE actor, bound agency, B07 kinds and `dataset_revision` only). |
 | Q-B07-14 | CMD013 `declaredFormat` is typed `label`. | Narrowed to CSV or XLSX (D-SAPI-4), as B06 narrows `mode`. |
-| Q-B07-15 | A mutable revision whose intake all expired has no command that closes it (the catalogue has no CancelRevision). | It stays mutable with the INTAKE_DEADLINE_PASSED blocker until CMD012 replaces it (cancel_revision). |
+| Q-B07-15 | A mutable revision whose intake all expired has no command that closes it (the catalogue has no CancelRevision). | It stays mutable (UPLOADING, accepting uploads) with the INTAKE_DEADLINE_PASSED blocker until the agency uploads again, selects, or CMD012 replaces it (cancel_revision). |
 | Q-B07-16 | Whether uploads need an ACTIVE agency (07: DRAFT permits no customer-data execution). | Yes (D-SRC-1; B06 D-CMD-2). |
-| Q-B07-17 | CMD012's "replacement allowance is evaluated separately": policy `pricing.customerPreExecutionSourceReplacementsIncluded = 1` belongs to the commercial scope. | B07 records lineage and the impact map; the allowance is counted by the payments package (B09) against the quote. |
+| Q-B07-17 | CMD012's "replacement allowance is evaluated separately": policy `pricing.customerPreExecutionSourceReplacementsIncluded = 1` belongs to the commercial scope. Where is it counted, and against which quote? | B07 records explicit lineage and the impact map and offers `RevisionLineageReader.replacementsSince(revisionId)`; the commercial package counts the allowance against the quote bound to the replaced revision (B09's checkout re-check, or B10's quote issuance). `b09/design` does not treat the allowance yet; §17 makes it an integration obligation. |
+| Q-B07-18 | HASHING's KAURO_SOURCE_REVISION_V1 preimage names "projection" without saying whether the projection's identity (the minted ProjectionId) is part of it. If it is content-only, two seals of identical reused bytes have one manifest hash, and B06's unique (agency, project, manifest_hash) — the source hash plans bind — refuses the second seal. | The preimage is exactly HASHING's four members; the projection carries the ProjectionIds the seal mints (SourceLocator.projectionId identifies the declared projection of one sealed revision), so every seal is its own manifest; the revision and the populations live in the separate sealed subject (D-HASH-1, D-HASH-4). If the authority rules otherwise, a versioned amendment of the preimage is proposed instead of widening it silently. |
+| Q-B07-19 | The registry guard of all_uploads_completed ("Actual provider completion is observed for selected uploads") names no command, and the catalogue has none that closes an intake. | The agency's selection (CMD016 on an UPLOADING revision) is the explicit act (D-INTAKE-1); a dedicated CloseIntake command would need a catalogue entry. |
+| Q-B07-20 | 09 caps unpaid sources at "fourteen days from sealing" without saying which seal governs bytes a later revision reuses. | The first seal of the bytes (D-RET-3): a re-seal never restarts the cap; reuse after the window needs a new upload. |
+| Q-B07-21 | Whether a revision's rejection (fatal_input_rejection) is an authority fact a restore must re-apply. | Yes: tombstoned as REVISION_REJECTED (D-RESTORE-1), so a restore never brings back an INSPECTING revision whose selected input failed the admission contract. |
 
 ## 15. Handoff: the implementation mandates
 
-Four mandates run in parallel worktrees from this branch; each is self-contained (its files, cases and done criteria), each keeps
-`pnpm run verify` green, and an integration step merges them in the order PERSISTENCE → DATA-PLANE → CONTROL → COMMANDS (the api
-tests of COMMANDS and the end-to-end tests of CONTROL run against the merged adapters). Real PostgreSQL 17 everywhere; provider
-fakes are labelled SIMULATED; the tests carry exactly the titles `docs/design/B07-case-map.md` names; no sleep synchronizes
-anything; migrations 0008–0011 change only for a defect a test finds, with the runtime boundary matrix re-reviewed.
+Four mandates run in parallel worktrees from this branch's head; each is self-contained (its files, cases and done criteria), each
+keeps `pnpm run verify` green, and an integration step merges them in the order PERSISTENCE → DATA-PLANE → CONTROL → COMMANDS (the
+end-to-end tests of CONTROL and the api tests of COMMANDS run against the merged adapters). Real PostgreSQL 17 everywhere; provider
+fakes are labelled SIMULATED; the tests carry exactly the titles `docs/design/B07-case-map.md` names (the case-map check,
+`tools/test/b07-case-map.test.mjs`, refuses an EXECUTED_LOCAL row whose test does not exist); no sleep synchronizes anything; every
+lifecycle instant is written as `kauro.server_now()`, and tests stand in the past only through the labelled TEST CLOCK;
+migrations 0009–0012 change only for a defect a test finds, with the runtime boundary matrix re-reviewed.
 
 | mandate | builds | demonstrates |
 |---|---|---|
-| **B07-PERSISTENCE** | the `pg` adapters of every source-store repository (`packages/persistence/src/source/*`), `runSource` on the B06 unit of work with the SYSTEM context bound to an agency (D-CTRL-1), the refusal translation of §3.3 in `sqlstate.ts`, the exports | `packages/persistence/test/source-adapters.test.ts`: every repository method through the runtime roles; R2-052 and the capacity race through `UploadSessionRepository.insert` (lock-wait observed, typed losers); CAS and fences; `recordDeletion` computing the residual from `locationPolicyAt` (refused at a location never read back); `recordProviderResidual`; `revokeAdmission` (KA072 when sealed); content-idempotent `SelectionManifestRepository.put`; no early `expireRecord`; tenant isolation of `runSource` |
-| **B07-DATA-PLANE** | `packages/data-plane` (`@kauro/data-plane`, layer adapter): `ContainerInspectorPort` (streaming SHA-256; CSV dialect facts; XLSX through a hardened ZIP/XML reader — no traversal, absolute or duplicate names, no DTD, entities or external relationships, 1 GiB per part and 20 GiB total with a ratio bound, XML depth; worksheet inventory with visibility, formulas and cache, merged cells, hidden rows and columns, positional columns with label states; the expected scan parts; the parser profile hash), `SelectionEvaluatorPort` (exact counts, bounded memory, attempt scratch), the preview reader (D-SAPI-7), the labelled contract fake of `MalwareScannerPort` (skips, timeouts, the EICAR token, stale signatures) | `container-inspection.test.ts` (S024 corpus built in the test, each refused with its class, no write outside the scratch, network denied), `scan-coverage.test.ts` (S054), `selection-evaluation.test.ts` (every selected file and table counted against an independent counter; hidden sheets only when selected; formulas inert) |
-| **B07-COMMANDS** | the six handlers (§11) with the two-phase runtime of CMD013 (D-RUN-2) and the ACCEPTED path of CMD014 (D-RUN-1, D-SAPI-5), the selection intake and the reads (SOURCE_ROUTES) with session hydration and its security fact (D-SESSION-2, D-SESSION-4); served in `apps/api` by joining `SOURCE_*` to `SERVED_COMMAND_IDS`, `COMMAND_RESPONSES`, `VIEW_DEFINITIONS`, `COMMAND_OUTCOMES` and `READ_OUTCOMES`; OpenAPI regenerated; the matrix applicability rows of CMD012–CMD017; permitted actions; the storage and vault ports bound to labelled fakes in tests | `apps/api/test/cmd012-create-revision.test.ts` … `cmd017-seal-revision.test.ts` and `source-reads.test.ts`: OK, DENY and RACE of every command through the real route and composition root |
-| **B07-CONTROL** | `apps/control` (`@kauro/control`, entrypoint): the consumers UPLOAD_INSPECTION, SELECTION_EVALUATION, STORAGE_LIFECYCLE, AUTHORITY_JOURNAL over B06's dispatch store and leases, the sweepers of §12.5, the labelled fakes of `ObjectStoragePort` (generations, no-overwrite preconditions, sessions usable past the application deadline, cancellation results, soft delete with a configurable read-back, listings), `SessionVaultPort` (AES-256-GCM with a test key, the binding as associated data) and `AuthorityJournalPort` (append-only file) | `apps/control/test/upload-inspection.test.ts` (S053, S024 end to end, CMD014-OK continuation), `storage-lifecycle.test.ts` (R2-051, CMD015-OK), `retention-sweeper.test.ts`, `authority-journal.test.ts` |
+| **B07-PERSISTENCE** | the `pg` adapters of every source-store repository (`packages/persistence/src/source/*`), `runSource` and `serverInstant()` on the B06 unit of work with the SYSTEM context bound to an agency (D-CTRL-1), the read ports `SourceAvailabilityReader` and `RevisionLineageReader`, `SealedManifestRepository.firstSeals` and `RetentionRepository.insertUnpaidRecord` (D-RET-3), the refusal translation of §3.3 in `sqlstate.ts`, the exports | `packages/persistence/test/source-adapters.test.ts`: every repository method through the runtime roles; every stamp the server's (no caller instant reaches SQL); R2-052 and the capacity race through `UploadSessionRepository.insert` (lock-wait observed, typed losers); CAS and fences; `recordDeletion` computing the residual from `locationPolicyAt` (refused at a location never read back); `recordProviderResidual`; `revokeAdmission` with its event (KA072 when sealed or when the window is open); content-idempotent `SelectionManifestRepository.put`; `firstSeals` of reused bytes; no early `expireRecord`; `availabilityOf` and `replacementsSince`; tenant isolation of `runSource` |
+| **B07-DATA-PLANE** | `packages/data-plane` (`@kauro/data-plane`, layer adapter): `ContainerInspectorPort` in its isolated child process (D-ISO-1: Node permission model, network hooks, isolation evidence; streaming SHA-256; CSV dialect facts; XLSX through a hardened ZIP/XML reader — no traversal, absolute or duplicate names, no DTD, entities or external relationships, 1 GiB per part and 20 GiB total with a ratio bound, XML depth; worksheet inventory with visibility, formulas and cache, merged cells, hidden rows and columns, positional columns with label states; the expected scan parts with the container at its verified length; the parser profile hash), `SelectionEvaluatorPort` (exact counts, bounded memory, attempt scratch), the preview reader (D-SAPI-7), the labelled contract fake of `MalwareScannerPort` (skips, timeouts, the EICAR token, stale signatures) | `container-inspection.test.ts` (the S024 corpus built in the test, each refused with its class; no write outside the scratch, no network attempt, decompression within the bound — each observer with its negative control), `scan-coverage.test.ts` (S054), `selection-evaluation.test.ts` (every selected file and table counted against an independent counter; hidden sheets only when selected; formulas inert) |
+| **B07-COMMANDS** | the six handlers (§11) with the two-phase runtime of CMD013 (D-RUN-2), the ACCEPTED path of CMD014 (D-RUN-1, D-SAPI-5) and CMD016's intake closure (D-INTAKE-1), the selection intake and the reads (SOURCE_ROUTES) with session hydration and its security fact (D-SESSION-2, D-SESSION-4); served in `apps/api` by joining `SOURCE_*` to `SERVED_COMMAND_IDS`, `COMMAND_RESPONSES`, `VIEW_DEFINITIONS`, `COMMAND_OUTCOMES` and `READ_OUTCOMES` — the routes move from `x-kauro-planned` to `paths`; the matrix applicability rows of CMD012–CMD017; permitted actions; the storage and vault ports bound to labelled fakes in tests | `apps/api/test/cmd012-create-revision.test.ts` … `cmd017-seal-revision.test.ts` and `source-reads.test.ts`: OK, DENY and RACE of every command through the real route and composition root |
+| **B07-CONTROL** | `apps/control` (`@kauro/control`, entrypoint): the consumers UPLOAD_INSPECTION, SELECTION_EVALUATION, STORAGE_LIFECYCLE, AUTHORITY_JOURNAL over B06's dispatch store and leases, the sweepers of `SOURCE_SWEEPERS` (§12.5), each unit of work revision-row first (D-LOCK-2), the labelled fakes of `ObjectStoragePort` (generations, no-overwrite preconditions, sessions usable past the application deadline, cancellation results, soft delete with a configurable read-back, listings), `SessionVaultPort` (AES-256-GCM with a test key, the binding as associated data) and `AuthorityJournalPort` (append-only file) | `apps/control/test/upload-inspection.test.ts` (S053, S024 end to end, CMD014-OK continuation, the revision left UPLOADING), `storage-lifecycle.test.ts` (R2-051, CMD015-OK), `retention-sweeper.test.ts` (records, revisions and RETENTION_EXPIRED revocations never early), `authority-journal.test.ts` (every routed kind, expired and rejected revisions included) |
 
 ## 16. Verification performed on this branch
 
-- `pnpm run verify` (generate, build, typecheck, every package's tests, the tool tests, the architecture gate, OpenAPI, the matrix,
-  clean-consume) green on Windows with PostgreSQL 17: contracts 12, domain 62, application 62, persistence 120, authorization 11,
-  api 118 (117 passed, 1 skipped: the Linux-only `/proc/<pid>/environ` check of B06), tools 24; architecture gate 6 packages and
-  13 edges without violation; OpenAPI equal to the 14 registered routes; the matrix 18 machines and 185 owned edges and initial
-  states; clean-consume of every publishable package.
-- `packages/persistence/test/source-migrations.test.ts`: 21 tests on a real PostgreSQL 17 cluster; B06's persistence and api
-  suites pass on the B07 schema, their sealed sources now built through the source-lifecycle fixture and expired by the retention
-  sweeper's role.
-- The B07 migrations apply from empty with the B06 runner (11 migrations; `listMigrations().length` asserted instead of a count).
-- The runtime boundary matrix was regenerated from a migrated cluster and reviewed entry by entry: the only B06 entry that changed
-  is `kauro_control` on `kauro.domain_events` (INSERT, D-CTRL-2); `kauro_app` on `kauro.upload_sessions` holds column grants
-  (D-ROLE-2).
+`pnpm run verify` ran at the worktree root on Windows 11 (Node 24, pnpm 10.16.1, PostgreSQL 17 from `C:\Tools\pgsql17\bin`) and
+exited 0: generate, build, typecheck, test, architecture gate, OpenAPI check, matrix check and clean consume. Test counts:
+contracts 12/12, domain 64/64, application 65/65, persistence 138/138, authorization 11/11, api 117 passed and 1 skipped (the
+skip is B06's, unchanged), tools 27/27. No temporary PostgreSQL cluster was left running.
+
+- **Migrations from empty.** `packages/persistence/test/migrations.test.ts` "every migration applied once, in order, with its
+  checksum recorded; a second run applies nothing" lists the twelve files `0001..0012` through the B06 runner on a fresh cluster
+  (without the TEST CLOCK, `startTemporaryPostgres({ testClock: false })`), and "B07 D-CLOCK-1: the shipped kauro.server_now() is
+  the transaction time and nothing else — …" checks the shipped clock function; every other persistence test file starts its own
+  cluster from empty through the same runner.
+- **Runtime boundary.** `packages/persistence/test/fixtures/runtime-boundary.json` was re-read from a migrated cluster and its ten
+  changes against `bfac6b1` reviewed entry by entry — `kauro_control` UPDATE (version) on `source_files` (F9),
+  `aggregate_kinds_read_b07_control` (F7), the control plane's revision policy without INSPECTING (F1), its event policy (F1, F9),
+  the anchor policies per role and kind (split read/insert for the request handlers and the control plane's kinds, F3), the
+  UNPAID-only record policy (F3), and the secret read policy on the server clock (F2); nothing else changed.
+- **Revert proofs.** Each database fix was re-opened in place in its migration, the test that demonstrates it was run and failed,
+  and the file was restored byte for byte (SHA-256 checked; final prefixes: 0009 `991ac07e5e19`, 0010 `96e353e13808`, 0011
+  `840615f0f679`, 0012 `0a9e8225d0df`):
+
+  | finding | mutation | test (source-migrations.test.ts) | result |
+  |---|---|---|---|
+  | B07-F1 | 0011: the guard no longer requires the binding for all_uploads_completed | "B07-F1: the intake closes only …" | fails |
+  | B07-F2 | 0009: `upload_sessions_window_clock` returns before checking | "B07-F2: every lifecycle instant …" | fails |
+  | B07-F3 | 0012: the request handlers' anchor insert policy accepts any kind | "B07-F3: request handlers write no retention evidence …" | fails |
+  | B07-F4 | 0010: `clean_means_covered` no longer calls `kauro.scan_coverage_complete` | "S054 at the database: …" | fails |
+  | B07-F5 | 0011: the UNPAID record anchored on this revision's own seal | "B07-F5: the unpaid hard cap belongs to the bytes …" | fails |
+  | B07-F9 | 0010: `source_files_event_per_version` removed | "B07-F9: an admitted file is an aggregate …" | fails |
+  | B07-F10 | 0009: the ledger trigger without its WHEN clause | "B07-F10: the ledgers are checked …" | fails |
+  | B07-F11 | 0011: `kauro.check_selection_inventory` not called | "B07-F11: the database compares a selection …" | fails |
+
+  The remaining findings are not a single migration clause to re-open: F7 is resolved by the foundation (the registry rows and
+  the control-plane read policy, checked by `aggregate-kinds.test.ts`); F8, F12 and F13 are contract checks whose subject did not
+  exist on `bfac6b1` (the tombstone mapping, the authority preimage and sealed subject, the planned operations and sweeper list —
+  §18 names each test); F14 is the ordering rule D-LOCK-2, whose test observes the second unit of work waiting on the revision row
+  in `pg_stat_activity` in both interleavings; F6 is specified for the DATA-PLANE mandate with its observables and negative
+  controls (D-ISO-1), not claimed here.
+
+### 16.1 Verify tail
+
+```
+✔ B07-F13: the source-lifecycle routes are documented from their contracts as planned operations — every specified command and route, never registered, never also served; a missing planned route, a registered planned route, a repeated operationId and a forbidden DTO member fail the check (33.0671ms)
+ℹ tests 27
+ℹ pass 27
+ℹ fail 0
+
+> kauro-platform@0.1.0 arch
+> node tools/architecture-gate.mjs
+architecture gate: 6 package(s), 13 edge(s), no violation
+
+> kauro-platform@0.1.0 openapi
+> node tools/openapi.mjs check
+openapi: the document is the generated one and matches the 14 registered routes (14 operations, every operationId present, response schemas equal to the ones the routes validate with, every problem status documenting exactly its route's outcome catalogue, no forbidden field); 14 planned operations, none registered or served
+
+> kauro-platform@0.1.0 matrix
+> node tools/matrix.mjs check
+matrix: the document is the generated one (18 machines, 185 edges and initial states each owned, 7 commands and 5 reads with their catalogues, every applicability citation resolved)
+
+> kauro-platform@0.1.0 clean-consume
+> node tools/clean-consume.mjs
+clean consumer ok: 73 contracts, 64 commands, provenance 9608c2de39ae
+clean consumer ok: @kauro/application 154 exports
+clean consumer ok: @kauro/domain 184 exports
+clean consumer ok: @kauro/persistence 49 exports
+clean consumer ok: @kauro/persistence/testing 28 exports
+clean consumer ok: 10 typed entry points (...) type-check from the tarballs alone
+clean-consume: every publishable package installs and works from its tarball alone
+VERIFY EXIT 0
+```
+
+## 17. Integration obligations (B07 and B09 on main)
+
+B07 and B09 were designed in parallel on the same base (`ac44af6`). Neither references the other's tables; they touch through
+ports, shared B06 tables and shared files. When both land, the integrator:
+
+1. **Migrations.** Keeps B07's `0009..0012` and renumbers B09's files after them (or the reverse, whichever merges second),
+   contiguous from 0001 (the runner refuses gaps); re-applies from empty; both packages' tests are the proof. B09's own
+   `aggregate_kinds` table and binding rewrite (its 0008 on `b09/design`) must be replaced by rows of the foundation registry, as
+   B07 did (Q-B09-13 / D-AGGK-5).
+2. **Aggregate-kind registry.** Both packages register rows (`upload_session`, `source_file`, `retention_record` by B07; the eight
+   commerce kinds by B09) and each event-inserting group gets its own read policy: `aggregate_kinds_read_b07_control`
+   (`kauro_control`) and B09's for `kauro_payment`. `aggregate-kinds.test.ts`'s expected inserters become
+   `[kauro_app, kauro_control, kauro_payment]`, its expected policies both package policies, its `TABLE_OF` every kind; `@kauro/domain`
+   `AGGREGATE_KINDS` the union.
+3. **`kauro.event_types`, `EVENT_TYPES`, `EVENT_PAYLOAD_ALLOWLIST`, `CONSUMERS`, `EVENT_SUBSCRIPTIONS`** (`packages/domain/src/model/events.ts`):
+   concatenate both packages' entries (disjoint prefixes: `upload_session.`, `source_file.`, `retention_record.`, `dataset_revision.selection_changed.v1`,
+   `project.current_revision_changed.v1` vs B09's commerce types); both migrations lift FORCE RLS on `event_types` in their own
+   transaction (Q-AGGK-2).
+4. **`dataset_revisions`.** B07 adds lifecycle columns, a lifecycle guard and policies; B09 grants `kauro_payment` column-scoped
+   SELECT (ids, state, manifest hash, sealed) and takes the revision's shared transition lock before issuing a commercial
+   authorization (its KP004 check "the quoted source revision SEALED"). B07's `retention_expires` takes the exclusive half of the
+   same lock (the lifecycle guard), so the two serialize in either order: the integrator adds one cross-package RACE test — a
+   retention expiry racing authorization issuance, both interleavings, observed in `pg_stat_activity` — and extends B09's column
+   grant with nothing of B07's (B09 reads no B07 column).
+5. **Source availability (quotes).** B09's `quotes.source_available_until` is supplied by the quote issuer (B10's CMD027) and
+   re-checked at checkout and capture; its source of truth is B07's retention: the integrator binds `SourceAvailabilityReader`
+   (`@kauro/domain` ports, implemented by B07-PERSISTENCE) where B10 issues a quote (sourceAvailableUntil ≤ availableUntil) and
+   where B09's checkout and capture re-check SOURCE_EXPIRED (state SEALED and availableUntil in the future on the server clock).
+   The hard cap belongs to the bytes (D-RET-3): a quote for a revision that reuses bytes inherits the earlier cap.
+6. **Replacement allowance (Q-B07-17).** `b09/design` does not count `pricing.customerPreExecutionSourceReplacementsIncluded`; the
+   integrator assigns it to the commercial package that re-checks a quote (B09 checkout or B10 issuance), which reads
+   `RevisionLineageReader.replacementsSince(quotedRevisionId)`; B07 needs no change.
+7. **Commercial scope of CMD012.** `CommercialScopeInspector.authorizationsBoundTo` (`@kauro/application` source-providers) is
+   bound to B09's `commercial_authorizations` reader so `dataset_revision.superseded.v1` names affected authorizations; until then
+   CMD012 records none.
+8. **`packages/persistence/src/sqlstate.ts`.** Merge both ranges (KA070–KA072 for B07, KP001–KP011 for B09) and both
+   `LABEL_CONSTRAINT_FIELDS` additions (`upload_sessions_display_name_label`, `refunds_reason_code_label`).
+9. **`@kauro/domain` shared files.** `FAILURE_REASONS` (errors.ts: union of both lists), `PlatformMachineName` and `machine()`
+   (state-machines.ts: both machine lists), `SystemContext` (tenant.ts: B07's optional bound `agencyId` beside B09's SERVICE and
+   OPERATOR contexts), the ports index.
+10. **The persistence harness and temporary cluster.** `temporary-postgres.ts`: B09's `kauro_payment_test` login and B07's TEST
+    CLOCK (installed after the logins; `testClock: false` for the migrations test); `harness.ts`/`testing/index.ts`: both packages'
+    fixtures (B07's `sealedRevision` through the source lifecycle; B09's payment pool, `service()`, `operator()`); `unit-of-work.ts`:
+    B09's commerce unit of work and B07's `runSource`/`serverInstant` (mandate B07-PERSISTENCE) on the same B06 factory.
+11. **`runtime-boundary.json`.** Re-read from a cluster migrated with both packages and reviewed: the union of both packages'
+    reviewed entries, nothing else.
+12. **OpenAPI (`tools/openapi.mjs`, `apps/api/openapi.json`, `tools/test/openapi.test.mjs`).** Both packages implement the same
+    `x-kauro-planned` mechanism (root member, "METHOD path" keys, identical check rules and messages, the `planned` loop in
+    `checkOpenApi`): keep one copy of the mechanism, both packages' planned blocks (B07's commands and source routes; B09's
+    commerce commands and reads) and both runtime-schema additions (`buildSourceResponseSchemas`, `buildCommerceResponseSchemas`),
+    then regenerate the document; both packages' tests stay.
+13. **Matrix (`tools/matrix.mjs`, `tools/test/matrix.test.mjs`).** Union of both owner tables and machine lists (the expected
+    machine count becomes 18 + B09's ten), regenerate `docs/design/B06-state-command-event-matrix.md`.
+14. **`@kauro/application` index and api registries.** Both `export * from "./sources/index.js"` and the commerce exports;
+    `api/outcomes.ts` and `api/response-schemas.ts` exports both packages need.
+
+## 18. Critique record
+
+Every finding of the adversarial critique of `bfac6b1` (`.claude/b07-b09-design-review/critic_B07.json`), with its disposition.
+Test names are in `packages/persistence/test/source-migrations.test.ts` (SM) unless another file is named.
+
+| id | status | disposition and evidence |
+|---|---|---|
+| B07-F1 (BLOCKING) | FIXED | Confirmed against 09 "Initial intake envelope" + "Upload reservation" and the registry guard. D-INTAKE-1: all_uploads_completed is CMD016's explicit act (the guard requires the binding in the same update; the control plane's policy no longer admits INSPECTING and its event policy no longer lists `dataset_revision.inspecting.v1`); every settle point and the selection take the revision row first (D-LOCK-1, D-LOCK-2). Migrations 0009 (policies), 0011 (guard). Tests: SM "B07-F1: the intake closes only by the agency's explicit selection — …" (the three-file intake with two sessions; fails on `bfac6b1`, whose guard let the control plane close the intake as soon as nothing was open and refused the selection on UPLOADING) and SM "B07-F1: the last open upload cancelled (CMD015), expired (the deadline sweeper) or rejected (an inspection outcome) never strands the revision: …". |
+| B07-F2 (MAJOR) | FIXED | Confirmed: every guard compared writer-supplied instants. D-CLOCK-1: `kauro.server_now()`; `upload_sessions_window_clock`, the revision guard's instant check, `retention_anchors_server_clock`, `retention_records_server_clock`, the file admission/revocation and deletion checks; the labelled TEST CLOCK for fixtures (`@kauro/persistence/testing`), the fixture never back-dates. Tests: SM "B07-F2: every lifecycle instant is the server's — …" (the critic's forward-dated reservation, expiry at the deadline value, fifteen-day back-dated seal, 99-day anchor, far-future record and revision expiries, a completion report after the deadline — all refused; negative control on the test clock) and `packages/persistence/test/migrations.test.ts` "B07 D-CLOCK-1: the shipped kauro.server_now() is the transaction time and nothing else — …". |
+| B07-F3 (MAJOR) | FIXED | Confirmed against B06 D-EVID-1. D-ANCH-2: anchor policies per role and kind, `retention_anchors_bound` at COMMIT, the UNPAID-only record policy for the request handlers anchored on this transaction's seal. Migration 0012. Test: SM "B07-F3: request handlers write no retention evidence they do not own — …" (the critic's LEGAL_FINANCIAL-until-2100 record and control-plane anchors refused; the sweeper's expiry then commits). |
+| B07-F4 (MAJOR) | FIXED | Confirmed against 09 "Scanner coverage" and S054. D-SCAN-1/2: `kauro.scan_coverage_complete` (exactly one CONTAINER part at the observed length, every part complete, counts and sums equal the coverage document), `signature_max_age_seconds = 86400`; the domain's `evaluateScanCoverage` takes the object and pins the age (CONTAINER_NOT_COVERED). Tests: SM "S054 at the database: …" (the critic's 1-of-100-bytes receipt with six-day-old signatures refused, the container missing or short, a widened age) and `packages/domain/test/source-model.test.ts` "B07-F4: scan coverage is judged against the object — …". |
+| B07-F5 (MAJOR) | FIXED | Confirmed against 09 "Retention schedule" and HASHING "Retention formulas". D-RET-3: the UNPAID record is anchored on the first seal of the bytes (checked at COMMIT), a seal whose bytes' window closed is refused, the RETENTION_EXPIRED revocation ends the admission of bytes whose governing records all expired; open question Q-B07-20. Tests: SM "B07-F5: the unpaid hard cap belongs to the bytes — …" and `source-model.test.ts` "deadlines: …" (firstSealOfBytes). |
+| B07-F6 (MAJOR) | FIXED | Confirmed: the S024 network clause was claimed without an observable on the Windows verify host. D-ISO-1 specifies the mechanism (child process under the Node permission model; network hooks because Node 24's permission model does not govern the network — verified on this host: `node --permission` refuses fs writes and child processes, `process.permission.has("net")` is false) and its observables with negative controls; the OS-level egress denial is LATER: B15. Port contract `InspectionIsolation` (`@kauro/application` source-providers.ts); case map S024 row. The behaviour is the DATA-PLANE mandate's (SPECIFIED, not claimed). |
+| B07-F7 (MAJOR) | FIXED | Resolved by the foundation (`ac44af6` "Foundation: the shared aggregate-kind registry (migration 0008)"): B07's own `aggregate_kinds` table, its DROP CONSTRAINT and its CASE rewrite of `domain_events_bind_aggregate` are deleted; B07 inserts `upload_session`, `source_file` and `retention_record` rows (D-KIND-1) and adds `aggregate_kinds_read_b07_control`. Tests: SM "UploadSession, StoredObject, SourceFile and RetentionRecord are seeded exactly as the domain machines, … bound through its unchanged function (B07-F7)" and `packages/persistence/test/aggregate-kinds.test.ts` (extended with the B07 kinds and the control plane as an event inserter). |
+| B07-F8 (MAJOR) | FIXED | Confirmed against 09 "Deletion receipts and restoration". `AuthorityTombstoneKind` gains REVISION_EXPIRED and REVISION_REJECTED, `state` is the closed `AuthorityTombstoneState`, `AUTHORITY_TOMBSTONES` maps every event routed to AUTHORITY_JOURNAL (and `dataset_revision.rejected.v1` is routed there, Q-B07-21). Tests: `packages/application/test/source-contracts.test.ts` "B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombstone kind and a terminal state — …" (on `bfac6b1` the port had no REVISION_EXPIRED kind and no mapping to check) and `source-model.test.ts` "every B07 event type carries an allowlist …"; the authority-journal pipeline test (B07-CONTROL) covers the expired case. |
+| B07-F9 (MINOR) | FIXED | Confirmed against B06 D-VER-1/D-EVT-1. D-FILE-2: `source_files.version`, event per version, kind `source_file`, `source_file.admitted.v1` and `source_file.admission_revoked.v1` (EXECUTION_CONTROL, NOTIFICATIONS). D-OBJ-3 records why `stored_objects` rows are not aggregates. Test: SM "B07-F9: an admitted file is an aggregate — …" (a revocation without its event fails KA003, without a version bump KA002). |
+| B07-F10 (MINOR) | FIXED | Confirmed: two SELECTs under READ COMMITTED. The check reads uploads and ledger in one statement per ledger and is queued only by a holding change (WHEN clause). Test: SM "B07-F10: the ledgers are checked by a write that changed what an upload holds, in one snapshot — …" (a ledger-neutral edge commits beside an adversarial ledger; a ledger-changing edge is refused KA070). The exact two-statement window is not reproducible deterministically without an in-function hold point; the single-statement shape is asserted on the function body. |
+| B07-F11 (MINOR) | FIXED | Confirmed: the database compared only two handler-supplied hashes. D-SEL-4: `kauro.check_selection_inventory` compares the manifest with the rows; `kauro.source_inventory_frozen` freezes an admitted file's inventory. Test: SM "B07-F11: the database compares a selection with the revision's current inventory row by row — …". The inventory hash equality remains a handler check (SELECTION_STALE), stated as such in the case map. |
+| B07-F12 (MINOR) | FIXED | Confirmed: the preimage departed from HASHING and A2 only renames. D-HASH-1 (the authority preimage exactly, CHECK `sealed_manifests_authority_preimage`), D-HASH-4 (the sealed subject, `subject_hash`), open question Q-B07-18 with the real reason (B06's unique source hash). Tests: `source-model.test.ts` "digests are domain separated; the manifest hash is exactly HASHING's KAURO_SOURCE_REVISION_V1 preimage and the sealed subject binds the revision (B07-F12)", SM "the legitimate lifecycle …" and SM "no CHECK passes on a missing member: …". |
+| B07-F13 (MINOR) | FIXED | Confirmed. D-API-1: the B07 routes are `x-kauro-planned` operations of `apps/api/openapi.json` (14 planned operations), checked by `tools/openapi.mjs`; `SOURCE_SWEEPERS` equals §12.5. Tests: `tools/test/openapi.test.mjs` "B07-F13: the source-lifecycle routes are documented from their contracts as planned operations — …", `source-contracts.test.ts` "B07-F13: the sweepers of the contracts are exactly the sweepers of design §12.5, …" and "B07-F13: the planned reply envelopes …". |
+| B07-F14 (MINOR) | FIXED | Confirmed for the design at `bfac6b1` (the observation moved the revision after locking the upload). With D-INTAKE-1 the inspection no longer moves the revision; D-LOCK-2 fixes the control-plane order (revision row first) for every unit of work that changes an upload, a file or the revision. Test: SM "D-LOCK-2 (B07-F14): a cancellation and an inspection outcome of the same revision are ordered by the revision row, never upload-first — …" (both interleavings, the wait observed in `pg_stat_activity`, no deadlock). |

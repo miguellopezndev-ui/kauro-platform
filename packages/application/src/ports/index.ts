@@ -17,6 +17,7 @@ export type {
   InspectionLimits,
   DetectedColumn,
   DetectedTable,
+  InspectionIsolation,
   ContainerInspection,
   ContainerInspectorPort,
   SelectionEvaluationInput,
@@ -25,7 +26,9 @@ export type {
   SessionSecretBinding,
   SessionVaultPort,
   AuthorityTombstoneKind,
+  AuthorityTombstoneState,
   AuthorityTombstone,
   AuthorityJournalPort,
   CommercialScopeInspector,
 } from "./source-providers.js";
+export { AUTHORITY_TOMBSTONES } from "./source-providers.js";

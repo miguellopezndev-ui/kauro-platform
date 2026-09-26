@@ -59,7 +59,7 @@ export const EDGE_OWNERS = {
   DatasetRevision: {
     "(initial DRAFT)": { command: "CMD011", event: "dataset_revision.created.v1", note: "CMD012 CreateRevision (B07) creates every later revision, with explicit lineage (D-REV-1)" },
     upload_reserved: { command: "CMD013", event: "dataset_revision.uploading.v1", note: "the first reservation, in its intent unit of work (D-RUN-2)" },
-    all_uploads_completed: { command: "CMD014", event: "dataset_revision.inspecting.v1", note: "taken asynchronously by CMD014's continuation, the UPLOAD_INSPECTION consumer (control plane), once no reservation, session or unobserved completion of the revision remains (D-RUN-1)" },
+    all_uploads_completed: { command: "CMD016", event: "dataset_revision.selection_changed.v1", note: "the agency's explicit closing of the intake: CMD016 binds its selection on the UPLOADING revision once no upload of it is RESERVED, UPLOADING or VERIFYING (D-INTAKE-1, B07-F1); no observation, inspection outcome, cancellation or deadline takes it" },
     previously_admitted_inputs_selected: { command: "CMD016", event: "dataset_revision.selection_changed.v1", note: "a selection that reuses admitted files of the project binds on a DRAFT revision" },
     all_selected_inputs_admitted: { owner: "B07", why: "the SELECTION_EVALUATION consumer (control plane) records a complete evaluation of the bound selection and binds its counts", event: "dataset_revision.ready_to_seal.v1" },
     fatal_input_rejection: { owner: "B07", why: "the SELECTION_EVALUATION consumer (control plane) records an ADMISSION_FAILED evaluation of the bound selection (no silent removal)", event: "dataset_revision.rejected.v1" },
@@ -92,11 +92,11 @@ export const EDGE_OWNERS = {
     deletion_retried: { owner: "B07", why: "the deletion-retry sweeper (control plane)", event: null },
   },
   SourceFile: {
-    "(initial ADMITTED)": { owner: "B07", why: "the UPLOAD_INSPECTION consumer admits a file only while its upload is VERIFYING under the current attempt (control plane)", event: null },
-    admission_revoked: { owner: "B07", why: "the upload-deadline sweeper (INTAKE_EXPIRED, refused while a sealed revision retains the file) or object inventory (GENERATION_MISSING, GENERATION_CHANGED) (D-FILE-1)", event: null },
+    "(initial ADMITTED)": { owner: "B07", why: "the UPLOAD_INSPECTION consumer admits a file only while its upload is VERIFYING under the current attempt (control plane); an aggregate since B07-F9", event: "source_file.admitted.v1" },
+    admission_revoked: { owner: "B07", why: "the upload-deadline sweeper (INTAKE_EXPIRED, only for a file no seal ever included, once its intake window closed), the retention sweeper (RETENTION_EXPIRED, once no including revision holds an ACTIVE record ahead, D-RET-3) or object inventory (GENERATION_MISSING, GENERATION_CHANGED) (D-FILE-1)", event: "source_file.admission_revoked.v1" },
   },
   RetentionRecord: {
-    "(initial ACTIVE)": { command: "CMD017", event: "retention_record.created.v1", note: "the UNPAID record anchored on the seal: hard deadline fourteen days after it (D-RET-2); later packages create the paid classes" },
+    "(initial ACTIVE)": { command: "CMD017", event: "retention_record.created.v1", note: "the UNPAID record anchored on the first seal of its bytes: hard deadline fourteen days after it, never restarted by a re-seal (D-RET-2, D-RET-3); later packages create the paid classes" },
     effective_deadline_reached: { owner: "B07", why: "the retention sweeper (control plane), never before the effective deadline", event: "retention_record.expired.v1" },
     early_deletion_requested: { command: "CMD042", event: null },
     cleanup_started: { owner: "B16", why: "managed deletion of expired data", event: null },
@@ -415,7 +415,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008–0011 of B07) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();

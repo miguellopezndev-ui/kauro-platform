@@ -73,7 +73,9 @@ export type {
   SelectionEvaluationRecord,
   SourceRevisionRecord,
   SealedProjection,
-  SealedManifestDocument,
+  SealedAssociation,
+  SourceRevisionManifest,
+  SealedSubjectDocument,
   SealedManifestRecord,
   RetentionAnchorKind,
   RetentionAnchorRecord,
@@ -100,6 +102,7 @@ export type {
   ScannedPart,
   ScannerReport,
   ScanCoveragePolicy,
+  ScannedObject,
   ScanCoverageReason,
   PartCoverage,
   ScanCoverage,
@@ -111,6 +114,7 @@ export {
   sourceDigest,
   selectionHashOf,
   sourceRevisionManifestHashOf,
+  sealedSubjectHashOf,
   projectionHashOf,
   inventoryHashOf,
   tableStructureHashOf,
@@ -121,5 +125,5 @@ export {
   authorityTombstoneHashOf,
   textDigest,
 } from "./digests.js";
-export { uploadApplicationDeadline, providerSessionHorizon, effectiveDeadline, unpaidSealedDeadlines, unpaidSoftDeadline, unsealedIntakeDeadline, isPast } from "./retention.js";
+export { uploadApplicationDeadline, providerSessionHorizon, effectiveDeadline, unpaidSealedDeadlines, firstSealOfBytes, unpaidSoftDeadline, unsealedIntakeDeadline, isPast } from "./retention.js";
 export { zonePrefix, isObjectName, quarantineObjectName, acceptedObjectName, agencyPrefix } from "./object-names.js";

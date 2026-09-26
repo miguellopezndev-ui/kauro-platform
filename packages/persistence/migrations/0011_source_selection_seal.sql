@@ -1,4 +1,4 @@
--- 0010 — B07 source lifecycle, part 3: selection manifests, selection evaluations (exact counts of the selected scope), the
+-- 0011 — B07 source lifecycle, part 3: selection manifests, selection evaluations (exact counts of the selected scope), the
 -- sealed manifest and its file set, and the lifecycle guard of dataset revisions.
 --
 -- Authority: 09 "Accepted immutability and sealing" (the agency selects tables and confirms parsing and projection;
@@ -106,6 +106,22 @@ ALTER TABLE kauro.dataset_revisions ADD CONSTRAINT dataset_revisions_evaluation_
   REFERENCES kauro.selection_evaluations (agency_id, revision_id, evaluation_id, evaluation_hash, selection_hash, physical_source_rows, logical_source_records, billable_source_units, association_edges);
 
 -- --- sealed manifests (the only subject that can be profiled and quoted) ----------------------------------------------------------
+-- Whether a jsonb object has exactly the given keys (NULL-safe: anything but such an object is false).
+CREATE OR REPLACE FUNCTION kauro.jsonb_has_exactly_keys(p_doc jsonb, p_keys text[]) RETURNS boolean
+  LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$
+  SELECT CASE WHEN jsonb_typeof(p_doc) = 'object'
+    THEN coalesce((SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(p_doc) k) = (SELECT array_agg(k ORDER BY k) FROM unnest(p_keys) k), false)
+    ELSE false END
+$$;
+
+-- B07-F12: two documents per seal. `manifest` is exactly the preimage reference/HASHING_AND_ACCOUNTING_RULES "Hash domain
+-- separation" gives KAURO_SOURCE_REVISION_V1 (amendment A2 of KAVO_SOURCE_REVISION_V1): the ordered accepted files (ids,
+-- generations, hashes, lengths), the table selection, the parser profile and the projection — nothing else (no revision id, no
+-- populations, no mutable upload state); its digest is manifest_hash, the source hash plans bind (B06 plans_source_fk). `subject`
+-- is the platform's sealed-subject document (domain KAURO_SOURCE_SEALED_SUBJECT_V1, D-HASH-4): the revision, its lineage, the
+-- manifest, projection, selection and evaluation hashes, the frozen populations, the uploads inspection rejected and the input
+-- envelope; its digest is subject_hash. Both carry ids, hashes, counts and tokens only (no customer text).
 CREATE TABLE kauro.sealed_manifests (
   revision_id          uuid PRIMARY KEY,
   agency_id            uuid NOT NULL REFERENCES kauro.agencies (agency_id),
@@ -114,16 +130,23 @@ CREATE TABLE kauro.sealed_manifests (
   projection_hash      text NOT NULL CHECK (kauro.is_sha256_hex(projection_hash)),
   selection_hash       text NOT NULL CHECK (kauro.is_sha256_hex(selection_hash)),
   evaluation_hash      text NOT NULL CHECK (kauro.is_sha256_hex(evaluation_hash)),
+  subject_hash         text NOT NULL CHECK (kauro.is_sha256_hex(subject_hash)),
   canonical_version    integer NOT NULL CHECK (canonical_version = 1),
-  -- the complete canonical manifest document whose KAURO_SOURCE_REVISION_V1 digest is manifest_hash (ids, hashes, counts,
-  -- tokens: no customer text)
-  manifest             jsonb NOT NULL CHECK (jsonb_typeof(manifest) = 'object' AND pg_column_size(manifest) <= 1048576),
+  manifest             jsonb NOT NULL CHECK (pg_column_size(manifest) <= 1048576),
+  subject              jsonb NOT NULL CHECK (pg_column_size(subject) <= 1048576),
   sealed_at            timestamptz NOT NULL,
   UNIQUE (agency_id, revision_id),
   UNIQUE (agency_id, manifest_hash),
+  UNIQUE (agency_id, subject_hash),
   FOREIGN KEY (agency_id, project_id, revision_id) REFERENCES kauro.dataset_revisions (agency_id, project_id, revision_id),
+  -- the authority preimage has exactly the four members HASHING names; a revision id or a population inside it is refused
+  CONSTRAINT sealed_manifests_authority_preimage CHECK (kauro.jsonb_has_exactly_keys(manifest, ARRAY['files', 'tableSelection', 'parserProfile', 'projection'])),
+  -- the subject names this revision and exactly the hashes of this row (NULL-safe)
   CONSTRAINT sealed_manifests_names_revision CHECK (
-    (manifest ->> 'revisionId') IS NOT DISTINCT FROM revision_id::text AND (manifest ->> 'canonicalVersion') IS NOT DISTINCT FROM canonical_version::text
+    jsonb_typeof(subject) = 'object'
+    AND (subject ->> 'revisionId') IS NOT DISTINCT FROM revision_id::text AND (subject ->> 'canonicalVersion') IS NOT DISTINCT FROM canonical_version::text
+    AND (subject ->> 'manifestHash') IS NOT DISTINCT FROM manifest_hash AND (subject ->> 'projectionHash') IS NOT DISTINCT FROM projection_hash
+    AND (subject ->> 'selectionHash') IS NOT DISTINCT FROM selection_hash AND (subject ->> 'evaluationHash') IS NOT DISTINCT FROM evaluation_hash
   )
 );
 CREATE TRIGGER sealed_manifests_append_only BEFORE UPDATE OR DELETE ON kauro.sealed_manifests
@@ -154,7 +177,7 @@ CREATE INDEX sealed_revision_files_by_file ON kauro.sealed_revision_files (agenc
 CREATE TRIGGER sealed_revision_files_append_only BEFORE UPDATE OR DELETE ON kauro.sealed_revision_files
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
 
--- An included file is admitted when it is sealed: the file's admission is a transition subject (0009), read after its shared
+-- An included file is admitted when it is sealed: the file's admission is a transition subject (0010), read after its shared
 -- transition lock and held to COMMIT, so a revocation in flight is ordered before the seal (and read) or after it (and refused
 -- by the revocation guard, which sees the seal).
 CREATE OR REPLACE FUNCTION kauro.sealed_revision_files_admitted() RETURNS trigger
@@ -175,15 +198,77 @@ $$;
 CREATE TRIGGER sealed_revision_files_admitted BEFORE INSERT ON kauro.sealed_revision_files
   FOR EACH ROW EXECUTE FUNCTION kauro.sealed_revision_files_admitted();
 
+-- --- a selection matches the revision's current inventory (B07-F11) ---------------------------------------------------------------
+-- The database's own comparison of a selection manifest with the inventory it is bound against (CMD016 failure: "Missing or newly
+-- changed tables invalidate previous selection"), from the rows, not from two hashes the handler supplies: every admitted file of
+-- the revision's own uploads is disposed; every file the manifest names is a file of this project of the origin it states, and an
+-- included one is ADMITTED now; at least one file is included; and the tables the manifest lists are exactly the detected tables of
+-- its files at their current structure hash, every table of an included file included or excluded. The inventory hash equality
+-- stays a handler check (SELECTION_STALE, D-SEL-3); this is the backstop the handler cannot skip.
+CREATE OR REPLACE FUNCTION kauro.check_selection_inventory(p_agency uuid, p_project uuid, p_revision uuid, p_manifest uuid) RETURNS void
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  body jsonb;
+BEGIN
+  SELECT m.body INTO body FROM kauro.selection_manifests m WHERE m.agency_id = p_agency AND m.selection_manifest_id = p_manifest AND m.revision_id = p_revision;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: revision % binds no selection manifest of its own', p_revision USING ERRCODE = 'KA072';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM kauro.source_files f
+     WHERE f.agency_id = p_agency AND f.origin_revision_id = p_revision AND f.state = 'ADMITTED'
+       AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(body -> 'files') e WHERE e ->> 'fileId' = f.file_id::text)
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: an admitted file of revision % has no disposition in the selection (a missing input invalidates it)', p_revision USING ERRCODE = 'KA072';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(body -> 'files') e
+     WHERE NOT EXISTS (
+       SELECT 1 FROM kauro.source_files f
+        WHERE f.agency_id = p_agency AND f.project_id = p_project AND f.file_id::text = e ->> 'fileId'
+          AND (e ->> 'origin' = 'THIS_REVISION') = (f.origin_revision_id = p_revision)
+          AND (e ->> 'disposition' IS DISTINCT FROM 'INCLUDE' OR f.state = 'ADMITTED')
+     )
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the selection of revision % names a file unknown to the project, of another origin, or no longer admitted', p_revision USING ERRCODE = 'KA072';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(body -> 'files') e WHERE e ->> 'disposition' = 'INCLUDE') THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the selection of revision % includes no file', p_revision USING ERRCODE = 'KA072';
+  END IF;
+  IF EXISTS (
+    SELECT f.file_id::text, t.table_id::text, t.structure_hash
+      FROM jsonb_array_elements(body -> 'files') e
+      JOIN kauro.source_files f ON f.agency_id = p_agency AND f.file_id::text = e ->> 'fileId'
+      JOIN kauro.source_tables t ON t.agency_id = f.agency_id AND t.file_id = f.file_id
+     WHERE e ->> 'disposition' = 'INCLUDE'
+    EXCEPT
+    SELECT x ->> 'fileId', x ->> 'tableId', x ->> 'structureHash' FROM jsonb_array_elements(coalesce(body -> 'tables', '[]'::jsonb)) x
+  ) OR EXISTS (
+    SELECT x ->> 'fileId', x ->> 'tableId', x ->> 'structureHash' FROM jsonb_array_elements(coalesce(body -> 'tables', '[]'::jsonb)) x
+    EXCEPT
+    SELECT f.file_id::text, t.table_id::text, t.structure_hash
+      FROM jsonb_array_elements(body -> 'files') e
+      JOIN kauro.source_files f ON f.agency_id = p_agency AND f.file_id::text = e ->> 'fileId'
+      JOIN kauro.source_tables t ON t.agency_id = f.agency_id AND t.file_id = f.file_id
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the tables of the selection of revision % are not the detected tables of its files at their current structure', p_revision USING ERRCODE = 'KA072';
+  END IF;
+END
+$$;
+
 -- --- dataset revision lifecycle guard ----------------------------------------------------------------------------------------------
 -- Entering a state requires the facts its registry guard names; a sealed subject never changes; a selection changes only while
--- the revision is selectable, against a settled inventory, and always starts uncounted. The listed-edge trigger of B06 decides
--- whether the edge exists; this guard decides whether its facts are present; the role policies of 0008 decide who may take it.
+-- the revision is selectable, against a settled inventory, and always starts uncounted; every lifecycle instant is the server's
+-- transaction time (D-CLOCK-1). The listed-edge trigger of B06 decides whether the edge exists; this guard decides whether its
+-- facts are present; the role policies of 0009 decide who may take it.
 CREATE OR REPLACE FUNCTION kauro.dataset_revisions_lifecycle_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 DECLARE
   live_uploads boolean;
+  clock timestamptz := kauro.server_now();
+  binding boolean := NEW.selection_hash IS DISTINCT FROM OLD.selection_hash OR NEW.selection_manifest_id IS DISTINCT FROM OLD.selection_manifest_id;
 BEGIN
   -- the transition lock first, then the facts (decision D-LOCK-1): B06's dataset_revisions_transition_lock takes the same lock,
   -- but fires after this guard (triggers fire by name), so a guard reading first would decide on what it read before waiting for
@@ -203,14 +288,27 @@ BEGIN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: sealed revision % cannot change its subject', OLD.revision_id USING ERRCODE = 'KA004';
   END IF;
 
+  -- D-CLOCK-1 (B07-F2): a lifecycle instant this update records is the server's transaction time, never a value the writer chose
+  IF (NEW.selected_at IS DISTINCT FROM OLD.selected_at AND NEW.selected_at IS DISTINCT FROM clock)
+     OR (NEW.sealed_at IS DISTINCT FROM OLD.sealed_at AND NEW.sealed_at IS DISTINCT FROM clock)
+     OR (NEW.superseded_at IS DISTINCT FROM OLD.superseded_at AND NEW.superseded_at IS DISTINCT FROM clock)
+     OR (NEW.cancelled_at IS DISTINCT FROM OLD.cancelled_at AND NEW.cancelled_at IS DISTINCT FROM clock)
+     OR (NEW.rejected_at IS DISTINCT FROM OLD.rejected_at AND NEW.rejected_at IS DISTINCT FROM clock)
+     OR (NEW.expired_at IS DISTINCT FROM OLD.expired_at AND NEW.expired_at IS DISTINCT FROM clock)
+     OR (NEW.deleted_at IS DISTINCT FROM OLD.deleted_at AND NEW.deleted_at IS DISTINCT FROM clock) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: revision % records a lifecycle instant other than the server''s transaction time', OLD.revision_id USING ERRCODE = 'KA072';
+  END IF;
+
   live_uploads := EXISTS (
     SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = OLD.agency_id AND u.revision_id = OLD.revision_id AND u.state IN ('RESERVED', 'UPLOADING', 'VERIFYING')
   );
 
-  -- binding a selection (CMD016): only while selectable, never removed, against a settled inventory (D-SEL-3), naming the
-  -- inventory the manifest was made against, and always leaving the revision INSPECTING and uncounted
-  IF NEW.selection_hash IS DISTINCT FROM OLD.selection_hash OR NEW.selection_manifest_id IS DISTINCT FROM OLD.selection_manifest_id THEN
-    IF OLD.state NOT IN ('DRAFT', 'INSPECTING', 'READY_TO_SEAL') OR NEW.selection_hash IS NULL OR NEW.state <> 'INSPECTING' OR NEW.evaluation_id IS NOT NULL THEN
+  -- binding a selection (CMD016): only while mutable and selectable — UPLOADING included, where binding the selection is the
+  -- agency's explicit closing of the intake (all_uploads_completed, D-INTAKE-1, B07-F1) — never removed, against a settled
+  -- inventory (D-SEL-3) the manifest matches row by row (B07-F11), naming the inventory the manifest was made against, and always
+  -- leaving the revision INSPECTING and uncounted
+  IF binding THEN
+    IF OLD.state NOT IN ('DRAFT', 'UPLOADING', 'INSPECTING', 'READY_TO_SEAL') OR NEW.selection_hash IS NULL OR NEW.state <> 'INSPECTING' OR NEW.evaluation_id IS NOT NULL THEN
       RAISE EXCEPTION 'LIFECYCLE_BINDING: a selection is bound to a selectable revision, which it leaves INSPECTING and uncounted (%)', OLD.revision_id USING ERRCODE = 'KA072';
     END IF;
     IF live_uploads THEN
@@ -222,6 +320,7 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'LIFECYCLE_BINDING: revision % must record the inventory its selection manifest names', OLD.revision_id USING ERRCODE = 'KA072';
     END IF;
+    PERFORM kauro.check_selection_inventory(NEW.agency_id, NEW.project_id, NEW.revision_id, NEW.selection_manifest_id);
   END IF;
 
   -- counts are bound only by all_selected_inputs_admitted (INSPECTING -> READY_TO_SEAL) and cleared only by a new selection
@@ -239,13 +338,12 @@ BEGIN
         RAISE EXCEPTION 'LIFECYCLE_BINDING: upload_reserved needs the reservation it records (%)', OLD.revision_id USING ERRCODE = 'KA072';
       END IF;
     ELSIF OLD.state = 'UPLOADING' AND NEW.state = 'INSPECTING' THEN
-      -- all_uploads_completed: "Actual provider completion is observed" — no reservation or session is still open, every
-      -- reported completion has been observed, and at least one observed input remains to inspect
-      IF EXISTS (SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = OLD.agency_id AND u.revision_id = OLD.revision_id
-                  AND (u.state IN ('RESERVED', 'UPLOADING') OR (u.state = 'VERIFYING' AND u.completion_observed_at IS NULL)))
-         OR NOT EXISTS (SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = OLD.agency_id AND u.revision_id = OLD.revision_id
-                  AND u.state IN ('VERIFYING', 'ADMITTED') AND u.completion_observed_at IS NOT NULL) THEN
-        RAISE EXCEPTION 'LIFECYCLE_BINDING: all_uploads_completed needs every completion observed and one input to inspect (%)', OLD.revision_id USING ERRCODE = 'KA072';
+      -- all_uploads_completed ("Actual provider completion is observed for selected uploads", D-INTAKE-1, B07-F1): the agency's
+      -- explicit act — the selection bound in this very update (the binding branch above required that no reservation, session or
+      -- verification of the revision is open and that every included file is admitted, i.e. its completion was observed). Nothing
+      -- else closes the intake: a revision fed by two concurrent sessions stays UPLOADING across the gaps between reservations.
+      IF NOT binding THEN
+        RAISE EXCEPTION 'LIFECYCLE_BINDING: all_uploads_completed is the agency''s explicit selection of revision % (CMD016), never a side effect', OLD.revision_id USING ERRCODE = 'KA072';
       END IF;
     ELSIF OLD.state = 'READY_TO_SEAL' AND NEW.state = 'INSPECTING' THEN
       -- selection_changes: "Invalidate selected-scope readiness and recompute affected facts"
@@ -304,19 +402,20 @@ BEGIN
       END IF;
     ELSIF OLD.state = 'SEALED' AND NEW.state = 'EXPIRED' THEN
       -- retention_expires: "Effective deadline derived from immutable anchors is reached" — the revision is governed by at least one
-      -- retention record, and none of them is still ACTIVE with an effective deadline after the expiry (the earliest applicable
-      -- deadline of each record governs it; a later lawful deadline of another record, such as a paid class, keeps the data)
+      -- retention record, and none of them is still ACTIVE with an effective deadline after the server clock (the earliest
+      -- applicable deadline of each record governs it; a later lawful deadline of another record, such as a paid class, keeps the
+      -- data). Decided on the server clock, never on the expiry instant a writer supplies (B07-F2).
       IF NEW.expired_at IS NULL
          OR NOT EXISTS (SELECT 1 FROM kauro.retention_records r WHERE r.agency_id = NEW.agency_id AND r.revision_id = NEW.revision_id)
          OR EXISTS (SELECT 1 FROM kauro.retention_records r WHERE r.agency_id = NEW.agency_id AND r.revision_id = NEW.revision_id
-                     AND r.state = 'ACTIVE' AND r.effective_deadline > NEW.expired_at) THEN
+                     AND r.state = 'ACTIVE' AND r.effective_deadline > clock) THEN
         RAISE EXCEPTION 'LIFECYCLE_BINDING: retention_expires needs every governing retention deadline of % reached', OLD.revision_id USING ERRCODE = 'KA072';
       END IF;
     ELSIF OLD.state = 'REJECTED' AND NEW.state = 'EXPIRED' THEN
       -- retention_expires of rejected input: "Rejected-input cleanup deadline is reached" — unsealed intake data follows its upload
-      -- session policy (D-RET-1), so every intake window of the revision has closed
+      -- session policy (D-RET-1), so every intake window of the revision has closed on the server clock
       IF NEW.expired_at IS NULL OR EXISTS (
-        SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = NEW.agency_id AND u.revision_id = NEW.revision_id AND u.application_expires_at > NEW.expired_at
+        SELECT 1 FROM kauro.upload_sessions u WHERE u.agency_id = NEW.agency_id AND u.revision_id = NEW.revision_id AND u.application_expires_at > clock
       ) THEN
         RAISE EXCEPTION 'LIFECYCLE_BINDING: retention_expires of rejected revision % waits for every intake window to close', OLD.revision_id USING ERRCODE = 'KA072';
       END IF;
@@ -329,15 +428,19 @@ CREATE TRIGGER dataset_revisions_lifecycle_guard BEFORE UPDATE ON kauro.dataset_
   FOR EACH ROW EXECUTE FUNCTION kauro.dataset_revisions_lifecycle_guard();
 
 -- At commit, a revision that entered SEALED has its sealed manifest with exactly its hashes, its sealed file set is exactly the
--- selection's dispositions (no file silently dropped or added) and agrees with the counts it froze, and its UNPAID retention
--- record is anchored on the seal with the hard cap of the policy (D-RET-2; "retention anchors survive failure": the seal and its
--- anchor commit together or not at all).
+-- selection's dispositions (no file silently dropped or added) and agrees with the counts it froze, its own REVISION_SEALED anchor
+-- at the seal instant ("retention anchors survive failure": the seal and its anchor commit together or not at all), and its UNPAID
+-- retention record carries the hard cap of the BYTES it seals (D-RET-2, D-RET-3, B07-F5): fourteen days from the first seal that
+-- ever included any of its included files — this seal for new bytes, an earlier revision's seal for reused bytes — anchored on
+-- that first seal's REVISION_SEALED anchor. Re-sealing reused bytes never starts a new fourteen days ("Extensions never ... revive
+-- an expired source or reset a hard clock"), and a seal whose bytes' window already closed is refused (a record born expired).
 CREATE OR REPLACE FUNCTION kauro.dataset_revisions_sealed_subject() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 DECLARE
   included integer;
   included_bytes bigint;
+  first_seal timestamptz;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM kauro.sealed_manifests m
@@ -368,13 +471,32 @@ BEGIN
     RAISE EXCEPTION 'LIFECYCLE_BINDING: the sealed file set of revision % is not the dispositions of its selection', NEW.revision_id USING ERRCODE = 'KA072';
   END IF;
   IF NOT EXISTS (
+    SELECT 1 FROM kauro.retention_anchors a
+     WHERE a.agency_id = NEW.agency_id AND a.revision_id = NEW.revision_id AND a.anchor_kind = 'REVISION_SEALED' AND a.occurred_at = NEW.sealed_at
+  ) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: sealed revision % has no REVISION_SEALED anchor at its seal', NEW.revision_id USING ERRCODE = 'KA072';
+  END IF;
+  -- the first seal of the bytes: the earliest seal of any revision that included any file this seal includes (this one included)
+  SELECT min(m.sealed_at) INTO first_seal
+    FROM kauro.sealed_revision_files s
+    JOIN kauro.sealed_revision_files o ON o.agency_id = s.agency_id AND o.file_id = s.file_id AND o.disposition = 'INCLUDED'
+    JOIN kauro.sealed_manifests m ON m.agency_id = o.agency_id AND m.revision_id = o.revision_id
+   WHERE s.agency_id = NEW.agency_id AND s.revision_id = NEW.revision_id AND s.disposition = 'INCLUDED';
+  -- policy retention.unpaidDaysHardFromSeal = 14; a day is an exact 86400-second duration (HASHING "Retention formulas")
+  IF first_seal IS NULL OR first_seal + interval '1209600 seconds' <= NEW.sealed_at THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the retention window of the bytes of revision % closed before this seal; reuse needs a new upload', NEW.revision_id USING ERRCODE = 'KA072';
+  END IF;
+  IF NOT EXISTS (
     SELECT 1 FROM kauro.retention_records r JOIN kauro.retention_anchors a ON a.agency_id = r.agency_id AND a.anchor_id = r.anchor_id
      WHERE r.agency_id = NEW.agency_id AND r.revision_id = NEW.revision_id AND r.class = 'UNPAID' AND a.anchor_kind = 'REVISION_SEALED'
-       AND a.revision_id = NEW.revision_id AND a.occurred_at = NEW.sealed_at
-       -- policy retention.unpaidDaysHardFromSeal = 14; a day is an exact 86400-second duration (HASHING "Retention formulas")
-       AND r.hard_deadline = NEW.sealed_at + interval '1209600 seconds'
+       AND a.project_id = NEW.project_id AND a.occurred_at = first_seal AND r.hard_deadline = first_seal + interval '1209600 seconds'
+       AND EXISTS (
+         SELECT 1 FROM kauro.sealed_revision_files o JOIN kauro.sealed_revision_files s ON s.agency_id = o.agency_id AND s.file_id = o.file_id
+          WHERE o.agency_id = a.agency_id AND o.revision_id = a.revision_id AND o.disposition = 'INCLUDED'
+            AND s.revision_id = NEW.revision_id AND s.disposition = 'INCLUDED'
+       )
   ) THEN
-    RAISE EXCEPTION 'LIFECYCLE_BINDING: sealed revision % has no retention record anchored on its seal', NEW.revision_id USING ERRCODE = 'KA072';
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: sealed revision % has no UNPAID retention record anchored on the first seal of its bytes', NEW.revision_id USING ERRCODE = 'KA072';
   END IF;
   RETURN NULL;
 END
@@ -385,7 +507,7 @@ CREATE CONSTRAINT TRIGGER dataset_revisions_sealed_subject AFTER UPDATE OF state
 
 -- At commit, a revision that left the mutable states has no upload in flight: a cancellation, a rejection, a seal, a
 -- supersession or an expiry tombstones or settles every reservation of the revision in the same transaction (CMD012 cancels them;
--- a concurrent reservation is ordered by the revision's transition lock, 0008), so no late session can target a closed revision.
+-- a concurrent reservation is ordered by the revision's row lock, 0009), so no late session can target a closed revision.
 CREATE OR REPLACE FUNCTION kauro.dataset_revisions_closed_without_live_uploads() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$

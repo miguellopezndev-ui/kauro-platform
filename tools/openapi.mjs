@@ -8,7 +8,9 @@
 //                                     an operation has no (or a duplicate) operationId, a registered route is undocumented,
 //                                     a documented route is not registered, a route's declared replies differ from the
 //                                     documented response schemas, a route's outcome catalogue differs from the problems it
-//                                     documents per status (x-kauro-outcomes), or a response schema declares a forbidden member
+//                                     documents per status (x-kauro-outcomes), or a response schema declares a forbidden member,
+//                                     or a planned operation (x-kauro-planned) is registered as a route, is also documented as
+//                                     served, repeats an operationId or declares a forbidden member
 //
 // Sources (nothing is written by hand): the served commands come from the provenance-verified registry commands.json (path,
 // method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their request schemas, the
@@ -18,6 +20,14 @@
 // are the ones the composition root actually registers: tools/openapi.mjs builds the api with `assembleApi` over the real pg
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
 // never connected, and the check asserts that it opened no connection.
+//
+// Planned operations (package B07, docs/design/B07-upload-source-lifecycle.md §9.5; finding B07-F13): the source-lifecycle routes
+// are specified with their request schemas, closed response schemas and outcome catalogues before their handlers exist. They are
+// generated from the same application contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths":
+// the check proves no planned route is registered (a registered route must be documented under "paths"), and a specified route
+// missing from the document fails the generated-document comparison; when mandate B07-COMMANDS serves a route it moves into the
+// served inventory and out of the planned list. (Package B09 plans its payment routes the same way; the integrator keeps one copy
+// of this mechanism and both packages' planned blocks.)
 //
 // Requires the workspace to be built (pnpm run build); the root "verify" script runs it after the build and the tests.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -90,9 +100,18 @@ function refsOf(schema, into = new Set()) {
 export function runtimeSchemas(sources) {
   const { application, bundle, operationalRoutes } = sources;
   const responses = application.buildResponseSchemas(bundle, operationalRoutes);
-  const byId = { ...responses.roots, Problem: application.PROBLEM_SCHEMA };
+  // package B07: the planned source routes' closed schemas, derived under the same rules (they never shadow a served one)
+  const source = application.buildSourceResponseSchemas(bundle, new Set(Object.keys(responses.defs)), application.SOURCE_ROUTES);
+  for (const id of Object.keys(source.roots)) if (id in responses.roots) throw new Error(`the B07 schema ${id} collides with a served one`);
+  for (const name of Object.keys(source.defs)) if (name in responses.defs) throw new Error(`the B07 view ${name} collides with a served one`);
+  const byId = { ...responses.roots, ...source.roots, Problem: application.PROBLEM_SCHEMA };
   for (const [command, schema] of Object.entries(application.REQUEST_SCHEMAS)) byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
-  const defs = { ...bundle.$defs, ...responses.defs };
+  for (const [command, schema] of Object.entries(application.SOURCE_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B07 request schema of ${command} collides with a served one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
+  byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
+  const defs = { ...bundle.$defs, ...responses.defs, ...source.defs };
   return { byId, defs };
 }
 
@@ -264,6 +283,87 @@ export function generateOpenApi(sources) {
     };
   }
 
+  // package B07: the planned source-lifecycle routes (see the header), generated from the application contracts, keyed "METHOD path"
+  const planned = {};
+  for (const spec of Object.values(application.B07_COMMANDS)) {
+    const command = registryCommands.find((c) => c.id === spec.id);
+    if (!command) throw new Error(`${spec.id} is planned but absent from the registry`);
+    if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
+      throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
+    }
+    if (served.has(spec.id)) continue;
+    const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
+    addComponent(`${spec.name}Request`, byId[requestId], requestId);
+    const reply = application.SOURCE_COMMAND_RESPONSES[spec.id];
+    const responses = {};
+    if (reply.view === null) {
+      responses[String(reply.status)] = {
+        description: "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
+      };
+    } else {
+      const replyId = application.sourceCommandResponseSchemaId(spec.id);
+      addComponent(`${spec.name}Completed`, byId[replyId], replyId);
+      responses[String(reply.status)] = { description: `COMPLETED: ${command.effect}`, headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } } };
+    }
+    Object.assign(responses, problemResponses(application.SOURCE_COMMAND_OUTCOMES[spec.id]));
+    planned[`${spec.method} ${spec.path}`] = {
+      operationId: spec.name,
+      summary: `${spec.id} ${spec.name}`,
+      description: `Precondition: ${command.precondition}\n\nEffect: ${command.effect}\n\nFailure: ${command.failure}`,
+      "x-kauro-command": spec.id,
+      "x-kauro-role": spec.role,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-idempotency": command.idempotency,
+      "x-kauro-gate": command.gate,
+      "x-kauro-cases": command.testIds ?? [],
+      "x-kauro-package": "B07",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
+        { $ref: "#/components/parameters/IdempotencyKey" },
+        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
+      responses,
+    };
+  }
+  addComponent("SelectionManifestDocument", byId[application.SELECTION_MANIFEST_SCHEMA_ID], application.SELECTION_MANIFEST_SCHEMA_ID);
+  for (const [operationId, route] of Object.entries(application.SOURCE_ROUTES)) {
+    const schemaId = application.sourceRouteResponseSchemaId(operationId);
+    addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
+    const intake = route.method === "POST";
+    const reply = { headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${operationId}Reply` } } } };
+    planned[`${route.method} ${route.path}`] = {
+      operationId,
+      summary: `${operationId} (${route.view})`,
+      description: `Authority: ${route.authority}`,
+      ...(intake ? { "x-kauro-intake": true } : { "x-kauro-read": true }),
+      "x-kauro-role": route.role,
+      "x-kauro-scope": "AGENCY_HEADER",
+      "x-kauro-package": "B07",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(route.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
+        { $ref: "#/components/parameters/AgencySelector" },
+        ...(operationId === "ListUploads" ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      ...(intake ? { requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}SelectionManifestDocument` } } } } } : {}),
+      responses: {
+        ...(intake
+          ? {
+              200: { description: "STORED: the same document was already stored for this revision (created false; content-idempotent, D-SEL-2)", ...reply },
+              201: { description: "STORED: the document is stored (created true)", ...reply },
+            }
+          : { [String(route.status)]: { description: `READ: ${route.view}`, ...reply } }),
+        ...problemResponses(application.SOURCE_ROUTE_OUTCOMES[operationId]),
+      },
+    };
+  }
+
   for (const route of operationalRoutes) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);
     const responses = {};
@@ -303,10 +403,11 @@ export function generateOpenApi(sources) {
       title: "Kauro API",
       version: "v1",
       description:
-        "Generated by tools/openapi.mjs; do not edit. Operations come from the vendored registry commands.json (provenance-verified); request schemas, the response views derived from the registry contracts, the envelopes and the Problem document are the application-owned schemas the api's closed validator compiles and its send guard validates every reply with.",
+        "Generated by tools/openapi.mjs; do not edit. Operations come from the vendored registry commands.json (provenance-verified); request schemas, the response views derived from the registry contracts, the envelopes and the Problem document are the application-owned schemas the api's closed validator compiles and its send guard validates every reply with. x-kauro-planned documents designed operations no route serves yet (keyed \"METHOD path\"), generated from the same contracts.",
       "x-kauro-registry": { "commands.json": provenance.files["commands.json"], "contracts.json": provenance.files["contracts.json"] },
     },
     paths: Object.fromEntries(Object.entries(paths).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+    "x-kauro-planned": Object.fromEntries(Object.entries(planned).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     components,
   };
   // brand amendment A2: every identifier this platform emits is Kauro; the document quotes registry prose, so it is checked
@@ -445,10 +546,22 @@ export function checkOpenApi({ document, expected, inventory, sources }) {
     else ids.set(operation.operationId, key);
   }
 
+  // planned operations (x-kauro-planned): never a registered route, never also served, operationIds unique across both lists
+  const planned = Object.entries(document["x-kauro-planned"] ?? {});
+  for (const [key, operation] of planned) {
+    if (typeof operation?.operationId !== "string" || operation.operationId === "") failures.push(`missing operationId: planned ${key}`);
+    else if (ids.has(operation.operationId)) failures.push(`duplicate operationId ${operation.operationId}: ${ids.get(operation.operationId)} and planned ${key}`);
+    else ids.set(operation.operationId, `planned ${key}`);
+  }
+
   const documented = new Map(operations.map((o) => [o.key, o]));
   const registered = new Map(inventory.map((r) => [`${r.method} ${openApiPath(r.url)}`, r]));
   for (const key of registered.keys()) if (!documented.has(key)) failures.push(`undocumented registered route: ${key}`);
   for (const key of documented.keys()) if (!registered.has(key)) failures.push(`documented route that is not registered: ${key}`);
+  for (const [key] of planned) {
+    if (registered.has(key)) failures.push(`planned route is registered: ${key} (a served route is documented under paths)`);
+    if (documented.has(key)) failures.push(`planned route is also documented as served: ${key}`);
+  }
 
   for (const [key, route] of registered) {
     const doc = documented.get(key);
@@ -485,7 +598,7 @@ export function checkOpenApi({ document, expected, inventory, sources }) {
     }
   }
 
-  for (const { key, operation } of operations) {
+  for (const { key, operation } of [...operations, ...planned.map(([plannedKey, operation]) => ({ key: `planned ${plannedKey}`, operation }))]) {
     for (const [status, response] of Object.entries(operation.responses ?? {})) {
       for (const media of Object.values(response?.content ?? {})) {
         for (const member of responseMembers(document, media.schema)) {
@@ -517,7 +630,7 @@ async function main(mode) {
       for (const f of failures) console.error(`openapi: ${f}`);
       return 1;
     }
-    console.log(`openapi: the document is the generated one and matches the ${inventory.length} registered routes (${operationsOf(document).length} operations, every operationId present, response schemas equal to the ones the routes validate with, every problem status documenting exactly its route's outcome catalogue, no forbidden field)`);
+    console.log(`openapi: the document is the generated one and matches the ${inventory.length} registered routes (${operationsOf(document).length} operations, every operationId present, response schemas equal to the ones the routes validate with, every problem status documenting exactly its route's outcome catalogue, no forbidden field); ${Object.keys(document["x-kauro-planned"] ?? {}).length} planned operations, none registered or served`);
     return 0;
   }
   console.error("usage: node tools/openapi.mjs generate|check");
