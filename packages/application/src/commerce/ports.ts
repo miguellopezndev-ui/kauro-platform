@@ -402,7 +402,7 @@ export interface SourceLineageReader {
 
 /**
  * The included pre-execution source replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18; registry
- * R2-092, owned by the recurrence package B10): implemented by B09 (mandate M2) and called by B10's replacement flow once the new
+ * R2-092, owned by the recurrence package B10): implemented by B09 (the stage-2 mandate M3, design §14) and called by B10's replacement flow once the new
  * revision is sealed, its plan approved and the replacement quote issued. It runs in a SERVICE unit of work under kauro_payment (only
  * the payment service revokes and issues entitlements, B09-F1): records the re-binding, revokes the replaced entitlement
  * (SOURCE_REPLACED, PRE_EXECUTION), supersedes the replaced quote, accepts the replacement and issues its entitlement bound to the same
