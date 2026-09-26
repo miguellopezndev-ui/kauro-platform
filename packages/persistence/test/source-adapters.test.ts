@@ -1553,6 +1553,8 @@ test("CMD012 through the adapters and firstSeals of reused bytes: the successor 
   const hard = await plusSeconds(a.sealedAt, 1_209_600);
   assert.deepEqual([seal.record.anchorId, seal.record.hardDeadline, seal.record.effectiveDeadline], [aAnchor?.anchorId, hard, hard], "the hard cap belongs to the bytes: the first seal + fourteen days");
   assert.ok(seal.sealed.sealedAt > a.sealedAt);
+  // the bytes now carry two real seals (the superseded predecessor's keeps its instant): the first is still the predecessor's
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.seals.firstSeals([a.fileId as SourceFileId])), [{ fileId: a.fileId, revisionId: a.revisionId, sealedAt: a.sealedAt, anchorId: aAnchor?.anchorId }]);
   const availability = await h.app.runSource(asOwner(t), (uow) => uow.sources.availability.availabilityOf(b.revisionId));
   assert.deepEqual([availability?.state, availability?.availableUntil, availability?.retentionId], ["SEALED", hard, seal.record.retentionId]);
 });
