@@ -9,6 +9,7 @@ export {
   FAKE_SCANNER_ENGINE,
   FAKE_SCANNER_ENGINE_VERSION,
   FAKE_SCANNER_EVIDENCE_CLASS,
+  FAKE_SCANNER_SIGNATURE_VERSION,
   eicarTestToken,
   type ContractFakeScannerOptions,
   type FakeScanCall,
