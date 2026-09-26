@@ -46,6 +46,31 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  apps/control:
+    dependencies:
+      '@kauro/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@kauro/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@kauro/data-plane':
+        specifier: workspace:*
+        version: link:../../packages/data-plane
+      '@kauro/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@kauro/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
+    devDependencies:
+      '@types/node':
+        specifier: 24.3.1
+        version: 24.3.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   packages/application:
     dependencies:
       '@kauro/contracts':

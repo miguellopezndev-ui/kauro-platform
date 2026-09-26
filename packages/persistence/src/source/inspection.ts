@@ -27,6 +27,7 @@ import {
   type SourceFileId,
   type SourceFileRecord,
   type SourceFileRepository,
+  type SourcePage,
   type SourceTableId,
   type SourceTableRecord,
   type StoredObjectId,
@@ -34,7 +35,7 @@ import {
   type VersionedWrite,
 } from "@kauro/domain";
 import { execute, int, type Queryable } from "../sql.js";
-import { bool, exact, instantText, jsonArray, missedWrite, notAvailable, one, opt, optionalInstantText, optionalInt, optionalString, str, type SourceAudience } from "./rows.js";
+import { bool, exact, instantText, jsonArray, missedWrite, notAvailable, one, opt, optionalInstantText, optionalInt, optionalString, pageLimit, str, type SourceAudience } from "./rows.js";
 
 type Row = Record<string, unknown>;
 
@@ -450,5 +451,43 @@ export class PgSourceFileRepository implements SourceFileRepository {
       [fileId],
     );
     return r.rows.map((x) => x.revision_id as RevisionId);
+  }
+
+  /**
+   * The RETENTION_EXPIRED revocations due on the server clock (D-RET-3): the same predicate as kauro.source_files_revocation_guard —
+   * some real seal included the file and no including revision holds an ACTIVE record ahead — so what is found is what the guard
+   * admits (it re-checks after the file's transition lock). Ids only (decision D-CTRL-5).
+   */
+  async findRetentionEnded(limit: number): Promise<ReadonlyArray<{ readonly fileId: SourceFileId; readonly agencyId: AgencyId; readonly originRevisionId: RevisionId }>> {
+    const r = await execute<{ file_id: string; agency_id: string; origin_revision_id: string }>(
+      this.db,
+      `SELECT f.file_id, f.agency_id, f.origin_revision_id FROM kauro.source_files f
+        WHERE f.state = 'ADMITTED'
+          AND EXISTS (SELECT 1 FROM kauro.sealed_revision_files s
+                       WHERE s.agency_id = f.agency_id AND s.file_id = f.file_id AND s.disposition = 'INCLUDED' AND kauro.is_real_seal(s.agency_id, s.revision_id))
+          AND NOT EXISTS (SELECT 1 FROM kauro.sealed_revision_files s JOIN kauro.retention_records rr ON rr.agency_id = s.agency_id AND rr.revision_id = s.revision_id
+                           WHERE s.agency_id = f.agency_id AND s.file_id = f.file_id AND s.disposition = 'INCLUDED' AND kauro.is_real_seal(s.agency_id, s.revision_id)
+                             AND rr.state = 'ACTIVE' AND rr.effective_deadline > kauro.server_now())
+        ORDER BY f.file_id LIMIT $1`,
+      [pageLimit(limit, 1000)],
+    );
+    return r.rows.map((x) => ({ fileId: x.file_id as SourceFileId, agencyId: x.agency_id as AgencyId, originRevisionId: x.origin_revision_id as RevisionId }));
+  }
+
+  /** Admitted files and the exact accepted generation each names, in file-id order (OBJECT_INVENTORY's comparison; decision D-CTRL-5). */
+  async admittedGenerations(page: SourcePage<SourceFileId>): Promise<ReadonlyArray<{ readonly fileId: SourceFileId; readonly agencyId: AgencyId; readonly originRevisionId: RevisionId; readonly acceptedObjectId: StoredObjectId; readonly providerGeneration: string }>> {
+    const r = await execute<{ file_id: string; agency_id: string; origin_revision_id: string; accepted_object_id: string; provider_generation: string }>(
+      this.db,
+      `SELECT file_id, agency_id, origin_revision_id, accepted_object_id, provider_generation FROM kauro.source_files
+        WHERE state = 'ADMITTED' AND ($2::uuid IS NULL OR file_id > $2::uuid) ORDER BY file_id LIMIT $1`,
+      [pageLimit(page.limit, 1000), page.after ?? null],
+    );
+    return r.rows.map((x) => ({
+      fileId: x.file_id as SourceFileId,
+      agencyId: x.agency_id as AgencyId,
+      originRevisionId: x.origin_revision_id as RevisionId,
+      acceptedObjectId: x.accepted_object_id as StoredObjectId,
+      providerGeneration: x.provider_generation,
+    }));
   }
 }
