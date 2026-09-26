@@ -3,7 +3,7 @@
 // exactly those names in the files it names; a JUnit report of node:test is read with its outcomes (names unescaped as the
 // reporter escapes them); a compiled test file maps to its source; and a case is proven only when every cited test PASSED.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { CASE_MAP_PATH, SUITES, canonical, caseResults, citationsOf, readCaseMap, readJunit, sourceOf } from "../evidence.mjs";
@@ -73,10 +73,17 @@ test("a case is proven only when every cited test PASSED: a failed, skipped or m
   assert.throws(() => caseResults([row], [...results("PASSED"), { source: "f.test.ts", name: "a", outcome: "PASSED" }]), /share a name/);
 });
 
-test("the suites the tool runs are the packages' own test scripts, and canonical JSON is key-order independent", () => {
+test("the suites the tool runs are the packages' own test scripts, one for every workspace package that has one, and canonical JSON is key-order independent", () => {
   for (const suite of SUITES.filter((s) => s.script !== null)) {
     const pkg = JSON.parse(readFileSync(join(root, suite.cwd, "package.json"), "utf8"));
     assert.equal(pkg.scripts.test, suite.script, suite.cwd);
   }
+  // the suites of `pnpm run test` (pnpm -r): every workspace package with a test script is one the tool runs
+  const tested = ["packages", "apps"].flatMap((top) =>
+    readdirSync(join(root, top))
+      .map((name) => `${top}/${name}`)
+      .filter((dir) => existsSync(join(root, dir, "package.json")) && JSON.parse(readFileSync(join(root, dir, "package.json"), "utf8")).scripts?.test !== undefined),
+  );
+  assert.deepEqual(SUITES.filter((s) => s.script !== null).map((s) => s.cwd).sort(), tested.sort(), "a workspace package's tests are a suite of the evidence run");
   assert.equal(canonical({ b: 1, a: [{ d: 2, c: 3 }] }), canonical({ a: [{ c: 3, d: 2 }], b: 1 }));
 });
