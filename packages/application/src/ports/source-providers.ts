@@ -300,8 +300,13 @@ export type AuthorityTombstoneKind =
   | "REVISION_DELETED"
   | "FILE_ADMISSION_REVOKED";
 
-/** The terminal state a tombstoned subject reached (closed: a tombstone never records a live state). */
-export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "REVOKED";
+/**
+ * The state a tombstoned subject reached, named exactly as the subject's own machine names it (closed: a tombstone never records
+ * a live state): UploadSession CANCELLED, EXPIRED, REJECTED; DatasetRevision CANCELLED, SUPERSEDED, REJECTED, EXPIRED, DELETED;
+ * SourceFile ADMISSION_REVOKED. Decision D-RESTORE-2 (residual FINAL-N1): the AUTHORITY_JOURNAL consumer compares this state with
+ * the subject's current state before appending, so a name the machine does not have would dead-letter every such tombstone.
+ */
+export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "ADMISSION_REVOKED";
 
 /**
  * Which tombstone each event routed to AUTHORITY_JOURNAL produces (EVENT_SUBSCRIPTIONS): the AUTHORITY_JOURNAL consumer appends
@@ -317,7 +322,7 @@ export const AUTHORITY_TOMBSTONES = Object.freeze({
   "dataset_revision.rejected.v1": { kind: "REVISION_REJECTED", state: "REJECTED" },
   "dataset_revision.expired.v1": { kind: "REVISION_EXPIRED", state: "EXPIRED" },
   "dataset_revision.deleted.v1": { kind: "REVISION_DELETED", state: "DELETED" },
-  "source_file.admission_revoked.v1": { kind: "FILE_ADMISSION_REVOKED", state: "REVOKED" },
+  "source_file.admission_revoked.v1": { kind: "FILE_ADMISSION_REVOKED", state: "ADMISSION_REVOKED" },
 } as const satisfies Readonly<Record<string, { readonly kind: AuthorityTombstoneKind; readonly state: AuthorityTombstoneState }>>);
 
 /** A minimal durable fact (14: scoped ids, deadlines, sequence and evidence hashes; no CRM payload). */
