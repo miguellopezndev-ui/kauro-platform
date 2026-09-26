@@ -274,9 +274,10 @@ export class PgUnitOfWorkFactory implements UnitOfWorkFactory {
   }
 
   async #once<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, isolation: IsolationLevel, statementTimeoutMs: number): Promise<T> {
+    const pool = this.poolFor(context);
     let acquired: Awaited<ReturnType<KauroPool["acquire"]>>;
     try {
-      acquired = await this.poolFor(context).acquire();
+      acquired = await pool.acquire();
     } catch (e) {
       if (e instanceof Error && e.name === "PrivilegedRoleError") throw e;
       const failure = new DomainFailure("CAPACITY_UNAVAILABLE", `no database connection available; correlation ${context.correlationId}`, { retryAfterSeconds: 1 }, true);
