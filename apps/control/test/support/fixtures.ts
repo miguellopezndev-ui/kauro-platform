@@ -21,6 +21,7 @@ import {
   type ProjectId,
   type RetentionAnchorId,
   type RevisionId,
+  type SelectionManifestDocument,
   type SelectionManifestId,
   type SourceFileId,
   type SourceTableId,
@@ -30,7 +31,7 @@ import {
   type UploadSessionRecord,
 } from "@kauro/domain";
 import { PgEventPublisher, PgSourceStore } from "@kauro/persistence";
-import { clockAt, fixtureSelection, type AgencyFixture } from "@kauro/persistence/testing";
+import { clockAt, fixtureSelection, sealSourceRevision, type AgencyFixture, type SealedSourceFixture, type SourceFixtureSessions } from "@kauro/persistence/testing";
 import { clock, ids, rawTx, type ControlEnv, type RawClient } from "./env.js";
 
 export interface Tenant {
@@ -247,10 +248,16 @@ export async function eventsOf(env: ControlEnv, aggregateId: string): Promise<Re
  * inventory, including the one admitted CSV table with a ROW projection of its first two columns, stored content-idempotently and
  * bound after the revision row — from UPLOADING that is the agency's explicit closing of the intake (all_uploads_completed).
  */
-export async function bindSelection(env: ControlEnv, t: Tenant, p: ProjectFixture, file: { readonly fileId: SourceFileId; readonly tableId: SourceTableId; readonly structureHash: string }): Promise<{ readonly selectionHash: Sha256Hex; readonly version: number }> {
+export async function bindSelection(
+  env: ControlEnv,
+  t: Tenant,
+  p: ProjectFixture,
+  file: { readonly fileId: SourceFileId; readonly tableId: SourceTableId; readonly structureHash: string },
+  amend: (selection: SelectionManifestDocument) => SelectionManifestDocument = (x) => x,
+): Promise<{ readonly selectionHash: Sha256Hex; readonly version: number }> {
   return asRequestHandler(env, t, null, async (s, emit) => {
     const inventoryHash = inventoryHashOf(await s.revisions.inventory(p.revisionId));
-    const selection = fixtureSelection(p.revisionId, { ...file, origin: "THIS_REVISION" }, inventoryHash);
+    const selection = amend(fixtureSelection(p.revisionId, { ...file, origin: "THIS_REVISION" }, inventoryHash));
     const selectionHash = selectionHashOf(selection);
     const { record } = await s.selections.put({ selectionManifestId: ids.next() as SelectionManifestId, agencyId: t.ag.agencyId, projectId: p.projectId, revisionId: p.revisionId, body: selection, bodyHash: selectionHash, createdByMembershipId: t.ag.ownerMembershipId, createdAt: clock.now() });
     const revision = await s.revisions.lock(p.revisionId);
@@ -272,5 +279,53 @@ export async function bindSelection(env: ControlEnv, t: Tenant, p: ProjectFixtur
       reusedFileIds: [],
     });
     return { selectionHash, version: bound.record.version };
+  });
+}
+
+/**
+ * A revision of the project sealed through the persistence package's source-lifecycle fixture (each write by the role that owns it,
+ * at the TEST CLOCK instants the fixture positions), its intake begun at `base` (default: fifteen days ago, so its UNPAID record's
+ * hard deadline — the seal + fourteen days — has passed). Its events carry no outbox records: nothing of it is dispatched.
+ */
+export async function sealedRevision(env: ControlEnv, t: Tenant, p: ProjectFixture, seed: string, base?: Date): Promise<SealedSourceFixture> {
+  const sessions: SourceFixtureSessions = {
+    app: (fn) => rawTx(env.h.appPool, t.ag.agencyId, t.ag.ownerUserId, (c) => fn(c)),
+    control: (fn) => rawTx(env.h.controlPool, t.ag.agencyId, "", (c) => fn(c)),
+  };
+  return sealSourceRevision(sessions, { agencyId: t.ag.agencyId, projectId: p.projectId, ownerUserId: t.ag.ownerUserId, ownerMembershipId: t.ag.ownerMembershipId }, { seed, ...(base === undefined ? {} : { base }) });
+}
+
+/**
+ * CMD012 through the adapters (the command is B07-COMMANDS'): project row, then the predecessor (D-LOCK-1); a SEALED predecessor is
+ * superseded by the successor, a mutable one cancelled (cancel_revision, naming its successor); the successor DRAFT is inserted and
+ * becomes the project's current revision — each with its event.
+ */
+export async function replaceRevision(env: ControlEnv, t: Tenant, p: ProjectFixture, predecessorId: RevisionId): Promise<RevisionId> {
+  return env.h.app.runSource(asOwner(env, t), async (uow) => {
+    const actor: ActorRef = { kind: "USER", userId: t.ag.ownerUserId };
+    const emit: Emit = async (kind, id, version, type, payload) => {
+      await uow.events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: t.ag.agencyId, eventType: type, actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload });
+    };
+    const owner = t.ag.ownerMembershipId;
+    const projectRecord = await uow.projects.lock(p.projectId);
+    const predecessor = await uow.sources.revisions.lock(predecessorId);
+    if (projectRecord === null || predecessor === null) throw new Error("fixture: the project or its revision is not visible");
+    const successorId = uow.ids.next() as RevisionId;
+    if (predecessor.state === "SEALED") {
+      await uow.sources.revisions.insertSuccessor({ revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, supersedesRevisionId: predecessorId, createdByMembershipId: owner, createdAt: clock.now() });
+      const superseded = await uow.sources.revisions.transition(predecessorId, predecessor.version, { event: "new_revision_explicitly_supersedes", successorRevisionId: successorId });
+      if (superseded.kind !== "APPLIED") throw new Error("fixture: the supersession did not apply");
+      await emit("dataset_revision", predecessorId, superseded.record.version, "dataset_revision.superseded.v1", { revisionId: predecessorId, agencyId: t.ag.agencyId, projectId: p.projectId, successorRevisionId: successorId, manifestHash: predecessor.manifestHash ?? "", affectedPlanIds: [], affectedApprovalIds: [], affectedCommercialAuthorizationIds: [] });
+    } else {
+      const cancelled = await uow.sources.revisions.transition(predecessorId, predecessor.version, { event: "cancel_revision", reason: "REPLACED_BY_NEW_REVISION", successorRevisionId: successorId });
+      if (cancelled.kind !== "APPLIED") throw new Error("fixture: cancel_revision did not apply");
+      await emit("dataset_revision", predecessorId, cancelled.record.version, "dataset_revision.cancelled.v1", { revisionId: predecessorId, agencyId: t.ag.agencyId, projectId: p.projectId, previousState: predecessor.state, reasonCode: "REPLACED_BY_NEW_REVISION", successorRevisionId: successorId, cancelledUploadIds: [] });
+      await uow.sources.revisions.insertSuccessor({ revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, supersedesRevisionId: predecessorId, createdByMembershipId: owner, createdAt: clock.now() });
+    }
+    await emit("dataset_revision", successorId, 1, "dataset_revision.created.v1", { revisionId: successorId, agencyId: t.ag.agencyId, projectId: p.projectId, state: "DRAFT", supersedesRevisionId: predecessorId, createdByMembershipId: owner });
+    const moved = await uow.sources.projects.switchCurrentRevision(p.projectId, projectRecord.version, successorId, clock.now());
+    if (moved.kind !== "APPLIED") throw new Error("fixture: the project pointer did not move");
+    await emit("project", p.projectId, moved.record.version, "project.current_revision_changed.v1", { projectId: p.projectId, agencyId: t.ag.agencyId, currentRevisionId: successorId, previousRevisionId: predecessorId, changedByMembershipId: owner });
+    return successorId;
   });
 }
