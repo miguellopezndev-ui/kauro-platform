@@ -26,7 +26,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
-import type { CompletedResponse, ReserveUploadView, SelectInputTablesView, SourceRevisionView } from "@kauro/application";
+import type { CompletedResponse, ReserveUploadView, SealRevisionView, SelectInputTablesView, SourceRevisionView } from "@kauro/application";
 import type { Sha256Hex } from "@kauro/contracts";
 import {
   PRICING_DEFINITION,
@@ -518,6 +518,40 @@ export async function readyRevision(w: World): Promise<ReadyRevision> {
   const selected = await bound(w, revisionId, 2, document);
   const { version } = await evaluate(w, w.A.agencyId, revisionId, [file]);
   return { projectId, revisionId, file, selectionManifestId: selected.data.selection.selectionManifestId, selectionHash: selected.data.selection.selectionHash, inventoryHash, version };
+}
+
+export interface SealedThroughRoutes extends ReadyRevision {
+  readonly manifestHash: string;
+  readonly projectionHash: string;
+  readonly sealedSubjectHash: string;
+  readonly retentionId: string;
+  /** SEALED's version (5 for a project's first revision). */
+  readonly sealedVersion: number;
+}
+
+/** A SEALED revision through the product: readyRevision, then SealRevision through its route (200). */
+export async function sealedThroughRoutes(w: World): Promise<SealedThroughRoutes> {
+  const ready = await readyRevision(w);
+  const body = completed<SealRevisionView>(await seal(w, ready.revisionId, ready.version, ready.selectionHash), 200);
+  return { ...ready, manifestHash: body.data.manifestHash, projectionHash: body.data.projectionHash, sealedSubjectHash: body.data.sealedSubjectHash, retentionId: body.data.retention.retentionId, sealedVersion: body.data.revision.version };
+}
+
+/** CreateRevision through its route. */
+export function createRevision(w: World, projectId: string, expectedVersion: number, supersedesRevisionId: string, options: { readonly person?: Person; readonly key?: string; readonly agency?: string } = {}): Promise<Reply> {
+  return call(w, {
+    url: sourceRoutes.createRevision(projectId),
+    token: (options.person ?? w.operator).token,
+    ...(options.agency !== undefined ? { agency: options.agency } : {}),
+    key: options.key ?? freshKey("create-revision"),
+    body: { expectedVersion, supersedesRevisionId },
+  });
+}
+
+/** Superuser oracle: a project's version and current revision. */
+export async function projectPointer(w: World, projectId: string): Promise<{ readonly version: number; readonly currentRevisionId: string }> {
+  const row = await w.row<{ version: string; current_revision_id: string }>("projects", "project_id = $1", [projectId]);
+  assert.ok(row, "the project exists");
+  return { version: Number(row.version), currentRevisionId: row.current_revision_id };
 }
 
 /** GetRevision through its route. */
