@@ -4,12 +4,13 @@
  * read (D-CORE-B2), M2's commerce authorizer, the verifiers by provider, the payment service's own verified identity for the work
  * it starts itself (the refund executor, the watchdog, the inbox worker), and the sink of background failures.
  */
-import type { CommerceAuthorizer, CommerceReconciler, PurchasedSubjectReader, WebhookVerifier } from "@kauro/application";
+import type { CommerceAuthorizer, CommerceReconciler, WebhookVerifier } from "@kauro/application";
 import { createCommerceAuthorizer, createCommerceReconciler } from "@kauro/application";
 import { createAssuranceVerifier } from "@kauro/authorization";
 import type { CausationId, Clock, CommerceUnitOfWork, Environment, IdGenerator, ServiceIdentity } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import { PgCommerceUnitOfWork, purchasedSubjectsOf } from "@kauro/persistence";
+import { PgCommerceUnitOfWork } from "@kauro/persistence";
+import { purchasedSubjectReader } from "../edition.js";
 import type { PaymentServiceAssembly } from "./assembly.js";
 
 /** The payment service's own identity (SERVICE_ROLE_TABLE: payment-service → PAYMENT_SERVICE; D-AUTHZ-B3). */
@@ -34,16 +35,6 @@ export interface PaymentRuntime {
   readonly onBackgroundFailure: (correlationId: string, error: unknown) => void;
 }
 
-/**
- * M2's PurchasedSubjectReader over the column-scoped PostgreSQL read of @kauro/persistence (D-CORE-B2): the purchased subject of a
- * quote after the shared halves of its transition locks, inside the reconciler's own commerce unit of work.
- */
-export const pgPurchasedSubjectReader: PurchasedSubjectReader = {
-  async subjectOf(uow, quote) {
-    return purchasedSubjectsOf(uow).subjectOf(quote);
-  },
-};
-
 export function createPaymentRuntime(input: {
   readonly assembly: PaymentServiceAssembly;
   readonly environment: Environment;
@@ -58,7 +49,7 @@ export function createPaymentRuntime(input: {
   }
   return {
     ...input,
-    reconciler: createCommerceReconciler({ subjects: pgPurchasedSubjectReader, approvalHosts: input.assembly.provider.approvalHosts }),
+    reconciler: createCommerceReconciler({ subjects: purchasedSubjectReader, approvalHosts: input.assembly.provider.approvalHosts }),
     authorizer: createCommerceAuthorizer({ clock: input.clock, assurance: createAssuranceVerifier() }),
     verifiers,
     self: { serviceId: PAYMENT_SERVICE_ID, audience: SERVICE_AUDIENCE, environment: input.environment },

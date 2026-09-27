@@ -34,7 +34,7 @@ import type {
   PurchasedSubjectReader,
 } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
-import { commerceRequestReadsOf, commercialInspectionsOf } from "@kauro/persistence";
+import { commerceRequestReadsOf, commercialInspectionsOf, purchasedSubjectsOf } from "@kauro/persistence";
 
 export const activeWorkInspector: ActiveWorkInspector = {
   async inspectClient(uow, clientId) {
@@ -92,11 +92,13 @@ export function unavailablePlanServices(): PlanServices {
 
 /**
  * The purchased subject of a quote as the caller's commerce unit of work reads it (PurchasedSubjectReader, D-CORE-B2): the persistence
- * adapter's column-scoped read after the shared halves of the transition locks, under the caller's policies — a TENANT context of
- * the request handlers, or a SERVICE context of the payment service after it adopted the stored operation's agency.
+ * adapter's column-scoped read (@kauro/persistence PgPurchasedSubjects, D-M3-B3) after the shared halves of the transition locks, under
+ * the caller's policies — a TENANT context of the request handlers, or a SERVICE context of the payment service after it adopted the
+ * stored operation's agency. The one adapter of the port (D-REQ-B2, D-INT2-B2): the request side's handlers, the payment service's
+ * reconciler and its re-binder all read the subject through it.
  */
 export const purchasedSubjectReader: PurchasedSubjectReader = {
-  subjectOf: (uow, quote) => commerceRequestReadsOf(uow).subjectOf(quote),
+  subjectOf: (uow, quote) => purchasedSubjectsOf(uow).subjectOf(quote),
 };
 
 /** The request side's queries (D-REQ-B2), bound to the persistence adapter's reads of the caller's unit of work. */
@@ -111,8 +113,9 @@ export const commerceRequestQueries: CommerceRequestQueries = {
 /**
  * The payment collaborators of this edition (D-REQ-B1). It binds what it owns — the reads of its own database — and names what it
  * does not: the payment provider adapter and the payment service's pool arrive with the integration package (B15) and the payment
- * service's composition, so CreatePaymentOrder and CapturePayment answer INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE inside the
- * unit of work with nothing written; B08's admission is not bound, so deliverable capacity is "unanswered" and checkout answers
+ * service's composition (ApiAssembly.payments: the composition root then takes both from the bound payment service, D-INT2-B3);
+ * without them CreatePaymentOrder and CapturePayment answer INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE inside the unit of work
+ * with nothing written; B08's admission is not bound, so deliverable capacity is "unanswered" and checkout answers
  * CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (D-CAP-B1); B07's source availability is not bound, so a quote's own promise
  * (Quote.sourceAvailableUntil, D-QUOTE-B7) and its revision's SEALED state decide. A deployment, and the tests, bind the rest through
  * ApiAssembly.commerce; nothing here is a fake (D-FAKE-B1: no production wiring binds one).

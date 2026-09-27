@@ -35,6 +35,7 @@ import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
 import type { PaymentService } from "./payments/index.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
+import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -209,7 +210,8 @@ export interface ApiAssembly {
    * The payment service of package B09 (payments/index.ts createPaymentService; stage-2 mandate M3): its routes — the provider
    * webhook (CMD030), ExecuteRefund (CMD033), ReconcilePayment (CMD034) — are registered in every edition; without a bound payment
    * service the webhook knows no provider and the service routes find no verified service identity (D-FAKE-B1: nothing in the
-   * product wiring binds a contract fake; the provider adapters are the integration package's, B15).
+   * product wiring binds a contract fake; the provider adapters are the integration package's, B15). Bound, it is also where the
+   * request side's CreatePaymentOrder and CapturePayment settle (its units of work and provider adapter; D-INT2-B3).
    */
   readonly payments?: PaymentService;
 }
@@ -241,7 +243,10 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
   const validator = assembly.validator ?? loadContractSchemas();
   // package B09: the request side of the payments workflow over the same units of work and authorizer, with the corporate owner's
-  // authorizer and the payment collaborators of the edition, replaced by the assembly's (D-REQ-B1)
+  // authorizer and the payment collaborators of the edition, replaced by the assembly's (D-REQ-B1). A bound payment service is the
+  // one the request side's provider commands settle through (D-INT2-B3): their settle step (T3) runs in its SERVICE units of work on
+  // its kauro_payment pool, as its own verified identity, with its provider adapter — the adapter its webhook, its refunds and its
+  // reconciliation use — unless the assembly binds these collaborators itself.
   const commerceRuntime: CommerceRequestRuntime = {
     unitOfWork,
     authorizer: runtime.authorizer,
@@ -249,7 +254,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     clock,
     ids,
   };
-  const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...assembly.commerce });
+  const paymentService: Partial<CommerceRequestCollaborators> =
+    assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
+  const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...paymentService, ...assembly.commerce });
   return createApiServer({
     environment: assembly.environment,
     handlers: createB06Handlers(runtime, collaborators),

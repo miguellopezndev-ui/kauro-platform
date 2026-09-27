@@ -92,9 +92,14 @@ const UNCERTAIN_ATTEMPT = "UNCERTAIN";
  * CAPTURED), CHECKING while any effect is uncertain — a capture or a creation whose outcome is unknown — with next actions that never
  * include paying again (15 "discourage paying again while uncertain"), FAILED for an order that failed, was cancelled or expired, and
  * PENDING while the checkout is in flight. A browser return never changes it: it is read from durable facts only (S057).
+ *
+ * CONFIRMED needs the obligation paid, not only a capture recorded (decision D-INT2-B5; 15 "CONFIRMED requires provider evidence"):
+ * a completed capture of the wrong amount moves the order to CAPTURED with only its allocation (S058: real money of the order,
+ * never its payment, an AMOUNT_MISMATCH case open and its remedy filed), so an order whose completed captures allocate less than
+ * its obligation reads CHECKING with support as its next action — never "Payment confirmed", never "pay again".
  */
-export function paymentStatusOf(order: Pick<PaymentOrderRecord, "state">, attempts: ReadonlyArray<Pick<PaymentAttemptRecord, "state">>): { readonly paymentStatus: PaymentStatus; readonly nextActions: ReadonlyArray<PaymentNextAction> } {
-  if (order.state === "CAPTURED") return { paymentStatus: "CONFIRMED", nextActions: [] };
+export function paymentStatusOf(order: Pick<PaymentOrderRecord, "state" | "allocatedCents" | "expectedAmountCents">, attempts: ReadonlyArray<Pick<PaymentAttemptRecord, "state">>): { readonly paymentStatus: PaymentStatus; readonly nextActions: ReadonlyArray<PaymentNextAction> } {
+  if (order.state === "CAPTURED") return order.allocatedCents >= order.expectedAmountCents ? { paymentStatus: "CONFIRMED", nextActions: [] } : { paymentStatus: "CHECKING", nextActions: ["CONTACT_SUPPORT"] };
   if (order.state === "CAPTURE_UNCERTAIN" || attempts.some((a) => a.state === UNCERTAIN_ATTEMPT)) return { paymentStatus: "CHECKING", nextActions: ["REFRESH_STATUS", "CONTACT_SUPPORT"] };
   switch (order.state) {
     case "FAILED":

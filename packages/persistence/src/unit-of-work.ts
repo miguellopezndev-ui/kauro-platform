@@ -341,7 +341,8 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 
 /**
  * The column-scoped purchased-subject read of a commerce unit of work of this package (D-CORE-B2): the api binds M2's
- * PurchasedSubjectReader to purchasedSubjectsOf(uow).subjectOf(quote) (stage-2 mandate M3).
+ * PurchasedSubjectReader to purchasedSubjectsOf(uow).subjectOf(quote) (stage-2 mandate M3), for the request side and the payment
+ * service alike (the one adapter of the port; D-INT2-B2).
  */
 export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the purchased subject is read in a commerce unit of work of @kauro/persistence");
@@ -373,7 +374,7 @@ export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOf
   readonly purchasedSubjects: PgPurchasedSubjects;
   /** The queries of the payment service's bounded periodic pass (D-PROTO-B4; stage-2 mandate M3), read through paymentSweepsOf(uow). */
   readonly paymentSweeps: PgPaymentSweeps;
-  /** The request side's reads (implementation mandate M4, D-REQ-B2): the purchased subject, shared halves, order and capture queries. */
+  /** The request side's reads (implementation mandate M4, D-REQ-B2): shared halves, order, capture and policy queries. */
   readonly requestReads: PgCommerceRequestReads;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;

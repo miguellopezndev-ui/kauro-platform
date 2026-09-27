@@ -23,7 +23,7 @@ import type { PurchaseRebinder, SourceLineageReader } from "@kauro/application";
 import { publishVersionEvent, versionEvent } from "@kauro/application";
 import type { CommercialAuthorizationId, CommercialAuthorizationRecord, PurchaseRebindingId, QuoteRecord, ReplacementBlocker } from "@kauro/domain";
 import { COMMITTING_REFUND_STATES, DomainFailure, NotFoundFailure, authorizesObligation, replacementBlockers } from "@kauro/domain";
-import { pgPurchasedSubjectReader } from "./runtime.js";
+import { purchasedSubjectReader } from "../edition.js";
 
 function applied<T>(write: { readonly kind: "APPLIED"; readonly record: T } | { readonly kind: "STALE"; readonly currentVersion: number; readonly currentState: string }, what: string): T {
   if (write.kind === "STALE") throw new DomainFailure("STALE_VERSION", `${what} changed concurrently: current is ${write.currentVersion} (${write.currentState})`, { currentVersion: write.currentVersion, currentState: write.currentState }, true);
@@ -60,7 +60,7 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
         }),
       ];
       if (replaced === null || replaced.quoteId !== from.quoteId) blockers.push("PURCHASE_NOT_INTACT");
-      const subject = await pgPurchasedSubjectReader.subjectOf(uow, to);
+      const subject = await purchasedSubjectReader.subjectOf(uow, to);
       if (subject === null || subject.approval === null || subject.capability === null) blockers.push("NOT_A_REPLACEMENT");
       if (blockers.length > 0 || replaced === null || lineage === null || subject === null || subject.approval === null || subject.capability === null) {
         return { kind: "REFUSED", blockers: [...new Set(blockers)] };

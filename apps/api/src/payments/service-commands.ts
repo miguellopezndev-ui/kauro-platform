@@ -19,7 +19,7 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { CommandResult, ExecuteRefundBody, ExecuteRefundView, ProviderCommandHooks, ProviderOrderObservation, ReconcilePaymentBody, ReconcilePaymentView, StoredEvidence } from "@kauro/application";
-import { EXECUTE_REFUND, RECONCILE_PAYMENT, operationOf, prepareProviderAttempt, problemOf, providerEffectPhases, runProviderCommand } from "@kauro/application";
+import { EXECUTE_REFUND, RECONCILE_PAYMENT, authorizationView, captureView, operationOf, paymentOrderView, prepareProviderAttempt, problemOf, providerEffectPhases, refundView, runProviderCommand } from "@kauro/application";
 import type {
   AgencyId,
   CausationId,
@@ -38,7 +38,6 @@ import type {
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, NotFoundFailure, StaleVersionFailure, commandRequestDigest, toUtcInstant } from "@kauro/domain";
 import type { PaymentRuntime } from "./runtime.js";
 import { causedBy } from "./runtime.js";
-import { authorizationView, captureView, paymentOrderView, refundView } from "./views.js";
 
 /** A service command as the route admitted it: the verified service identity, the idempotency key, the path ids and the closed body. */
 export interface ServiceCommandRequest<Body> {

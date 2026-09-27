@@ -56,6 +56,6 @@ export { PgPaymentSweeps } from "./repositories/commerce-sweeps.js";
 export type { AgencyWithPayments, SweptAttempt } from "./repositories/commerce-sweeps.js";
 export { PgIngressFactRecorder } from "./ingress-facts.js";
 export type { IngressFact, IngressFactRecorder } from "./ingress-facts.js";
-// the request side's reads (implementation mandate M4; D-REQ-B2, D-CORE-B2)
+// the request side's reads (implementation mandate M4; D-REQ-B2); its purchased subject is PgPurchasedSubjects above (D-INT2-B2)
 export { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
-export type { PurchasedSubjectRow, RequestTransitionSubject } from "./repositories/commerce-request-reads.js";
+export type { RequestTransitionSubject } from "./repositories/commerce-request-reads.js";

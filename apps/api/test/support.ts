@@ -51,7 +51,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle, type PaymentService } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -400,6 +400,13 @@ export interface WorldOptions {
    * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
    */
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
+  /**
+   * Package B09 (stage-2 integration): the payment service the api binds (ApiAssembly.payments), built over the harness and the
+   * api's verified request-handler pool before the server is assembled — so one api serves the B06 routes, the request side and the
+   * payment service's routes with the world's people — and closed by stop() after the server, before the database
+   * (test/payment-support.ts paymentWorld({ requestSide: true })).
+   */
+  readonly payments?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly service: PaymentService; close(): Promise<void> }>;
 }
 
 export interface RawEvent {
@@ -433,6 +440,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const plans = testPlanServices(holds);
   const tokens = new Map<string, AuthenticatedSubject>();
   const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
+  const payments = options.payments !== undefined ? await options.payments(h, db) : null;
 
   const base: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
@@ -462,6 +470,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
+    ...(payments !== null ? { payments: payments.service } : {}),
     validator,
     clock: options.clock ?? clock,
     ids,
@@ -735,6 +744,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stop() {
       await app.close();
+      if (payments !== null) await payments.close();
       await db.close();
       await h.stop();
     },

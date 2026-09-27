@@ -10,6 +10,11 @@
  * adapters are package B15's): M2's labelled contract fakes of @kauro/application/testing — the PayPal Orders v2 provider, its
  * webhook verifier, the restricted evidence store, the service authenticator, the fiscal bridge and B07's lineage reader.
  *
+ * With `requestSide: true` (the stage-2 integration's scenario tests, apps/api/test/b09-scenarios.test.ts) the world's one api —
+ * built by support.ts world() with its people — also binds this payment service (ApiAssembly.payments) and serves the request side
+ * (CMD028, CMD029, CMD031, CMD032 and the four reads) beside the payment service's routes: its provider commands settle through the
+ * bound payment service (D-INT2-B3), and the platform ports of B07 and B08 are M2's labelled contract fakes (`sources`, `capacity`).
+ *
  * Preconditions are written through M1's adapters (@kauro/persistence/testing paidPurchase, checkoutOrder, activateAgency and
  * recordReviewedFiscalProfile, the commerce unit of work for refunds and profiles) and, where a precondition is a provider effect
  * (an order the provider created, a capture whose response was lost), through M2's provider-effect runtime with the minimal
@@ -21,16 +26,20 @@ import type { FastifyInstance } from "fastify";
 import type { CommandResult, DurableOperation, ProtocolPoint, ProviderCommandHooks } from "@kauro/application";
 import { operationOf, prepareProviderAttempt, providerEffectPhases, runProviderCommand } from "@kauro/application";
 import {
+  createDeliveryCapacityFake,
   createEvidenceStoreFake,
   createFiscalBridgeFake,
   createPayPalContractFake,
   createServiceAuthenticatorFake,
+  createSourceAvailabilityFake,
   createSourceLineageFake,
   createWebhookVerifierFake,
+  type DeliveryCapacityFake,
   type EvidenceStoreFake,
   type FiscalBridgeFake,
   type PayPalContractFake,
   type ServiceAuthenticatorFake,
+  type SourceAvailabilityFake,
   type SourceLineageFake,
   type WebhookVerifierFake,
 } from "@kauro/application/testing";
@@ -105,6 +114,9 @@ export interface PaymentWorld {
   readonly services: ServiceAuthenticatorFake;
   readonly fiscalBridge: FiscalBridgeFake;
   readonly lineage: SourceLineageFake;
+  /** The platform ports of B07 (source availability) and B08 (deliverable capacity): bound to the request side with `requestSide`. */
+  readonly sources: SourceAvailabilityFake;
+  readonly capacity: DeliveryCapacityFake;
   /** The platform's qualified merchant route (the fake's merchant) and fiscal issuer route. */
   readonly route: QualifiedRoute;
   readonly issuerRef: FiscalIssuerRef;
@@ -118,36 +130,61 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(): Promise<PaymentWorld> {
-  const w = await world();
-  const { h } = w;
-  await activateAgency(h, w.A);
+export async function paymentWorld(options: { readonly requestSide?: boolean } = {}): Promise<PaymentWorld> {
   const paypal = createPayPalContractFake({ clock });
   const verifier = createWebhookVerifierFake({ clock });
   const evidence = createEvidenceStoreFake({ clock });
   const services = createServiceAuthenticatorFake({ clock });
   const fiscalBridge = createFiscalBridgeFake();
   const lineage = createSourceLineageFake({ clock });
+  const sources = createSourceAvailabilityFake({ clock });
+  const capacity = createDeliveryCapacityFake({ clock });
+  const holds = new PaymentHolds();
+  const backgroundFailures: Array<{ correlationId: string; error: unknown }> = [];
+  // the payment service over its three verified pools beside the api's request-handler pool (the composition's own assembly)
+  const open = async (h: World["h"], db: World["db"]): Promise<{ readonly service: PaymentService; readonly pools: PaymentPools }> => {
+    const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
+    const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
+    const service = createPaymentService({
+      assembly: { commerce: pools.commerce, ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, lineage, hold: (command, point) => holds.pass(command, point) },
+      environment: "LOCAL",
+      clock,
+      ids,
+      onBackgroundFailure: (correlationId, error) => backgroundFailures.push({ correlationId, error }),
+    });
+    return { service, pools };
+  };
+  // requestSide: the world's one api serves the B06 routes, the request side and the payment service's routes (D-INT2-B3); the
+  // request side binds only the platform ports of B07 and B08 — its provider commands take the bound payment service's
+  const holder: { bound: { readonly service: PaymentService; readonly pools: PaymentPools } | null } = { bound: null };
+  const w = await world(
+    options.requestSide === true
+      ? {
+          commerce: () => ({ capacity, sources }),
+          payments: async (h, db) => {
+            const opened = await open(h, db);
+            holder.bound = opened;
+            return { service: opened.service, close: () => opened.pools.close() };
+          },
+        }
+      : {},
+  );
+  const { h } = w;
+  await activateAgency(h, w.A);
   const route = await h.qualifiedPaymentRoute({ payee: paypal.merchantId });
   const issuerRef = await h.qualifiedFiscalIssuer();
   const kora = (await h.person("kora-payment-owner")) as UserId;
   await h.grantKauroOwner(kora);
   const profileId = await recordReviewedFiscalProfile(h, { operatorUserId: kora, agencyId: w.A.agencyId, issuerRef });
   await h.publishCapability(w.hubspotCapabilityId, "AVAILABLE_LIMITED");
-  const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
-  const pools = await openPaymentPools(w.db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
-  const holds = new PaymentHolds();
-  const backgroundFailures: Array<{ correlationId: string; error: unknown }> = [];
-  const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
-  const service = createPaymentService({
-    assembly: { commerce: pools.commerce, ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, lineage, hold: (command, point) => holds.pass(command, point) },
-    environment: "LOCAL",
-    clock,
-    ids,
-    onBackgroundFailure: (correlationId, error) => backgroundFailures.push({ correlationId, error }),
-  });
-  const app = assembleApi({ environment: "LOCAL", unitOfWork: w.db.unitOfWork, database: w.db, authenticator: createBearerTokenAuthenticator(new Map()), validator: loadContractSchemas(), clock, ids, payments: service, onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }) });
-  await app.ready();
+  const ownApi = holder.bound === null;
+  const internalErrors: Array<{ correlationId: string; error: unknown }> = ownApi ? [] : w.internalErrors;
+  const { service, pools } = holder.bound ?? (await open(h, w.db));
+  let app: FastifyInstance = w.app;
+  if (ownApi) {
+    app = assembleApi({ environment: "LOCAL", unitOfWork: w.db.unitOfWork, database: w.db, authenticator: createBearerTokenAuthenticator(new Map()), validator: loadContractSchemas(), clock, ids, payments: service, onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }) });
+    await app.ready();
+  }
   const api: World = { ...w, app };
   return {
     w,
@@ -162,6 +199,8 @@ export async function paymentWorld(): Promise<PaymentWorld> {
     services,
     fiscalBridge,
     lineage,
+    sources,
+    capacity,
     route,
     issuerRef,
     kora,
@@ -170,8 +209,11 @@ export async function paymentWorld(): Promise<PaymentWorld> {
     backgroundFailures,
     internalErrors,
     async stop() {
-      await app.close();
-      await pools.close();
+      // a separate api closes itself and its pools first; the world's own api closes the pools it bound (support.ts world({ payments }))
+      if (ownApi) {
+        await app.close();
+        await pools.close();
+      }
       await w.stop();
     },
   };
