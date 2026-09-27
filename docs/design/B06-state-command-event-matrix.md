@@ -6,7 +6,10 @@ generated one or when a source it is generated from changed without it. Sources:
 the event registry of `@kauro/domain` (`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome
 catalogues of `@kauro/application` (`B06_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the transition
 seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the
-owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Authority:
+owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served
+commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision
+D-REQ-B7): their specs, catalogues (`COMMERCE_COMMAND_OUTCOMES`, `COMMERCE_READ_OUTCOMES`) and published events
+(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Authority:
 prompts/B06 "Provide a complete state/command/event matrix"; 10 "Contract tests and compatibility"; 07 "Acceptance
 obligations". Re-check finding N13.
 
@@ -150,8 +153,8 @@ registry machine; initial PREPARED; terminal CONFIRMED, FAILED_NO_EFFECT, CANCEL
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial PREPARED) | PREPARED | CMD028 CreatePaymentOrder (B09); CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1) | payment_attempt.prepared.v1 | database |
-| PREPARED | dispatch_intent_committed | DISPATCHING | CMD029 CapturePayment (B09); CMD028 and CMD033 commit their attempts' dispatch intent the same way | payment_attempt.dispatching.v1 | database |
+| — | (initial PREPARED) | PREPARED | CMD028 CreatePaymentOrder (B09); CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1) | payment_attempt.prepared.v1 | route |
+| PREPARED | dispatch_intent_committed | DISPATCHING | CMD029 CapturePayment (B09); CMD028 and CMD033 commit their attempts' dispatch intent the same way | payment_attempt.dispatching.v1 | route |
 | PREPARED | cancel_before_dispatch | CANCELLED_BEFORE_DISPATCH | B09: the payment service's resume of an intent whose dispatch never committed: no provider call was possible (D-PROTO-B2) | payment_attempt.cancelled_before_dispatch.v1 | database |
 | DISPATCHING | authenticated_pending | PROVIDER_PENDING | CMD030 ReceivePaymentWebhook (B09) | payment_attempt.provider_pending.v1 | database |
 | DISPATCHING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | database |
@@ -282,7 +285,7 @@ platform machine (B09 decision D-MACH-B1); initial DRAFT; terminal EXPIRED, SUPE
 | — | (initial DRAFT) | DRAFT | CMD027 CreateQuote (B10); drafted and issued in one transaction | quote.drafted.v1 | database |
 | DRAFT | issue_quote | ISSUED | CMD027 CreateQuote (B10) | quote.issued.v1 | database |
 | DRAFT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
-| ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09); a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6) | quote.accepted_for_checkout.v1 | database |
+| ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09); a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6) | quote.accepted_for_checkout.v1 | route |
 | ISSUED | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
 | ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | database |
 | ISSUED | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
@@ -296,20 +299,20 @@ platform machine (B09 decision D-MACH-B2); initial INTENT_CREATED; terminal CAPT
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial INTENT_CREATED) | INTENT_CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.intent_created.v1 | database |
-| INTENT_CREATED | dispatch_intent_committed | CREATING | CMD028 CreatePaymentOrder (B09) | payment_order.creating.v1 | database |
+| — | (initial INTENT_CREATED) | INTENT_CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.intent_created.v1 | route |
+| INTENT_CREATED | dispatch_intent_committed | CREATING | CMD028 CreatePaymentOrder (B09) | payment_order.creating.v1 | route |
 | INTENT_CREATED | cancel_before_dispatch | CANCELLED | B09: the payment service's resume of a CMD028 intent whose dispatch never committed (D-PROTO-B2) | payment_order.cancelled.v1 | database |
-| CREATING | provider_order_created | CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.created.v1 | database |
+| CREATING | provider_order_created | CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.created.v1 | route |
 | CREATING | creation_proved_no_effect | FAILED | CMD034 ReconcilePayment (B09) | payment_order.failed.v1 | database |
 | CREATED | buyer_approval_observed | APPROVED | CMD030 ReceivePaymentWebhook (B09) | payment_order.approved.v1 | database |
-| CREATED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
-| APPROVED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
+| CREATED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | route |
+| APPROVED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | route |
 | CREATED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
 | APPROVED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
 | CAPTURING | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
-| CAPTURING | capture_ambiguous | CAPTURE_UNCERTAIN | CMD029 CapturePayment (B09) | payment_order.capture_uncertain.v1 | database |
-| CAPTURING | capture_proved_no_effect | APPROVED | CMD029 CapturePayment (B09) | payment_order.approved.v1 | database |
-| CAPTURING | capture_proved_no_effect_unapproved | CREATED | CMD029 CapturePayment (B09) | payment_order.created.v1 | database |
+| CAPTURING | capture_ambiguous | CAPTURE_UNCERTAIN | CMD029 CapturePayment (B09) | payment_order.capture_uncertain.v1 | route |
+| CAPTURING | capture_proved_no_effect | APPROVED | CMD029 CapturePayment (B09) | payment_order.approved.v1 | route |
+| CAPTURING | capture_proved_no_effect_unapproved | CREATED | CMD029 CapturePayment (B09) | payment_order.created.v1 | route |
 | CAPTURE_UNCERTAIN | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
 | CAPTURE_UNCERTAIN | reconciliation_proves_no_capture | APPROVED | CMD034 ReconcilePayment (B09) | payment_order.approved.v1 | database |
 | CAPTURE_UNCERTAIN | reconciliation_proves_no_capture_unapproved | CREATED | CMD034 ReconcilePayment (B09) | payment_order.created.v1 | database |
@@ -335,7 +338,7 @@ platform machine (B09 decision D-MACH-B4); initial ACTIVE; terminal REVOKED; unl
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial ACTIVE) | ACTIVE | CMD029 CapturePayment (B09); or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction | commercial_authorization.issued.v1 | database |
+| — | (initial ACTIVE) | ACTIVE | CMD029 CapturePayment (B09); or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction | commercial_authorization.issued.v1 | route |
 | ACTIVE | execution_admitted | CONSUMED | CMD036 ExecuteProject (B08) | commercial_authorization.consumed.v1 | database |
 | CONSUMED | package_published | DELIVERED | B08: atomic publication of the purchased package | commercial_authorization.delivered.v1 | database |
 | ACTIVE | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
@@ -348,8 +351,8 @@ platform machine (B09 decision D-MACH-B5); initial REQUESTED; terminal COMPLETED
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial REQUESTED) | REQUESTED | CMD031 RequestRefund (B09); the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way | refund.requested.v1 | database |
-| REQUESTED | approve_refund | APPROVED | CMD032 ApproveRefund (B09) | refund.approved.v1 | database |
+| — | (initial REQUESTED) | REQUESTED | CMD031 RequestRefund (B09); the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way | refund.requested.v1 | route |
+| REQUESTED | approve_refund | APPROVED | CMD032 ApproveRefund (B09) | refund.approved.v1 | route |
 | REQUESTED | reject_refund | REJECTED | B12: the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3) | refund.rejected.v1 | database |
 | APPROVED | dispatch_intent_committed | SUBMITTING | CMD033 ExecuteRefund (B09) | refund.submitting.v1 | database |
 | APPROVED | authorization_lapsed | FAILED | B09: the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch | refund.failed.v1 | database |
@@ -416,6 +419,9 @@ APPROVED plan bound to each other both ways at COMMIT (SQLSTATE KA020, re-check 
 
 ## 2. The served commands
 
+A B09 provider command's events are those of its whole run: the request handler's intent and claim and the payment service's
+settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh step-up unless a standing policy covers the refund.
+
 | Command | Route | Role | Scope | Step-up | Edges | Events published | Outbox consumers |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | CMD001 CreateAgency | POST /api/v1/agencies | VERIFIED_USER | NONE | — | Agency (initial DRAFT) | agency.created.v1, membership.created.v1 | agency.created.v1 → NOTIFICATIONS |
@@ -425,6 +431,10 @@ APPROVED plan bound to each other both ways at COMMIT (SQLSTATE KA020, re-check 
 | CMD023 RevisePlan | POST /api/v1/plans/{planId}/revisions | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan compiled_or_edited; Plan new_plan_revision | plan.superseded.v1, approval.withdrawn.v1, plan.created.v1, plan.validation_required.v1 | approval.withdrawn.v1 → NOTIFICATIONS; approval.withdrawn.v1 → EXECUTION_CONTROL; plan.superseded.v1 → EXECUTION_CONTROL |
 | CMD025 ApprovePlan | POST /api/v1/plans/{planId}/approve | AGENCY_APPROVER | AGENCY_HEADER | fresh | Plan agency_approval | approval.created.v1, plan.approved.v1 | approval.created.v1 → NOTIFICATIONS |
 | CMD026 WithdrawApproval | POST /api/v1/plans/{planId}/withdraw | AGENCY_APPROVER | AGENCY_HEADER | — | Plan withdraw_approval | approval.withdrawn.v1, plan.withdrawn.v1 | approval.withdrawn.v1 → NOTIFICATIONS; approval.withdrawn.v1 → EXECUTION_CONTROL; plan.withdrawn.v1 → EXECUTION_CONTROL |
+| CMD028 CreatePaymentOrder | POST /api/v1/quotes/{quoteId}/payment-orders | AGENCY_BILLING | AGENCY_HEADER | — | PaymentAttempt (initial PREPARED); Quote accept_terms_for_checkout; PaymentOrder (initial INTENT_CREATED); PaymentOrder dispatch_intent_committed; PaymentOrder provider_order_created | quote.accepted_for_checkout.v1, payment_order.intent_created.v1, payment_attempt.prepared.v1, payment_attempt.dispatching.v1, payment_order.creating.v1, payment_order.created.v1, payment_order.failed.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, reconciliation_case.opened.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; reconciliation_case.opened.v1 → NOTIFICATIONS |
+| CMD029 CapturePayment | POST /api/v1/payment-orders/{orderId}/capture | AGENCY_BILLING | AGENCY_HEADER | — | PaymentAttempt dispatch_intent_committed; PaymentOrder capture_dispatch_committed; PaymentOrder capture_ambiguous; PaymentOrder capture_proved_no_effect; PaymentOrder capture_proved_no_effect_unapproved; CommercialAuthorization (initial ACTIVE) | payment_attempt.prepared.v1, payment_attempt.dispatching.v1, payment_order.capturing.v1, payment_order.captured.v1, payment_order.capture_uncertain.v1, payment_order.approved.v1, payment_order.created.v1, payment_attempt.confirmed.v1, payment_attempt.provider_pending.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, commercial_authorization.issued.v1, refund.requested.v1, reconciliation_case.opened.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
+| CMD031 RequestRefund | POST /api/v1/projects/{projectId}/refund-requests | AGENCY_BILLING | AGENCY_HEADER | — | Refund (initial REQUESTED) | refund.requested.v1 | refund.requested.v1 → NOTIFICATIONS |
+| CMD032 ApproveRefund | POST /api/v1/refunds/{refundId}/approve | KAURO_OWNER | STORED_OPERATION | fresh, or a covering standing policy | Refund approve_refund | refund.approved.v1 | refund.approved.v1 → PAYMENT_SERVICE |
 
 ## 3. Error catalogue
 
@@ -705,6 +715,186 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD028 CreatePaymentOrder
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the quote is not visible to the caller's scope |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | HASH_MISMATCH | — | always | COMMAND | termsHash is not the quote's terms: current.mismatch names it and the UI reloads the terms it displayed |
+| 409 | PRECONDITION_FAILED | QUOTE_NOT_ACTIVE | — | always | COMMAND | the quote is not ISSUED or ACCEPTED_FOR_CHECKOUT |
+| 409 | PRECONDITION_FAILED | QUOTE_EXPIRED | — | always | COMMAND | the price expired: checkout is blocked and a new quote is required |
+| 409 | PRECONDITION_FAILED | ALREADY_PAID | — | — | COMMAND | a completed capture already pays this quote; no second purchase of the same subject |
+| 409 | PAYMENT_UNCERTAIN | CAPTURE_UNCERTAIN | — | — | COMMAND | a capture of the project's open order may have happened: pay nothing again, refresh the status |
+| 409 | PAYMENT_PENDING | CAPTURE_IN_PROGRESS | — | — | COMMAND | the project's open order is being captured; retry with the same key once it settles |
+| 409 | PAYMENT_PENDING | CREATION_IN_PROGRESS | — | — | COMMAND | the project's open order is still being created at the provider; retry with the same key once it settles |
+| 409 | PRECONDITION_FAILED | AGENCY_NOT_ACTIVE | — | always | COMMAND | the agency is not ACTIVE (DRAFT, RESTRICTED, CLOSING or CLOSED block new purchases; 07) |
+| 409 | PRECONDITION_FAILED | APPROVAL_NOT_CURRENT | — | — | COMMAND | the quoted plan is no longer APPROVED under the quoted, unwithdrawn approval of the quoted body |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_UNREVIEWED | — | — | COMMAND | the agency's current fiscal profile carries no reviewed treatment (R2-082): the sale path is blocked |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_CHANGED | — | — | COMMAND | the reviewed treatment is no longer the one the quote was priced with: a new quote is required |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the quoted source revision is no longer SEALED (S060: a price-valid quote does not keep deleted data executable) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the quoted target contract is no longer confirmed and current |
+| 422 | CAPABILITY_UNAVAILABLE | MODE_NOT_OFFERED | — | — | COMMAND | the project's capability is no longer offered |
+| 422 | CAPABILITY_UNAVAILABLE | PAYMENT_ROUTE_UNQUALIFIED | — | — | COMMAND | no qualified merchant route for the provider and environment |
+| 422 | CAPABILITY_UNAVAILABLE | FISCAL_ROUTE_UNQUALIFIED | — | — | COMMAND | the quoted fiscal issuer route is not qualified |
+| 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | DELIVERY_CAPACITY_UNAVAILABLE | — | — | COMMAND | the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key |
+
+### CMD029 CapturePayment
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | PROVIDER_REFERENCE_MISMATCH | UNKNOWN_REFERENCE | — | COMMAND | providerApprovalRef does not name the stored provider order: a browser claim is never payment (S057) |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the payment order is not visible to the caller's scope |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | ORDER_NOT_CAPTURABLE | — | always | COMMAND | the order is not CREATED or APPROVED (never created, failed, cancelled or expired) |
+| 409 | PRECONDITION_FAILED | ALREADY_PAID | — | always | COMMAND | the order is already CAPTURED |
+| 409 | PRECONDITION_FAILED | QUOTE_NOT_ACTIVE | — | — | COMMAND | the quote no longer governs checkout (superseded or withdrawn) |
+| 409 | PRECONDITION_FAILED | QUOTE_EXPIRED | — | — | COMMAND | the price expired before the capture started (15 "If the quote expires before provider capture starts, checkout is blocked") |
+| 409 | PAYMENT_PENDING | CAPTURE_IN_PROGRESS | — | — | COMMAND | a capture of this order is in flight under another key; retry with the same key once it settles |
+| 409 | PAYMENT_UNCERTAIN | CAPTURE_UNCERTAIN | — | — | COMMAND | a capture of this order may have happened: it is reconciled, never repeated |
+| 409 | PRECONDITION_FAILED | AGENCY_NOT_ACTIVE | — | always | COMMAND | the agency is not ACTIVE (DRAFT, RESTRICTED, CLOSING or CLOSED block new purchases; 07) |
+| 409 | PRECONDITION_FAILED | APPROVAL_NOT_CURRENT | — | — | COMMAND | the quoted plan is no longer APPROVED under the quoted, unwithdrawn approval of the quoted body |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_UNREVIEWED | — | — | COMMAND | the agency's current fiscal profile no longer carries a reviewed treatment: the capture does not start |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_CHANGED | — | — | COMMAND | the reviewed treatment changed since the quote was priced: a new quote is required before any capture |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the quoted source revision is no longer SEALED (S060: a price-valid quote does not keep deleted data executable) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the quoted target contract is no longer confirmed and current |
+| 422 | CAPABILITY_UNAVAILABLE | MODE_NOT_OFFERED | — | — | COMMAND | the project's capability is no longer offered |
+| 422 | CAPABILITY_UNAVAILABLE | PAYMENT_ROUTE_UNQUALIFIED | — | — | COMMAND | the order's merchant route is no longer qualified |
+| 422 | CAPABILITY_UNAVAILABLE | FISCAL_ROUTE_UNQUALIFIED | — | — | COMMAND | the quoted fiscal issuer route is no longer qualified |
+| 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | DELIVERY_CAPACITY_UNAVAILABLE | — | — | COMMAND | the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key |
+
+### CMD031 RequestRefund
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's scope |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | NOTHING_TO_REFUND | — | — | COMMAND | the project has no completed capture with a refundable service or tax balance |
+| 409 | PRECONDITION_FAILED | REFUND_REQUEST_OPEN | — | — | COMMAND | a request of this capture already awaits review; it is reviewed, not repeated |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD032 ApproveRefund
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | REFUND_COMPONENT_INVALID | RANGE | — | COMMAND | the amounts are empty, or name a component this refund does not carry |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock) |
+| 403 | NOT_AUTHORIZED | SELF_APPROVAL_FORBIDDEN | — | — | COMMAND | the approver is the identity that requested the refund (segregation of duties, D-AUTHZ-B2) |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | authorizationRef names neither an applicable standing policy nor a step-up proof of the approver |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the approver's step-up is older than the freshness window |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is another identity's |
+| 403 | ASSURANCE_REQUIRED | POLICY_NOT_APPLICABLE | — | — | ASSURANCE | the named standing policy does not cover this refund (origin, phase, scope or validity): a policy is referenced, never invented |
+| 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the operator's finance scope: a foreign and a nonexistent id answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the refund's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | REFUND_NOT_REQUESTED | — | always | COMMAND | the refund is not REQUESTED (already approved, rejected, executing or final) |
+| 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture is not COMPLETED (reversed captures already returned the money) |
+| 409 | PRECONDITION_FAILED | REFUND_EXCEEDS_REMAINING | — | — | COMMAND | the amounts exceed the reconciled remaining capture, given every committed refund (CMD032 failure) |
+| 409 | PRECONDITION_FAILED | REFUND_TAX_INCONSISTENT | RANGE | — | COMMAND | taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ## 4. Contract-test applicability (manual 10)
 
 "For each command, tests cover the legitimate state, wrong role, wrong agency, stale version, duplicate request, changed-body
@@ -810,6 +1000,62 @@ the check proves every citation resolves to an existing test.
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
 
+### CMD028 CreatePaymentOrder
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd028-create-payment-order.test.ts` :: "OK: an AGENCY_BILLING member creates one order for an issued quote…" |
+| wrong role | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
+| wrong agency | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND…" |
+| stale version | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms…" |
+| duplicate request | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order…" |
+| changed-body same key | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
+| lost response | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order…"<br>`cmd028-create-payment-order.test.ts` :: "DENY (ambiguous): a creation timeout answers 202 and the same key observes by request identity…" |
+| external uncertainty | `cmd028-create-payment-order.test.ts` :: "DENY (ambiguous): a creation timeout answers 202…"<br>`cmd028-create-payment-order.test.ts` :: "D-REQ-B8: a creation the provider proved had no effect takes a new deliberate attempt…" |
+
+### CMD029 CapturePayment
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd029-capture-payment.test.ts` :: "OK: capture through the server adapter…" |
+| wrong role | `cmd029-capture-payment.test.ts` :: "DENY: a foreign tenant's order is NOT_FOUND, a wrong role is NOT_AUTHORIZED…" |
+| wrong agency | `cmd029-capture-payment.test.ts` :: "DENY: a foreign tenant's order is NOT_FOUND…" |
+| stale version | NOT_APPLICABLE: CapturePayment carries no expectedVersion (registry field: providerApprovalRef); the order's state is read before its transition lock and again under it, and a capture already paid or in flight answers ALREADY_PAID or PAYMENT_PENDING with the current state |
+| duplicate request | `cmd029-capture-payment.test.ts` :: "RACE: an identical retry replays…" |
+| changed-body same key | `cmd029-capture-payment.test.ts` :: "RACE: an identical retry replays, the same key with another providerApprovalRef is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
+| lost response | `cmd029-capture-payment.test.ts` :: "RACE: an identical retry replays…" |
+| external uncertainty | `cmd029-capture-payment.test.ts` :: "DENY: a foreign tenant's order is NOT_FOUND…"<br>`cmd029-capture-payment.test.ts` :: "RACE: an identical retry replays…" |
+
+### CMD031 RequestRefund
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd031-request-refund.test.ts` :: "OK: an AGENCY_BILLING member requests a refund of a paid project…" |
+| wrong role | `cmd031-request-refund.test.ts` :: "DENY: a foreign tenant's project is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
+| wrong agency | `cmd031-request-refund.test.ts` :: "DENY: a foreign tenant's project is NOT_FOUND…" |
+| stale version | NOT_APPLICABLE: a request creates the refund and carries no expectedVersion (registry fields: reasonCode, evidenceRef); the capture it names is read after its transition lock, and a second open request is REFUND_REQUEST_OPEN |
+| duplicate request | `cmd031-request-refund.test.ts` :: "RACE: an identical retry replays…" |
+| changed-body same key | `cmd031-request-refund.test.ts` :: "RACE: an identical retry replays, the same key with another reasonCode is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
+| lost response | `cmd031-request-refund.test.ts` :: "RACE: an identical retry replays…" |
+| external uncertainty | NOT_APPLICABLE: a refund request reaches no provider (customer cancellation is no permission to send PSP refunds); the provider effect belongs to CMD033 after an owner's approval |
+
+### CMD032 ApproveRefund
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd032-approve-refund.test.ts` :: "OK: a KAURO_OWNER with a fresh step-up approves the remaining service…"<br>`cmd032-approve-refund.test.ts` :: "D-REF-B4: a standing policy that covers the refund as it stands authorizes the approval without a step-up…" |
+| wrong role | `cmd032-approve-refund.test.ts` :: "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED…" |
+| wrong agency | `cmd032-approve-refund.test.ts` :: "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND…" |
+| stale version | `cmd032-approve-refund.test.ts` :: "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION…" |
+| duplicate request | `cmd032-approve-refund.test.ts` :: "RACE: an identical retry replays…" |
+| changed-body same key | `cmd032-approve-refund.test.ts` :: "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
+| lost response | `cmd032-approve-refund.test.ts` :: "RACE: an identical retry replays…" |
+| external uncertainty | NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service) |
+
 ## 5. The manual-10 reads (re-check finding N16)
 
 Every read runs under the caller's own context and policies after the same access decision as a command (identity, and for an
@@ -817,7 +1063,9 @@ agency read an ACTIVE live membership after its transition lock; every membershi
 durable security fact under the read's action token. Lists page by keyset with an opaque cursor bound to the caller, the agency,
 the list, its filter and its order (`api/cursor`, KEYSET_V1). What differs by role is the projection: a team manager
 (MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view
-carries the caller's permitted actions (`api/permitted-actions`).
+carries the caller's permitted actions (`api/permitted-actions`). Package B09's reads (D-REQ-B7) follow the same rules: the agency
+reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),
+and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER).
 
 | Read | Route | Scope | List | Reply view | Action token | Authority |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -826,6 +1074,10 @@ carries the caller's permitted actions (`api/permitted-actions`).
 | ListMembers | GET /api/v1/agencies/{agencyId}/members | AGENCY_PATH | limit, cursor | TeamPage | LIST_MEMBERS | 10 "Agency and team routes": "GET /agencies/{agencyId}/members returns only team information appropriate to the caller" |
 | ListClients | GET /api/v1/agencies/{agencyId}/clients | AGENCY_PATH | limit, cursor | ClientPage | LIST_CLIENTS | 10 "Client and project routes": "GET lists safe client summaries with pagination" |
 | GetProject | GET /api/v1/projects/{projectId} | AGENCY_HEADER | — | ProjectView | GET_PROJECT | 10 "Client and project routes": "GET /projects/{projectId} returns the current revision summary, commercial state, retention deadlines, safe progress and permitted actions" |
+| GetQuote | GET /api/v1/quotes/{quoteId} | AGENCY_HEADER | — | QuoteView | READ_QUOTE | 10 "Quote and payment routes": "GET /quotes/{quoteId} returns price components, tax status, discount provenance, expiry and data availability. It also returns checkoutReady and structured blockers" |
+| GetPaymentOrder | GET /api/v1/payment-orders/{orderId} | AGENCY_HEADER | — | PaymentOrderDetailView | READ_PAYMENT_ORDER | 10 "Quote and payment routes": "A browser return endpoint only navigates to server-side reconciliation"; 15 "Payment state transitions" |
+| GetRefund | GET /api/v1/refunds/{refundId} | AGENCY_HEADER | — | RefundView | READ_REFUND | 10 "Refund request, review, execute and reconcile"; 15 "Refund policy and calculation" |
+| GetRefundReview | GET /api/v1/operations/refunds/{refundId} | STORED_OPERATION | — | RefundReviewView | READ_REFUND_REVIEW | 10 "The owner sees the exact amount, reason, provider effect and commission/tax consequences"; COMMAND_CATALOGUE CMD032 precondition |
 
 ### ListAgencies
 
@@ -927,6 +1179,94 @@ carries the caller's permitted actions (`api/permitted-actions`).
 | 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
 | 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
 | 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's agency |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetQuote
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the quote is not visible to the caller's scope |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetPaymentOrder
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the payment order is not visible to the caller's scope |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetRefund
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the refund is not visible to the caller's scope |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### GetRefundReview
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock) |
+| 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the operator's finance scope: a foreign and a nonexistent id answer alike |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
