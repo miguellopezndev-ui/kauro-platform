@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, READ_ROUTES, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
+import { B06_COMMANDS, COMMERCE_COMMANDS, COMMERCE_SERVED_COMMAND_IDS, READ_ROUTES, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -242,7 +242,11 @@ test("exactly the seven catalogue routes are registered as POST and the five man
   }
   assert.equal(fastifyPath("/api/v1/agencies/{agencyId}/clients"), "/api/v1/agencies/:agencyId/clients");
   const inventory = routeInventoryOf(w.app);
-  assert.equal(inventory.filter((r) => r.method === "POST").length, 7);
+  // the seven catalogue routes of B06; beside them only the payment service's routes of package B09 (stage-2 mandate M3), served
+  // in every edition (without a bound payment service they know no provider and no service identity)
+  const payment = new Set(COMMERCE_SERVED_COMMAND_IDS.map((id) => fastifyPath(COMMERCE_COMMANDS[id].path)));
+  assert.equal(inventory.filter((r) => r.method === "POST" && !payment.has(r.url)).length, 7);
+  assert.deepEqual(inventory.filter((r) => r.method === "POST" && payment.has(r.url)).map((r) => r.url), [...payment]);
   assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/")).length, 5);
   // each route validates its body against its own closed request schema
   for (const id of Object.keys(B06_COMMANDS) as Array<keyof typeof B06_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);

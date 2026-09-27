@@ -62,6 +62,8 @@ import { PgLeaseStore } from "./lease-store.js";
 import type { KauroPool, RuntimeRole } from "./pool.js";
 import { PgCommercialInspections } from "./repositories/commerce-inspections.js";
 import { createCommerceRepositories } from "./repositories/commerce-repositories.js";
+import { PgPurchasedSubjects } from "./repositories/commerce-subject.js";
+import { PgPaymentSweeps } from "./repositories/commerce-sweeps.js";
 import { PgApprovalRepository, PgPlanRepository, PgValidationReceiptRepository } from "./repositories/plans.js";
 import { PgAgencyRepository, PgIdentityRepository, PgInvitationRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 import { PgCapabilityRepository, PgDatasetRevisionRepository, PgEndClientRepository, PgProcessingAuthorityRepository, PgProjectRepository, PgTargetContractRepository } from "./repositories/workspace.js";
@@ -337,6 +339,21 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 // --- the commerce unit of work (package B09) ------------------------------------------------------------------------------------------
 
 /**
+ * The column-scoped purchased-subject read of a commerce unit of work of this package (D-CORE-B2): the api binds M2's
+ * PurchasedSubjectReader to purchasedSubjectsOf(uow).subjectOf(quote) (stage-2 mandate M3).
+ */
+export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the purchased subject is read in a commerce unit of work of @kauro/persistence");
+  return uow.purchasedSubjects;
+}
+
+/** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */
+export function paymentSweepsOf(uow: UnitOfWork): PgPaymentSweeps {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the payment sweeps read a commerce unit of work of @kauro/persistence");
+  return uow.paymentSweeps;
+}
+
+/**
  * A unit of work of the payments and fiscal workflow (@kauro/domain CommerceUnitOfWork): B06's unit of work plus the commerce
  * repositories and the scope index on the same connection, and the adoption of one scope per unit of work (D-SCOPE-B1).
  *
@@ -348,6 +365,13 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOfWork {
   readonly commerce: CommerceRepositories;
   readonly scopes: ScopeIndex;
+  /**
+   * The column-scoped read of a quote's purchased subject (D-CORE-B2; stage-2 mandate M3): what the payment service's reconciler
+   * relies on to issue an entitlement, read through purchasedSubjectsOf(uow) by the api's PurchasedSubjectReader binding.
+   */
+  readonly purchasedSubjects: PgPurchasedSubjects;
+  /** The queries of the payment service's bounded periodic pass (D-PROTO-B4; stage-2 mandate M3), read through paymentSweepsOf(uow). */
+  readonly paymentSweeps: PgPaymentSweeps;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -358,6 +382,8 @@ export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOf
     const built = createCommerceRepositories({ db: client, ids, clock, events: this.events, provenance: () => this.provenance() });
     this.commerce = built.repositories;
     this.scopes = built.scopes;
+    this.purchasedSubjects = new PgPurchasedSubjects(client);
+    this.paymentSweeps = new PgPaymentSweeps(client);
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {

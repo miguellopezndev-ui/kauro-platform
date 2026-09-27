@@ -183,6 +183,12 @@ export interface ProviderEvidenceStore {
   readonly integrationClass: IntegrationClass;
   put(evidence: Omit<StoredEvidence, "artifactRef" | "sha256"> & { readonly bytes: Uint8Array }): Promise<{ readonly artifactRef: string; readonly sha256: Sha256Hex }>;
   get(artifactRef: string): Promise<StoredEvidence | null>;
+  /**
+   * The evidence stored under a content digest (the store is content-addressed): how the payment service's inbox worker finds the
+   * verified body of an inbox record, which keeps only the body's SHA-256 (B06 inbox_records.body_hash), to apply it after a crash
+   * between the ingress commit and the application (design §8 CMD030 RACE; decision D-M3-B2).
+   */
+  findByDigest(sha256: Sha256Hex): Promise<StoredEvidence | null>;
 }
 
 // --- fiscal document adapter / bridge ------------------------------------------------------------------------------------------------
@@ -404,7 +410,9 @@ export interface SourceLineageReader {
  * The included pre-execution source replacement (16 "Scope changes and credits"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18; registry
  * R2-092, owned by the recurrence package B10): implemented by B09 (the stage-2 mandate M3, design §14) and called by B10's replacement flow once the new
  * revision is sealed, its plan approved and the replacement quote issued. It runs in a SERVICE unit of work under kauro_payment (only
- * the payment service revokes and issues entitlements, B09-F1): records the re-binding, revokes the replaced entitlement
+ * the payment service revokes and issues entitlements, B09-F1) that the caller has adopted to the paid order's scope first
+ * (`adoptScope("PAYMENT_ORDER", <the capture's order>)`, D-SCOPE-B1; design decision D-M3-B6 — a unit of work that adopted nothing is
+ * refused INTEGRITY_FAILURE, a capture of another agency is NOT_FOUND): records the re-binding, revokes the replaced entitlement
  * (SOURCE_REPLACED, PRE_EXECUTION), supersedes the replaced quote, accepts the replacement and issues its entitlement bound to the same
  * capture — one transaction; refused with its blockers otherwise (commerce/authority replacementBlockers; SQLSTATE KP013).
  */

@@ -153,15 +153,15 @@ registry machine; initial PREPARED; terminal CONFIRMED, FAILED_NO_EFFECT, CANCEL
 | — | (initial PREPARED) | PREPARED | CMD028 CreatePaymentOrder (B09); CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1) | payment_attempt.prepared.v1 | database |
 | PREPARED | dispatch_intent_committed | DISPATCHING | CMD029 CapturePayment (B09); CMD028 and CMD033 commit their attempts' dispatch intent the same way | payment_attempt.dispatching.v1 | database |
 | PREPARED | cancel_before_dispatch | CANCELLED_BEFORE_DISPATCH | B09: the payment service's resume of an intent whose dispatch never committed: no provider call was possible (D-PROTO-B2) | payment_attempt.cancelled_before_dispatch.v1 | database |
-| DISPATCHING | authenticated_pending | PROVIDER_PENDING | CMD030 ReceivePaymentWebhook (B09) | payment_attempt.provider_pending.v1 | database |
-| DISPATCHING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | database |
+| DISPATCHING | authenticated_pending | PROVIDER_PENDING | CMD030 ReceivePaymentWebhook (B09) | payment_attempt.provider_pending.v1 | route |
+| DISPATCHING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | route |
 | DISPATCHING | ambiguous_transport_result | UNCERTAIN | B09: the settle step of the provider-effect protocol classifies a timeout, reset or unreadable response (D-PROTO-B1) | payment_attempt.uncertain.v1 | database |
-| DISPATCHING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
-| PROVIDER_PENDING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | database |
-| PROVIDER_PENDING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
+| DISPATCHING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | route |
+| PROVIDER_PENDING | authenticated_completed | CONFIRMED | CMD030 ReceivePaymentWebhook (B09); the dispatching command's own settle step records an authenticated response the same way | payment_attempt.confirmed.v1 | route |
+| PROVIDER_PENDING | proved_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | route |
 | PROVIDER_PENDING | observation_lost | UNCERTAIN | B09: the payment service's watchdog past the dispatch deadline (D-PROTO-B4) | payment_attempt.uncertain.v1 | database |
-| UNCERTAIN | reconciliation_completed | CONFIRMED | CMD034 ReconcilePayment (B09) | payment_attempt.confirmed.v1 | database |
-| UNCERTAIN | reconciliation_proves_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | database |
+| UNCERTAIN | reconciliation_completed | CONFIRMED | CMD034 ReconcilePayment (B09) | payment_attempt.confirmed.v1 | route |
+| UNCERTAIN | reconciliation_proves_no_effect | FAILED_NO_EFFECT | CMD034 ReconcilePayment (B09) | payment_attempt.failed_no_effect.v1 | route |
 
 ### ImportStage
 
@@ -300,23 +300,23 @@ platform machine (B09 decision D-MACH-B2); initial INTENT_CREATED; terminal CAPT
 | INTENT_CREATED | dispatch_intent_committed | CREATING | CMD028 CreatePaymentOrder (B09) | payment_order.creating.v1 | database |
 | INTENT_CREATED | cancel_before_dispatch | CANCELLED | B09: the payment service's resume of a CMD028 intent whose dispatch never committed (D-PROTO-B2) | payment_order.cancelled.v1 | database |
 | CREATING | provider_order_created | CREATED | CMD028 CreatePaymentOrder (B09) | payment_order.created.v1 | database |
-| CREATING | creation_proved_no_effect | FAILED | CMD034 ReconcilePayment (B09) | payment_order.failed.v1 | database |
-| CREATED | buyer_approval_observed | APPROVED | CMD030 ReceivePaymentWebhook (B09) | payment_order.approved.v1 | database |
+| CREATING | creation_proved_no_effect | FAILED | CMD034 ReconcilePayment (B09) | payment_order.failed.v1 | route |
+| CREATED | buyer_approval_observed | APPROVED | CMD030 ReceivePaymentWebhook (B09) | payment_order.approved.v1 | route |
 | CREATED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
 | APPROVED | capture_dispatch_committed | CAPTURING | CMD029 CapturePayment (B09) | payment_order.capturing.v1 | database |
-| CREATED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
-| APPROVED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
-| CAPTURING | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
+| CREATED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | route |
+| APPROVED | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | route |
+| CAPTURING | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | route |
 | CAPTURING | capture_ambiguous | CAPTURE_UNCERTAIN | CMD029 CapturePayment (B09) | payment_order.capture_uncertain.v1 | database |
 | CAPTURING | capture_proved_no_effect | APPROVED | CMD029 CapturePayment (B09) | payment_order.approved.v1 | database |
 | CAPTURING | capture_proved_no_effect_unapproved | CREATED | CMD029 CapturePayment (B09) | payment_order.created.v1 | database |
-| CAPTURE_UNCERTAIN | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | database |
-| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture | APPROVED | CMD034 ReconcilePayment (B09) | payment_order.approved.v1 | database |
-| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture_unapproved | CREATED | CMD034 ReconcilePayment (B09) | payment_order.created.v1 | database |
-| CREATED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | database |
-| APPROVED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | database |
-| CREATED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | database |
-| APPROVED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | database |
+| CAPTURE_UNCERTAIN | capture_observed | CAPTURED | CMD030 ReceivePaymentWebhook (B09); CMD029's settle step and CMD034 record an observed capture the same way | payment_order.captured.v1 | route |
+| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture | APPROVED | CMD034 ReconcilePayment (B09) | payment_order.approved.v1 | route |
+| CAPTURE_UNCERTAIN | reconciliation_proves_no_capture_unapproved | CREATED | CMD034 ReconcilePayment (B09) | payment_order.created.v1 | route |
+| CREATED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | route |
+| APPROVED | order_voided | CANCELLED | CMD030 ReceivePaymentWebhook (B09) | payment_order.cancelled.v1 | route |
+| CREATED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | route |
+| APPROVED | order_expired | EXPIRED | CMD030 ReceivePaymentWebhook (B09); or CMD034 when a provider query shows the expiry | payment_order.expired.v1 | route |
 
 ### CaptureFact
 
@@ -324,10 +324,10 @@ platform machine (B09 decision D-MACH-B3); initial PENDING; terminal DENIED, REV
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial PENDING) | PENDING | CMD030 ReceivePaymentWebhook (B09); a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too | capture.pending.v1 | database |
-| PENDING | provider_completed | COMPLETED | CMD030 ReceivePaymentWebhook (B09) | capture.completed.v1 | database |
-| PENDING | provider_denied | DENIED | CMD030 ReceivePaymentWebhook (B09) | capture.denied.v1 | database |
-| COMPLETED | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09); from COMPLETED only: a capture first seen reversed is recorded COMPLETED, then REVERSED, in one transaction (D-PAY-B5) | capture.reversed.v1 | database |
+| — | (initial PENDING) | PENDING | CMD030 ReceivePaymentWebhook (B09); a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too | capture.pending.v1 | route |
+| PENDING | provider_completed | COMPLETED | CMD030 ReceivePaymentWebhook (B09) | capture.completed.v1 | route |
+| PENDING | provider_denied | DENIED | CMD030 ReceivePaymentWebhook (B09) | capture.denied.v1 | route |
+| COMPLETED | provider_reversed | REVERSED | CMD030 ReceivePaymentWebhook (B09); from COMPLETED only: a capture first seen reversed is recorded COMPLETED, then REVERSED, in one transaction (D-PAY-B5) | capture.reversed.v1 | route |
 
 ### CommercialAuthorization
 
@@ -338,9 +338,9 @@ platform machine (B09 decision D-MACH-B4); initial ACTIVE; terminal REVOKED; unl
 | — | (initial ACTIVE) | ACTIVE | CMD029 CapturePayment (B09); or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction | commercial_authorization.issued.v1 | database |
 | ACTIVE | execution_admitted | CONSUMED | CMD036 ExecuteProject (B08) | commercial_authorization.consumed.v1 | database |
 | CONSUMED | package_published | DELIVERED | B08: atomic publication of the purchased package | commercial_authorization.delivered.v1 | database |
-| ACTIVE | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
-| CONSUMED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
-| DELIVERED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | database |
+| ACTIVE | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | route |
+| CONSUMED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | route |
+| DELIVERED | authority_revoked | REVOKED | CMD030 ReceivePaymentWebhook (B09); a reversal; CMD033 revokes it when a completed refund leaves no service basis | commercial_authorization.revoked.v1 | route |
 
 ### Refund
 
@@ -351,15 +351,15 @@ platform machine (B09 decision D-MACH-B5); initial REQUESTED; terminal COMPLETED
 | — | (initial REQUESTED) | REQUESTED | CMD031 RequestRefund (B09); the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way | refund.requested.v1 | database |
 | REQUESTED | approve_refund | APPROVED | CMD032 ApproveRefund (B09) | refund.approved.v1 | database |
 | REQUESTED | reject_refund | REJECTED | B12: the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3) | refund.rejected.v1 | database |
-| APPROVED | dispatch_intent_committed | SUBMITTING | CMD033 ExecuteRefund (B09) | refund.submitting.v1 | database |
+| APPROVED | dispatch_intent_committed | SUBMITTING | CMD033 ExecuteRefund (B09) | refund.submitting.v1 | route |
 | APPROVED | authorization_lapsed | FAILED | B09: the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch | refund.failed.v1 | database |
-| SUBMITTING | authenticated_completed | COMPLETED | CMD033 ExecuteRefund (B09) | refund.completed.v1 | database |
-| SUBMITTING | ambiguous_transport_result | UNCERTAIN | CMD033 ExecuteRefund (B09) | refund.uncertain.v1 | database |
-| SUBMITTING | proved_no_effect | APPROVED | CMD033 ExecuteRefund (B09) | refund.approved.v1 | database |
-| SUBMITTING | provider_refused | FAILED | CMD033 ExecuteRefund (B09) | refund.failed.v1 | database |
-| UNCERTAIN | reconciliation_completed | COMPLETED | CMD034 ReconcilePayment (B09) | refund.completed.v1 | database |
-| UNCERTAIN | reconciliation_proves_no_effect | APPROVED | CMD034 ReconcilePayment (B09) | refund.approved.v1 | database |
-| UNCERTAIN | reconciliation_proves_refusal | FAILED | CMD034 ReconcilePayment (B09) | refund.failed.v1 | database |
+| SUBMITTING | authenticated_completed | COMPLETED | CMD033 ExecuteRefund (B09) | refund.completed.v1 | route |
+| SUBMITTING | ambiguous_transport_result | UNCERTAIN | CMD033 ExecuteRefund (B09) | refund.uncertain.v1 | route |
+| SUBMITTING | proved_no_effect | APPROVED | CMD033 ExecuteRefund (B09) | refund.approved.v1 | route |
+| SUBMITTING | provider_refused | FAILED | CMD033 ExecuteRefund (B09) | refund.failed.v1 | route |
+| UNCERTAIN | reconciliation_completed | COMPLETED | CMD034 ReconcilePayment (B09) | refund.completed.v1 | route |
+| UNCERTAIN | reconciliation_proves_no_effect | APPROVED | CMD034 ReconcilePayment (B09) | refund.approved.v1 | route |
+| UNCERTAIN | reconciliation_proves_refusal | FAILED | CMD034 ReconcilePayment (B09) | refund.failed.v1 | route |
 
 ### ReconciliationCase
 
@@ -367,7 +367,7 @@ platform machine (B09 decision D-MACH-B6); initial OPEN; terminal RESOLVED; unli
 
 | From | Event | To | Performed by | Event type | B06 |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial OPEN) | OPEN | CMD034 ReconcilePayment (B09); CMD029 and CMD030 open cases the same way | reconciliation_case.opened.v1 | database |
+| — | (initial OPEN) | OPEN | CMD034 ReconcilePayment (B09); CMD029 and CMD030 open cases the same way | reconciliation_case.opened.v1 | route |
 | OPEN | case_resolved | RESOLVED | B12: the owner's finance review records the explaining facts or decision; no registry command names it (Q-B09-3) | reconciliation_case.resolved.v1 | database |
 
 ### PaymentRoute
@@ -425,6 +425,9 @@ APPROVED plan bound to each other both ways at COMMIT (SQLSTATE KA020, re-check 
 | CMD023 RevisePlan | POST /api/v1/plans/{planId}/revisions | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan compiled_or_edited; Plan new_plan_revision | plan.superseded.v1, approval.withdrawn.v1, plan.created.v1, plan.validation_required.v1 | approval.withdrawn.v1 → NOTIFICATIONS; approval.withdrawn.v1 → EXECUTION_CONTROL; plan.superseded.v1 → EXECUTION_CONTROL |
 | CMD025 ApprovePlan | POST /api/v1/plans/{planId}/approve | AGENCY_APPROVER | AGENCY_HEADER | fresh | Plan agency_approval | approval.created.v1, plan.approved.v1 | approval.created.v1 → NOTIFICATIONS |
 | CMD026 WithdrawApproval | POST /api/v1/plans/{planId}/withdraw | AGENCY_APPROVER | AGENCY_HEADER | — | Plan withdraw_approval | approval.withdrawn.v1, plan.withdrawn.v1 | approval.withdrawn.v1 → NOTIFICATIONS; approval.withdrawn.v1 → EXECUTION_CONTROL; plan.withdrawn.v1 → EXECUTION_CONTROL |
+| CMD030 ReceivePaymentWebhook | POST /api/v1/payments/webhooks/{provider} | AUTHENTICATED_PROVIDER | PROVIDER_INGRESS | — | PaymentAttempt authenticated_pending; PaymentAttempt authenticated_completed; PaymentOrder buyer_approval_observed; PaymentOrder capture_observed; PaymentOrder order_voided; PaymentOrder order_expired; CaptureFact (initial PENDING); CaptureFact provider_completed; CaptureFact provider_denied; CaptureFact provider_reversed; CommercialAuthorization authority_revoked | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1 | payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
+| CMD033 ExecuteRefund | POST /api/v1/refunds/{refundId}/execute | PAYMENT_SERVICE | STORED_OPERATION | — | Refund dispatch_intent_committed; Refund authenticated_completed; Refund ambiguous_transport_result; Refund proved_no_effect; Refund provider_refused | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1, payment_attempt.prepared.v1, payment_attempt.dispatching.v1, refund.submitting.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
+| CMD034 ReconcilePayment | POST /api/v1/payment-orders/{orderId}/reconcile | PAYMENT_SERVICE | STORED_OPERATION | — | PaymentAttempt proved_no_effect; PaymentAttempt reconciliation_completed; PaymentAttempt reconciliation_proves_no_effect; PaymentOrder creation_proved_no_effect; PaymentOrder reconciliation_proves_no_capture; PaymentOrder reconciliation_proves_no_capture_unapproved; Refund reconciliation_completed; Refund reconciliation_proves_no_effect; Refund reconciliation_proves_refusal; ReconciliationCase (initial OPEN) | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1 | payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
 
 ## 3. Error catalogue
 
@@ -705,6 +708,84 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD030 ReceivePaymentWebhook
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PROVIDER_BODY_TOO_LARGE | — | — | ADMISSION | the raw body exceeds the provider's bound; nothing is verified or stored |
+| 401 | AUTHENTICATION_REQUIRED | PROVIDER_SIGNATURE_INVALID | — | — | AUTHENTICATION | the provider signature over the exact raw bytes does not verify: nothing is stored but the anonymous denial |
+| 401 | AUTHENTICATION_REQUIRED | PROVIDER_EVENT_STALE | — | — | AUTHENTICATION | the transmission is outside the freshness window (a replay is refused) |
+| 401 | AUTHENTICATION_REQUIRED | PROVIDER_ENVIRONMENT_MISMATCH | — | — | AUTHENTICATION | the event was signed for another environment than this deployment's |
+| 404 | NOT_FOUND | PROVIDER_UNKNOWN | — | — | ADMISSION | no verifier is configured for the provider named in the path |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD033 ExecuteRefund
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded |
+| 403 | NOT_AUTHORIZED | SERVICE_NOT_PERMITTED | — | — | ACCESS | the verified service identity does not hold the command's technical role |
+| 403 | NOT_AUTHORIZED | SERVICE_ENVIRONMENT_MISMATCH | — | — | ACCESS | the service identity was issued for another environment |
+| 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the scope index: nothing is adopted and nothing written |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the refund's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | REFUND_NOT_APPROVED | — | always | COMMAND | the refund is not APPROVED (requested, rejected, completed or failed) |
+| 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture was reversed: the authorization lapsed and no refund is dispatched |
+| 409 | PAYMENT_PENDING | REFUND_IN_PROGRESS | — | — | COMMAND | a submission of this refund is in flight under another key |
+| 409 | PAYMENT_UNCERTAIN | REFUND_UNCERTAIN | — | — | COMMAND | a prior submission may have refunded: reconcile it (CMD034) before any new dispatch |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD034 ReconcilePayment
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded |
+| 403 | NOT_AUTHORIZED | SERVICE_NOT_PERMITTED | — | — | ACCESS | the verified service identity does not hold the command's technical role |
+| 403 | NOT_AUTHORIZED | SERVICE_ENVIRONMENT_MISMATCH | — | — | ACCESS | the service identity was issued for another environment |
+| 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the scope index: nothing is adopted and nothing written |
+| 404 | NOT_FOUND | EVIDENCE_NOT_FOUND | — | — | COMMAND | observationRef names no stored, authenticated provider observation |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | OBSERVATION_SUBJECT_MISMATCH | — | — | COMMAND | the observation is about another order, provider or environment |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ## 4. Contract-test applicability (manual 10)
 
 "For each command, tests cover the legitimate state, wrong role, wrong agency, stale version, duplicate request, changed-body
@@ -809,6 +890,48 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
+
+### CMD030 ReceivePaymentWebhook
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd030-payment-webhook.test.ts` :: "OK: a verified capture event is stored once in the inbox and applied to its order…" |
+| wrong role | `cmd030-payment-webhook.test.ts` :: "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial…" |
+| wrong agency | `cmd030-payment-webhook.test.ts` :: "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial; an event of a foreign tenant's environment or an unknown provider reference is an exception…" |
+| stale version | NOT_APPLICABLE: a provider event carries no expectedVersion; an observation older in provider chronology than the latest applied one is kept as history and changes nothing (STALE_IGNORED, D-PAY-B3) |
+| duplicate request | `cmd030-payment-webhook.test.ts` :: "RACE: an identical retry of a delivery is the same inbox record…" |
+| changed-body same key | `cmd030-payment-webhook.test.ts` :: "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED…" |
+| invalid schema | `b09-payment-service.test.ts` :: "the payment service's routes admit their requests in manual-10 order…" |
+| lost response | `cmd030-payment-webhook.test.ts` :: "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED, a crash between the ingress commit and the application applies the record once…" |
+| external uncertainty | NOT_APPLICABLE: the webhook performs no provider effect; an event that reports a completion without its instant is applied only after a stored provider query of its order (D-PAY-B6), and a verification that calls the provider does so before anything is stored |
+
+### CMD033 ExecuteRefund
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd033-execute-refund.test.ts` :: "OK: the payment service executes an approved refund once…" |
+| wrong role | `cmd033-execute-refund.test.ts` :: "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED…" |
+| wrong agency | `cmd033-execute-refund.test.ts` :: "DENY: a refund of a foreign tenant is NOT_FOUND…" |
+| stale version | `cmd033-execute-refund.test.ts` :: "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite…" |
+| duplicate request | `cmd033-execute-refund.test.ts` :: "RACE: an identical retry resumes the one operation…" |
+| changed-body same key | `cmd033-execute-refund.test.ts` :: "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-payment-service.test.ts` :: "the payment service's routes admit their requests in manual-10 order…" |
+| lost response | `cmd033-execute-refund.test.ts` :: "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing…" |
+| external uncertainty | `cmd033-execute-refund.test.ts` :: "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)…" |
+
+### CMD034 ReconcilePayment
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd034-reconcile-payment.test.ts` :: "OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization…" |
+| wrong role | `cmd034-reconcile-payment.test.ts` :: "DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED…" |
+| wrong agency | `cmd034-reconcile-payment.test.ts` :: "DENY: an order of a foreign tenant is NOT_FOUND…" |
+| stale version | NOT_APPLICABLE: ReconcilePayment carries no expectedVersion (registry fields: observationRef); observations are ordered by provider chronology and applied once per stored artifact and subject |
+| duplicate request | `cmd034-reconcile-payment.test.ts` :: "RACE: an identical retry replays…" |
+| changed-body same key | `cmd034-reconcile-payment.test.ts` :: "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `b09-payment-service.test.ts` :: "the payment service's routes admit their requests in manual-10 order…" |
+| lost response | `cmd034-reconcile-payment.test.ts` :: "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry…" |
+| external uncertainty | NOT_APPLICABLE: the command applies a stored, authenticated provider query and calls no provider; the uncertainty it settles is the dispatching command's (the watchdog stores the query, D-PROTO-B4) |
 
 ## 5. The manual-10 reads (re-check finding N16)
 

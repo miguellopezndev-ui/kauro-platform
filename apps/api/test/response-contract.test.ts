@@ -163,6 +163,11 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/agencies/:agencyId/members", "ListMembers", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListMembers" } }],
       ["GET", "/api/v1/agencies/:agencyId/clients", "ListClients", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListClients" } }],
       ["GET", "/api/v1/projects/:projectId", "GetProject", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetProject" } }],
+      // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
+      // where a provider effect may stay unknown (CMD033)
+      ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],
+      ["POST", "/api/v1/refunds/:refundId/execute", "ExecuteRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD033" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/reconcile", "ReconcilePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD034" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request

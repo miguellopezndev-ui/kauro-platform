@@ -113,6 +113,34 @@ export interface PurchaseInput {
   readonly profileId: FiscalProfileId;
   readonly treatment?: ReviewedTreatment;
   readonly billableUnits?: number;
+  /**
+   * The provider identities the payment service learns (stage-2 mandate M3): by default opaque `PO-…` and `CAP-…` references no
+   * provider knows; a test that dispatches to or observes a provider (the labelled contract fake of @kauro/application/testing)
+   * names the provider order and capture the provider itself made, so its later effects and observations name the same ones.
+   */
+  readonly provider?: ProviderIdentities;
+}
+
+/** Where the provider identities of a fixture purchase come from (see PurchaseInput.provider). */
+export interface ProviderIdentities {
+  /** The provider order of the checkout (the order's amount and its platform id, as the provider's order would carry them). */
+  readonly order?: (order: { readonly orderId: PaymentOrderId; readonly attemptId: PaymentAttemptId; readonly totalCents: bigint }) => string | Promise<string>;
+  /** The provider capture that pays the order (paidPurchase only), and the completion instant the provider reported with it. */
+  readonly capture?: (capture: { readonly providerOrderId: string; readonly totalCents: bigint }) => { readonly providerCaptureId: string; readonly completedAt?: string } | Promise<{ readonly providerCaptureId: string; readonly completedAt?: string }>;
+}
+
+/** A checkout the provider created and the buyer can approve: the quote ACCEPTED_FOR_CHECKOUT, the order CREATED, nothing paid. */
+export interface CheckoutOrder {
+  readonly quoteId: QuoteId;
+  readonly orderId: PaymentOrderId;
+  /** The CREATE_ORDER attempt (CONFIRMED) and the CMD028 journal entry it was created under. */
+  readonly attemptId: PaymentAttemptId;
+  readonly projectId: string;
+  readonly providerOrderId: string;
+  readonly serviceCents: bigint;
+  readonly taxCents: bigint;
+  readonly totalCents: bigint;
+  readonly termsHash: string;
 }
 
 export interface PaidPurchase {
@@ -129,12 +157,95 @@ export interface PaidPurchase {
 }
 
 /**
- * A purchase paid by one capture that alone pays it, with its CommercialAuthorization ACTIVE: the quote issued at R2-INITIAL with
- * the founding rate (2500 bps, never stacked), accepted for checkout by the first order; the order and its CREATE_ORDER attempt
- * (T1, with a command journal entry of CMD028), the claim (T2), the provider's creation (T3); then the payment service records the
- * authenticated completion, the order CAPTURED and the entitlement, in one transaction under the agency it adopted.
+ * A checkout the provider created (stage-2 mandate M3: the webhook and reconciliation tests pay it at the provider and deliver the
+ * provider's events): the quote issued at R2-INITIAL with the founding rate (2500 bps, never stacked), accepted for checkout by the
+ * first order; the order and its CREATE_ORDER attempt (T1, with a command journal entry of CMD028), the claim (T2), the provider's
+ * creation (T3) — the order CREATED with its provider identity, nothing captured.
+ */
+export async function checkoutOrder(h: Harness, input: PurchaseInput): Promise<CheckoutOrder> {
+  return (await openCheckout(h, input)).checkout;
+}
+
+/**
+ * A purchase paid by one capture that alone pays it, with its CommercialAuthorization ACTIVE: the checkout of checkoutOrder, then
+ * the payment service records the authenticated completion, the order CAPTURED and the entitlement, in one transaction under the
+ * agency it adopted.
  */
 export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<PaidPurchase> {
+  const { agency, route } = input;
+  const { checkout, quote, units } = await openCheckout(h, input);
+  const created = { orderId: checkout.orderId };
+  const providerOrderId = checkout.providerOrderId;
+  const providerCapture = input.provider?.capture !== undefined ? await input.provider.capture({ providerOrderId, totalCents: checkout.totalCents }) : null;
+
+  // the authenticated completion of a capture that alone pays the obligation: the fact, the order CAPTURED, the entitlement
+  const paid = await h.commerce.run(h.service(), async (uow) => {
+    if ((await uow.adoptScope("PAYMENT_ORDER", created.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
+    const captureId = uow.ids.next() as CaptureId;
+    const authorizationId = uow.ids.next() as CommercialAuthorizationId;
+    const now = clock.now();
+    await uow.commerce.captures.insert({
+      captureId,
+      agencyId: agency.agencyId,
+      orderId: created.orderId,
+      status: "COMPLETED",
+      provider: route.provider,
+      environment: route.environment,
+      providerCaptureId: providerCapture?.providerCaptureId ?? `CAP-${captureId.slice(-12)}`,
+      merchantRef: route.merchantRef,
+      payeeDigest: route.payeeDigest,
+      amountCents: quote.amounts.totalCents,
+      allocation: { serviceCents: quote.amounts.serviceCents, taxCents: quote.amounts.taxCents, excessCents: 0n },
+      fundsState: "UNKNOWN",
+      providerCompletedAt: providerCapture?.completedAt ?? now,
+      firstObservationSource: "WEBHOOK",
+      observedAt: now,
+      evidenceHash: sha(`capture-evidence-${captureId}`),
+    });
+    if (providerCapture !== null) {
+      await uow.scopes.record({ kind: "PROVIDER_CAPTURE", key: `${route.provider}|${route.environment}|${providerCapture.providerCaptureId}`, agencyId: agency.agencyId, orderId: created.orderId, captureId }, now);
+    }
+    applied(await uow.commerce.orders.transition(created.orderId, 3, { state: "CAPTURED" }, now), "the order's capture");
+    await uow.commerce.authorizations.issue({
+      authorizationId,
+      agencyId: agency.agencyId,
+      projectId: quote.plan.projectId,
+      quoteId: quote.quoteId,
+      orderId: created.orderId,
+      orderQuoteId: quote.quoteId,
+      captureId,
+      approvalId: quote.approval.approvalId as ApprovalId,
+      approvalHash: quote.approval.approvalHash,
+      planId: quote.plan.planId,
+      planHash: quote.plan.bodyHash,
+      revisionHash: quote.plan.revisionHash,
+      targetContractHash: quote.plan.targetContractHash,
+      capabilityId: quote.project.capabilityId,
+      capabilityVersion: quote.project.capabilityVersion,
+      mode: quote.project.mode,
+      billableUnits: units,
+      honoredAfterPriceExpiry: false,
+      createdAt: now,
+    });
+    return { captureId, authorizationId };
+  });
+
+  return {
+    quoteId: quote.quoteId,
+    orderId: created.orderId,
+    captureId: paid.captureId,
+    authorizationId: paid.authorizationId,
+    projectId: quote.plan.projectId,
+    providerOrderId,
+    serviceCents: quote.amounts.serviceCents,
+    taxCents: quote.amounts.taxCents,
+    totalCents: quote.amounts.totalCents,
+    termsHash: quote.termsHash,
+  };
+}
+
+/** The quote and the checkout of a fixture purchase (checkoutOrder, paidPurchase). */
+async function openCheckout(h: Harness, input: PurchaseInput) {
   const { agency, route } = input;
   const owner = { kind: "USER", userId: agency.ownerUserId } as const;
   const treatment = input.treatment ?? "EXEMPT_EXPORT";
@@ -248,7 +359,7 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
   });
 
   // T3: the payment service records the provider's authenticated creation in the agency it adopted through the order
-  const providerOrderId = `PO-${created.orderId.slice(-12)}`;
+  const providerOrderId = input.provider?.order !== undefined ? await input.provider.order({ orderId: created.orderId, attemptId: created.attemptId, totalCents: quote.amounts.totalCents }) : `PO-${created.orderId.slice(-12)}`;
   await h.commerce.run(h.service(), async (uow) => {
     if ((await uow.adoptScope("PAYMENT_ORDER", created.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
     const now = clock.now();
@@ -257,60 +368,10 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
     await uow.scopes.record({ kind: "PROVIDER_ORDER", key: `${route.provider}|${route.environment}|${providerOrderId}`, agencyId: agency.agencyId, orderId: created.orderId }, now);
   });
 
-  // the authenticated completion of a capture that alone pays the obligation: the fact, the order CAPTURED, the entitlement
-  const paid = await h.commerce.run(h.service(), async (uow) => {
-    if ((await uow.adoptScope("PAYMENT_ORDER", created.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
-    const captureId = uow.ids.next() as CaptureId;
-    const authorizationId = uow.ids.next() as CommercialAuthorizationId;
-    const now = clock.now();
-    await uow.commerce.captures.insert({
-      captureId,
-      agencyId: agency.agencyId,
-      orderId: created.orderId,
-      status: "COMPLETED",
-      provider: route.provider,
-      environment: route.environment,
-      providerCaptureId: `CAP-${captureId.slice(-12)}`,
-      merchantRef: route.merchantRef,
-      payeeDigest: route.payeeDigest,
-      amountCents: quote.amounts.totalCents,
-      allocation: { serviceCents: quote.amounts.serviceCents, taxCents: quote.amounts.taxCents, excessCents: 0n },
-      fundsState: "UNKNOWN",
-      providerCompletedAt: now,
-      firstObservationSource: "WEBHOOK",
-      observedAt: now,
-      evidenceHash: sha(`capture-evidence-${captureId}`),
-    });
-    applied(await uow.commerce.orders.transition(created.orderId, 3, { state: "CAPTURED" }, now), "the order's capture");
-    await uow.commerce.authorizations.issue({
-      authorizationId,
-      agencyId: agency.agencyId,
-      projectId: quote.plan.projectId,
-      quoteId: quote.quoteId,
-      orderId: created.orderId,
-      orderQuoteId: quote.quoteId,
-      captureId,
-      approvalId: quote.approval.approvalId as ApprovalId,
-      approvalHash: quote.approval.approvalHash,
-      planId: quote.plan.planId,
-      planHash: quote.plan.bodyHash,
-      revisionHash: quote.plan.revisionHash,
-      targetContractHash: quote.plan.targetContractHash,
-      capabilityId: quote.project.capabilityId,
-      capabilityVersion: quote.project.capabilityVersion,
-      mode: quote.project.mode,
-      billableUnits: units,
-      honoredAfterPriceExpiry: false,
-      createdAt: now,
-    });
-    return { captureId, authorizationId };
-  });
-
-  return {
+  const checkout: CheckoutOrder = {
     quoteId: quote.quoteId,
     orderId: created.orderId,
-    captureId: paid.captureId,
-    authorizationId: paid.authorizationId,
+    attemptId: created.attemptId,
     projectId: quote.plan.projectId,
     providerOrderId,
     serviceCents: quote.amounts.serviceCents,
@@ -318,4 +379,5 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
     totalCents: quote.amounts.totalCents,
     termsHash: quote.termsHash,
   };
+  return { checkout, quote, units };
 }

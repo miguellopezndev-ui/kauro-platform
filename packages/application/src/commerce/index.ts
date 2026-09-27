@@ -107,3 +107,6 @@ export { DISPATCH_TIMEOUT_SECONDS, DISPATCH_WATCHDOG_MARGIN_SECONDS, MAX_ATTEMPT
 
 // the commerce core (implementation mandate M2; design §5, §6, §8.1)
 export * from "./core/index.js";
+
+// the served payment routes (stage-2 mandate M3: the payment service's side; D-API-B1)
+export { COMMERCE_SERVED_COMMAND_IDS, isServedCommerceCommand, commerceCommandRouteResponses } from "./served.js";

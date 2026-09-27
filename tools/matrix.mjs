@@ -14,7 +14,9 @@
 // registry's state_transitions.json (via @kauro/contracts STATE_MACHINES, provenance-verified) and commands.json/cases.json, the
 // platform machines of @kauro/domain (EndClient, Project; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and
 // their outcome catalogues of @kauro/application, the transition seeds of the migrations, the events each handler publishes (read
-// from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
+// from its source; for the served payment commands of package B09 the declared COMMERCE_PUBLISHED table below, since their events
+// are the ones commerceVersionEventType names for the versions their paths write), and the api test sources the applicability rows
+// cite. Requires the workspace to be built.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -345,6 +347,65 @@ export const APPLICABILITY = {
   },
 };
 
+// package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
+const WEBHOOK = "cmd030-payment-webhook.test.ts";
+const EXECUTE = "cmd033-execute-refund.test.ts";
+const RECONCILE = "cmd034-reconcile-payment.test.ts";
+const SERVICE_ADMISSION = ["b09-payment-service.test.ts", "the payment service's routes admit their requests in manual-10 order"];
+APPLICABILITY.CMD030 = {
+  "legitimate state": [[WEBHOOK, "OK: a verified capture event is stored once in the inbox and applied to its order"]],
+  "wrong role": [[WEBHOOK, "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial"]],
+  "wrong agency": [[WEBHOOK, "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial; an event of a foreign tenant's environment or an unknown provider reference is an exception"]],
+  "stale version": "NOT_APPLICABLE: a provider event carries no expectedVersion; an observation older in provider chronology than the latest applied one is kept as history and changes nothing (STALE_IGNORED, D-PAY-B3)",
+  "duplicate request": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record"]],
+  "changed-body same key": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED, a crash between the ingress commit and the application applies the record once"]],
+  "external uncertainty": "NOT_APPLICABLE: the webhook performs no provider effect; an event that reports a completion without its instant is applied only after a stored provider query of its order (D-PAY-B6), and a verification that calls the provider does so before anything is stored",
+};
+APPLICABILITY.CMD033 = {
+  "legitimate state": [[EXECUTE, "OK: the payment service executes an approved refund once"]],
+  "wrong role": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND"]],
+  "stale version": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
+  "duplicate request": [[EXECUTE, "RACE: an identical retry resumes the one operation"]],
+  "changed-body same key": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing"]],
+  "external uncertainty": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
+};
+APPLICABILITY.CMD034 = {
+  "legitimate state": [[RECONCILE, "OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization"]],
+  "wrong role": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND"]],
+  "stale version": "NOT_APPLICABLE: ReconcilePayment carries no expectedVersion (registry fields: observationRef); observations are ordered by provider chronology and applied once per stored artifact and subject",
+  "duplicate request": [[RECONCILE, "RACE: an identical retry replays"]],
+  "changed-body same key": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry"]],
+  "external uncertainty": "NOT_APPLICABLE: the command applies a stored, authenticated provider query and calls no provider; the uncertainty it settles is the dispatching command's (the watchdog stores the query, D-PROTO-B4)",
+};
+
+/**
+ * The events a served payment command's path may publish (package B09): every version the reconciler writes is published with the
+ * event commerceVersionEventType names (D-EVT-B3), so the table lists, per command, the types of the versions its path writes -
+ * the reconciler's for CMD030 and CMD034, and for CMD033 its own intent and claim besides (the REFUND attempt PREPARED and
+ * DISPATCHING, the refund SUBMITTING).
+ */
+const RECONCILER_EVENTS = [
+  "payment_order.created.v1", "payment_order.approved.v1", "payment_order.capture_uncertain.v1", "payment_order.captured.v1", "payment_order.failed.v1", "payment_order.cancelled.v1", "payment_order.expired.v1",
+  "payment_attempt.provider_pending.v1", "payment_attempt.confirmed.v1", "payment_attempt.failed_no_effect.v1", "payment_attempt.uncertain.v1",
+  "capture.pending.v1", "capture.completed.v1", "capture.denied.v1", "capture.reversed.v1", "capture.fee_observed.v1", "capture.funds_observed.v1",
+  "commercial_authorization.issued.v1", "commercial_authorization.revoked.v1",
+  "refund.requested.v1", "refund.approved.v1", "refund.uncertain.v1", "refund.completed.v1", "refund.failed.v1",
+  "reconciliation_case.opened.v1",
+];
+export const COMMERCE_PUBLISHED = {
+  CMD030: RECONCILER_EVENTS,
+  CMD033: [...RECONCILER_EVENTS, "payment_attempt.prepared.v1", "payment_attempt.dispatching.v1", "refund.submitting.v1"],
+  CMD034: RECONCILER_EVENTS,
+};
+
 // --- sources --------------------------------------------------------------------------------------------------------------------
 
 export async function loadMatrixSources() {
@@ -363,7 +424,7 @@ export async function loadMatrixSources() {
   }
   // the events each served command's handler publishes
   const HANDLER_FILES = { CMD001: "create-agency.ts", CMD009: "create-client.ts", CMD010: "archive-client.ts", CMD011: "create-project.ts", CMD023: "revise-plan.ts", CMD025: "approve-plan.ts", CMD026: "withdraw-approval.ts" };
-  const published = {};
+  const published = { ...COMMERCE_PUBLISHED };
   for (const [id, file] of Object.entries(HANDLER_FILES)) {
     const text = readFileSync(join(root, "packages", "application", "src", "commands", "handlers", file), "utf8");
     published[id] = [...new Set([...text.matchAll(/eventType: "([a-z_.0-9]+)"/g)].map((m) => m[1]))];
@@ -380,14 +441,15 @@ export async function loadMatrixSources() {
     commands,
     eventTypes: new Set(domain.EVENT_TYPES),
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
-    specs: application.B06_COMMANDS,
-    outcomes: application.COMMAND_OUTCOMES,
+    // the served payment commands of package B09 beside B06's (mandate M3: CMD030, CMD033, CMD034)
+    specs: { ...application.B06_COMMANDS, ...Object.fromEntries(application.COMMERCE_SERVED_COMMAND_IDS.map((id) => [id, application.COMMERCE_COMMANDS[id]])) },
+    outcomes: { ...application.COMMAND_OUTCOMES, ...Object.fromEntries(application.COMMERCE_SERVED_COMMAND_IDS.map((id) => [id, application.COMMERCE_COMMAND_OUTCOMES[id]])) },
     reads: application.READ_ROUTES,
     readOutcomes: application.READ_OUTCOMES,
     readViews: application.READ_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
-    served: new Set(application.SERVED_COMMAND_IDS),
+    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS]),
     seeded,
     published,
     tests,
@@ -501,7 +563,8 @@ export function generateMatrix(s) {
     for (const [machine, table] of Object.entries(EDGE_OWNERS)) for (const [event, o] of Object.entries(table)) if (o.command === id) edges.push(`${machine} ${event}`);
     const events = s.published[id];
     const consumers = [...new Set(s.subscriptions.filter((x) => events.includes(x.eventType)).map((x) => `${x.eventType} → ${x.consumer}`))];
-    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
+    const stepUp = spec.stepUpRequired === true ? "fresh" : spec.stepUp === "UNLESS_STANDING_POLICY" ? "fresh unless a standing policy" : "—";
+    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${stepUp} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
   }
   line();
   line("## 3. Error catalogue");

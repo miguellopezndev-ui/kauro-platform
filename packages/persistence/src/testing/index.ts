@@ -16,5 +16,5 @@ export { start as startHarness, waitForLockWait, settlesOrWaits, backendPid, bar
 export type { Harness, AgencyFixture, CapabilityPublicationState, LockObservation } from "./harness.js";
 export { recordQualifiedPaymentRoute, recordQualifiedFiscalIssuer, grantCorporateRole, revokeCorporateRole } from "./commerce-fixtures.js";
 export type { QualifiedRoute } from "./commerce-fixtures.js";
-export { activateAgency, recordReviewedFiscalProfile, paidPurchase } from "./commerce-purchases.js";
-export type { ReviewedTreatment, PurchaseInput, PaidPurchase } from "./commerce-purchases.js";
+export { activateAgency, recordReviewedFiscalProfile, paidPurchase, checkoutOrder } from "./commerce-purchases.js";
+export type { ReviewedTreatment, PurchaseInput, PaidPurchase, CheckoutOrder, ProviderIdentities } from "./commerce-purchases.js";
