@@ -134,3 +134,23 @@ test("stage-1 closure status: every row opens with EXECUTED_LOCAL, PARTIAL or MI
     }
   }
 });
+
+/** The stage-2 mandate or integrator the design (section 14) gives an api test file, as tools/test/b09-design.test.mjs reads it. */
+const ownerOf = (file) =>
+  /cmd0(28|29|31|32)-/.test(file) ? "M4" : /cmd0(30|33|34)-|b09-(ledger|fiscal)\.test/.test(file) ? "M3" : /b09-scenarios\.test/.test(file) ? "INT-2" : null;
+
+test("stage 2 (M4): a PLANNED clause names a test of its mandate that is still to be written, and a row a stage-2 mandate or integrator restated cites a test of its own on the branch", () => {
+  for (const row of rows()) {
+    // a planned clause whose every test of that mandate is on the branch is a row its mandate did not move
+    for (const [, mandate] of row.status.matchAll(/PLANNED \((M3|M4|INT-2)\)/g)) {
+      assert.ok(
+        row.citations.some((c) => ownerOf(c.file) === mandate && !existsSync(join(root, c.file))),
+        `${row.caseId}: PLANNED (${mandate}) names no test of ${mandate} that is still to be written (move the row)`,
+      );
+    }
+    const mover = /^\*\*(?:EXECUTED_LOCAL|PARTIAL|MISSING)\*\* \(stage 2, (M3|M4|INT-2): /.exec(row.status)?.[1];
+    if (mover !== undefined) {
+      assert.ok(row.citations.some((c) => ownerOf(c.file) === mover && existsSync(join(root, c.file))), `${row.caseId}: restated by ${mover}, which it cites no test of`);
+    }
+  }
+});

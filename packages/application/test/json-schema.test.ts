@@ -6,22 +6,27 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
-import type { ContractSchemaBundle } from "../src/index.js";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
+import type { CommerceReadOperationId, CommerceServedCommandId, ContractSchemaBundle } from "../src/index.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, COMMERCE_COMMAND_RESPONSES, COMMERCE_READ_ROUTES, COMMERCE_REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, commerceCommandResponseSchemaId, commerceReadResponseSchemaId, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas, the 3 declared replies of the operational routes, the 5 read replies and Problem, and nothing else", () => {
+test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas, the 3 declared replies of the operational routes, the 5 read replies, the 7 payment request schemas with their 7 command replies and 4 read replies (B09), and Problem, and nothing else", () => {
   const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.keys(route.responses).map((status) => operationalResponseSchemaId(route.operationId, status)));
   assert.equal(operationalIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
   assert.equal(readIds.length, 5, "the five manual-10 reads (N16)");
-  const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds];
-  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + responseIds.length + 1);
+  // package B09 (D-REQ-B7): the payment catalogue's closed request schemas and the envelopes of its replies and reads
+  const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
+  const commerceResponseIds = [...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId), ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId)];
+  assert.deepEqual([commerceRequestIds.length, commerceResponseIds.length], [7, 11]);
+  const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...commerceResponseIds];
+  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + commerceRequestIds.length + responseIds.length + 1);
+  for (const id of commerceRequestIds) assert.ok((validator.knownSchemaIds as ReadonlyArray<string>).includes(id), id);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);
   for (const id of REQUEST_SCHEMA_IDS) assert.ok(validator.knownSchemaIds.includes(id), id);
-  for (const id of responseIds) assert.ok(validator.knownSchemaIds.includes(id), id);
+  for (const id of responseIds) assert.ok((validator.knownSchemaIds as ReadonlyArray<string>).includes(id), id);
   assert.ok(validator.knownSchemaIds.includes("Problem"));
   assert.throws(() => validator.validate("customer-target-metadata" as never, {}), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");
 });

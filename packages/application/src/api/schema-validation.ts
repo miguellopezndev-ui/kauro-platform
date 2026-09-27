@@ -79,24 +79,13 @@ export const PROBLEM_SCHEMA = Object.freeze({
   },
 } as const);
 
-/** What a validator compiles beside the B06 schemas. */
-export interface SchemaValidatorOptions {
-  /**
-   * Package B09 (docs/design/B09-payments-fiscal.md §10; stage-2 mandate M3): the closed request schemas of the payment commands
-   * (COMMERCE_REQUEST_SCHEMAS) and their response views and envelopes (buildCommerceResponseSchemas), derived from the same bundle
-   * under the same rules. The api's composition compiles them, so the send guard validates the served payment routes' replies
-   * exactly as the B06 routes'; a validator built without them knows the B06 schemas alone.
-   */
-  readonly commerce?: boolean;
-}
-
 /**
  * Builds the closed validator: every registry contract, every request schema, every response schema and the Problem schema,
  * nothing else. The response views are compiled as definitions beside the registry's (`#/$defs/<View>`), derived from that
  * same bundle (api/response-schemas); `operational` is the list of operational routes whose replies are declared (the
  * application-owned OPERATIONAL_ROUTES unless a caller names the list explicitly).
  */
-export function createSchemaValidator(bundle: ContractSchemaBundle, operational: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES, options: SchemaValidatorOptions = {}): SchemaValidator {
+export function createSchemaValidator(bundle: ContractSchemaBundle, operational: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): SchemaValidator {
   const roots: Record<string, unknown> = {};
   for (const name of CONTRACT_NAMES) {
     const def = bundle.$defs[name];
@@ -104,25 +93,24 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  // package B09: the payment commands' closed request schemas and the envelopes of their replies and reads (D-REQ-B7), derived
+  // under the same rules; an id or a view that collided with a B06 one would be an integrity failure
+  for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 request schema ${id} collides with a B06 one`);
+    roots[id] = schema;
+  }
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
   const defs: Record<string, unknown> = { ...bundle.$defs, ...responses.defs };
-  if (options.commerce === true) {
-    // package B09: the payment commands' request schemas and response views, never shadowing a B06 schema
-    for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {
-      const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
-      if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 request schema ${id} collides with a B06 one`);
-      roots[id] = schema;
-    }
-    const commerce = buildCommerceResponseSchemas(bundle);
-    for (const [id, schema] of Object.entries(commerce.roots)) {
-      if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 response schema ${id} collides with a B06 one`);
-      roots[id] = schema;
-    }
-    for (const [name, schema] of Object.entries(commerce.defs)) {
-      if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 view ${name} collides with a B06 or registry definition`);
-      defs[name] = schema;
-    }
+  const commerce = buildCommerceResponseSchemas(bundle);
+  for (const [id, schema] of Object.entries(commerce.roots)) {
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 response schema ${id} collides with a B06 one`);
+    roots[id] = schema;
+  }
+  for (const [name, schema] of Object.entries(commerce.defs)) {
+    if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 view ${name} collides with a B06 or registry definition`);
+    defs[name] = schema;
   }
   roots["Problem"] = PROBLEM_SCHEMA;
   const compiled: CompiledSchemaSet = compileSchemaBundle({ defs, roots });

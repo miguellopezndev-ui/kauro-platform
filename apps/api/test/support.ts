@@ -22,7 +22,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -33,6 +33,8 @@ import type {
   ClientId,
   Clock,
   CommandJournal,
+  CommerceUnitOfWork,
+  CommerceUnitOfWorkFactory,
   ExecutionContext,
   IdGenerator,
   MembershipId,
@@ -122,7 +124,7 @@ export class SimulatedCrash extends Error {
   }
 }
 
-function instrumentUnitOfWork(uow: UnitOfWork, holds: HoldPoints): UnitOfWork {
+function instrumentUnitOfWork<U extends UnitOfWork>(uow: U, holds: HoldPoints): U {
   const journal: CommandJournal = {
     async reserve(identity, digest, correlationId) {
       const outcome = await uow.journal.reserve(identity, digest, correlationId);
@@ -150,10 +152,13 @@ export interface UnitOfWorkStats {
   runs: number;
 }
 
-/** Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. */
-export function instrumentedFactory(inner: UnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): UnitOfWorkFactory {
+/**
+ * Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. The factory is
+ * the commerce one (package B09): its units of work carry the commerce repositories beside B06's, and the decoration keeps them.
+ */
+export function instrumentedFactory(inner: CommerceUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): CommerceUnitOfWorkFactory {
   return {
-    async run<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    async run<T>(context: ExecutionContext, work: (uow: CommerceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
       stats.runs += 1;
       const out = await inner.run(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
       await holds.pass("after.commit");
@@ -390,6 +395,11 @@ export interface WorldOptions {
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
   /** The clock the api (authorizer, handlers) runs on; the fixture clock by default. */
   readonly clock?: Clock;
+  /**
+   * Package B09: the payment collaborators the api binds over the harness (the payment service's units of work and the labelled
+   * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
+   */
+  readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
 }
 
 export interface RawEvent {
@@ -451,6 +461,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
+    ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
     validator,
     clock: options.clock ?? clock,
     ids,

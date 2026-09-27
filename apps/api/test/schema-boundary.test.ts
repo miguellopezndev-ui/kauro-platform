@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { EndClientView, KnownSchemaId, ProjectView } from "@kauro/application";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, COMMERCE_COMMAND_RESPONSES, COMMERCE_READ_ROUTES, COMMERCE_REQUEST_SCHEMAS, OPERATIONAL_ROUTES, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, commandResponseSchemaId, commerceCommandResponseSchemaId, commerceReadResponseSchemaId, operationalResponseSchemaId, readResponseSchemaId, requestSchemaId } from "@kauro/application";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, COMMERCE_COMMAND_RESPONSES, COMMERCE_READ_ROUTES, COMMERCE_REQUEST_SCHEMAS, OPERATIONAL_ROUTES, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SERVED_COMMAND_IDS, commandResponseSchemaId, commerceCommandResponseSchemaId, commerceReadResponseSchemaId, operationalResponseSchemaId, readResponseSchemaId, requestSchemaId, type CommerceReadOperationId, type CommerceServedCommandId } from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import { asProblem, call, completed, effectCounts, ids, outcome, routes, sha, world, type World } from "./support.js";
@@ -89,13 +89,12 @@ test("the validator the api composes is closed: exactly the contract names, the 
     ...OPERATIONAL_ROUTES.flatMap((r) => Object.keys(r.responses).map((s) => operationalResponseSchemaId(r.operationId, s))),
     // the READ envelopes of the manual-10 reads (N16)
     ...READ_OPERATION_IDS.map(readResponseSchemaId),
-    // package B09 (stage-2 mandate M3): the payment commands' COMPLETED envelopes and the payment reads' READ envelopes, compiled
-    // by the api's composition so the send guard checks the served payment routes' replies (createSchemaValidator commerce)
-    ...(Object.keys(COMMERCE_COMMAND_RESPONSES) as Array<keyof typeof COMMERCE_COMMAND_RESPONSES>).map(commerceCommandResponseSchemaId),
-    ...(Object.keys(COMMERCE_READ_ROUTES) as Array<keyof typeof COMMERCE_READ_ROUTES>).map(commerceReadResponseSchemaId),
+    // package B09 (D-REQ-B7): the COMPLETED envelope of every payment command and the READ envelope of every payment read, derived
+    // under the same rules — compiled whole, so the routes of both B09 sides validate against one closed set
+    ...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId),
+    ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId),
   ];
-  // the request schemas: B06's and the payment commands' closed ones (COMMERCE_REQUEST_SCHEMAS), under the same prefix
-  const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `urn:kauro:api:v1:request:${command}`);
+  const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, ...commerceRequestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

@@ -10,5 +10,5 @@ import { createSchemaValidator, type ContractSchemaBundle } from "@kauro/applica
 export function loadContractSchemas(): SchemaValidator {
   const url = new URL(import.meta.resolve("@kauro/contracts/schemas.json"));
   const bundle = JSON.parse(readFileSync(url, "utf8")) as ContractSchemaBundle;
-  return createSchemaValidator(bundle, undefined, { commerce: true });
+  return createSchemaValidator(bundle);
 }

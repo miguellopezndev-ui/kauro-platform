@@ -26,7 +26,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16), the two
-  // operational probes and the payment service's three routes (package B09, mandate M3)
+  // operational probes, and every payment route of package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -34,18 +34,26 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId} GetAgency",
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
+      "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/quotes/{quoteId} GetQuote",
+      "GET /api/v1/refunds/{refundId} GetRefund",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
+      "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
+      "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
+      "POST /api/v1/refunds/{refundId}/approve ApproveRefund",
       "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",
     ],
   );
@@ -154,38 +162,75 @@ test("a registered route without a declared response contract and a stale docume
   assert.deepEqual(check({ document: stale }), ["apps/api/openapi.json is not the generated document (run pnpm run openapi:generate); it differs at /paths/~1api~1v1~1agencies/post/summary"]);
 });
 
-test("B09: the payment routes are documented from their contracts as planned operations, never registered and never also served; a registered planned route, a repeated operationId and a forbidden DTO member fail the check", () => {
+test("B09: the payment routes are documented from their contracts — a served one under paths with exactly the replies its route declares, the rest as planned operations never registered and never also served; a planned route the api registers, a repeated operationId and a forbidden DTO member fail the check", () => {
+  const { application } = sources;
   const planned = expected["x-kauro-planned"];
-  const commands = Object.values(sources.application.COMMERCE_COMMANDS);
-  const reads = Object.values(sources.application.COMMERCE_READ_ROUTES);
-  // the served payment routes (mandate M3: CMD030, CMD033, CMD034) are documented under paths from the same contracts; the rest stay planned
-  const served = new Set(sources.application.COMMERCE_SERVED_COMMAND_IDS);
-  assert.deepEqual([...served].sort(), ["CMD030", "CMD033", "CMD034"]);
-  assert.deepEqual(Object.keys(planned).sort(), [...commands.filter((c) => !served.has(c.id)).map((c) => `${c.method} ${c.path}`), ...reads.map((r) => `GET ${r.path}`)].sort());
+  const commands = Object.values(application.COMMERCE_COMMANDS);
+  const reads = Object.entries(application.COMMERCE_READ_ROUTES);
+  // the served lists decide where each operation lives (D-REQ-B7): paths, or the planned list — never both, never neither
+  assert.deepEqual(
+    Object.keys(planned).sort(),
+    [...commands.filter((c) => !application.isServedCommerceCommand(c.id)).map((c) => `${c.method} ${c.path}`), ...reads.filter(([id]) => !application.isServedCommerceRead(id)).map(([, r]) => `GET ${r.path}`)].sort(),
+  );
+  const operationOf = (served, method, path) => (served ? expected.paths[path]?.[method.toLowerCase()] : planned[`${method} ${path}`]);
   for (const spec of commands) {
-    const op = served.has(spec.id) ? expected.paths[spec.path][spec.method.toLowerCase()] : planned[`${spec.method} ${spec.path}`];
-    assert.equal(served.has(spec.id) ? planned[`${spec.method} ${spec.path}`] : undefined, undefined, `${spec.id} is never both served and planned`);
+    const served = application.isServedCommerceCommand(spec.id);
+    const op = operationOf(served, spec.method, spec.path);
+    assert.ok(op !== undefined, spec.id);
+    assert.equal(served ? planned[`${spec.method} ${spec.path}`] : expected.paths[spec.path]?.[spec.method.toLowerCase()], undefined, `${spec.id} is documented once`);
     assert.equal(op.operationId, spec.name);
     assert.equal(op["x-kauro-role"], spec.role);
     assert.equal(op["x-kauro-package"], "B09");
-    const reply = sources.application.COMMERCE_COMMAND_RESPONSES[spec.id];
-    const problemStatuses = sources.application.outcomesByStatus(sources.application.COMMERCE_COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
+    const reply = application.COMMERCE_COMMAND_RESPONSES[spec.id];
+    const problemStatuses = application.outcomesByStatus(application.COMMERCE_COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), [String(reply.status), ...(reply.accepted ? ["202"] : []), ...problemStatuses].sort(), spec.id);
+    const route = inventory.find((r) => r.method === spec.method && openApiPath(r.url) === spec.path);
+    if (served) {
+      // a served operation documents exactly the replies its route declares (the 202 accepted observation beside the success)
+      assert.ok(route !== undefined, `${spec.id} is registered`);
+      assert.deepEqual(route.responses, application.commerceCommandRouteResponses(spec.id), spec.id);
+    } else assert.equal(route, undefined, `${spec.id} is not registered`);
   }
+  for (const [operationId, spec] of reads) {
+    const op = operationOf(application.isServedCommerceRead(operationId), "GET", spec.path);
+    assert.equal(op.operationId, operationId);
+    assert.equal(op["x-kauro-read"], true);
+    assert.equal(op["x-kauro-scope"], spec.scope);
+  }
+  // every B09 operation is served after the stage-2 integration (D-INT2-B1): M4's request side — the four commands and the four
+  // reads the agency and the corporate owner call — and M3's payment service side (the webhook, ExecuteRefund, ReconcilePayment)
+  assert.deepEqual([...application.COMMERCE_SERVED_COMMAND_IDS], ["CMD028", "CMD029", "CMD030", "CMD031", "CMD032", "CMD033", "CMD034"]);
+  assert.deepEqual(Object.keys(planned), [], "nothing of the payment catalogue stays planned");
+  assert.deepEqual([...application.COMMERCE_SERVED_READ_IDS], ["GetQuote", "GetPaymentOrder", "GetRefund", "GetRefundReview"]);
   // the webhook takes no idempotency key and no bearer token: its identity is the provider inbox, its authentication the signature
-  const webhook = expected.paths["/api/v1/payments/webhooks/{provider}"].post;
+  const webhook = operationOf(application.isServedCommerceCommand("CMD030"), "POST", "/api/v1/payments/webhooks/{provider}");
   assert.deepEqual(webhook.security, []);
   assert.equal(webhook.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"), false);
-  // the payment service authenticates as a service identity, never as a person
-  assert.deepEqual(expected.paths["/api/v1/refunds/{refundId}/execute"].post.security, [{ serviceAuth: [] }]);
-  assert.deepEqual(expected.paths["/api/v1/payment-orders/{orderId}/reconcile"].post.security, [{ serviceAuth: [] }]);
-  // a planned route the api registers must be served from paths
-  const registeredPlanned = [...inventory, { method: "POST", url: "/api/v1/refunds/:refundId/approve", responses: inventory[0].responses }];
-  assert.ok(check({ inventory: registeredPlanned }).includes("planned route is registered: POST /api/v1/refunds/{refundId}/approve (a served route is documented under paths)"));
-  const duplicate = clone(committed);
-  duplicate["x-kauro-planned"]["POST /api/v1/refunds/{refundId}/approve"].operationId = "ApprovePlan";
-  assert.ok(check({ document: duplicate }).some((f) => f.startsWith("duplicate operationId ApprovePlan")));
+  // the payment service authenticates as a service identity, never as a person; the corporate owner and the agency as people
+  assert.deepEqual(operationOf(application.isServedCommerceCommand("CMD033"), "POST", "/api/v1/refunds/{refundId}/execute").security, [{ serviceAuth: [] }]);
+  assert.deepEqual(operationOf(application.isServedCommerceCommand("CMD034"), "POST", "/api/v1/payment-orders/{orderId}/reconcile").security, [{ serviceAuth: [] }]);
+  const approve = expected.paths["/api/v1/refunds/{refundId}/approve"].post;
+  assert.deepEqual(approve.security, [{ bearerAuth: [] }]);
+  assert.equal(approve.parameters.some((p) => p.$ref === "#/components/parameters/AgencySelector"), false, "the scope of an operator is the stored operation, never a selector");
+  assert.equal(expected.paths["/api/v1/quotes/{quoteId}/payment-orders"].post.parameters.some((p) => p.$ref === "#/components/parameters/AgencySelector"), true);
+  // a route documented as planned that the api registers fails the check (it must be served from paths), and so does a planned
+  // operationId that repeats a served one
+  const demoted = clone(committed);
+  demoted["x-kauro-planned"]["POST /api/v1/refunds/{refundId}/approve"] = { ...demoted.paths["/api/v1/refunds/{refundId}/approve"].post, operationId: "ApprovePlan" };
+  delete demoted.paths["/api/v1/refunds/{refundId}/approve"];
+  const demotedFailures = check({ document: demoted });
+  assert.ok(demotedFailures.includes("planned route is registered: POST /api/v1/refunds/{refundId}/approve (a served route is documented under paths)"), demotedFailures.join("\n"));
+  assert.ok(demotedFailures.includes("undocumented registered route: POST /api/v1/refunds/{refundId}/approve"), demotedFailures.join("\n"));
+  assert.ok(demotedFailures.some((f) => f.startsWith("duplicate operationId ApprovePlan")), demotedFailures.join("\n"));
+  // a served operation also listed as planned
+  const twice = clone(committed);
+  twice["x-kauro-planned"]["POST /api/v1/refunds/{refundId}/approve"] = { ...twice.paths["/api/v1/refunds/{refundId}/approve"].post, operationId: "ApproveRefundAgain" };
+  assert.ok(check({ document: twice }).includes("planned route is also documented as served: POST /api/v1/refunds/{refundId}/approve"));
+  // a forbidden member in a payment view is refused wherever the view is documented, served or planned
   const leaking = clone(committed);
   leaking.components.schemas.RefundView.properties.tokenHash = { type: "string", pattern: "^[0-9a-f]{64}$" };
-  assert.ok(check({ document: leaking }).some((f) => f.startsWith("DTO exposes a forbidden field: planned POST /api/v1/projects/{projectId}/refund-requests 201")));
+  leaking["x-kauro-planned"]["POST /api/v1/refunds/{refundId}/approve-again"] = { ...leaking.paths["/api/v1/refunds/{refundId}/approve"].post, operationId: "ApproveRefundAgain" };
+  const leaks = check({ document: leaking });
+  assert.ok(leaks.some((f) => f.startsWith("DTO exposes a forbidden field: POST /api/v1/projects/{projectId}/refund-requests 201")), leaks.join("\n"));
+  assert.ok(leaks.some((f) => f.startsWith("DTO exposes a forbidden field: planned POST /api/v1/refunds/{refundId}/approve-again 200")), leaks.join("\n"));
 });

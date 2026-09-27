@@ -14,8 +14,20 @@ import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
 import type { ResponseSchemaId } from "../api/response-schemas.js";
+import type { CommerceRequestSchemaCommand } from "../commerce/request-schemas.js";
+import type { CommerceReadOperationId, CommerceServedCommandId } from "../commerce/response-schemas.js";
 
-export type KnownSchemaId = ContractName | RequestSchemaId | ResponseSchemaId | "Problem";
+/**
+ * The request and response schemas of the payments workflow (package B09; commerce/request-schemas, commerce/response-schemas): the
+ * closed request schema of each of its seven commands, the COMPLETED envelope of each and the READ envelope of each of its reads,
+ * compiled by the same validator as the B06 ones (decision D-REQ-B7 of docs/design/B09-payments-fiscal.md).
+ */
+export type CommerceSchemaId =
+  | `urn:kauro:api:v1:request:${CommerceRequestSchemaCommand}`
+  | `urn:kauro:api:v1:response:${CommerceServedCommandId}`
+  | `urn:kauro:api:v1:response:read:${CommerceReadOperationId}`;
+
+export type KnownSchemaId = ContractName | RequestSchemaId | ResponseSchemaId | CommerceSchemaId | "Problem";
 
 export type ValidationOutcome<T> =
   | { readonly kind: "VALID"; readonly value: T }

@@ -134,7 +134,13 @@ export async function prepareProviderAttempt(
 
 async function subjectOf(uow: CommerceUnitOfWork, effect: ProviderEffect, attempt: PaymentAttemptRecord, lock: boolean): Promise<AttemptSubject> {
   const c = uow.commerce;
-  const order = lock ? await c.orders.lock(attempt.orderId) : await c.orders.get(attempt.orderId);
+  // the claim locks the order only where it writes it: a creation's first claim (INTENT_CREATED → CREATING), a capture's claim
+  // (CREATED | APPROVED → CAPTURING) and a refund's claim (the payment service's own). A later attempt of a creation leaves the order
+  // CREATING and writes only the attempt, whose compare-and-swap is the serialization point; the request handlers may not lock an
+  // order they do not move (payment_orders_tenant_claim admits INTENT_CREATED, CREATED and APPROVED only; D-AUTH-B4, D-REQ-B8)
+  const unlocked = await c.orders.get(attempt.orderId);
+  const writes = lock && (effect !== "CREATE_ORDER" || unlocked?.state === "INTENT_CREATED");
+  const order = writes ? await c.orders.lock(attempt.orderId) : unlocked;
   if (order === null) throw new NotFoundFailure("payment_order");
   if (effect !== "REFUND") return { effect, order };
   if (attempt.refundId === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a REFUND attempt names its refund");
@@ -520,7 +526,9 @@ export async function runProviderCommand<Body, View>(run: ProviderCommandRun<Bod
         case "NEW_ATTEMPT": {
           // a creation that proved no effect: a new deliberate attempt under a new request identity (D-PROTO-B3)
           const attempt = await principal(async (uow) => {
-            const order = await uow.commerce.orders.lock(operation.resource.id as PaymentOrderId);
+            // the order stays CREATING: only the new attempt is written, and the one-live-attempt index and the ordinal sequence decide
+            // between two resumes that both saw the proved no-effect (the request handlers may not lock a CREATING order; D-REQ-B8)
+            const order = await uow.commerce.orders.get(operation.resource.id as PaymentOrderId);
             if (order === null) throw new NotFoundFailure("payment_order");
             return prepareProviderAttempt(uow, { adapter: run.adapter, subject: { effect: "CREATE_ORDER", order }, ordinal: step.ordinal, causationId: operation.journalEntryId as string as CausationId, now: run.clock.now() });
           });

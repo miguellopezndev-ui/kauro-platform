@@ -26,7 +26,7 @@ export { SQLSTATE, failureOfSqlState, commerceReplayOf, COMMERCE_REPLAY_CONSTRAI
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -56,3 +56,6 @@ export { PgPaymentSweeps } from "./repositories/commerce-sweeps.js";
 export type { AgencyWithPayments, SweptAttempt } from "./repositories/commerce-sweeps.js";
 export { PgIngressFactRecorder } from "./ingress-facts.js";
 export type { IngressFact, IngressFactRecorder } from "./ingress-facts.js";
+// the request side's reads (implementation mandate M4; D-REQ-B2, D-CORE-B2)
+export { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
+export type { PurchasedSubjectRow, RequestTransitionSubject } from "./repositories/commerce-request-reads.js";

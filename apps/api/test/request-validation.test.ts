@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, COMMERCE_COMMANDS, COMMERCE_SERVED_COMMAND_IDS, READ_ROUTES, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
+import { B06_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -241,15 +241,22 @@ test("exactly the seven catalogue routes are registered as POST and the five man
     assert.ok(read.path.startsWith("/api/v1/"), read.path);
   }
   assert.equal(fastifyPath("/api/v1/agencies/{agencyId}/clients"), "/api/v1/agencies/:agencyId/clients");
+  // package B09 serves its routes beside them (M3 and M4; D-REQ-B7, D-INT2-B1): the served payment commands as POST and the served
+  // payment reads as GET
+  const commercePosts = new Set(COMMERCE_SERVED_COMMAND_IDS.map((id) => fastifyPath(COMMERCE_COMMANDS[id].path)));
+  const commerceGets = new Set(COMMERCE_SERVED_READ_IDS.map((id) => fastifyPath(COMMERCE_READ_ROUTES[id].path)));
+  for (const path of commercePosts) assert.ok(w.app.hasRoute({ method: "POST", url: path }) && path.startsWith("/api/v1/"), path);
+  for (const path of commerceGets) assert.ok(w.app.hasRoute({ method: "GET", url: path }) && path.startsWith("/api/v1/"), path);
   const inventory = routeInventoryOf(w.app);
-  // the seven catalogue routes of B06; beside them only the payment service's routes of package B09 (stage-2 mandate M3), served
-  // in every edition (without a bound payment service they know no provider and no service identity)
-  const payment = new Set(COMMERCE_SERVED_COMMAND_IDS.map((id) => fastifyPath(COMMERCE_COMMANDS[id].path)));
-  assert.equal(inventory.filter((r) => r.method === "POST" && !payment.has(r.url)).length, 7);
-  assert.deepEqual(inventory.filter((r) => r.method === "POST" && payment.has(r.url)).map((r) => r.url), [...payment]);
-  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/")).length, 5);
+  // the seven catalogue routes and five reads of B06; beside them every served route of package B09 — the request side (M4) and
+  // the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and nothing else of the payment catalogue
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url)).length, 7);
+  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url)).length, 5);
+  assert.deepEqual(inventory.filter((r) => commercePosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercePosts].sort());
+  assert.deepEqual(inventory.filter((r) => commerceGets.has(r.url) && r.method === "GET").map((r) => r.url).sort(), [...commerceGets].sort());
   // each route validates its body against its own closed request schema
   for (const id of Object.keys(B06_COMMANDS) as Array<keyof typeof B06_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
+  for (const id of COMMERCE_SERVED_COMMAND_IDS) assert.ok((w.validator.knownSchemaIds as ReadonlyArray<string>).includes(`${REQUEST_SCHEMA_PREFIX}${id}`), id);
 });
 
 test("an unexpected exception is 500 INTERNAL_ERROR with only the correlation id, RETRY_SAME_KEY and the safe classification handed to the sink; no stack, SQL or message reaches the wire", async () => {
