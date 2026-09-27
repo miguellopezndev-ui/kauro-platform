@@ -258,7 +258,9 @@ test("the closed outcome catalogues of the B07 routes: registered codes and reas
   // the reads carry no role refusal (AGENCY_READER: every membership role reads); the session read does (the operator's own)
   assert.ok(!SOURCE_ROUTE_OUTCOMES.GetUpload.some((o) => o.reason === "ROLE_INSUFFICIENT"));
   assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
-  assert.ok(SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "UPLOAD_NOT_OWNED"));
+  // another member than the requester is answered 200 UNAVAILABLE / NOT_REQUESTER with its DENY fact (D-SESSION-2, D-CMD-17), never a
+  // problem: the closed catalogue holds no UPLOAD_NOT_OWNED, so the send guard would refuse one
+  assert.ok(!SOURCE_ROUTE_OUTCOMES.GetUploadSession.some((o) => o.reason === "UPLOAD_NOT_OWNED"));
 });
 
 test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombstone kind and a terminal state — an expired and a rejected revision included — and nothing else produces one", () => {
