@@ -60,10 +60,12 @@ import {
   type SystemContext,
   type TableVisibility,
   type UploadId,
+  type UploadSessionRecord,
 } from "@kauro/domain";
 import { PgEventPublisher, PgSourceStore } from "@kauro/persistence";
-import { FIXTURE_EVALUATOR_VERSION, FIXTURE_INSPECTOR_VERSION, FIXTURE_SCANNER, FIXTURE_SCANNER_ENGINE_VERSION, FIXTURE_SIGNATURE_VERSION, clockAt, type AgencyFixture, type SourceFixtureSessions } from "@kauro/persistence/testing";
+import { FIXTURE_EVALUATOR_VERSION, FIXTURE_INSPECTOR_VERSION, FIXTURE_SCANNER, FIXTURE_SCANNER_ENGINE_VERSION, FIXTURE_SIGNATURE_VERSION, clockAt, serverInstant, type AgencyFixture, type SourceFixtureSessions } from "@kauro/persistence/testing";
 import { call, clock, completed, freshKey, ids, rawEvent, type Person, type Reply, type World } from "./support.js";
+import { boundControlWriter, type HeldTransaction } from "./writers.js";
 
 // --- routes ------------------------------------------------------------------------------------------------------------------------
 
@@ -290,11 +292,10 @@ export interface AdmittedFile {
 }
 
 /**
- * UPLOAD_INSPECTION's writes for a VERIFYING upload (see the header): the claimed attempt observes the finalized generation, then —
- * revision row first — the quarantine digest is verified, the generation promoted by the storage port's copy and registered, the
- * receipt recorded, the file admitted with `tables`, the upload ADMITTED with its INPUT_ADMITTED anchor. The revision stays UPLOADING.
+ * UPLOAD_INSPECTION's first unit of work (the attempt claimed, the provider observation recorded) and its work outside any
+ * transaction (the promotion copy of the exact generation through the storage port, the receipt's facts).
  */
-export async function admit(w: World, agencyId: string, uploadId: string, finalized: Finalized, tables: ReadonlyArray<DetectedTable> = [CSV_TABLE]): Promise<AdmittedFile> {
+async function prepareAdmission(w: World, agencyId: string, uploadId: string, finalized: Finalized, tables: ReadonlyArray<DetectedTable>): Promise<PreparedAdmission> {
   const claim = await controlUnitOfWork(w, agencyId, async (uow, emit) => {
     const found = await uow.sources.uploads.get(uploadId as UploadId);
     assert.ok(found, "the upload is visible to its agency's control plane");
@@ -334,17 +335,26 @@ export async function admit(w: World, agencyId: string, uploadId: string, finali
     };
   });
   const receiptHash = inspectionReceiptHashOf({ uploadId: upload.uploadId, inspectionFence: claim.attempt.inspectionFence, observedGeneration: finalized.generation, observedBytes: finalized.bytes, sha256, outcome: "ADMITTED", acceptedGeneration });
-  await controlUnitOfWork(w, agencyId, async (uow, emit) => {
-    assert.ok(await uow.sources.revisions.lock(upload.revisionId));
-    const now = await uow.serverInstant();
-    await uow.sources.objects.verify(upload.quarantineObjectId, sha256, now as never);
-    await uow.sources.objects.register({
+  return { agencyId, finalized, claim, upload, format, fileId, acceptedObjectId, sha256, acceptedName, acceptedGeneration, parserProfileHash, rows, admittedTables, receiptHash };
+}
+
+/**
+ * UPLOAD_INSPECTION's decision unit of work (revision row first, D-LOCK-2): the quarantine digest verified, the accepted generation
+ * registered and verified, the receipt of the claimed attempt, the file admitted with its tables, the upload ADMITTED with its
+ * INPUT_ADMITTED anchor and events — in a control-plane unit of work of the product's adapter or a held control transaction.
+ */
+async function admissionWrites(w: World, step: ControlStep, emit: Emit, prepared: PreparedAdmission): Promise<AdmittedFile> {
+  const { agencyId, finalized, claim, upload, format, fileId, acceptedObjectId, sha256, acceptedName, acceptedGeneration, parserProfileHash, rows, admittedTables, receiptHash } = prepared;
+    assert.ok(await step.sources.revisions.lock(upload.revisionId));
+    const now = await step.serverInstant();
+    await step.sources.objects.verify(upload.quarantineObjectId, sha256, now as never);
+    await step.sources.objects.register({
       objectId: acceptedObjectId, agencyId: upload.agencyId, projectId: upload.projectId, revisionId: upload.revisionId, uploadId: upload.uploadId, fileId,
       zone: "ACCEPTED", dataClass: "RAW", provider: w.storage.provider, locationRef: w.storage.location("ACCEPTED").locationRef, objectName: acceptedName,
       createdBy: { kind: "SERVICE", serviceId: CONTROL_SERVICE }, createdAt: now as never, observed: { generation: acceptedGeneration, bytes: finalized.bytes, observedAt: now as never, late: false },
     });
-    await uow.sources.objects.verify(acceptedObjectId, sha256, now as never);
-    await uow.sources.inspections.append({
+    await step.sources.objects.verify(acceptedObjectId, sha256, now as never);
+    await step.sources.inspections.append({
       receiptId: ids.next() as InspectionReceiptId, agencyId: upload.agencyId, uploadId: upload.uploadId, revisionId: upload.revisionId, receiptHash, inspectionFence: claim.attempt.inspectionFence,
       quarantineObjectId: upload.quarantineObjectId, observedGeneration: finalized.generation, observedBytes: finalized.bytes, sha256,
       completionClaimDigest: upload.completionClaimDigest as Sha256Hex, claimConsistent: true, declaredFormat: upload.declaredFormat, detectedFormat: format,
@@ -355,18 +365,73 @@ export async function admit(w: World, agencyId: string, uploadId: string, finali
       problems: [], parserProfileHash, inspectorVersion: FIXTURE_INSPECTOR_VERSION, outcome: "ADMITTED", accepted: { objectId: acceptedObjectId, generation: acceptedGeneration, sha256 },
       startedAt: claim.attempt.claimedAt, completedAt: now,
     } as never);
-    await uow.sources.files.admit(
+    await step.sources.files.admit(
       { fileId, storageRef: acceptedObjectId, agencyId: upload.agencyId, projectId: upload.projectId, originRevisionId: upload.revisionId, originUploadId: upload.uploadId, inspectionReceiptHash: receiptHash, providerGeneration: acceptedGeneration, sha256, bytes: finalized.bytes, format, scanState: "COVERED_CLEAN", parserProfileHash },
       rows as never,
     );
     await emit("source_file", fileId, 1, "source_file.admitted.v1", { fileId, agencyId, projectId: upload.projectId, originRevisionId: upload.revisionId, originUploadId: upload.uploadId, inspectionReceiptHash: receiptHash, bytes: finalized.bytes, format });
-    const current = await uow.sources.uploads.lock(upload.uploadId);
+    const current = await step.sources.uploads.lock(upload.uploadId);
     assert.ok(current);
-    const admitted = applied(await uow.sources.uploads.transition(upload.uploadId, current.version, { event: "inspection_admitted", fileId, receiptHash, inspectionFence: claim.attempt.inspectionFence }), "inspection_admitted");
+    const admitted = applied(await step.sources.uploads.transition(upload.uploadId, current.version, { event: "inspection_admitted", fileId, receiptHash, inspectionFence: claim.attempt.inspectionFence }), "inspection_admitted");
     await emit("upload_session", upload.uploadId, admitted.version, "upload_session.admitted.v1", { uploadId: upload.uploadId, agencyId, revisionId: upload.revisionId, fileId, inspectionReceiptHash: receiptHash, observedBytes: finalized.bytes, scanState: "COVERED_CLEAN", detectedFormat: format });
-    await uow.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: upload.agencyId, projectId: upload.projectId, revisionId: upload.revisionId, uploadId: upload.uploadId, kind: "INPUT_ADMITTED", sourceEvidenceHash: receiptHash });
-  });
+    await step.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: upload.agencyId, projectId: upload.projectId, revisionId: upload.revisionId, uploadId: upload.uploadId, kind: "INPUT_ADMITTED", sourceEvidenceHash: receiptHash });
   return { uploadId: upload.uploadId, revisionId: upload.revisionId, projectId: upload.projectId, fileId, format, tables: admittedTables, acceptedObjectId, acceptedGeneration, sha256, bytes: finalized.bytes, receiptHash, parserProfileHash };
+}
+
+/** What a control-plane step writes through: the source store and the server clock of its transaction. */
+interface ControlStep {
+  readonly sources: SourceUnitOfWork["sources"];
+  serverInstant(): Promise<string>;
+}
+
+interface PreparedAdmission {
+  readonly agencyId: string;
+  readonly finalized: Finalized;
+  readonly claim: { readonly attempt: { readonly inspectionFence: number; readonly claimedAt: string } };
+  readonly upload: UploadSessionRecord;
+  readonly format: "CSV" | "XLSX";
+  readonly fileId: SourceFileId;
+  readonly acceptedObjectId: StoredObjectId;
+  readonly sha256: Sha256Hex;
+  readonly acceptedName: string;
+  readonly acceptedGeneration: string;
+  readonly parserProfileHash: Sha256Hex;
+  readonly rows: ReadonlyArray<unknown>;
+  readonly admittedTables: ReadonlyArray<AdmittedTable>;
+  readonly receiptHash: Sha256Hex;
+}
+
+/**
+ * UPLOAD_INSPECTION's writes for a VERIFYING upload (see the header): the claimed attempt observes the finalized generation, then —
+ * revision row first — the quarantine digest is verified, the generation promoted by the storage port's copy and registered, the
+ * receipt recorded, the file admitted with `tables`, the upload ADMITTED with its INPUT_ADMITTED anchor. The revision stays UPLOADING.
+ */
+export async function admit(w: World, agencyId: string, uploadId: string, finalized: Finalized, tables: ReadonlyArray<DetectedTable> = [CSV_TABLE]): Promise<AdmittedFile> {
+  const prepared = await prepareAdmission(w, agencyId, uploadId, finalized, tables);
+  return controlUnitOfWork(w, agencyId, (uow, emit) => admissionWrites(w, uow, emit, prepared));
+}
+
+/**
+ * The same decision unit of work held open (a control-plane transaction bound to the agency, D-CTRL-1): the attempt claimed and the
+ * observation committed, the admission written but uncommitted — the revision row, then the upload, held by UPLOAD_INSPECTION while
+ * a request is observed waiting on them (D-LOCK-2). The caller commits or closes the writer.
+ */
+export async function heldAdmission(w: World, agency: AgencyFixture, uploadId: string, finalized: Finalized): Promise<{ readonly writer: HeldTransaction; readonly admitted: AdmittedFile }> {
+  const prepared = await prepareAdmission(w, agency.agencyId, uploadId, finalized, [CSV_TABLE]);
+  const writer = await boundControlWriter(w, agency);
+  try {
+    const store = new PgSourceStore(writer.client, "CONTROL");
+    const events = new PgEventPublisher(writer.client, ids, clock);
+    const actor: ActorRef = { kind: "SERVICE", serviceId: CONTROL_SERVICE };
+    const emit: Emit = async (kind, id, version, type, payload) => {
+      await events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: agency.agencyId as AgencyId, eventType: type, actor, causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId, payload });
+    };
+    const admitted = await admissionWrites(w, { sources: store, serverInstant: () => serverInstant(writer.client) }, emit, prepared);
+    return { writer, admitted };
+  } catch (e) {
+    await writer.close();
+    throw e;
+  }
 }
 
 /**
