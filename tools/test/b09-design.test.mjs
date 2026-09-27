@@ -97,5 +97,6 @@ test("B09-N8: the implementation mandates are staged and self-contained — stag
     }
     assert.doesNotMatch(line, /PLANNED \(M[12]\)/, `${line.slice(0, 20)}: stage-1 mandates write no command-level test`);
   }
-  assert.ok(planned > 0);
+  // after the stage-2 integration every cited api test is on the branch: no planned citation is left (INT-2, design §14)
+  assert.equal(planned, 0);
 });

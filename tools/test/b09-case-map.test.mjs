@@ -154,3 +154,51 @@ test("stage 2 (M4): a PLANNED clause names a test of its mandate that is still t
     }
   }
 });
+
+/** The committed "Closure at the stage-2 integration" table: its count line and its rows, by case. */
+function closureTable() {
+  const text = readFileSync(CASE_MAP, "utf8");
+  const start = text.indexOf("## Closure at the stage-2 integration");
+  const end = text.indexOf("## Scenarios");
+  assert.ok(start >= 0 && end > start, "the closure table sits before the scenarios");
+  const section = text.slice(start, end);
+  const counts = /^(\d+) cases: (\d+) EXECUTED_LOCAL, (\d+) PARTIAL, (\d+) MISSING\.$/m.exec(section);
+  assert.ok(counts, "the closure table states its counts");
+  const table = new Map();
+  for (const line of section.split(/\r?\n/)) {
+    if (!line.startsWith("| ")) continue;
+    const cells = cellsOf(line);
+    // four cells: never read as a case row (five or six cells) by this check or by tools/evidence.mjs
+    if (cells.length !== 4 || !/^(S\d{3}|R2-\d{3}|CMD\d{3}-(OK|DENY|RACE))$/.test(cells[0])) continue;
+    assert.ok(!table.has(cells[0]), `${cells[0]} appears once in the closure table`);
+    table.set(cells[0], { closure: cells[1], evidence: cells[2], remaining: cells[3] });
+  }
+  return { counts: counts.slice(1).map(Number), table };
+}
+
+test("stage-2 integration: the closure table is the rows' own — every case once with the closure status and evidence classes of its status cell, the later packages it names as remaining and the registry cases of theirs it names; no case is MISSING and no clause is planned", () => {
+  const packageOf = new Map([...registry("cases.json"), ...registry("additional_scenarios.json")].map((c) => [c.id, c.package]));
+  const commandPackage = new Map([...packageOf].filter(([id]) => /^CMD\d{3}-OK$/.test(id)).map(([id, pkg]) => [id.slice(0, 6), pkg]));
+  const { counts, table } = closureTable();
+  const map = rows();
+  assert.deepEqual([...table.keys()], map.map((r) => r.caseId), "one line per case, in the rows' order");
+  for (const row of map) {
+    const m = /^\*\*(EXECUTED_LOCAL|PARTIAL|MISSING)\*\* \((?:stage 1|stage 2, (?:M3|M4|INT-2)): (.*?)\) — (.*)$/.exec(row.status);
+    assert.ok(m, `${row.caseId}: its status cell`);
+    const [, closure, detail, classes] = m;
+    const evidence = [...new Set([...classes.matchAll(/\b(EXISTS|SIMULATED|PLANNED \((?:M3|M4|INT-2)\)|LATER \(B\d{2}\))/g)].map((x) => x[1]))];
+    const remaining = closure === "EXECUTED_LOCAL" ? [] : [...new Set([...detail.matchAll(/\bB\d{2}\b/g)].map((x) => x[0]))].sort();
+    const named = `${detail} ${row.later}`.replace(/R2-(\d{3})\.\.R2-(\d{3})/g, (_, from, to) =>
+      Array.from({ length: Number(to) - Number(from) + 1 }, (_x, k) => `R2-${String(Number(from) + k).padStart(3, "0")}`).join(", "),
+    );
+    const later = new Set(remaining);
+    const cases = [...new Set([...named.matchAll(/\b(S\d{3}|R2-\d{3}|CMD\d{3}(?:-(?:OK|DENY|RACE))?)\b/g)].map((x) => x[1]))].filter((id) => later.has(packageOf.get(id) ?? commandPackage.get(id) ?? "")).sort();
+    const packages = remaining.join(", ") || "—";
+    assert.deepEqual(table.get(row.caseId), { closure, evidence: evidence.join(" + "), remaining: cases.length === 0 ? packages : `${packages}: ${cases.join(", ")}` }, row.caseId);
+    assert.notEqual(closure, "MISSING", `${row.caseId}: nothing is missing after the stage-2 integration`);
+    assert.doesNotMatch(row.status, /PLANNED/, `${row.caseId}: no planned clause is left after the stage-2 integration`);
+    if (closure === "PARTIAL") assert.ok(remaining.length > 0, `${row.caseId}: a PARTIAL case names the later package that owns what remains`);
+  }
+  const count = (c) => [...table.values()].filter((t) => t.closure === c).length;
+  assert.deepEqual(counts, [table.size, count("EXECUTED_LOCAL"), count("PARTIAL"), count("MISSING")]);
+});
