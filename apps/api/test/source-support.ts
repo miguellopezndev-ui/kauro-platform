@@ -33,6 +33,7 @@ import {
   acceptedObjectName,
   evaluationHashOf,
   inspectionReceiptHashOf,
+  inventoryHashOf,
   parserProfileHashOf,
   quarantineObjectName,
   selectionHashOf,
@@ -51,6 +52,7 @@ import {
   type ProjectId,
   type RetentionAnchorId,
   type RevisionId,
+  type RevisionTransition,
   type SelectionManifestDocument,
   type SelectionManifestId,
   type SourceFileId,
@@ -171,7 +173,7 @@ export function controlUnitOfWork<T>(w: World, agencyId: string, work: (uow: Sou
   return w.h.control.runSource(controlContext(agencyId), (uow) => work(uow, emitterOf(uow, agencyId)));
 }
 
-type Emit = (kind: AggregateKind, id: string, version: number, type: EventType, payload: EventPayload) => Promise<void>;
+export type Emit = (kind: AggregateKind, id: string, version: number, type: EventType, payload: EventPayload) => Promise<void>;
 
 function emitterOf(uow: SourceUnitOfWork, agencyId: string): Emit {
   const actor: ActorRef = { kind: "SERVICE", serviceId: CONTROL_SERVICE };
@@ -379,7 +381,7 @@ async function admissionWrites(w: World, step: ControlStep, emit: Emit, prepared
 }
 
 /** What a control-plane step writes through: the source store and the server clock of its transaction. */
-interface ControlStep {
+export interface ControlStep {
   readonly sources: SourceUnitOfWork["sources"];
   serverInstant(): Promise<string>;
 }
@@ -420,13 +422,8 @@ export async function heldAdmission(w: World, agency: AgencyFixture, uploadId: s
   const prepared = await prepareAdmission(w, agency.agencyId, uploadId, finalized, [CSV_TABLE]);
   const writer = await boundControlWriter(w, agency);
   try {
-    const store = new PgSourceStore(writer.client, "CONTROL");
-    const events = new PgEventPublisher(writer.client, ids, clock);
-    const actor: ActorRef = { kind: "SERVICE", serviceId: CONTROL_SERVICE };
-    const emit: Emit = async (kind, id, version, type, payload) => {
-      await events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: agency.agencyId as AgencyId, eventType: type, actor, causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId, payload });
-    };
-    const admitted = await admissionWrites(w, { sources: store, serverInstant: () => serverInstant(writer.client) }, emit, prepared);
+    const { step, emit } = controlStepOn(writer, agency.agencyId);
+    const admitted = await admissionWrites(w, step, emit, prepared);
     return { writer, admitted };
   } catch (e) {
     await writer.close();
@@ -526,14 +523,22 @@ export const COUNTS = { physicalSourceRows: 3, logicalSourceRecords: 3, billable
  * generations of its included files, all_selected_inputs_admitted with the counts, dataset_revision.ready_to_seal.v1. Returns the
  * revision's version (READY_TO_SEAL).
  */
-export async function evaluate(w: World, agencyId: string, revisionId: string, files: ReadonlyArray<Pick<AdmittedFile, "fileId" | "acceptedGeneration" | "sha256" | "bytes" | "tables">>, counted: { readonly generationOf?: (file: Pick<AdmittedFile, "fileId" | "acceptedGeneration">) => string } = {}): Promise<{ readonly version: number; readonly evaluationHash: string }> {
-  return controlUnitOfWork(w, agencyId, async (uow, emit) => {
+export async function evaluate(w: World, agencyId: string, revisionId: string, files: ReadonlyArray<CountedFile>): Promise<{ readonly version: number; readonly evaluationHash: string }> {
+  return controlUnitOfWork(w, agencyId, (uow, emit) => evaluationWrites(uow, emit, agencyId, revisionId, files));
+}
+
+/** A file as SELECTION_EVALUATION counts it: its admitted generation, digest and length, and its tables' rows and columns. */
+export type CountedFile = Pick<AdmittedFile, "fileId" | "acceptedGeneration" | "sha256" | "bytes" | "tables">;
+
+/** SELECTION_EVALUATION's unit of work (see evaluate), in a unit of work of the product's adapter or a transaction of a fixture. */
+async function evaluationWrites(uow: ControlStep, emit: Emit, agencyId: string, revisionId: string, files: ReadonlyArray<CountedFile>): Promise<{ readonly version: number; readonly evaluationHash: string }> {
+  {
     const revision = await uow.sources.revisions.lock(revisionId as RevisionId);
     assert.ok(revision && revision.selectionHash !== undefined && revision.selectionManifestId !== undefined, "a bound selection");
     const manifest = await uow.sources.selections.get(revision.revisionId, revision.selectionManifestId);
     assert.ok(manifest);
     const includedFiles = new Set(manifest.body.files.filter((f) => f.disposition === "INCLUDE").map((f) => f.fileId as string));
-    const evaluated = files.filter((f) => includedFiles.has(f.fileId)).map((f) => ({ fileId: f.fileId, generation: counted.generationOf?.(f) ?? f.acceptedGeneration, sha256: f.sha256, bytes: f.bytes }));
+    const evaluated = files.filter((f) => includedFiles.has(f.fileId)).map((f) => ({ fileId: f.fileId, generation: f.acceptedGeneration, sha256: f.sha256, bytes: f.bytes }));
     const includedTables = manifest.body.tables.filter((t) => t.disposition === "INCLUDE");
     const tables = includedTables.map((t) => {
       const table = files.flatMap((f) => f.tables).find((x) => x.tableId === t.tableId);
@@ -554,7 +559,7 @@ export async function evaluate(w: World, agencyId: string, revisionId: string, f
     const ready = applied(await uow.sources.revisions.transition(revision.revisionId, revision.version, { event: "all_selected_inputs_admitted", evaluationId, evaluationHash, populations }), "all_selected_inputs_admitted");
     await emit("dataset_revision", revision.revisionId, ready.version, "dataset_revision.ready_to_seal.v1", { revisionId: revision.revisionId, agencyId, projectId: revision.projectId, selectionHash: revision.selectionHash, evaluationHash, ...populations });
     return { version: ready.version, evaluationHash };
-  });
+  }
 }
 
 /** SealRevision through its route. */
@@ -633,14 +638,18 @@ export async function revisionOf(w: World, revisionId: string, person: Person = 
 /** A file's admission revoked by its control-plane owner (D-FILE-1): the upload-deadline sweeper or the object inventory. */
 export async function revokeAdmission(w: World, agencyId: string, fileId: string, reason: "INTAKE_EXPIRED" | "GENERATION_MISSING" | "GENERATION_CHANGED"): Promise<void> {
   await controlUnitOfWork(w, agencyId, async (uow, emit) => {
-    const file = await uow.sources.files.get(fileId as SourceFileId);
+    const found = await uow.sources.files.get(fileId as SourceFileId);
+    assert.ok(found);
+    // the revision row first, then the file (D-LOCK-2)
+    assert.ok(await uow.sources.revisions.lock(found.originRevisionId));
+    const file = await uow.sources.files.get(found.fileId);
     assert.ok(file);
     const revoked = applied(await uow.sources.files.revokeAdmission(file.fileId, file.version, reason), "revokeAdmission");
     await emit("source_file", file.fileId, revoked.version, "source_file.admission_revoked.v1", {
       fileId: file.fileId,
       agencyId,
       projectId: file.projectId,
-      reason,
+      revocationReason: reason,
       selectedByRevisionIds: [...(await uow.sources.files.selectedBy(file.fileId))],
       sealedByRevisionIds: [...(await uow.sources.files.sealedBy(file.fileId))],
     });
@@ -699,6 +708,127 @@ export async function issuedUploadAt(w: World, revisionId: string, at: Date, per
   } finally {
     c.release(destroy);
   }
+}
+
+/**
+ * One transaction of a fixture on a runtime pool — the request handlers' as `person` (their tenant context), or the control plane's
+ * bound to agency A (D-CTRL-1) — through the product's own source adapters, its labelled TEST CLOCK at `at` (null: the real clock).
+ */
+export async function adapterTx<T>(w: World, person: Person | null, at: Date | null, fn: (step: ControlStep, emit: Emit, c: PoolClient) => Promise<T>): Promise<T> {
+  const c = await (person === null ? w.h.controlPool : w.h.appPool).raw.connect();
+  let destroy: Error | undefined;
+  try {
+    await c.query("BEGIN");
+    await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, person === null ? "" : person.userId]);
+    if (at !== null) await clockAt(c, at);
+    const events = new PgEventPublisher(c, ids, clock);
+    const actor: ActorRef = person === null ? { kind: "SERVICE", serviceId: CONTROL_SERVICE } : { kind: "USER", userId: person.userId };
+    const emit: Emit = async (kind, id, version, type, payload) => {
+      await events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: w.A.agencyId as AgencyId, eventType: type, actor, causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId, payload });
+    };
+    const out = await fn({ sources: new PgSourceStore(c, person === null ? "CONTROL" : "REQUEST"), serverInstant: () => serverInstant(c) }, emit, c);
+    await c.query("COMMIT");
+    return out;
+  } catch (e) {
+    try {
+      await c.query("ROLLBACK");
+    } catch (rollbackError) {
+      destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
+    throw e;
+  } finally {
+    c.release(destroy);
+  }
+}
+
+/** A sealed revision's included file as the reuse of its bytes names it (its first table's detected facts, superuser oracle). */
+export async function reusableFileOf(w: World, fileId: string): Promise<CountedFile> {
+  const file = await w.row<{ provider_generation: string; sha256: string; bytes: string }>("source_files", "file_id = $1", [fileId]);
+  const table = await w.row<{ table_id: string; ordinal: number; kind: "CSV_TABLE" | "WORKSHEET"; visibility: TableVisibility; structure_hash: string; column_count: number; row_estimate: string | null }>("source_tables", "file_id = $1 AND ordinal = 0", [fileId]);
+  assert.ok(file && table);
+  return {
+    fileId: fileId as SourceFileId,
+    acceptedGeneration: file.provider_generation,
+    sha256: file.sha256 as Sha256Hex,
+    bytes: Number(file.bytes),
+    tables: [{ tableId: table.table_id as SourceTableId, ordinal: table.ordinal, kind: table.kind, visibility: table.visibility, structureHash: table.structure_hash as Sha256Hex, columnCount: table.column_count, rows: Number(table.row_estimate ?? 1) }],
+  };
+}
+
+/**
+ * A successor revision that reuses a sealed revision's bytes, made ready at `at`: CMD012 (the sealed predecessor superseded, the DRAFT
+ * successor, the project pointer), one minute later CMD016 binding a selection that includes the reused file (DRAFT → INSPECTING,
+ * previously_admitted_inputs_selected, D-RET-3: allowed while the bytes' first seal is younger than fourteen days), one minute later
+ * SELECTION_EVALUATION counting it READY_TO_SEAL — each as the product's adapters write it, by the role that owns it, at the server
+ * instant of a transaction whose labelled TEST CLOCK stands at that time. What no route can do: an agency that selected in time and
+ * seals after the bytes' window closed.
+ */
+export async function reuseReadyAt(w: World, projectId: string, sealed: { readonly revisionId: string; readonly fileId: string }, at: Date): Promise<{ readonly revisionId: RevisionId; readonly version: number; readonly selectionHash: string }> {
+  const file = await reusableFileOf(w, sealed.fileId);
+  const membershipId = w.memberships.operator as MembershipId;
+  const successorId = ids.next() as RevisionId;
+  await adapterTx(w, w.operator, at, async (step, emit, c) => {
+    const project = await c.query<{ version: string }>("SELECT version::text FROM kauro.projects WHERE project_id = $1 FOR UPDATE", [projectId]);
+    const projectVersion = Number(project.rows[0]?.version);
+    const predecessor = await step.sources.revisions.lock(sealed.revisionId as RevisionId);
+    assert.ok(predecessor && predecessor.state === "SEALED" && predecessor.manifestHash !== undefined);
+    const superseded = applied(await step.sources.revisions.transition(predecessor.revisionId, predecessor.version, { event: "new_revision_explicitly_supersedes", successorRevisionId: successorId }), "new_revision_explicitly_supersedes");
+    await emit("dataset_revision", predecessor.revisionId, superseded.version, "dataset_revision.superseded.v1", { revisionId: predecessor.revisionId, agencyId: w.A.agencyId, projectId, successorRevisionId: successorId, manifestHash: predecessor.manifestHash, affectedPlanIds: [], affectedApprovalIds: [], affectedCommercialAuthorizationIds: [] });
+    const successor = await step.sources.revisions.insertSuccessor({ revisionId: successorId, agencyId: w.A.agencyId as AgencyId, projectId: projectId as ProjectId, supersedesRevisionId: predecessor.revisionId, createdByMembershipId: membershipId, createdAt: clock.now() });
+    await emit("dataset_revision", successorId, successor.version, "dataset_revision.created.v1", { revisionId: successorId, agencyId: w.A.agencyId, projectId, state: successor.state, supersedesRevisionId: predecessor.revisionId, createdByMembershipId: membershipId });
+    const moved = applied(await step.sources.projects.switchCurrentRevision(projectId as ProjectId, projectVersion, successorId, clock.now()), "switchCurrentRevision");
+    await emit("project", projectId, moved.version, "project.current_revision_changed.v1", { projectId, agencyId: w.A.agencyId, currentRevisionId: successorId, previousRevisionId: predecessor.revisionId, changedByMembershipId: membershipId });
+  });
+  const selectionHash = await adapterTx(w, w.operator, new Date(at.getTime() + 60_000), async (step, emit) => {
+    const revision = await step.sources.revisions.lock(successorId);
+    assert.ok(revision && revision.state === "DRAFT");
+    const inventoryHash = inventoryHashOf(await step.sources.revisions.inventory(successorId));
+    const body = manifestOf(successorId, inventoryHash, [{ file, origin: "REUSED" }]);
+    const stored = await step.sources.selections.put({ selectionManifestId: ids.next() as SelectionManifestId, agencyId: w.A.agencyId as AgencyId, projectId: projectId as ProjectId, revisionId: successorId, body, bodyHash: selectionHashOf(body), createdByMembershipId: membershipId, createdAt: clock.now() });
+    const selection = { selectionManifestId: stored.record.selectionManifestId, selectionHash: selectionHashOf(body), inventoryHash };
+    const bound = applied(await step.sources.revisions.transition(successorId, revision.version, { event: "previously_admitted_inputs_selected", selection } as RevisionTransition), "previously_admitted_inputs_selected");
+    await emit("dataset_revision", successorId, bound.version, "dataset_revision.selection_changed.v1", { revisionId: successorId, agencyId: w.A.agencyId, projectId, selectionManifestId: selection.selectionManifestId, selectionHash: selection.selectionHash, inventoryHash, previousState: "DRAFT", state: "INSPECTING", includedFileCount: 1, includedTableCount: 1, reusedFileIds: [file.fileId] });
+    return selection.selectionHash;
+  });
+  const { version } = await adapterTx(w, null, new Date(at.getTime() + 120_000), (step, emit) => evaluationWrites(step, emit, w.A.agencyId, successorId, [file]));
+  return { revisionId: successorId, version, selectionHash };
+}
+
+/**
+ * The upload-deadline sweeper's unit of work for an admitted upload whose intake window closed (design §12.5 UPLOAD_DEADLINES, as
+ * mandate B07-CONTROL runs it; D-RET-1, D-LOCK-2): the revision row, then the upload; a file some real seal included follows that
+ * seal's retention and is left as it is (answer SEALED); otherwise intake_deadline_reached with its event, the file's admission
+ * revoked INTAKE_EXPIRED with its event, and the INTAKE_EXPIRED anchor (answer EXPIRED). In the caller's transaction.
+ */
+export async function intakeExpiryWrites(step: ControlStep, emit: Emit, agencyId: string, uploadId: string): Promise<"EXPIRED" | "SEALED"> {
+  const found = await step.sources.uploads.get(uploadId as UploadId);
+  assert.ok(found);
+  assert.ok(await step.sources.revisions.lock(found.revisionId));
+  const upload = await step.sources.uploads.lock(found.uploadId);
+  assert.ok(upload && upload.state === "ADMITTED" && upload.fileId !== undefined, "an admitted upload");
+  if ((await step.sources.files.sealedBy(upload.fileId)).length > 0) return "SEALED";
+  const expired = applied(await step.sources.uploads.transition(upload.uploadId, upload.version, { event: "intake_deadline_reached", reason: "INTAKE_EXPIRED" }), "intake_deadline_reached");
+  await emit("upload_session", upload.uploadId, expired.version, "upload_session.expired.v1", { uploadId: upload.uploadId, agencyId, revisionId: upload.revisionId, previousState: "ADMITTED", reasonCode: "INTAKE_EXPIRED", releasedBytes: upload.observedBytes ?? 0, providerCancellationState: expired.providerCancellationState, fileId: upload.fileId });
+  const file = await step.sources.files.get(upload.fileId);
+  assert.ok(file && file.state === "ADMITTED");
+  const selectedBy = await step.sources.files.selectedBy(file.fileId);
+  const revoked = applied(await step.sources.files.revokeAdmission(file.fileId, file.version, "INTAKE_EXPIRED"), "admission revocation");
+  await emit("source_file", file.fileId, revoked.version, "source_file.admission_revoked.v1", { fileId: file.fileId, agencyId, projectId: file.projectId, revocationReason: "INTAKE_EXPIRED", selectedByRevisionIds: [...selectedBy], sealedByRevisionIds: [] });
+  await step.sources.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: upload.agencyId, projectId: upload.projectId, revisionId: upload.revisionId, uploadId: upload.uploadId, kind: "INTAKE_EXPIRED", sourceEvidenceHash: null });
+  return "EXPIRED";
+}
+
+/**
+ * The source store and the event emitter of a held control-plane transaction bound to the agency (writers.ts boundControlWriter): a
+ * consumer's or sweeper's unit of work a RACE test holds open, written by the product's adapters as the control plane (a SERVICE).
+ */
+export function controlStepOn(writer: HeldTransaction, agencyId: string): { readonly step: ControlStep; readonly emit: Emit } {
+  const events = new PgEventPublisher(writer.client, ids, clock);
+  const actor: ActorRef = { kind: "SERVICE", serviceId: CONTROL_SERVICE };
+  const emit: Emit = async (kind, id, version, type, payload) => {
+    await events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: agencyId as AgencyId, eventType: type, actor, causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId, payload });
+  };
+  return { step: { sources: new PgSourceStore(writer.client, "CONTROL"), serverInstant: () => serverInstant(writer.client) }, emit };
 }
 
 /** The digest-only session reference of a past issue (never delivered, never stored sealed). */
