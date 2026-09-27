@@ -35,7 +35,7 @@ import type {
   ServiceContext,
   ServiceIdentity,
 } from "@kauro/domain";
-import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, NotFoundFailure, StaleVersionFailure, commandRequestDigest } from "@kauro/domain";
+import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, NotFoundFailure, StaleVersionFailure, commandRequestDigest, toUtcInstant } from "@kauro/domain";
 import type { PaymentRuntime } from "./runtime.js";
 import { causedBy } from "./runtime.js";
 import { authorizationView, captureView, paymentOrderView, refundView } from "./views.js";
@@ -349,7 +349,7 @@ export async function storeProviderQuery(rt: PaymentRuntime, input: { readonly p
  * The watchdog of one attempt (D-PROTO-B4): an attempt whose dispatch deadline passed while its effect is still unknown is
  * observed at the provider and the stored observation applied through CMD034 under the payment service's own identity, with a
  * journal key derived from the stored query (the same artifact is applied once). An attempt that settled meanwhile needs nothing;
- * one whose deadline has not come throws NotDueYet with it.
+ * one whose deadline has not passed throws NotDueYet with the first millisecond past it.
  */
 export async function watchAttempt(rt: PaymentRuntime, orderId: PaymentOrderId, attemptId: PaymentAttemptId): Promise<"APPLIED" | "NOT_APPLICABLE"> {
   const context: ServiceContext = { kind: "SERVICE", serviceId: rt.self.serviceId, correlationId: rt.ids.next() as CorrelationId };
@@ -361,8 +361,10 @@ export async function watchAttempt(rt: PaymentRuntime, orderId: PaymentOrderId, 
     return { attempt, ...(order.providerOrderId !== undefined ? { providerOrderId: order.providerOrderId } : {}) };
   });
   if (found === null || !LIVE.has(found.attempt.state)) return "NOT_APPLICABLE";
+  // the record's instant has millisecond precision and the database's deadline microsecond precision (now() + 60 s, D-PROTO-B6):
+  // the attempt is due from the first millisecond after the recorded one, never before the database's own deadline (decision D-M3-B7)
   const deadline = found.attempt.dispatchDeadlineAt;
-  if (deadline !== undefined && Date.parse(deadline) > rt.clock.nowMs()) throw new NotDueYet(deadline);
+  if (deadline !== undefined && Date.parse(deadline) >= rt.clock.nowMs()) throw new NotDueYet(toUtcInstant(Date.parse(deadline) + 1));
   const observationRef = await storeProviderQuery(rt, { ...(found.providerOrderId !== undefined ? { providerOrderId: found.providerOrderId } : {}), providerRequestId: found.attempt.providerRequestId });
   const result = await reconcilePayment(rt, {
     correlationId: context.correlationId,

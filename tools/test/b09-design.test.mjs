@@ -4,7 +4,7 @@
 // codes against a port that exists only on an unmerged package's branch or starts from the pre-review head, every port a mandate
 // names exists on this branch, and every PLANNED citation of the case map names the mandate §14 gives its test file.
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -86,6 +86,12 @@ test("B09-N8: the implementation mandates are staged and self-contained — stag
     for (const file of files) {
       const owner = ownerOf(file);
       assert.ok(owner, `${file} has no owner in §14`);
+      // a citation whose file is on the branch is no longer planned: its titles exist (tools/test/b09-case-map.test.mjs) and its
+      // row is restated at stage 2 by the mandate or integrator that demonstrated it
+      if (existsSync(join(root, file))) {
+        assert.match(line, /\*\* \(stage 2, (M3|M4|INT-2): /, `${line.slice(0, 20)}: ${file} is on the branch, so its row is restated at stage 2`);
+        continue;
+      }
       assert.ok(line.includes(`PLANNED (${owner})`), `${line.slice(0, 20)}: ${file} is planned for ${owner}`);
       planned += 1;
     }

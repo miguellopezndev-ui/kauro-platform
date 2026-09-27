@@ -2816,6 +2816,656 @@
         }
       }
     },
+    "/api/v1/payment-orders/{orderId}/reconcile": {
+      "post": {
+        "operationId": "ReconcilePayment",
+        "summary": "CMD034 ReconcilePayment",
+        "description": "Precondition: Authenticated current provider observation is available and the service identity has scoped permission.\n\nEffect: Advance local facts from actual provider state and record mismatch incidents.\n\nFailure: A provider pending/held state is never coerced to settled available cash.",
+        "x-kauro-command": "CMD034",
+        "x-kauro-role": "PAYMENT_SERVICE",
+        "x-kauro-principal": "PAYMENT_SERVICE",
+        "x-kauro-runtime-role": "kauro_payment",
+        "x-kauro-settle-runtime-role": null,
+        "x-kauro-scope": "STORED_OPERATION",
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-step-up": "NEVER",
+        "x-kauro-external-effect": "NONE",
+        "x-kauro-gate": "G-PAYMENT",
+        "x-kauro-cases": [
+          "CMD034-OK",
+          "CMD034-DENY",
+          "CMD034-RACE"
+        ],
+        "x-kauro-package": "B09",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "description": "Path id, resolved with server-owned scope (the agency selector, or the stored operation's scope index).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcilePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "COMPLETED: Advance local facts from actual provider state and record mismatch incidents.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcilePaymentCompleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 12 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "CONTENT_TYPE_UNSUPPORTED",
+                "layer": "ADMISSION",
+                "meaning": "the body is not application/json (UTF-8)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_SYNTAX",
+                "layer": "ADMISSION",
+                "meaning": "the body is not strict UTF-8 JSON"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DUPLICATE_KEY",
+                "layer": "ADMISSION",
+                "meaning": "an object of the body repeats a member name"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DEPTH_EXCEEDED",
+                "layer": "ADMISSION",
+                "meaning": "the body nests deeper than the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_STRING_TOO_LONG",
+                "layer": "ADMISSION",
+                "meaning": "a string of the body exceeds the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "REQUIRED",
+                  "UNKNOWN_FIELD",
+                  "TYPE",
+                  "FORMAT",
+                  "RANGE",
+                  "ENUM"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_MISSING",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is absent"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_INVALID",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is not a key of the accepted shape"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "PATH_ID_INVALID",
+                "fieldCodes": [
+                  "FORMAT"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "a path parameter is not an id"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": null,
+                "layer": "AUTHENTICATION",
+                "meaning": "no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "SERVICE_NOT_PERMITTED",
+                "layer": "ACCESS",
+                "meaning": "the verified service identity does not hold the command's technical role"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "SERVICE_ENVIRONMENT_MISMATCH",
+                "layer": "ACCESS",
+                "meaning": "the service identity was issued for another environment"
+              }
+            ]
+          },
+          "404": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_FOUND",
+                "reason": null,
+                "layer": "ACCESS",
+                "meaning": "the stored operation is unknown to the scope index: nothing is adopted and nothing written"
+              },
+              {
+                "code": "NOT_FOUND",
+                "reason": "EVIDENCE_NOT_FOUND",
+                "layer": "COMMAND",
+                "meaning": "observationRef names no stored, authenticated provider observation"
+              }
+            ]
+          },
+          "409": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": "REQUEST_DIGEST_DIFFERS",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the key was used with another request: nothing was executed again"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OPERATION_PENDING",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the first request under this key is still in flight; retry with the same key"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OBSERVATION_SUBJECT_MISMATCH",
+                "layer": "COMMAND",
+                "meaning": "the observation is about another order, provider or environment"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/payments/webhooks/{provider}": {
+      "post": {
+        "operationId": "ReceivePaymentWebhook",
+        "summary": "CMD030 ReceivePaymentWebhook",
+        "description": "Precondition: Ingress authenticates provider-specific signature, freshness, environment and bounded raw body before event acceptance.\n\nEffect: Store a deduplicated durable inbox entry and reconcile it with the local order.\n\nFailure: Wrong payee/currency/order or invalid signature rejects; duplicates do not add money or commissions.",
+        "x-kauro-command": "CMD030",
+        "x-kauro-role": "AUTHENTICATED_PROVIDER",
+        "x-kauro-principal": "PROVIDER",
+        "x-kauro-runtime-role": "kauro_payment",
+        "x-kauro-settle-runtime-role": null,
+        "x-kauro-scope": "PROVIDER_INGRESS",
+        "x-kauro-idempotency": "PROVIDER_INBOX",
+        "x-kauro-step-up": "NEVER",
+        "x-kauro-external-effect": "NONE",
+        "x-kauro-gate": "G-PAYMENT",
+        "x-kauro-cases": [
+          "CMD030-OK",
+          "CMD030-DENY",
+          "CMD030-RACE"
+        ],
+        "x-kauro-package": "B09",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "description": "The provider label; an unconfigured provider is PROVIDER_UNKNOWN.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The provider's raw event: authenticated by the provider-specific signature over the exact bytes, freshness and environment, bounded by the provider's body limit; never validated as a Kauro schema. The ingress records it and builds the normalized inbox command (x-kauro-normalized-command).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "x-kauro-normalized-command": {
+          "$ref": "#/components/schemas/ReceivePaymentWebhookRequest"
+        },
+        "responses": {
+          "200": {
+            "description": "COMPLETED: Store a deduplicated durable inbox entry and reconcile it with the local order.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivePaymentWebhookCompleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "PROVIDER_BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the raw body exceeds the provider's bound; nothing is verified or stored"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "PROVIDER_SIGNATURE_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the provider signature over the exact raw bytes does not verify: nothing is stored but the anonymous denial"
+              },
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "PROVIDER_EVENT_STALE",
+                "layer": "AUTHENTICATION",
+                "meaning": "the transmission is outside the freshness window (a replay is refused)"
+              },
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "PROVIDER_ENVIRONMENT_MISMATCH",
+                "layer": "AUTHENTICATION",
+                "meaning": "the event was signed for another environment than this deployment's"
+              }
+            ]
+          },
+          "404": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_FOUND",
+                "reason": "PROVIDER_UNKNOWN",
+                "layer": "ADMISSION",
+                "meaning": "no verifier is configured for the provider named in the path"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
     "/api/v1/plans/{planId}/approve": {
       "post": {
         "operationId": "ApprovePlan",
@@ -4544,6 +5194,441 @@
                 "reason": "RESPONSE_CONTRACT_VIOLATION",
                 "layer": "PLATFORM",
                 "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/refunds/{refundId}/execute": {
+      "post": {
+        "operationId": "ExecuteRefund",
+        "summary": "CMD033 ExecuteRefund",
+        "description": "Precondition: A valid unreversed refund authorization exists and any prior ambiguous submission is reconciled.\n\nEffect: Submit once per reconciled provider identity and publish final refund/credit-note/commission events.\n\nFailure: Timeout stays UNCERTAIN with no blind duplicate financial effect.",
+        "x-kauro-command": "CMD033",
+        "x-kauro-role": "PAYMENT_SERVICE",
+        "x-kauro-principal": "PAYMENT_SERVICE",
+        "x-kauro-runtime-role": "kauro_payment",
+        "x-kauro-settle-runtime-role": "kauro_payment",
+        "x-kauro-scope": "STORED_OPERATION",
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-step-up": "NEVER",
+        "x-kauro-external-effect": "PROVIDER_REFUND",
+        "x-kauro-gate": "G-PAYMENT",
+        "x-kauro-cases": [
+          "CMD033-OK",
+          "CMD033-DENY",
+          "CMD033-RACE"
+        ],
+        "x-kauro-package": "B09",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "refundId",
+            "in": "path",
+            "required": true,
+            "description": "Path id, resolved with server-owned scope (the agency selector, or the stored operation's scope index).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "COMPLETED: Submit once per reconciled provider identity and publish final refund/credit-note/commission events.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteRefundCompleted"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "ACCEPTED: the provider effect was dispatched and its outcome is not known yet; the durable operation, its state and the polling guidance (package B09 D-PROTO-B2)",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 12 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "CONTENT_TYPE_UNSUPPORTED",
+                "layer": "ADMISSION",
+                "meaning": "the body is not application/json (UTF-8)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_SYNTAX",
+                "layer": "ADMISSION",
+                "meaning": "the body is not strict UTF-8 JSON"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DUPLICATE_KEY",
+                "layer": "ADMISSION",
+                "meaning": "an object of the body repeats a member name"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DEPTH_EXCEEDED",
+                "layer": "ADMISSION",
+                "meaning": "the body nests deeper than the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_STRING_TOO_LONG",
+                "layer": "ADMISSION",
+                "meaning": "a string of the body exceeds the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "REQUIRED",
+                  "UNKNOWN_FIELD",
+                  "TYPE",
+                  "FORMAT",
+                  "RANGE",
+                  "ENUM"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_MISSING",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is absent"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_INVALID",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is not a key of the accepted shape"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "PATH_ID_INVALID",
+                "fieldCodes": [
+                  "FORMAT"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "a path parameter is not an id"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": null,
+                "layer": "AUTHENTICATION",
+                "meaning": "no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "SERVICE_NOT_PERMITTED",
+                "layer": "ACCESS",
+                "meaning": "the verified service identity does not hold the command's technical role"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "SERVICE_ENVIRONMENT_MISMATCH",
+                "layer": "ACCESS",
+                "meaning": "the service identity was issued for another environment"
+              }
+            ]
+          },
+          "404": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_FOUND",
+                "reason": null,
+                "layer": "ACCESS",
+                "meaning": "the stored operation is unknown to the scope index: nothing is adopted and nothing written"
+              }
+            ]
+          },
+          "409": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": "REQUEST_DIGEST_DIFFERS",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the key was used with another request: nothing was executed again"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OPERATION_PENDING",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the first request under this key is still in flight; retry with the same key"
+              },
+              {
+                "code": "STALE_VERSION",
+                "reason": null,
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "expectedVersion is not the refund's current version; the current safe version and state come back"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "REFUND_NOT_APPROVED",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the refund is not APPROVED (requested, rejected, completed or failed)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "CAPTURE_NOT_REFUNDABLE",
+                "layer": "COMMAND",
+                "meaning": "the capture was reversed: the authorization lapsed and no refund is dispatched"
+              },
+              {
+                "code": "PAYMENT_PENDING",
+                "reason": "REFUND_IN_PROGRESS",
+                "layer": "COMMAND",
+                "meaning": "a submission of this refund is in flight under another key"
+              },
+              {
+                "code": "PAYMENT_UNCERTAIN",
+                "reason": "REFUND_UNCERTAIN",
+                "layer": "COMMAND",
+                "meaning": "a prior submission may have refunded: reconcile it (CMD034) before any new dispatch"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "PROVIDER_SERVICES_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written)"
               }
             ]
           },
@@ -6469,652 +7554,6 @@
         }
       }
     },
-    "POST /api/v1/payment-orders/{orderId}/reconcile": {
-      "operationId": "ReconcilePayment",
-      "summary": "CMD034 ReconcilePayment",
-      "description": "Precondition: Authenticated current provider observation is available and the service identity has scoped permission.\n\nEffect: Advance local facts from actual provider state and record mismatch incidents.\n\nFailure: A provider pending/held state is never coerced to settled available cash.",
-      "x-kauro-command": "CMD034",
-      "x-kauro-role": "PAYMENT_SERVICE",
-      "x-kauro-principal": "PAYMENT_SERVICE",
-      "x-kauro-runtime-role": "kauro_payment",
-      "x-kauro-settle-runtime-role": null,
-      "x-kauro-scope": "STORED_OPERATION",
-      "x-kauro-idempotency": "REQUIRED",
-      "x-kauro-step-up": "NEVER",
-      "x-kauro-external-effect": "NONE",
-      "x-kauro-gate": "G-PAYMENT",
-      "x-kauro-cases": [
-        "CMD034-OK",
-        "CMD034-DENY",
-        "CMD034-RACE"
-      ],
-      "x-kauro-package": "B09",
-      "security": [
-        {
-          "serviceAuth": []
-        }
-      ],
-      "parameters": [
-        {
-          "name": "orderId",
-          "in": "path",
-          "required": true,
-          "description": "Path id, resolved with server-owned scope (the agency selector, or the stored operation's scope index).",
-          "schema": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-          }
-        },
-        {
-          "$ref": "#/components/parameters/IdempotencyKey"
-        },
-        {
-          "$ref": "#/components/parameters/CorrelationId"
-        }
-      ],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ReconcilePaymentRequest"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "COMPLETED: Advance local facts from actual provider state and record mismatch incidents.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReconcilePaymentCompleted"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 12 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "HEADER_REPEATED",
-              "layer": "TRANSPORT",
-              "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "REQUEST_MALFORMED",
-              "layer": "TRANSPORT",
-              "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "CONTENT_TYPE_UNSUPPORTED",
-              "layer": "ADMISSION",
-              "meaning": "the body is not application/json (UTF-8)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "BODY_TOO_LARGE",
-              "layer": "ADMISSION",
-              "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_SYNTAX",
-              "layer": "ADMISSION",
-              "meaning": "the body is not strict UTF-8 JSON"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_DUPLICATE_KEY",
-              "layer": "ADMISSION",
-              "meaning": "an object of the body repeats a member name"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_DEPTH_EXCEEDED",
-              "layer": "ADMISSION",
-              "meaning": "the body nests deeper than the parser bound"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_STRING_TOO_LONG",
-              "layer": "ADMISSION",
-              "meaning": "a string of the body exceeds the parser bound"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "SCHEMA_VIOLATION",
-              "fieldCodes": [
-                "REQUIRED",
-                "UNKNOWN_FIELD",
-                "TYPE",
-                "FORMAT",
-                "RANGE",
-                "ENUM"
-              ],
-              "layer": "ADMISSION",
-              "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "IDEMPOTENCY_KEY_MISSING",
-              "layer": "ADMISSION",
-              "meaning": "the Idempotency-Key header is absent"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "IDEMPOTENCY_KEY_INVALID",
-              "layer": "ADMISSION",
-              "meaning": "the Idempotency-Key header is not a key of the accepted shape"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "PATH_ID_INVALID",
-              "fieldCodes": [
-                "FORMAT"
-              ],
-              "layer": "ADMISSION",
-              "meaning": "a path parameter is not an id"
-            }
-          ]
-        },
-        "401": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "AUTHENTICATION_REQUIRED",
-              "reason": null,
-              "layer": "AUTHENTICATION",
-              "meaning": "no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded"
-            }
-          ]
-        },
-        "403": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "NOT_AUTHORIZED",
-              "reason": "SERVICE_NOT_PERMITTED",
-              "layer": "ACCESS",
-              "meaning": "the verified service identity does not hold the command's technical role"
-            },
-            {
-              "code": "NOT_AUTHORIZED",
-              "reason": "SERVICE_ENVIRONMENT_MISMATCH",
-              "layer": "ACCESS",
-              "meaning": "the service identity was issued for another environment"
-            }
-          ]
-        },
-        "404": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "NOT_FOUND",
-              "reason": null,
-              "layer": "ACCESS",
-              "meaning": "the stored operation is unknown to the scope index: nothing is adopted and nothing written"
-            },
-            {
-              "code": "NOT_FOUND",
-              "reason": "EVIDENCE_NOT_FOUND",
-              "layer": "COMMAND",
-              "meaning": "observationRef names no stored, authenticated provider observation"
-            }
-          ]
-        },
-        "409": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "IDEMPOTENCY_CONFLICT",
-              "reason": "REQUEST_DIGEST_DIFFERS",
-              "layer": "IDEMPOTENCY",
-              "meaning": "the key was used with another request: nothing was executed again"
-            },
-            {
-              "code": "PRECONDITION_FAILED",
-              "reason": "OPERATION_PENDING",
-              "layer": "IDEMPOTENCY",
-              "meaning": "the first request under this key is still in flight; retry with the same key"
-            },
-            {
-              "code": "PRECONDITION_FAILED",
-              "reason": "OBSERVATION_SUBJECT_MISMATCH",
-              "layer": "COMMAND",
-              "meaning": "the observation is about another order, provider or environment"
-            }
-          ]
-        },
-        "422": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
-            },
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": "RESPONSE_CONTRACT_VIOLATION",
-              "layer": "PLATFORM",
-              "meaning": "the reply its route's contract refused was not sent (R23, N13)"
-            }
-          ]
-        },
-        "500": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTERNAL_ERROR",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
-            }
-          ]
-        },
-        "503": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "CAPACITY_UNAVAILABLE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
-            }
-          ]
-        }
-      }
-    },
-    "POST /api/v1/payments/webhooks/{provider}": {
-      "operationId": "ReceivePaymentWebhook",
-      "summary": "CMD030 ReceivePaymentWebhook",
-      "description": "Precondition: Ingress authenticates provider-specific signature, freshness, environment and bounded raw body before event acceptance.\n\nEffect: Store a deduplicated durable inbox entry and reconcile it with the local order.\n\nFailure: Wrong payee/currency/order or invalid signature rejects; duplicates do not add money or commissions.",
-      "x-kauro-command": "CMD030",
-      "x-kauro-role": "AUTHENTICATED_PROVIDER",
-      "x-kauro-principal": "PROVIDER",
-      "x-kauro-runtime-role": "kauro_payment",
-      "x-kauro-settle-runtime-role": null,
-      "x-kauro-scope": "PROVIDER_INGRESS",
-      "x-kauro-idempotency": "PROVIDER_INBOX",
-      "x-kauro-step-up": "NEVER",
-      "x-kauro-external-effect": "NONE",
-      "x-kauro-gate": "G-PAYMENT",
-      "x-kauro-cases": [
-        "CMD030-OK",
-        "CMD030-DENY",
-        "CMD030-RACE"
-      ],
-      "x-kauro-package": "B09",
-      "security": [],
-      "parameters": [
-        {
-          "name": "provider",
-          "in": "path",
-          "required": true,
-          "description": "The provider label; an unconfigured provider is PROVIDER_UNKNOWN.",
-          "schema": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_-]{1,63}$"
-          }
-        },
-        {
-          "$ref": "#/components/parameters/CorrelationId"
-        }
-      ],
-      "requestBody": {
-        "required": true,
-        "description": "The provider's raw event: authenticated by the provider-specific signature over the exact bytes, freshness and environment, bounded by the provider's body limit; never validated as a Kauro schema. The ingress records it and builds the normalized inbox command (x-kauro-normalized-command).",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object"
-            }
-          }
-        }
-      },
-      "x-kauro-normalized-command": {
-        "$ref": "#/components/schemas/ReceivePaymentWebhookRequest"
-      },
-      "responses": {
-        "200": {
-          "description": "COMPLETED: Store a deduplicated durable inbox entry and reconcile it with the local order.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReceivePaymentWebhookCompleted"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "HEADER_REPEATED",
-              "layer": "TRANSPORT",
-              "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "REQUEST_MALFORMED",
-              "layer": "TRANSPORT",
-              "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "PROVIDER_BODY_TOO_LARGE",
-              "layer": "ADMISSION",
-              "meaning": "the raw body exceeds the provider's bound; nothing is verified or stored"
-            }
-          ]
-        },
-        "401": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "AUTHENTICATION_REQUIRED",
-              "reason": "PROVIDER_SIGNATURE_INVALID",
-              "layer": "AUTHENTICATION",
-              "meaning": "the provider signature over the exact raw bytes does not verify: nothing is stored but the anonymous denial"
-            },
-            {
-              "code": "AUTHENTICATION_REQUIRED",
-              "reason": "PROVIDER_EVENT_STALE",
-              "layer": "AUTHENTICATION",
-              "meaning": "the transmission is outside the freshness window (a replay is refused)"
-            },
-            {
-              "code": "AUTHENTICATION_REQUIRED",
-              "reason": "PROVIDER_ENVIRONMENT_MISMATCH",
-              "layer": "AUTHENTICATION",
-              "meaning": "the event was signed for another environment than this deployment's"
-            }
-          ]
-        },
-        "404": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "NOT_FOUND",
-              "reason": "PROVIDER_UNKNOWN",
-              "layer": "ADMISSION",
-              "meaning": "no verifier is configured for the provider named in the path"
-            }
-          ]
-        },
-        "422": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
-            },
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": "RESPONSE_CONTRACT_VIOLATION",
-              "layer": "PLATFORM",
-              "meaning": "the reply its route's contract refused was not sent (R23, N13)"
-            }
-          ]
-        },
-        "500": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTERNAL_ERROR",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
-            }
-          ]
-        },
-        "503": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "CAPACITY_UNAVAILABLE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
-            }
-          ]
-        }
-      }
-    },
     "POST /api/v1/projects/{projectId}/refund-requests": {
       "operationId": "RequestRefund",
       "summary": "CMD031 RequestRefund",
@@ -8507,439 +8946,6 @@
               "reason": "RESPONSE_CONTRACT_VIOLATION",
               "layer": "PLATFORM",
               "meaning": "the reply its route's contract refused was not sent (R23, N13)"
-            }
-          ]
-        },
-        "500": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTERNAL_ERROR",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
-            }
-          ]
-        },
-        "503": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "CAPACITY_UNAVAILABLE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
-            }
-          ]
-        }
-      }
-    },
-    "POST /api/v1/refunds/{refundId}/execute": {
-      "operationId": "ExecuteRefund",
-      "summary": "CMD033 ExecuteRefund",
-      "description": "Precondition: A valid unreversed refund authorization exists and any prior ambiguous submission is reconciled.\n\nEffect: Submit once per reconciled provider identity and publish final refund/credit-note/commission events.\n\nFailure: Timeout stays UNCERTAIN with no blind duplicate financial effect.",
-      "x-kauro-command": "CMD033",
-      "x-kauro-role": "PAYMENT_SERVICE",
-      "x-kauro-principal": "PAYMENT_SERVICE",
-      "x-kauro-runtime-role": "kauro_payment",
-      "x-kauro-settle-runtime-role": "kauro_payment",
-      "x-kauro-scope": "STORED_OPERATION",
-      "x-kauro-idempotency": "REQUIRED",
-      "x-kauro-step-up": "NEVER",
-      "x-kauro-external-effect": "PROVIDER_REFUND",
-      "x-kauro-gate": "G-PAYMENT",
-      "x-kauro-cases": [
-        "CMD033-OK",
-        "CMD033-DENY",
-        "CMD033-RACE"
-      ],
-      "x-kauro-package": "B09",
-      "security": [
-        {
-          "serviceAuth": []
-        }
-      ],
-      "parameters": [
-        {
-          "name": "refundId",
-          "in": "path",
-          "required": true,
-          "description": "Path id, resolved with server-owned scope (the agency selector, or the stored operation's scope index).",
-          "schema": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-          }
-        },
-        {
-          "$ref": "#/components/parameters/IdempotencyKey"
-        },
-        {
-          "$ref": "#/components/parameters/CorrelationId"
-        }
-      ],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ExecuteRefundRequest"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "COMPLETED: Submit once per reconciled provider identity and publish final refund/credit-note/commission events.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExecuteRefundCompleted"
-              }
-            }
-          }
-        },
-        "202": {
-          "description": "ACCEPTED: the provider effect was dispatched and its outcome is not known yet; the durable operation, its state and the polling guidance (package B09 D-PROTO-B2)",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AcceptedResponse"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 12 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "HEADER_REPEATED",
-              "layer": "TRANSPORT",
-              "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "REQUEST_MALFORMED",
-              "layer": "TRANSPORT",
-              "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "CONTENT_TYPE_UNSUPPORTED",
-              "layer": "ADMISSION",
-              "meaning": "the body is not application/json (UTF-8)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "BODY_TOO_LARGE",
-              "layer": "ADMISSION",
-              "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_SYNTAX",
-              "layer": "ADMISSION",
-              "meaning": "the body is not strict UTF-8 JSON"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_DUPLICATE_KEY",
-              "layer": "ADMISSION",
-              "meaning": "an object of the body repeats a member name"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_DEPTH_EXCEEDED",
-              "layer": "ADMISSION",
-              "meaning": "the body nests deeper than the parser bound"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "JSON_STRING_TOO_LONG",
-              "layer": "ADMISSION",
-              "meaning": "a string of the body exceeds the parser bound"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "SCHEMA_VIOLATION",
-              "fieldCodes": [
-                "REQUIRED",
-                "UNKNOWN_FIELD",
-                "TYPE",
-                "FORMAT",
-                "RANGE",
-                "ENUM"
-              ],
-              "layer": "ADMISSION",
-              "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "IDEMPOTENCY_KEY_MISSING",
-              "layer": "ADMISSION",
-              "meaning": "the Idempotency-Key header is absent"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "IDEMPOTENCY_KEY_INVALID",
-              "layer": "ADMISSION",
-              "meaning": "the Idempotency-Key header is not a key of the accepted shape"
-            },
-            {
-              "code": "INVALID_REQUEST",
-              "reason": "PATH_ID_INVALID",
-              "fieldCodes": [
-                "FORMAT"
-              ],
-              "layer": "ADMISSION",
-              "meaning": "a path parameter is not an id"
-            }
-          ]
-        },
-        "401": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "AUTHENTICATION_REQUIRED",
-              "reason": null,
-              "layer": "AUTHENTICATION",
-              "meaning": "no verified service identity (issuer, audience, expected identity): the anonymous denial is recorded"
-            }
-          ]
-        },
-        "403": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "NOT_AUTHORIZED",
-              "reason": "SERVICE_NOT_PERMITTED",
-              "layer": "ACCESS",
-              "meaning": "the verified service identity does not hold the command's technical role"
-            },
-            {
-              "code": "NOT_AUTHORIZED",
-              "reason": "SERVICE_ENVIRONMENT_MISMATCH",
-              "layer": "ACCESS",
-              "meaning": "the service identity was issued for another environment"
-            }
-          ]
-        },
-        "404": {
-          "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "NOT_FOUND",
-              "reason": null,
-              "layer": "ACCESS",
-              "meaning": "the stored operation is unknown to the scope index: nothing is adopted and nothing written"
-            }
-          ]
-        },
-        "409": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "IDEMPOTENCY_CONFLICT",
-              "reason": "REQUEST_DIGEST_DIFFERS",
-              "layer": "IDEMPOTENCY",
-              "meaning": "the key was used with another request: nothing was executed again"
-            },
-            {
-              "code": "PRECONDITION_FAILED",
-              "reason": "OPERATION_PENDING",
-              "layer": "IDEMPOTENCY",
-              "meaning": "the first request under this key is still in flight; retry with the same key"
-            },
-            {
-              "code": "STALE_VERSION",
-              "reason": null,
-              "current": "ALWAYS",
-              "layer": "COMMAND",
-              "meaning": "expectedVersion is not the refund's current version; the current safe version and state come back"
-            },
-            {
-              "code": "PRECONDITION_FAILED",
-              "reason": "REFUND_NOT_APPROVED",
-              "current": "ALWAYS",
-              "layer": "COMMAND",
-              "meaning": "the refund is not APPROVED (requested, rejected, completed or failed)"
-            },
-            {
-              "code": "PRECONDITION_FAILED",
-              "reason": "CAPTURE_NOT_REFUNDABLE",
-              "layer": "COMMAND",
-              "meaning": "the capture was reversed: the authorization lapsed and no refund is dispatched"
-            },
-            {
-              "code": "PAYMENT_PENDING",
-              "reason": "REFUND_IN_PROGRESS",
-              "layer": "COMMAND",
-              "meaning": "a submission of this refund is in flight under another key"
-            },
-            {
-              "code": "PAYMENT_UNCERTAIN",
-              "reason": "REFUND_UNCERTAIN",
-              "layer": "COMMAND",
-              "meaning": "a prior submission may have refunded: reconcile it (CMD034) before any new dispatch"
-            }
-          ]
-        },
-        "422": {
-          "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
-          "headers": {
-            "X-Correlation-Id": {
-              "$ref": "#/components/headers/CorrelationId"
-            },
-            "Cache-Control": {
-              "$ref": "#/components/headers/CacheControl"
-            }
-          },
-          "content": {
-            "application/problem+json": {
-              "schema": {
-                "$ref": "#/components/schemas/Problem"
-              }
-            }
-          },
-          "x-kauro-outcomes": [
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": null,
-              "layer": "PLATFORM",
-              "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
-            },
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": "RESPONSE_CONTRACT_VIOLATION",
-              "layer": "PLATFORM",
-              "meaning": "the reply its route's contract refused was not sent (R23, N13)"
-            },
-            {
-              "code": "INTEGRITY_FAILURE",
-              "reason": "PROVIDER_SERVICES_UNAVAILABLE",
-              "layer": "COMMAND",
-              "meaning": "no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written)"
             }
           ]
         },

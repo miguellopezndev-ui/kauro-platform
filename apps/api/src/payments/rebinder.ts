@@ -4,7 +4,11 @@
  * execution has started and the new scope stays in the same band"; COMMERCIAL_LEDGER_WORKED_EXAMPLES §18 "Record the replacement
  * against the purchased entitlement; do not charge a new project by default"). Called by the recurrence package's replacement
  * flow (B10, R2-092) once the new revision is sealed, its plan approved and the replacement quote issued, in a SERVICE unit of work
- * under kauro_payment (only the payment service revokes and issues entitlements, B09-F1), adopted to the capture's order.
+ * under kauro_payment (only the payment service revokes and issues entitlements, B09-F1). The caller's unit of work has adopted the
+ * paid order's scope (adoptScope("PAYMENT_ORDER", the capture's order); D-SCOPE-B1, decision D-M3-B6): the payment service sees
+ * nothing of an agency before it adopts one of its stored operations, and the re-binding's input names the capture, not the order —
+ * a unit of work that adopted nothing is refused INTEGRITY_FAILURE before anything is read, and a capture its adopted agency does not
+ * hold is NOT_FOUND.
  *
  * The domain decides first (commerce/authority replacementBlockers: the replaced entitlement ACTIVE — no execution started —, the
  * capture alone pays its purchase and no refund of it is open or committed, the replacement an ISSUED replacement of the accepted
@@ -30,10 +34,10 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
   return {
     async rebind(uow, input) {
       if (uow.context.kind !== "SERVICE") throw new DomainFailure("INTEGRITY_FAILURE", "a re-binding runs in a SERVICE unit of work of the payment service (D-QUOTE-B6)");
+      if (uow.commerceScope === null) throw new DomainFailure("INTEGRITY_FAILURE", "a re-binding runs in a unit of work that adopted the paid order's scope (D-SCOPE-B1, D-M3-B6)");
       const c = uow.commerce;
       const capture = await c.captures.get(input.captureId);
-      if (capture === null) throw new NotFoundFailure("capture");
-      if (uow.commerceScope === null && (await uow.adoptScope("PAYMENT_ORDER", capture.orderId)) === null) throw new NotFoundFailure("payment_order");
+      if (capture === null || capture.agencyId !== uow.commerceScope) throw new NotFoundFailure("capture");
       const order = await c.orders.get(capture.orderId);
       const from = await c.quotes.get(input.fromQuoteId);
       const to = await c.quotes.get(input.toQuoteId);

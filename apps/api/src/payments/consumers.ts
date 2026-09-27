@@ -13,7 +13,7 @@
  *                 with exactly its invoice's snapshot (D-FISC-B5), validated once that invoice is issued (CMD035, B15). One live
  *                 document per subject is the identity. Blocked drafts are re-evaluated when the reviewed facts change.
  *  PAYMENT_SERVICE the watchdog of every dispatched attempt (payment_attempt.dispatching / provider_pending / uncertain, and the
- *                 attempt of refund.uncertain): not due before its dispatch deadline (the delivery is rescheduled at it), then a
+ *                 attempt of refund.uncertain): not due before its dispatch deadline (the delivery is rescheduled just past it), then a
  *                 stored provider query applied through CMD034 (D-PROTO-B4); and the refund executor (refund.approved): CMD033
  *                 under the payment service's own identity with its journal key derived from the refund and its version, so a
  *                 redelivered approval resumes the one operation and never executes the refund twice.

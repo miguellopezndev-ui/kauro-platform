@@ -24,8 +24,10 @@
 // Planned operations (package B09, docs/design/B09-payments-fiscal.md §10): the payment routes are designed with their request
 // schemas, closed response schemas and outcome catalogues before their handlers exist. They are generated from the same
 // application contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths": the check proves no
-// planned route is registered (a registered route must be documented under "paths"), and when implementation mandate M3 serves a
-// route it moves into the served inventory and out of the planned list.
+// planned route is registered (a registered route must be documented under "paths"), and when an implementation mandate serves a
+// route it moves into the served inventory (COMMERCE_SERVED_COMMAND_IDS: mandate M3 serves the payment service's side — CMD030,
+// CMD033, CMD034) and out of the planned list: it is documented under "paths" from the same contracts, and checked against the
+// route's declared replies like every served route.
 //
 // Requires the workspace to be built (pnpm run build); the root "verify" script runs it after the build and the tests.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -288,6 +290,7 @@ export function generateOpenApi(sources) {
 
   // package B09: the planned payment routes (see the header), generated from the application contracts, keyed "METHOD path"
   const planned = {};
+  const commerceServed = new Set(application.COMMERCE_SERVED_COMMAND_IDS);
   const PROVIDER_LABEL = { type: "string", pattern: "^[a-z][a-z0-9_-]{1,63}$" };
   for (const spec of Object.values(application.COMMERCE_COMMANDS)) {
     const command = registryCommands.find((c) => c.id === spec.id);
@@ -296,6 +299,7 @@ export function generateOpenApi(sources) {
       throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
     }
     if (served.has(spec.id)) continue;
+    const servedNow = commerceServed.has(spec.id);
     const webhook = spec.idempotencyStore === "PROVIDER_INBOX";
     const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
     addComponent(`${spec.name}Request`, byId[requestId], requestId);
@@ -317,7 +321,7 @@ export function generateOpenApi(sources) {
       };
     }
     Object.assign(responses, problemResponses(application.COMMERCE_COMMAND_OUTCOMES[spec.id]));
-    planned[`${spec.method} ${spec.path}`] = {
+    const operation = {
       operationId: spec.name,
       summary: `${spec.id} ${spec.name}`,
       description: `Precondition: ${command.precondition}\n\nEffect: ${command.effect}\n\nFailure: ${command.failure}`,
@@ -355,6 +359,16 @@ export function generateOpenApi(sources) {
       ...(webhook ? { "x-kauro-normalized-command": { $ref: `${COMPONENTS}${spec.name}Request` } } : {}),
       responses,
     };
+    if (!servedNow) {
+      planned[`${spec.method} ${spec.path}`] = operation;
+      continue;
+    }
+    // a served payment route: documented under paths, and its documented replies are the ones its route declares
+    const contract = application.commerceCommandRouteResponses(spec.id);
+    const declared = Object.keys(contract.declared).sort();
+    const documented = Object.keys(responses).filter((status) => Number(status) < 400).sort();
+    if (declared.join(",") !== documented.join(",")) throw new Error(`${spec.id}: the served route declares ${declared.join(", ")} but its contract documents ${documented.join(", ")}`);
+    paths[spec.path] = { ...(paths[spec.path] ?? {}), [spec.method.toLowerCase()]: operation };
   }
   for (const [operationId, spec] of Object.entries(application.COMMERCE_READ_ROUTES)) {
     const schemaId = application.commerceReadResponseSchemaId(operationId);

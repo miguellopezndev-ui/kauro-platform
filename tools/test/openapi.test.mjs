@@ -25,8 +25,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.equal(readFileSync(DOCUMENT_PATH, "utf8"), serialize(expected));
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
-  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16) and the two
-  // operational probes
+  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16), the two
+  // operational probes and the payment service's three routes (package B09, mandate M3)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -41,9 +41,12 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
+      "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
+      "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",
     ],
   );
   for (const command of sources.registryCommands.filter((c) => sources.application.SERVED_COMMAND_IDS.includes(c.id))) {
@@ -155,9 +158,13 @@ test("B09: the payment routes are documented from their contracts as planned ope
   const planned = expected["x-kauro-planned"];
   const commands = Object.values(sources.application.COMMERCE_COMMANDS);
   const reads = Object.values(sources.application.COMMERCE_READ_ROUTES);
-  assert.deepEqual(Object.keys(planned).sort(), [...commands.map((c) => `${c.method} ${c.path}`), ...reads.map((r) => `GET ${r.path}`)].sort());
+  // the served payment routes (mandate M3: CMD030, CMD033, CMD034) are documented under paths from the same contracts; the rest stay planned
+  const served = new Set(sources.application.COMMERCE_SERVED_COMMAND_IDS);
+  assert.deepEqual([...served].sort(), ["CMD030", "CMD033", "CMD034"]);
+  assert.deepEqual(Object.keys(planned).sort(), [...commands.filter((c) => !served.has(c.id)).map((c) => `${c.method} ${c.path}`), ...reads.map((r) => `GET ${r.path}`)].sort());
   for (const spec of commands) {
-    const op = planned[`${spec.method} ${spec.path}`];
+    const op = served.has(spec.id) ? expected.paths[spec.path][spec.method.toLowerCase()] : planned[`${spec.method} ${spec.path}`];
+    assert.equal(served.has(spec.id) ? planned[`${spec.method} ${spec.path}`] : undefined, undefined, `${spec.id} is never both served and planned`);
     assert.equal(op.operationId, spec.name);
     assert.equal(op["x-kauro-role"], spec.role);
     assert.equal(op["x-kauro-package"], "B09");
@@ -166,11 +173,12 @@ test("B09: the payment routes are documented from their contracts as planned ope
     assert.deepEqual(Object.keys(op.responses).sort(), [String(reply.status), ...(reply.accepted ? ["202"] : []), ...problemStatuses].sort(), spec.id);
   }
   // the webhook takes no idempotency key and no bearer token: its identity is the provider inbox, its authentication the signature
-  const webhook = planned["POST /api/v1/payments/webhooks/{provider}"];
+  const webhook = expected.paths["/api/v1/payments/webhooks/{provider}"].post;
   assert.deepEqual(webhook.security, []);
   assert.equal(webhook.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"), false);
   // the payment service authenticates as a service identity, never as a person
-  assert.deepEqual(planned["POST /api/v1/refunds/{refundId}/execute"].security, [{ serviceAuth: [] }]);
+  assert.deepEqual(expected.paths["/api/v1/refunds/{refundId}/execute"].post.security, [{ serviceAuth: [] }]);
+  assert.deepEqual(expected.paths["/api/v1/payment-orders/{orderId}/reconcile"].post.security, [{ serviceAuth: [] }]);
   // a planned route the api registers must be served from paths
   const registeredPlanned = [...inventory, { method: "POST", url: "/api/v1/refunds/:refundId/approve", responses: inventory[0].responses }];
   assert.ok(check({ inventory: registeredPlanned }).includes("planned route is registered: POST /api/v1/refunds/{refundId}/approve (a served route is documented under paths)"));

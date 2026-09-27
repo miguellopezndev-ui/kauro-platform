@@ -7,7 +7,7 @@
  * the shared halves of their transition locks in the platform's lock order (agency → capability → approval → source revision →
  * target contract; B06 D-TX-2), so a suspension, a withdrawal, an expiry or a supersession in flight is ordered before or after
  * the reading unit of work. The B06 repositories select every column (plan bodies, project purposes) and cannot run under
- * kauro_payment; this reader is what the M2 reconciler's `PurchasedSubjectReader` port binds to (apps/api payments/subjects.ts).
+ * kauro_payment; this reader is what the M2 reconciler's `PurchasedSubjectReader` port binds to (apps/api src/payments/runtime.ts pgPurchasedSubjectReader; decision D-M3-B3).
  * The database re-checks every fact at issuance anyway (kauro.commercial_authorizations_require_capture, KP004).
  *
  * The shape is the application port's own (`PurchasedSubject` of @kauro/application commerce/core/subject.ts), written
