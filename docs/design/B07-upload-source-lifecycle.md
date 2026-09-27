@@ -888,6 +888,46 @@ VERIFY EXIT 0
 - When a stage-2 mandate writes a cited test, the integrator of `b07/integration` moves that row from SPECIFIED to EXECUTED_LOCAL
   or SIMULATED and updates the status table.
 
+### 16.3 Verification of `b07/commands` (mandate B07-COMMANDS)
+
+`b07/commands` branches from `b07/stage-1` (`cfaf7a4`). Mandate B07-COMMANDS was interrupted by a usage limit after two commits
+(`8179411`, the six handlers, the source reads and the selection manifest intake; `5dc3479`, serving them in `apps/api`) with the
+OpenAPI move, the CMD013 test and its fixtures uncommitted. The resumed run reviewed that work and kept it, fixed what the tests
+found, and wrote the rest of the mandate:
+
+- Every B07-COMMANDS row of the case map has its test under its exact title, through the real route and composition root:
+  `apps/api/test/cmd012-create-revision.test.ts` … `cmd017-seal-revision.test.ts` (22 cited titles), plus
+  `source-reads.test.ts` and `source-role-matrix.test.ts`. The rows moved from SPECIFIED to EXECUTED_LOCAL, or to SIMULATED where
+  the clause rests on the labelled storage or vault fake; the status table counts them (13 EXECUTED_LOCAL, 10 PARTIAL, 0 MISSING —
+  five cases wait for B07-CONTROL's pipeline half, five for a later package).
+- The matrix serves CMD012..CMD017 with their applicability rows and documents the source routes and the intake (D-CMD-16); the
+  OpenAPI document lists every B07 route under `paths` and plans nothing (D-CMD-11).
+- Decisions D-CMD-6..D-CMD-17 record what the implementation fixed where the design was silent or had to be corrected, among them
+  the answers the route catalogues were missing or listed wrongly (D-CMD-6, D-CMD-17), the file read after its transition lock
+  (D-CMD-7), the generation re-check of the seal (D-CMD-9), the storage fake's https session URI (D-CMD-12), the preview reader of
+  the tests (D-CMD-13) and the test harness (D-CMD-15).
+- Defects the tests found and the run fixed: the lock observation of the RACE tests matched a part of the statement
+  `pg_stat_activity` does not keep (a statement is truncated at 1,024 bytes; D-CMD-15); the control-plane fixture published the
+  admission revocation under a payload key the allowlist refuses (`revocationReason`); the reservation fixture declared a length
+  its bytes did not have (the storage fake refuses it, as a provider does); `source-contracts.test.ts` still asserted the catalogue
+  entry D-CMD-17 removes; `@kauro/data-plane` had to be a dependency, not a devDependency, of `apps/api` (the architecture gate).
+- No migration, `runtime-boundary.json` entry or external dependency changed; the lockfile gains only the api's workspace link to
+  `@kauro/data-plane`. No fake was created (`tools/test/b07-stage-one.test.mjs` passes).
+
+`pnpm run verify` at `1b63f5c`, after `pnpm install --frozen-lockfile`, on **Windows 11** (Node 24, pnpm 10.16.1,
+`C:\Tools\pgsql17\bin`): exit 0 — contracts 12/12, domain 64/64, application 73/73, persistence 159/159, authorization 11/11,
+data-plane 12/12, api 145 passed and 1 skipped of 146 (B06's Linux-only test), tools 30/30; architecture gate 7 packages and 17
+edges with no violation; OpenAPI 28 registered operations and none planned; matrix 18 machines, 13 commands, 12 reads and 1 intake;
+clean-consume 13 typed entry points. Every temporary cluster of the run was created under the run's own scratch directory and
+stopped and removed afterwards. The commit after `1b63f5c` adds this section only.
+
+**For the `b07/integration` integrator** (merge order COMMANDS, then CONTROL): the shared files this branch edits are listed in the
+mandate's report. `b07/control` also appends decisions after D-PERS-8, a section 16.3 before §17, lines at the end of the case map,
+a row after the api row of the README and an importer to `pnpm-lock.yaml`; keep both sides and renumber the two 16.3 sections. Then
+move B07-CONTROL's rows from SPECIFIED and update the status table (`tools/test/b07-case-map.test.mjs`); B07-CONTROL's pipeline
+tests may now drive CMD012..CMD017 through these routes instead of their fixtures, and `apps/api/test/source-support.ts`'s
+control-plane writes may give way to the consumers of `apps/control`.
+
 ## 17. Integration obligations (B07 and B09 on main)
 
 B07 and B09 were designed in parallel on the same base (`ac44af6`). Neither references the other's tables; they touch through
