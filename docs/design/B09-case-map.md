@@ -11,9 +11,9 @@ named here by file and exact title, so the implementation writes them under exac
 proves on every verify that every B09 case has one row, that every cited existing test exists under exactly its title, and that
 every DENY and RACE row of CMD028–CMD034 states its registry scenario (D-CASEMAP-B1).
 
-Closure status of a case (the first word of every status cell; `tools/test/b09-case-map.test.mjs` checks it on every verify). The
-parenthesis after it names the stage that set it: `stage 1:` for the stage-1 integration, `stage 2, M3:`, `stage 2, M4:` or
-`stage 2, INT-2:` for the stage-2 mandate or integrator that moved the row.
+Closure status of a case (the first word of every status cell; `tools/test/b09-case-map.test.mjs` checks it on every verify), recorded
+at the stage-1 integration as `(stage 1: …)` and restated by the stage-2 mandate that demonstrates the row under its own label —
+`(stage 2, M3: …)`, `(stage 2, M4: …)`, `(stage 2, INT-2: …)`:
 
 - **EXECUTED_LOCAL** — every clause of the registry expectation is demonstrated by the cited tests, each on the branch and passing in
   `pnpm run verify` on Windows and on Linux at the head of `b09/impl-stage1` (stage 1) or of the branch of the stage-2 mandate that
@@ -23,10 +23,10 @@ parenthesis after it names the stage that set it: `stage 1:` for the stage-1 int
   claimed.
 - **MISSING** — no test of the case runs at this stage; the row states the reason and the stage-2 mandate and case that deliver it.
 
-A stage-2 mandate that writes a cited test moves its row (M3, M4, INT-2) and names itself in the status; the check refuses a MISSING
-row that cites a test on the branch, an EXECUTED_LOCAL row that cites one that is not, and a PLANNED clause whose test is on the
-branch. A row whose command-level test passes through a labelled contract fake stays PARTIAL with its SIMULATED clause named and
-what remains with the package that owns it (B15 for the live provider; B07 and B08 for their ports).
+A stage-2 mandate that writes a cited test moves its row (M3, M4, INT-2) and restates its status under its own label; the check
+refuses a MISSING row that cites a test on the branch and an EXECUTED_LOCAL row that cites one that is not. A row whose every clause
+runs through the routes and a real database but whose provider-side facts come from a labelled contract fake stays PARTIAL, with the
+live integration (B15) as what remains.
 
 Evidence classes of the cited tests (21 "Evidence classes"; every claim names its class):
 
@@ -38,7 +38,9 @@ Evidence classes of the cited tests (21 "Evidence classes"; every claim names it
   route (Fastify `inject`), the composition
   root, the `pg` unit of work, the shipped authorizers and handlers, the response guard and a real PostgreSQL 17, like the B06
   command tests (`apps/api/test/`). Hold points and waits observed in `pg_stat_activity` fix interleavings; no sleep. A crash is
-  injected at a named boundary by a hold point that ends the process's unit of work without its commit (the B06 technique).
+  injected at a named boundary by a hold point that ends the process's unit of work without its commit (the B06 technique). A
+  PLANNED clause names a test that is not on the branch yet: once its mandate writes it, the row is restated (the check refuses a
+  planned clause whose tests are all on the branch, and a restated row that cites no test of the mandate that restated it).
 - **SIMULATED** — a clause shown through a labelled contract fake of the payment provider, the webhook verifier, the evidence
   store, the fiscal bridge, the service authenticator, or — until their package is on main — the platform ports of B07 (source
   availability and lineage) and B08 (delivery capacity) (`integrationClass` / `binding` `CONTRACT_FAKE`, D-FAKE-B1). Never counted as
