@@ -124,6 +124,10 @@ test("DENY: VIEWER → 403; foreign revision → 404; INSPECTING revision → 40
 
   assert.equal(outcome(w, await reserve(w, revisionId, 2, { person: w.viewer })), "403 NOT_AUTHORIZED ROLE_INSUFFICIENT");
   assert.equal(outcome(w, await reserve(w, foreign.revisionId, 1)), "404 NOT_FOUND -");
+  // the revision's expectedVersion is compared on the locked row: the version before the first reservation is stale
+  const stale = await reserve(w, revisionId, 1);
+  assert.equal(outcome(w, stale), "409 STALE_VERSION -");
+  assert.deepEqual(currentOf(stale), { version: 2, state: "UPLOADING" });
   const notAccepting = await reserve(w, inspecting.revisionId, 3);
   assert.equal(outcome(w, notAccepting), "409 PRECONDITION_FAILED REVISION_NOT_ACCEPTING_UPLOADS");
   assert.deepEqual(currentOf(notAccepting), { version: 3, state: "INSPECTING" });

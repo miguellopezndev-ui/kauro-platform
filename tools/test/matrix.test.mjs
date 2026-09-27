@@ -47,3 +47,14 @@ test("an applicability row citing a test that does not exist, or answering a mut
   delete absent.CMD026;
   assert.deepEqual(checkSources(sources, EDGE_OWNERS, absent), ["CMD026 is served but has no applicability row"]);
 });
+
+test("B07-COMMANDS: every specified source-lifecycle command is served with its applicability row, every source read is a served read and the intake a served intake — a command left unserved, a source read that is not a served read, an unserved intake and a missing applicability row fail the check", () => {
+  const unserved = { ...sources, served: new Set([...sources.served].filter((id) => id !== "CMD017")) };
+  assert.deepEqual(checkSources(unserved), ["CMD017 is specified but not served"]);
+  const { GetInspection: _inspection, ...reads } = sources.reads;
+  assert.deepEqual(checkSources({ ...sources, reads }), ["the source read GetInspection is not a served read"]);
+  assert.deepEqual(checkSources({ ...sources, intakes: {} }), ["the source intake SubmitSelectionManifest is not a served intake"]);
+  const absent = clone(APPLICABILITY);
+  delete absent.CMD016;
+  assert.deepEqual(checkSources(sources, EDGE_OWNERS, absent), ["CMD016 is served but has no applicability row"]);
+});
