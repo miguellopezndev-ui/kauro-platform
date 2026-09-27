@@ -104,6 +104,12 @@ test("DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity 
   assert.equal(outcome(pw.api, elsewhere), "403 NOT_AUTHORIZED SERVICE_ENVIRONMENT_MISMATCH");
   const anonymous = await execute(pw, refundId, { expectedVersion: 2 }, { token: null });
   assert.equal(outcome(pw.api, anonymous), "401 AUTHENTICATION_REQUIRED -");
+  // a stale version: the refund moved past what the caller saw — 409 STALE_VERSION with the current safe version and state, no journal entry
+  const staleKey = freshKey("execute-stale");
+  const stale = await execute(pw, refundId, { expectedVersion: 1 }, { key: staleKey });
+  assert.equal(outcome(pw.api, stale), "409 STALE_VERSION -");
+  assert.deepEqual(asProblem(pw.api, stale).current, { version: 2, state: "APPROVED" });
+  assert.equal(await journalOf(staleKey), undefined);
   assert.deepEqual(await refundRow(refundId), { state: "APPROVED", version: "2", provider_refund_id: null, failure_code: null });
   assert.equal((await refundAttempts(refundId)).length, 0, "no attempt, no provider call");
 
