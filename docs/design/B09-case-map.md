@@ -211,8 +211,9 @@ rows on every verify.
   `tools/evidence.mjs` seals this file beside B06's case map in the evidence bundle of a candidate commit.
 - The stage-2 integration (INT-2; design §14 "Stage-2 integration record", D-INT2-B1..B5): `apps/api/test/b09-scenarios.test.ts` ::
   "INT-2 seam (D-INT2-B3): …" (an api that binds the payment service settles the request side's provider commands through it —
-  §16 INT2-1) and :: "INT-2 seam (D-INT2-B4): …" (the payment service's replies and the agency's reads project one order the same
-  way — §16 INT2-2), beside the six scenario rows above; "S058: …" also proves D-INT2-B5 (a capture of the wrong amount never reads
+  §16 INT2-1), :: "INT-2 seam (D-INT2-B4): …" (the payment service's replies and the agency's reads project one order the same
+  way — §16 INT2-2) and :: "INT-2 seam (D-INT2-B1): …" (every served payment route's run publishes only the events its command lists
+  in `COMMERCE_COMMAND_EVENTS`, the matrix's source), beside the six scenario rows above; "S058: …" also proves D-INT2-B5 (a capture of the wrong amount never reads
   as a confirmed payment — §16 INT2-3). The world is `paymentWorld({ requestSide: true })` of `apps/api/test/payment-support.ts`:
   the composition root's one api serves the B06 routes, the request side and the payment service's routes over one real PostgreSQL
   17, with M2's labelled contract fakes and none added.

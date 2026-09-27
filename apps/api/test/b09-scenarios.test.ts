@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ApproveRefundView, CapturePaymentView, CreatePaymentOrderView, ExecuteRefundView, PaymentOrderDetailView, QuoteView, ReconcilePaymentView, RequestRefundView, WebhookAck } from "@kauro/application";
+import { COMMERCE_COMMAND_EVENTS } from "@kauro/application";
 import { sealedAvailability } from "@kauro/application/testing";
 import type { Sha256Hex } from "@kauro/contracts";
 import type { PlanId, UserId } from "@kauro/domain";
@@ -148,6 +149,37 @@ test("INT-2 seam (D-INT2-B4): the payment service's replies and the agency's rea
   const paidRead = await orderDetail(order.orderId);
   assert.deepEqual([paid.data.order.paymentStatus, paid.data.order.nextActions], ["CONFIRMED", []]);
   assert.deepEqual([paid.data.order, paid.data.captures, paid.data.commercialAuthorization], [paidRead.order, paidRead.captures, paidRead.commercialAuthorization], "one projection of the paid order");
+});
+
+test("INT-2 seam (D-INT2-B1): each served payment route's run publishes only the events COMMERCE_COMMAND_EVENTS lists for its command — CreatePaymentOrder, the webhook, RequestRefund, ApproveRefund, ExecuteRefund and ReconcilePayment in one purchase's life", async () => {
+  const { w } = pw;
+  const published = async (command: keyof typeof COMMERCE_COMMAND_EVENTS, reply: Reply): Promise<ReadonlyArray<string>> => {
+    const correlationId = reply.headers["x-correlation-id"];
+    const types = (await rows<{ event_type: string }>(pw, "SELECT event_type FROM kauro.domain_events WHERE correlation_id = $1 ORDER BY sequence", [correlationId])).map((e) => e.event_type);
+    assert.ok(types.length > 0, `${command} published its run's events under the request's correlation id`);
+    for (const type of types) assert.ok(COMMERCE_COMMAND_EVENTS[command].includes(type as never), `${command} lists ${type}`);
+    return types;
+  };
+  const quote = await readyQuote("seam-b1");
+  const createReply = await createOrder(quote);
+  const created = completed<CreatePaymentOrderView>(createReply, 201).data.order;
+  await published("CMD028", createReply);
+  pw.paypal.approve(created.providerOrderId!);
+  const captured = await deliver(pw, "PAYMENT.CAPTURE.COMPLETED", pw.paypal.captureAtProvider(created.providerOrderId!));
+  assert.ok((await published("CMD030", captured.reply)).includes("commercial_authorization.issued.v1"));
+  const requestReply = await call(w, { url: paymentRoutes.requestRefund(created.projectId), token: w.billing.token, key: freshKey("seam-b1-request"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } });
+  const refundId = completed<RequestRefundView>(requestReply, 201).data.refund.refundId;
+  assert.deepEqual(await published("CMD031", requestReply), ["refund.requested.v1"]);
+  const approveReply = await call(w, { url: paymentRoutes.approveRefund(refundId), token: kora.token, key: freshKey("seam-b1-approve"), agency: null, body: { expectedVersion: 1, serviceCents: "1000", taxCents: "0", authorizationRef: await w.stepUp(kora) } });
+  completed<ApproveRefundView>(approveReply, 200);
+  assert.deepEqual(await published("CMD032", approveReply), ["refund.approved.v1"]);
+  const executeReply = await execute(pw, refundId, { expectedVersion: 2 });
+  assert.equal(completed<ExecuteRefundView>(executeReply, 200).data.refund.state, "COMPLETED");
+  assert.ok((await published("CMD033", executeReply)).includes("refund.completed.v1"));
+  const reconcileReply = await reconcile(pw, created.orderId, { observationRef: await storeQuery(pw, created.providerOrderId!) });
+  completed<ReconcilePaymentView>(reconcileReply, 200);
+  const reconciled = (await rows<{ event_type: string }>(pw, "SELECT event_type FROM kauro.domain_events WHERE correlation_id = $1", [reconcileReply.headers["x-correlation-id"]])).map((e) => e.event_type);
+  for (const type of reconciled) assert.ok(COMMERCE_COMMAND_EVENTS.CMD034.includes(type as never), `CMD034 lists ${type}`);
 });
 
 // --- S057 --------------------------------------------------------------------------------------------------------------------------
