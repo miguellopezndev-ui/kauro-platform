@@ -47,6 +47,7 @@ import {
   type EventPayload,
   type EventType,
   type InspectionReceiptId,
+  type MembershipId,
   type ProjectId,
   type RetentionAnchorId,
   type RevisionId,
@@ -60,8 +61,9 @@ import {
   type TableVisibility,
   type UploadId,
 } from "@kauro/domain";
-import { FIXTURE_EVALUATOR_VERSION, FIXTURE_INSPECTOR_VERSION, FIXTURE_SCANNER, FIXTURE_SCANNER_ENGINE_VERSION, FIXTURE_SIGNATURE_VERSION, type AgencyFixture, type SourceFixtureSessions } from "@kauro/persistence/testing";
-import { call, completed, freshKey, ids, rawEvent, type Person, type Reply, type World } from "./support.js";
+import { PgEventPublisher, PgSourceStore } from "@kauro/persistence";
+import { FIXTURE_EVALUATOR_VERSION, FIXTURE_INSPECTOR_VERSION, FIXTURE_SCANNER, FIXTURE_SCANNER_ENGINE_VERSION, FIXTURE_SIGNATURE_VERSION, clockAt, type AgencyFixture, type SourceFixtureSessions } from "@kauro/persistence/testing";
+import { call, clock, completed, freshKey, ids, rawEvent, type Person, type Reply, type World } from "./support.js";
 
 // --- routes ------------------------------------------------------------------------------------------------------------------------
 
@@ -579,6 +581,63 @@ export async function revokeAdmission(w: World, agencyId: string, fileId: string
     });
   });
 }
+
+// --- the past, on the labelled TEST CLOCK -------------------------------------------------------------------------------------------
+
+/**
+ * CMD013's two units of work as they would have run at `at` (an upload reserved and its session issued then): written by the
+ * product's own source adapters on the request handlers' runtime role, as the acting person through their own live membership
+ * (D-PAIR-1), inside one transaction whose labelled TEST CLOCK (@kauro/persistence/testing clockAt) stands at `at` — every instant
+ * is kauro.server_now() of that transaction, never a back-dated row (D-CLOCK-1). What no route can do: a request now can only
+ * reserve now. The session reference is a digest only (no secret is stored: the upload's session is not delivered again).
+ */
+export async function issuedUploadAt(w: World, revisionId: string, at: Date, person: Person, membershipId: string, bytes = 1_000_000): Promise<{ readonly uploadId: UploadId; readonly deadline: string }> {
+  const c = await w.h.appPool.raw.connect();
+  let destroy: Error | undefined;
+  try {
+    await c.query("BEGIN");
+    await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, person.userId]);
+    await clockAt(c, at);
+    const store = new PgSourceStore(c, "REQUEST");
+    const events = new PgEventPublisher(c, ids, clock);
+    const actor: ActorRef = { kind: "USER", userId: person.userId };
+    const publish = (kind: AggregateKind, id: string, version: number, type: EventType, payload: EventPayload) =>
+      events.publish({ aggregateKind: kind, aggregateId: id, aggregateVersion: version, agencyId: w.A.agencyId as AgencyId, eventType: type, actor, causationId: ids.next() as CausationId, correlationId: ids.next() as CorrelationId, payload });
+    const revision = await store.revisions.lock(revisionId as RevisionId);
+    assert.ok(revision && (revision.state === "DRAFT" || revision.state === "UPLOADING"), "a revision accepting uploads");
+    const uploadId = ids.next() as UploadId;
+    const objectId = ids.next() as StoredObjectId;
+    await store.objects.register({
+      objectId, agencyId: revision.agencyId, projectId: revision.projectId, revisionId: revision.revisionId, uploadId, zone: "QUARANTINE", dataClass: "RAW", provider: w.storage.provider,
+      locationRef: w.storage.location("QUARANTINE").locationRef, objectName: quarantineObjectName(revision.agencyId, revision.projectId, revision.revisionId, uploadId),
+      createdBy: { kind: "MEMBERSHIP", membershipId: membershipId as MembershipId }, createdAt: clock.now(),
+    });
+    const upload = await store.uploads.insert({ uploadId, agencyId: revision.agencyId, projectId: revision.projectId, revisionId: revision.revisionId, displayName: "late export.csv", declaredFormat: "CSV", reservedBytes: bytes, quarantineObjectId: objectId, requestedByMembershipId: membershipId as MembershipId, requestedByUserId: person.userId });
+    await publish("upload_session", uploadId, upload.version, "upload_session.reserved.v1", { uploadId, agencyId: revision.agencyId, projectId: revision.projectId, revisionId: revision.revisionId, reservedBytes: bytes, declaredFormat: "CSV", requestedByMembershipId: membershipId, state: upload.state });
+    await store.retention.appendAnchor({ anchorId: ids.next() as RetentionAnchorId, agencyId: revision.agencyId, projectId: revision.projectId, revisionId: revision.revisionId, uploadId, kind: "UPLOAD_INITIATED", sourceEvidenceHash: null });
+    if (revision.state === "DRAFT") {
+      const uploading = applied(await store.revisions.transition(revision.revisionId, revision.version, { event: "upload_reserved", firstUploadId: uploadId }), "upload_reserved");
+      await publish("dataset_revision", revision.revisionId, uploading.version, "dataset_revision.uploading.v1", { revisionId: revision.revisionId, agencyId: revision.agencyId, projectId: revision.projectId, firstUploadId: uploadId, state: uploading.state });
+    }
+    const providerSessionDigest = textDigest(`${CONTRACT_FAKE_SESSION_PREFIX_FOR_PAST}${uploadId}`);
+    const issued = applied(await store.uploads.transition(uploadId, upload.version, { event: "session_issued", sessionAttempt: upload.sessionAttempt, providerSessionDigest, providerSessionLifetimeSeconds: w.storage.capabilities().sessionLifetimeSeconds }), "session_issued");
+    await publish("upload_session", uploadId, issued.version, "upload_session.session_issued.v1", { uploadId, agencyId: revision.agencyId, revisionId: revision.revisionId, sessionAttempt: upload.sessionAttempt, providerSessionDigest });
+    await c.query("COMMIT");
+    return { uploadId, deadline: issued.applicationExpiresAt };
+  } catch (e) {
+    try {
+      await c.query("ROLLBACK");
+    } catch (rollbackError) {
+      destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
+    throw e;
+  } finally {
+    c.release(destroy);
+  }
+}
+
+/** The digest-only session reference of a past issue (never delivered, never stored sealed). */
+const CONTRACT_FAKE_SESSION_PREFIX_FOR_PAST = "https://contract-fake-storage.invalid/resumable-session/past-";
 
 // --- oracles -----------------------------------------------------------------------------------------------------------------------
 
