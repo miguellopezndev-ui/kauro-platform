@@ -89,7 +89,11 @@ export function sha(s: string): Sha256Hex {
 
 // --- hold points -------------------------------------------------------------------------------------------------------
 
-export type HoldName = "journal.reserved" | "journal.commit" | "collaborator" | "after.commit";
+/**
+ * `source.intent` (B07): a source command attached its journal entry to the business object it created — the last write of
+ * CMD013's intent unit of work, so a request held there holds the revision row with its reservation written and uncommitted.
+ */
+export type HoldName = "journal.reserved" | "journal.commit" | "collaborator" | "after.commit" | "source.intent";
 
 interface ArmedHold {
   readonly reached: () => void;
@@ -165,11 +169,32 @@ function instrumentUnitOfWork<U extends UnitOfWork>(uow: U, holds: HoldPoints): 
     markUncertain: (entryId) => uow.journal.markUncertain(entryId),
     find: (identity) => uow.journal.find(identity),
   };
+  let sources: unknown;
   return new Proxy(uow, {
     get(target, property) {
       if (property === "journal") return journal;
+      if (property === "sources" && "sources" in target) {
+        sources ??= instrumentSources((target as unknown as SourceUnitOfWork).sources, holds);
+        return sources;
+      }
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+}
+
+/** The source store with the `source.intent` hold after the pending-operation journal attaches an entry (B07). */
+function instrumentSources(sources: SourceUnitOfWork["sources"], holds: HoldPoints): SourceUnitOfWork["sources"] {
+  const operations: SourceUnitOfWork["sources"]["operations"] = {
+    async attach(entryId, resourceKind, resourceId) {
+      await sources.operations.attach(entryId, resourceKind, resourceId);
+      await holds.pass("source.intent");
+    },
+  };
+  return new Proxy(sources, {
+    get(target, property) {
+      if (property === "operations") return operations;
+      return Reflect.get(target, property, target) as unknown;
     },
   });
 }

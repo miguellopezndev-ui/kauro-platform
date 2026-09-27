@@ -77,6 +77,12 @@ export function sealRevisionHandler(runtime: SourceRuntime): SealRevisionHandler
             if (!file) throw new DomainFailure("INTEGRITY_FAILURE", "a file of the bound selection is not visible");
             files.set(file.fileId, file);
             if (entry.disposition !== "INCLUDE") continue;
+            // the object inventory revokes a file whose accepted generation changed at the provider (D-FILE-1): that is the changed
+            // generation of step 6; any other revocation (an expired intake, an ended retention, a lost generation) is a revoked
+            // admission (decision D-CMD-9)
+            if (file.state === "ADMISSION_REVOKED" && file.revocationReason === "GENERATION_CHANGED") {
+              throw new DomainFailure("PRECONDITION_FAILED", "an included file's accepted generation changed after the evaluation", { reason: "GENERATION_CHANGED", ...current });
+            }
             if (file.state !== "ADMITTED" || !file.admitted) throw new DomainFailure("PRECONDITION_FAILED", "an included file's admission was revoked", { reason: "INPUT_NOT_ADMITTED", ...current });
             const counted = evaluation.files.find((f) => f.fileId === file.fileId);
             if (counted === undefined || counted.generation !== file.providerGeneration || counted.sha256 !== file.sha256 || counted.bytes !== file.bytes) {

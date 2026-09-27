@@ -25,8 +25,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.equal(readFileSync(DOCUMENT_PATH, "utf8"), serialize(expected));
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
-  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16) and the two
-  // operational probes
+  // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
+  // (N16), the seven source reads and the selection manifest intake (B07), and the two operational probes
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -35,6 +35,13 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/revisions/{revisionId} GetRevision",
+      "GET /api/v1/revisions/{revisionId}/inspection GetInspection",
+      "GET /api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId} GetSelectionManifest",
+      "GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview PreviewTable",
+      "GET /api/v1/revisions/{revisionId}/uploads ListUploads",
+      "GET /api/v1/uploads/{uploadId} GetUpload",
+      "GET /api/v1/uploads/{uploadId}/session GetUploadSession",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
@@ -44,6 +51,13 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/revisions CreateRevision",
+      "POST /api/v1/revisions/{revisionId}/seal SealRevision",
+      "POST /api/v1/revisions/{revisionId}/selection SelectInputTables",
+      "POST /api/v1/revisions/{revisionId}/selection-manifests SubmitSelectionManifest",
+      "POST /api/v1/revisions/{revisionId}/uploads ReserveUpload",
+      "POST /api/v1/uploads/{uploadId}/cancel CancelUpload",
+      "POST /api/v1/uploads/{uploadId}/complete CompleteUpload",
     ],
   );
   for (const command of sources.registryCommands.filter((c) => sources.application.SERVED_COMMAND_IDS.includes(c.id))) {
@@ -151,32 +165,48 @@ test("a registered route without a declared response contract and a stale docume
   assert.deepEqual(check({ document: stale }), ["apps/api/openapi.json is not the generated document (run pnpm run openapi:generate); it differs at /paths/~1api~1v1~1agencies/post/summary"]);
 });
 
-test("B07-F13: the source-lifecycle routes are documented from their contracts as planned operations — every specified command and route, never registered, never also served; a missing planned route, a registered planned route, a repeated operationId and a forbidden DTO member fail the check", () => {
-  const planned = committed["x-kauro-planned"];
-  const commands = Object.values(sources.application.B07_COMMANDS);
-  const routes = Object.values(sources.application.SOURCE_ROUTES);
-  assert.deepEqual(Object.keys(planned).sort(), [...commands.map((c) => `${c.method} ${c.path}`), ...routes.map((r) => `${r.method} ${r.path}`)].sort());
-  for (const spec of commands) {
-    const op = planned[`${spec.method} ${spec.path}`];
+test("B07-F13: the source-lifecycle routes are served and documented under paths from their contracts — every command, read and the selection manifest intake, none left planned; the planned mechanism stays for later packages: a planned operation that is registered, also served, repeats an operationId or exposes a forbidden member fails the check", () => {
+  const { application } = sources;
+  // B07 plans nothing any more (mandate B07-COMMANDS served every specified route)
+  assert.deepEqual(committed["x-kauro-planned"], {});
+  for (const spec of Object.values(application.B07_COMMANDS)) {
+    const op = committed.paths[spec.path][spec.method.toLowerCase()];
     assert.equal(op.operationId, spec.name);
-    assert.equal(op["x-kauro-package"], "B07");
-    const reply = sources.application.SOURCE_COMMAND_RESPONSES[spec.id];
-    const problemStatuses = sources.application.outcomesByStatus(sources.application.SOURCE_COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
+    assert.equal(op["x-kauro-command"], spec.id);
+    const reply = application.COMMAND_RESPONSES[spec.id];
+    const problemStatuses = application.outcomesByStatus(application.COMMAND_OUTCOMES[spec.id]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), [String(reply.status), ...problemStatuses].sort(), spec.id);
+    assert.ok(op.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"), spec.id);
   }
   // CompleteUpload answers the ACCEPTED envelope (completion remains asynchronous, D-RUN-1)
-  assert.deepEqual(planned["POST /api/v1/uploads/{uploadId}/complete"].responses["202"].content["application/json"].schema, { $ref: "#/components/schemas/AcceptedResponse" });
-  // a specified route missing from the document is not the generated document
-  const missing = clone(committed);
-  delete missing["x-kauro-planned"]["POST /api/v1/revisions/{revisionId}/seal"];
-  assert.ok(check({ document: missing }).some((f) => f.startsWith("apps/api/openapi.json is not the generated document")));
-  // a planned route the api registers must be served from paths
-  const registeredPlanned = [...inventory, { method: "POST", url: "/api/v1/revisions/:revisionId/seal", responses: inventory[0].responses }];
-  assert.ok(check({ inventory: registeredPlanned }).includes("planned route is registered: POST /api/v1/revisions/{revisionId}/seal (a served route is documented under paths)"));
-  const duplicate = clone(committed);
-  duplicate["x-kauro-planned"]["POST /api/v1/revisions/{revisionId}/seal"].operationId = "ApprovePlan";
-  assert.ok(check({ document: duplicate }).some((f) => f.startsWith("duplicate operationId ApprovePlan")));
-  const leaking = clone(committed);
-  leaking.components.schemas.UploadView.properties.sessionUri = { type: "string" };
-  assert.ok(check({ document: leaking }).some((f) => f.startsWith("DTO exposes a forbidden field: planned ") && f.includes("sessionUri")));
+  assert.deepEqual(committed.paths["/api/v1/uploads/{uploadId}/complete"].post.responses["202"].content["application/json"].schema, { $ref: "#/components/schemas/AcceptedResponse" });
+  for (const [operationId, route] of Object.entries(application.SOURCE_ROUTES)) {
+    const op = committed.paths[route.path][route.method.toLowerCase()];
+    assert.equal(op.operationId, operationId);
+    if (route.method === "GET") assert.equal(op["x-kauro-read"], true, operationId);
+  }
+  // the intake: no idempotency key (content-idempotent), 201 stored and 200 the same document again, the document schema as body
+  const intake = committed.paths["/api/v1/revisions/{revisionId}/selection-manifests"].post;
+  assert.equal(intake["x-kauro-intake"], true);
+  assert.ok(!intake.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"));
+  assert.deepEqual(intake.requestBody.content["application/json"].schema, { $ref: "#/components/schemas/SelectionManifestDocument" });
+  for (const status of ["200", "201"]) assert.deepEqual(intake.responses[status].content["application/json"].schema, { $ref: "#/components/schemas/SubmitSelectionManifestReply" });
+  // the planned mechanism (B09 plans its payment routes the same way): an operation planned where a served route stands
+  const seal = committed.paths["/api/v1/revisions/{revisionId}/seal"].post;
+  const planned = (operation) => {
+    const document = clone(committed);
+    document["x-kauro-planned"] = { "POST /api/v1/revisions/{revisionId}/seal": operation };
+    return check({ document }).filter((f) => !f.startsWith("apps/api/openapi.json is not the generated document"));
+  };
+  assert.deepEqual(planned({ ...clone(seal), operationId: "PlannedSeal" }), [
+    "planned route is registered: POST /api/v1/revisions/{revisionId}/seal (a served route is documented under paths)",
+    "planned route is also documented as served: POST /api/v1/revisions/{revisionId}/seal",
+  ]);
+  assert.ok(planned(clone(seal)).some((f) => f.startsWith("duplicate operationId SealRevision")));
+  const leaking = { ...clone(seal), operationId: "PlannedLeak", responses: { 200: { description: "leak", content: { "application/json": { schema: { type: "object", properties: { sessionUri: { type: "string" } } } } } } } };
+  assert.ok(planned(leaking).some((f) => f.startsWith("DTO exposes a forbidden field: planned ") && f.includes("sessionUri")));
+  // and a served source route that leaks is refused like any other (the bearer session URI never rides on progress)
+  const leakingView = clone(committed);
+  leakingView.components.schemas.UploadView.properties.sessionUri = { type: "string" };
+  assert.ok(check({ document: leakingView }).some((f) => f.startsWith("DTO exposes a forbidden field: GET /api/v1/uploads/{uploadId} ") && f.includes("sessionUri")));
 });
