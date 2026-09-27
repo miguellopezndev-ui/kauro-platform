@@ -1254,7 +1254,8 @@ extended M2's evidence-store fake with `findByDigest` (D-M3-B2). The route tests
 titles are `apps/api/test/cmd030-payment-webhook`, `cmd033-execute-refund`, `cmd034-reconcile-payment`, `b09-ledger` and
 `b09-fiscal`; what the payment service does beyond the thirty cases (the manual-10 admission of its routes, an edition without a
 payment service, the refund executor, the watchdog, the sweep, D-PAY-B6's completion query, D-AUTH-B3, the re-binder) is
-`apps/api/test/b09-payment-service.test.ts`. Two defects were found by those tests and fixed with them: the re-binder read the
+`apps/api/test/b09-payment-service.test.ts`, and the stage-1 obligation that FINANCE posts the movable balance a payload carries
+(D-LEDGER-B6) is `b09-ledger`'s "D-LEDGER-B6 through the FINANCE consumer: …" (a full refund after a kept fee, through the route). Two defects were found by those tests and fixed with them: the re-binder read the
 capture before any scope was adopted (D-M3-B6), and the watchdog rescheduled up to a millisecond before the database's deadline
 (D-M3-B7). The rows M3 demonstrates are restated in the case map as `(stage 2, M3: …)`: every clause through the routes and a real
 database, the provider-side facts from the labelled contract fakes, so each stays PARTIAL with only the live integration remaining

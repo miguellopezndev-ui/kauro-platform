@@ -148,8 +148,10 @@ changed-body same key, lost response, external uncertainty).
   (the manual-10 admission of the three payment routes — the matrix's "invalid schema" row of CMD030, CMD033 and CMD034 cites it —,
   an edition that binds no payment service, the PAYMENT_SERVICE refund executor and watchdog, the cancel-before-dispatch sweep,
   D-PAY-B6's completion query, D-AUTH-B3 through the column-scoped purchased-subject read, the PurchaseRebinder of D-QUOTE-B6),
-  `apps/api/test/b09-ledger.test.ts` :: "the payment dispatcher holds one lease per consumer: …" and `apps/api/test/b09-fiscal.test.ts`
-  :: "D-FISC-B6: …" (a blocked draft resolved by a later review).
+  `apps/api/test/b09-ledger.test.ts` :: "D-LEDGER-B6 through the FINANCE consumer: …" (the stage-1 carried obligation: a full refund
+  after a kept fee posts the movable balance its payload carries — the receivable ends at zero, the kept fee on PSP_AVAILABLE) and ::
+  "the payment dispatcher holds one lease per consumer: …", and `apps/api/test/b09-fiscal.test.ts` :: "D-FISC-B6: …" (a blocked draft
+  resolved by a later review).
 - The foundation's registry: `packages/persistence/test/aggregate-kinds.test.ts` :: "only the migration owner writes the registry:
   every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the event inserters (the request handlers; package B09's
   payment service) read it, and the owner can register but never rewrite or remove a kind" (FOUNDATION §4, extended by B09).

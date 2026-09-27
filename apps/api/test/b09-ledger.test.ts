@@ -6,10 +6,10 @@
 // fake's; actual statement fees are package B15's, R2-085).
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { ReconcilePaymentView, WebhookAck } from "@kauro/application";
+import type { ExecuteRefundView, ReconcilePaymentView, WebhookAck } from "@kauro/application";
 import { illustrativeProcessorFee } from "@kauro/domain";
 import { createPaymentDispatcher } from "../src/index.js";
-import { checkout, deliver, dispatch, paymentWorld, reconcile, rows, storeQuery, type PaymentWorld } from "./payment-support.js";
+import { approvedRefund, checkout, deliver, dispatch, execute, paid, paymentWorld, reconcile, rows, storeQuery, type PaymentWorld } from "./payment-support.js";
 import { completed } from "./support.js";
 
 let pw: PaymentWorld;
@@ -96,6 +96,35 @@ test("R2-078: the FINANCE consumer posts the provider-reported fee of a capture,
   const again = await finance.handle({ eventId: reported.completion.event_id as never, eventType: event.event_type, agencyId: event.agency_id as never, aggregateId: event.aggregate_id, aggregateVersion: Number(event.aggregate_version), payload: event.payload });
   assert.equal(again, "DUPLICATE");
   assert.equal(await entries(), before);
+});
+
+test("D-LEDGER-B6 through the FINANCE consumer: a full service refund executed after a fee the provider keeps takes the capture's movable balance from its receivable and the kept fee from the merchant's available balance — the receivable ends at exactly zero, never negative, and the entitlement is revoked", async () => {
+  const purchase = await paid(pw, "ledger-kept-fee");
+  // the provider reports its fee after the completion (capture.fee_observed.v1, the movable balance before it: the whole capture)
+  pw.paypal.updateCapture(purchase.providerCaptureId, { feeCents: 5_275n });
+  completed<ReconcilePaymentView>(await reconcile(pw, purchase.orderId, { observationRef: await storeQuery(pw, purchase.providerOrderId) }), 200);
+  // the whole service goes back through the service route (the provider keeps its fee)
+  const refundId = await approvedRefund(pw, purchase, 97_125n);
+  const executed = completed<ExecuteRefundView>(await execute(pw, refundId, { expectedVersion: 2 }), 200);
+  assert.equal(executed.data.refund.state, "COMPLETED");
+  const completion = (await rows<{ event_id: string; payload: Record<string, unknown> }>(pw, "SELECT event_id, payload FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'refund.completed.v1'", [refundId]))[0]!;
+  assert.deepEqual([completion.payload["fundsState"], completion.payload["movableBalanceCents"], completion.payload["serviceBasisAfterCents"]], ["UNKNOWN", 91850, 0], "the payload carries the movable balance before the return: the capture less the reported fee");
+  await dispatch(pw, "FINANCE");
+  // the return's set: the liability back, 91,850 from the capture's receivable, the kept 5,275 from the merchant's available balance
+  assert.deepEqual(await linesOf(completion.event_id), [
+    { account_code: "CONTRACT_LIABILITY", direction: "DEBIT", amount_cents: "97125", source_kind: "REFUND" },
+    { account_code: "PSP_RECEIVABLE", direction: "CREDIT", amount_cents: "91850", source_kind: "REFUND" },
+    { account_code: "PSP_AVAILABLE", direction: "CREDIT", amount_cents: "5275", source_kind: "REFUND" },
+  ]);
+  const across = async (account: string): Promise<bigint> => {
+    const r = await rows<{ n: string | null }>(pw, "SELECT sum(CASE WHEN direction = 'DEBIT' THEN amount_cents ELSE -amount_cents END)::text AS n FROM kauro.ledger_entries WHERE source_ref IN ($1, $2) AND account_code = $3", [purchase.captureId, refundId, account]);
+    return BigInt(r[0]?.n ?? "0");
+  };
+  assert.deepEqual(
+    [await across("PSP_RECEIVABLE"), await across("PSP_AVAILABLE"), await across("PROCESSOR_EXPENSE"), await across("CONTRACT_LIABILITY")],
+    [0n, -5_275n, 5_275n, 0n],
+  );
+  assert.deepEqual(await rows(pw, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [purchase.authorizationId]), [{ state: "REVOKED" }], "no service basis is left (D-REF-B5)");
 });
 
 test("the payment dispatcher holds one lease per consumer: a second dispatcher of FINANCE finds it HELD and claims nothing, and FISCAL is leased on its own", async () => {
