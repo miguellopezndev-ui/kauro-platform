@@ -4,7 +4,7 @@
 // codes against a port that exists only on an unmerged package's branch or starts from the pre-review head, every port a mandate
 // names exists on this branch, and every PLANNED citation of the case map names the mandate §14 gives its test file.
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -79,17 +79,19 @@ test("B09-N8: the implementation mandates are staged and self-contained — stag
   // the case map's planned citations name the mandate §14 gives their file
   const ownerOf = (file) =>
     /cmd0(28|29|31|32)-/.test(file) ? "M4" : /cmd0(30|33|34)-|b09-(ledger|fiscal)\.test/.test(file) ? "M3" : /b09-scenarios\.test/.test(file) ? "INT-2" : null;
-  let planned = 0;
+  // (a test its mandate has written is on the branch and cited as it is: its row no longer plans it, tools/test/b09-case-map.test.mjs)
+  let cited = 0;
   for (const line of caseMap.split(/\r?\n/)) {
     if (!/^\| (S\d{3}|R2-\d{3}|CMD\d{3}-(OK|DENY|RACE)) \|/.test(line)) continue;
     const files = [...line.matchAll(/`(apps\/api\/test\/[a-z0-9-]+\.test\.ts)`/g)].map((m) => m[1]);
     for (const file of files) {
       const owner = ownerOf(file);
       assert.ok(owner, `${file} has no owner in §14`);
+      cited += 1;
+      if (existsSync(join(root, file))) continue;
       assert.ok(line.includes(`PLANNED (${owner})`), `${line.slice(0, 20)}: ${file} is planned for ${owner}`);
-      planned += 1;
     }
     assert.doesNotMatch(line, /PLANNED \(M[12]\)/, `${line.slice(0, 20)}: stage-1 mandates write no command-level test`);
   }
-  assert.ok(planned > 0);
+  assert.ok(cited > 0);
 });
