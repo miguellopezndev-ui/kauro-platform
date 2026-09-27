@@ -13,6 +13,9 @@
  *    death there (the transport answers INTERNAL_ERROR), a pause keeps it at that point until the test releases it; no sleep
  *    synchronizes anything, and a lock wait is observed in pg_stat_activity.
  *
+ * A world may leave any of the payment collaborators to the edition (`unbound`): what the composition root binds when a deployment
+ * binds nothing (D-REQ-B1).
+ *
  * The purchases are the adapter-written fixtures of @kauro/persistence/testing (issueQuote, paidPurchase, activateAgency,
  * recordReviewedFiscalProfile) over a plan approved through the real CMD025 route; the api's clock can be moved forward to put a
  * price past its expiry without backdating any database row.
@@ -156,14 +159,28 @@ export interface ReadyQuote extends IssuedQuote {
   readonly revisionId: string;
 }
 
-export async function paymentsWorld(): Promise<PaymentsWorld> {
+/** A payment collaborator the world can leave to the edition (edition.ts commerceEdition: not bound, as a deployment runs; D-REQ-B1). */
+export type EditionCollaborator = "payment" | "provider" | "capacity" | "sources";
+
+export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator> } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
   const sources = createSourceAvailabilityFake({ clock });
   const verifier = createWebhookVerifierFake({ clock });
   const holds = new ProtocolHolds();
-  const w = await world({ clock, commerce: (h) => ({ payment: h.commerce, provider, capacity, sources, protocolHold: holds.hook }) });
+  // every collaborator the test binds replaces the edition's; one it leaves unbound stays the edition's (null)
+  const unbound = new Set(options.unbound ?? []);
+  const w = await world({
+    clock,
+    commerce: (h) => ({
+      ...(unbound.has("payment") ? {} : { payment: h.commerce }),
+      ...(unbound.has("provider") ? {} : { provider }),
+      ...(unbound.has("capacity") ? {} : { capacity }),
+      ...(unbound.has("sources") ? {} : { sources }),
+      protocolHold: holds.hook,
+    }),
+  });
   // the agency sells: ACTIVE, the platform's qualified routes, a reviewed fiscal profile recorded by a corporate owner
   await activateAgency(w.h, w.A);
   const route = await w.h.qualifiedPaymentRoute({ provider: provider.provider, environment: provider.environment, payee: provider.merchantId });

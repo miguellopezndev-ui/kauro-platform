@@ -130,3 +130,29 @@ test("B09 reads: an agency reads its quote with checkout readiness and the actio
   // a refund no stored operation names is NOT_FOUND to the corporate owner too
   assert.equal(outcome(w, await read(w, paymentRoutes.getRefundReview(ids.next()), pw.kora.token, null)), "404 NOT_FOUND -");
 });
+
+test("D-REQ-B1: the composition root binds the payment collaborators a deployment supplies and names the ones it does not — with none bound, as this edition deploys, checkout answers 503 CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (B08's admission unanswered); with the admission bound and still no provider adapter or payment service, CreatePaymentOrder answers 422 INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE; the quote shows no merchant route, nothing is written and no provider is called", async () => {
+  const deployments = [
+    { what: "the edition as deployed", unbound: ["payment", "provider", "capacity", "sources"], blockers: ["DELIVERY_CAPACITY_UNAVAILABLE", "PAYMENT_ROUTE_UNQUALIFIED"], answer: "503 CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE" },
+    { what: "B08's admission and B07's availability bound", unbound: ["payment", "provider"], blockers: ["PAYMENT_ROUTE_UNQUALIFIED"], answer: "422 INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE" },
+  ] as const;
+  for (const d of deployments) {
+    const edition = await paymentsWorld({ unbound: d.unbound });
+    try {
+      const { w } = edition;
+      const quote = await edition.readyQuote(`d-req-b1-${d.unbound.length}`);
+      // the read names the missing merchant route (no adapter, so no provider or environment to qualify) and, unbound, the capacity
+      const view = readData<QuoteView>(await read(w, paymentRoutes.getQuote(quote.quoteId), w.billing.token));
+      assert.deepEqual([view.checkoutReady, view.checkoutBlockers], [false, d.blockers], d.what);
+      const before = await edition.effects();
+      const reply = await call(w, { url: paymentRoutes.createPaymentOrder(quote.quoteId), token: w.billing.token, key: freshKey("d-req-b1"), body: { termsHash: quote.termsHash } });
+      assert.equal(outcome(w, reply), d.answer, `${d.what}: ${reply.text}`);
+      assert.deepEqual(await edition.effects(), before, `${d.what}: no quote acceptance, order, attempt, journal entry, event, fact or provider call`);
+      assert.equal(await w.count("payment_orders", "quote_id = $1", [quote.quoteId]), 0, d.what);
+      assert.equal(edition.provider.calls.length, 0, `${d.what}: the provider fake is not bound, and nothing reached it`);
+      assert.deepEqual(w.internalErrors, [], d.what);
+    } finally {
+      await edition.stop();
+    }
+  }
+});
