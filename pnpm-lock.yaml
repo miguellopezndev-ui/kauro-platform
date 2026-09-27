@@ -26,6 +26,9 @@ importers:
       '@kauro/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@kauro/data-plane':
+        specifier: workspace:*
+        version: link:../../packages/data-plane
       '@kauro/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -36,9 +39,6 @@ importers:
         specifier: 5.12.5
         version: 5.12.5
     devDependencies:
-      '@kauro/data-plane':
-        specifier: workspace:*
-        version: link:../../packages/data-plane
       '@types/node':
         specifier: 24.3.1
         version: 24.3.1
