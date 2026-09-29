@@ -25,7 +25,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.equal(readFileSync(DOCUMENT_PATH, "utf8"), serialize(expected));
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
-  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16) and the two
+  // the eight registry commands the api serves (B06 and CMD044), under their registry paths and names, the seven reads (the five
+  // manual-10 reads of N16 and the two support-case reads) and the two
   // operational probes
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
@@ -35,6 +36,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/projects/{projectId}/support-cases ListSupportCases",
+      "GET /api/v1/support-cases/{caseId} GetSupportCase",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
@@ -44,6 +47,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/support-cases CreateSupportCase",
     ],
   );
   for (const command of sources.registryCommands.filter((c) => sources.application.SERVED_COMMAND_IDS.includes(c.id))) {
