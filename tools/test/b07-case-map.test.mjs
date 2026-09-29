@@ -93,9 +93,11 @@ function sectionOf(caseId) {
 
 const STATUS_ROW = /^\| ([A-Z0-9-]+) \| (EXECUTED_LOCAL|PARTIAL|MISSING) \| (\d+) EXECUTED_LOCAL, (\d+) SIMULATED — [^|]+ \| ([^|]+) \| ([^|]+) \|$/;
 
-test("B07 case map: the status table of b07/stage-1 names every case once, with the counts of its section's EXECUTED_LOCAL and SIMULATED rows, every mandate of its SPECIFIED rows, and the status those rows imply", () => {
+test("B07 case map: the status table of b07/integration names every case once, with the counts of its section's EXECUTED_LOCAL and SIMULATED rows, no SPECIFIED row left once both stage-2 mandates are merged, and the status those rows imply", () => {
   const b07 = registry("program.json").find((p) => p.id === "B07");
-  const start = text.indexOf("\n## Status at `b07/stage-1`\n");
+  // b07/integration merges every mandate of design §15: a row still SPECIFIED would name a test no merged mandate wrote
+  assert.deepEqual(text.split("\n").filter((l) => /^\s*- SPECIFIED \(/.test(l)), [], "no row is SPECIFIED on b07/integration");
+  const start = text.indexOf("\n## Status at `b07/integration`\n");
   assert.ok(start >= 0, "the case map has its status section");
   const end = text.indexOf("\n## ", start + 1);
   const section = text.slice(start, end < 0 ? undefined : end).split("\n");
