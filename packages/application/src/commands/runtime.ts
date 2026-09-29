@@ -78,6 +78,24 @@ export interface CommandOutcome<View> {
 }
 
 /**
+ * The outcome of a command whose work continues after its answer (10 "Responses and safe errors": long work returns 202 with
+ * operationId, current state, status URL and allowed polling guidance; B07 D-RUN-1: CompleteUpload). The journal records the
+ * 202 and exactly these members, so a replay answers the same ACCEPTED envelope.
+ */
+export interface AcceptedOutcome {
+  readonly status: 202;
+  readonly accepted: { readonly operationId: string; readonly state: string; readonly statusPath: string; readonly pollAfterSeconds: number };
+  readonly resourceKind: string;
+  readonly resourceId: string;
+}
+
+/** A unit of work of the factory a command runs in: B06's `run`, or the source lifecycle's `runSource` (B07). */
+export type UnitOfWorkRunner<U extends UnitOfWork> = <T>(context: TenantContext | IdentityContext, work: (uow: U) => Promise<T>) => Promise<T>;
+
+/** How a command's journaled view names the version of the aggregate it edited or created (the COMPLETED envelope's `version`). */
+export type VersionOfView = (view: unknown) => number;
+
+/**
  * Reason tokens of ALLOW security facts (08 "Audit events and retention": access grants and ownership changes are durable
  * facts; a high-impact action authorized by a fresh step-up crosses a trust boundary that has its audit event).
  */
@@ -101,8 +119,12 @@ class ReplayedResult<View> {
   constructor(readonly status: 200 | 201, readonly view: View, readonly version: number) {}
 }
 
+class ReplayedAccepted {
+  constructor(readonly accepted: AcceptedOutcome["accepted"]) {}
+}
+
 /** A DENY decision of the authorizer, thrown so the unit of work rolls back and recognised afterwards as a decision. */
-class AuthorizationDenied extends DomainFailure {
+export class AuthorizationDenied extends DomainFailure {
   constructor(command: CommandId, readonly decision: Extract<AuthorizationDecision, { kind: "DENY" }>) {
     super(decision.code, `${command} denied: ${decision.reason}`, { reason: decision.reason });
     this.name = "AuthorizationDenied";
@@ -127,14 +149,14 @@ export function identityOf<Body>(spec: CommandSpec<Body>, envelope: CommandEnvel
   };
 }
 
-function resultOf<View>(failure: DomainFailure, correlationId: string): CommandResult<View> {
+export function resultOf<View>(failure: DomainFailure, correlationId: string): CommandResult<View> {
   const problem = problemOf(failure, correlationId);
   if (CONFLICT_CODES.has(failure.code)) return { kind: "CONFLICT", problem };
   if (UNAVAILABLE_CODES.has(failure.code)) return { kind: "UNAVAILABLE", problem };
   return { kind: "REJECTED", problem };
 }
 
-function versionOfView(view: unknown): number {
+export function versionOfView(view: unknown): number {
   // every B06 view carries the version of the aggregate the command edited or created, at its top level or as `.plan`,
   // `.client` or `.agency` (the aggregate the resource link names)
   if (typeof view === "object" && view !== null) {
@@ -150,6 +172,16 @@ function versionOfView(view: unknown): number {
   throw new DomainFailure("INTEGRITY_FAILURE", "journaled response carries no aggregate version");
 }
 
+/** The members of a journaled ACCEPTED answer, as recorded (a replay answers exactly them). */
+function acceptedOf(body: unknown): AcceptedOutcome["accepted"] {
+  const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const { operationId, state, statusPath, pollAfterSeconds } = b;
+  if (typeof operationId !== "string" || typeof state !== "string" || typeof statusPath !== "string" || typeof pollAfterSeconds !== "number") {
+    throw new DomainFailure("INTEGRITY_FAILURE", "journaled ACCEPTED answer lacks its operation, state, status path or polling guidance");
+  }
+  return { operationId, state, statusPath, pollAfterSeconds };
+}
+
 /**
  * Runs one command: binds the context, authorizes access, reserves the journal entry (or replays the journaled result of the
  * first execution under the same identity and digest), checks the assurance a new execution needs, executes `body` on the
@@ -160,6 +192,23 @@ export async function runCommand<Body, View>(
   runtime: CommandRuntime,
   envelope: CommandEnvelope<Body>,
   body: (uow: UnitOfWork, ctx: CommandContext) => Promise<CommandOutcome<View>>,
+): Promise<CommandResult<View>> {
+  return runCommandIn<Body, View, UnitOfWork>(spec, runtime, envelope, (context, work) => runtime.unitOfWork.run(context, work), body);
+}
+
+/**
+ * The pipeline of `runCommand` (access decision, journal reserve or replay, assurance, the body, journal commit) in the unit of
+ * work `run` opens — B06's `run`, or `runSource` for the source lifecycle (B07), whose store lives on the same connection and
+ * context — for a body that answers COMPLETED (200/201) or ACCEPTED (202, journaled and replayed as such). `versionOf` reads the
+ * COMPLETED envelope's version from a journaled view on replay (B06's heuristic by default).
+ */
+export async function runCommandIn<Body, View, U extends UnitOfWork>(
+  spec: CommandSpec<Body>,
+  runtime: CommandRuntime,
+  envelope: CommandEnvelope<Body>,
+  run: UnitOfWorkRunner<U>,
+  body: (uow: U, ctx: CommandContext) => Promise<CommandOutcome<View> | AcceptedOutcome>,
+  versionOf: VersionOfView = versionOfView,
 ): Promise<CommandResult<View>> {
   const correlationId = envelope.correlationId;
   let context: TenantContext | IdentityContext;
@@ -180,7 +229,7 @@ export async function runCommand<Body, View>(
   };
 
   try {
-    const completed = await runtime.unitOfWork.run(context, async (uow): Promise<CommandOutcome<View> | ReplayedResult<View>> => {
+    const completed = await run(context, async (uow): Promise<CommandOutcome<View> | AcceptedOutcome | ReplayedResult<View> | ReplayedAccepted> => {
       // 1–7. who may act here, decided before anything tenant-scoped is written: the membership's transition lock is held until
       //      this unit of work ends (D-TX-2), so a concurrent suspension, revocation or role change is ordered before or after it
       const access = await runtime.authorizer.authorize(uow, request);
@@ -190,10 +239,11 @@ export async function runCommand<Body, View>(
       const reservation = await uow.journal.reserve(identity, digest, correlationId);
       if (reservation.kind === "REPLAY") {
         const status = reservation.entry.responseStatus;
-        if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) {
+        if ((status !== 200 && status !== 201 && status !== 202) || reservation.entry.responseBody === undefined) {
           throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
         }
-        return new ReplayedResult<View>(status, reservation.entry.responseBody as View, versionOfView(reservation.entry.responseBody));
+        if (status === 202) return new ReplayedAccepted(acceptedOf(reservation.entry.responseBody));
+        return new ReplayedResult<View>(status, reservation.entry.responseBody as View, versionOf(reservation.entry.responseBody));
       }
       if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();
       if (reservation.kind === "PENDING") {
@@ -231,28 +281,46 @@ export async function runCommand<Body, View>(
       // first execution, a concurrent duplicate and a retry after a lost response answer with the same durable bytes
       const committed = await uow.journal.commit(reservation.entryId, {
         responseStatus: outcome.status,
-        responseBody: outcome.view,
+        responseBody: outcome.status === 202 ? outcome.accepted : outcome.view,
         resourceKind: outcome.resourceKind,
         resourceId: outcome.resourceId,
       });
       if (committed.state !== "COMMITTED" || committed.responseStatus !== outcome.status || committed.responseBody === undefined) {
         throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
       }
+      if (outcome.status === 202) return { ...outcome, accepted: acceptedOf(committed.responseBody) };
       return { ...outcome, view: committed.responseBody as View };
     });
+    if (completed instanceof ReplayedAccepted) return { kind: "ACCEPTED", status: 202, ...completed.accepted };
     if (completed instanceof ReplayedResult) {
       return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: true };
     }
+    if (completed.status === 202) return { kind: "ACCEPTED", status: 202, ...completed.accepted };
     return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: false };
   } catch (e) {
-    if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
-    if (e instanceof AuthorizationDenied) {
-      await recordDenialFact(runtime, context, spec.id, correlationId, e, e.decision.policyVersion);
-    } else if (DENIAL_CODES.has(e.code)) {
-      await recordDenialFact(runtime, context, spec.id, correlationId, e, AUTHORIZATION_POLICY_VERSION);
-    }
-    return resultOf<View>(e, correlationId);
+    return settleCommandFailure<View>(runtime, context, spec.id, correlationId, e);
   }
+}
+
+/**
+ * The answer of a command whose unit of work threw: an unexpected exception (or an INTERNAL_ERROR the adapter classified)
+ * propagates to the transport; a DomainFailure becomes CONFLICT, REJECTED or UNAVAILABLE, and an authorization denial — a DENY of
+ * the authorizer or a handler's NOT_AUTHORIZED / ASSURANCE_REQUIRED — is first recorded as a durable fact in its own transaction.
+ */
+export async function settleCommandFailure<View>(
+  runtime: Pick<CommandRuntime, "unitOfWork" | "clock">,
+  context: TenantContext | IdentityContext,
+  action: string,
+  correlationId: CorrelationId,
+  e: unknown,
+): Promise<CommandResult<View>> {
+  if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
+  if (e instanceof AuthorizationDenied) {
+    await recordDenialFact(runtime, context, action, correlationId, e, e.decision.policyVersion);
+  } else if (DENIAL_CODES.has(e.code)) {
+    await recordDenialFact(runtime, context, action, correlationId, e, AUTHORIZATION_POLICY_VERSION);
+  }
+  return resultOf<View>(e, correlationId);
 }
 
 /**

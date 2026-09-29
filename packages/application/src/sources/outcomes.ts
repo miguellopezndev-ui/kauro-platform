@@ -1,15 +1,15 @@
 /**
  * The closed outcome catalogues of the source lifecycle's routes (B07; docs/design/B07-upload-source-lifecycle.md §10), composed
- * from the pipeline's shared entries exactly as B06 composes its own (api/outcomes, decision D-OUT-1 of B06): every problem a route
- * may answer is one entry — code, reason, field codes, whether it carries the current safe version. When mandate B07-COMMANDS
- * serves these routes they join COMMAND_OUTCOMES / READ_OUTCOMES (the api's send guard refuses any other problem, the OpenAPI
- * document lists them per status, the state/command/event matrix is generated from them); until then they are the specified
- * contract the handlers are tested against.
+ * from the pipeline's shared entries exactly as B06 composes its own (api/outcome-kit, decision D-OUT-1 of B06): every problem a
+ * route may answer is one entry — code, reason, field codes, whether it carries the current safe version. Since mandate
+ * B07-COMMANDS served these routes they are part of COMMAND_OUTCOMES / READ_OUTCOMES / INTAKE_OUTCOMES (api/outcomes): the api's
+ * send guard refuses any other problem, the OpenAPI document lists them per status and the state/command/event matrix is
+ * generated from them.
  *
  * The reasons are the FAILURE_REASONS of @kauro/domain; the codes are manual 10's stable codes plus B06's PRECONDITION_FAILED,
  * ADMISSION_LIMITED and INTERNAL_ERROR (B06 D-ERR-1..3). No entry names a bucket, an object name, a session URI or a raw value.
  */
-import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcomes.js";
+import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { B07CommandId } from "./contracts.js";
 
 const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED } = OUTCOME_BLOCKS;
@@ -94,6 +94,9 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
     UPLOADS_UNRESOLVED,
     outcome("COMMAND", "PRECONDITION_FAILED", "INPUT_NOT_ADMITTED", "an included file's admission was revoked (its intake expired or its generation was lost): no executable sealed revision is left", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "GENERATION_CHANGED", "an included file's accepted generation, digest or length is not the one the evaluation counted", { current: "ALWAYS" }),
+    // design §11 CMD017 step 8 (D-RET-3): the first seal of the bytes is fourteen days old or more — the record would be born
+    // expired; reuse after the window needs a new upload (decision D-CMD-6: the specified answer the catalogue had omitted)
+    outcome("COMMAND", "PRECONDITION_FAILED", "REUSE_NOT_AVAILABLE", "a reused file's bytes were first sealed fourteen days ago or more: their hard cap is behind this seal, so reuse needs a new upload (D-RET-3)", { current: "ALWAYS" }),
   ],
 });
 
@@ -117,6 +120,10 @@ export const SOURCE_COMMAND_OUTCOMES: Readonly<Record<B07CommandId, ReadonlyArra
 
 /** The auxiliary routes of the source lifecycle, by operation id (contracts.ts SOURCE_ROUTES carries method, path and role). */
 export type SourceRouteId = "SubmitSelectionManifest" | "GetSelectionManifest" | "GetRevision" | "GetInspection" | "ListUploads" | "GetUpload" | "GetUploadSession" | "PreviewTable";
+/** The document intake among them (a POST that stores a document, D-SEL-2). */
+export type SourceIntakeId = "SubmitSelectionManifest";
+/** The reads among them (GET, served as manual-10 reads). */
+export type SourceReadId = Exclude<SourceRouteId, SourceIntakeId>;
 
 const SELECTION_DOCUMENT: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("COMMAND", "INVALID_REQUEST", "SELECTION_MANIFEST_MISMATCH", "the document names another revision than the path"),
@@ -124,6 +131,9 @@ const SELECTION_DOCUMENT: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("COMMAND", "INVALID_REQUEST", "HIDDEN_SHEET_NOT_ACKNOWLEDGED", "a hidden worksheet is included without its explicit acknowledgement"),
   outcome("COMMAND", "INVALID_REQUEST", "PARSER_CHOICE_INVALID", "an included table's parser choice does not fit its kind"),
   outcome("COMMAND", "INVALID_REQUEST", "PROJECTION_INVALID", "a projection or association names what the document does not include"),
+  // a referenced-entity projection without the key the agency confirmed is a defect of the document itself (03 "Count the correct
+  // population"): the intake refuses it with CMD016's own reason (decision D-CMD-6: the catalogue completed where it was silent)
+  outcome("COMMAND", "INVALID_REQUEST", "PROJECTION_KEY_NOT_CONFIRMED", "a referenced-entity projection names no key the agency confirmed"),
   outcome("COMMAND", "INVALID_REQUEST", "SELECTED_COLUMNS_LIMIT", "a table selects more than 800 columns"),
 ]);
 
@@ -144,7 +154,7 @@ const ROUTE_SPECIFIC: Readonly<Record<SourceRouteId, ReadonlyArray<ProblemOutcom
   ListUploads: [...EVERY_READ, ...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the revision")],
   GetUpload: [...EVERY_READ, ...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload")],
   /** The protected session read: the requester only, the command's role (D-SESSION-2). */
-  GetUploadSession: [...EVERY_READ, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload"), NOT_OWNED],
+  GetUploadSession: [...EVERY_READ, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the upload")],
   /** 10 "A preview endpoint returns a bounded authorized sample with safe display escaping and no shared caching" (D-SAPI-7). */
   PreviewTable: [
     ...EVERY_READ,

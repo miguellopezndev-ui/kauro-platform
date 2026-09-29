@@ -73,6 +73,14 @@ export async function retentionSweeper(w: World, agency: AgencyFixture): Promise
   return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
 }
 
+/**
+ * A control-plane unit of work of the source lifecycle (B07 design §12): the control plane bound to one agency (D-CTRL-1), as its
+ * consumers and sweepers write, held open for as long as a RACE test needs (e.g. UPLOAD_INSPECTION holding the revision row).
+ */
+export async function boundControlWriter(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
+  return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
+}
+
 /** Waits until the writer's connection is blocked on a lock while running a statement containing `fragment`; throws otherwise. */
 export function waitForWriterLockWait(w: World, writer: HeldTransaction, fragment: string): Promise<number> {
   return waitForLockWait(w.h.oracle, writer.applicationName, fragment);

@@ -14,6 +14,7 @@ import {
   ACCEPTED_RESPONSE_SCHEMA_ID,
   APPROVE_PLAN,
   ARCHIVE_CLIENT,
+  B06_COMMANDS,
   COMMAND_RESPONSES,
   CREATE_AGENCY,
   CREATE_CLIENT,
@@ -152,7 +153,12 @@ test("R23: every response schema is closed and none declares a forbidden member;
 });
 
 test("R23: the validator compiles the COMPLETED envelope of every served command, the ACCEPTED envelope and the declared replies of operational routes; operational routes are declared and checked like command routes", () => {
-  for (const command of SERVED_COMMAND_IDS) assert.ok(validator.knownSchemaIds.includes(commandResponseSchemaId(command)), command);
+  // every served command that completes has its COMPLETED envelope; the one command answered ACCEPTED (B07 CMD014, D-RUN-1)
+  // validates its 202 with the shared ACCEPTED envelope and has none of its own
+  for (const command of SERVED_COMMAND_IDS) {
+    assert.equal(validator.knownSchemaIds.includes(commandResponseSchemaId(command)), COMMAND_RESPONSES[command].view !== null, command);
+  }
+  assert.deepEqual(SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view === null), ["CMD014"]);
   assert.ok(validator.knownSchemaIds.includes(ACCEPTED_RESPONSE_SCHEMA_ID));
   // the operational routes of this edition are the two probes (14 "Monitoring and service health"); the default validator
   // compiles exactly their declared replies, and a probe's reply is checked like a command's
@@ -253,7 +259,8 @@ test("R23 / R29: the COMPLETED reply of each of the seven handlers satisfies its
   const other = world();
   const revised = await createB06Handlers(other.runtime, collaborators(other)).CMD023.execute(envelope(REVISE_PLAN, other.operator, { key: "response-schema-cmd023", agencyId: other.agencyId, path: { planId: other.planId }, body: { expectedVersion: 4, decisionPatchArtifactRef: "0192f3a4-5b6c-7d8e-9f01-23456789abcd" } }));
   replies.push(["CMD023", envelopeOf("CMD023", revised)]);
-  assert.deepEqual(replies.map(([c]) => c).sort(), [...SERVED_COMMAND_IDS].sort());
+  // the seven B06 handlers (B07's six are exercised through the real route in apps/api/test/cmd012..cmd017)
+  assert.deepEqual(replies.map(([c]) => c).sort(), Object.keys(B06_COMMANDS).sort());
   for (const [command, reply] of replies) assert.deepEqual(validator.validate(commandResponseSchemaId(command), reply), { kind: "VALID", value: reply }, command);
 
   // R29: a consumer holding only the DTO recomputes the approval hash (the preimage members, nothing else)

@@ -12,22 +12,23 @@
 //                                     or a planned operation (x-kauro-planned) is registered as a route, is also documented as
 //                                     served, repeats an operationId or declares a forbidden member
 //
-// Sources (nothing is written by hand): the served commands come from the provenance-verified registry commands.json (path,
-// method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their request schemas, the
-// response views (derived from the registry contract bundle), the envelopes, the Problem document, the manual-10 reads
-// (READ_ROUTES, re-check finding N16) and the operational routes come from @kauro/application — the very objects the api's
+// Sources (nothing is written by hand): the served commands — B06's seven and B07's six — come from the provenance-verified
+// registry commands.json (path, method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their
+// request schemas, the response views (derived from the registry contract bundle), the envelopes, the Problem document, the reads
+// (READ_ROUTES: the manual-10 reads of re-check finding N16 and B07's source reads), the selection manifest intake
+// (SOURCE_INTAKE_ROUTES, B07 D-SEL-2) and the operational routes come from @kauro/application — the very objects the api's
 // validator compiles and its send guard validates with. The routes
 // are the ones the composition root actually registers: tools/openapi.mjs builds the api with `assembleApi` over the real pg
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
 // never connected, and the check asserts that it opened no connection.
 //
-// Planned operations (package B07, docs/design/B07-upload-source-lifecycle.md §9.5; finding B07-F13): the source-lifecycle routes
-// are specified with their request schemas, closed response schemas and outcome catalogues before their handlers exist. They are
-// generated from the same application contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths":
-// the check proves no planned route is registered (a registered route must be documented under "paths"), and a specified route
-// missing from the document fails the generated-document comparison; when mandate B07-COMMANDS serves a route it moves into the
-// served inventory and out of the planned list. (Package B09 plans its payment routes the same way; the integrator keeps one copy
-// of this mechanism and both packages' planned blocks.)
+// Planned operations (package B07, docs/design/B07-upload-source-lifecycle.md §9.5; finding B07-F13): a route specified with its
+// request schema, closed response schemas and outcome catalogue before its handler exists is generated from the same application
+// contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths": the check proves no planned route is
+// registered (a registered route must be documented under "paths") or also served, and a specified route missing from the document
+// fails the generated-document comparison. Mandate B07-COMMANDS served every B07 route, so they moved into "paths" and B07 plans
+// nothing any more; the mechanism stays (the planned block is empty) for the packages that plan their routes the same way (B09's
+// payment routes: the integrator keeps this one copy of the mechanism and their planned block).
 //
 // Requires the workspace to be built (pnpm run build); the root "verify" script runs it after the build and the tests.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -99,19 +100,16 @@ function refsOf(schema, into = new Set()) {
 /** Every schema the validator compiles for replies and requests, by id, with the definitions they reference. */
 export function runtimeSchemas(sources) {
   const { application, bundle, operationalRoutes } = sources;
+  // the served replies of every route, B06's and B07's alike (one build: the views, the envelopes, the intake's STORED envelope)
   const responses = application.buildResponseSchemas(bundle, operationalRoutes);
-  // package B07: the planned source routes' closed schemas, derived under the same rules (they never shadow a served one)
-  const source = application.buildSourceResponseSchemas(bundle, new Set(Object.keys(responses.defs)), application.SOURCE_ROUTES);
-  for (const id of Object.keys(source.roots)) if (id in responses.roots) throw new Error(`the B07 schema ${id} collides with a served one`);
-  for (const name of Object.keys(source.defs)) if (name in responses.defs) throw new Error(`the B07 view ${name} collides with a served one`);
-  const byId = { ...responses.roots, ...source.roots, Problem: application.PROBLEM_SCHEMA };
+  const byId = { ...responses.roots, Problem: application.PROBLEM_SCHEMA };
   for (const [command, schema] of Object.entries(application.REQUEST_SCHEMAS)) byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   for (const [command, schema] of Object.entries(application.SOURCE_REQUEST_SCHEMAS)) {
-    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B07 request schema of ${command} collides with a served one`);
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B07 request schema of ${command} collides with another one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   }
   byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
-  const defs = { ...bundle.$defs, ...responses.defs, ...source.defs };
+  const defs = { ...bundle.$defs, ...responses.defs };
   return { byId, defs };
 }
 
@@ -203,9 +201,11 @@ export function generateOpenApi(sources) {
 
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
+  // the served commands' specs: B06's seven and B07's six (mandate B07-COMMANDS)
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
-    const spec = application.B06_COMMANDS[command.id];
+    const spec = specs[command.id];
     if (!spec) throw new Error(`${command.id} has a declared response but no command spec`);
     if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
       throw new Error(`${command.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
@@ -215,6 +215,15 @@ export function generateOpenApi(sources) {
     addComponent(`${command.name}Request`, byId[requestId], requestId);
     const responses = {};
     for (const [status, declared] of Object.entries(contract.declared)) {
+      if (declared.schemaId === application.ACCEPTED_RESPONSE_SCHEMA_ID) {
+        // an ACCEPTED command (B07 CompleteUpload, D-RUN-1): the shared envelope, added once below
+        responses[status] = {
+          description: "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
+          headers: REPLY_HEADERS,
+          content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
+        };
+        continue;
+      }
       addComponent(`${command.name}Completed`, byId[declared.schemaId], declared.schemaId);
       responses[status] = {
         description: `COMPLETED: ${command.effect}`,
@@ -251,7 +260,8 @@ export function generateOpenApi(sources) {
   const missing = [...served].filter((id) => !registryCommands.some((c) => c.id === id));
   if (missing.length > 0) throw new Error(`served commands absent from the registry: ${missing.join(", ")}`);
 
-  // the manual-10 reads (N16): not registry commands; their paths, operation ids and authority come from READ_ROUTES
+  // the reads — the manual-10 reads (N16) and B07's source reads: not registry commands; their paths, operation ids and authority
+  // come from READ_ROUTES
   for (const spec of Object.values(application.READ_ROUTES)) {
     const contract = application.readRouteResponses(spec.operationId);
     const schemaId = application.readResponseSchemaId(spec.operationId);
@@ -283,86 +293,39 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // package B07: the planned source-lifecycle routes (see the header), generated from the application contracts, keyed "METHOD path"
-  const planned = {};
-  for (const spec of Object.values(application.B07_COMMANDS)) {
-    const command = registryCommands.find((c) => c.id === spec.id);
-    if (!command) throw new Error(`${spec.id} is planned but absent from the registry`);
-    if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
-      throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
-    }
-    if (served.has(spec.id)) continue;
-    const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
-    addComponent(`${spec.name}Request`, byId[requestId], requestId);
-    const reply = application.SOURCE_COMMAND_RESPONSES[spec.id];
-    const responses = {};
-    if (reply.view === null) {
-      responses[String(reply.status)] = {
-        description: "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
-        headers: REPLY_HEADERS,
-        content: { "application/json": { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
-      };
-    } else {
-      const replyId = application.sourceCommandResponseSchemaId(spec.id);
-      addComponent(`${spec.name}Completed`, byId[replyId], replyId);
-      responses[String(reply.status)] = { description: `COMPLETED: ${command.effect}`, headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } } };
-    }
-    Object.assign(responses, problemResponses(application.SOURCE_COMMAND_OUTCOMES[spec.id]));
-    planned[`${spec.method} ${spec.path}`] = {
-      operationId: spec.name,
-      summary: `${spec.id} ${spec.name}`,
-      description: `Precondition: ${command.precondition}\n\nEffect: ${command.effect}\n\nFailure: ${command.failure}`,
-      "x-kauro-command": spec.id,
-      "x-kauro-role": spec.role,
-      "x-kauro-scope": spec.scope,
-      "x-kauro-idempotency": command.idempotency,
-      "x-kauro-gate": command.gate,
-      "x-kauro-cases": command.testIds ?? [],
-      "x-kauro-package": "B07",
-      security: [{ bearerAuth: [] }],
-      parameters: [
-        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
-        { $ref: "#/components/parameters/IdempotencyKey" },
-        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
-        { $ref: "#/components/parameters/CorrelationId" },
-      ],
-      requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
-      responses,
-    };
-  }
+  // the document intakes (B07 D-SEL-2): the selection manifest, stored once per content — 201 stored, 200 the same document again
   addComponent("SelectionManifestDocument", byId[application.SELECTION_MANIFEST_SCHEMA_ID], application.SELECTION_MANIFEST_SCHEMA_ID);
-  for (const [operationId, route] of Object.entries(application.SOURCE_ROUTES)) {
-    const schemaId = application.sourceRouteResponseSchemaId(operationId);
-    addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
-    const intake = route.method === "POST";
-    const reply = { headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${operationId}Reply` } } } };
-    planned[`${route.method} ${route.path}`] = {
-      operationId,
-      summary: `${operationId} (${route.view})`,
-      description: `Authority: ${route.authority}`,
-      ...(intake ? { "x-kauro-intake": true } : { "x-kauro-read": true }),
-      "x-kauro-role": route.role,
-      "x-kauro-scope": "AGENCY_HEADER",
-      "x-kauro-package": "B07",
-      security: [{ bearerAuth: [] }],
-      parameters: [
-        ...pathParameters(route.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
-        { $ref: "#/components/parameters/AgencySelector" },
-        ...(operationId === "ListUploads" ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
-        { $ref: "#/components/parameters/CorrelationId" },
-      ],
-      ...(intake ? { requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}SelectionManifestDocument` } } } } } : {}),
-      responses: {
-        ...(intake
-          ? {
-              200: { description: "STORED: the same document was already stored for this revision (created false; content-idempotent, D-SEL-2)", ...reply },
-              201: { description: "STORED: the document is stored (created true)", ...reply },
-            }
-          : { [String(route.status)]: { description: `READ: ${route.view}`, ...reply } }),
-        ...problemResponses(application.SOURCE_ROUTE_OUTCOMES[operationId]),
+  for (const spec of Object.values(application.SOURCE_INTAKE_ROUTES)) {
+    if (spec.schemaId !== application.SELECTION_MANIFEST_SCHEMA_ID) throw new Error(`${spec.operationId} admits a document schema this generator does not document`);
+    const contract = application.intakeRouteResponses(spec.operationId);
+    const schemaId = application.intakeResponseSchemaId(spec.operationId);
+    addComponent(`${spec.operationId}Reply`, byId[schemaId], schemaId);
+    const reply = (description) => ({ description, headers: REPLY_HEADERS, content: { [contract.declared["201"].contentType]: { schema: { $ref: `${COMPONENTS}${spec.operationId}Reply` } } } });
+    paths[spec.path] = {
+      ...(paths[spec.path] ?? {}),
+      [spec.method.toLowerCase()]: {
+        operationId: spec.operationId,
+        summary: spec.summary,
+        description: `Authority: ${spec.authority}`,
+        "x-kauro-intake": true,
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
+          ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+          { $ref: "#/components/parameters/CorrelationId" },
+        ],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}SelectionManifestDocument` } } } },
+        responses: {
+          200: reply("STORED: the same document was already stored for this revision (created false; content-idempotent, D-SEL-2)"),
+          201: reply("STORED: the document is stored (created true)"),
+          ...problemResponses(contract.outcomes),
+        },
       },
     };
   }
+
+  // planned operations (see the header): none since mandate B07-COMMANDS served the B07 routes; the block and its check remain
+  const planned = {};
 
   for (const route of operationalRoutes) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);

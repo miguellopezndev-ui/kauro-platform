@@ -26,6 +26,9 @@ importers:
       '@kauro/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@kauro/data-plane':
+        specifier: workspace:*
+        version: link:../../packages/data-plane
       '@kauro/domain':
         specifier: workspace:*
         version: link:../../packages/domain

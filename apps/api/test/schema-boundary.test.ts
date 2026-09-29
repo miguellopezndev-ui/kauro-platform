@@ -15,7 +15,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { EndClientView, KnownSchemaId, ProjectView } from "@kauro/application";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, commandResponseSchemaId, operationalResponseSchemaId, readResponseSchemaId, requestSchemaId } from "@kauro/application";
+import {
+  ACCEPTED_RESPONSE_SCHEMA_ID,
+  COMMAND_RESPONSES,
+  INTAKE_OPERATION_IDS,
+  OPERATIONAL_ROUTES,
+  READ_OPERATION_IDS,
+  REQUEST_SCHEMA_IDS,
+  SELECTION_MANIFEST_SCHEMA_ID,
+  SERVED_COMMAND_IDS,
+  SOURCE_REQUEST_SCHEMA_IDS,
+  commandResponseSchemaId,
+  intakeResponseSchemaId,
+  operationalResponseSchemaId,
+  readResponseSchemaId,
+  requestSchemaId,
+} from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import { asProblem, call, completed, effectCounts, ids, outcome, routes, sha, world, type World } from "./support.js";
@@ -84,13 +99,18 @@ test("the validator the api composes is closed: exactly the contract names, the 
   // the response schema ids: the COMPLETED envelope of each served command, the ACCEPTED envelope and the declared replies of
   // the operational routes — application-owned schemas like the request ones (api/response-schemas)
   const responseIds = [
-    ...SERVED_COMMAND_IDS.map(commandResponseSchemaId),
+    // every served command that completes (B07's CompleteUpload answers the ACCEPTED envelope, D-RUN-1)
+    ...SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId),
     ACCEPTED_RESPONSE_SCHEMA_ID,
     ...OPERATIONAL_ROUTES.flatMap((r) => Object.keys(r.responses).map((s) => operationalResponseSchemaId(r.operationId, s))),
-    // the READ envelopes of the manual-10 reads (N16)
+    // the READ envelopes of the manual-10 reads (N16) and of the source reads (B07)
     ...READ_OPERATION_IDS.map(readResponseSchemaId),
+    // the STORED envelope of the selection manifest intake (B07 D-SEL-2)
+    ...INTAKE_OPERATION_IDS.map(intakeResponseSchemaId),
   ];
-  const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, ...responseIds, "Problem"].sort();
+  // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID];
+  const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(Object.keys(w.validator).sort(), ["knownSchemaIds", "validate"], "validate and the closed id list: nothing compiles or registers a schema");

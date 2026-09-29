@@ -263,6 +263,39 @@ export interface SelectionEvaluatorPort {
   evaluate(input: SelectionEvaluationInput): Promise<SelectionEvaluationOutcome>;
 }
 
+// --- table preview (the bounded sample of an admitted table; @kauro/data-plane) ---------------------------------------------------
+
+/**
+ * One preview request (decision D-SAPI-7): the admitted generation streamed through the storage port, the admitted digest and
+ * length the bytes must have, the table by ordinal, the inspection limits and the scratch the parse runs in.
+ */
+export interface TablePreviewRequest {
+  readonly open: () => AsyncIterable<Uint8Array>;
+  readonly sha256: Sha256Hex;
+  readonly bytes: number;
+  readonly format: DeclaredFormat;
+  readonly ordinal: number;
+  readonly limits: InspectionLimits;
+  readonly scratchDir: string;
+}
+
+/** The bounded sample: at most 20 rows of at most 50 cells of at most 200 characters, null for an empty cell. */
+export interface TablePreviewResult {
+  readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly columnCount: number;
+  readonly truncated: boolean;
+}
+
+/**
+ * The platform's own bounded preview reader (mandate B07-DATA-PLANE's IsolatedTablePreviewReader: it re-verifies the admitted
+ * digest and length and parses in its isolated child, D-ISO-1). Not a provider: always real, in tests too. PreviewTable (design
+ * §9.1) reads an admitted table through it after its unit of work (no transaction spans a provider read or a parse, §5).
+ */
+export interface TablePreviewPort {
+  readonly version: string;
+  preview(request: TablePreviewRequest): Promise<TablePreviewResult>;
+}
+
 // --- session vault -----------------------------------------------------------------------------------------------------------
 
 /** Additional authenticated data binding a sealed session reference to exactly one upload, requester and issuance attempt. */

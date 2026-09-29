@@ -16,14 +16,17 @@ import type { FieldError } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
 import { HEADERS } from "./envelope.js";
-import { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
+import { COMMAND_OUTCOMES, INTAKE_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
 import { problemOf, type Problem } from "./problems.js";
 import {
+  ACCEPTED_RESPONSE_SCHEMA_ID,
   COMMAND_RESPONSES,
   OPERATIONAL_ROUTES,
   commandResponseSchemaId,
+  intakeResponseSchemaId,
   operationalResponseSchemaId,
   readResponseSchemaId,
+  type IntakeOperationId,
   type OperationalRoute,
   type ReadOperationId,
   type ServedCommandId,
@@ -54,12 +57,16 @@ export const PROBLEM_RESPONSE: DeclaredResponse = Object.freeze({ contentType: H
  */
 export const UNROUTED_RESPONSES: RouteResponses = Object.freeze({ operationId: "unrouted", declared: Object.freeze({}), problem: PROBLEM_RESPONSE, outcomes: null });
 
-/** The declared replies of a served command route: its COMPLETED status and schema, problems otherwise. */
+/**
+ * The declared replies of a served command route: its COMPLETED status and schema — or, for a command whose completion remains
+ * asynchronous (CMD014, B07 D-RUN-1), 202 and the ACCEPTED envelope — and problems otherwise.
+ */
 export function commandRouteResponses(command: ServedCommandId, operationId: string): RouteResponses {
   const success = COMMAND_RESPONSES[command];
+  const schemaId = success.view === null ? ACCEPTED_RESPONSE_SCHEMA_ID : commandResponseSchemaId(command);
   return Object.freeze({
     operationId,
-    declared: Object.freeze({ [String(success.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId: commandResponseSchemaId(command) }) }),
+    declared: Object.freeze({ [String(success.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId }) }),
     problem: PROBLEM_RESPONSE,
     outcomes: COMMAND_OUTCOMES[command],
   });
@@ -72,6 +79,20 @@ export function readRouteResponses(operationId: ReadOperationId): RouteResponses
     declared: Object.freeze({ "200": Object.freeze({ contentType: HEADERS.contentType, schemaId: readResponseSchemaId(operationId) }) }),
     problem: PROBLEM_RESPONSE,
     outcomes: READ_OUTCOMES[operationId],
+  });
+}
+
+/**
+ * The declared replies of a served document intake (B07 D-SEL-2): 201 when this request stored the document, 200 when the same
+ * document was already stored — both the STORED envelope — and problems from its catalogue otherwise.
+ */
+export function intakeRouteResponses(operationId: IntakeOperationId): RouteResponses {
+  const stored = Object.freeze({ contentType: HEADERS.contentType, schemaId: intakeResponseSchemaId(operationId) });
+  return Object.freeze({
+    operationId,
+    declared: Object.freeze({ "200": stored, "201": stored }),
+    problem: PROBLEM_RESPONSE,
+    outcomes: INTAKE_OUTCOMES[operationId],
   });
 }
 

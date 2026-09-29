@@ -7,20 +7,26 @@ import { test } from "node:test";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import type { ContractSchemaBundle } from "../src/index.js";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, COMMAND_RESPONSES, INTAKE_OPERATION_IDS, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, SERVED_COMMAND_IDS, SOURCE_REQUEST_SCHEMA_IDS, intakeResponseSchemaId, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas, the 3 declared replies of the operational routes, the 5 read replies and Problem, and nothing else", () => {
+test("the validator compiles exactly the 73 contracts, the 13 request schemas and the selection manifest document, the 12 COMPLETED envelopes and ACCEPTED, the 3 declared replies of the operational routes, the 12 read replies, the intake reply and Problem, and nothing else", () => {
   const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.keys(route.responses).map((status) => operationalResponseSchemaId(route.operationId, status)));
   assert.equal(operationalIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
-  assert.equal(readIds.length, 5, "the five manual-10 reads (N16)");
-  const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds];
-  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + responseIds.length + 1);
+  assert.equal(readIds.length, 12, "the five manual-10 reads (N16) and the seven source reads (B07 design §9.1)");
+  const completedIds = SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId);
+  assert.equal(completedIds.length, 12, "every served command but CMD014, answered ACCEPTED (B07 D-RUN-1)");
+  const intakeIds = INTAKE_OPERATION_IDS.map(intakeResponseSchemaId);
+  assert.equal(intakeIds.length, 1, "the selection manifest intake (B07 D-SEL-2)");
+  const responseIds = [...completedIds, ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...intakeIds];
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID];
+  assert.equal(requestIds.length, 14, "seven B06 and six B07 request schemas, and the selection manifest document");
+  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + requestIds.length + responseIds.length + 1);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);
-  for (const id of REQUEST_SCHEMA_IDS) assert.ok(validator.knownSchemaIds.includes(id), id);
+  for (const id of requestIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   for (const id of responseIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   assert.ok(validator.knownSchemaIds.includes("Problem"));
   assert.throws(() => validator.validate("customer-target-metadata" as never, {}), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");

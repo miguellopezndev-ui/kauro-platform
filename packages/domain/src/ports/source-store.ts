@@ -244,6 +244,13 @@ export interface SourceFileRepository {
    */
   admit(file: Omit<SourceFileRecord, "state" | "admitted" | "revokedAt" | "revocationReason" | "version" | "admittedAt">, tables: ReadonlyArray<DetectedTableRow>): Promise<SourceFileRecord>;
   get(fileId: SourceFileId): Promise<SourceFileRecord | null>;
+  /**
+   * The file read after its transition lock (shared), held until the unit of work ends (D-FILE-1; design §11 CMD017 step 8: "each
+   * included file read after its transition lock"): a revocation issued meanwhile (it takes the exclusive half) waits for this unit
+   * of work and is then refused by the database if this one sealed the file; one committed first is what this read returns, so the
+   * seal answers INPUT_NOT_ADMITTED instead of meeting the database's refusal (mandate B07-COMMANDS, decision D-CMD-7).
+   */
+  lockShared(fileId: SourceFileId): Promise<SourceFileRecord | null>;
   /** Files admitted from this revision's own uploads. */
   listForRevision(revisionId: RevisionId): Promise<ReadonlyArray<SourceFileRecord>>;
   /** Admitted files of the project that a new revision may reuse (registry edge previously_admitted_inputs_selected). */

@@ -14,8 +14,9 @@
 // registry's state_transitions.json (via @kauro/contracts STATE_MACHINES, provenance-verified) and commands.json/cases.json, the
 // platform machines of @kauro/domain (EndClient, Project; since B07 the source-lifecycle machines UploadSession, StoredObject,
 // SourceFile, RetentionRecord), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and their outcome catalogues of
-// @kauro/application (and the specified B07 commands and routes with theirs), the transition seeds of the migrations, the events each handler publishes (read
-// from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
+// @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the source reads and the selection
+// manifest intake — the transition seeds of the migrations, the events each handler publishes (read from its source), and the api
+// test sources the applicability rows cite. Requires the workspace to be built.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -234,6 +235,22 @@ const common = {
   "external uncertainty": "NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer",
 };
 const ROLE_MATRIX = ["role-matrix.test.ts", "N17: every served command against every role"];
+const SOURCE_ROLE_MATRIX = ["source-role-matrix.test.ts", "every source-lifecycle command against every role"];
+
+/**
+ * The mutations a B07 command meets in its own file (B07 case map): the duplicate, the changed body under one key and the lost
+ * response are its RACE test's (the replay, IDEMPOTENCY_CONFLICT, a crash before or after COMMIT); the invalid schema is the shared
+ * admission of every served route. External uncertainty: the command reaches no provider (CMD013, which does, has its own cell).
+ */
+function sourceCommon(file) {
+  return {
+    "duplicate request": [[file, "RACE: "]],
+    "changed-body same key": [[file, "RACE: "]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [[file, "RACE: "]],
+    "external uncertainty": "NOT_APPLICABLE: the command reaches no provider; every effect is rows of one database transaction, and its outbox rows are dispatched later by the control plane's consumers (mandate B07-CONTROL), whose provider uncertainty is theirs (STORAGE_LIFECYCLE records an UNCERTAIN cancellation and reconciles it)",
+  };
+}
 
 export const APPLICABILITY = {
   CMD001: {
@@ -286,6 +303,51 @@ export const APPLICABILITY = {
     "wrong agency": [["cmd026-withdraw-approval.test.ts", "DENY: VIEWER → 403; another APPROVER → 403 NOT_APPROVAL_CONTROLLER; foreign → 404"]],
     "stale version": [["cmd026-withdraw-approval.test.ts", "RACE: two withdrawals → one 200, one 409"]],
   },
+  // the source lifecycle (B07, mandate B07-COMMANDS): each command's own OK / DENY / RACE tests (docs/design/B07-case-map.md), the
+  // role matrix of the six commands, and the shared schema admission of every served route
+  CMD012: {
+    ...sourceCommon("cmd012-create-revision.test.ts"),
+    "legitimate state": [["cmd012-create-revision.test.ts", "OK: an OPERATOR replaces the project's SEALED revision"], ["cmd012-create-revision.test.ts", "OK: replacing a mutable revision cancels it"]],
+    "wrong role": [["cmd012-create-revision.test.ts", "DENY: VIEWER → 403 ROLE_INSUFFICIENT"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [["cmd012-create-revision.test.ts", "DENY: VIEWER → 403 ROLE_INSUFFICIENT; foreign project → 404"], SOURCE_ROLE_MATRIX],
+    "stale version": [["cmd012-create-revision.test.ts", "RACE: two CreateRevision calls on one project version → one 201, one 409 STALE_VERSION"]],
+  },
+  CMD013: {
+    ...sourceCommon("cmd013-reserve-upload.test.ts"),
+    "legitimate state": [["cmd013-reserve-upload.test.ts", "OK: an OPERATOR reserves 1 MB on a DRAFT revision"]],
+    "wrong role": [["cmd013-reserve-upload.test.ts", "DENY: VIEWER → 403"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [["cmd013-reserve-upload.test.ts", "DENY: VIEWER → 403; foreign revision → 404"], SOURCE_ROLE_MATRIX],
+    "stale version": [["cmd013-reserve-upload.test.ts", "DENY: VIEWER → 403"]],
+    "external uncertainty": [["cmd013-reserve-upload.test.ts", "RACE: identical retry → the same reservation and the session re-delivered"], ["cmd014-complete-upload.test.ts", "DENY: another member's upload → 403 UPLOAD_NOT_OWNED; RESERVED → 409 SESSION_NOT_ISSUED"]],
+  },
+  CMD014: {
+    ...sourceCommon("cmd014-complete-upload.test.ts"),
+    "legitimate state": [["cmd014-complete-upload.test.ts", "OK: the requester reports completion → 202 ACCEPTED"]],
+    "wrong role": [["cmd014-complete-upload.test.ts", "DENY: another member's upload → 403 UPLOAD_NOT_OWNED"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [SOURCE_ROLE_MATRIX],
+    "stale version": "NOT_APPLICABLE: CompleteUpload carries no expectedVersion (registry fields: providerCompletionRef); it is idempotent by upload and claim (D-SAPI-5) and serializes with CancelUpload on the revision row — RACE of cmd014-complete-upload.test.ts",
+  },
+  CMD015: {
+    ...sourceCommon("cmd015-cancel-upload.test.ts"),
+    "legitimate state": [["cmd015-cancel-upload.test.ts", "OK: the requester cancels an UPLOADING upload"]],
+    "wrong role": [["cmd015-cancel-upload.test.ts", "DENY: another member → 403 UPLOAD_NOT_OWNED"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [["cmd015-cancel-upload.test.ts", "DENY: another member → 403 UPLOAD_NOT_OWNED; ADMITTED → 409 UPLOAD_ADMITTED; already cancelled → 409 UPLOAD_TERMINAL; foreign → 404"], SOURCE_ROLE_MATRIX],
+    "stale version": [["cmd015-cancel-upload.test.ts", "RACE: two cancels on one version → one 200, one 409 STALE_VERSION"]],
+  },
+  CMD016: {
+    ...sourceCommon("cmd016-select-input-tables.test.ts"),
+    "legitimate state": [["cmd016-select-input-tables.test.ts", "OK: an OPERATOR stores a selection manifest"]],
+    "wrong role": [["cmd016-select-input-tables.test.ts", "DENY: a manifest made against another inventory"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [["cmd016-select-input-tables.test.ts", "DENY: a manifest made against another inventory"], SOURCE_ROLE_MATRIX],
+    "stale version": [["cmd016-select-input-tables.test.ts", "RACE: two selections on one version → one 200, one 409 STALE_VERSION"]],
+  },
+  CMD017: {
+    ...sourceCommon("cmd017-seal-revision.test.ts"),
+    "legitimate state": [["cmd017-seal-revision.test.ts", "OK: an OPERATOR seals a READY_TO_SEAL revision"]],
+    "wrong role": [["cmd017-seal-revision.test.ts", "DENY: a revoked admission → 409 INPUT_NOT_ADMITTED"], SOURCE_ROLE_MATRIX],
+    "wrong agency": [["cmd017-seal-revision.test.ts", "DENY: a revoked admission → 409 INPUT_NOT_ADMITTED"], SOURCE_ROLE_MATRIX],
+    "stale version": [["cmd017-seal-revision.test.ts", "RACE: two seals on one version → one 200, one 409"]],
+  },
 };
 
 // --- sources --------------------------------------------------------------------------------------------------------------------
@@ -305,10 +367,24 @@ export async function loadMatrixSources() {
     }
   }
   // the events each served command's handler publishes
-  const HANDLER_FILES = { CMD001: "create-agency.ts", CMD009: "create-client.ts", CMD010: "archive-client.ts", CMD011: "create-project.ts", CMD023: "revise-plan.ts", CMD025: "approve-plan.ts", CMD026: "withdraw-approval.ts" };
+  const HANDLER_FILES = {
+    CMD001: "commands/handlers/create-agency.ts",
+    CMD009: "commands/handlers/create-client.ts",
+    CMD010: "commands/handlers/archive-client.ts",
+    CMD011: "commands/handlers/create-project.ts",
+    CMD023: "commands/handlers/revise-plan.ts",
+    CMD025: "commands/handlers/approve-plan.ts",
+    CMD026: "commands/handlers/withdraw-approval.ts",
+    CMD012: "sources/handlers/create-revision.ts",
+    CMD013: "sources/handlers/reserve-upload.ts",
+    CMD014: "sources/handlers/complete-upload.ts",
+    CMD015: "sources/handlers/cancel-upload.ts",
+    CMD016: "sources/handlers/select-input-tables.ts",
+    CMD017: "sources/handlers/seal-revision.ts",
+  };
   const published = {};
   for (const [id, file] of Object.entries(HANDLER_FILES)) {
-    const text = readFileSync(join(root, "packages", "application", "src", "commands", "handlers", file), "utf8");
+    const text = readFileSync(join(root, "packages", "application", "src", ...file.split("/")), "utf8");
     published[id] = [...new Set([...text.matchAll(/eventType: "([a-z_.0-9]+)"/g)].map((m) => m[1]))];
   }
   // test titles of the api package, by file
@@ -328,11 +404,14 @@ export async function loadMatrixSources() {
     commands,
     eventTypes: new Set(domain.EVENT_TYPES),
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
-    specs: application.B06_COMMANDS,
+    specs: { ...application.B06_COMMANDS, ...application.B07_COMMANDS },
     outcomes: application.COMMAND_OUTCOMES,
     reads: application.READ_ROUTES,
     readOutcomes: application.READ_OUTCOMES,
     readViews: application.READ_RESPONSES,
+    intakes: application.SOURCE_INTAKE_ROUTES,
+    intakeOutcomes: application.INTAKE_OUTCOMES,
+    intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
     served: new Set(application.SERVED_COMMAND_IDS),
@@ -385,6 +464,12 @@ export function checkSources(s, owners = EDGE_OWNERS, applicability = APPLICABIL
   // the specified source-lifecycle commands and routes (B07): each has its closed outcome catalogue before it is served
   for (const id of Object.keys(s.sourceSpecs)) if (!s.sourceOutcomes[id]) failures.push(`${id} is specified but has no outcome catalogue`);
   for (const id of Object.keys(s.sourceRoutes)) if (!s.sourceRouteOutcomes[id]) failures.push(`the source route ${id} has no outcome catalogue`);
+  // since mandate B07-COMMANDS every specified B07 command is served, every source read is a served read and the intake is served
+  for (const id of Object.keys(s.sourceSpecs)) if (!s.served.has(id)) failures.push(`${id} is specified but not served`);
+  for (const [id, route] of Object.entries(s.sourceRoutes)) {
+    if (route.method === "GET" && !(id in s.reads)) failures.push(`the source read ${id} is not a served read`);
+    if (route.method === "POST" && !(id in s.intakes)) failures.push(`the source intake ${id} is not a served intake`);
+  }
   return failures;
 }
 
@@ -395,15 +480,15 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06 served, B07 specified)");
+  line("# State, command and event matrix (B06 and B07 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
   line("`commands.json` and `cases.json` (provenance-verified, `@kauro/contracts`), the platform machines of `@kauro/domain` (EndClient");
   line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07) and its event registry");
   line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
-  line("(`B06_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard) and the specified B07 commands and routes with theirs");
-  line("(`B07_COMMANDS`, `SOURCE_COMMAND_OUTCOMES`, `SOURCE_ROUTES`, `SOURCE_ROUTE_OUTCOMES`; served by mandate B07-COMMANDS), the transition");
+  line("(`B06_COMMANDS` and `B07_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
+  line("intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
@@ -461,35 +546,16 @@ export function generateMatrix(s) {
     line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
   }
   line();
-  line("## 2a. The specified source-lifecycle commands and routes (B07)");
+  line("## 2a. The source-lifecycle routes (B07)");
   line();
-  line("Specified by `docs/design/B07-upload-source-lifecycle.md` with their closed outcome catalogues; served by mandate B07-COMMANDS,");
-  line("when they join the served commands above (the api's send guard, the OpenAPI document and sections 3 and 4 then cover them).");
-  line();
-  line("| Command | Route | Role | Scope | Step-up | Edges | Success |");
-  line("| --- | --- | --- | --- | --- | --- | --- |");
-  for (const [id, spec] of Object.entries(s.sourceSpecs)) {
-    const edges = [];
-    for (const [machine, table] of Object.entries(EDGE_OWNERS)) for (const [event, o] of Object.entries(table)) if (o.command === id) edges.push(`${machine} ${event}`);
-    const success = id === "CMD014" ? "202 ACCEPTED (B06 envelope)" : id === "CMD012" || id === "CMD013" ? "201 COMPLETED" : "200 COMPLETED";
-    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${success} |`);
-  }
+  line("Specified by `docs/design/B07-upload-source-lifecycle.md` and served by mandate B07-COMMANDS: the six commands are rows of section 2");
+  line("with their catalogues in section 3 and their applicability in section 4; the reads are rows of section 5; the selection manifest");
+  line("intake (D-SEL-2: content-idempotent, no journal entry) is section 5a.");
   line();
   line("| Route | Operation | Role | Success view | Authority |");
   line("| --- | --- | --- | --- | --- |");
   for (const [id, route] of Object.entries(s.sourceRoutes)) line(`| ${route.method} ${cell(route.path)} | ${id} | ${route.role} | ${route.status} ${route.view} | ${cell(route.authority)} |`);
   line();
-  for (const [id, outcomes] of [...Object.entries(s.sourceOutcomes), ...Object.entries(s.sourceRouteOutcomes)]) {
-    const title = s.sourceSpecs[id] ? `${id} ${s.sourceSpecs[id].name}` : id;
-    line(`### ${title} (specified)`);
-    line();
-    line("| Status | Code | Reason | Field codes | current | Layer | Meaning |");
-    line("| --- | --- | --- | --- | --- | --- | --- |");
-    for (const [status, entries] of s.outcomesByStatus(outcomes)) {
-      for (const e of entries) line(`| ${status} | ${e.code} | ${e.reason ?? "—"} | ${e.fieldCodes ? e.fieldCodes.join(", ") : "—"} | ${e.current ? e.current.toLowerCase() : "—"} | ${e.layer} | ${cell(e.meaning)} |`);
-    }
-    line();
-  }
   line("## 3. Error catalogue");
   line();
   line("Every problem a served command may answer (`COMMAND_OUTCOMES`). The api's send guard refuses any other problem on the route");
@@ -552,6 +618,26 @@ export function generateMatrix(s) {
     }
     line();
   }
+  line("## 5a. The document intakes (B07 D-SEL-2)");
+  line();
+  line("A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was");
+  line("already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live");
+  line("membership after its transition lock) plus the intake's own role; every denial is a durable fact under its action token.");
+  line();
+  line("| Intake | Route | Scope | Reply view | Action token | Authority |");
+  line("| --- | --- | --- | --- | --- | --- |");
+  for (const spec of Object.values(s.intakes)) line(`| ${spec.operationId} | POST ${cell(spec.path)} | ${spec.scope} | ${s.intakeViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
+  line();
+  for (const spec of Object.values(s.intakes)) {
+    line(`### ${spec.operationId}`);
+    line();
+    line("| Status | Code | Reason | Field codes | current | Layer | Meaning |");
+    line("| --- | --- | --- | --- | --- | --- | --- |");
+    for (const [status, entries] of s.outcomesByStatus(s.intakeOutcomes[spec.operationId])) {
+      for (const e of entries) line(`| ${status} | ${e.code} | ${e.reason ?? "—"} | ${e.fieldCodes ? e.fieldCodes.join(", ") : "—"} | ${e.current ? e.current.toLowerCase() : "—"} | ${e.layer} | ${cell(e.meaning)} |`);
+    }
+    line();
+  }
   return out.join("\n") + "\n";
 }
 
@@ -588,7 +674,7 @@ async function main() {
     return;
   }
   const edges = s.machines.reduce((n, m) => n + m.transitions.length + 1, 0);
-  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands and ${Object.keys(s.reads).length} reads with their catalogues, every applicability citation resolved)\n`);
+  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands, ${Object.keys(s.reads).length} reads and ${Object.keys(s.intakes).length} intake with their catalogues, every applicability citation resolved)\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

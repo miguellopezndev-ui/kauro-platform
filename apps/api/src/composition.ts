@@ -20,16 +20,16 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, CommandRuntime, SchemaValidator } from "@kauro/application";
-import { createB06Handlers, createReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import type { B06Collaborators, B07Collaborators, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
+import { createB06Handlers, createB07Handlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
-import type { Clock, Environment, IdGenerator, RandomBytes, UnitOfWorkFactory } from "@kauro/domain";
+import type { Clock, Environment, IdGenerator, RandomBytes, SourceUnitOfWorkFactory } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
 import { applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
+import { noCommercialAuthorizationsBeforePayments, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
@@ -47,7 +47,8 @@ export const READINESS_STATEMENT_TIMEOUT_MS = 2_000;
 
 export interface DatabaseHandle {
   readonly pool: KauroPool;
-  readonly unitOfWork: UnitOfWorkFactory;
+  /** The unit-of-work factory of the runtime pool; it also opens source units of work (runSource, B07). */
+  readonly unitOfWork: SourceUnitOfWorkFactory;
   /** The migrations applied at start, or null when KAURO_DB_MIGRATE_ON_START is off. */
   readonly migrations: ApplyResult | null;
   /** The highest migration version this build ships (readiness compares the database's ledger with the shipped set). */
@@ -144,24 +145,27 @@ export function writeNotReady(correlationId: string, response: ReadinessResponse
 
 /**
  * Hands the cause of every CAPACITY_UNAVAILABLE outcome of a unit of work to `report` by correlation id, then lets the outcome
- * continue unchanged: the answer stays a retryable 503, and the operator can tell a database outage from capacity pressure.
+ * continue unchanged: the answer stays a retryable 503, and the operator can tell a database outage from capacity pressure. Both
+ * kinds of unit of work are reported alike (`run` and the source lifecycle's `runSource`).
  */
-export function reportingUnavailability(inner: UnitOfWorkFactory, report: (correlationId: string, cause: unknown) => void): UnitOfWorkFactory {
+export function reportingUnavailability(inner: SourceUnitOfWorkFactory, report: (correlationId: string, cause: unknown) => void): SourceUnitOfWorkFactory {
+  const reported = async <T>(correlationId: string, work: () => Promise<T>): Promise<T> => {
+    try {
+      return await work();
+    } catch (e) {
+      if (e instanceof DomainFailure && e.code === "CAPACITY_UNAVAILABLE") report(correlationId, e.cause ?? e);
+      throw e;
+    }
+  };
   return {
-    async run(context, work, options) {
-      try {
-        return await inner.run(context, work, options);
-      } catch (e) {
-        if (e instanceof DomainFailure && e.code === "CAPACITY_UNAVAILABLE") report(context.correlationId, e.cause ?? e);
-        throw e;
-      }
-    },
+    run: (context, work, options) => reported(context.correlationId, () => inner.run(context, work, options)),
+    runSource: (context, work, options) => reported(context.correlationId, () => inner.runSource(context, work, options)),
   };
 }
 
 export interface ApiAssembly {
   readonly environment: Environment;
-  readonly unitOfWork: UnitOfWorkFactory;
+  readonly unitOfWork: SourceUnitOfWorkFactory;
   readonly authenticator: Authenticator;
   /** The database side of readiness and the build's schema version (the DatabaseHandle). */
   readonly database: Pick<DatabaseHandle, "readiness" | "codeSchemaVersion">;
@@ -170,6 +174,13 @@ export interface ApiAssembly {
    * a deployment of this edition binds nothing and answers PLAN_SERVICES_UNAVAILABLE for CMD023/CMD025 (I-INT-2).
    */
   readonly collaborators?: Partial<B06Collaborators>;
+  /**
+   * Collaborators of the source lifecycle that replace the edition defaults (B07 design §11; edition.ts): the provider adapters
+   * with the application origin sessions are bound to, the preview reader, the commercial-scope inspector. The acceptance tests
+   * bind the labelled contract fakes of @kauro/application/testing (SIMULATED) here; a deployment of this edition binds none
+   * (D-SAPI-6) and B15 binds the real adapters.
+   */
+  readonly sources?: Partial<B07Collaborators>;
   /** The closed validator; loaded from the contract bundle when absent (a test passes the instance it asserts on). */
   readonly validator?: SchemaValidator;
   readonly clock?: Clock;
@@ -191,11 +202,14 @@ export interface ApiAssembly {
   readonly limits?: HttpLimits;
 }
 
-/** Binds the authorizer, the seven command handlers, the five reads and the HTTP server over an open unit-of-work factory. */
+/**
+ * Binds the authorizer, the thirteen command handlers (B06's seven, B07's six), the twelve reads, the selection manifest intake and
+ * the HTTP server over an open unit-of-work factory.
+ */
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
-  const runtime: CommandRuntime = {
+  const runtime: SourceRuntime = {
     unitOfWork: reportingUnavailability(assembly.unitOfWork, assembly.onUnavailable ?? writeUnavailable),
     authorizer: createAuthorizer({ clock, assurance: createAssuranceVerifier() }),
     clock,
@@ -209,12 +223,20 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ...unavailablePlanServices(),
     ...assembly.collaborators,
   };
+  const sources: B07Collaborators = {
+    providers: null,
+    preview: null,
+    commercialScope: noCommercialAuthorizationsBeforePayments,
+    ...assembly.sources,
+  };
   const cursorKey = assembly.cursorKey ?? systemRandom(32);
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
+  const readRuntime: SourceReadRuntime = { unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey };
   return createApiServer({
     environment: assembly.environment,
-    handlers: createB06Handlers(runtime, collaborators),
-    reads: createReadHandlers({ unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey }),
+    handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
+    reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
+    intakes: createSourceIntakeHandlers(readRuntime),
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
     validator: assembly.validator ?? loadContractSchemas(),

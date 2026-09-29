@@ -19,8 +19,15 @@
  *   nonretryable outcome "until the subject or implementation changes"; 07 "Acceptance obligations" — "a downstream team must
  *   not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" — a local result is never
  *   presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md.
+ * - `noCommercialAuthorizationsBeforePayments` (B07): CMD012's impact map names the live commercial authorizations bound to the
+ *   revision it replaces (docs/design/B07-upload-source-lifecycle.md §17 item 7). CommercialAuthorization is the payments
+ *   package's aggregate (B09; 07 "Aggregate ownership"): no table of it exists before B09, so no authorization can be bound and the
+ *   set is empty by construction — the edition's production answer, not a stand-in. B09 binds its reader through the same port.
+ * - The source-lifecycle provider adapters (object storage, session vault) and the preview reader are not bound by this edition
+ *   (B07 D-SAPI-6): the composition root leaves them null, so every source command and read that needs one answers
+ *   INTEGRITY_FAILURE / SOURCE_SERVICES_UNAVAILABLE and reserves nothing; B15 binds the real adapters.
  */
-import type { ActiveWorkInspector, ArtifactResolver, CommercialConsequenceInspector, DisclosureComposer, ExternalActionInspector, PlanPatchCompiler } from "@kauro/application";
+import type { ActiveWorkInspector, ArtifactResolver, CommercialConsequenceInspector, CommercialScopeInspector, DisclosureComposer, ExternalActionInspector, PlanPatchCompiler } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 
 export const openProjectsInspector: ActiveWorkInspector = {
@@ -37,6 +44,12 @@ export const noExternalActionsInThisEdition: ExternalActionInspector = {
 
 export const noCommercialConsequencesInThisEdition: CommercialConsequenceInspector = {
   async unreconciledForPlan() {
+    return [];
+  },
+};
+
+export const noCommercialAuthorizationsBeforePayments: CommercialScopeInspector = {
+  async authorizationsBoundTo() {
     return [];
   },
 };

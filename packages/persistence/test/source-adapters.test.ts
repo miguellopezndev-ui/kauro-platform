@@ -886,6 +886,9 @@ test("the upload lifecycle through every UploadSessionRepository, SessionSecretR
     const file = await uow.sources.files.get(admitted.fileId);
     assert.ok(file);
     assert.deepEqual([file.state, file.admitted, file.version, file.storageRef, file.providerGeneration, file.bytes], ["ADMITTED", true, 1, admitted.acceptedObjectId, admitted.acceptedGeneration, bytes]);
+    // the same record after the file's shared transition lock (CMD017 reads each included file so, D-CMD-7)
+    assert.deepEqual(await uow.sources.files.lockShared(admitted.fileId), file);
+    assert.equal(await uow.sources.files.lockShared("0190c7a2-0000-7000-8000-0000000000ff" as SourceFileId), null);
     assert.deepEqual((await uow.sources.files.listForRevision(p.revisionId)).map((f) => f.fileId), [admitted.fileId]);
     assert.deepEqual((await uow.sources.files.listReusable(p.projectId)).map((f) => f.fileId), [admitted.fileId]);
     const [table] = await uow.sources.files.tables(admitted.fileId);

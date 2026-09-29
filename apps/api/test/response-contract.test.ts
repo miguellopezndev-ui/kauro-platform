@@ -157,12 +157,29 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/plans/:planId/revisions", "RevisePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD023" } }],
       ["POST", "/api/v1/plans/:planId/approve", "ApprovePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD025" } }],
       ["POST", "/api/v1/plans/:planId/withdraw", "WithdrawApproval", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD026" } }],
+      // the six source-lifecycle commands (B07 design §11); CompleteUpload answers the shared ACCEPTED envelope (D-RUN-1)
+      ["POST", "/api/v1/projects/:projectId/revisions", "CreateRevision", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD012" } }],
+      ["POST", "/api/v1/revisions/:revisionId/uploads", "ReserveUpload", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD013" } }],
+      ["POST", "/api/v1/uploads/:uploadId/complete", "CompleteUpload", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/uploads/:uploadId/cancel", "CancelUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD015" } }],
+      ["POST", "/api/v1/revisions/:revisionId/selection", "SelectInputTables", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD016" } }],
+      ["POST", "/api/v1/revisions/:revisionId/seal", "SealRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD017" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
       ["GET", "/api/v1/agencies/:agencyId/members", "ListMembers", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListMembers" } }],
       ["GET", "/api/v1/agencies/:agencyId/clients", "ListClients", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListClients" } }],
       ["GET", "/api/v1/projects/:projectId", "GetProject", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetProject" } }],
+      // the source reads (B07 design §9.1)
+      ["GET", "/api/v1/revisions/:revisionId/selection-manifests/:selectionManifestId", "GetSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSelectionManifest" } }],
+      ["GET", "/api/v1/revisions/:revisionId", "GetRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRevision" } }],
+      ["GET", "/api/v1/revisions/:revisionId/inspection", "GetInspection", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetInspection" } }],
+      ["GET", "/api/v1/revisions/:revisionId/uploads", "ListUploads", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListUploads" } }],
+      ["GET", "/api/v1/uploads/:uploadId", "GetUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetUpload" } }],
+      ["GET", "/api/v1/uploads/:uploadId/session", "GetUploadSession", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetUploadSession" } }],
+      ["GET", "/api/v1/revisions/:revisionId/tables/:tableId/preview", "PreviewTable", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTable" } }],
+      // the selection manifest intake: 201 stored, 200 the same document again (B07 D-SEL-2)
+      ["POST", "/api/v1/revisions/:revisionId/selection-manifests", "SubmitSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request
