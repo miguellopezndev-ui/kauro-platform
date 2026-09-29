@@ -37,6 +37,7 @@ import {
   type ExecutionStore,
   type IdGenerator,
   type JobCancellation,
+  type JobExecutionSubject,
   type LaunchIntent,
   type LaunchState,
   type LeaseRecord,
@@ -213,11 +214,15 @@ export class PgExecutionStore implements ExecutionStore {
     return this.#leases.get("JOB_ATTEMPT", jobId as string as LeaseRecord["resourceId"]);
   }
 
+  /**
+   * The ledgers as any runtime group reads them: the request handlers hold SELECT on active_jobs and waiting_jobs of the platform ledger
+   * only (0019), so the one-row ledger (ledger_id is CHECKed to 1) is read without naming its key column (D8-CMD-3).
+   */
   async capacity(agencyId: AgencyId): Promise<ExecutionCapacitySnapshot> {
     const r = await execute<{ active: number; waiting: number; live: number }>(
       this.db,
-      `SELECT (SELECT c.active_jobs FROM kauro.execution_capacity c WHERE c.ledger_id = 1) AS active,
-              (SELECT c.waiting_jobs FROM kauro.execution_capacity c WHERE c.ledger_id = 1) AS waiting,
+      `SELECT (SELECT c.active_jobs FROM kauro.execution_capacity c) AS active,
+              (SELECT c.waiting_jobs FROM kauro.execution_capacity c) AS waiting,
               coalesce((SELECT l.live_jobs FROM kauro.agency_execution_capacity l WHERE l.agency_id = $1), 0) AS live`,
       [agencyId],
     );
@@ -267,7 +272,7 @@ export class PgExecutionStore implements ExecutionStore {
     await execute(this.db, "SELECT ledger_id FROM kauro.execution_capacity WHERE ledger_id = 1 FOR UPDATE");
   }
 
-  async readAuthority(job: ProcessingJobRecord): Promise<ExecutionAuthorityFacts> {
+  async readAuthority(job: JobExecutionSubject): Promise<ExecutionAuthorityFacts> {
     const r = await execute<Row>(
       this.db,
       `SELECT (SELECT g.state FROM kauro.agencies g WHERE g.agency_id = $1) AS agency_state,

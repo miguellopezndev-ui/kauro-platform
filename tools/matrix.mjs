@@ -15,7 +15,8 @@
 // platform machines of @kauro/domain (EndClient, Project; since B07 the source-lifecycle machines UploadSession, StoredObject,
 // SourceFile, RetentionRecord; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs
 // and their outcome catalogues of @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the
-// source reads and the selection manifest intake — the transition seeds of the migrations, the events each handler publishes (read
+// source reads and the selection manifest intake, and since mandate B08-COMMANDS-EXECUTION B08's two execution commands (CMD036 ExecuteProject,
+// CMD037 CancelJob) with the GetJob read, whose events are read from the execution store's methods — the transition seeds of the migrations, the events each handler publishes (read
 // from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
 //
 // Package B09's served commands and reads (decision D-REQ-B7) join the served sections from the application's served lists
@@ -263,7 +264,7 @@ export const EDGE_OWNERS = {
   },
   CommercialAuthorization: {
     "(initial ACTIVE)": { command: "CMD029", event: "commercial_authorization.issued.v1", note: "or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction" },
-    execution_admitted: { command: "CMD036", event: "commercial_authorization.consumed.v1" },
+    execution_admitted: { owner: "B08", why: "JOB_ADMISSION (control plane) consumes the authorization in the transaction that admits its job, bound at COMMIT to that job edge (KA081; D8-AUTH-1: CMD036 binds and does not consume)", event: "commercial_authorization.consumed.v1" },
     package_published: { owner: "B08", why: "atomic publication of the purchased package", event: "commercial_authorization.delivered.v1" },
     authority_revoked: { command: "CMD030", event: "commercial_authorization.revoked.v1", note: "a reversal; CMD033 revokes it when a completed refund leaves no service basis" },
   },
@@ -533,6 +534,34 @@ APPLICABILITY.CMD034 = {
   "external uncertainty": "NOT_APPLICABLE: the command applies a stored, authenticated provider query and calls no provider; the uncertainty it settles is the dispatching command's (the watchdog stores the query, D-PROTO-B4)",
 };
 
+// package B08's execution commands (mandate B08-COMMANDS-EXECUTION; docs/design/B08-case-map.md CMD036 and CMD037): each command's
+// own OK / DENY / RACE tests, the role matrix of the two commands and the GetJob read, and the shared schema admission of every served route
+const EXECUTE_PROJECT = "cmd036-execute-project.test.ts";
+const CANCEL_JOB = "cmd037-cancel-job.test.ts";
+const EXECUTION_ROLE_MATRIX = ["execution-role-matrix.test.ts", "every execution command and the job read against every role"];
+APPLICABILITY.CMD036 = {
+  "legitimate state": [[EXECUTE_PROJECT, "OK: ExecuteProject with a live commercial authorization"]],
+  "wrong role": [[EXECUTE_PROJECT, "DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT"], EXECUTION_ROLE_MATRIX],
+  "wrong agency": [[EXECUTE_PROJECT, "DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency's project 404"], EXECUTION_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: ExecuteProject carries no expectedVersion (registry fields: commercialAuthorizationId); the authorization, approval, source, target and capability are read after their transition locks (D-TX-2) and a fact that changed is refused with its own reason (AUTHORIZATION_REVOKED, PLAN_NOT_APPROVED, SOURCE_EXPIRED, TARGET_STALE, MODE_NOT_OFFERED), never with STALE_VERSION",
+  "duplicate request": [[EXECUTE_PROJECT, "RACE: an identical retry replays the 202"], [EXECUTE_PROJECT, "DENY: ExecuteProject for an authorization that already has a job answers that same job"]],
+  "changed-body same key": [[EXECUTE_PROJECT, "RACE: an identical retry replays the 202, the same key with another authorization is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[EXECUTE_PROJECT, "S055: the process dies after ExecuteProject commits"], [EXECUTE_PROJECT, "RACE: an identical retry replays the 202"]],
+  "external uncertainty": "NOT_APPLICABLE: ExecuteProject reaches no provider — it queues one job and its outbox record, and the control plane's JOB_EXECUTION launches the worker after COMMIT; the launch uncertainty is that consumer's (mandate B08-CONTROL-EXECUTION), and S055 proves the undelivered record stays due",
+};
+APPLICABILITY.CMD037 = {
+  "legitimate state": [[CANCEL_JOB, "OK: CancelJob on a RUNNING job answers 200"]],
+  "wrong role": [[CANCEL_JOB, "DENY: a VIEWER is 403"], EXECUTION_ROLE_MATRIX],
+  "wrong agency": [[CANCEL_JOB, "DENY: a VIEWER is 403, another agency's job 404"], EXECUTION_ROLE_MATRIX],
+  "stale version": [[CANCEL_JOB, "DENY: a VIEWER is 403, another agency's job 404, a stale version 409 STALE_VERSION"], [CANCEL_JOB, "RACE: an identical retry replays the 200"]],
+  "duplicate request": [[CANCEL_JOB, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[CANCEL_JOB, "RACE: an identical retry replays the 200, the same key with another reason is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CANCEL_JOB, "RACE: an identical retry replays the 200"], [CANCEL_JOB, "RACE (S062): CancelJob through the route racing the publication"]],
+  "external uncertainty": "NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062)",
+};
+
 // --- sources --------------------------------------------------------------------------------------------------------------------
 
 export async function loadMatrixSources() {
@@ -570,8 +599,19 @@ export async function loadMatrixSources() {
     const text = readFileSync(join(root, "packages", "application", "src", ...file.split("/")), "utf8");
     published[id] = [...new Set([...text.matchAll(/eventType: "([a-z_.0-9]+)"/g)].map((m) => m[1]))];
   }
+  // package B08's two commands (D8-API-1): the execution store writes each event in the statement that changes the job, so the events
+  // are read from the store method the handler calls (queueJob for CMD036, requestCancellation for CMD037)
+  const executionStore = readFileSync(join(root, "packages", "persistence", "src", "execution", "store.ts"), "utf8");
+  const storeEvents = (method) => {
+    const start = executionStore.indexOf(`  async ${method}(`);
+    if (start < 0) throw new Error(`the execution store has no method ${method}`);
+    const end = executionStore.indexOf("\n  }\n", start);
+    return [...new Set([...executionStore.slice(start, end).matchAll(/"(processing_job\.[a-z_.0-9]+)"/g)].map((m) => m[1]))];
+  };
+  published.CMD036 = storeEvents("queueJob");
+  published.CMD037 = storeEvents("requestCancellation");
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];
@@ -681,7 +721,7 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06, B07 and B09 served)");
+  line("# State, command and event matrix (B06, B07, B08 and B09 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
@@ -689,7 +729,7 @@ export function generateMatrix(s) {
   line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07; the commerce machines of B09)");
   line("and its event registry");
   line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
-  line("(`B06_COMMANDS` and `B07_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
+  line("(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
   line("intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
@@ -810,7 +850,9 @@ export function generateMatrix(s) {
   line("(MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view");
   line("carries the caller's permitted actions (`api/permitted-actions`). Package B09's reads (D-REQ-B7) follow the same rules: the agency");
   line("reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),");
-  line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER).");
+  line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER). Package B08's GetJob");
+  line("(D8-API-1) is the status path of CMD036's 202: every member reads the job of the agency, a job of another agency answers NOT_FOUND,");
+  line("and the view is the job's safe progress, never a provider identity, a fence or a lease.");
   line();
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");

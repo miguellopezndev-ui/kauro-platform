@@ -73,14 +73,15 @@ test("GetJob answers the job's state, attempt ordinal, deadlines, cancellation v
   for (const person of [w.owner, w.admin, w.operator]) assert.deepEqual((await seen(jobId, { state: "QUEUED", attempt: 0 }, person.token)).permittedActions, ["CancelJob"]);
   for (const person of [w.approver, w.approver2, w.billing]) assert.deepEqual((await seen(jobId, { state: "QUEUED", attempt: 0 }, person.token)).permittedActions, []);
 
-  // ADMITTED: attempt one with the execution deadline; the provider not yet launched
+  // ADMITTED: attempt one, the provider not yet launched — the execution deadline starts with the launch (D8-DL-1), so none is shown yet
   await admitJob(w.h, w.A, jobId);
   const admitted = await seen(jobId, { state: "ADMITTED", attempt: 1, activeProviderState: "LAUNCHING" });
-  assert.equal(typeof admitted.executionDeadlineAt, "string");
+  assert.equal(admitted.executionDeadlineAt, undefined);
 
   // RUNNING: the provider job runs; VERIFYING: it finished and its output is being verified — no package is named before the publication
   await launchJob(w.h, w.A, jobId);
-  await seen(jobId, { state: "RUNNING", attempt: 1, activeProviderState: "RUNNING" });
+  const running = await seen(jobId, { state: "RUNNING", attempt: 1, activeProviderState: "RUNNING" });
+  assert.equal(typeof running.executionDeadlineAt, "string");
   await stageJob(w.h, w.A, jobId);
   await seen(jobId, { state: "VERIFYING", attempt: 1, activeProviderState: "FINISHED" });
   const verified = await verifyJob(w.h, w.A, jobId);

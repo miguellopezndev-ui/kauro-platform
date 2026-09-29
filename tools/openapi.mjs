@@ -117,6 +117,10 @@ export function runtimeSchemas(sources) {
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   }
   byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
+  for (const [command, schema] of Object.entries(application.EXECUTION_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B08 request schema of ${command} collides with another one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
   for (const [command, schema] of Object.entries(application.COMMERCE_REQUEST_SCHEMAS)) {
     if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B09 request schema of ${command} collides with a served one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
@@ -219,8 +223,8 @@ export function generateOpenApi(sources) {
 
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
-  // the served commands' specs: B06's seven and B07's six (mandate B07-COMMANDS)
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS };
+  // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS) and B08's two (mandate B08-COMMANDS-EXECUTION)
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
     const spec = specs[command.id];
@@ -234,9 +238,12 @@ export function generateOpenApi(sources) {
     const responses = {};
     for (const [status, declared] of Object.entries(contract.declared)) {
       if (declared.schemaId === application.ACCEPTED_RESPONSE_SCHEMA_ID) {
-        // an ACCEPTED command (B07 CompleteUpload, D-RUN-1): the shared envelope, added once below
+        // an ACCEPTED command (B07 CompleteUpload, D-RUN-1; B08 ExecuteProject, D8-API-1): the shared envelope, added once below
         responses[status] = {
-          description: "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
+          description:
+            command.id === "CMD036"
+              ? "ACCEPTED: the job was queued and runs asynchronously — the operation (the processing job), its state, the status path of GetJob and the polling guidance (package B08 D8-API-1)"
+              : "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
           headers: REPLY_HEADERS,
           content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
         };

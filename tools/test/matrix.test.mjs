@@ -36,8 +36,8 @@ test("an unowned edge, an owner of an edge the machine does not list, an unknown
   unknown.Agency.agreements_and_profile_accepted = { command: "CMD999", event: "agency.activated.v1" };
   assert.deepEqual(checkSources(sources, unknown), ["Agency: agreements_and_profile_accepted names CMD999, which the registry does not have"]);
   const unregistered = clone(EDGE_OWNERS);
-  unregistered.Job.cancel_command = { command: "CMD037", event: "job.cancel_requested.v1" };
-  assert.deepEqual(checkSources(sources, unregistered), ["Job: cancel_command names job.cancel_requested.v1, which EVENT_TYPES does not register"]);
+  unregistered.Job.provider_start_observed = { command: "CMD035", event: "job.cancel_requested.v1" };
+  assert.deepEqual(checkSources(sources, unregistered), ["Job: provider_start_observed names job.cancel_requested.v1, which EVENT_TYPES does not register"]);
   const unpublished = clone(EDGE_OWNERS);
   unpublished.EndClient.archive_client = { command: "CMD010", event: "end_client.created.v1" };
   assert.deepEqual(checkSources(sources, unpublished), ["EndClient: archive_client says CMD010 publishes end_client.created.v1, which its handler never publishes"]);

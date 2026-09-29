@@ -176,6 +176,7 @@ test("RACE: an identical retry replays the 200, the same key with another reason
 
   // two CancelJob calls on one version: the first held before its journal commit with the job row locked; the second is observed waiting on
   // that row (FOR UPDATE), then finds the cancellation committed and answers the version it read as stale — one cancellation, one 409
+  await endLiveJobs(pw); // the control plane completes the cancellation: the platform slot the first job held is free again
   const racing = await runningJob(pw, "cmd037-race-two");
   const racingRow = await jobRow(pw, racing.jobId);
   const racingBody = { expectedVersion: Number(racingRow.version), reasonCode: REASON };
@@ -198,6 +199,7 @@ test("RACE: an identical retry replays the 200, the same key with another reason
   assert.equal((await jobRow(pw, racing.jobId)).cancel_version, "1");
 
   // a crash before COMMIT leaves the job running: the cancel_command and its event were written and never committed; the same key then cancels once
+  await endLiveJobs(pw);
   const crashing = await runningJob(pw, "cmd037-race-crash");
   const crashingRow = await jobRow(pw, crashing.jobId);
   const crashKey = freshKey("cmd037-race-crash");

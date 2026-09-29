@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { B06_COMMANDS, B07_COMMANDS, COMMAND_OUTCOMES, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { B06_COMMANDS, B07_COMMANDS, COMMAND_OUTCOMES, EXECUTION_COMMANDS, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
@@ -17,8 +17,8 @@ import { approvalBodyOf, call, clock, completed, ids, outcome, routes, world, ty
 
 const validator = loadContractSchemas();
 const CONTENT_TYPE = "application/problem+json";
-/** The specs of every served command: B06's seven and B07's six (mandate B07-COMMANDS). */
-const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS };
+/** The specs of every served command: B06's seven, B07's six (mandate B07-COMMANDS) and B08's two (mandate B08-COMMANDS-EXECUTION). */
+const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS, ...EXECUTION_COMMANDS };
 
 function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: ReadonlyArray<FieldError>; readonly current?: boolean } = {}) {
   const fields = overrides.fields ?? (entry.fieldCodes !== undefined ? entry.fieldCodes.map((code) => ({ field: "expectedVersion", code })) : undefined);
@@ -199,6 +199,11 @@ const b06 = (file: string): ReadonlyArray<string> => [`commands/handlers/${file}
  * alone calls — every file whose sites the command can reach.
  */
 const b07 = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `sources/handlers/${f}`);
+/**
+ * A B08 handler (mandate B08-COMMANDS-EXECUTION): its own file with the execution package's shared helpers and the job projection —
+ * every file whose sites the command can reach.
+ */
+const b08 = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `execution/handlers/${f}`);
 
 /** The files of each served command's handler, under packages/application/src. */
 const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = {
@@ -215,6 +220,8 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = 
   CMD015: b07("cancel-upload.ts"),
   CMD016: b07("select-input-tables.ts", "selection-rules.ts"),
   CMD017: b07("seal-revision.ts"),
+  CMD036: b08("execute-project.ts"),
+  CMD037: b08("cancel-job.ts"),
 };
 
 const handlerSitesOf = (command: ServedCommandId) => HANDLER_FILES[command].flatMap((file) => sitesOf(source(`packages/application/src/${file}`), file));

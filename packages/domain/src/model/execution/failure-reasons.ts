@@ -18,6 +18,12 @@ export const EXECUTION_FAILURE_REASONS = [
   // KA083 and the grant ceiling of migration 0021 (the audit half of B08): translated here with the rest of D8-SQL-1
   "NO_FUNDED_GRANT",
   "GRANT_CEILING",
+  // ExecuteProject (CMD036): the commercial authorization is no longer ACTIVE, so no job may be bound to it (D8-AUTH-1)
+  "AUTHORIZATION_REVOKED",
+  // CancelJob (CMD037): the job already ended (FAILED, CANCELLED or EXPIRED) — a cancellation has nothing left to stop
+  "JOB_TERMINAL",
+  // CancelJob (CMD037): the publication committed first (S062) — the job is READY and its package is the answer, never a rollback
+  "JOB_ALREADY_READY",
 ] as const;
 
 export type ExecutionFailureReason = (typeof EXECUTION_FAILURE_REASONS)[number];
