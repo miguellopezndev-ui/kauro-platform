@@ -218,7 +218,7 @@ test("R20: the initial-state seed equals the registry machines (and the platform
     const births = machineOf(["enforce_initial_state", "enforce_initial_state_of", "enforce_observed_birth"]);
     for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
     assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
-    assert.equal(edges.size, 19, "every seeded machine guards its table's edges");
+    assert.equal(edges.size, 23, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve)");
     for (const d of defs.rows) {
       if (/enforce_initial_state|enforce_membership_initial_state|enforce_observed_birth/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
     }

@@ -541,7 +541,8 @@ test("UploadSession, StoredObject, SourceFile and RetentionRecord are seeded exa
       return true;
     });
   }
-  await assert.rejects(eventOf("quote"), (e: unknown) => {
+  // a kind no package on this tree registers (package B09 registers quote since the B07+B09 merge)
+  await assert.rejects(eventOf("job"), (e: unknown) => {
     assert.equal(code(e), "KA006", String(e));
     assert.match((e as Error).message, /has no binding/);
     return true;

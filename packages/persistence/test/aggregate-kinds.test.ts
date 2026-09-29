@@ -202,7 +202,8 @@ test("every registered kind binds to the table TABLE_OF names; each B06 and B07 
 test("an unregistered kind is refused: KA006 by the binding (as B06's CASE answered it), and by the foreign key to the registry under it", async () => {
   const before_ = await eventCount();
   await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
-    for (const kind of ["upload", "quote", "Agency", "agency ", "agencies", ""]) {
+    // kinds no package on this tree registers (B07 registers upload_session and B09 quote since the B07+B09 merge)
+    for (const kind of ["upload", "job", "Agency", "agency ", "agencies", ""]) {
       await refusedInSavepoint(c, () => eventOf(c, kind, A.agencyId, 1, A.agencyId), "KA006", undefined, `unregistered kind ${JSON.stringify(kind)}`);
     }
   });
@@ -210,7 +211,7 @@ test("an unregistered kind is refused: KA006 by the binding (as B06's CASE answe
   // by domain_events_aggregate_kind_fkey
   await rolledBack(h.oracle, async () => {
     await h.oracle.query("ALTER TABLE kauro.domain_events DISABLE TRIGGER domain_events_bind_aggregate");
-    await assert.rejects(eventOf(h.oracle, "quote", A.agencyId, 1, A.agencyId), refusedWith("23503", "domain_events_aggregate_kind_fkey"));
+    await assert.rejects(eventOf(h.oracle, "job", A.agencyId, 1, A.agencyId), refusedWith("23503", "domain_events_aggregate_kind_fkey"));
   });
   const trigger = await h.oracle.query<{ tgenabled: string }>("SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'kauro.domain_events'::regclass AND tgname = 'domain_events_bind_aggregate'");
   assert.deepEqual(trigger.rows, [{ tgenabled: "O" }], "the binding trigger is back in force");

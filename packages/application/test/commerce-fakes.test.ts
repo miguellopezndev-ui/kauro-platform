@@ -430,12 +430,21 @@ function sourcesUnder(dir: string, out: string[] = []): string[] {
 }
 
 test("D-FAKE-B1: no contract fake is reachable from production wiring — the package's entry point never reaches the test-only commerce/testing modules, which only the ./testing subpath exports, and no production source of the workspace imports @kauro/application/testing", () => {
-  const testingDir = join(packageRoot, "src", "commerce", "testing") + (process.platform === "win32" ? "\\" : "/");
+  const sep = process.platform === "win32" ? "\\" : "/";
+  // the test-only modules: every module of the testing directories the ./testing index reaches — package B09's commerce fakes and
+  // package B07's source-provider fakes behind the one index of the subpath (the B07+B09 merge keeps one ./testing export, B07 design
+  // §17 item 15). B06's in-memory ports share src/testing but are the main entry's own (pure orchestration tests), not the subpath's.
+  const testingDirs = [join(packageRoot, "src", "commerce", "testing") + sep, join(packageRoot, "src", "testing") + sep];
+  const mainEntryPorts = join(packageRoot, "src", "testing", "in-memory-ports.ts");
+  const testOnly = [...reachableFrom(join(packageRoot, "src", "testing", "index.ts"))].filter((f) => testingDirs.some((dir) => f.startsWith(dir)) && f !== mainEntryPorts);
+  assert.ok(testOnly.some((f) => f.endsWith(join("commerce", "testing", "paypal-fake.ts"))) && testOnly.some((f) => f.endsWith(join("testing", "contract-fake-object-storage.ts"))), "both packages' fakes are behind the subpath");
   const reachable = [...reachableFrom(join(packageRoot, "src", "index.ts"))];
   assert.ok(reachable.some((f) => f.endsWith(join("commerce", "core", "provider-effects.ts"))), "the walk follows the entry point's graph");
-  assert.deepEqual(reachable.filter((f) => f.startsWith(testingDir)), []);
+  assert.deepEqual(reachable.filter((f) => testOnly.includes(f)), []);
   const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as { exports: Record<string, { default: string }> };
-  assert.equal(manifest.exports["./testing"]?.default, "./dist/src/commerce/testing/index.js");
+  assert.equal(manifest.exports["./testing"]?.default, "./dist/src/testing/index.js");
+  // the subpath's one index re-exports the commerce fakes
+  assert.ok(reachableFrom(join(packageRoot, "src", "testing", "index.ts")).has(join(packageRoot, "src", "commerce", "testing", "index.ts")), "the ./testing index reaches the commerce fakes");
   const rules = JSON.parse(readFileSync(join(repoRoot, "architecture.rules.json"), "utf8")) as { testOnlySubpaths: string[] };
   assert.ok(rules.testOnlySubpaths.includes("/testing"));
   const production = [...sourcesUnder(join(repoRoot, "packages")), ...sourcesUnder(join(repoRoot, "apps"))];
