@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { B06_COMMANDS, COMMAND_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { B06_COMMANDS, B07_COMMANDS, COMMAND_OUTCOMES, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
@@ -17,6 +17,8 @@ import { approvalBodyOf, call, clock, completed, ids, outcome, routes, world, ty
 
 const validator = loadContractSchemas();
 const CONTENT_TYPE = "application/problem+json";
+/** The specs of every served command: B06's seven and B07's six (mandate B07-COMMANDS). */
+const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS };
 
 function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: ReadonlyArray<FieldError>; readonly current?: boolean } = {}) {
   const fields = overrides.fields ?? (entry.fieldCodes !== undefined ? entry.fieldCodes.map((code) => ({ field: "expectedVersion", code })) : undefined);
@@ -33,7 +35,7 @@ function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: Readon
 
 function refused(command: ServedCommandId, problem: ReturnType<typeof problemOf>): ResponseContractViolation {
   try {
-    checkReply(validator, commandRouteResponses(command, B06_COMMANDS[command].name), problem.status, CONTENT_TYPE, problem);
+    checkReply(validator, commandRouteResponses(command, SPECS[command].name), problem.status, CONTENT_TYPE, problem);
   } catch (e) {
     if (e instanceof ResponseContractViolation) return e;
     throw e;
@@ -44,7 +46,7 @@ function refused(command: ServedCommandId, problem: ReturnType<typeof problemOf>
 test("N13: every listed outcome of every served command passes the send guard of its route — with its field codes and its current version — and a problem outside the catalogue, a field code or a current the entry does not list, or a missing current it always carries, is refused", () => {
   let listed = 0;
   for (const command of SERVED_COMMAND_IDS) {
-    const contract = commandRouteResponses(command, B06_COMMANDS[command].name);
+    const contract = commandRouteResponses(command, SPECS[command].name);
     assert.equal(contract.outcomes, COMMAND_OUTCOMES[command]);
     for (const entry of COMMAND_OUTCOMES[command]) {
       const problem = problemFor(entry);
@@ -126,6 +128,9 @@ const INDIRECT_REASONS: ReadonlyArray<{ readonly expression: RegExp; readonly re
 const strictJsonReasons = (): ReadonlyArray<FailureReason> =>
   [...(/export type StrictJsonReason = [^;]*;/.exec(source("packages/application/src/api/strict-json.ts"))?.[0] ?? "").matchAll(/"([A-Z_]+)"/g)].map((m) => m[1] as FailureReason);
 
+/** The reason requireProviders raises when no provider adapter is bound (packages/application/src/sources/handlers/shared.ts, D-SAPI-6). */
+const sourceServicesReason = (): FailureReason => /function requireProviders[\s\S]*?reason: "([A-Z_]+)"/.exec(source("packages/application/src/sources/handlers/shared.ts"))?.[1] as FailureReason;
+
 /** The reason IdempotencyConflictFailure carries (packages/domain/src/model/errors.ts). */
 const idempotencyConflictReason = (): FailureReason => /class IdempotencyConflictFailure[\s\S]*?reason: "([A-Z_]+)"/.exec(source("packages/domain/src/model/errors.ts"))?.[1] as FailureReason;
 
@@ -133,7 +138,7 @@ const idempotencyConflictReason = (): FailureReason => /class IdempotencyConflic
  * Top-level helpers that build a failure from their parameters: their bodies are not sites, their call sites are (read below as
  * invalid("X"), invalid(e.reason), problemFor("X"), and a handler's checkExpectedVersion(...) or applied(...) as STALE_VERSION).
  */
-const FAILURE_HELPERS = ["invalid", "problemFor", "checkExpectedVersion", "applied"];
+const FAILURE_HELPERS = ["invalid", "problemFor", "checkExpectedVersion", "applied", "requireProviders"];
 
 function withoutHelperBodies(text: string): string {
   let out = text;
@@ -178,6 +183,8 @@ function sitesOf(input: string, file: string): Array<{ code: FailureCode; reason
   for (const m of text.matchAll(/\binvalid\("([A-Z_]+)"/g)) sites.push({ code: "INVALID_REQUEST", reason: m[1] as FailureReason, site: m[0] });
   if (/\binvalid\(e\.reason\)/.test(text)) for (const reason of strictJsonReasons()) sites.push({ code: "INVALID_REQUEST", reason, site: "invalid(e.reason)" });
   if (/new IdempotencyConflictFailure\(/.test(text)) sites.push({ code: "IDEMPOTENCY_CONFLICT", reason: idempotencyConflictReason(), site: "new IdempotencyConflictFailure()" });
+  // B07: a provider port reached through requireProviders(...) (sources/handlers/shared.ts) answers SOURCE_SERVICES_UNAVAILABLE unbound
+  if (/\brequireProviders\(/.test(text)) sites.push({ code: "INTEGRITY_FAILURE", reason: sourceServicesReason(), site: "requireProviders(...)" });
   for (const m of text.matchAll(/\bproblemFor\("([A-Z_]+)"/g)) sites.push({ code: "INVALID_REQUEST", reason: m[1] as FailureReason, site: m[0] });
   const framework = /function frameworkReason[\s\S]*?\n}/.exec(text)?.[0];
   if (framework !== undefined) for (const m of framework.matchAll(/return "([A-Z_]+)";/g)) sites.push({ code: "INVALID_REQUEST", reason: m[1] as FailureReason, site: `frameworkReason → ${m[1]}` });
@@ -185,15 +192,32 @@ function sitesOf(input: string, file: string): Array<{ code: FailureCode; reason
   return sites;
 }
 
-const HANDLER_FILES: Readonly<Record<ServedCommandId, string>> = {
-  CMD001: "create-agency.ts",
-  CMD009: "create-client.ts",
-  CMD010: "archive-client.ts",
-  CMD011: "create-project.ts",
-  CMD023: "revise-plan.ts",
-  CMD025: "approve-plan.ts",
-  CMD026: "withdraw-approval.ts",
+/** A B06 handler: its own file (commands/handlers/shared.ts is part of the pipeline). */
+const b06 = (file: string): ReadonlyArray<string> => [`commands/handlers/${file}`];
+/**
+ * A B07 handler (mandate B07-COMMANDS): its own file with the source lifecycle's shared helpers and projections, and the helpers it
+ * alone calls — every file whose sites the command can reach.
+ */
+const b07 = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `sources/handlers/${f}`);
+
+/** The files of each served command's handler, under packages/application/src. */
+const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = {
+  CMD001: b06("create-agency.ts"),
+  CMD009: b06("create-client.ts"),
+  CMD010: b06("archive-client.ts"),
+  CMD011: b06("create-project.ts"),
+  CMD023: b06("revise-plan.ts"),
+  CMD025: b06("approve-plan.ts"),
+  CMD026: b06("withdraw-approval.ts"),
+  CMD012: b07("create-revision.ts"),
+  CMD013: b07("reserve-upload.ts"),
+  CMD014: b07("complete-upload.ts"),
+  CMD015: b07("cancel-upload.ts"),
+  CMD016: b07("select-input-tables.ts", "selection-rules.ts"),
+  CMD017: b07("seal-revision.ts"),
 };
+
+const handlerSitesOf = (command: ServedCommandId) => HANDLER_FILES[command].flatMap((file) => sitesOf(source(`packages/application/src/${file}`), file));
 
 /**
  * Pipeline sites no served route reaches, each with why (the scan reads them and this list says where they end): a new
@@ -219,8 +243,8 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
   const tenantOnly = new Set(["TENANT_CONTEXT_MISSING", "NOT_A_MEMBER", "MEMBERSHIP_SUSPENDED", "MEMBERSHIP_NOT_ACTIVE", "ROLE_INSUFFICIENT", "PATH_ID_INVALID", "AGENCY_SELECTOR_INVALID"]);
   const unreachableSeen = new Set<string>();
   for (const command of SERVED_COMMAND_IDS) {
-    const spec = B06_COMMANDS[command];
-    const handlerSites = sitesOf(source(`packages/application/src/commands/handlers/${HANDLER_FILES[command]}`), HANDLER_FILES[command]);
+    const spec = SPECS[command];
+    const handlerSites = handlerSitesOf(command);
     assert.ok(handlerSites.length > 0, `${command} has failure sites`);
     const reached = [...pipeline, ...(spec.stepUpRequired ? assurance : []), ...handlerSites];
     for (const site of reached) {
@@ -238,6 +262,22 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
     }
   }
   assert.deepEqual([...unreachableSeen].sort(), UNREACHABLE_PIPELINE_SITES.map((u) => `${u.code}/${u.reason}`).sort(), "every named unreachable site still exists and is still unreachable");
+});
+
+test("B07-COMMANDS: every failure site of the source reads and of the selection manifest intake is an entry of their catalogues — each read's own sites and the helpers it reaches, the intake's document rules; the access decisions of the reads on every source read and the intake's operating role", () => {
+  const readSites = [...sitesOf(source("packages/application/src/sources/handlers/reads.ts"), "reads.ts"), ...sitesOf(source("packages/application/src/sources/handlers/shared.ts"), "shared.ts"), ...sitesOf(source("packages/application/src/sources/handlers/projections.ts"), "projections.ts")];
+  const union = Object.entries(READ_OUTCOMES).filter(([op]) => !["ListAgencies", "GetAgency", "ListMembers", "ListClients", "GetProject"].includes(op)).flatMap(([, entries]) => entries);
+  assert.ok(readSites.length >= 8, `${readSites.length} source read sites`);
+  for (const site of readSites) assert.ok(union.some((o) => o.code === site.code && o.reason === site.reason), `the source read failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is in no source read catalogue`);
+  // the session read follows the command's own role; the other reads admit every role (D-SAPI-1)
+  assert.ok(READ_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
+  for (const op of ["GetSelectionManifest", "GetRevision", "GetInspection", "ListUploads", "GetUpload", "PreviewTable"] as const) assert.ok(!READ_OUTCOMES[op].some((o) => o.reason === "ROLE_INSUFFICIENT"), op);
+  // the intake: its own sites and the document rules it applies (checkDocument of selection-rules.ts)
+  const checkDocument = /export function checkDocument[\s\S]*?\n}\n/.exec(source("packages/application/src/sources/handlers/selection-rules.ts"))?.[0] ?? "";
+  assert.ok(checkDocument.length > 0, "the document rules are found");
+  const intakeSites = [...sitesOf(source("packages/application/src/sources/handlers/intake.ts"), "intake.ts"), ...sitesOf(checkDocument, "selection-rules.ts checkDocument")];
+  for (const site of intakeSites) assert.ok(outcomeOf(INTAKE_OUTCOMES.SubmitSelectionManifest, site.code, site.reason ?? undefined) !== null, `the intake failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
+  assert.ok(intakeSites.some((s) => s.reason === "ROLE_INSUFFICIENT") && intakeSites.some((s) => s.reason === "SELECTION_MANIFEST_MISMATCH"));
 });
 
 test("N13/N16: every failure site of the reads (queries/reads.ts) is an entry of the read catalogues — the tenant-scoped decisions of every agency read, the query and cursor refusals of every list", () => {

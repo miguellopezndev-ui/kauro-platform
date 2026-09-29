@@ -24,6 +24,11 @@ export const SQLSTATE = Object.freeze({
   // a live approval on a plan that is not APPROVED under it (migration 0004, the deferred constraint triggers
   // plans_live_approval_binding and approvals_live_approval_binding; decision D-PLAN-4)
   LIVE_APPROVAL_UNBOUND: "KA020",
+  // B07 source lifecycle (migrations 0009..0012; decision D-SQL-1: a range of its own): a quota ledger that disagrees with its
+  // uploads, a fence that moved backwards or a stale attempt that wrote, a lifecycle transition without the facts its state needs
+  QUOTA_LEDGER: "KA070",
+  FENCE_DISCIPLINE: "KA071",
+  LIFECYCLE_BINDING: "KA072",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -50,6 +55,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA011: { code: "PRECONDITION_FAILED", reason: "INVITATION_NOT_OPEN" },
   KA012: { code: "PRECONDITION_FAILED", reason: "INBOX_BODY_CONFLICT" },
   KA020: { code: "INTEGRITY_FAILURE", reason: "LIVE_APPROVAL_UNBOUND" },
+  KA070: { code: "INTEGRITY_FAILURE", reason: "QUOTA_LEDGER" },
+  KA071: { code: "PRECONDITION_FAILED", reason: "FENCE_DISCIPLINE" },
+  KA072: { code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -69,6 +77,27 @@ export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.
   end_clients_display_name_label: "displayName",
   projects_purpose_label: "purpose",
   approvals_withdraw_reason_label: "reasonCode",
+  // B07: CMD013 ReserveUpload displayName (migration 0009)
+  upload_sessions_display_name_label: "displayName",
+});
+
+/**
+ * B07's refusal translation (docs/design/B07-upload-source-lifecycle.md §3.3): the constraints of the source lifecycle whose
+ * refusal is a business outcome a request can meet — the intake envelope and the agency's session limit decided on the committed
+ * ledgers (R2-052), a project's one mutable revision and a predecessor replaced once — and the deadline checks a writer on the
+ * wrong side of the server clock meets (D-EXP-1: the same class as KA072, "a deadline edge on the wrong side of its deadline").
+ * Keyed by the constraint (or unique index) name the error carries, for its SQLSTATE.
+ */
+export const SOURCE_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason: FailureReason; readonly retryable?: boolean }>> = Object.freeze({
+  revision_quota_bytes_within_envelope: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "REVISION_QUOTA_EXCEEDED" },
+  revision_quota_files_within_envelope: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "REVISION_FILE_LIMIT" },
+  upload_sessions_reserved_bytes_check: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "FILE_TOO_LARGE" },
+  // a slot frees when a live session ends: the caller may retry later (429)
+  upload_capacity_within_limit: { sqlState: "23514", code: "ADMISSION_LIMITED", reason: "UPLOAD_CONCURRENCY_LIMITED", retryable: true },
+  dataset_revisions_one_mutable_per_project: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "REVISION_NOT_MUTABLE" },
+  dataset_revisions_supersedes_once: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "PREDECESSOR_NOT_CURRENT" },
+  retention_records_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+  upload_sessions_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
 });
 
 /**
@@ -77,6 +106,10 @@ export const LABEL_CONSTRAINT_FIELDS: Readonly<Record<string, string>> = Object.
  */
 export function failureOfSqlState(sqlState: string | undefined, constraint?: string): DomainFailure | null {
   if (!sqlState) return null;
+  const source = constraint === undefined ? undefined : SOURCE_CONSTRAINT_FAILURES[constraint];
+  if (source !== undefined && source.sqlState === sqlState) {
+    return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
+  }
   if (sqlState === SQLSTATE.UNIQUE_VIOLATION) {
     if (constraint === "agencies_one_draft_per_creator") return new DomainFailure("ADMISSION_LIMITED", "one draft agency per identity", { reason: "DRAFT_AGENCY_EXISTS" });
     // command_journal_identity (concurrent duplicate), approvals_one_live_per_plan (lost approval race) and

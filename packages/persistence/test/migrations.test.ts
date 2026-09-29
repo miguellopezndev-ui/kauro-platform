@@ -8,13 +8,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { AGGREGATE_KINDS, EVENT_TYPES, PLATFORM_STATE_MACHINES } from "@kauro/domain";
+import { AGGREGATE_KINDS, EVENT_TYPES, PLATFORM_STATE_MACHINES, SOURCE_LIFECYCLE_STATE_MACHINES } from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
 let pg: TemporaryPostgres;
 before(async () => {
-  pg = await startTemporaryPostgres();
+  // the shipped schema exactly as the runner leaves it: no labelled TEST CLOCK in this cluster (B07 decision D-CLOCK-1)
+  pg = await startTemporaryPostgres({ testClock: false });
 });
 after(async () => {
   await pg.stop();
@@ -22,7 +23,8 @@ after(async () => {
 
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
-  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md)
+  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md); B07 numbers its
+  // own files from 0009 (the integrator renumbers the second of B07 and B09 to merge)
   assert.deepEqual(files.map((f) => f.file), [
     "0001_schema_roles_helpers.sql",
     "0002_identity_agencies_memberships.sql",
@@ -32,7 +34,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0006_journals_leases.sql",
     "0007_security_events.sql",
     "0008_aggregate_kind_registry.sql",
+    "0009_source_uploads_registry.sql",
+    "0010_source_inspection_inventory.sql",
+    "0011_source_selection_seal.sql",
+    "0012_source_retention_events.sql",
   ]);
+  assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
   const owner = await pg.connect("kauro_owner");
   try {
@@ -158,7 +165,9 @@ test("the listed-transition seed equals the registry machines for every machine 
       assert.deepEqual(r.rows.map((x) => x.edge), expected, name);
     }
     const others = await su.query<{ machine: string }>("SELECT DISTINCT machine FROM kauro.state_transitions ORDER BY 1");
-    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"]);
+    // B07 adds the platform machines RetentionRecord, SourceFile, StoredObject and UploadSession (their edges equal the domain
+    // SOURCE_LIFECYCLE_STATE_MACHINES: source-migrations.test.ts)
+    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "RetentionRecord", "SourceFile", "StoredObject", "UploadSession"]);
   } finally {
     await su.end();
   }
@@ -168,8 +177,9 @@ test("R20: the initial-state seed equals the registry machines (and the platform
   const su = await pg.connect("postgres");
   try {
     const seeded = await su.query<{ machine: string; initial_state: string }>("SELECT machine, initial_state FROM kauro.state_machines ORDER BY machine");
-    const expected = ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project"].map((name) => {
-      const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name);
+    // B07 adds the platform machines of the source lifecycle (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2), each born in its initial state
+    const expected = ["Agency", "Capability", "DatasetRevision", "EndClient", "Membership", "Plan", "Project", "RetentionRecord", "SourceFile", "StoredObject", "UploadSession"].map((name) => {
+      const m = STATE_MACHINES.find((x) => x.contract === name) ?? PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ?? SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name);
       assert.ok(m, `${name} is a registry or platform machine`);
       return { machine: name, initial_state: m.initial };
     });
@@ -251,5 +261,34 @@ test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's s
     assert.deepEqual(constraints.rows, [{ conname: "domain_events_aggregate_kind_fkey", def: "FOREIGN KEY (aggregate_kind) REFERENCES kauro.aggregate_kinds(aggregate_kind)" }]);
   } finally {
     await su.end();
+  }
+});
+
+test("B07 D-CLOCK-1: the shipped kauro.server_now() is the transaction time and nothing else — no setting, no offset — and no runtime role can redefine it", async () => {
+  const su = await pg.connect("postgres");
+  try {
+    const f = await su.query<{ body: string; owner: string; volatility: string; comment: string | null }>(
+      "SELECT prosrc AS body, pg_get_userbyid(proowner) AS owner, provolatile AS volatility, obj_description(oid, 'pg_proc') AS comment FROM pg_proc WHERE oid = 'kauro.server_now()'::regprocedure",
+    );
+    assert.deepEqual(f.rows, [{ body: " SELECT transaction_timestamp() ", owner: "kauro_owner", volatility: "s", comment: null }]);
+    // within one transaction it is constant and equal to now(); a transaction-local test-clock setting changes nothing here
+    await su.query("BEGIN");
+    try {
+      await su.query("SELECT set_config('kauro_test.clock_offset_seconds', '-1296000', true)");
+      const r = await su.query<{ same: boolean }>("SELECT kauro.server_now() = now() AS same");
+      assert.deepEqual(r.rows, [{ same: true }]);
+    } finally {
+      await su.query("ROLLBACK");
+    }
+  } finally {
+    await su.end();
+  }
+  for (const login of ["kauro_app_test", "kauro_control_test", "kauro_assurance_test", "kauro_validator_test", "kauro_ingress_test"] as const) {
+    const c = await pg.connect(login);
+    try {
+      await assert.rejects(c.query("CREATE OR REPLACE FUNCTION kauro.server_now() RETURNS timestamptz LANGUAGE sql AS $$ SELECT now() - interval '15 days' $$"), (e: unknown) => (e as { code?: string }).code === "42501", login);
+    } finally {
+      await c.end();
+    }
   }
 });

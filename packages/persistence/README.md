@@ -7,7 +7,11 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   journal/request journal/leases, security events (0001–0007, B06), and the shared aggregate-kind registry (0008,
   `docs/design/FOUNDATION-aggregate-kinds.md`): `kauro.aggregate_kinds` names each kind's table and uuid key column, the events
   refer to it by a foreign key, and `kauro.domain_events_bind_aggregate` reads the registered table; a later package registers
-  its kinds with one INSERT in its own migration, numbered from 0009. Every tenant table has row-level security enabled and
+  its kinds with one INSERT in its own migration, numbered from 0009. `migrations/0009..0012_source_*.sql` — the B07 source
+  lifecycle (`docs/design/B07-upload-source-lifecycle.md`): upload sessions and quota ledgers, the object registry, inspection
+  receipts and admitted files with their frozen inventory, selections, evaluations and the sealed manifest and subject, retention
+  anchors and records; every lifecycle instant is the server's (`kauro.server_now()`, which the test harness replaces by a
+  labelled TEST CLOCK in its temporary clusters only). Every tenant table has row-level security enabled and
   forced; every tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
   (an event of its own agency, bound to an aggregate of that agency at or below its version); every aggregate is born in its
   machine's initial state (`kauro.state_machines`, seeded from the registry) and changes state only along a listed edge.

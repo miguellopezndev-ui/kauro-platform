@@ -1,7 +1,7 @@
 {
   "name": "@kauro/api",
   "version": "0.1.0",
-  "description": "Kauro HTTP API (Fastify): the seven B06 command routes with the manual-10 admission pipeline (content type, size, strict JSON, closed schema, envelope headers, authenticated subject), typed replies and safe problem responses, and the composition root that binds the PostgreSQL adapters (configuration from the environment, migrations on start, verified pool, tenant context per unit of work).",
+  "description": "Kauro HTTP API (Fastify): the seven B06 command routes and the six B07 source-lifecycle command routes, the reads and the selection manifest intake, with the manual-10 admission pipeline (content type, size, strict JSON, closed schema, envelope headers, authenticated subject), typed replies and safe problem responses, and the composition root that binds the PostgreSQL adapters (configuration from the environment, migrations on start, verified pool, tenant context per unit of work).",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
@@ -29,6 +29,7 @@
     "@kauro/application": "workspace:*",
     "@kauro/authorization": "workspace:*",
     "@kauro/contracts": "workspace:*",
+    "@kauro/data-plane": "workspace:*",
     "@kauro/domain": "workspace:*",
     "@kauro/persistence": "workspace:*",
     "fastify": "5.12.5"

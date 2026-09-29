@@ -22,11 +22,11 @@ export {
   MigratorRoleError,
 } from "./migrations/runner.js";
 export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection, LedgerEntry, SchemaCompatibility } from "./migrations/runner.js";
-export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
+export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -37,3 +37,24 @@ export { PgInboxIngress, PgInboxConsumerStore, PgOutboxDispatchStore } from "./i
 export { PgIdentityRepository, PgAgencyRepository, PgMembershipRepository, PgInvitationRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 export { PgProcessingAuthorityRepository, PgEndClientRepository, PgProjectRepository, PgDatasetRevisionRepository, PgTargetContractRepository, PgCapabilityRepository } from "./repositories/workspace.js";
 export { PgPlanRepository, PgValidationReceiptRepository, PgApprovalRepository } from "./repositories/plans.js";
+export {
+  PgSourceStore,
+  PgUploadSessionRepository,
+  PgSessionSecretRepository,
+  PgStoredObjectRepository,
+  PROVIDER_SOFT_DELETED_REASON,
+  PgInspectionReceiptRepository,
+  PgSourceFileRepository,
+  PgSelectionManifestRepository,
+  PgSelectionEvaluationRepository,
+  PgSourceRevisionRepository,
+  PgProjectRevisionPointer,
+  PgRevisionAuthorityInspector,
+  PgPendingOperationJournal,
+  PgSealedManifestRepository,
+  PgRetentionRepository,
+  PgSourceAvailabilityReader,
+  PgRevisionLineageReader,
+  serverInstantOf,
+} from "./source/index.js";
+export type { SourceAudience } from "./source/index.js";

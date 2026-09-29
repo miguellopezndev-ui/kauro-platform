@@ -1,9 +1,11 @@
 /**
- * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands, registered from
- * the command specs of @kauro/application (method, path, scope), with the admission pipeline of manual 10 (content type, byte
- * size, strict JSON, closed schema, envelope headers, authenticated subject) in front of every handler, typed replies
- * (CompletedResponse / AcceptedResponse / Problem) and the safe problem translation of every failure (opaque INTERNAL_ERROR by
- * correlation id; 07 "Command outcomes"), plus the liveness and readiness probes outside /api/v1 (health.ts).
+ * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands and the six B07
+ * source-lifecycle commands, registered from the command specs of @kauro/application (method, path, scope), with the admission
+ * pipeline of manual 10 (content type, byte size, strict JSON, closed schema, envelope headers, authenticated subject) in front of
+ * every handler, typed replies (CompletedResponse / AcceptedResponse / Problem) and the safe problem translation of every failure
+ * (opaque INTERNAL_ERROR by correlation id; 07 "Command outcomes"); the manual-10 reads and the source reads; the selection
+ * manifest intake (B07 D-SEL-2: a document stored once per content, STORED 201 or 200); plus the liveness and readiness probes
+ * outside /api/v1 (health.ts).
  *
  * Fastify's built-in JSON parser and Ajv are not used for command bodies: the body reaches the route as raw bytes and goes
  * through the strict UTF-8 decoding, the strict parser and the closed validator of @kauro/application, so an invalid byte, a
@@ -42,10 +44,13 @@ import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type {
   AcceptedResponse,
   B06Handlers,
+  B07Handlers,
   CommandEnvelope,
   CommandHandler,
   CommandResult,
   CompletedResponse,
+  IntakeHandler,
+  IntakeResult,
   Problem,
   RawRequest,
   ReadHandler,
@@ -53,6 +58,8 @@ import type {
   ReadResult,
   RouteResponses,
   SchemaValidator,
+  SourceIntakeHandlers,
+  SourceReadHandlers,
   UnauthenticatedRequest,
 } from "@kauro/application";
 import {
@@ -61,6 +68,7 @@ import {
   REQUEST_LIMITS,
   ResponseContractViolation,
   UNROUTED_RESPONSES,
+  admitDocument,
   admitHeaders,
   admitRead,
   admitStructure,
@@ -69,6 +77,7 @@ import {
   correlationIdOf,
   envelopeOf,
   internalProblem,
+  intakeRouteResponses,
   isServedCommand,
   problemOf,
   readRouteResponses,
@@ -119,9 +128,12 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  readonly handlers: B06Handlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16). */
-  readonly reads: ReadHandlers;
+  /** The seven B06 commands and the six B07 source-lifecycle commands (B07 design §11). */
+  readonly handlers: B06Handlers & B07Handlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16) and the source reads (B07 design §9.1). */
+  readonly reads: ReadHandlers & SourceReadHandlers;
+  /** The document intakes: the selection manifest (B07 D-SEL-2). */
+  readonly intakes: SourceIntakeHandlers;
   readonly authenticator: Authenticator;
   /**
    * Answers a structurally admitted command request that carried no authenticated subject: records the durable anonymous
@@ -410,7 +422,75 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
     registerRead(app, options, handler, sink);
   }
+  for (const handler of Object.values(options.intakes) as ReadonlyArray<IntakeHandler<unknown>>) {
+    registerIntake(app, options, handler, sink);
+  }
   return app;
+}
+
+/** The body of an intake's 201 or 200 (the STORED envelope of @kauro/application's intake response schemas). */
+export interface StoredReply<View> {
+  readonly kind: "STORED";
+  readonly data: View;
+}
+
+/**
+ * A document intake (B07 D-SEL-2): POST with a JSON document and no idempotency key — the intake is content-idempotent, so the
+ * same document again answers the stored record (200) and a new one is stored (201). Admission as a command's (repeated envelope
+ * header and content type from the head before the body is read; then size, strict UTF-8 JSON and the closed document schema; path
+ * ids; the agency selector), then the authenticated subject — refused with its anonymous fact like every route — then the handler,
+ * whose access decision (the reads' ACTIVE live membership and the intake's own role) belongs to @kauro/application.
+ */
+function registerIntake<View>(app: FastifyInstance, options: ApiServerOptions, handler: IntakeHandler<View>, sink: (correlationId: string, error: unknown) => void): void {
+  const spec = handler.spec;
+  app.route<{ Params: Record<string, string>; Body: Buffer | undefined; Reply: StoredReply<View> | Problem }>({
+    method: spec.method,
+    url: fastifyPath(spec.path),
+    config: { responses: intakeRouteResponses(spec.operationId) },
+    onRequest: async (request, reply) => {
+      const early = admitHeaders({ headers: singleValued(request.headers), repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId: request.id as CorrelationId });
+      if (early !== null) return sendProblem(reply, early.problem);
+      return undefined;
+    },
+    handler: async (request, reply) => {
+      const headers = singleValued(request.headers);
+      const admission = admitDocument(
+        spec,
+        {
+          headers,
+          repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders),
+          correlationId: request.id as CorrelationId,
+          params: request.params,
+          body: Buffer.isBuffer(request.body) ? request.body : null,
+          clientAddressHash: null,
+        },
+        options.validator,
+      );
+      if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
+      const { correlationId, agencyId, path, body } = admission.admission;
+      const subject = await options.authenticator.authenticate(headers);
+      if (!subject) {
+        let refusal: Problem;
+        try {
+          refusal = await options.refuseUnauthenticated(spec.action, { correlationId, agencyId });
+        } catch (error) {
+          sink(correlationId, error);
+          return sendProblem(reply, internalProblem(correlationId));
+        }
+        return sendProblem(reply, refusal);
+      }
+      let result: IntakeResult<View>;
+      try {
+        result = await handler.execute({ correlationId, subject, agencyId, path, body });
+      } catch (error) {
+        sink(correlationId, error);
+        return sendProblem(reply, internalProblem(correlationId));
+      }
+      if (result.kind === "PROBLEM") return sendProblem(reply, result.problem);
+      const stored: StoredReply<View> = { kind: "STORED", data: result.view };
+      return reply.code(result.created ? 201 : 200).type(HEADERS.contentType).send(stored);
+    },
+  });
 }
 
 /**

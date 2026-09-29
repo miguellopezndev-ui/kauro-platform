@@ -10,6 +10,13 @@
  * plan-side ports the B06 commands consume but do not own — ArtifactResolver, PlanPatchCompiler, DisclosureComposer. They
  * are ports of @kauro/application, not fakes of the database: the plan rows, receipts, locks and hashes are all real.
  *
+ * The source lifecycle (B07, mandate B07-COMMANDS) runs on the same world: the unit-of-work factory also opens source units of work
+ * (`runSource`, decorated with the same hold points), and the provider ports the source commands reach are bound to the labelled
+ * contract fakes of @kauro/application/testing (`storage`, `vault`; provider tokens `contract-fake-*`, evidence class SIMULATED,
+ * owned by B07-PROVIDER-FAKES) — the only provider stand-ins; the database, the handlers and the transport are the shipped ones.
+ * The api's process clock is movable (`processClock.advance`), for the grace a pending intent waits before it resumes (D-RUN-2);
+ * every lifecycle instant stays the database's own (D-CLOCK-1).
+ *
  * Deterministic interleavings (21 "Concurrency and crash matrix"): the unit-of-work factory is decorated with hold points
  * (`journal.reserved`, `journal.commit`, `collaborator`, `after.commit`). A RACE test arms one, starts request A, waits until
  * A reached the hold (its transaction open: journal row reserved or aggregate row locked), starts request B, observes B
@@ -22,7 +29,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import { ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -41,17 +49,38 @@ import type {
   ProcessingAuthorityId,
   ProjectId,
   RevisionId,
+  SourceUnitOfWork,
+  SourceUnitOfWorkFactory,
   UnitOfWork,
-  UnitOfWorkFactory,
   UnitOfWorkOptions,
   UserId,
   ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialAuthorizationsBeforePayments, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
+
+/** A process clock a test can move forward (never backwards): the api's business clock; the database keeps its own. */
+export interface MovableClock extends Clock {
+  advance(ms: number): void;
+}
+
+export function movableClock(): MovableClock {
+  let offsetMs = 0;
+  return {
+    now: () => toUtcInstant(Date.now() + offsetMs),
+    nowMs: () => Date.now() + offsetMs,
+    advance(ms: number) {
+      if (!(ms > 0)) throw new RangeError("the clock moves forward");
+      offsetMs += ms;
+    },
+  };
+}
+
+/** The application origin the test world binds resumable sessions to (the reserved .invalid domain, RFC 2606). */
+export const TEST_ORIGIN = "https://app.kauro.invalid";
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
 
 export function sha(s: string): Sha256Hex {
@@ -60,7 +89,11 @@ export function sha(s: string): Sha256Hex {
 
 // --- hold points -------------------------------------------------------------------------------------------------------
 
-export type HoldName = "journal.reserved" | "journal.commit" | "collaborator" | "after.commit";
+/**
+ * `source.intent` (B07): a source command attached its journal entry to the business object it created — the last write of
+ * CMD013's intent unit of work, so a request held there holds the revision row with its reservation written and uncommitted.
+ */
+export type HoldName = "journal.reserved" | "journal.commit" | "collaborator" | "after.commit" | "source.intent";
 
 interface ArmedHold {
   readonly reached: () => void;
@@ -122,7 +155,7 @@ export class SimulatedCrash extends Error {
   }
 }
 
-function instrumentUnitOfWork(uow: UnitOfWork, holds: HoldPoints): UnitOfWork {
+function instrumentUnitOfWork<U extends UnitOfWork>(uow: U, holds: HoldPoints): U {
   const journal: CommandJournal = {
     async reserve(identity, digest, correlationId) {
       const outcome = await uow.journal.reserve(identity, digest, correlationId);
@@ -136,11 +169,32 @@ function instrumentUnitOfWork(uow: UnitOfWork, holds: HoldPoints): UnitOfWork {
     markUncertain: (entryId) => uow.journal.markUncertain(entryId),
     find: (identity) => uow.journal.find(identity),
   };
+  let sources: unknown;
   return new Proxy(uow, {
     get(target, property) {
       if (property === "journal") return journal;
+      if (property === "sources" && "sources" in target) {
+        sources ??= instrumentSources((target as unknown as SourceUnitOfWork).sources, holds);
+        return sources;
+      }
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+}
+
+/** The source store with the `source.intent` hold after the pending-operation journal attaches an entry (B07). */
+function instrumentSources(sources: SourceUnitOfWork["sources"], holds: HoldPoints): SourceUnitOfWork["sources"] {
+  const operations: SourceUnitOfWork["sources"]["operations"] = {
+    async attach(entryId, resourceKind, resourceId) {
+      await sources.operations.attach(entryId, resourceKind, resourceId);
+      await holds.pass("source.intent");
+    },
+  };
+  return new Proxy(sources, {
+    get(target, property) {
+      if (property === "operations") return operations;
+      return Reflect.get(target, property, target) as unknown;
     },
   });
 }
@@ -150,12 +204,21 @@ export interface UnitOfWorkStats {
   runs: number;
 }
 
-/** Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. */
-export function instrumentedFactory(inner: UnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): UnitOfWorkFactory {
+/**
+ * Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. Both kinds of
+ * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07).
+ */
+export function instrumentedFactory(inner: SourceUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): SourceUnitOfWorkFactory {
   return {
     async run<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
       stats.runs += 1;
       const out = await inner.run(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
+      await holds.pass("after.commit");
+      return out;
+    },
+    async runSource<T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+      stats.runs += 1;
+      const out = await inner.runSource(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
       await holds.pass("after.commit");
       return out;
     },
@@ -323,6 +386,11 @@ export interface World {
   readonly stats: UnitOfWorkStats;
   readonly validator: SchemaValidator;
   readonly plans: TestPlanServices;
+  /** The api's process clock (movable; the database's clock is its own). */
+  readonly processClock: MovableClock;
+  /** The labelled contract fakes the source lifecycle's provider ports are bound to (SIMULATED; B07-PROVIDER-FAKES). */
+  readonly storage: ContractFakeObjectStorage;
+  readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
@@ -388,8 +456,10 @@ export interface World {
 export interface WorldOptions {
   /** Replaces or extends the collaborators before the server is built. */
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
-  /** The clock the api (authorizer, handlers) runs on; the fixture clock by default. */
+  /** The clock the api (authorizer, handlers) runs on; the world's movable process clock by default. */
   readonly clock?: Clock;
+  /** Replaces or extends the source lifecycle's collaborators (the storage and vault fakes, the origin, no preview reader). */
+  readonly sources?: (base: B07Collaborators) => Partial<B07Collaborators>;
 }
 
 export interface RawEvent {
@@ -423,6 +493,11 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const plans = testPlanServices(holds);
   const tokens = new Map<string, AuthenticatedSubject>();
   const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
+  const processClock = movableClock();
+  const storage = new ContractFakeObjectStorage();
+  const vault = new ContractFakeSessionVault();
+  const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: noCommercialAuthorizationsBeforePayments };
+  const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
 
   const base: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
@@ -451,8 +526,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
+    sources,
     validator,
-    clock: options.clock ?? clock,
+    clock: options.clock ?? processClock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
   });
@@ -524,6 +600,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     stats,
     validator,
     plans,
+    processClock,
+    storage,
+    vault,
     internalErrors,
     A,
     owner,

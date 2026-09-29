@@ -1,5 +1,5 @@
 /**
- * Concurrent writers of the rows a B06 command reads but does not own — B07's revision expiry, B08's target-contract
+ * Concurrent writers of the rows a B06 command reads but does not own — B07's revision expiry (the retention sweeper), B08's target-contract
  * supersession, the control plane's capability suspension, an agency transition — each as its own transaction on the fixture
  * pools, held open for as long as a RACE test needs. They place a writer on either side of a command held inside its unit of
  * work (21 "Concurrency and crash matrix"): the writer is either observed waiting on the command's lock in pg_stat_activity, or
@@ -22,14 +22,14 @@ export interface HeldTransaction {
   close(): Promise<void>;
 }
 
-async function open(client: PoolClient, context: { readonly agencyId: string; readonly userId: string } | null): Promise<HeldTransaction> {
+async function open(client: PoolClient, context: { readonly agencyId: string; readonly userId: string | null } | null): Promise<HeldTransaction> {
   let state: "OPEN" | "COMMITTED" | "CLOSED" = "OPEN";
   try {
     const name = await client.query<{ name: string }>("SELECT current_setting('application_name') AS name");
     const applicationName = name.rows[0]?.name;
     if (applicationName === undefined || applicationName === "") throw new Error("the writer connection has no application name to be observed by");
     await client.query("BEGIN");
-    if (context !== null) await client.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [context.agencyId, context.userId]);
+    if (context !== null) await client.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [context.agencyId, context.userId ?? ""]);
     return {
       applicationName,
       client,
@@ -63,6 +63,22 @@ export async function tenantWriter(w: World, agency: AgencyFixture): Promise<Hel
 /** A writer on the control-plane role (capabilities are platform-wide rows the control plane owns). */
 export async function controlWriter(w: World): Promise<HeldTransaction> {
   return open(await w.h.controlPool.raw.connect(), null);
+}
+
+/**
+ * B07's retention sweeper: the control plane bound to one agency (design B07 D-CTRL-1), the only writer of retention_expires on a
+ * sealed revision (the request-handler role cannot enter EXPIRED, D-ROLE-2).
+ */
+export async function retentionSweeper(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
+  return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
+}
+
+/**
+ * A control-plane unit of work of the source lifecycle (B07 design §12): the control plane bound to one agency (D-CTRL-1), as its
+ * consumers and sweepers write, held open for as long as a RACE test needs (e.g. UPLOAD_INSPECTION holding the revision row).
+ */
+export async function boundControlWriter(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
+  return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
 }
 
 /** Waits until the writer's connection is blocked on a lock while running a statement containing `fragment`; throws otherwise. */

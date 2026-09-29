@@ -35,22 +35,33 @@ export type {
   ServedCommandId,
   JsonSchema,
   ViewDefinition,
+  ViewMember,
+  DerivedMember,
+  PlatformMember,
   OperationalRoute,
   OperationalResponse,
   RegistryBundle,
   ResponseSchemaSet,
   ReadOperationId,
   ReadResponseSchemaId,
+  IntakeOperationId,
+  IntakeResponseSchemaId,
+  CommandReply,
 } from "./api/response-schemas.js";
 export {
   RESPONSE_SCHEMA_PREFIX,
   RESPONSE_FIELD_VOCABULARY,
   VIEW_DEFINITIONS,
+  VIEW_MEMBER_KIT,
+  viewSchema,
   COMMAND_RESPONSES,
   SERVED_COMMAND_IDS,
   READ_RESPONSES,
   READ_OPERATION_IDS,
   readResponseSchemaId,
+  INTAKE_RESPONSES,
+  INTAKE_OPERATION_IDS,
+  intakeResponseSchemaId,
   ACCEPTED_RESPONSE_SCHEMA,
   ACCEPTED_RESPONSE_SCHEMA_ID,
   OPERATIONAL_ROUTES,
@@ -65,21 +76,22 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, INTAKE_OUTCOMES, OUTCOME_BLOCKS, problemOutcome, closedCatalogue, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,
   ResponseContractViolation,
   checkReply,
   commandRouteResponses,
+  intakeRouteResponses,
   operationalRouteResponses,
   readRouteResponses,
   isServedCommand,
   mediaTypeOf,
   responseIntegrityProblem,
 } from "./api/response-contract.js";
-export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
+export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome, DocumentRoute, DocumentAdmission, DocumentAdmissionOutcome } from "./api/admission.js";
+export { admitHeaders, admitStructure, admitDocument, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,
@@ -103,8 +115,8 @@ export type {
   B06CommandId,
 } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS } from "./commands/contracts.js";
-export type { CommandRuntime, CommandContext, CommandOutcome, UnauthenticatedRequest } from "./commands/runtime.js";
-export { runCommand, contextOf, identityOf, refuseUnauthenticated, recordDenialFact, ALLOW_REASONS } from "./commands/runtime.js";
+export type { CommandRuntime, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest } from "./commands/runtime.js";
+export { runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, recordDenialFact, ALLOW_REASONS } from "./commands/runtime.js";
 export type { B06Collaborators, B06Handlers, ApprovalPreimage } from "./commands/handlers/index.js";
 export {
   createB06Handlers,
@@ -118,5 +130,7 @@ export {
   approvalHashOf,
   LAUNCH_ASSURANCE_POLICY,
 } from "./commands/handlers/index.js";
+// B07 source lifecycle (docs/design/B07-upload-source-lifecycle.md)
+export * from "./sources/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";

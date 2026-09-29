@@ -40,6 +40,13 @@ export interface SystemContext {
   readonly kind: "SYSTEM";
   readonly serviceId: string;
   readonly correlationId: CorrelationId;
+  /**
+   * Decision D-CTRL-1 (B07): a control-plane unit of work that acts on one tenant's rows binds that agency (kauro.agency_id), and
+   * the source-lifecycle tables admit control-plane writes only for the bound agency. Absent, the unit of work may only discover
+   * work across tenants through the columns granted to kauro_control (never customer text). The agency comes from the durable
+   * work item (the outbox event's agency_id), never from a request.
+   */
+  readonly agencyId?: AgencyId;
 }
 
 export interface AnonymousContext {

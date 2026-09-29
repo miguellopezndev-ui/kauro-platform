@@ -4,6 +4,19 @@ The Kauro HTTP API (manual 10) on Fastify 5. `createApiServer(options)` register
 command specs of `@kauro/application` (`POST /api/v1/agencies`, `/agencies/{agencyId}/clients`, `/clients/{clientId}/archive`,
 `/clients/{clientId}/projects`, `/plans/{planId}/revisions`, `/plans/{planId}/approve`, `/plans/{planId}/withdraw`).
 
+Since B07 (mandate B07-COMMANDS, `docs/design/B07-upload-source-lifecycle.md` §9, §11) it also registers the six source-lifecycle
+command routes (`POST /api/v1/projects/{projectId}/revisions`, `/revisions/{revisionId}/uploads`, `/uploads/{uploadId}/complete` —
+answered 202 ACCEPTED, the verification being the control plane's — `/uploads/{uploadId}/cancel`, `/revisions/{revisionId}/selection`,
+`/revisions/{revisionId}/seal`), the seven source reads (revision, inspection, uploads, upload, the requester-only session,
+the stored selection manifest, the bounded table preview) and the selection manifest intake
+(`POST /revisions/{revisionId}/selection-manifests`: content-idempotent, 201 stored or 200 the same document again, no
+idempotency key). CMD013 runs in two units of work around its one provider call (D-RUN-2). The provider adapters (object
+storage, session vault) and the preview reader are source collaborators (`sources` of `assembleApi`): this edition binds none, so
+a command or read that needs one answers `INTEGRITY_FAILURE / SOURCE_SERVICES_UNAVAILABLE` and reserves nothing (D-SAPI-6); the
+tests bind the labelled contract fakes of `@kauro/application/testing` (SIMULATED) and the platform's own preview reader of
+`@kauro/data-plane`, and B15 binds the real adapters. CMD012's commercial impact map is `noCommercialAuthorizationsBeforePayments`
+(no commercial authorization exists before B09).
+
 Every request goes through the admission pipeline of manual 10 in this order, and the first failure answers:
 a repeated single-valued envelope header (`Authorization`, `Content-Type`, `Idempotency-Key`, `X-Correlation-Id`,
 `X-Kauro-Agency`: `HEADER_REPEATED`) → content type (`application/json`, optional `charset=utf-8`; both decided in an

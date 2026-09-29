@@ -20,104 +20,63 @@
  * validator of api/schema-validation; every reply of the api is validated against them before it is sent (apps/api), and
  * tools/openapi.mjs publishes them in the OpenAPI document. Nothing here is compiled from a runtime value (S093).
  */
-import type { ContractName } from "@kauro/contracts";
 import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
-import { CURSOR_PATTERN } from "./cursor.js";
-import { RESOURCE_ACTIONS } from "./permitted-actions.js";
-import { LABEL_PATTERN } from "./request-schemas.js";
+import { SOURCE_ROUTES } from "../sources/contracts.js";
+import type { B07CommandId } from "../sources/contracts.js";
+import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
+import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
 import { READINESS_BLOCKERS } from "./views.js";
+import {
+  FORBIDDEN_RESPONSE_FIELDS,
+  RESPONSE_FIELD_VOCABULARY,
+  RESPONSE_SCHEMA_PREFIX,
+  VIEW_MEMBER_KIT,
+  declaredMembers,
+  openObjects,
+  viewSchema,
+  type JsonSchema,
+  type RegistryBundle,
+  type ViewDefinition,
+} from "./view-kit.js";
 
-export const RESPONSE_SCHEMA_PREFIX = "urn:kauro:api:v1:response:";
+// the view kit (api/view-kit) is part of this module's public surface, as it was before the B07 views joined the served ones
+export {
+  RESPONSE_SCHEMA_PREFIX,
+  RESPONSE_FIELD_VOCABULARY,
+  VIEW_MEMBER_KIT,
+  FORBIDDEN_RESPONSE_FIELDS,
+  declaredMembers,
+  openObjects,
+  viewSchema,
+} from "./view-kit.js";
+export type { JsonSchema, DerivedMember, PlatformMember, ViewMember, ViewDefinition, RegistryBundle } from "./view-kit.js";
+
+const { ID, VERSION, HASH, UTC, LABEL, COUNT } = RESPONSE_FIELD_VOCABULARY;
+const { registry, platform, ref, NARROW_ID, NARROW_LABEL, CURSOR, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION } = VIEW_MEMBER_KIT;
+
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
-/** The B06 commands this edition serves, by registry id. */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026";
+/**
+ * The commands this edition serves, by registry id: the seven of B06 and, since mandate B07-COMMANDS, the six of the source
+ * lifecycle (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths).
+ */
+export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId;
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
-/** The manual-10 reads this edition serves (re-check finding N16), by operation id. */
-export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject";
+/** The manual-10 reads this edition serves (re-check finding N16) and the reads of the source lifecycle (B07), by operation id. */
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId;
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
-export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId;
-
-export type JsonSchema = Readonly<Record<string, unknown>>;
-
-// --- field vocabulary (reference/FIELD_CONTRACTS.md "Common rules"; the request schemas use the same shapes) -----------------
-
-const UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
-/** A server identity the platform minted (UUIDv7) or derived (UUIDv5): "Application IDs are opaque server identities". */
-const ID = Object.freeze({ type: "string", pattern: UUID_PATTERN });
-/** A version the platform assigns: an aggregate starts at 1 and every edit adds one (design D-VER-1). */
-const VERSION = Object.freeze({ type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER });
-/** "SHA-256 is lowercase hexadecimal". */
-const HASH = Object.freeze({ type: "string", pattern: "^[0-9a-f]{64}$" });
-/** "UTC instants include Z"; the calendar assertion is the validator's `date-time` format (10 "Schema format execution"). */
-const UTC = Object.freeze({ type: "string", format: "date-time", pattern: "Z$" });
-/**
- * The registry `label` shape (FIELD_CONTRACTS: labels are untrusted text, bounded), with the control-character rule of the
- * request schemas and kauro.is_label: a label the api could not have admitted is never answered either (re-check finding N6).
- */
-const LABEL = Object.freeze({ type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN });
-/** A non-negative exact count. */
-const COUNT = Object.freeze({ type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
-
-/** The shapes above, exported so a test can prove each equals the registry vocabulary it claims to be. */
-export const RESPONSE_FIELD_VOCABULARY = Object.freeze({ ID, VERSION, HASH, UTC, LABEL, COUNT, UUID_PATTERN });
-
-// --- view definitions ----------------------------------------------------------------------------------------------------
+/** The document intakes this edition serves (B07 D-SEL-2: the selection manifest), by operation id. */
+export type IntakeOperationId = SourceIntakeId;
+export type IntakeResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}intake:${IntakeOperationId}`;
+export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId | IntakeResponseSchemaId;
 
 /**
- * A member taken from the registry, optionally narrowed by keywords the registry member lacks: from the view's own contract
- * (same name), or — `from` — from the named member of another contract (a reference such as a project's capability version).
- */
-interface DerivedMember {
-  readonly kind: "registry";
-  readonly required: boolean;
-  readonly narrow?: JsonSchema;
-  readonly from?: readonly [ContractName, string];
-}
-/** A member the registry has no contract for; its schema is platform vocabulary and its rationale is recorded. */
-interface PlatformMember {
-  readonly kind: "platform";
-  readonly required: boolean;
-  readonly schema: JsonSchema;
-  readonly description: string;
-}
-type ViewMember = DerivedMember | PlatformMember;
-
-export interface ViewDefinition {
-  readonly name: string;
-  readonly description: string;
-  /** The registry contract the view projects, or null when the registry has none (the members are then all platform). */
-  readonly contract: ContractName | null;
-  /** Registry members of `contract` the view deliberately does not select, each with the reason (FIELD_CONTRACTS). */
-  readonly withheld: Readonly<Record<string, string>>;
-  readonly members: Readonly<Record<string, ViewMember>>;
-}
-
-const registry = (required: boolean, narrow?: JsonSchema, from?: readonly [ContractName, string]): DerivedMember => ({
-  kind: "registry",
-  required,
-  ...(narrow !== undefined ? { narrow } : {}),
-  ...(from !== undefined ? { from } : {}),
-});
-const platform = (required: boolean, schema: JsonSchema, description: string): PlatformMember => ({ kind: "platform", required, schema, description });
-const ref = (name: string): JsonSchema => ({ $ref: `#/$defs/${name}` });
-const NARROW_ID = Object.freeze({ pattern: UUID_PATTERN });
-/** A registry label narrowed by the platform's control-character rule (the request schemas and kauro.is_label; N6). */
-const NARROW_LABEL = Object.freeze({ pattern: LABEL_PATTERN });
-/** The served commands a caller may issue on a resource, derived server-side (api/permitted-actions; N16). */
-const RESOURCE_ACTIONS_SCHEMA = Object.freeze({ type: "array", maxItems: RESOURCE_ACTIONS.length, items: { type: "string", enum: [...RESOURCE_ACTIONS] } });
-const RESOURCE_ACTIONS_DESCRIPTION =
-  "The served commands the caller may issue on this resource, derived server-side from the caller's role, the resource's state and, for an approval, its control (07 \"The handoff to UI includes every state, safe field, permitted action\"); informative, never authority (re-check finding N16).";
-/** An opaque list cursor (api/cursor): integrity-protected and bound to the caller, the scope, the filter and the order. */
-const CURSOR = Object.freeze({ type: "string", pattern: CURSOR_PATTERN, maxLength: 600 });
-
-/**
- * Every DTO definition of the served routes. Order is the order of the OpenAPI components. A view is closed: a member not
+ * Every DTO definition of the B06 routes. Order is the order of the OpenAPI components. A view is closed: a member not
  * listed here can never reach the wire, whatever a record or a collaborator carries.
  */
-export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
+const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
   {
     name: "AgencyView",
     description: "The safe agency view (10 \"GET /agencies/{agencyId} returns the safe agency view\"), with the caller's permitted actions.",
@@ -423,8 +382,20 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
   },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
-/** The success reply of every served command: status and the view its COMPLETED envelope carries. */
-export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, { readonly status: 200 | 201; readonly view: string }>> = Object.freeze({
+/**
+ * Every DTO definition of the served routes: B06's, then the source lifecycle's (sources/response-views, joined when mandate
+ * B07-COMMANDS served its routes; design §9.5). A view is closed: a member not listed can never reach the wire.
+ */
+export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([...B06_VIEW_DEFINITIONS, ...SOURCE_VIEW_DEFINITIONS]);
+
+/**
+ * The success reply of a served command: a COMPLETED envelope carrying a view at 200 or 201, or — CompleteUpload (CMD014), whose
+ * completion remains asynchronous (B07 D-RUN-1) — B06's ACCEPTED envelope at 202 and no view.
+ */
+export type CommandReply = { readonly status: 200 | 201; readonly view: string } | { readonly status: 202; readonly view: null };
+
+/** The success reply of every served command: status and the view its COMPLETED envelope carries (none for ACCEPTED). */
+export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> = Object.freeze({
   CMD001: { status: 201, view: "CreateAgencyView" },
   CMD009: { status: 201, view: "EndClientView" },
   CMD010: { status: 200, view: "ArchiveClientView" },
@@ -432,29 +403,66 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, { readonly stat
   CMD023: { status: 201, view: "RevisePlanView" },
   CMD025: { status: 201, view: "ApprovePlanView" },
   CMD026: { status: 200, view: "WithdrawApprovalView" },
+  ...SOURCE_COMMAND_RESPONSES,
 });
 
 export const SERVED_COMMAND_IDS = Object.freeze(Object.keys(COMMAND_RESPONSES) as ServedCommandId[]);
 
+/** The COMPLETED envelope of a served command (an ACCEPTED command validates with ACCEPTED_RESPONSE_SCHEMA_ID instead). */
 export function commandResponseSchemaId(command: ServedCommandId): CommandResponseSchemaId {
   return `${RESPONSE_SCHEMA_PREFIX}${command}`;
 }
 
 export const ACCEPTED_RESPONSE_SCHEMA_ID: AcceptedResponseSchemaId = `${RESPONSE_SCHEMA_PREFIX}accepted`;
 
-/** The reply of every served read (N16): 200 and the view it carries. */
+/** The reply of every served read (N16; the source lifecycle's reads, B07): 200 and the view it carries. */
 export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: string }>> = Object.freeze({
   ListAgencies: { view: "AgencyPage" },
   GetAgency: { view: "AgencyView" },
   ListMembers: { view: "TeamPage" },
   ListClients: { view: "ClientPage" },
   GetProject: { view: "ProjectView" },
+  GetSelectionManifest: { view: SOURCE_ROUTES.GetSelectionManifest.view },
+  GetRevision: { view: SOURCE_ROUTES.GetRevision.view },
+  GetInspection: { view: SOURCE_ROUTES.GetInspection.view },
+  ListUploads: { view: SOURCE_ROUTES.ListUploads.view },
+  GetUpload: { view: SOURCE_ROUTES.GetUpload.view },
+  GetUploadSession: { view: SOURCE_ROUTES.GetUploadSession.view },
+  PreviewTable: { view: SOURCE_ROUTES.PreviewTable.view },
 });
 
 export const READ_OPERATION_IDS = Object.freeze(Object.keys(READ_RESPONSES) as ReadOperationId[]);
 
 export function readResponseSchemaId(operationId: ReadOperationId): ReadResponseSchemaId {
   return `${RESPONSE_SCHEMA_PREFIX}read:${operationId}`;
+}
+
+/** The reply of every served document intake (B07 D-SEL-2): 201 when stored, 200 when the same document was already stored. */
+export const INTAKE_RESPONSES: Readonly<Record<IntakeOperationId, { readonly view: string }>> = Object.freeze({
+  SubmitSelectionManifest: { view: SOURCE_ROUTES.SubmitSelectionManifest.view },
+});
+
+export const INTAKE_OPERATION_IDS = Object.freeze(Object.keys(INTAKE_RESPONSES) as IntakeOperationId[]);
+
+export function intakeResponseSchemaId(operationId: IntakeOperationId): IntakeResponseSchemaId {
+  return `${RESPONSE_SCHEMA_PREFIX}intake:${operationId}`;
+}
+
+function intakeEnvelope(operationId: IntakeOperationId): JsonSchema {
+  return {
+    $schema: DIALECT,
+    $id: intakeResponseSchemaId(operationId),
+    title: `${operationId} STORED`,
+    description:
+      "A document intake (B07 D-SEL-2): the stored document's identity; created false (200) when the same body was already stored for this revision (content-idempotent, no journal entry, no aggregate version), created true (201) when this request stored it.",
+    type: "object",
+    additionalProperties: false,
+    required: ["kind", "data"],
+    properties: {
+      kind: { type: "string", const: "STORED" },
+      data: ref(INTAKE_RESPONSES[operationId].view),
+    },
+  };
 }
 
 function readEnvelope(operationId: ReadOperationId): JsonSchema {
@@ -474,6 +482,8 @@ function readEnvelope(operationId: ReadOperationId): JsonSchema {
 }
 
 function completedEnvelope(command: ServedCommandId): JsonSchema {
+  const reply = COMMAND_RESPONSES[command];
+  if (reply.view === null) throw new TypeError(`${command} answers the ACCEPTED envelope, not a COMPLETED one`);
   return {
     $schema: DIALECT,
     $id: commandResponseSchemaId(command),
@@ -486,7 +496,7 @@ function completedEnvelope(command: ServedCommandId): JsonSchema {
       kind: { type: "string", const: "COMPLETED" },
       version: VERSION,
       replayed: { type: "boolean" },
-      data: ref(COMMAND_RESPONSES[command].view),
+      data: ref(reply.view),
     },
   };
 }
@@ -496,7 +506,8 @@ export const ACCEPTED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
   $schema: DIALECT,
   $id: ACCEPTED_RESPONSE_SCHEMA_ID,
   title: "ACCEPTED",
-  description: "Accepted long work: the durable operation reference, its current state, the status path and the polling guidance. None of the B06 commands answers it.",
+  description:
+    "Accepted long work: the durable operation reference, its current state, the status path and the polling guidance. CompleteUpload (CMD014) answers it: the completion is a claim, verified asynchronously by the control plane (B07 D-RUN-1); none of the B06 commands does.",
   type: "object",
   additionalProperties: false,
   required: ["kind", "operationId", "state", "statusPath", "pollAfterSeconds"],
@@ -618,63 +629,6 @@ export function operationalResponseSchemaId(operationId: string, status: string)
   return `${RESPONSE_SCHEMA_PREFIX}op:${operationId}:${status}`;
 }
 
-// --- forbidden response members ----------------------------------------------------------------------------------------------
-
-/**
- * Member names no response schema may declare, with the authority that forbids them. The schemas are closed, so a member that
- * no schema declares can never reach the wire; this list proves no schema declares one (start-up and the OpenAPI checker).
- */
-export const FORBIDDEN_RESPONSE_FIELDS: Readonly<Record<string, string>> = Object.freeze({
-  token: "10 \"Agency and team routes\": no authentication provider tokens",
-  tokenHash: "08 \"Invitation, recovery and ownership transfer\": stored token material is protected",
-  accessToken: "10 \"Agency and team routes\": no authentication provider tokens",
-  refreshToken: "10 \"Agency and team routes\": no authentication provider tokens",
-  idToken: "10 \"Agency and team routes\": no authentication provider tokens",
-  sessionToken: "08 \"Authentication and assurance\": session tokens never leave the secure flow",
-  bearerToken: "10 \"Agency and team routes\": no authentication provider tokens",
-  invitationToken: "08 \"Invitation, recovery and ownership transfer\": one-use opaque tokens",
-  subject: "08 \"Identity is not permission\": the provider subject stays with the authenticator",
-  subjectHash: "08 \"Identity is not permission\": the provider subject stays with the authenticator",
-  providerSubject: "08 \"Identity is not permission\": the provider subject stays with the authenticator",
-  password: "08 \"Authentication and assurance\": passwords never leave the secure flow",
-  passwordHash: "08 \"Authentication and assurance\": passwords never leave the secure flow",
-  recoveryCodes: "10 \"Agency and team routes\": no recovery settings",
-  recoverySettings: "10 \"Agency and team routes\": no recovery settings",
-  mfaSeed: "08 \"Authentication and assurance\": MFA seeds never leave the secure flow",
-  mfaSecret: "08 \"Authentication and assurance\": MFA seeds never leave the secure flow",
-  totpSecret: "08 \"Authentication and assurance\": MFA seeds never leave the secure flow",
-  secret: "10 \"Responses and safe errors\": no internal secrets",
-  clientSecret: "10 \"Responses and safe errors\": no internal secrets",
-  privateKey: "10 \"Responses and safe errors\": no internal secrets",
-  apiKey: "10 \"Responses and safe errors\": no internal secrets",
-  credentials: "08 \"Authentication and assurance\": provider credentials never leave the secure flow",
-  assuranceProofRef: "10 \"Agency and team routes\": no private security evidence (the step-up proof)",
-  emailVerifiedAt: "10 \"Agency and team routes\": no private security evidence (identity verification facts)",
-  mfaEnrolledAt: "10 \"Agency and team routes\": no private security evidence (identity verification facts)",
-  stack: "10 \"Responses and safe errors\": no stack traces",
-  stackTrace: "10 \"Responses and safe errors\": no stack traces",
-  sql: "10 \"Responses and safe errors\": no SQL",
-  bucket: "10 \"Responses and safe errors\": no bucket names",
-  bucketName: "10 \"Responses and safe errors\": no bucket names",
-  sessionUri: "10 \"Responses and safe errors\": no session URIs",
-  requestDigest: "10 \"Read endpoints return safe projections\": the idempotency journal is an internal record",
-  responseBody: "10 \"Read endpoints return safe projections\": the idempotency journal is an internal record",
-  createdByUserId: "10 \"Read endpoints return safe projections\": internal column",
-  activeOwnerCount: "10 \"Read endpoints return safe projections\": internal column",
-  legalProfileRef: "registry Agency.legalProfileRef \"Private reviewed customer billing profile\"",
-});
-
-// --- building the schemas from the registry bundle ---------------------------------------------------------------------------
-
-/** The generated registry bundle, as @kauro/contracts/schemas.json ships it. */
-export interface RegistryBundle {
-  readonly $defs: Readonly<Record<string, unknown>>;
-}
-
-interface RegistryContractSchema {
-  readonly properties: Readonly<Record<string, JsonSchema>>;
-  readonly required?: ReadonlyArray<string>;
-}
 
 export interface ResponseSchemaSet {
   /** View definitions by name, referenced from the envelopes as `#/$defs/<name>`. */
@@ -685,108 +639,6 @@ export interface ResponseSchemaSet {
 
 function refuse(message: string): never {
   throw new DomainFailure("INTEGRITY_FAILURE", `response schemas: ${message}`);
-}
-
-function registryContract(bundle: RegistryBundle, name: ContractName): RegistryContractSchema {
-  const def = bundle.$defs[name];
-  if (typeof def !== "object" || def === null || typeof (def as { properties?: unknown }).properties !== "object") refuse(`the registry bundle has no contract ${name}`);
-  return def as RegistryContractSchema;
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-/** Every member name any object schema in `schema` declares, with its path; `$ref`s are not followed. */
-export function declaredMembers(schema: unknown, at = ""): ReadonlyArray<{ readonly name: string; readonly path: string }> {
-  const out: Array<{ name: string; path: string }> = [];
-  const walk = (s: unknown, path: string): void => {
-    if (Array.isArray(s)) {
-      s.forEach((x, i) => walk(x, `${path}/${i}`));
-      return;
-    }
-    if (!isPlainObject(s)) return;
-    for (const [k, v] of Object.entries(s)) {
-      if (k === "properties" && isPlainObject(v)) {
-        for (const [name, sub] of Object.entries(v)) {
-          out.push({ name, path: `${path}/properties/${name}` });
-          walk(sub, `${path}/properties/${name}`);
-        }
-      } else if (k !== "enum" && k !== "const") {
-        walk(v, `${path}/${k}`);
-      }
-    }
-  };
-  walk(schema, at);
-  return out;
-}
-
-/** Paths of object schemas that are not closed (`additionalProperties: false`); a wire contract is closed (10). */
-export function openObjects(schema: unknown, at = ""): ReadonlyArray<string> {
-  const out: string[] = [];
-  const walk = (s: unknown, path: string): void => {
-    if (Array.isArray(s)) {
-      s.forEach((x, i) => walk(x, `${path}/${i}`));
-      return;
-    }
-    if (!isPlainObject(s)) return;
-    const isObject = s["type"] === "object" || (Array.isArray(s["type"]) && (s["type"] as unknown[]).includes("object")) || "properties" in s;
-    if (isObject && s["additionalProperties"] !== false) out.push(path || "/");
-    for (const [k, v] of Object.entries(s)) {
-      if (k === "properties" && isPlainObject(v)) {
-        for (const [name, sub] of Object.entries(v)) walk(sub, `${path}/properties/${name}`);
-      } else if (k !== "enum" && k !== "const") {
-        walk(v, `${path}/${k}`);
-      }
-    }
-  };
-  walk(schema, at);
-  return out;
-}
-
-function viewSchema(bundle: RegistryBundle, view: ViewDefinition): JsonSchema {
-  const contract = view.contract === null ? null : registryContract(bundle, view.contract);
-  const properties: Record<string, JsonSchema> = {};
-  const required: string[] = [];
-  for (const [name, member] of Object.entries(view.members)) {
-    if (member.kind === "registry") {
-      const [sourceName, sourceMember] = member.from ?? [view.contract, name];
-      if (sourceName === null) refuse(`${view.name}.${name} is derived from the registry but names no contract`);
-      const source = sourceName === view.contract && contract !== null ? contract : registryContract(bundle, sourceName);
-      const base = source.properties[sourceMember];
-      if (base === undefined) refuse(`${view.name}.${name}: the registry contract ${sourceName} has no member ${sourceMember}`);
-      if ((source.required ?? []).includes(sourceMember) && !member.required) refuse(`${view.name}.${name}: the registry requires ${sourceName}.${sourceMember}; a view cannot make it optional`);
-      const narrowed: Record<string, unknown> = { ...base };
-      for (const [k, v] of Object.entries(member.narrow ?? {})) {
-        if (k in base) refuse(`${view.name}.${name}: narrowing may only add keywords the registry member lacks (${k} is already set)`);
-        narrowed[k] = v;
-      }
-      properties[name] = narrowed;
-    } else {
-      if (contract !== null && name in contract.properties) refuse(`${view.name}.${name} is a registry member of ${view.contract}; it must be derived, not redeclared`);
-      properties[name] = { ...member.schema, description: member.description };
-    }
-    if (member.required) required.push(name);
-  }
-  if (contract !== null) {
-    for (const name of Object.keys(contract.properties)) {
-      if (!(name in view.members) && !(name in view.withheld)) refuse(`${view.name}: registry member ${view.contract}.${name} is neither selected nor withheld with a reason`);
-    }
-    for (const name of Object.keys(view.withheld)) {
-      if (!(name in contract.properties)) refuse(`${view.name}: withheld member ${name} is not a registry member of ${view.contract}`);
-      if (name in view.members) refuse(`${view.name}: ${name} is both selected and withheld`);
-    }
-  }
-  const withheld = Object.entries(view.withheld);
-  return {
-    title: view.name,
-    description: view.description,
-    ...(view.contract !== null ? { $comment: `Projection of registry contract ${view.contract}.${withheld.length > 0 ? ` Withheld: ${withheld.map(([k, why]) => `${k} (${why})`).join("; ")}` : " Every registry member is selected."}` } : {}),
-    type: "object",
-    additionalProperties: false,
-    required,
-    properties,
-  };
 }
 
 function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<OperationalResponseSchemaId, JsonSchema> {
@@ -818,7 +670,10 @@ export function buildResponseSchemas(bundle: RegistryBundle, operational: Readon
   }
   const roots: Record<string, JsonSchema> = {};
   for (const command of SERVED_COMMAND_IDS) {
-    if (!(COMMAND_RESPONSES[command].view in defs)) refuse(`${command} names an unknown view ${COMMAND_RESPONSES[command].view}`);
+    const reply = COMMAND_RESPONSES[command];
+    // an ACCEPTED command (CMD014) validates its 202 with the shared ACCEPTED envelope below
+    if (reply.view === null) continue;
+    if (!(reply.view in defs)) refuse(`${command} names an unknown view ${reply.view}`);
     roots[commandResponseSchemaId(command)] = completedEnvelope(command);
   }
   roots[ACCEPTED_RESPONSE_SCHEMA_ID] = ACCEPTED_RESPONSE_SCHEMA;
@@ -826,10 +681,16 @@ export function buildResponseSchemas(bundle: RegistryBundle, operational: Readon
     if (!(READ_RESPONSES[operationId].view in defs)) refuse(`${operationId} names an unknown view ${READ_RESPONSES[operationId].view}`);
     roots[readResponseSchemaId(operationId)] = readEnvelope(operationId);
   }
+  for (const operationId of INTAKE_OPERATION_IDS) {
+    if (!(INTAKE_RESPONSES[operationId].view in defs)) refuse(`${operationId} names an unknown view ${INTAKE_RESPONSES[operationId].view}`);
+    roots[intakeResponseSchemaId(operationId)] = intakeEnvelope(operationId);
+  }
   Object.assign(roots, operationalRoots(operational));
   for (const [where, schema] of [...Object.entries(defs), ...Object.entries(roots)]) {
     for (const member of declaredMembers(schema)) {
       if (member.name in FORBIDDEN_RESPONSE_FIELDS) refuse(`${where}${member.path} declares the forbidden member ${member.name} (${FORBIDDEN_RESPONSE_FIELDS[member.name]})`);
+      // the resumable session URL is a bearer credential: one view carries it, to its requester only (B07 D-SESSION-2)
+      if (member.name === SESSION_URL_MEMBER && where !== SESSION_URL_VIEW) refuse(`${where}${member.path} carries the session URL outside ${SESSION_URL_VIEW}`);
     }
     const open = openObjects(schema);
     if (open.length > 0) refuse(`${where} is not closed at ${open.join(", ")} (additionalProperties must be false)`);

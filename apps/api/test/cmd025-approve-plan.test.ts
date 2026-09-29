@@ -8,8 +8,9 @@ import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rawEvent, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
-import { reachedHold, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
+import { expireSealedRevision } from "@kauro/persistence/testing";
+import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
+import { reachedHold, retentionSweeper, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
 let w: World;
 let projectId: ProjectId;
@@ -339,8 +340,8 @@ test("the approval binds its source and target through the planHash the approver
 });
 
 /** The dataset_revisions row a plan fixture's source hash names (superuser oracle). */
-async function sourceRowOf(plan: PlanFixture): Promise<{ revision_id: string; version: string }> {
-  const row = await w.row<{ revision_id: string; version: string }>("dataset_revisions", "manifest_hash = $1", [plan.revisionHash]);
+async function sourceRowOf(plan: PlanFixture): Promise<{ revision_id: string; project_id: string; version: string }> {
+  const row = await w.row<{ revision_id: string; project_id: string; version: string }>("dataset_revisions", "manifest_hash = $1", [plan.revisionHash]);
   if (!row) throw new Error("the plan fixture has no source revision row");
   return row;
 }
@@ -353,13 +354,13 @@ async function targetRowOf(plan: PlanFixture): Promise<{ contract_id: string }> 
 }
 
 /**
- * B07's retention_expires edge (SEALED -> EXPIRED), written inside the writer's open transaction. B06 registers no revision
- * lifecycle event beyond creation (B07 registers its own), so the new version is recorded with the registered revision event
- * the database requires for every version (D-EVT-1).
+ * B07's retention_expires edge (the governing retention record ACTIVE -> EXPIRED, then the revision SEALED -> EXPIRED with
+ * dataset_revision.expired.v1), written by the retention sweeper inside the writer's open transaction (@kauro/persistence/testing
+ * expireSealedRevision). The fixture sealed the source fifteen days ago, so its UNPAID hard cap has passed and the database admits
+ * the expiry (it refuses one before the governing deadline, B07 decision D-RET-2).
  */
-async function expireSource(writer: HeldTransaction, revision: { revision_id: string; version: string }): Promise<void> {
-  await writer.query("UPDATE kauro.dataset_revisions SET state = 'EXPIRED', version = version + 1 WHERE revision_id = $1", [revision.revision_id]);
-  await rawEvent(writer.client, { aggregateKind: "dataset_revision", aggregateId: revision.revision_id, aggregateVersion: Number(revision.version) + 1, agencyId: w.A.agencyId, eventType: "dataset_revision.created.v1", actorUserId: w.A.ownerUserId, payload: { revisionId: revision.revision_id, agencyId: w.A.agencyId, state: "EXPIRED" } });
+async function expireSource(writer: HeldTransaction, revision: { revision_id: string; project_id: string }): Promise<void> {
+  await expireSealedRevision(writer.client, { agencyId: w.A.agencyId, projectId: revision.project_id, ownerUserId: w.A.ownerUserId, ownerMembershipId: w.A.ownerMembershipId }, revision.revision_id);
 }
 
 test("RACE: a source expiry racing ApprovePlan — the approval holds the sealed revision's transition lock to COMMIT: an expiry that comes second waits and then reads the approval; an expiry committed first is refused 422 SOURCE_EXPIRED", async () => {
@@ -372,7 +373,7 @@ test("RACE: a source expiry racing ApprovePlan — the approval holds the sealed
   // commits ordered after A and reads the approval its own edge effect ("Revoke reads/execution") has to reach
   const first = await w.approvable(w.A, projectId, "race-expiry-second");
   const firstSource = await sourceRowOf(first);
-  const writerA = await tenantWriter(w, w.A);
+  const writerA = await retentionSweeper(w, w.A);
   try {
     const hold = w.holds.arm("collaborator");
     const request = call(w, { url: routes.approvePlan(first.planId), token: w.approver.token, body: approvalBody(first, proof) });
@@ -385,7 +386,12 @@ test("RACE: a source expiry racing ApprovePlan — the approval holds the sealed
     }
     const approved = completed<ApprovePlanView>(await request, 201);
     await expiry;
-    const seen = await writerA.query<{ approval_id: string }>("SELECT approval_id FROM kauro.approvals WHERE revision_hash = $1 AND withdrawn_at IS NULL", [first.revisionHash]);
+    // the sweeper is the control plane, which reads no approval row (B06 grants); it sees the approval through the event the
+    // approval committed, which the control plane reads to route it (B06 domain_events_control_read)
+    const seen = await writerA.query<{ approval_id: string }>(
+      "SELECT aggregate_id AS approval_id FROM kauro.domain_events WHERE agency_id = $1 AND event_type = 'approval.created.v1' AND payload->>'revisionHash' = $2",
+      [w.A.agencyId, first.revisionHash],
+    );
     assert.deepEqual(seen.rows.map((r) => r.approval_id), [approved.data.approval.approvalId], "the expiry is serialized after the approval and sees it");
     await writerA.commit();
   } finally {
@@ -400,7 +406,7 @@ test("RACE: a source expiry racing ApprovePlan — the approval holds the sealed
   const secondSource = await sourceRowOf(second);
   const approvalsBefore = await w.count("approvals");
   const key = freshKey("cmd025-race-expiry-first");
-  const writerB = await tenantWriter(w, w.A);
+  const writerB = await retentionSweeper(w, w.A);
   try {
     await expireSource(writerB, secondSource);
     const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
@@ -480,7 +486,7 @@ test("N3 RACE: a source expiry queued behind an in-flight approval is never over
   const planOne = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "n3-source-one" });
   const planTwo = await w.plan(w.A, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed: "n3-source-two" });
   const sourceRow = await sourceRowOf(planOne);
-  const writer = await tenantWriter(w, w.A);
+  const writer = await retentionSweeper(w, w.A);
   try {
     const hold = w.holds.arm("collaborator");
     const first = call(w, { url: routes.approvePlan(planOne.planId), token: w.approver.token, body: approvalBody(planOne, proof) });

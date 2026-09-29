@@ -1,8 +1,9 @@
 /**
  * The SchemaValidator adapter over the strict compiler (api/json-schema): closed over exactly the registry contract names,
- * the request schema ids of this package, the response schema ids of this package (api/response-schemas: the COMPLETED
- * envelope of every served command, the ACCEPTED envelope, the declared replies of the operational routes) and the Problem
- * schema (S093: "compile only reviewed application-owned schemas"). The contract bundle is the generated
+ * the request schema ids of this package (B06's and the source lifecycle's, with the selection manifest document of its intake),
+ * the response schema ids of this package (api/response-schemas: the COMPLETED envelope of every served command, the ACCEPTED
+ * envelope, the READ envelope of every served read, the STORED envelope of the intake, the declared replies of the operational
+ * routes) and the Problem schema (S093: "compile only reviewed application-owned schemas"). The contract bundle is the generated
  * `@kauro/contracts/schemas.json`; the transport reads that file once at start-up and hands the parsed object here, so this
  * module needs no file system access.
  */
@@ -13,6 +14,7 @@ import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
 import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
+import { SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS } from "../sources/request-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -91,6 +93,13 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  // the source lifecycle's served command schemas and the document its intake stores (B07; design §9.2, D-SEL-2)
+  for (const [command, schema] of Object.entries(SOURCE_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);
+    roots[id] = schema;
+  }
+  roots[SELECTION_MANIFEST_SCHEMA_ID] = SELECTION_MANIFEST_SCHEMA;
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
   roots["Problem"] = PROBLEM_SCHEMA;

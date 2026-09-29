@@ -13,11 +13,12 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
-import { ROLES, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
-import { constraintOf, event, ids, plan, project, sha, sqlState, tx, type PlanFixture } from "./support.js";
+import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
+import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, tx, type PlanFixture } from "./support.js";
 
 let h: Harness;
 let app: Client;
+let control: Client;
 let validator: Client;
 let owner: Client;
 let alice: UserId;
@@ -29,10 +30,13 @@ let B: AgencyFixture;
 /** Carol founded C and is also an ACTIVE VIEWER of A: A's agency row and her own membership in A are visible to her from C. */
 let C: AgencyFixture;
 let carolInA: string;
-/** One aggregate of every B06 kind in agency A, with its current version (read by the oracle). */
+/** One aggregate of every registered kind in agency A (B06's seven and B07's three), with its current version (read by the oracle). */
 const ofA = new Map<AggregateKind, { readonly id: string; readonly version: number }>();
 
-/** Where each B06 kind lives (0002..0004); the oracle reads current versions from here, independently of the registry. */
+/**
+ * Where each kind lives (B06: 0002..0004; B07: 0009, 0010, 0012 — B07 extends this list with the kinds it registers, as the
+ * foundation asks); the oracle reads current versions from here, independently of the registry.
+ */
 const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn: string]>> = Object.freeze({
   agency: ["agencies", "agency_id"],
   membership: ["memberships", "membership_id"],
@@ -41,6 +45,9 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   dataset_revision: ["dataset_revisions", "revision_id"],
   plan: ["plans", "plan_id"],
   approval: ["approvals", "approval_id"],
+  upload_session: ["upload_sessions", "upload_id"],
+  source_file: ["source_files", "file_id"],
+  retention_record: ["retention_records", "retention_id"],
 });
 
 const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin] as const;
@@ -77,6 +84,7 @@ const registryRow = "INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_na
 before(async () => {
   h = await startHarness();
   app = await h.pg.connect("kauro_app_test");
+  control = await h.pg.connect("kauro_control_test");
   validator = await h.pg.connect("kauro_validator_test");
   owner = await h.pg.connect("kauro_owner");
   alice = await h.person("alice-kinds");
@@ -91,8 +99,13 @@ before(async () => {
   const approverMembership = await h.addMember(A, approver, "APPROVER");
   carolInA = await h.addMember(A, carol, "VIEWER");
   const clientA = await h.endClient(A, await h.processingAuthority(A), "Client A");
-  const { projectId, revisionId } = await project(app, A, clientA, await h.offeredCapability("CLEAN"));
-  const p: PlanFixture & { receiptHash?: string } = await plan(app, A, projectId, "VALIDATED", "kinds", validator);
+  const capabilityId = await h.offeredCapability("CLEAN");
+  const { projectId, revisionId } = await project(app, A, clientA, capabilityId);
+  const p: PlanFixture & { receiptHash?: string } = await plan({ app, control }, A, projectId, "VALIDATED", "kinds", validator);
+  // B07's kinds: an upload, the file it admitted and the retention record of the seal, each born and walked under the role that
+  // owns it with one event per version (the source-lifecycle fixture), in a project of their own
+  const sourceProject = await project(app, A, clientA, capabilityId);
+  const source = await sealSourceRevision(sourceSessions({ app, control }, A), { agencyId: A.agencyId, projectId: sourceProject.projectId, ownerUserId: A.ownerUserId, ownerMembershipId: A.ownerMembershipId }, { seed: "kinds-source" });
   const proof = await h.recordStepUp(approver);
   const approvalId = ids.next();
   // CMD025's writes as the approver's own session: the approval (v1) and its event, the plan APPROVED (v5) naming it and its event
@@ -114,6 +127,9 @@ before(async () => {
     dataset_revision: revisionId,
     plan: p.planId,
     approval: approvalId,
+    upload_session: source.uploadId,
+    source_file: source.fileId,
+    retention_record: source.retentionId,
   };
   for (const kind of AGGREGATE_KINDS) {
     const [table, column] = TABLE_OF[kind];
@@ -124,6 +140,7 @@ before(async () => {
 });
 after(async () => {
   await app.end();
+  await control.end();
   await validator.end();
   await owner.end();
   await h.stop();
@@ -139,7 +156,7 @@ async function eventCount(): Promise<number> {
   return (await h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM kauro.domain_events")).rows[0]!.n;
 }
 
-test("every B06 kind binds: each aggregate of A was born and walked under kauro_app with one bound event per version, and an event at or below its version passes the binding (only the one-event-per-version identity refuses a second)", async () => {
+test("every registered kind binds: each aggregate of A was born and walked under the role that owns it with one bound event per version, and an event at or below its version passes the binding (only the one-event-per-version identity refuses a second)", async () => {
   assert.deepEqual([...ofA.keys()].sort(), [...AGGREGATE_KINDS].sort());
   for (const kind of AGGREGATE_KINDS) {
     const { id, version } = aggregateOfA(kind);
@@ -164,7 +181,7 @@ test("every B06 kind binds: each aggregate of A was born and walked under kauro_
 test("an unregistered kind is refused: KA006 by the binding (as B06's CASE answered it), and by the foreign key to the registry under it", async () => {
   const before_ = await eventCount();
   await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
-    for (const kind of ["upload_session", "quote", "Agency", "agency ", "agencies", ""]) {
+    for (const kind of ["upload", "quote", "Agency", "agency ", "agencies", ""]) {
       await refusedInSavepoint(c, () => eventOf(c, kind, A.agencyId, 1, A.agencyId), "KA006", undefined, `unregistered kind ${JSON.stringify(kind)}`);
     }
   });
@@ -172,7 +189,7 @@ test("an unregistered kind is refused: KA006 by the binding (as B06's CASE answe
   // by domain_events_aggregate_kind_fkey
   await rolledBack(h.oracle, async () => {
     await h.oracle.query("ALTER TABLE kauro.domain_events DISABLE TRIGGER domain_events_bind_aggregate");
-    await assert.rejects(eventOf(h.oracle, "upload_session", A.agencyId, 1, A.agencyId), refusedWith("23503", "domain_events_aggregate_kind_fkey"));
+    await assert.rejects(eventOf(h.oracle, "quote", A.agencyId, 1, A.agencyId), refusedWith("23503", "domain_events_aggregate_kind_fkey"));
   });
   const trigger = await h.oracle.query<{ tgenabled: string }>("SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'kauro.domain_events'::regclass AND tgname = 'domain_events_bind_aggregate'");
   assert.deepEqual(trigger.rows, [{ tgenabled: "O" }], "the binding trigger is back in force");
@@ -217,7 +234,7 @@ test("for every kind: another agency's aggregate, an aggregate the writer's poli
   assert.equal(await eventCount(), before_, "no refused event was recorded");
 });
 
-test("only the migration owner writes the registry: every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the request handlers read it, and the owner can register but never rewrite or remove a kind", async () => {
+test("only the migration owner writes the registry: every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the event inserters (the request handlers and, since B07, the control plane) read it, and the owner can register but never rewrite or remove a kind", async () => {
   const registry = (await h.oracle.query<{ aggregate_kind: string; table_name: string; id_column: string; owner_package: string }>("SELECT * FROM kauro.aggregate_kinds ORDER BY aggregate_kind")).rows;
   for (const login of RUNTIME_LOGINS) {
     const c = await h.pg.connect(login);
@@ -226,8 +243,9 @@ test("only the migration owner writes the registry: every runtime login is refus
       await assert.rejects(c.query("UPDATE kauro.aggregate_kinds SET table_name = 'plans', id_column = 'plan_id' WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} UPDATE`);
       await assert.rejects(c.query("DELETE FROM kauro.aggregate_kinds WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} DELETE`);
       await assert.rejects(c.query("TRUNCATE kauro.aggregate_kinds"), refusedWith("42501"), `${login} TRUNCATE`);
-      if (login === ROLES.appLogin) {
-        // the request handlers insert domain events, so the binding (SECURITY INVOKER) reads the registry as them
+      if (login === ROLES.appLogin || login === ROLES.controlLogin) {
+        // the request handlers insert domain events, and since B07 the control plane appends the source-lifecycle events it owns
+        // (B07 D-CTRL-2), so the binding (SECURITY INVOKER) reads the registry as either
         const seen = await c.query("SELECT aggregate_kind, table_name, id_column, owner_package FROM kauro.aggregate_kinds ORDER BY aggregate_kind");
         assert.deepEqual(seen.rows, registry);
       } else {
@@ -237,17 +255,18 @@ test("only the migration owner writes the registry: every runtime login is refus
       await c.end();
     }
   }
-  // the catalog says the same: one table grant to one runtime group, one read policy, one INSERT policy for the migrator, and
-  // no policy that lets anybody UPDATE or DELETE a kind
+  // the catalog says the same: one table grant and one read policy per event-inserting runtime group (the request handlers; since
+  // B07 the control plane, with its package-prefixed policy), one INSERT policy for the migrator, and no policy that lets anybody
+  // UPDATE or DELETE a kind
   const grants = await h.oracle.query<{ role: string; privilege: string }>(
     `SELECT r.rolname AS role, a.privilege_type AS privilege FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a JOIN pg_roles r ON r.oid = a.grantee
       WHERE c.oid = 'kauro.aggregate_kinds'::regclass AND r.rolname = ANY($1::text[]) ORDER BY 1, 2`,
     [[...RUNTIME_ROLES]],
   );
-  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }]);
+  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }, { role: "kauro_control", privilege: "SELECT" }]);
   // the rule behind that one grant, stated over the catalog so that a later package that lets a runtime group append events cannot
   // forget the registry the binding reads as that group: the groups that may read the registry (a grant and a SELECT policy) are
-  // exactly the groups that may insert domain events — on main, the request handlers alone
+  // exactly the groups that may insert domain events — on main the request handlers alone, with B07 also the control plane
   const inserters = await h.oracle.query<{ role: string }>(
     "SELECT r AS role FROM unnest($1::text[]) r WHERE has_any_column_privilege(r, 'kauro.domain_events', 'INSERT') ORDER BY 1",
     [[...RUNTIME_ROLES]],
@@ -260,7 +279,8 @@ test("only the migration owner writes the registry: every runtime login is refus
     [[...RUNTIME_ROLES]],
   );
   assert.deepEqual(readers.rows, inserters.rows, "registry readers are exactly the event inserters");
-  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }]);
+  // B07 extends the foundation's list (FOUNDATION-aggregate-kinds.md §4): the control plane appends the events of its edges
+  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }, { role: "kauro_control" }]);
   const columnGrants = await h.oracle.query("SELECT attname FROM pg_attribute WHERE attrelid = 'kauro.aggregate_kinds'::regclass AND attacl IS NOT NULL");
   assert.deepEqual(columnGrants.rows, []);
   const policies = await h.oracle.query<{ policyname: string; cmd: string; roles: string[] }>(
@@ -268,6 +288,7 @@ test("only the migration owner writes the registry: every runtime login is refus
   );
   assert.deepEqual(policies.rows, [
     { policyname: "aggregate_kinds_read", cmd: "SELECT", roles: ["kauro_app"] },
+    { policyname: "aggregate_kinds_read_b07_control", cmd: "SELECT", roles: ["kauro_control"] },
     { policyname: "aggregate_kinds_register", cmd: "INSERT", roles: [ROLES.owner] },
   ]);
   const rls = await h.oracle.query("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = 'kauro.aggregate_kinds'::regclass");

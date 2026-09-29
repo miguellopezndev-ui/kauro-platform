@@ -6,3 +6,32 @@ export type { SchemaValidator, KnownSchemaId, ValidationOutcome } from "./schema
 export type { ArtifactResolver, DecisionPatch, PlanPatchCompiler, PatchCompilation, DisclosureComposer, DisclosureSet } from "./plan-services.js";
 export type { ActiveWorkInspector, ActiveWorkSummary, ExternalActionInspector, CompletedExternalAction, CommercialConsequenceInspector, UnreconciledConsequence } from "./work-inspectors.js";
 export type { CommandSpec, CommandHandler, CommandBus } from "./command-handler.js";
+export type {
+  ProviderEvidenceClass,
+  StorageLocation,
+  ObjectObservation,
+  ResumableSession,
+  ProviderCancellationResult,
+  ObjectStoragePort,
+  MalwareScannerPort,
+  InspectionLimits,
+  DetectedColumn,
+  DetectedTable,
+  InspectionIsolation,
+  ContainerInspection,
+  ContainerInspectorPort,
+  SelectionEvaluationInput,
+  SelectionEvaluationOutcome,
+  SelectionEvaluatorPort,
+  TablePreviewRequest,
+  TablePreviewResult,
+  TablePreviewPort,
+  SessionSecretBinding,
+  SessionVaultPort,
+  AuthorityTombstoneKind,
+  AuthorityTombstoneState,
+  AuthorityTombstone,
+  AuthorityJournalPort,
+  CommercialScopeInspector,
+} from "./source-providers.js";
+export { AUTHORITY_TOMBSTONES } from "./source-providers.js";

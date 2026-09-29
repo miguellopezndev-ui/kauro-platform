@@ -121,7 +121,7 @@ test("R45: the request log's id is the correlation id — supplied or minted, ev
     // an unexpected exception: the sink's correlation id is the one in the log lines and in the answer
     const failing = assembleApi({
       environment: "LOCAL",
-      unitOfWork: { run: async () => Promise.reject(new TypeError("boom")) },
+      unitOfWork: { run: async () => Promise.reject(new TypeError("boom")), runSource: async () => Promise.reject(new TypeError("boom")) },
       database: w.db,
       authenticator: createBearerTokenAuthenticator(tokens),
       validator: loadContractSchemas(),

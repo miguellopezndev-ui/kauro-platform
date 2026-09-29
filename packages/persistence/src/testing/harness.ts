@@ -45,6 +45,7 @@ import { PgInboxIngress } from "../inbox-outbox.js";
 import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
 import { createUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -113,9 +114,12 @@ export interface Harness {
    */
   recordValidationReceipt(receipt: ValidationReceiptRecord): Promise<void>;
   /**
-   * A dataset revision of `projectId` born DRAFT and walked along the listed DatasetRevision edges to SEALED
-   * (previously_admitted_inputs_selected → all_selected_inputs_admitted → seal_command) or on to EXPIRED (retention_expires),
-   * one version and one event per edge, as B07's lifecycle leaves it; the manifest hash is the revision's source hash.
+   * A dataset revision of `projectId` sealed through the B07 source lifecycle (source-lifecycle.ts: reservation, completion,
+   * inspection and admission, selection, evaluation, seal with its manifest and retention record; each write under the runtime
+   * role that owns it) — upload_reserved → all_uploads_completed → all_selected_inputs_admitted → seal_command — or on to
+   * EXPIRED by the retention sweeper (retention_expires), one version and one event per edge. The project's pristine current
+   * revision is sealed first; later calls seal a further revision beside it. Sealed fifteen days ago, so a test may expire it.
+   * The manifest hash is the revision's source hash (plans_source_fk).
    */
   sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED"): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
   processingAuthority(agency: AgencyFixture): Promise<ProcessingAuthorityId>;
@@ -179,6 +183,28 @@ export async function start(): Promise<Harness> {
       await c.query("BEGIN");
       await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agencyId, userId]);
       const out = await fn(c, new PgEventPublisher(c, ids, clock));
+      await c.query("COMMIT");
+      return out;
+    } catch (e) {
+      try {
+        await c.query("ROLLBACK");
+      } catch (rollbackError) {
+        destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+      }
+      throw e;
+    } finally {
+      c.release(destroy);
+    }
+  };
+
+  /** Raw statements as the control plane bound to one agency (design B07 D-CTRL-1), for the source-lifecycle fixture. */
+  const asControlFor = async <T>(agencyId: AgencyId, fn: (c: PoolClient) => Promise<T>): Promise<T> => {
+    const c = await controlPool.raw.connect();
+    let destroy: Error | undefined;
+    try {
+      await c.query("BEGIN");
+      await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', '', true)", [agencyId]);
+      const out = await fn(c);
       await c.query("COMMIT");
       return out;
     } catch (e) {
@@ -280,33 +306,17 @@ export async function start(): Promise<Harness> {
     },
 
     async sealedRevision(agency, projectId, state = "SEALED") {
-      const revisionId = ids.next() as RevisionId;
-      const revisionHash = sha(`manifest-${revisionId}`);
-      const projectionHash = sha(`projection-${revisionId}`);
-      const version = await asTenant(agency.agencyId, agency.ownerUserId, async (c, events) => {
-        const actor = { kind: "USER", userId: agency.ownerUserId } as const;
-        const base = { aggregateKind: "dataset_revision", aggregateId: revisionId, agencyId: agency.agencyId, actor, causationId: correlation() as unknown as CausationId, correlationId: correlation() } as const;
-        const ref = { revisionId, agencyId: agency.agencyId, projectId };
-        await c.query("INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, version, state, created_at, updated_at) VALUES ($1, $2, $3, 1, 'DRAFT', now(), now())", [revisionId, agency.agencyId, projectId]);
-        await events.publish({ ...base, aggregateVersion: 1, eventType: "dataset_revision.created.v1", payload: { ...ref, state: "DRAFT" } });
-        const move = async (from: string, to: string, sets: string, params: ReadonlyArray<unknown>): Promise<number> => {
-          const r = await c.query<{ version: string }>(`UPDATE kauro.dataset_revisions SET state = $3, version = version + 1${sets} WHERE revision_id = $1 AND state = $2 RETURNING version`, [revisionId, from, to, ...params]);
-          const row = r.rows[0];
-          if (!row) throw new Error(`revision ${revisionId} did not move ${from} -> ${to}`);
-          return Number(row.version);
-        };
-        const inspecting = await move("DRAFT", "INSPECTING", "", []);
-        await events.publish({ ...base, aggregateVersion: inspecting, eventType: "dataset_revision.inspecting.v1", payload: ref });
-        const ready = await move("INSPECTING", "READY_TO_SEAL", "", []);
-        await events.publish({ ...base, aggregateVersion: ready, eventType: "dataset_revision.ready_to_seal.v1", payload: ref });
-        const sealed = await move("READY_TO_SEAL", "SEALED", ", manifest_hash = $4, projection_hash = $5, sealed_at = now()", [revisionHash, projectionHash]);
-        await events.publish({ ...base, aggregateVersion: sealed, eventType: "dataset_revision.sealed.v1", payload: { ...ref, manifestHash: revisionHash, projectionHash } });
-        if (state === "SEALED") return sealed;
-        const expired = await move("SEALED", "EXPIRED", "", []);
-        await events.publish({ ...base, aggregateVersion: expired, eventType: "dataset_revision.expired.v1", payload: ref });
-        return expired;
-      });
-      return { revisionId, revisionHash, version };
+      // the B07 source lifecycle, each write under the role that owns it (source-lifecycle.ts); sealed fifteen days ago, so a test
+      // may take the retention sweeper's retention_expires at any time (the database refuses an expiry before its deadline)
+      const sealed = await sealSourceRevision(
+        {
+          app: (fn) => asTenant(agency.agencyId, agency.ownerUserId, (c) => fn(c)),
+          control: (fn) => asControlFor(agency.agencyId, fn),
+        },
+        { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId },
+        { seed: `harness-${projectId}`, state },
+      );
+      return { revisionId: sealed.revisionId as RevisionId, revisionHash: sealed.manifestHash as Sha256Hex, version: sealed.version };
     },
 
     async processingAuthority(agency) {

@@ -80,7 +80,32 @@ function run(cmd: string, args: string[], what: string, options: { readonly deta
 export interface StartOptions {
   /** Skip applying migrations (a test that exercises the runner itself). */
   readonly migrate?: boolean;
+  /**
+   * Install the labelled TEST CLOCK (default true; see TEST_CLOCK_FUNCTION). false keeps the shipped kauro.server_now() exactly as
+   * the migration defines it (the migrations test proves that body).
+   */
+  readonly testClock?: boolean;
 }
+
+/**
+ * The transaction-local setting the test clock reads: seconds (a decimal, possibly negative) added to the transaction time. A
+ * fixture sets it with set_config(TEST_CLOCK_OFFSET_SETTING, '<seconds>', true) inside its own transaction to stand in the past.
+ */
+export const TEST_CLOCK_OFFSET_SETTING = "kauro_test.clock_offset_seconds";
+
+/**
+ * The TEST CLOCK (B07 decision D-CLOCK-1): every B07 lifecycle guard reads kauro.server_now(), which a deployment defines as
+ * transaction_timestamp() (migration 0009). Fixtures that need a past — a revision sealed fifteen days ago so a test may expire it,
+ * an upload initiated twenty-five hours ago — must never back-date a row through a production role (the database refuses it,
+ * B07-F2); instead the temporary cluster replaces the function, as the migration owner, by this body, which adds the
+ * transaction-local offset above. Only this test-only subpath installs it (the architecture gate keeps @kauro/persistence/testing
+ * out of production), and the function's comment labels it. Without the setting it is exactly the transaction time.
+ */
+export const TEST_CLOCK_FUNCTION = `CREATE OR REPLACE FUNCTION kauro.server_now() RETURNS timestamptz
+  LANGUAGE sql STABLE PARALLEL SAFE SET search_path = pg_catalog AS
+$$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(current_setting('${TEST_CLOCK_OFFSET_SETTING}', true), ''), '0')::double precision) $$`;
+
+export const TEST_CLOCK_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: transaction_timestamp() plus the transaction-local kauro_test.clock_offset_seconds; never present in a deployment";
 
 export async function startTemporaryPostgres(options: StartOptions = {}): Promise<TemporaryPostgres> {
   const bin = pgbin();
@@ -132,6 +157,15 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
         await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}`);
       } finally {
         await su2.end();
+      }
+      if (options.testClock !== false) {
+        const owner = await connect(ROLES.owner);
+        try {
+          await owner.query(TEST_CLOCK_FUNCTION);
+          await owner.query(`COMMENT ON FUNCTION kauro.server_now() IS '${TEST_CLOCK_COMMENT}'`);
+        } finally {
+          await owner.end();
+        }
       }
     }
     return {

@@ -10,10 +10,11 @@ import { APPLICABILITY, EDGE_OWNERS, MATRIX_PATH, checkSources, generateMatrix, 
 const sources = await loadMatrixSources();
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-test("the committed matrix is the generated one and every source check passes: every edge of the 12 registry and 2 platform machines is owned, every served command has its catalogue and its applicability row", () => {
+test("the committed matrix is the generated one and every source check passes: every edge of the 12 registry, 2 B06 platform and 4 B07 source-lifecycle machines is owned, every served command has its catalogue and its applicability row, every specified B07 command and route its catalogue", () => {
   assert.deepEqual(checkSources(sources), []);
   assert.equal(readFileSync(MATRIX_PATH, "utf8"), generateMatrix(sources));
-  assert.equal(sources.machines.length, 14);
+  assert.equal(sources.machines.length, 18);
+  for (const id of Object.keys(sources.sourceSpecs)) assert.ok(generateMatrix(sources).includes(`### ${id} `), id);
   for (const id of sources.served) assert.ok(generateMatrix(sources).includes(`### ${id} `), id);
 });
 
@@ -45,4 +46,15 @@ test("an applicability row citing a test that does not exist, or answering a mut
   const absent = clone(APPLICABILITY);
   delete absent.CMD026;
   assert.deepEqual(checkSources(sources, EDGE_OWNERS, absent), ["CMD026 is served but has no applicability row"]);
+});
+
+test("B07-COMMANDS: every specified source-lifecycle command is served with its applicability row, every source read is a served read and the intake a served intake — a command left unserved, a source read that is not a served read, an unserved intake and a missing applicability row fail the check", () => {
+  const unserved = { ...sources, served: new Set([...sources.served].filter((id) => id !== "CMD017")) };
+  assert.deepEqual(checkSources(unserved), ["CMD017 is specified but not served"]);
+  const { GetInspection: _inspection, ...reads } = sources.reads;
+  assert.deepEqual(checkSources({ ...sources, reads }), ["the source read GetInspection is not a served read"]);
+  assert.deepEqual(checkSources({ ...sources, intakes: {} }), ["the source intake SubmitSelectionManifest is not a served intake"]);
+  const absent = clone(APPLICABILITY);
+  delete absent.CMD016;
+  assert.deepEqual(checkSources(sources, EDGE_OWNERS, absent), ["CMD016 is served but has no applicability row"]);
 });

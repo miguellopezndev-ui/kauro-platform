@@ -14,8 +14,19 @@ import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
 import type { ResponseSchemaId } from "../api/response-schemas.js";
+import type { SELECTION_MANIFEST_SCHEMA_ID, SourceRequestSchemaId } from "../sources/request-schemas.js";
 
-export type KnownSchemaId = ContractName | RequestSchemaId | ResponseSchemaId | "Problem";
+/**
+ * B07 adds its six command schemas and the selection manifest document schema to the closed set (application-owned, reviewed
+ * schemas only — S093).
+ */
+export type KnownSchemaId =
+  | ContractName
+  | RequestSchemaId
+  | ResponseSchemaId
+  | SourceRequestSchemaId
+  | typeof SELECTION_MANIFEST_SCHEMA_ID
+  | "Problem";
 
 export type ValidationOutcome<T> =
   | { readonly kind: "VALID"; readonly value: T }

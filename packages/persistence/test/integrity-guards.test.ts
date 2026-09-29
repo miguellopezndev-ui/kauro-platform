@@ -144,7 +144,7 @@ test("R4: the control plane reads the command journal's safe technical metadata 
 });
 
 test("R5/R13: an approval binds its actor, the actor's own membership in this agency and a step-up proof of that same actor", async () => {
-  const p = await plan(app, A, projectA, "VALIDATED", "r5", validator);
+  const p = await plan({ app, control }, A, projectA, "VALIDATED", "r5", validator);
   const approverProof = await h.recordStepUp(approver);
   const bobProof = await h.recordStepUp(bob);
   // Two independent layers refuse a mismatched actor/membership pair. The runtime role's insert policy (acting session and,
@@ -186,7 +186,7 @@ async function withdraw(c: Client, p: PlanFixture, approvalId: string, byMembers
 }
 
 test("R5 (acting session): an approval and its withdrawal are acts of the session's own identity — nobody records an approval in the approver's name, even with the approver's membership and fresh proof, nor a withdrawal under another member's membership; the approver's own session and the owner's own membership can", async () => {
-  const p = await plan(app, A, projectA, "VALIDATED", "r5-session", validator);
+  const p = await plan({ app, control }, A, projectA, "VALIDATED", "r5-session", validator);
   const approverProof = await h.recordStepUp(approver);
   // alice (the owner of A) writes the whole approval in the approver's name — the row, its event, the plan APPROVED and its
   // event: every key binds, only the acting session is somebody else
@@ -214,8 +214,8 @@ test("R5 (acting session): an approval and its withdrawal are acts of the sessio
 });
 
 test("R11: a plan names only its own approval — pointing plan Y at plan X's approval is refused at COMMIT and Y stays VALIDATED", async () => {
-  const x = await plan(app, A, projectA, "VALIDATED", "r11-x", validator);
-  const y = await plan(app, A, projectA, "VALIDATED", "r11-y", validator);
+  const x = await plan({ app, control }, A, projectA, "VALIDATED", "r11-x", validator);
+  const y = await plan({ app, control }, A, projectA, "VALIDATED", "r11-y", validator);
   const proof = await h.recordStepUp(approver);
   const approvalOfX = ids.next();
   await tx(app, ctx(A, approver), async (c) => {
@@ -487,7 +487,9 @@ test("R20: every aggregate is born in its machine's initial state — a row inse
   assert.deepEqual(counts.rows[0], { agencies: 0, memberships: 0, archived: 0, projects: 0, sealed: 0, hubspot: 0 });
   // the positive symmetry: born in the initial state and walked along the listed edges, the same aggregates commit
   const walked = await h.sealedRevision(A, projectA as never, "SEALED");
-  assert.equal(walked.version, 4, "DRAFT v1 -> INSPECTING v2 -> READY_TO_SEAL v3 -> SEALED v4");
+  // since B07 the walk is the source lifecycle's own: upload_reserved, all_uploads_completed (the agency's selection closes the
+  // intake, B07 D-INTAKE-1), all_selected_inputs_admitted, seal_command
+  assert.equal(walked.version, 5, "DRAFT v1 -> UPLOADING v2 -> INSPECTING v3 (with the selection) -> READY_TO_SEAL v4 -> SEALED v5");
   const capabilityId = await h.offeredCapability("HUBSPOT", "AVAILABLE_LIMITED", { version: "R2-WALKED" });
   const published = await h.oracle.query("SELECT state FROM kauro.capabilities WHERE capability_id = $1", [capabilityId]);
   assert.deepEqual(published.rows[0], { state: "AVAILABLE_LIMITED" });
@@ -523,7 +525,7 @@ test("R20: the founding owner of CreateAgency is the one membership born ACTIVE 
 });
 
 test("R30: validation receipts are written only by the validator, under the plan's own tenant; a plan binds only a VALID receipt of its own body and subjects", async () => {
-  const p = await plan(app, A, projectA, "VALIDATING", "r30-p");
+  const p = await plan({ app, control }, A, projectA, "VALIDATING", "r30-p");
   const insertReceipt = (c: Client, of: PlanFixture, receiptHash: string) =>
     c.query(
       `INSERT INTO kauro.validation_receipts (receipt_id, agency_id, plan_id, receipt_hash, revision_hash, target_contract_hash, plan_hash, core_package_hash, profile_evidence_hash, disposition_evidence_hash, artifact_evidence_hash, started_at, completed_at, result, counts, created_at)
@@ -538,7 +540,7 @@ test("R30: validation receipts are written only by the validator, under the plan
   const receiptOfP = sha("r30-p-receipt");
   await validationReceipt(validator, A, p, receiptOfP);
   // plans_receipt_fk binds the plan: another plan cannot name p's receipt
-  const q = await plan(app, A, projectA, "VALIDATING", "r30-q");
+  const q = await plan({ app, control }, A, projectA, "VALIDATING", "r30-q");
   const validate = (of: PlanFixture, receiptHash: string) =>
     tx(app, ctx(A, alice), async (c) => {
       await c.query("UPDATE kauro.plans SET state = 'VALIDATED', version = 4, validation_receipt_hash = $2 WHERE plan_id = $1 AND version = 3", [of.planId, receiptHash]);

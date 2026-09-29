@@ -177,4 +177,7 @@ export { SERVICE_MODES, PROJECT_STATES, OFFERED_CAPABILITY_STATES, isOffered, AG
 export type { Environment, IdempotencyIdentity, CommandRequestSubject, JournalState, CommandJournalEntry } from "./model/idempotency.js";
 export { ENVIRONMENTS, IDEMPOTENCY_KEY, COMMAND_REQUEST_DOMAIN, commandRequestDigest } from "./model/idempotency.js";
 
+// B07 source lifecycle (docs/design/B07-upload-source-lifecycle.md)
+export * from "./model/source/index.js";
+
 export * from "./ports/index.js";
