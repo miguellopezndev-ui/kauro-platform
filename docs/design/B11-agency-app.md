@@ -180,5 +180,9 @@ map. **W-IDP-LIVE** starts after the owner opens Google Cloud. Binding mandates 
 
 ## 11. Verification on this branch
 
-`pnpm install --frozen-lockfile`, `pnpm run verify` (Windows, and Linux clone as WSL user `miguel`), plus `pnpm --filter @kauro/web
-run e2e` with `KAURO_E2E_ENGINES=all` on Windows (6/6). Results: §12 of the commit that records them (the lane result).
+| check | platform | subject | result |
+|---|---|---|---|
+| `pnpm install --frozen-lockfile && pnpm run verify` | Windows 11, Node 24.14.1, pnpm 10.16.1, PostgreSQL 17 | `4cac0f3` tree (+ doc-only edits) | exit 0 in 6 m 34 s: ui 5, contracts 12, web 4, domain 54, application 55, persistence 107, authorization 11, api 117 (+1 Linux-only skip of B06), tools 30; gate 8 packages / 14 edges; openapi 14 routes; matrix; clean-consume |
+| same, clean clone as WSL user `miguel`, `PGBIN=/usr/lib/postgresql/17/bin` | Ubuntu 24.04, Node 24.21.0 | `d85e322` | exit 0: same counts, api 118; clone deleted |
+| `pnpm --filter @kauro/web run e2e`, `KAURO_E2E_ENGINES=all` | Windows 11 | `3abde5b` tree | 6/6 (Chromium 153, Firefox 155, WebKit 26.6) |
+| cookie and back/forward probe (scratch, not committed) | Windows, three engines | — | `__Host-` cookie dropped by WebKit over http://localhost, kept over https; `no-store` page re-fetched after logout in all engines |
