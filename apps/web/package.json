@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@kauro/contracts": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/node": "24.3.1",
     "@types/react": "19.3.0",
