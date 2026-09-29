@@ -6,6 +6,11 @@
  * its work item (D-CTRL-1), takes the revision row before any upload or file of it (D-LOCK-2), records only the server's instants
  * (D-CLOCK-1) and appends only the events of the edges the control plane owns (D-CTRL-2). External providers are reached only
  * through the ports of @kauro/application; the platform's own parsers (@kauro/data-plane) are always real.
+ *
+ * Processing authority (docs/design/B08-audit-approval-jobs.md §4..§7, §11, mandate B08-CONTROL-EXECUTION): where the execution units
+ * of work, the worker host and the verifier are handed in, the consumers JOB_EXECUTION and EXECUTION_CONTROL and the sweepers of
+ * EXECUTION_SWEEPERS (JOB_ADMISSION, ATTEMPT_MONITOR, JOB_DEADLINES, STAGING_JANITOR) over the same dispatcher, each unit bound to the
+ * job's agency, every provider call outside any transaction and every answer recorded only under the job's row lock (§6).
  */
 export { PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
 export type { DispatcherOptions, DispatchCounts } from "./dispatcher.js";

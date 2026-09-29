@@ -309,12 +309,15 @@ export class JobPipeline {
           if (current !== null && current.launchState !== "LAUNCHED") await uow.execution.recordLaunch(attempt.attemptId, "LAUNCHED", attempt.identity);
         });
       }
+      // a lease that lapsed on the server clock is never heartbeaten back (B06: heartbeats only under a live fence): its attempt is
+      // abandoned once its provider job is terminated, whatever the worker last said (D8-ATT-2)
+      const lapsed = lease === null || microsOfInstant(lease.expiresAt) <= microsOfInstant(now);
       switch (observation.state) {
         case "QUEUED":
-          return this.heartbeat(job, attempt, service);
+          return lapsed ? this.lapse(job, attempt, service) : this.heartbeat(job, attempt, service);
         case "RUNNING":
+          if (lapsed) return this.lapse(job, attempt, service);
           if (this.alive(observation)) return this.running(job, attempt, service);
-          if (lease === null || microsOfInstant(lease.expiresAt) <= microsOfInstant(now)) return this.lapse(job, attempt, service);
           return waiting("WORKER_SILENT");
         case "SUCCEEDED": {
           const started = await this.started(job, attempt, service);
