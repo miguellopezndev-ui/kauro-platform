@@ -42,16 +42,25 @@ export class ProviderSessionReconciliation implements SourceSweeper {
       });
       if (recorded) acted += 1;
     }
-    // B07-R4: the bearer records of pending cancellations whose provider horizon passed, found per agency and purged
+    // B07-R4: the bearer records of pending cancellations whose provider horizon passed, found per agency and purged. The agencies
+    // are paged in id order until `limit` records are found or none is left, so an agency whose records were purged earlier never
+    // hides one after it; the next run starts again from the first (its purged agencies then yield nothing)
     const lapsed: Array<{ readonly uploadId: UploadId; readonly agencyId: AgencyId }> = [];
-    const agencies = await units.runSource(run.discovery, (uow) => uow.sources.uploads.findAgenciesWithLapsedCancellations(limit));
-    for (const agencyId of agencies) {
-      // one agency's failure to list its records is reported and leaves the others to run (found again by the next run)
-      await run.attempt(agencyId, async () => {
-        const found = await units.runSource(boundTo(run.itemFor(agencyId)), (uow) => uow.sources.uploads.findLapsedSessionSecrets(limit));
-        lapsed.push(...found);
-        return found.length > 0;
-      });
+    let after: AgencyId | undefined;
+    while (lapsed.length < limit) {
+      const cursor = after;
+      const agencies = await units.runSource(run.discovery, (uow) => uow.sources.uploads.findAgenciesWithLapsedCancellations(limit, cursor));
+      for (const agencyId of agencies) {
+        if (lapsed.length >= limit) break;
+        // one agency's failure to list its records is reported and leaves the others to run (found again by the next run)
+        await run.attempt(agencyId, async () => {
+          const found = await units.runSource(boundTo(run.itemFor(agencyId)), (uow) => uow.sources.uploads.findLapsedSessionSecrets(limit - lapsed.length));
+          lapsed.push(...found);
+          return found.length > 0;
+        });
+      }
+      if (agencies.length < limit) break;
+      after = agencies.at(-1);
     }
     for (const found of lapsed) {
       const purged = await run.attempt(found.uploadId, async () => (await cancelProviderSession(this.deps.storage, this.deps.vault, units, run.itemFor(found.agencyId), found.uploadId)).kind === "HORIZON_PASSED");

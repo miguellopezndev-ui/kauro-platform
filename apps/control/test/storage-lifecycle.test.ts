@@ -292,7 +292,7 @@ test("OBJECT_INVENTORY and DELETION_RETRIES: an admitted generation the provider
   assert.equal((await env.plane.sweepers.deletionRetries.sweep(env.plane.units, 100)).examined, 0);
 });
 
-test("B07-R4: an unresolved provider cancellation outlives its provider horizon — STORAGE_LIFECYCLE and PROVIDER_SESSION_RECONCILIATION answered UNCERTAIN while the horizon was ahead, keeping the bearer record for the next attempt; once the horizon has passed on the server clock, PROVIDER_SESSION_RECONCILIATION still finds the record and purges it without asking the provider, the recorded state staying UNCERTAIN", { timeout: 300_000 }, async () => {
+test("B07-R4: an unresolved provider cancellation outlives its provider horizon — STORAGE_LIFECYCLE and PROVIDER_SESSION_RECONCILIATION answered UNCERTAIN while the horizon was ahead, keeping the bearer record for the next attempt; once the horizon has passed on the server clock, PROVIDER_SESSION_RECONCILIATION still finds the record and purges it without asking the provider, the recorded state staying UNCERTAIN; agencies whose lapsed records were purged earlier never hide a later one", { timeout: 300_000 }, async () => {
   const t = await tenant(env, "r4-horizon");
   await setSessionLimit(env, t, 10);
   const p = await project(env, t);
@@ -335,6 +335,21 @@ test("B07-R4: an unresolved provider cancellation outlives its provider horizon 
     assert.equal(env.storage.calls("cancelResumableSession").filter((c) => c.request["sessionDigest"] === textDigest(ref)).length, attempts, "no provider call past the horizon");
     // nothing is left to find: a second run past the horizon acts on nothing
     assert.deepEqual([(await env.plane.sweepers.providerSessionReconciliation.sweep(later.units, 100)).acted], [0]);
+
+    // no starvation: a later agency's lapsed record is found past every agency whose lapsed cancellations were purged before it
+    // (they stay lapsed and are listed first), even by a sweep of one item
+    const t2 = await tenant(env, "r4-later");
+    const p2 = await project(env, t2);
+    const up2 = await reserve(env, t2, p2, csv("r4-later").length, "CSV");
+    const ref2 = await issue(env, t2, up2);
+    await cancel(env, t2, up2);
+    await dispatchStorageLifecycle(new Map<string, ScriptedCancellation>([[textDigest(ref2), { answer: "UNCERTAIN", sessionCancelled: false }]]));
+    assert.deepEqual([(await uploadRow(up2.uploadId)).provider_cancellation_state, (await uploadRow(up2.uploadId)).secrets], ["UNCERTAIN", "1"]);
+    const firstPage = await later.units.runSource(unbound, (uow) => uow.sources.uploads.findAgenciesWithLapsedCancellations(1));
+    assert.ok(firstPage.length === 1 && firstPage[0] !== t2.ag.agencyId, "an agency whose record was already purged comes first");
+    const paged = await env.plane.sweepers.providerSessionReconciliation.sweep(later.units, 1);
+    assert.deepEqual([paged.acted, paged.failed], [1, []]);
+    assert.deepEqual([(await uploadRow(up2.uploadId)).provider_cancellation_state, (await uploadRow(up2.uploadId)).secrets], ["UNCERTAIN", "0"]);
   } finally {
     await later.close();
   }

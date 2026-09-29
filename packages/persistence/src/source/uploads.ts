@@ -382,15 +382,17 @@ export class PgUploadSessionRepository implements UploadSessionRepository {
   /**
    * B07-R4, unbound: the agencies with a pending provider cancellation (REQUESTED or UNCERTAIN) past its horizon on the server clock
    * (the partial index upload_sessions_provider_reconciliation). Whether a bearer record is still held is not visible unbound
-   * (upload_session_secrets is readable by the control plane only in the agency it is bound to), so it is asked per agency.
+   * (upload_session_secrets is readable by the control plane only in the agency it is bound to), so it is asked per agency; pages
+   * in agency-id order after `after`.
    */
-  async findAgenciesWithLapsedCancellations(limit: number): Promise<ReadonlyArray<AgencyId>> {
+  async findAgenciesWithLapsedCancellations(limit: number, after?: AgencyId): Promise<ReadonlyArray<AgencyId>> {
     const r = await execute<{ agency_id: string }>(
       this.db,
       `SELECT DISTINCT agency_id FROM kauro.upload_sessions
         WHERE provider_cancellation_state IN ('REQUESTED', 'UNCERTAIN') AND provider_session_expires_at <= kauro.server_now()
+          AND ($2::uuid IS NULL OR agency_id > $2::uuid)
         ORDER BY agency_id LIMIT $1`,
-      [pageLimit(limit, 1000)],
+      [pageLimit(limit, 1000), after ?? null],
     );
     return r.rows.map((x) => x.agency_id as AgencyId);
   }

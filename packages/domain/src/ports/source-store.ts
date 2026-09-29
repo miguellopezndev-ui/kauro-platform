@@ -141,9 +141,10 @@ export interface UploadSessionRepository {
   /**
    * Control-plane discovery (unbound; B07-R4): the agencies holding a provider cancellation still REQUESTED or UNCERTAIN whose
    * provider horizon has passed on the server clock. The bearer records are readable only bound to their agency, so which of those
-   * sessions still hold one is asked per agency (`findLapsedSessionSecrets`).
+   * sessions still hold one is asked per agency (`findLapsedSessionSecrets`). In agency-id order after `after`, so a sweep pages
+   * through every such agency and none is starved by agencies whose records were purged earlier.
    */
-  findAgenciesWithLapsedCancellations(limit: number): Promise<ReadonlyArray<AgencyId>>;
+  findAgenciesWithLapsedCancellations(limit: number, after?: AgencyId): Promise<ReadonlyArray<AgencyId>>;
   /**
    * Bound to one agency (B07-R4): its uploads whose provider cancellation is still REQUESTED or UNCERTAIN past the provider horizon
    * on the server clock and whose sealed bearer record is still stored — the records PROVIDER_SESSION_RECONCILIATION purges (D-CTRL-7:
