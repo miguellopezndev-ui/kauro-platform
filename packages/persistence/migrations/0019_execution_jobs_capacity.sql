@@ -11,8 +11,8 @@
 -- scenarios S055, S056, R2-046, CMD036, CMD037. Design: docs/design/B08-audit-approval-jobs.md §4, §8, §9 (decisions D8-JOB-1/2,
 -- D8-AUTH-1, D8-CAP-1/2, D8-SCHED-1, D8-ATT-1/2, D8-LOCK-1, D8-RET-1, D8-CLOCK-1, D8-ROLE-1/2, D8-SQL-1, D8-XPKG-4..8) and the
 -- decisions register rows D8-PEX-1.. of mandate B08-PERSISTENCE-EXECUTION. It extends B06 (0001..0008), B07 (0009..0012), B09
--- (0013..0017) and the merge (0018) and forks nothing: new tables, triggers, policies, grants and keys, and supersets of the one
--- function and the one index it replaces (retention_anchors_bound, retention_anchors_once_per_revision; D8-BASE-2).
+-- (0013..0017) and the merge (0018) and forks nothing: new tables, triggers, policies, grants and keys, and a superset of the one
+-- function it replaces (retention_anchors_bound; D8-BASE-2).
 --
 -- SQLSTATE vocabulary added by B08 (a range of its own, D8-SQL-1; mapped by @kauro/persistence sqlstate.ts):
 --   KA080 FENCE     an attempt or a step that is not its lease's current owner at its fence, or an object outside its own prefix
@@ -692,9 +692,8 @@ CREATE TRIGGER processing_attempts_bookkeeping AFTER INSERT OR UPDATE ON kauro.p
   FOR EACH ROW EXECUTE FUNCTION kauro.processing_attempts_bookkeeping();
 
 -- --- consumption at admission, bound at COMMIT (D8-AUTH-1, D8-RET-1, D8-ATT-1; KA081, KA080) -----------------------------------------
--- The authorization names the job it is consumed by (B09 learns it once, job_ref); the key binds the pair.
-ALTER TABLE kauro.commercial_authorizations ADD CONSTRAINT commercial_authorizations_job_fk
-  FOREIGN KEY (agency_id, job_ref, authorization_id) REFERENCES kauro.processing_jobs (agency_id, job_id, authorization_id);
+-- The authorization names the job it is consumed by (B09 learns it once, job_ref); the two deferred bounds below bind the pair — the
+-- job admitted by exactly this authorization, the authorization consumed by exactly this job — at COMMIT (decision D8-PEX-8).
 
 -- QUEUED -> ADMITTED commits only with the authorization ACTIVE -> CONSUMED naming the job at the admission's instant, its source's
 -- EXECUTION_ADMITTED anchor (written now or by an earlier admission of the revision), the revision's PAID_ORDINARY record (created now or kept, D8-XPKG-8) and attempt 1 CLAIMED at fence 1
@@ -731,11 +730,16 @@ $$;
 CREATE CONSTRAINT TRIGGER processing_jobs_admission_bound AFTER UPDATE ON kauro.processing_jobs
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (OLD.state = 'QUEUED' AND NEW.state = 'ADMITTED') EXECUTE FUNCTION kauro.processing_jobs_admission_bound();
 
--- ... and ACTIVE -> CONSUMED commits only with its job entering ADMITTED at that instant (the registry's execution_admitted guard)
+-- ... and ACTIVE -> CONSUMED commits only with its job entering ADMITTED at that instant (the registry's execution_admitted guard).
+-- Every runtime role is bound; a superuser session is not (it can disable any trigger anyway), which keeps B09's own stand-in for
+-- this edge — its critique suite consumes an entitlement as the superuser oracle, B09-F2 — unchanged (decision D8-PEX-8).
 CREATE OR REPLACE FUNCTION kauro.commercial_authorizations_consumption_bound() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = current_user AND r.rolsuper) THEN
+    RETURN NULL;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM kauro.processing_jobs j
      WHERE j.agency_id = NEW.agency_id AND j.job_id = NEW.job_ref AND j.authorization_id = NEW.authorization_id
