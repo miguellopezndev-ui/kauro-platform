@@ -133,3 +133,44 @@ test("undeclared dependencies and cycles are rejected", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("B11 D-SEC-2: the node-side files of a client-bundle package (tests, build scripts and configuration, browser-test harness) may use Node built-ins; its shipped source may not use one, declare a Server Action or a server data cache, or import next/og; a Next.js build output is not scanned", () => {
+  const files = {
+    "packages/ui/package.json": pkg("@kauro/ui"),
+    "packages/ui/src/index.ts": "export const tokens = 1;",
+    "packages/ui/test/tokens.test.ts": 'import { readFileSync } from "node:fs";\nimport { tokens } from "../src/index.js";\nexport { readFileSync, tokens };',
+    "apps/web/package.json": pkg("@kauro/web", { "@kauro/ui": "workspace:*", next: "16.3.6" }),
+    "apps/web/src/app/page.tsx": 'import { tokens } from "@kauro/ui";\nimport "@kauro/ui/tokens.css";\nexport default function Page() { return tokens; }',
+    "apps/web/test/headers.test.ts": 'import { test } from "node:test";\nexport { test };',
+    "apps/web/e2e/support/serve.mjs": 'import https from "node:https";\nexport { https };',
+    "apps/web/scripts/next.mjs": 'import { spawn } from "node:child_process";\nexport { spawn };',
+    "apps/web/next.config.ts": 'import { join } from "node:path";\nexport default { root: join(".", "..") };',
+    "apps/web/playwright.config.ts": 'import { join } from "node:path";\nexport default join("e2e");',
+    "apps/web/.next/server/app/page.js": 'import { readFileSync } from "node:fs";\n"use server";\nexport { readFileSync };',
+  };
+  const clean = tree(files);
+  try {
+    const r = run(clean);
+    assert.equal(r.code, 0, r.out);
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const dirty = tree({
+    ...files,
+    "apps/web/src/app/actions.ts": '"use server";\nimport { createHash } from "node:crypto";\nexport async function save() { return createHash("sha256"); }',
+    "apps/web/src/app/inline.tsx": 'export async function act() {\n  "use server";\n  return 1;\n}\nexport async function cached() {\n  \'use cache\'\n  return 2;\n}',
+    "apps/web/src/app/og/route.tsx": 'import { ImageResponse } from "next/og";\nexport const GET = () => new ImageResponse(null);',
+  });
+  try {
+    const r = run(dirty);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /apps\/web\/src\/app\/actions\.ts:1: \[client-bundle\] a client bundle declares "use server"/);
+    assert.match(r.out, /apps\/web\/src\/app\/actions\.ts:2: \[client-bundle\] client bundle imports a Node built-in \(node:crypto\)/);
+    assert.match(r.out, /apps\/web\/src\/app\/inline\.tsx:2: \[client-bundle\] a client bundle declares "use server"/);
+    assert.match(r.out, /apps\/web\/src\/app\/inline\.tsx:6: \[client-bundle\] a client bundle declares "use cache"/);
+    assert.match(r.out, /apps\/web\/src\/app\/og\/route\.tsx:1: \[client-bundle\] a client bundle imports the forbidden module next\/og/);
+    assert.doesNotMatch(r.out, /apps\/web\/(test|e2e|scripts)\/|next\.config\.ts|playwright\.config\.ts|packages\/ui\/test\/|\.next\//, "node-side files and build outputs are not client bundles");
+  } finally {
+    rmSync(dirty, { recursive: true, force: true });
+  }
+});

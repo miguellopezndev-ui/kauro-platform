@@ -11,7 +11,12 @@ const rules = JSON.parse(readFileSync(join(root, "architecture.rules.json"), "ut
 const argvRoot = process.argv[2] ? resolve(process.argv[2]) : root; // a fixture tree can be gated the same way (tests)
 
 const SOURCE_EXT = new Set([".ts", ".tsx", ".mts", ".js", ".mjs"]);
-const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "coverage", "tmp"]);
+// build and test outputs are generated, never source (.next: the Next.js build of apps/web; the Playwright result folders)
+const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "coverage", "tmp", ".next", "test-results", "playwright-report", "blob-report"]);
+const nodeSide = rules.clientBundleNodeSide ?? [];
+const forbiddenDirectives = rules.forbiddenInClientBundles?.directives ?? [];
+const forbiddenSpecifiers = rules.forbiddenInClientBundles?.specifiers ?? [];
+const DIRECTIVE_RE = /^\s*(["'])(use [a-z]+)\1;?\s*(\/\/.*)?$/;
 
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
@@ -76,8 +81,20 @@ for (const pkg of pkgs) {
     const rel = relative(argvRoot, file).split(sep).join("/");
     const inPackage = relative(pkg.dir, file).split(sep).join("/");
     const isTestFile = inPackage.startsWith("test/");
-    const isClientBundle = rules.clientBundles.some((prefix) => rel.startsWith(prefix));
+    // a node-side file of a client-bundle package (its tests, build scripts and configuration, the browser-test harness) never
+    // reaches a browser: the client-bundle rules do not apply to it (B11 design D-SEC-2)
+    const isNodeSide = nodeSide.some((entry) => (entry.endsWith("/") ? inPackage.startsWith(entry) : inPackage === entry));
+    const isClientBundle = rules.clientBundles.some((prefix) => rel.startsWith(prefix)) && !isNodeSide;
+    if (isClientBundle) {
+      readFileSync(file, "utf8").split("\n").forEach((text, i) => {
+        const m = DIRECTIVE_RE.exec(text);
+        if (m && forbiddenDirectives.includes(m[2])) violations.push({ file: rel, line: i + 1, rule: "client-bundle", text: `a client bundle declares "${m[2]}" (no Server Action and no server data cache, B11 design D-SEC-2)` });
+      });
+    }
     for (const { spec, line } of specifiersOf(file)) {
+      if (isClientBundle && forbiddenSpecifiers.some((f) => spec === f || spec.startsWith(`${f}/`))) {
+        violations.push({ file: rel, line, rule: "client-bundle", text: `a client bundle imports the forbidden module ${spec} (B11 design D-SEC-2)` });
+      }
       if (spec.startsWith("node:")) {
         if (isClientBundle) violations.push({ file: rel, line, rule: "client-bundle", text: `client bundle imports a Node built-in (${spec})` });
         continue;
