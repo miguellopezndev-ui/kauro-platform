@@ -13,7 +13,7 @@ import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports
 import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
-import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
+import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 import { SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS } from "../sources/request-schemas.js";
 import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
 import { buildCommerceResponseSchemas } from "../commerce/response-schemas.js";
@@ -107,6 +107,12 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
   for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {
     const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
     if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 request schema ${id} collides with a B06 or B07 one`);
+    roots[id] = schema;
+  }
+  // package B11: the closed request schemas of the operational routes that take a body (the session boundary's, the public
+  // routes'), under their own prefix; an id that collided with a command's would be an integrity failure
+  for (const [id, schema] of Object.entries(operationalRequestSchemas(operational))) {
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the operational request schema ${id} collides with another request schema`);
     roots[id] = schema;
   }
   const responses = buildResponseSchemas(bundle, operational);

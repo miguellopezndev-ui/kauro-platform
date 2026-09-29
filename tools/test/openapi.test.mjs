@@ -26,8 +26,9 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
-  // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1)
+  // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, every payment route of
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the five routes of the browser session
+  // boundary (B11 W2)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -38,6 +39,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/public/identity-config getIdentityConfig",
       "GET /api/v1/quotes/{quoteId} GetQuote",
       "GET /api/v1/refunds/{refundId} GetRefund",
       "GET /api/v1/revisions/{revisionId} GetRevision",
@@ -45,12 +47,14 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId} GetSelectionManifest",
       "GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview PreviewTable",
       "GET /api/v1/revisions/{revisionId}/uploads ListUploads",
+      "GET /api/v1/sessions/current getCurrentSession",
       "GET /api/v1/uploads/{uploadId} GetUpload",
       "GET /api/v1/uploads/{uploadId}/session GetUploadSession",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
+      "POST /api/v1/assurance/step-ups createStepUp",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
@@ -68,6 +72,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/revisions/{revisionId}/selection SelectInputTables",
       "POST /api/v1/revisions/{revisionId}/selection-manifests SubmitSelectionManifest",
       "POST /api/v1/revisions/{revisionId}/uploads ReserveUpload",
+      "POST /api/v1/sessions openSession",
+      "POST /api/v1/sessions/current/revoke revokeCurrentSession",
       "POST /api/v1/uploads/{uploadId}/cancel CancelUpload",
       "POST /api/v1/uploads/{uploadId}/complete CompleteUpload",
     ],
@@ -91,14 +97,28 @@ test("the committed document is the generated one, byte for byte, and matches ev
     const problemStatuses = sources.application.outcomesByStatus(sources.application.READ_OUTCOMES[read.operationId]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), ["200", ...problemStatuses].sort());
   }
-  // the probes are the operational routes of @kauro/application (R42 connected to R23): documented with the replies they declare
+  // the probes and the session routes are the operational routes of @kauro/application (R42 connected to R23): documented with
+  // the replies they declare — a probe with the one Problem default, a session route with one Problem per status of its closed
+  // catalogue (like a command's), a body-less 204 without content, a request body where the route takes one
   for (const route of sources.operationalRoutes) {
     const op = expected.paths[route.path][route.method.toLowerCase()];
     assert.equal(op.operationId, route.operationId);
     assert.equal(op["x-kauro-operational"], true);
-    assert.deepEqual(Object.keys(op.responses).sort(), [...Object.keys(route.responses), "default"].sort());
+    const outcomes = sources.application.OPERATIONAL_OUTCOMES[route.operationId];
+    const problemStatuses = outcomes === undefined ? ["default"] : sources.application.outcomesByStatus(outcomes).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), [...Object.keys(route.responses), ...problemStatuses].sort());
+    for (const [status, response] of Object.entries(route.responses)) assert.equal(op.responses[status].content === undefined, response.schema === null, `${route.operationId} ${status}`);
+    assert.equal(op.requestBody !== undefined, route.request !== undefined, route.operationId);
   }
-  assert.deepEqual(sources.operationalRoutes.map((r) => `${r.method} ${r.path} ${r.operationId}`), ["GET /livez getLiveness", "GET /readyz getReadiness"]);
+  assert.deepEqual(sources.operationalRoutes.map((r) => `${r.method} ${r.path} ${r.operationId}`), [
+    "GET /livez getLiveness",
+    "GET /readyz getReadiness",
+    "POST /api/v1/sessions openSession",
+    "GET /api/v1/sessions/current getCurrentSession",
+    "POST /api/v1/sessions/current/revoke revokeCurrentSession",
+    "POST /api/v1/assurance/step-ups createStepUp",
+    "GET /api/v1/public/identity-config getIdentityConfig",
+  ]);
   // the ApprovalView component carries every member of the KAURO_PLAN_APPROVAL_V1 preimage (R29)
   const approval = expected.components.schemas.ApprovalView;
   for (const member of ["approvalId", "actorId", "agencyId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "createdAt"]) {
@@ -271,7 +291,10 @@ test("B09: the payment routes are documented from their contracts — a served o
   assert.deepEqual(operationOf(application.isServedCommerceCommand("CMD033"), "POST", "/api/v1/refunds/{refundId}/execute").security, [{ serviceAuth: [] }]);
   assert.deepEqual(operationOf(application.isServedCommerceCommand("CMD034"), "POST", "/api/v1/payment-orders/{orderId}/reconcile").security, [{ serviceAuth: [] }]);
   const approve = expected.paths["/api/v1/refunds/{refundId}/approve"].post;
-  assert.deepEqual(approve.security, [{ bearerAuth: [] }]);
+  // a person authenticates with a bearer token or the browser session, whose unsafe requests carry the CSRF token (B11 D-AUTH-5)
+  assert.deepEqual(approve.security, [{ bearerAuth: [] }, { sessionCookie: [] }]);
+  assert.equal(approve.parameters.some((p) => p.$ref === "#/components/parameters/CsrfToken"), true);
+  assert.equal(operationOf(true, "POST", "/api/v1/refunds/{refundId}/execute").parameters.some((p) => p.$ref === "#/components/parameters/CsrfToken"), false, "a service identity sends no session cookie");
   assert.equal(approve.parameters.some((p) => p.$ref === "#/components/parameters/AgencySelector"), false, "the scope of an operator is the stored operation, never a selector");
   assert.equal(expected.paths["/api/v1/quotes/{quoteId}/payment-orders"].post.parameters.some((p) => p.$ref === "#/components/parameters/AgencySelector"), true);
   // a route documented as planned that the api registers fails the check (it must be served from paths), and so does a planned

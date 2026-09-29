@@ -139,10 +139,13 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
 
 // --- route catalogues ---------------------------------------------------------------------------------------------------------
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY } = ROUTE_OUTCOME_FRAGMENTS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, COOKIE_CSRF } = ROUTE_OUTCOME_FRAGMENTS;
 
-/** A person's identity outcomes: a service identity is not a person, so its route answers SERVICE_ACCESS instead. */
-const PERSON_ONLY = new Set(["AUTHENTICATION_REQUIRED/-", "AUTHENTICATION_REQUIRED/SUBJECT_UNAUTHENTICATED", "NOT_AUTHORIZED/IDENTITY_DISABLED", "NOT_AUTHORIZED/IDENTITY_UNVERIFIED"]);
+/**
+ * A person's identity outcomes: a service identity is not a person, so its route answers SERVICE_ACCESS instead — and its
+ * authenticator reads no session cookie, so the browser session's AMBIGUOUS_CREDENTIALS (B11 D-AUTH-5) is not its answer either.
+ */
+const PERSON_ONLY = new Set(["AUTHENTICATION_REQUIRED/-", "AUTHENTICATION_REQUIRED/SUBJECT_UNAUTHENTICATED", "INVALID_REQUEST/AMBIGUOUS_CREDENTIALS", "NOT_AUTHORIZED/IDENTITY_DISABLED", "NOT_AUTHORIZED/IDENTITY_UNVERIFIED"]);
 const keyOf = (o: ProblemOutcome): string => `${o.code}/${o.reason ?? "-"}`;
 
 function compose(route: string, ...parts: ReadonlyArray<ReadonlyArray<ProblemOutcome>>): ReadonlyArray<ProblemOutcome> {
@@ -155,8 +158,10 @@ function compose(route: string, ...parts: ReadonlyArray<ReadonlyArray<ProblemOut
   return Object.freeze(entries);
 }
 
-const tenantCommand = (id: CommerceCommandId) => compose(id, EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, COMMAND_SPECIFIC[id]);
-const operatorCommand = (id: CommerceCommandId) => compose(id, EVERY_ROUTE, PATH_IDS, OPERATOR_ACCESS, COMMAND_SPECIFIC[id]);
+// a person's command is authenticated by the api's authenticator, so an unsafe request carrying the session cookie answers the
+// cookie CSRF rule (B11 D-AUTH-5) before its journal is reserved
+const tenantCommand = (id: CommerceCommandId) => compose(id, EVERY_ROUTE, COOKIE_CSRF, PATH_IDS, TENANT, AGENCY_HEADER, COMMAND_SPECIFIC[id]);
+const operatorCommand = (id: CommerceCommandId) => compose(id, EVERY_ROUTE, COOKIE_CSRF, PATH_IDS, OPERATOR_ACCESS, COMMAND_SPECIFIC[id]);
 const serviceCommand = (id: CommerceCommandId) => compose(id, EVERY_ROUTE.filter((o) => !PERSON_ONLY.has(keyOf(o))), PATH_IDS, SERVICE_ACCESS, COMMAND_SPECIFIC[id]);
 /** The webhook: the envelope's transport and the platform's own outcomes, the provider's admission and authentication; no key, no person. */
 const providerCommand = (id: CommerceCommandId) =>

@@ -32,7 +32,8 @@
     "@kauro/data-plane": "workspace:*",
     "@kauro/domain": "workspace:*",
     "@kauro/persistence": "workspace:*",
-    "fastify": "5.12.5"
+    "fastify": "5.12.5",
+    "jose": "6.2.12"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

@@ -525,8 +525,19 @@ export const ACCEPTED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
 /** One declared reply of an operational route. */
 export interface OperationalResponse {
   readonly description: string;
-  readonly contentType: string;
-  /** A closed JSON Schema literal in the vocabulary of api/json-schema; compiled once at start-up, never from a runtime value. */
+  /** The media type of the reply's body, or null for a reply without one (204). */
+  readonly contentType: string | null;
+  /**
+   * A closed JSON Schema literal in the vocabulary of api/json-schema; compiled once at start-up, never from a runtime value.
+   * Null exactly when the reply has no body.
+   */
+  readonly schema: JsonSchema | null;
+}
+
+/** The body an operational route admits (B11 W2: the identity token of a sign-in or a step-up). */
+export interface OperationalRequest {
+  readonly contentType: "application/json";
+  /** A closed JSON Schema literal, compiled under `urn:kauro:api:v1:request:op:<operationId>`. */
   readonly schema: JsonSchema;
 }
 
@@ -547,6 +558,8 @@ export interface OperationalRoute {
   readonly authority: string;
   /** Declared replies by HTTP status; a status >= 400 that is not declared answers a Problem. */
   readonly responses: Readonly<Record<string, OperationalResponse>>;
+  /** The body the route admits, when it takes one (strict JSON, closed schema, admitted like a command's body). */
+  readonly request?: OperationalRequest;
 }
 
 /** The reply of GET /livez: the process is live; nothing else is checked (14 "Monitoring and service health"). */
@@ -593,13 +606,144 @@ export const READINESS_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
 
 const JSON_CONTENT_TYPE = "application/json";
 
+// --- the browser session boundary (B11 design D-AUTH-1..5) -------------------------------------------------------------------
+
+/** An identity provider's ID token as the browser hands it over: visible ASCII, bounded (the verifier bounds it further). */
+const ID_TOKEN = Object.freeze({ type: "string", minLength: 1, maxLength: 16_384, pattern: "^[\\u0021-\\u007e]+$" });
+/** A nullable UTC instant. */
+const UTC_OR_NULL = Object.freeze({ type: ["string", "null"], format: "date-time", pattern: "Z$" });
+
+/** The body of POST /api/v1/sessions and POST /api/v1/assurance/step-ups: the one ID token, nothing else. */
+export const IDENTITY_TOKEN_REQUEST_SCHEMA: JsonSchema = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["idToken"],
+  properties: { idToken: ID_TOKEN },
+});
+
+/**
+ * SessionView (D-AUTH-4): the person and the session, and the CSRF token the page sends on unsafe requests. No provider token,
+ * subject, e-mail address or secret: the cookie carries the secret and the page never reads it.
+ */
+export const SESSION_VIEW_SCHEMA: JsonSchema = Object.freeze({
+  title: "SessionView",
+  description: "The signed-in person and the session: verification facts as flags, the deadlines of the session, the freshness of its latest step-up and its CSRF token (B11 design D-AUTH-4).",
+  type: "object",
+  additionalProperties: false,
+  required: ["userId", "emailVerified", "mfaEnrolled", "mfaAt", "stepUpFreshUntil", "idleExpiresAt", "absoluteExpiresAt", "csrfToken"],
+  properties: {
+    userId: ID,
+    emailVerified: { type: "boolean" },
+    mfaEnrolled: { type: "boolean" },
+    mfaAt: UTC_OR_NULL,
+    stepUpFreshUntil: UTC_OR_NULL,
+    idleExpiresAt: UTC,
+    absoluteExpiresAt: UTC,
+    csrfToken: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+  },
+});
+
+/** The reply of a step-up: the B06 STEP_UP proof CMD025 cites as assuranceProofRef, and when it stops being fresh. */
+export const STEP_UP_PROOF_SCHEMA: JsonSchema = Object.freeze({
+  title: "StepUpProofView",
+  type: "object",
+  additionalProperties: false,
+  required: ["proofId", "expiresAt"],
+  properties: { proofId: ID, expiresAt: UTC },
+});
+
+/** Which IdentityClient adapter the page loads (D-AUTH-2); the contract fake is announced in LOCAL only. */
+export const IDENTITY_CONFIG_SCHEMA: JsonSchema = Object.freeze({
+  title: "IdentityConfigView",
+  type: "object",
+  additionalProperties: false,
+  required: ["adapter", "projectId"],
+  properties: {
+    adapter: { type: "string", enum: ["IDENTITY_PLATFORM", "CONTRACT_FAKE"] },
+    projectId: { type: "string", pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$" },
+    endpoint: { type: "string", pattern: "^https?://[^\\s/]+$", maxLength: 200 },
+  },
+});
+
+/** The operation ids of the session boundary's routes. */
+export const SESSION_OPERATION_IDS = Object.freeze({
+  open: "openSession",
+  current: "getCurrentSession",
+  revoke: "revokeCurrentSession",
+  stepUp: "createStepUp",
+  identityConfig: "getIdentityConfig",
+} as const);
+
+const SESSION_AUTHORITY = '08 "Authentication and assurance"; B11 design D-AUTH-1..5';
+
+/**
+ * The routes of the browser session boundary (B11 W2): auxiliary routes, not catalogue commands, served in the OpenAPI
+ * document with closed replies and closed outcome catalogues (api/outcomes OPERATIONAL_OUTCOMES). apps/api registers them when
+ * the session boundary is bound (apps/api/src/sessions.ts).
+ */
+export const SESSION_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: SESSION_OPERATION_IDS.open,
+    method: "POST",
+    path: "/api/v1/sessions",
+    summary: "Exchange a verified identity token for a browser session (Set-Cookie __Host-kauro_session)",
+    authority: SESSION_AUTHORITY,
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: IDENTITY_TOKEN_REQUEST_SCHEMA }),
+    responses: Object.freeze({
+      "201": Object.freeze({ description: "The session is open; the cookie carries its secret (Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age = the absolute lifetime).", contentType: JSON_CONTENT_TYPE, schema: SESSION_VIEW_SCHEMA }),
+    }),
+  }),
+  Object.freeze({
+    operationId: SESSION_OPERATION_IDS.current,
+    method: "GET",
+    path: "/api/v1/sessions/current",
+    summary: "The session the cookie names, while it is live",
+    authority: SESSION_AUTHORITY,
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "The live session; last-seen moves at most once a minute.", contentType: JSON_CONTENT_TYPE, schema: SESSION_VIEW_SCHEMA }),
+    }),
+  }),
+  Object.freeze({
+    operationId: SESSION_OPERATION_IDS.revoke,
+    method: "POST",
+    path: "/api/v1/sessions/current/revoke",
+    summary: "Logout: end the session, clear the cookie and the site's cache, cookies and storage (idempotent)",
+    authority: `${SESSION_AUTHORITY}; 08 "Browser, API and cache isolation"`,
+    responses: Object.freeze({
+      "204": Object.freeze({ description: "Ended (or already ended): Set-Cookie clears the session cookie and Clear-Site-Data names cache, cookies and storage.", contentType: null, schema: null }),
+    }),
+  }),
+  Object.freeze({
+    operationId: SESSION_OPERATION_IDS.stepUp,
+    method: "POST",
+    path: "/api/v1/assurance/step-ups",
+    summary: "Record a recent second-factor re-authentication of the caller as a STEP_UP proof",
+    authority: `${SESSION_AUTHORITY}; B06 D-ASSUR-1, D-EVID-1`,
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: IDENTITY_TOKEN_REQUEST_SCHEMA }),
+    responses: Object.freeze({
+      "201": Object.freeze({ description: "The proof, cited by CMD025 (and later CMD005, CMD007, CMD043) as assuranceProofRef until expiresAt.", contentType: JSON_CONTENT_TYPE, schema: STEP_UP_PROOF_SCHEMA }),
+    }),
+  }),
+  Object.freeze({
+    operationId: SESSION_OPERATION_IDS.identityConfig,
+    method: "GET",
+    path: "/api/v1/public/identity-config",
+    summary: "Which identity client the application loads (public, no credential)",
+    authority: "B11 design D-AUTH-2",
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "The identity client adapter and its public configuration.", contentType: JSON_CONTENT_TYPE, schema: IDENTITY_CONFIG_SCHEMA }),
+    }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 /**
  * The operational routes of this edition: the platform's liveness and readiness probes, outside /api/v1, without a credential
  * and without a customer row (14 "Monitoring and service health": "Liveness checks process health ... Readiness checks the
  * minimum dependencies and schema compatibility needed for the service's role"; 14 "Deployment and rollback"; review finding
- * R42, decision E-OPS-4). apps/api/src/health.ts serves them and registers each with `operationalRouteResponses(<operationId>)`
- * as its `config.responses`, so the send guard validates their replies like any command's, the validator compiles each
- * declared reply, and the OpenAPI document and its checker cover them (R23).
+ * R42, decision E-OPS-4), and the routes of the browser session boundary (SESSION_ROUTES, B11 W2). apps/api/src/health.ts serves
+ * the probes and apps/api/src/sessions.ts the session routes, each registered with `operationalRouteResponses(<operationId>)` as
+ * its `config.responses`, so the send guard validates their replies like any command's, the validator compiles each declared
+ * reply and request body, and the OpenAPI document and its checker cover them (R23).
  */
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
@@ -623,10 +767,30 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
       "503": Object.freeze({ description: "Not ready: the process is draining, the database is unreachable, or its schema is behind or drifted.", contentType: JSON_CONTENT_TYPE, schema: READINESS_RESPONSE_SCHEMA }),
     }),
   }),
+  ...SESSION_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {
   return `${RESPONSE_SCHEMA_PREFIX}op:${operationId}:${status}`;
+}
+
+/** The request schema id of an operational route that takes a body. */
+export function operationalRequestSchemaId(operationId: string): OperationalRequestSchemaId {
+  return `${OPERATIONAL_REQUEST_SCHEMA_PREFIX}${operationId}`;
+}
+
+export const OPERATIONAL_REQUEST_SCHEMA_PREFIX = "urn:kauro:api:v1:request:op:";
+export type OperationalRequestSchemaId = `${typeof OPERATIONAL_REQUEST_SCHEMA_PREFIX}${string}`;
+
+/** The request schemas of the operational routes that take a body, by schema id (compiled by the closed validator). */
+export function operationalRequestSchemas(routes: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): Readonly<Record<OperationalRequestSchemaId, JsonSchema>> {
+  const out: Record<OperationalRequestSchemaId, JsonSchema> = {};
+  for (const route of routes) {
+    if (route.request === undefined) continue;
+    const id = operationalRequestSchemaId(route.operationId);
+    out[id] = { $schema: DIALECT, $id: id, title: `${route.operationId} request`, ...route.request.schema };
+  }
+  return out;
 }
 
 
@@ -659,6 +823,12 @@ function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<Opera
     seen.add(route.operationId);
     for (const [status, response] of Object.entries(route.responses)) {
       if (!/^[1-5][0-9]{2}$/.test(status)) refuse(`operational route ${route.operationId} declares status ${status}`);
+      // a reply without a body (204) declares neither a media type nor a schema; any other declares both
+      if ((response.schema === null) !== (response.contentType === null)) refuse(`operational route ${route.operationId} ${status} declares a body schema without a media type, or the reverse`);
+      if (response.schema === null) {
+        if (status !== "204") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 has none`);
+        continue;
+      }
       const id = operationalResponseSchemaId(route.operationId, status);
       roots[id] = { $schema: DIALECT, $id: id, title: `${route.operationId} ${status}`, ...response.schema };
     }

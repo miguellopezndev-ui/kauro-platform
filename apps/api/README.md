@@ -83,6 +83,19 @@ and of every not-ready probe, and every error a pooled connection raises (idle, 
 subjects for LOCAL and tests; SANDBOX and LIVE refuse to start until the Identity Platform verifier is bound (design §12c,
 I-INT-3). The transport and operability decisions are recorded in `docs/design/B06-review/E-transport-operability.md`.
 
+The browser session boundary (B11 W2, `docs/design/B11-agency-app.md` D-AUTH-1..5, §12) is bound when the configuration
+names it (`KAURO_IDENTITY_KEY_SOURCE` = `GOOGLE_X509`, or `CONTRACT_FAKE` in LOCAL only with `KAURO_IDENTITY_FAKE_JWKS_FILE`
+and the optional `KAURO_IDENTITY_FAKE_ENDPOINT`; `KAURO_IDENTITY_PROJECT_ID`; `KAURO_APP_ORIGINS`, the exact browser origins;
+`KAURO_DB_ASSURANCE_USER`/`_PASSWORD`/`_POOL_MAX`, a login of `kauro_assurance` whose pool shares the four connections of
+the budget): `POST /api/v1/sessions`, `GET /api/v1/sessions/current`, `POST /api/v1/sessions/current/revoke`,
+`POST /api/v1/assurance/step-ups` and `GET /api/v1/public/identity-config`, and the SessionAuthenticator, which authenticates
+the `__Host-kauro_session` cookie of every command and read beside the LOCAL bearer file (a cookie and a bearer token
+together are AMBIGUOUS_CREDENTIALS; an unsafe cookie request needs the exact Origin, a same-origin Sec-Fetch-Site and the
+session's X-Kauro-CSRF token, decided before the journal). The identity token verifier (`createIdentityTokenVerifier`, jose)
+accepts RS256 only and Google's securetoken certificates (Cache-Control max-age) or, in LOCAL, the contract fake's JWKS. No
+reply carries a CORS header. Without the session boundary the B06 edition is unchanged (LOCAL: bearer file; SANDBOX and LIVE
+refuse to start).
+
 Tests (`test/`) run the real server, composed by the real composition root, against a PostgreSQL 17 cluster each test file
 starts itself: the OK/DENY/RACE triads of the seven commands, idempotency (S052), the schema boundary (S093), request
 validation (R2-058, R2-059, the admission order), the pipeline order and its authorization (`pipeline-authorization.test.ts`),

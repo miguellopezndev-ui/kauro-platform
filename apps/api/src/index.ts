@@ -7,13 +7,20 @@
  * handlers and the server over a unit-of-work factory, `startApi` runs both, and `bootstrap` adds the authenticator of the
  * environment, listens and offers the bounded `shutdown` (`main.ts` is the process entry). `runMigrationJob` is the one-shot
  * migration job (`migrate.ts` is its process entry): the only process that receives the owner's credential (N7).
+ * The browser session boundary of B11 W2 (design D-AUTH-1..5): `createIdentityTokenVerifier` (jose; key sources GOOGLE_X509 and,
+ * in LOCAL only, CONTRACT_FAKE), the SessionAuthenticator and the session routes (`sessions.ts`), bound by `assembleApi`'s
+ * `sessions` and, from the configuration, by `startApi`.
  */
 export { createApiServer, fastifyPath, classifyInternalError, clientNetworkOf, routeInventoryOf, DEFAULT_HTTP_LIMITS } from "./server.js";
 export type { ApiServerOptions, ApiLogger, CommandReply, HttpLimits, ReadReply, StoredReply, RouteInventoryEntry } from "./server.js";
 export { HEALTH_ROUTES, HEALTH_PATHS, LIVENESS_RESPONSE_SCHEMA, READINESS_RESPONSE_SCHEMA, readinessOf, registerHealthRoutes } from "./health.js";
 export type { DatabaseReadiness, HealthOptions, LivenessResponse, ProbeResponse, ProbeRoute, ProbeSchema, ReadinessResponse } from "./health.js";
-export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError } from "./authenticator.js";
-export type { Authenticator, SubjectFacts, BearerTokenEntry } from "./authenticator.js";
+export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError, authenticationOf } from "./authenticator.js";
+export type { Authenticator, Authentication, AuthenticationRequest, SubjectFacts, BearerTokenEntry } from "./authenticator.js";
+export { createIdentityTokenVerifier, GOOGLE_SECURETOKEN_X509_URL, IDENTITY_PLATFORM_PROVIDER, MAX_ID_TOKEN_LENGTH } from "./identity-verifier.js";
+export type { IdentityTokenVerifierOptions, IdentityKeySource, JsonWebKeySet, KeyDocumentFetch } from "./identity-verifier.js";
+export { createSessionAuthenticator, registerSessionRoutes, assertIdentityConfig } from "./sessions.js";
+export type { SessionAssembly, SessionRoutesOptions, IdentityConfigView } from "./sessions.js";
 export { loadContractSchemas } from "./schemas.js";
 export {
   loadConfig,
@@ -25,9 +32,11 @@ export {
   MIGRATOR_PASSWORD_VARIABLE,
   MIGRATOR_PASSWORD_FILE_VARIABLE,
   CURSOR_KEY_FILE_VARIABLE,
+  IDENTITY_VARIABLES,
+  ASSURANCE_POOL_CEILING,
   readKeyFile,
 } from "./config.js";
-export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
+export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig, IdentityConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
 export { activeWorkInspector, noExternalActionsInThisEdition, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, unavailablePlanServices, commerceEdition, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
@@ -42,11 +51,13 @@ export {
   writeNotReady,
   systemClock,
   systemRandom,
+  sessionAssemblyOf,
   API_APPLICATION_NAME,
+  SESSIONS_APPLICATION_NAME,
   READINESS_STATEMENT_TIMEOUT_MS,
 } from "./composition.js";
 export type { DatabaseHandle, DatabaseConfig, DatabaseDependencies, ApiAssembly, RequestUnitOfWorkFactory, StartOptions, StartedApi } from "./composition.js";
-export { bootstrap, authenticatorOf, shutdownWithin } from "./bootstrap.js";
+export { bootstrap, authenticatorOf, shutdownWithin, readFakeJwks, identityKeySourceOf } from "./bootstrap.js";
 export type { BootstrappedApi, BootstrapOptions, ShutdownOutcome } from "./bootstrap.js";
 // the payment service's side of package B09 (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8.2, §14)
 export * from "./payments/index.js";

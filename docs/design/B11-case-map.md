@@ -38,6 +38,15 @@ Registry verification clauses:
 Counts at design: 13 cases — 0 EXECUTED_LOCAL, 0 SIMULATED, 0 PARTIAL, 13 MISSING (all planned). Target at B11 closure: 4
 EXECUTED_LOCAL (S067, CMD044-OK, CMD044-DENY, CMD044-RACE), 9 PARTIAL (owners B08, B10, B13, B15, B16, B17).
 
+## Stage 1 records
+
+What the stage-1 mandates delivered, per case (the status column above is updated by INT-1).
+
+| case | test file :: exact title | status | commit |
+|---|---|---|---|
+| S067 | `apps/api/test/b11-sessions.test.ts` :: "S067: a revoked or expired session reads nothing — every read with its cookie answers 401, the revoke answer clears the cookie and the site data, is idempotent, and no reply is cacheable" | api half EXECUTED_LOCAL (W2; Windows); browser half PLANNED (W6) | `0470497` |
+| R2-134 | `apps/api/test/b11-sessions.test.ts` :: "R2-134: a session opened after expiry carries no invitation or acceptance state, and sign-in answers the same for an unknown, a disabled and an existing identity" | api half EXECUTED_LOCAL (W2; Windows; identity provider SIMULATED); browser half PLANNED (W6) | `0470497` |
+
 ## Gates
 
 ### G-UX (owner manual 11, package B11; 8 cases)

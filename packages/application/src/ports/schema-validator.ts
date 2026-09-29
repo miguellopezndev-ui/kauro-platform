@@ -13,7 +13,7 @@
 import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
-import type { ResponseSchemaId } from "../api/response-schemas.js";
+import type { OperationalRequestSchemaId, ResponseSchemaId } from "../api/response-schemas.js";
 import type { CommerceRequestSchemaCommand } from "../commerce/request-schemas.js";
 import type { CommerceReadOperationId, CommerceServedCommandId } from "../commerce/response-schemas.js";
 import type { SELECTION_MANIFEST_SCHEMA_ID, SourceRequestSchemaId } from "../sources/request-schemas.js";
@@ -30,11 +30,13 @@ export type CommerceSchemaId =
 
 /**
  * B07 adds its six command schemas and the selection manifest document schema to the closed set (application-owned, reviewed
- * schemas only — S093); B09 its payment schemas (CommerceSchemaId).
+ * schemas only — S093); B09 its payment schemas (CommerceSchemaId); B11 the request schemas of its operational routes
+ * (OperationalRequestSchemaId: the session boundary's bodies).
  */
 export type KnownSchemaId =
   | ContractName
   | RequestSchemaId
+  | OperationalRequestSchemaId
   | ResponseSchemaId
   | SourceRequestSchemaId
   | typeof SELECTION_MANIFEST_SCHEMA_ID

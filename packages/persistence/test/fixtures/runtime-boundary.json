@@ -124,6 +124,18 @@
         ]
       }
     },
+    "kauro_assurance": {
+      "kauro.web_sessions": {
+        "UPDATE": [
+          "idle_expires_at",
+          "last_seen_at",
+          "revoke_reason",
+          "revoked_at",
+          "step_up_fresh_until",
+          "step_up_proof_id"
+        ]
+      }
+    },
     "kauro_control": {
       "kauro.command_journal": {
         "SELECT": [
@@ -2063,6 +2075,30 @@
       ],
       "using": null,
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "web_sessions/web_sessions_open": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": null,
+      "check": "((user_id = kauro.current_user_id()) AND (secret_sha256 = kauro.current_session_sha256()))"
+    },
+    "web_sessions/web_sessions_presented": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())",
+      "check": null
+    },
+    "web_sessions/web_sessions_presented_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())",
+      "check": "(secret_sha256 = kauro.current_session_sha256())"
     }
   },
   "tables": {
@@ -2303,6 +2339,10 @@
     "kauro_assurance": {
       "kauro.assurance_proofs": [
         "INSERT"
+      ],
+      "kauro.web_sessions": [
+        "INSERT",
+        "SELECT"
       ]
     },
     "kauro_control": {

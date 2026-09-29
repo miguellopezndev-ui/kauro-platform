@@ -24,7 +24,8 @@ after(async () => {
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
   // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md); B07 owns 0009..0012
-  // and B09 0013..0017 (the second of B07 and B09 to merge was renumbered after the first)
+  // and B09 0013..0017 (the second of B07 and B09 to merge was renumbered after the first); B08 owns 0019..0021 — reserved here
+  // until B08 lands — and B11 0022..0024 (docs/design/B11-agency-app.md section 12, D-INT1-1)
   assert.deepEqual(files.map((f) => f.file), [
     "0001_schema_roles_helpers.sql",
     "0002_identity_agencies_memberships.sql",
@@ -47,6 +48,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0017_tax_documents_ledger_settlements.sql",
     // the B07 + B09 merge: the payment service's read of the source lifecycle's retention (docs/design/B07-B09-merge.md D-MERGE-3)
     "0018_payment_service_source_reads.sql",
+    // package B08's numbers, reserved (a header and SELECT 1) until its own files land: the runner refuses a gap (D-INT1-1)
+    "0019_reserved_b08.sql",
+    "0020_reserved_b08.sql",
+    "0021_reserved_b08.sql",
+    // package B11: numbered 0009 on each mandate's branch and renumbered by the stage-1 integrator (D-INT1-1)
+    "0022_web_sessions.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

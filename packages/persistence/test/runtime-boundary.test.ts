@@ -40,6 +40,21 @@ test("N11/B06 work: every runtime role's table and column privileges and every r
   assert.deepEqual(app["kauro.validation_receipts"], ["SELECT"]);
   assert.equal((expected.columns["kauro_app"]?.["kauro.identities"]?.["UPDATE"] ?? []).includes("state"), false);
   for (const role of ["kauro_assurance", "kauro_validator", "kauro_ingress"]) {
-    for (const privileges of Object.values(expected.tables[role] ?? {})) assert.equal(privileges.includes("SELECT") || privileges.includes("UPDATE") || privileges.includes("DELETE"), false, `${role} reads or rewrites a whole table`);
+    for (const [rel, privileges] of Object.entries(expected.tables[role] ?? {})) {
+      // B11 D-AUTH-1: the authentication boundary also keeps the web sessions — it reads them (a row only when the transaction
+      // presents its secret hash: web_sessions_presented) and updates named columns only; nothing else is read or rewritten
+      if (role === "kauro_assurance" && rel === "kauro.web_sessions") {
+        assert.deepEqual(privileges, ["INSERT", "SELECT"]);
+        continue;
+      }
+      assert.equal(privileges.includes("SELECT") || privileges.includes("UPDATE") || privileges.includes("DELETE"), false, `${role} reads or rewrites a whole table`);
+    }
   }
+  // the web sessions belong to the authentication boundary alone: the request handlers hold nothing on them (B11 D-AUTH-1)
+  for (const role of ["kauro_app", "kauro_control", "kauro_validator", "kauro_ingress"]) {
+    assert.equal(expected.tables[role]?.["kauro.web_sessions"], undefined, `${role} on web_sessions`);
+    assert.equal(expected.columns[role]?.["kauro.web_sessions"], undefined, `${role} columns of web_sessions`);
+  }
+  assert.deepEqual(Object.keys(expected.columns["kauro_assurance"]?.["kauro.web_sessions"] ?? {}), ["UPDATE"]);
+  assert.equal((expected.columns["kauro_assurance"]?.["kauro.web_sessions"]?.["UPDATE"] ?? []).some((c) => ["user_id", "secret_sha256", "session_id", "absolute_expires_at", "created_at"].includes(c)), false, "what a session is never changes");
 });

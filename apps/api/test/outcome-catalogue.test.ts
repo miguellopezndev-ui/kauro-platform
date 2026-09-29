@@ -237,6 +237,8 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
     ...sitesOf(source("packages/application/src/commands/handlers/shared.ts"), "shared.ts"),
     ...sitesOf(source("packages/authorization/src/authorizer.ts"), "authorizer.ts"),
     ...sitesOf(source("apps/api/src/server.ts"), "server.ts"),
+    // the credential decisions of the session authenticator (B11 D-AUTH-5), reached by every command before the journal
+    ...sitesOf(source("packages/application/src/sessions/protocol.ts"), "protocol.ts"),
   ];
   const assurance = sitesOf(source("packages/authorization/src/assurance.ts"), "assurance.ts");
   assert.ok(pipeline.length >= 20 && new Set(assurance.map((s) => s.reason)).size === 3, `${pipeline.length} pipeline sites, ${assurance.length} assurance sites`);
