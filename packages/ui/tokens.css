@@ -36,6 +36,8 @@
   --kauro-focus-width: 2px;
   --kauro-focus-offset: 2px;
   --kauro-radius: 4px;
+  --kauro-target-size: 44px;
+  --kauro-border-width: 1px;
 }
 html {
   color: var(--kauro-color-text);
@@ -55,4 +57,386 @@ html {
 }
 @media (forced-colors: active) {
   :focus-visible { outline-color: Highlight; }
+}
+.kauro-icon {
+  inline-size: 1em;
+  block-size: 1em;
+  flex: none;
+}
+.kauro-heading {
+  margin: 0 0 var(--kauro-space-3);
+  line-height: var(--kauro-line-height-heading);
+  font-weight: 700;
+}
+h2.kauro-heading {
+  font-size: 1.5rem;
+}
+h3.kauro-heading {
+  font-size: 1.25rem;
+}
+h4.kauro-heading {
+  font-size: 1.125rem;
+}
+.kauro-safe-text bdi {
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+}
+.kauro-safe-text-marker {
+  display: inline-block;
+  margin-inline-end: var(--kauro-space-1);
+  padding: 0 var(--kauro-space-1);
+  border: var(--kauro-border-width) solid currentColor;
+  border-radius: var(--kauro-radius);
+  color: var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-safe-text-full {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.kauro-safe-text-full[hidden] {
+  display: none;
+}
+.kauro-disclosure {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kauro-color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.kauro-count, .kauro-money, .kauro-deadline {
+  font-variant-numeric: tabular-nums;
+}
+.kauro-count, .kauro-money {
+  white-space: nowrap;
+}
+.kauro-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kauro-space-2);
+  box-sizing: border-box;
+  min-block-size: var(--kauro-target-size);
+  min-inline-size: var(--kauro-target-size);
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: var(--kauro-border-width) solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius);
+  font: inherit;
+  font-weight: 600;
+  line-height: var(--kauro-line-height-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+.kauro-button-primary {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-button-primary:hover:not(:disabled) {
+  background: var(--kauro-color-primary-hover);
+  border-color: var(--kauro-color-primary-hover);
+}
+.kauro-button-secondary {
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-primary);
+}
+.kauro-button-secondary:hover:not(:disabled) {
+  background: var(--kauro-color-surface);
+}
+.kauro-button-danger {
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-danger-text);
+  border-color: var(--kauro-color-danger-text);
+}
+.kauro-button-danger:hover:not(:disabled) {
+  background: var(--kauro-color-danger-surface);
+}
+.kauro-button:disabled {
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  border-color: var(--kauro-color-control-border);
+  cursor: not-allowed;
+}
+.kauro-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kauro-space-1);
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-label {
+  font-weight: 600;
+}
+.kauro-hint {
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+}
+.kauro-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-2);
+  margin: 0;
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+.kauro-field :is(input, select, textarea) {
+  box-sizing: border-box;
+  min-block-size: var(--kauro-target-size);
+  max-inline-size: 100%;
+  padding: var(--kauro-space-2) var(--kauro-space-3);
+  border: var(--kauro-border-width) solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+}
+.kauro-field :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--kauro-color-danger-text);
+}
+.kauro-error-summary {
+  margin-block-end: var(--kauro-space-4);
+  padding: var(--kauro-space-4);
+  border: var(--kauro-border-width) solid var(--kauro-color-danger-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-danger-surface);
+  color: var(--kauro-color-text);
+}
+.kauro-error-summary .kauro-heading {
+  color: var(--kauro-color-danger-text);
+}
+.kauro-error-summary-list {
+  margin: 0;
+  padding-inline-start: var(--kauro-space-5);
+}
+.kauro-error-summary-list a {
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+.kauro-dialog {
+  box-sizing: border-box;
+  inline-size: min(40rem, calc(100% - 2 * var(--kauro-space-4)));
+  max-block-size: calc(100dvh - 2 * var(--kauro-space-4));
+  overflow: auto;
+  padding: var(--kauro-space-5);
+  border: var(--kauro-border-width) solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+}
+.kauro-dialog::backdrop {
+  background: color-mix(in srgb, var(--kauro-color-text) 60%, transparent);
+}
+.kauro-dialog-summary {
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-effect-list {
+  display: grid;
+  gap: var(--kauro-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-effect {
+  border: var(--kauro-border-width) solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  padding: var(--kauro-space-4);
+}
+.kauro-effect-description p {
+  margin: 0 0 var(--kauro-space-2);
+}
+.kauro-effect-acknowledge {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-3);
+}
+.kauro-effect-acknowledge input {
+  flex: none;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin: 0;
+}
+.kauro-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-5);
+}
+.kauro-table-region {
+  max-inline-size: 100%;
+  overflow-x: auto;
+}
+.kauro-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+.kauro-table-caption {
+  padding-block-end: var(--kauro-space-2);
+  text-align: start;
+  font-weight: 700;
+}
+.kauro-table :is(th, td) {
+  padding: var(--kauro-space-2) var(--kauro-space-3);
+  text-align: start;
+  vertical-align: top;
+  border-block-end: var(--kauro-border-width) solid var(--kauro-color-border);
+}
+.kauro-table thead th {
+  background: var(--kauro-color-surface);
+}
+.kauro-table :is(th, td).kauro-table-end {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-table-empty {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-1);
+  min-block-size: var(--kauro-target-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.kauro-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  margin-block-start: var(--kauro-space-3);
+}
+.kauro-pagination p {
+  margin: 0;
+  margin-inline-end: auto;
+}
+.kauro-tone-neutral {
+  color: var(--kauro-color-text);
+  background: var(--kauro-color-surface);
+}
+.kauro-tone-info {
+  color: var(--kauro-color-info-text);
+  background: var(--kauro-color-info-surface);
+}
+.kauro-tone-success {
+  color: var(--kauro-color-success-text);
+  background: var(--kauro-color-success-surface);
+}
+.kauro-tone-warning {
+  color: var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-tone-danger {
+  color: var(--kauro-color-danger-text);
+  background: var(--kauro-color-danger-surface);
+}
+.kauro-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-1);
+  padding: var(--kauro-space-1) var(--kauro-space-2);
+  border: var(--kauro-border-width) solid currentColor;
+  border-radius: var(--kauro-radius);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-3);
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border: var(--kauro-border-width) solid currentColor;
+  border-radius: var(--kauro-radius);
+}
+.kauro-banner-body {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--kauro-color-text);
+}
+.kauro-banner-title {
+  margin: 0 0 var(--kauro-space-1);
+  font-weight: 700;
+}
+.kauro-phase-list {
+  display: grid;
+  gap: var(--kauro-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2);
+}
+.kauro-phase-label {
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
+.kauro-phase-state {
+  padding: 0 var(--kauro-space-2);
+  border: var(--kauro-border-width) solid currentColor;
+  border-radius: var(--kauro-radius);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-phase-done {
+  color: var(--kauro-color-success-text);
+}
+.kauro-phase-current {
+  color: var(--kauro-color-info-text);
+  font-weight: 700;
+}
+.kauro-phase-upcoming {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-phase-failed {
+  color: var(--kauro-color-danger-text);
+}
+.kauro-count-denominators {
+  border: var(--kauro-border-width) solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  padding: var(--kauro-space-4);
+}
+.kauro-measures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--kauro-space-4);
+  margin: 0;
+}
+.kauro-measure dt {
+  font-weight: 700;
+}
+.kauro-measure dd {
+  margin: 0;
+}
+.kauro-measure-value {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.kauro-measure-definition {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-output-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--kauro-font-size-body);
+}
+.kauro-output-files li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+}
+@media (forced-colors: active) {
+  .kauro-button, .kauro-status-badge, .kauro-banner, .kauro-error-summary, .kauro-effect { border-color: CanvasText; }
+  .kauro-button:disabled { border-color: GrayText; color: GrayText; }
 }
