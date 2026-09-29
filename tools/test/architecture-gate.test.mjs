@@ -174,3 +174,81 @@ test("B11 D-SEC-2: the node-side files of a client-bundle package (tests, build 
     rmSync(dirty, { recursive: true, force: true });
   }
 });
+
+test("B11 D-SEC-2: a file that reads the environment lives in apps/web/src/server/config/ and starts with import server-only; a comment about the environment reads nothing, and node-side files may read it", () => {
+  const files = {
+    "packages/contracts/package.json": pkg("@kauro/contracts"),
+    "packages/contracts/src/index.ts": "export const x = 1;",
+    "apps/web/package.json": pkg("@kauro/web", { "@kauro/contracts": "workspace:*" }),
+    "apps/web/src/index.ts": 'import { x } from "@kauro/contracts";\nexport { x };',
+    "apps/web/src/server/config/hosts.ts": '// the one reader of the host values (process.env is named here in a comment only)\n/* import.meta.env too */\nimport "server-only";\nexport const host = process.env["KAURO_PUBLIC_ORIGIN"];',
+    "apps/web/src/server/config/quiet.ts": '\n\nimport "server-only";\nexport const quiet = 1;',
+    "apps/web/src/server/pure.ts": '// takes its values as arguments: process.env is never read here\nexport const parse = (value: string | undefined) => value ?? "";',
+    "apps/web/test/env.test.ts": 'export const level = process.env.NODE_ENV;',
+    "apps/web/e2e/support/serve.mjs": "export const port = process.env.KAURO_E2E_PORT;",
+    "apps/web/scripts/next.mjs": "export const env = { ...process.env };",
+    "apps/web/next.config.ts": 'export default { level: process.env["NODE_ENV"] };',
+  };
+  const clean = tree(files);
+  try {
+    const r = run(clean);
+    assert.equal(r.code, 0, r.out);
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const dirty = tree({
+    ...files,
+    "apps/web/src/server/pure.ts": '// takes its values as arguments\nexport const parse = () => process.env.KAURO_ENV;',
+    "apps/web/src/app/page.tsx": 'export default function Page() {\n  return process?.env?.KAURO_ENV ?? "";\n}',
+    "apps/web/src/app/meta.ts": "export const mode = import.meta.env.MODE;",
+    "apps/web/src/app/bracket.ts": 'export const level = process["env"];',
+    "apps/web/src/app/destructured.ts": "const { env } = process;\nexport { env };",
+    "apps/web/src/server/config/late.ts": 'export const before = 1;\nimport "server-only";\nexport const level = process.env["KAURO_ENV"];',
+    "apps/web/src/server/config/plain.ts": 'import { x } from "@kauro/contracts";\nexport const level = process.env["KAURO_ENV"] ?? x;',
+    "apps/web/src/server/config/empty.ts": "// nothing here\n",
+    "apps/web/src/server/config/wrong.ts": 'import "server-only-extra";\nexport const level = process.env["KAURO_ENV"];',
+  });
+  try {
+    const r = run(dirty);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /apps\/web\/src\/server\/pure\.ts:2: \[server-config\] a client bundle reads the environment outside apps\/web\/src\/server\/config\//);
+    assert.match(r.out, /apps\/web\/src\/app\/page\.tsx:2: \[server-config\] a client bundle reads the environment outside/);
+    assert.match(r.out, /apps\/web\/src\/app\/meta\.ts:1: \[server-config\] a client bundle reads the environment outside/);
+    assert.match(r.out, /apps\/web\/src\/app\/bracket\.ts:1: \[server-config\] a client bundle reads the environment outside/);
+    assert.match(r.out, /apps\/web\/src\/app\/destructured\.ts:1: \[server-config\] a client bundle reads the environment outside/);
+    assert.match(r.out, /apps\/web\/src\/server\/config\/late\.ts:1: \[server-config\] a server configuration module must start with import "server-only"/);
+    assert.match(r.out, /apps\/web\/src\/server\/config\/plain\.ts:1: \[server-config\] a server configuration module must start with import "server-only"/);
+    assert.match(r.out, /apps\/web\/src\/server\/config\/empty\.ts:1: \[server-config\] a server configuration module must start with import "server-only"/);
+    assert.match(r.out, /apps\/web\/src\/server\/config\/wrong\.ts:1: \[server-config\] a server configuration module must start with import "server-only"/);
+    assert.doesNotMatch(r.out, /config\/hosts\.ts|config\/quiet\.ts|apps\/web\/(test|e2e|scripts)\/|next\.config\.ts/, "a compliant config module and the node-side files are not reported");
+  } finally {
+    rmSync(dirty, { recursive: true, force: true });
+  }
+});
+
+test("B11 D-SEC-2: a test or node-side file may import a workspace devDependency, shipped source may not", () => {
+  const manifest = JSON.stringify({ name: "@kauro/web", version: "0.0.0", type: "module", dependencies: {}, devDependencies: { "@kauro/contracts": "workspace:*" } });
+  const files = {
+    "packages/contracts/package.json": pkg("@kauro/contracts"),
+    "packages/contracts/src/index.ts": "export const x = 1;",
+    "apps/web/package.json": manifest,
+    "apps/web/src/index.ts": "export const y = 2;",
+    "apps/web/test/contracts.test.ts": 'import { x } from "@kauro/contracts";\nexport { x };',
+  };
+  const clean = tree(files);
+  try {
+    const r = run(clean);
+    assert.equal(r.code, 0, r.out);
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  const dirty = tree({ ...files, "apps/web/src/index.ts": 'import { x } from "@kauro/contracts";\nexport const y = x;' });
+  try {
+    const r = run(dirty);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /apps\/web\/src\/index\.ts:1: \[declared\] @kauro\/contracts is imported but not declared/);
+    assert.doesNotMatch(r.out, /contracts\.test\.ts/);
+  } finally {
+    rmSync(dirty, { recursive: true, force: true });
+  }
+});

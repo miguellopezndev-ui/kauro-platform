@@ -17,6 +17,18 @@ const nodeSide = rules.clientBundleNodeSide ?? [];
 const forbiddenDirectives = rules.forbiddenInClientBundles?.directives ?? [];
 const forbiddenSpecifiers = rules.forbiddenInClientBundles?.specifiers ?? [];
 const DIRECTIVE_RE = /^\s*(["'])(use [a-z]+)\1;?\s*(\/\/.*)?$/;
+const serverConfigDirs = rules.serverConfigDirectories ?? [];
+const serverOnlyImport = rules.serverOnlyImport ?? "server-only";
+const environmentReaders = (rules.environmentReaders ?? []).map((pattern) => new RegExp(pattern));
+const serverOnlyLine = new RegExp(`^\\s*import\\s+["']${serverOnlyImport}["'];?\\s*$`);
+
+// a file's lines with its comments blanked (line numbers kept): a comment that talks about process.env reads nothing
+function codeLines(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
+    .split("\n")
+    .map((line) => line.replace(/(^|\s)\/\/.*$/, "$1"));
+}
 
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
@@ -37,7 +49,7 @@ function workspacePackages(base) {
       const pkgPath = join(dir, name, "package.json");
       if (!existsSync(pkgPath)) continue;
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-      out.push({ name: pkg.name, dir: join(dir, name), group, layer: rules.layers[pkg.name] ?? null, deps: { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}) } });
+      out.push({ name: pkg.name, dir: join(dir, name), group, layer: rules.layers[pkg.name] ?? null, deps: { ...(pkg.dependencies ?? {}), ...(pkg.peerDependencies ?? {}) }, devDeps: pkg.devDependencies ?? {} });
     }
   }
   return out;
@@ -91,6 +103,16 @@ for (const pkg of pkgs) {
         if (m && forbiddenDirectives.includes(m[2])) violations.push({ file: rel, line: i + 1, rule: "client-bundle", text: `a client bundle declares "${m[2]}" (no Server Action and no server data cache, B11 design D-SEC-2)` });
       });
     }
+    if (isClientBundle && serverConfigDirs.length > 0) {
+      const code = codeLines(readFileSync(file, "utf8"));
+      const inConfig = serverConfigDirs.some((dir) => rel.startsWith(dir));
+      const reading = code.findIndex((text) => environmentReaders.some((re) => re.test(text)));
+      if (reading >= 0 && !inConfig) violations.push({ file: rel, line: reading + 1, rule: "server-config", text: `a client bundle reads the environment outside ${serverConfigDirs.join(", ")} (B11 design D-SEC-2)` });
+      if (inConfig) {
+        const first = code.findIndex((text) => text.trim() !== "");
+        if (first < 0 || !serverOnlyLine.test(code[first])) violations.push({ file: rel, line: first < 0 ? 1 : first + 1, rule: "server-config", text: `a server configuration module must start with import "${serverOnlyImport}" (B11 design D-SEC-2)` });
+      }
+    }
     for (const { spec, line } of specifiersOf(file)) {
       if (isClientBundle && forbiddenSpecifiers.some((f) => spec === f || spec.startsWith(`${f}/`))) {
         violations.push({ file: rel, line, rule: "client-bundle", text: `a client bundle imports the forbidden module ${spec} (B11 design D-SEC-2)` });
@@ -112,7 +134,7 @@ for (const pkg of pkgs) {
       if (ref.pkg) {
         edges.set(pkg.name, (edges.get(pkg.name) ?? new Set()).add(ref.pkg.name));
         imported.add(ref.pkg.name);
-        if (!(ref.name in pkg.deps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
+        if (!(ref.name in pkg.deps) && !(isNodeSide && ref.name in pkg.devDeps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
         if (!allowed.has(ref.pkg.layer)) violations.push({ file: rel, line, rule: "layer", text: `${pkg.layer} package ${pkg.name} may not import ${ref.pkg.layer} package ${ref.name}` });
         if (ref.sub && !rules.publicSubpaths.some((s) => ref.sub === s || ref.sub.startsWith(s + "/"))) {
           violations.push({ file: rel, line, rule: "deep-import", text: `deep import into ${ref.name}${ref.sub}; only the public entry points are allowed` });
