@@ -1,13 +1,14 @@
 /**
- * The provider holds of accepted generations over `pg` (B07-R1; migration 0020; decisions D-HOLD-1..D-HOLD-3, D-CLOCK-1). An intent,
+ * The provider holds of accepted generations over `pg` (B07-R1; migration 0020; decisions D-HOLD-1..D-HOLD-4, D-CLOCK-1). An intent,
  * a release decision (with its claim) and a recorded answer take the object's hold lock first (`kauro.lock_object_holds`, a
  * transaction-level advisory lock the database's guards take as well) and read what they decide on after it; a unit of work that
  * intends or releases the holds of several objects does so in object-id order, so two of them never wait on each other in a cycle.
  * A seal and a close change rows under their row locks only (migration 0020 explains why that suffices). Every instant is
  * kauro.server_now() in SQL. The database refuses what the adapter's own reads would have refused (a hold of a revoked file, a seal
  * past the bound, a release while an attempt is in flight or a seal retains the generation, an intent while a release may still land,
- * a second live claim, an answer under a superseded claim): the adapter answers the expected races with typed results, the guards are
- * the backstop.
+ * a second live claim, an answer under a superseded claim, a claim that does not name the recorded metageneration, a re-observed one
+ * under a claim that lapsed or was superseded): the adapter answers the expected races with typed results, the guards are the backstop.
+ * Metagenerations are int8 at the database and decimal strings here (Cloud Storage's int64 as the JSON API writes it, D-HOLD-4).
  */
 import {
   HOLD_RELEASE_CLAIM_SECONDS,
@@ -15,6 +16,8 @@ import {
   SEAL_HOLD_ATTEMPT_SECONDS,
   type AgencyId,
   type HoldReassertionId,
+  type HoldReleaseAnswer,
+  type HoldReleaseRebase,
   type HoldReassertionResult,
   type HoldReleaseDecision,
   type HoldReleaseId,
@@ -59,6 +62,7 @@ const HOLD_COLUMNS = [
   exact("released_at"),
   "release_result",
   "released_by",
+  "metageneration::text AS metageneration",
 ].join(", ");
 
 const RELEASE_COLUMNS = [
@@ -70,11 +74,12 @@ const RELEASE_COLUMNS = [
   exact("claimed_at"),
   exact("claim_expires_at"),
   exact("in_flight_until"),
+  "metageneration::text AS metageneration",
   exact("answered_at"),
   "release_result",
 ].join(", ");
 
-const REASSERTION_COLUMNS = ["reassertion_id", "hold_id", "agency_id", "object_id", "generation", "result", "reasserted_by", exact("observed_at")].join(", ");
+const REASSERTION_COLUMNS = ["reassertion_id", "hold_id", "agency_id", "object_id", "generation", "result", "reasserted_by", exact("observed_at"), "metageneration::text AS metageneration"].join(", ");
 
 type Row = Record<string, unknown>;
 
@@ -101,6 +106,7 @@ function holdRecord(r: Row): ObjectHoldRecord {
     ...opt("releasedAt", optionalInstantText(r["released_at"])),
     ...opt("releaseResult", optionalString<NonNullable<ObjectHoldRecord["releaseResult"]>>(r["release_result"])),
     ...opt("releasedBy", optionalString<HoldReleaseId>(r["released_by"])),
+    ...opt("metageneration", optionalString(r["metageneration"])),
   };
 }
 
@@ -114,6 +120,7 @@ function releaseRecord(r: Row): ObjectHoldReleaseRecord {
     claimedAt: instantText(r["claimed_at"]),
     claimExpiresAt: instantText(r["claim_expires_at"]),
     inFlightUntil: instantText(r["in_flight_until"]),
+    ...opt("metageneration", optionalString(r["metageneration"])),
     ...opt("answeredAt", optionalInstantText(r["answered_at"])),
     ...opt("releaseResult", optionalString<NonNullable<ObjectHoldReleaseRecord["releaseResult"]>>(r["release_result"])),
   };
@@ -129,6 +136,7 @@ function reassertionRecord(r: Row): ObjectHoldReassertionRecord {
     result: str<HoldReassertionResult>(r["result"]),
     reassertedBy: str<ObjectHoldReassertionRecord["reassertedBy"]>(r["reasserted_by"]),
     observedAt: instantText(r["observed_at"]),
+    ...opt("metageneration", optionalString(r["metageneration"])),
   };
 }
 
@@ -139,7 +147,7 @@ const BOUND = `make_interval(secs => ${SEAL_HOLD_ATTEMPT_SECONDS})`;
 const CLAIM = `make_interval(secs => ${HOLD_RELEASE_CLAIM_SECONDS})`;
 const IN_FLIGHT = `make_interval(secs => ${HOLD_RELEASE_CLAIM_SECONDS + PROVIDER_CALL_TIMEOUT_MS / 1000})`;
 
-/** A claim of the object neither answered nor past its in-flight bound: a provider release of it may still land (D-HOLD-3). */
+/** A claim of the object neither answered nor past its in-flight bound: a provider release of it is still expected (D-HOLD-3). */
 const RELEASE_MAY_LAND = "SELECT 1 FROM kauro.object_hold_releases r WHERE r.object_id = $1 AND r.answered_at IS NULL AND r.in_flight_until > kauro.server_now() LIMIT 1";
 
 export class PgObjectHoldRepository implements ObjectHoldRepository {
@@ -167,12 +175,12 @@ export class PgObjectHoldRepository implements ObjectHoldRepository {
     return { kind: "INTENDED", record: holdRecord(one(r.rows, "object hold intent")) };
   }
 
-  async seal(holdId: ObjectHoldId): Promise<{ readonly kind: "APPLIED"; readonly record: ObjectHoldRecord } | { readonly kind: "STALE"; readonly currentState: ObjectHoldRecord["state"] | null }> {
+  async seal(holdId: ObjectHoldId, metageneration: string): Promise<{ readonly kind: "APPLIED"; readonly record: ObjectHoldRecord } | { readonly kind: "STALE"; readonly currentState: ObjectHoldRecord["state"] | null }> {
     const r = await execute<Row>(
       this.db,
-      `UPDATE kauro.object_holds SET state = 'SEALED', sealed_at = kauro.server_now()
+      `UPDATE kauro.object_holds SET state = 'SEALED', sealed_at = kauro.server_now(), metageneration = $2::bigint
         WHERE hold_id = $1 AND state = 'INTENDED' AND attempt_expires_at > kauro.server_now() RETURNING ${HOLD_COLUMNS}`,
-      [holdId],
+      [holdId, metageneration],
     );
     const row = r.rows[0];
     if (row) return { kind: "APPLIED", record: holdRecord(row) };
@@ -180,12 +188,14 @@ export class PgObjectHoldRepository implements ObjectHoldRepository {
     return { kind: "STALE", currentState: (after.rows[0]?.state as ObjectHoldRecord["state"] | undefined) ?? null };
   }
 
-  async closeAttempt(attemptId: SealAttemptId): Promise<ReadonlyArray<ObjectHoldRecord>> {
+  async closeAttempt(attemptId: SealAttemptId, placed: ReadonlyArray<{ readonly holdId: ObjectHoldId; readonly metageneration: string }> = []): Promise<ReadonlyArray<ObjectHoldRecord>> {
+    // each placed hold's metageneration is recorded by the edge that closes it (D-HOLD-4); an unanswered placement records none
     const r = await execute<Row>(
       this.db,
-      `UPDATE kauro.object_holds SET state = 'CLOSED', closed_at = kauro.server_now(), close_reason = 'REFUSED'
-        WHERE attempt_id = $1 AND state = 'INTENDED' RETURNING ${HOLD_COLUMNS}`,
-      [attemptId],
+      `UPDATE kauro.object_holds h SET state = 'CLOSED', closed_at = kauro.server_now(), close_reason = 'REFUSED',
+              metageneration = (SELECT p.m FROM unnest($2::uuid[], $3::bigint[]) AS p(hold_id, m) WHERE p.hold_id = h.hold_id)
+        WHERE h.attempt_id = $1 AND h.state = 'INTENDED' RETURNING ${HOLD_COLUMNS}`,
+      [attemptId, placed.map((x) => x.holdId), placed.map((x) => x.metageneration)],
     );
     return r.rows.map(holdRecord);
   }
@@ -224,20 +234,46 @@ export class PgObjectHoldRepository implements ObjectHoldRepository {
       if (first === undefined) return { kind: "NONE" };
       pending = { agency_id: first.agency_id, generation: first.generation, holds: String(moved.rows.length) };
     }
+    // the claim names the greatest metageneration recorded for the holds it releases: the incarnation its release clears (D-HOLD-4)
     const claim = await execute<Row>(
       this.db,
-      `INSERT INTO kauro.object_hold_releases (release_id, agency_id, object_id, generation, sequence, claimed_at, claim_expires_at, in_flight_until, created_at, updated_at)
+      `INSERT INTO kauro.object_hold_releases (release_id, agency_id, object_id, generation, sequence, claimed_at, claim_expires_at, in_flight_until, metageneration, created_at, updated_at)
        SELECT $1::uuid, $2::uuid, $3::uuid, $4::text, coalesce(max(sequence), 0) + 1, kauro.server_now(), kauro.server_now() + ${CLAIM}, kauro.server_now() + ${IN_FLIGHT},
-              kauro.server_now(), kauro.server_now()
+              kauro.object_hold_recorded_metageneration($3::uuid, $4::text), kauro.server_now(), kauro.server_now()
          FROM kauro.object_hold_releases WHERE object_id = $3
        RETURNING ${RELEASE_COLUMNS}`,
       [releaseId, pending.agency_id, objectId, pending.generation],
     );
     const record = releaseRecord(one(claim.rows, "release claim"));
-    return { kind: "RELEASE", releaseId: record.releaseId, generation: record.generation, holds: Number(pending.holds), claimedAt: record.claimedAt, claimExpiresAt: record.claimExpiresAt };
+    return {
+      kind: "RELEASE",
+      releaseId: record.releaseId,
+      generation: record.generation,
+      ...opt("metageneration", record.metageneration),
+      holds: Number(pending.holds),
+      claimedAt: record.claimedAt,
+      claimExpiresAt: record.claimExpiresAt,
+    };
   }
 
-  async recordRelease(releaseId: HoldReleaseId, result: "RELEASED" | "ABSENT"): Promise<HoldReleaseRecording> {
+  async rebaseRelease(releaseId: HoldReleaseId, metageneration: string): Promise<HoldReleaseRebase> {
+    const claimed = await execute<{ object_id: string }>(this.db, "SELECT object_id FROM kauro.object_hold_releases WHERE release_id = $1", [releaseId]);
+    const objectId = claimed.rows[0]?.object_id as StoredObjectId | undefined;
+    if (objectId === undefined) return { kind: "STALE" };
+    await this.#lock(objectId);
+    // only the object's latest claim, unanswered and live, and only a newer metageneration (D-HOLD-4; the guard refuses the rest)
+    const r = await execute(
+      this.db,
+      `UPDATE kauro.object_hold_releases c SET metageneration = $2::bigint
+        WHERE c.release_id = $1 AND c.answered_at IS NULL AND c.claim_expires_at > kauro.server_now()
+          AND (c.metageneration IS NULL OR c.metageneration < $2::bigint)
+          AND NOT EXISTS (SELECT 1 FROM kauro.object_hold_releases l WHERE l.object_id = c.object_id AND l.sequence > c.sequence)`,
+      [releaseId, metageneration],
+    );
+    return (r.rowCount ?? 0) > 0 ? { kind: "REBASED" } : { kind: "STALE" };
+  }
+
+  async recordRelease(releaseId: HoldReleaseId, result: HoldReleaseAnswer): Promise<HoldReleaseRecording> {
     const claimed = await execute<{ object_id: string }>(this.db, "SELECT object_id FROM kauro.object_hold_releases WHERE release_id = $1", [releaseId]);
     const objectId = claimed.rows[0]?.object_id as StoredObjectId | undefined;
     if (objectId === undefined) return { kind: "STALE" };
@@ -269,10 +305,10 @@ export class PgObjectHoldRepository implements ObjectHoldRepository {
   async recordReassertion(reassertion: NewHoldReassertion): Promise<ObjectHoldReassertionRecord> {
     const r = await execute<Row>(
       this.db,
-      `INSERT INTO kauro.object_hold_reassertions (reassertion_id, hold_id, agency_id, object_id, generation, result, reasserted_by, observed_at, created_at)
-       SELECT $1::uuid, h.hold_id, h.agency_id, h.object_id, h.generation, $3::text, $4::text, kauro.server_now(), kauro.server_now() FROM kauro.object_holds h WHERE h.hold_id = $2::uuid
+      `INSERT INTO kauro.object_hold_reassertions (reassertion_id, hold_id, agency_id, object_id, generation, result, reasserted_by, observed_at, metageneration, created_at)
+       SELECT $1::uuid, h.hold_id, h.agency_id, h.object_id, h.generation, $3::text, $4::text, kauro.server_now(), $5::bigint, kauro.server_now() FROM kauro.object_holds h WHERE h.hold_id = $2::uuid
        RETURNING ${REASSERTION_COLUMNS}`,
-      [reassertion.reassertionId, reassertion.holdId, reassertion.result, reassertion.reassertedBy],
+      [reassertion.reassertionId, reassertion.holdId, reassertion.result, reassertion.reassertedBy, reassertion.metageneration ?? null],
     );
     return reassertionRecord(one(r.rows, "hold re-assertion"));
   }

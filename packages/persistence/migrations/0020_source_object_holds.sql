@@ -6,7 +6,7 @@
 -- delete, versioning and holds" (a hold requires authority, reason, applicable scope, start, expiry, review owner and permitted
 -- access; retention locks are not enabled casually because they can prevent lawful early deletion), 07 "Transaction discipline" (no
 -- transaction spans an external call; application checks cannot be the sole protection), S053 and CMD017 ("a changed generation ...
--- leaves no executable sealed revision"). Design: docs/design/B07-upload-source-lifecycle.md D-HOLD-1..D-HOLD-3, §11 CMD017, §12.5.
+-- leaves no executable sealed revision"). Design: docs/design/B07-upload-source-lifecycle.md D-HOLD-1..D-HOLD-4, §11 CMD017, §12.5.
 --
 -- Before its unit of work, SealRevision places a TEMPORARY hold (Cloud Storage objects.patch {temporaryHold: true} with
 -- ifGenerationMatch) on the exact accepted generation of every included file, through ObjectStoragePort; while held, the provider
@@ -39,9 +39,27 @@
 --              while one is live, and a lapsed, unanswered claim is claimed again by the next caller (a new token);
 --   ANSWERED   only the object's latest claim is answered, once, by its claimant, and in the same transaction every RELEASING hold of
 --              the object is RELEASED naming that claim (released_by) — a superseded claimant's answer is refused (KA071);
---   IN FLIGHT  a provider call cannot be fenced by the database, so a claim may still land at the provider until it is answered or
---              until in_flight_until = claim_expires_at + 10 s (PROVIDER_CALL_TIMEOUT_MS): no hold of the object is intended before
---              then (KA071), so no earlier release can clear a hold placed after the intent.
+--   IN FLIGHT  a claim is not expected to land at the provider after it is answered or after in_flight_until = claim_expires_at + 10 s
+--              (PROVIDER_CALL_TIMEOUT_MS): no hold of the object is intended before then (KA071). That time bound is defense in depth
+--              only — a timed-out provider call is not cancelled and may land later still (the third re-check, PARTIALLY_FIXED at
+--              09faf25) — and the fence below does not depend on it.
+--
+-- The incarnation fence (the third re-check of B07-R1; decision D-HOLD-4). The provider's hold is a flag, but its generation's metadata
+-- has an incarnation: Cloud Storage increments an object generation's metageneration on every metadata update (objects.patch — a hold
+-- placed or released is one) and refuses a patch whose ifMetagenerationMatch (or ifGenerationMatch) precondition does not hold (412),
+-- changing nothing. So every release names the incarnation it clears:
+--
+--   placement  answers the metageneration after the hold was set; the seal records it with its hold (metageneration, set once, by the
+--              edge that ends the attempt: SEALED, or CLOSED/REFUSED), and a re-assertion records the one it observed held;
+--   claim      names the greatest metageneration recorded for the holds it releases (kauro.object_hold_recorded_metageneration,
+--              checked at the claim), and its release carries ifGenerationMatch and ifMetagenerationMatch = that one;
+--   412        means that incarnation is already superseded or released: the claimant re-observes the generation and answers ABSENT
+--              (not live), NOT_HELD (live without a hold: this release cleared nothing), or — held at a newer metageneration — records
+--              that one under its claim first (only while the claim is the object's latest, unanswered and live, KA071: no hold is
+--              intended meanwhile, so the hold observed is no newer seal's) and releases again under it; never a blind retry.
+--
+-- Every newer hold is placed after the release it follows was decided and its metageneration recorded, and each placement increments
+-- the metageneration, so a delayed release — however late it lands — names an incarnation that no longer exists and clears nothing.
 --
 -- After its commit the seal re-asserts every sealed hold at the provider (the idempotent placement under the generation precondition,
 -- then a re-observation of the generation and its hold flag; a hold missing on the live generation is placed again) and records what it
@@ -64,10 +82,16 @@ CREATE TABLE kauro.object_hold_releases (
   claimed_at        timestamptz NOT NULL,
   -- the claimant issues its provider call before it (HOLD_RELEASE_CLAIM_SECONDS); another caller may claim the release after it
   claim_expires_at  timestamptz NOT NULL,
-  -- no provider call of this claim can land after it (the claim's bound + PROVIDER_CALL_TIMEOUT_MS): the intent guard waits for it
+  -- no provider call of this claim is expected to land after it (the claim's bound + PROVIDER_CALL_TIMEOUT_MS): the intent guard waits
+  -- for it (defense in depth; the metageneration fences a call that outlives it)
   in_flight_until   timestamptz NOT NULL,
+  -- the hold incarnation the release names (ifMetagenerationMatch, D-HOLD-4): the greatest recorded for the holds it releases at the
+  -- claim (NULL: none recorded, the claimant observes first), raised only by its claimant's re-observation while the claim is live
+  metageneration    bigint CHECK (metageneration IS NULL OR metageneration >= 1),
   answered_at       timestamptz,
-  release_result    text CHECK (release_result IS NULL OR release_result IN ('RELEASED', 'ABSENT')),
+  -- RELEASED (cleared under the claim's metageneration), ABSENT (the generation is not live), NOT_HELD (412, and the generation is live
+  -- without a hold: this release cleared nothing)
+  release_result    text CHECK (release_result IS NULL OR release_result IN ('RELEASED', 'ABSENT', 'NOT_HELD')),
   created_at        timestamptz NOT NULL,
   updated_at        timestamptz NOT NULL,
   UNIQUE (object_id, sequence),
@@ -106,7 +130,10 @@ CREATE TABLE kauro.object_holds (
   close_reason          text CHECK (close_reason IS NULL OR close_reason IN ('REFUSED', 'ABANDONED')),
   release_requested_at  timestamptz,
   released_at           timestamptz,
-  release_result        text CHECK (release_result IS NULL OR release_result IN ('RELEASED', 'ABSENT')),
+  release_result        text CHECK (release_result IS NULL OR release_result IN ('RELEASED', 'ABSENT', 'NOT_HELD')),
+  -- the provider's metageneration of the generation right after this hold's placement (D-HOLD-4): recorded once, by the edge that ends
+  -- the attempt (SEALED, or CLOSED/REFUSED); NULL while no placement answer was recorded
+  metageneration        bigint CHECK (metageneration IS NULL OR metageneration >= 1),
   -- the release claim whose claimant recorded the provider's answer (D-HOLD-3)
   released_by           uuid REFERENCES kauro.object_hold_releases (release_id),
   created_at            timestamptz NOT NULL,
@@ -200,6 +227,15 @@ BEGIN
      OR (OLD.released_at IS NOT NULL AND (NEW.released_at IS DISTINCT FROM OLD.released_at OR NEW.release_result IS DISTINCT FROM OLD.release_result OR NEW.released_by IS DISTINCT FROM OLD.released_by)) THEN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: the facts of hold % are set once', OLD.hold_id USING ERRCODE = 'KA004';
   END IF;
+  -- the placement's metageneration (D-HOLD-4): set once, by the edge that ends the attempt (the request handler's seal or close)
+  IF NEW.metageneration IS DISTINCT FROM OLD.metageneration THEN
+    IF OLD.metageneration IS NOT NULL THEN
+      RAISE EXCEPTION 'IMMUTABLE_COLUMN: the metageneration of hold % is set once', OLD.hold_id USING ERRCODE = 'KA004';
+    END IF;
+    IF NOT (OLD.state = 'INTENDED' AND NEW.state IN ('SEALED', 'CLOSED')) THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: the metageneration of hold % is recorded by the edge that ends its attempt', OLD.hold_id USING ERRCODE = 'KA072';
+    END IF;
+  END IF;
   IF NEW.state IS NOT DISTINCT FROM OLD.state THEN
     RETURN NEW;
   END IF;
@@ -216,6 +252,10 @@ BEGIN
     END IF;
     IF kauro.server_now() >= OLD.attempt_expires_at THEN
       RAISE EXCEPTION 'LIFECYCLE_BINDING: hold % is past its attempt bound', OLD.hold_id USING ERRCODE = 'KA072';
+    END IF;
+    -- a sealed hold names the incarnation its placement answered: its release will name at least that one (D-HOLD-4)
+    IF NEW.metageneration IS NULL THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: hold % is sealed with the metageneration its placement answered', OLD.hold_id USING ERRCODE = 'KA072';
     END IF;
     IF NOT EXISTS (
       SELECT 1 FROM kauro.sealed_revision_files s
@@ -258,7 +298,8 @@ $$;
 CREATE TRIGGER object_holds_transition_guard BEFORE UPDATE ON kauro.object_holds FOR EACH ROW EXECUTE FUNCTION kauro.object_holds_transition_guard();
 
 -- a claim: taken at the server's instant after the object's hold lock, only for a decided release (a hold of the object RELEASING at
--- that generation), numbered next in the object's order, and never while another claim of the object is live (exactly one caller)
+-- that generation), numbered next in the object's order, never while another claim of the object is live (exactly one caller), and
+-- naming the greatest metageneration recorded for the holds it releases (D-HOLD-4)
 CREATE OR REPLACE FUNCTION kauro.object_hold_releases_claim_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -279,19 +320,39 @@ BEGIN
   IF EXISTS (SELECT 1 FROM kauro.object_hold_releases r WHERE r.object_id = NEW.object_id AND r.answered_at IS NULL AND r.claim_expires_at > kauro.server_now()) THEN
     RAISE EXCEPTION 'FENCE_DISCIPLINE: the release of object % is claimed by another caller', NEW.object_id USING ERRCODE = 'KA071';
   END IF;
+  IF NEW.metageneration IS DISTINCT FROM kauro.object_hold_recorded_metageneration(NEW.object_id, NEW.generation) THEN
+    RAISE EXCEPTION 'LIFECYCLE_BINDING: the release claim % names the greatest metageneration recorded for the holds it releases', NEW.release_id USING ERRCODE = 'KA072';
+  END IF;
   RETURN NEW;
 END
 $$;
 CREATE TRIGGER object_hold_releases_claim_guard BEFORE INSERT ON kauro.object_hold_releases FOR EACH ROW EXECUTE FUNCTION kauro.object_hold_releases_claim_guard();
 
 -- an answer: set once, at the server's instant, after the object's hold lock, and only on the object's latest claim — the claimant's
--- (a superseded claim's answer is refused: its caller no longer holds the release)
+-- (a superseded claim's answer is refused: its caller no longer holds the release). A re-observed metageneration (D-HOLD-4): only a
+-- newer one, only unanswered, and only while the claim is the object's latest and live — while it is, no hold of the object can be
+-- intended, so the hold its claimant observed is no newer seal's
 CREATE OR REPLACE FUNCTION kauro.object_hold_releases_answer_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
   IF OLD.answered_at IS NOT NULL AND (NEW.answered_at IS DISTINCT FROM OLD.answered_at OR NEW.release_result IS DISTINCT FROM OLD.release_result) THEN
     RAISE EXCEPTION 'IMMUTABLE_COLUMN: the answer of release claim % is set once', OLD.release_id USING ERRCODE = 'KA004';
+  END IF;
+  IF NEW.metageneration IS DISTINCT FROM OLD.metageneration THEN
+    PERFORM kauro.lock_object_holds(OLD.object_id);
+    IF OLD.answered_at IS NOT NULL OR NEW.answered_at IS NOT NULL THEN
+      RAISE EXCEPTION 'FENCE_DISCIPLINE: release claim % names a re-observed metageneration only while unanswered', OLD.release_id USING ERRCODE = 'KA071';
+    END IF;
+    IF NEW.metageneration IS NULL OR NEW.metageneration <= coalesce(OLD.metageneration, 0) THEN
+      RAISE EXCEPTION 'LIFECYCLE_BINDING: release claim % names only a newer metageneration', OLD.release_id USING ERRCODE = 'KA072';
+    END IF;
+    IF OLD.claim_expires_at <= kauro.server_now() THEN
+      RAISE EXCEPTION 'FENCE_DISCIPLINE: release claim % lapsed', OLD.release_id USING ERRCODE = 'KA071';
+    END IF;
+    IF EXISTS (SELECT 1 FROM kauro.object_hold_releases r WHERE r.object_id = OLD.object_id AND r.sequence > OLD.sequence) THEN
+      RAISE EXCEPTION 'FENCE_DISCIPLINE: release claim % was superseded by a later claim of object %', OLD.release_id, OLD.object_id USING ERRCODE = 'KA071';
+    END IF;
   END IF;
   IF NEW.answered_at IS NOT DISTINCT FROM OLD.answered_at AND NEW.release_result IS NOT DISTINCT FROM OLD.release_result THEN
     RETURN NEW;
@@ -317,6 +378,8 @@ CREATE TABLE kauro.object_hold_reassertions (
   generation      text NOT NULL CHECK (kauro.is_generation(generation)),
   -- HELD: the generation is the live one and the provider reports it held; GENERATION_NOT_LIVE: another generation, or none
   result          text NOT NULL CHECK (result IN ('HELD', 'GENERATION_NOT_LIVE')),
+  -- HELD only: the metageneration the provider reported with the hold (the hold's latest recorded incarnation, D-HOLD-4)
+  metageneration  bigint CHECK (metageneration IS NULL OR (metageneration >= 1 AND result = 'HELD')),
   -- the seal after its commit (a request handler), or OBJECT_INVENTORY (the control plane): row security binds each to its role
   reasserted_by   text NOT NULL CHECK (reasserted_by IN ('SEAL', 'OBJECT_INVENTORY')),
   observed_at     timestamptz NOT NULL,
@@ -343,6 +406,19 @@ END
 $$;
 CREATE TRIGGER object_hold_reassertions_guard BEFORE INSERT ON kauro.object_hold_reassertions FOR EACH ROW EXECUTE FUNCTION kauro.object_hold_reassertions_guard();
 
+-- The greatest metageneration recorded for the RELEASING holds of an object at a generation (D-HOLD-4): their placements' and their
+-- re-assertions' — the hold incarnation a release claim of them names (the claim guard checks it); NULL when none was recorded.
+CREATE OR REPLACE FUNCTION kauro.object_hold_recorded_metageneration(object uuid, held_generation text) RETURNS bigint
+  LANGUAGE sql STABLE STRICT SET search_path = pg_catalog AS
+$$
+  SELECT max(m) FROM (
+    SELECT h.metageneration AS m FROM kauro.object_holds h WHERE h.object_id = object AND h.generation = held_generation AND h.state = 'RELEASING'
+    UNION ALL
+    SELECT a.metageneration FROM kauro.object_hold_reassertions a JOIN kauro.object_holds h ON h.hold_id = a.hold_id
+     WHERE h.object_id = object AND h.generation = held_generation AND h.state = 'RELEASING'
+  ) recorded
+$$;
+
 -- --- row-level security and grants ------------------------------------------------------------------------------------------------
 -- The seal's request handler intends, seals and closes (REFUSED) the holds of its own attempt as the acting person, and releases what
 -- nothing needs any more; the control plane, bound to the agency, abandons an attempt past its bound and releases (D-HOLD-3). No
@@ -364,6 +440,8 @@ CREATE POLICY object_holds_control_update ON kauro.object_holds FOR UPDATE TO ka
 GRANT SELECT, INSERT ON kauro.object_holds TO kauro_app;
 GRANT SELECT ON kauro.object_holds TO kauro_control;
 GRANT UPDATE (state, sealed_at, closed_at, close_reason, release_requested_at, released_at, release_result, released_by, updated_at) ON kauro.object_holds TO kauro_app, kauro_control;
+-- a placement's metageneration is recorded by the request handler that placed it (the control plane places no hold)
+GRANT UPDATE (metageneration) ON kauro.object_holds TO kauro_app;
 
 -- A release is claimed and answered by whichever runtime carries it out — a request handler releasing its own refused attempt, the
 -- control plane everything else — each for its own agency (the claim is the fence, not the role); the control plane discovers lapsed
@@ -379,7 +457,7 @@ CREATE POLICY object_hold_releases_control_insert ON kauro.object_hold_releases 
 CREATE POLICY object_hold_releases_control_update ON kauro.object_hold_releases FOR UPDATE TO kauro_control
   USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
 GRANT SELECT, INSERT ON kauro.object_hold_releases TO kauro_app, kauro_control;
-GRANT UPDATE (answered_at, release_result, updated_at) ON kauro.object_hold_releases TO kauro_app, kauro_control;
+GRANT UPDATE (answered_at, release_result, metageneration, updated_at) ON kauro.object_hold_releases TO kauro_app, kauro_control;
 
 ALTER TABLE kauro.object_hold_reassertions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.object_hold_reassertions FORCE ROW LEVEL SECURITY;

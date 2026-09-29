@@ -31,6 +31,7 @@ export {
   SEAL_HOLD_ATTEMPT_SECONDS,
   HOLD_RELEASE_CLAIM_SECONDS,
   HOLD_REASSERTION_ROUNDS,
+  HOLD_RELEASE_ROUNDS,
   COMPLETION_REF_MAX_CHARS,
   COMPLETION_POLL_AFTER_SECONDS,
 } from "./policy.js";
@@ -63,6 +64,7 @@ export type {
   ObjectHoldCloseReason,
   ObjectHoldRecord,
   ObjectHoldReleaseRecord,
+  HoldReleaseAnswer,
   HoldReassertionResult,
   ObjectHoldReassertionRecord,
   ScanState,

@@ -152,10 +152,14 @@ export class ObjectInventory implements SourceSweeper {
   async #reassert(units: SourceUnitOfWorkFactory, item: WorkItem, found: UnconfirmedSealedHold): Promise<"HELD" | "GENERATION_NOT_LIVE"> {
     const object = await units.runSource(boundTo(item), (uow) => uow.sources.objects.get(found.objectId));
     if (object === null) throw Object.assign(new Error("the object of a sealed hold is not visible"), { name: "HoldReassertionPending" });
-    const result = await reassertHold(this.deps.storage, locationOf(object), object.objectName, found.generation);
-    if (result === null) throw Object.assign(new Error("the provider did not confirm the sealed hold"), { name: "HoldReassertionPending" });
-    await units.runSource(boundTo(item), (uow) => uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: found.holdId, result, reassertedBy: "OBJECT_INVENTORY" }));
-    return result;
+    const reasserted = await reassertHold(this.deps.storage, locationOf(object), object.objectName, found.generation);
+    if (reasserted === null) throw Object.assign(new Error("the provider did not confirm the sealed hold"), { name: "HoldReassertionPending" });
+    // a HELD finding records the metageneration observed with the hold: the hold's latest incarnation, which its release names (D-HOLD-4)
+    const metageneration = reasserted.result === "HELD" ? reasserted.metageneration : undefined;
+    await units.runSource(boundTo(item), (uow) =>
+      uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: found.holdId, result: reasserted.result, reassertedBy: "OBJECT_INVENTORY", ...(metageneration === undefined ? {} : { metageneration }) }),
+    );
+    return reasserted.result;
   }
 
   /** One live generation: known, the object of a settled intent, or unregistered (registered RESIDUAL and deleted). */

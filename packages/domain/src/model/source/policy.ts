@@ -89,9 +89,10 @@ export const SEAL_HOLD_ATTEMPT_SECONDS = 900;
  * Decision D-HOLD-3 (B07-R1, second re-check): the bound of one release claim of an object's seal holds. A release is carried out by
  * exactly one caller, the one whose claim (its fence token) the database recorded; the claimant issues its provider call only while
  * the claim holds — this long after it began the unit of work that took the claim, on its own monotonic clock — and bounds the call
- * by PROVIDER_CALL_TIMEOUT_MS. Past the claim's bound another caller may claim the release again. Because a provider call cannot be
- * fenced by the database, no hold of the object is intended while any claim may still land: until it is answered, or until
- * `claim_expires_at` + PROVIDER_CALL_TIMEOUT_MS (`in_flight_until`, migration 0020 CHECKs both intervals: 900 s and 10 s).
+ * by PROVIDER_CALL_TIMEOUT_MS. Past the claim's bound another caller may claim the release again. No hold of the object is intended
+ * while any claim may still land: until it is answered, or until `claim_expires_at` + PROVIDER_CALL_TIMEOUT_MS (`in_flight_until`,
+ * migration 0020 CHECKs both intervals: 900 s and 10 s). That time bound is defense in depth only: a call that outlives it is fenced by
+ * the provider itself, since every release names the metageneration of the hold incarnation it releases (D-HOLD-4).
  */
 export const HOLD_RELEASE_CLAIM_SECONDS = 900;
 
@@ -101,6 +102,14 @@ export const HOLD_RELEASE_CLAIM_SECONDS = 900;
  * a hold found missing on the live generation, at most this many rounds before it leaves the hold unconfirmed for OBJECT_INVENTORY.
  */
 export const HOLD_REASSERTION_ROUNDS = 3;
+
+/**
+ * Decision D-HOLD-4 (B07-R1, third re-check): the release calls one claimant issues under one claim at most. A release names the
+ * metageneration of the hold incarnation it releases; when the provider refuses it (412) or none is recorded, the claimant re-observes
+ * the generation and, only when it is still live and held, records the observed metageneration under its live claim and releases
+ * again — never more than this many times before it leaves the release to the next claim.
+ */
+export const HOLD_RELEASE_ROUNDS = 2;
 
 /** Decision D-SAPI-2: a completion reference longer than this is refused structurally (text field of CMD014). */
 export const COMPLETION_REF_MAX_CHARS = 4_096;

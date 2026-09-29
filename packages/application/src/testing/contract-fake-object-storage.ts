@@ -30,14 +30,20 @@
  * - Temporary holds (B07-R1, decision D-HOLD-1; Cloud Storage "Object holds": while an object has a hold it cannot be deleted or
  *   replaced; its metadata can still change). `placeHold` sets the flag on exactly the name's live generation under a generation
  *   precondition (another live generation, or none, is GENERATION_NOT_LIVE and nothing is held; an already held one answers HELD
- *   again: a hold is a flag, not a count); `releaseHold` clears it on exactly that generation (RELEASED, also when it was not held;
- *   ABSENT when it is not the live generation). A held generation refuses every deletion and replacement with OBJECT_HELD, whoever
+ *   again: a hold is a flag, not a count); `releaseHold` clears it on exactly that generation at exactly the metageneration it names
+ *   (RELEASED, also when it was not held; ABSENT when no object is live under the name; PRECONDITION_FAILED when another generation is
+ *   live or the metageneration is another one). A held generation refuses every deletion and replacement with OBJECT_HELD, whoever
  *   asks: the port's `delete`, and outside the platform `plantObject(..., { overwrite: true })` and `deleteOutOfBand` — a
  *   finalizing session or a copy to its name is already refused by their no-overwrite precondition. A held generation is therefore
  *   never soft-deleted; its hold is visible in `generationsOf` (`temporaryHold`), and the provider reports it as Cloud Storage's
- *   object resource does: `stat` and a HELD placement's observation carry `temporaryHold`. The hold is a flag with no incarnation —
- *   exactly the provider's: a release that lands late clears a hold placed after it was sent (B07-R1, second re-check), which is why
- *   the platform fences releases by claim and waits out a claim's in-flight bound before it intends a hold (D-HOLD-3). `releaseHold`
+ *   object resource does: `stat` and a HELD placement's observation carry `temporaryHold`.
+ * - Metagenerations (B07-R1 third re-check, D-HOLD-4; Cloud Storage "Object versioning" and "Request preconditions": metageneration
+ *   is the incarnation of a generation's metadata, 1 when the generation is written, incremented by every metadata update, and
+ *   `ifMetagenerationMatch` fails a patch with 412 and no change when it names another). Every hold placement and every release that
+ *   succeeds is a metadata update — also a placement on an already held generation and a release of an unheld one — and increments it;
+ *   a patch whose precondition fails changes nothing. `stat`, a HELD placement and `generationsOf` report it. A call's preconditions
+ *   are its own arguments, checked when its effect lands: a release held at a hold point (or its answer lost) keeps the metageneration
+ *   it was sent with, so one that lands after a newer placement fails with PRECONDITION_FAILED and the newer hold survives. `releaseHold`
  *   takes hold points like every call, so a test lands a release exactly when it chooses.
  * - A call log of every provider call (never the bearer session reference: its SHA-256 digest only), hold points that pause a
  *   call until the test releases it (interleavings without sleeps), and scripted faults (UNAVAILABLE before any effect; a TIMEOUT
@@ -54,6 +60,7 @@ import type { Clock, CompletionClaim, StorageZone } from "@kauro/domain";
 import { COMPLETION_REF_MAX_CHARS, PROVIDER_SESSION_LIFETIME_SECONDS, isObjectName, textDigest, toUtcInstant } from "@kauro/domain";
 import type {
   HoldPlacement,
+  HoldRelease,
   ObjectObservation,
   ObjectStoragePort,
   ProviderCancellationResult,
@@ -82,6 +89,8 @@ const PAGE_TOKEN_PREFIX = `${CONTRACT_FAKE_STORAGE_PROVIDER}:page:`;
 const ZONES: ReadonlyArray<StorageZone> = ["QUARANTINE", "ACCEPTED", "PROFILE", "MINIMIZED", "STAGING", "DELIVERY", "IMPORT_RECEIPT", "LEGAL_FINANCE", "SECURITY"];
 const LOCATION_REF = /^[A-Z][A-Z0-9_]{2,63}$/;
 const GENERATION = /^[1-9][0-9]{0,19}$/;
+/** A metageneration of the provider's form (int64 as a decimal string). */
+const METAGENERATION = /^[1-9][0-9]{0,18}$/;
 const SIZE = /^(0|[1-9][0-9]{0,15})$/;
 const CRC32C_BASE64 = /^[A-Za-z0-9+/]{6}==$/;
 const MD5_BASE64 = /^[A-Za-z0-9+/]{22}==$/;
@@ -189,6 +198,8 @@ export interface StoredGenerationView {
   readonly status: GenerationStatus;
   /** Whether the generation is under a temporary hold (only a live generation can be: a held one cannot be replaced or deleted). */
   readonly temporaryHold: boolean;
+  /** The incarnation of the generation's metadata (1 when written, incremented by every hold placement and release, D-HOLD-4). */
+  readonly metageneration: string;
   readonly createdAt: UtcInstant;
   readonly softDeletedAt?: UtcInstant;
   readonly softDeleteExpiresAt?: UtcInstant;
@@ -274,6 +285,7 @@ interface GenerationRecord {
   readonly createdMs: number;
   status: GenerationStatus;
   temporaryHold: boolean;
+  metageneration: bigint;
   softDeletedMs?: number;
   expiresMs?: number;
 }
@@ -462,6 +474,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
         md5: live.md5,
         observedAt: this.#clock.now(),
         temporaryHold: live.temporaryHold,
+        metageneration: live.metageneration.toString(),
       });
       return { value: observation, outcome: `PRESENT ${live.generation}${live.temporaryHold ? " HELD" : ""}` };
     });
@@ -517,20 +530,27 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       const live = this.#live(locationRef, objectName);
       // ifGenerationMatch: another live generation is 412, no live object 404 — nothing is held either way
       if (live === undefined || live.generation !== generation) return { value: Object.freeze({ outcome: "GENERATION_NOT_LIVE" }), outcome: "GENERATION_NOT_LIVE" };
+      // a metadata update: the flag set (again) and the metageneration incremented (D-HOLD-4)
       live.temporaryHold = true;
-      const observation: ObjectObservation = Object.freeze({ generation: live.generation, bytes: live.content.length, crc32c: live.crc32c, md5: live.md5, observedAt: this.#clock.now(), temporaryHold: true });
-      return { value: Object.freeze({ outcome: "HELD", observation }), outcome: `HELD ${live.generation}` };
+      live.metageneration += 1n;
+      const metageneration = live.metageneration.toString();
+      const observation: ObjectObservation = Object.freeze({ generation: live.generation, bytes: live.content.length, crc32c: live.crc32c, md5: live.md5, observedAt: this.#clock.now(), temporaryHold: true, metageneration });
+      return { value: Object.freeze({ outcome: "HELD", observation, metageneration }), outcome: `HELD ${live.generation}` };
     });
   }
 
-  releaseHold(location: StorageLocation, objectName: string, generation: string): Promise<"RELEASED" | "ABSENT"> {
-    return this.#call("releaseHold", { locationRef: location.locationRef, objectName, generation }, () => {
+  releaseHold(location: StorageLocation, objectName: string, generation: string, metageneration: string): Promise<HoldRelease> {
+    return this.#call("releaseHold", { locationRef: location.locationRef, objectName, generation, metageneration }, () => {
       const locationRef = this.#knownLocation(location);
       if (typeof objectName !== "string" || objectName.length === 0) throw invalid("objectName must be a non-empty string");
       if (typeof generation !== "string" || !GENERATION.test(generation)) throw invalid("the generation is not a provider generation");
+      if (typeof metageneration !== "string" || !METAGENERATION.test(metageneration)) throw invalid("the metageneration is not a provider metageneration");
       const live = this.#live(locationRef, objectName);
-      if (live === undefined || live.generation !== generation) return { value: "ABSENT" as const, outcome: "ABSENT" };
+      // 404: no live object; 412: ifGenerationMatch or ifMetagenerationMatch does not hold — nothing changes either way
+      if (live === undefined) return { value: "ABSENT" as const, outcome: "ABSENT" };
+      if (live.generation !== generation || live.metageneration !== BigInt(metageneration)) return { value: "PRECONDITION_FAILED" as const, outcome: "PRECONDITION_FAILED" };
       live.temporaryHold = false;
+      live.metageneration += 1n;
       return { value: "RELEASED" as const, outcome: `RELEASED ${live.generation}` };
     });
   }
@@ -770,7 +790,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
     if ((this.#objects.get(key) ?? []).length > 0) throw new ContractFakeStorageError("PRECONDITION_FAILED", "the name already held a generation");
     const bytes = content.slice();
     const { crc32c, md5 } = providerChecksumsOf(bytes);
-    this.#objects.set(key, [{ locationRef, objectName, generation, content: bytes, sha256: rawDigest(bytes), crc32c, md5, origin: "PLANTED", createdMs: this.#clock.nowMs(), status: "LIVE", temporaryHold: false }]);
+    this.#objects.set(key, [{ locationRef, objectName, generation, content: bytes, sha256: rawDigest(bytes), crc32c, md5, origin: "PLANTED", createdMs: this.#clock.nowMs(), status: "LIVE", temporaryHold: false, metageneration: 1n }]);
     return Object.freeze({ generation });
   }
 
@@ -899,6 +919,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       createdMs: this.#clock.nowMs(),
       status: "LIVE",
       temporaryHold: false,
+      metageneration: 1n,
     };
     generations.push(record);
     this.#objects.set(key, generations);
@@ -946,6 +967,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       origin: g.origin,
       status: g.status,
       temporaryHold: g.temporaryHold,
+      metageneration: g.metageneration.toString(),
       createdAt: toUtcInstant(g.createdMs),
       ...(g.softDeletedMs === undefined ? {} : { softDeletedAt: toUtcInstant(g.softDeletedMs) }),
       ...(g.expiresMs === undefined ? {} : { softDeleteExpiresAt: toUtcInstant(g.expiresMs) }),

@@ -37,14 +37,17 @@
  * keeps its holds until its retention ends (the RETENTION sweeper releases them with the file's admission, D-RET-3). A seal that is
  * refused, fails or is answered by a replay closes its attempt's holds (REFUSED) and releases what nothing else needs, each release
  * under its own claim (D-HOLD-3); a crash between the hold and the commit leaves them INTENDED, and RETENTION abandons and releases
- * them past their bound (SEAL_HOLD_ATTEMPT_SECONDS). The clauses that rest on the provider honouring the hold are SIMULATED (the
- * labelled storage fake) until B15 binds Cloud Storage. Unbound providers answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
+ * them past their bound (SEAL_HOLD_ATTEMPT_SECONDS). Every hold records the metageneration its placement answered (SEALED with the
+ * seal, or as its attempt closes) and every release names the greatest one recorded (ifMetagenerationMatch, D-HOLD-4): a release that
+ * lands late — a timed-out call is not cancelled — fails its precondition once a newer hold was placed, and clears nothing. The clauses
+ * that rest on the provider honouring the hold and its preconditions are SIMULATED (the labelled storage fake) until B15 binds Cloud
+ * Storage. Unbound providers answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
  */
 import type { CommandId, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
   EvaluatedTable,
   HoldReassertionId,
-  HoldReassertionResult,
+  HoldReleaseAnswer,
   HoldReleaseId,
   ObjectHoldId,
   ProjectionId,
@@ -68,7 +71,7 @@ import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { applied, checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { contextOf, identityOf } from "../../commands/runtime.js";
 import type { ObjectStoragePort, StorageLocation } from "../../ports/source-providers.js";
-import { boundedProviderCall, claimStillHeld, monotonicMs, reassertHold } from "../provider-holds.js";
+import { boundedProviderCall, claimStillHeld, monotonicMs, reassertHold, releaseUnderClaim, type HoldReassertion, type ReleaseTarget } from "../provider-holds.js";
 import { SEAL_REVISION, type SealRevisionBody, type SealRevisionHandler, type SealRevisionView } from "../contracts.js";
 import { readRevisionView, retentionView } from "./projections.js";
 import { reachedOnServer, requireProviders, runSourceCommand, versionAt, type B07Collaborators, type SourceRuntime } from "./shared.js";
@@ -83,6 +86,8 @@ type PlacedHold =
       readonly objectName: string;
       readonly generation: string;
       readonly bytes: number;
+      /** The metageneration the placement answered: the hold incarnation its release names (D-HOLD-4). */
+      readonly metageneration: string;
     }
   | { readonly kind: "GENERATION_NOT_LIVE"; readonly holdId: ObjectHoldId }
   | { readonly kind: "UNOBSERVED" };
@@ -265,10 +270,11 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
             fileSet,
           );
           // the holds this seal commits with (D-HOLD-2): SEALED in this transaction, after the sealed file set names each generation, in
-          // object-id order; one the control plane abandoned past its bound is not the seal's any more
+          // object-id order, each with the metageneration its placement answered (D-HOLD-4); one the control plane abandoned past its
+          // bound is not the seal's any more
           const held = included.map((f) => attempt.placed.get(f.fileId)).filter((h): h is Extract<PlacedHold, { kind: "HELD" }> => h !== undefined && h.kind === "HELD");
           for (const hold of [...held].sort((a, b) => (a.objectId < b.objectId ? -1 : a.objectId > b.objectId ? 1 : 0))) {
-            if ((await uow.sources.holds.seal(hold.holdId)).kind !== "APPLIED") throw generationNotObserved("the provider hold of an included file is no longer this seal's (past its bound)");
+            if ((await uow.sources.holds.seal(hold.holdId, hold.metageneration)).kind !== "APPLIED") throw generationNotObserved("the provider hold of an included file is no longer this seal's (past its bound)");
           }
           const anchor = await uow.sources.retention.appendAnchor({ anchorId: uow.ids.next() as RetentionAnchorId, agencyId, projectId: revision.projectId, revisionId, kind: "REVISION_SEALED", sourceEvidenceHash: manifestHash });
           const record = await uow.sources.retention.insertUnpaidRecord({
@@ -449,39 +455,53 @@ async function place(storage: ObjectStoragePort, intent: { readonly holdId: Obje
   const answer = await boundedProviderCall(storage.placeHold(intent.location, intent.objectName, intent.generation));
   if (!answer.answered) return { kind: "UNOBSERVED" };
   if (answer.value.outcome === "GENERATION_NOT_LIVE") return { kind: "GENERATION_NOT_LIVE", holdId: intent.holdId };
-  const { observation } = answer.value;
-  return { kind: "HELD", holdId: intent.holdId, objectId: intent.objectId, location: intent.location, objectName: intent.objectName, generation: observation.generation, bytes: observation.bytes };
+  const { observation, metageneration } = answer.value;
+  return { kind: "HELD", holdId: intent.holdId, objectId: intent.objectId, location: intent.location, objectName: intent.objectName, generation: observation.generation, bytes: observation.bytes, metageneration };
 }
 
 /**
  * D-HOLD-3: a seal that did not commit — refused, failed, or answered by a replay of another execution — closes the holds its attempt
- * recorded (REFUSED) and releases, at the provider, every object whose hold nothing else needs any more (no other attempt in flight,
- * no seal retaining it), recording the provider's answer. Each release is this execution's only under the claim the database recorded
- * for it (its fence token): the provider call is issued only while the claim holds and bounded by PROVIDER_CALL_TIMEOUT_MS, and the
- * answer is recorded under the same claim (a claim another caller superseded records nothing). Best effort and never the command's
- * answer: whatever it does not finish (a lost connection, an unanswered release) stays recorded — INTENDED past its bound, or
- * RELEASING under a claim that lapses — and the RETENTION sweeper abandons, claims again and releases it.
+ * recorded (REFUSED, each placed one with the metageneration its placement answered, D-HOLD-4) and releases, at the provider, every
+ * object whose hold nothing else needs any more (no other attempt in flight, no seal retaining it), recording the provider's answer.
+ * Each release is this execution's only under the claim the database recorded for it (its fence token): the provider call names the
+ * claim's metageneration (`releaseUnderClaim`: re-observed and re-based under the live claim when none is recorded or the provider
+ * refuses it, 412), is issued only while the claim holds and bounded by PROVIDER_CALL_TIMEOUT_MS, and the answer is recorded under the
+ * same claim (a claim another caller superseded records nothing). Best effort and never the command's answer: whatever it does not
+ * finish (a lost connection, an unanswered release) stays recorded — INTENDED past its bound, or RELEASING under a claim that lapses —
+ * and the RETENTION sweeper abandons, claims again and releases it; a timed-out call that lands later names an incarnation a newer
+ * hold has superseded, and clears nothing.
  */
 async function releaseAttemptHolds(runtime: SourceRuntime, storage: ObjectStoragePort, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt): Promise<void> {
   try {
     const context = contextOf(SEAL_REVISION, envelope);
     const started = monotonicMs();
+    const placed = [...attempt.placed.values()].filter((h): h is Extract<PlacedHold, { kind: "HELD" }> => h.kind === "HELD").map((h) => ({ holdId: h.holdId, metageneration: h.metageneration }));
     const releases = await runtime.unitOfWork.runSource(context, async (uow) => {
-      const closed = await uow.sources.holds.closeAttempt(attempt.attemptId);
-      const out: Array<{ readonly releaseId: HoldReleaseId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }> = [];
+      const closed = await uow.sources.holds.closeAttempt(attempt.attemptId, placed);
+      const out: Array<{ readonly releaseId: HoldReleaseId; readonly target: ReleaseTarget }> = [];
       for (const objectId of [...new Set(closed.map((h) => h.objectId))].sort(byId)) {
         const decision = await uow.sources.holds.requestRelease(objectId, uow.ids.next() as HoldReleaseId);
         if (decision.kind !== "RELEASE") continue;
         const object = await uow.sources.objects.get(objectId);
-        if (object !== null) out.push({ releaseId: decision.releaseId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName, generation: decision.generation });
+        if (object === null) continue;
+        const location: StorageLocation = { provider: object.provider, locationRef: object.locationRef };
+        out.push({ releaseId: decision.releaseId, target: { location, objectName: object.objectName, generation: decision.generation, ...(decision.metageneration === undefined ? {} : { metageneration: decision.metageneration }) } });
       }
       return out;
     });
-    const answers: Array<{ readonly releaseId: HoldReleaseId; readonly result: "RELEASED" | "ABSENT" }> = [];
+    const answers: Array<{ readonly releaseId: HoldReleaseId; readonly result: HoldReleaseAnswer }> = [];
     for (const r of releases) {
-      // a claim that lapsed before its call is issued is left to the next claimant (D-HOLD-3)
-      if (!claimStillHeld(started)) break;
-      const answer = await boundedProviderCall(storage.releaseHold(r.location, r.objectName, r.generation));
+      const answer = await releaseUnderClaim(storage, r.target, {
+        // a claim that lapsed before its call is issued is left to the next claimant (D-HOLD-3)
+        stillHeld: () => claimStillHeld(started),
+        rebase: async (metageneration) => {
+          try {
+            return (await runtime.unitOfWork.runSource(context, (uow) => uow.sources.holds.rebaseRelease(r.releaseId, metageneration))).kind === "REBASED";
+          } catch {
+            return false;
+          }
+        },
+      });
       if (answer.answered) answers.push({ releaseId: r.releaseId, result: answer.value });
     }
     if (answers.length === 0) return;
@@ -496,8 +516,9 @@ async function releaseAttemptHolds(runtime: SourceRuntime, storage: ObjectStorag
 /**
  * D-HOLD-2: after its commit the seal re-asserts every hold it sealed — the idempotent placement with the generation precondition,
  * then a re-observation of the generation and its hold flag; a hold found missing on the live generation is placed again
- * (`reassertHold`) — and records each finding (HELD, or GENERATION_NOT_LIVE) before it answers. A generation that is not live any
- * more is never a silent success: its finding is recorded for OBJECT_INVENTORY, which revokes the file's admission
+ * (`reassertHold`) — and records each finding (HELD with the metageneration observed with the hold, the hold's latest incarnation a
+ * release names, D-HOLD-4; or GENERATION_NOT_LIVE) before it answers. A generation that is not live any more is never a silent
+ * success: its finding is recorded for OBJECT_INVENTORY, which revokes the file's admission
  * (GENERATION_CHANGED, GENERATION_MISSING — whatever retains it, the sealed revision included). The seal's answer stays the journaled
  * 200 (the seal committed, and a replay answers the same); whatever is not answered or not recorded (the provider silent, the process
  * gone) is re-asserted by OBJECT_INVENTORY once the attempt bound passed.
@@ -505,14 +526,17 @@ async function releaseAttemptHolds(runtime: SourceRuntime, storage: ObjectStorag
 async function reassertSealedHolds(runtime: SourceRuntime, storage: ObjectStoragePort, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt): Promise<void> {
   try {
     const held = [...attempt.placed.values()].filter((h): h is Extract<PlacedHold, { kind: "HELD" }> => h.kind === "HELD").sort((a, b) => byId(a.objectId, b.objectId));
-    const findings: Array<{ readonly holdId: ObjectHoldId; readonly result: HoldReassertionResult }> = [];
+    const findings: Array<{ readonly holdId: ObjectHoldId; readonly found: HoldReassertion }> = [];
     for (const hold of held) {
-      const result = await reassertHold(storage, hold.location, hold.objectName, hold.generation);
-      if (result !== null) findings.push({ holdId: hold.holdId, result });
+      const found = await reassertHold(storage, hold.location, hold.objectName, hold.generation);
+      if (found !== null) findings.push({ holdId: hold.holdId, found });
     }
     if (findings.length === 0) return;
     await runtime.unitOfWork.runSource(contextOf(SEAL_REVISION, envelope), async (uow) => {
-      for (const f of findings) await uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: f.holdId, result: f.result, reassertedBy: "SEAL" });
+      for (const f of findings) {
+        const metageneration = f.found.result === "HELD" ? f.found.metageneration : undefined;
+        await uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: f.holdId, result: f.found.result, reassertedBy: "SEAL", ...(metageneration === undefined ? {} : { metageneration }) });
+      }
     });
   } catch {
     // unrecorded: OBJECT_INVENTORY re-asserts the hold once the attempt bound passed (D-HOLD-2)

@@ -31,6 +31,7 @@
       "kauro.object_hold_releases": {
         "UPDATE": [
           "answered_at",
+          "metageneration",
           "release_result",
           "updated_at"
         ]
@@ -39,6 +40,7 @@
         "UPDATE": [
           "close_reason",
           "closed_at",
+          "metageneration",
           "release_requested_at",
           "release_result",
           "released_at",
@@ -181,6 +183,7 @@
       "kauro.object_hold_releases": {
         "UPDATE": [
           "answered_at",
+          "metageneration",
           "release_result",
           "updated_at"
         ]

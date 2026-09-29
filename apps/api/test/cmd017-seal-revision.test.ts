@@ -251,13 +251,15 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   const unavailable = await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key });
   assert.equal(outcome(w, unavailable), "503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED");
   assert.equal(await w.journal(key), null, "a refusal leaves no journal row: the same key executes again");
-  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "RELEASED"]], "the unanswered attempt's hold is closed and released all the same");
+  // the unanswered attempt's hold is closed and its release decided all the same; no placement answer named an incarnation, so the
+  // claimant re-observed the generation (D-HOLD-4): live without a hold, NOT_HELD — nothing to clear, no release issued
+  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "NOT_HELD"]], "the unanswered attempt's hold is closed and its release answered");
   await assertNothingSealed(unobserved, unobservedEvents);
   const sealed = completed<SealRevisionView>(await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key }), 200);
   assert.deepEqual([sealed.replayed, sealed.data.revision.state], [false, "SEALED"]);
   // the refused attempt's placement, the sealing attempt's placement, and its re-assertion after the commit (D-HOLD-2)
   assert.deepEqual(placementsOf(unobservedObject), ["FAILED UNAVAILABLE", `HELD ${unobserved.file.acceptedGeneration}`, `HELD ${unobserved.file.acceptedGeneration}`]);
-  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "RELEASED"], ["SEALED", null, null]]);
+  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "NOT_HELD"], ["SEALED", null, null]]);
   assert.equal(heldAtProvider(unobservedObject), true, "the sealed generation stays held");
   const fileSet = await w.h.oracle.query<{ provider_generation: string }>("SELECT provider_generation FROM kauro.sealed_revision_files WHERE revision_id = $1", [unobserved.revisionId]);
   assert.deepEqual(fileSet.rows, [{ provider_generation: unobserved.file.acceptedGeneration }], "the sealed generation is the one the provider holds and the evaluation counted");
@@ -266,7 +268,7 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   assert.equal(replay.status, 200);
   assert.equal(replay.json<{ replayed: boolean }>().replayed, true);
   assert.equal(placementsOf(unobservedObject).length, 3, "a replay performs no provider call");
-  assert.equal(releasesOf(unobservedObject).length, 1);
+  assert.equal(releasesOf(unobservedObject).length, 0, "the refused attempt held nothing: no release was issued");
 });
 
 test("RACE (B07-R1): the seal's hold placement held at the storage port while the provider replaces the accepted generation — released, the placement's generation precondition fails and the seal answers 409 GENERATION_CHANGED with nothing sealed; the seal never answers from what the provider held before the replacement", async () => {

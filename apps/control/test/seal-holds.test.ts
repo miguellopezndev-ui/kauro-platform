@@ -1,5 +1,5 @@
 // The provider holds of a seal's accepted generations through the control plane (B07-R1; docs/design/B07-upload-source-lifecycle.md
-// D-HOLD-1..D-HOLD-3, §11 CMD017, §12.5 RETENTION): SealRevision through the application's own handler (support/product.ts, as apps/api
+// D-HOLD-1..D-HOLD-4, §11 CMD017, §12.5 RETENTION): SealRevision through the application's own handler (support/product.ts, as apps/api
 // binds it) holds the exact accepted generation of every included file at the labelled storage fake before its unit of work (CONTRACT
 // FAKE, evidence class SIMULATED: the provider honouring the hold is simulated until B15 binds Cloud Storage), and this package's
 // RETENTION sweeper releases what nothing needs any more — a sealed subject's holds when the retention of its bytes ends (before the
@@ -9,7 +9,7 @@
 // a wait and never a back-dated row. The superuser is the oracle only.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { ReserveUploadView, SealRevisionView, SelectInputTablesView, SelectionManifestIntakeView } from "@kauro/application";
+import type { CommandResult, HoldRelease, ReserveUploadView, SealRevisionView, SelectInputTablesView, SelectionManifestIntakeView } from "@kauro/application";
 import {
   inventoryHashOf,
   selectionHashOf,
@@ -98,6 +98,32 @@ async function acceptedOf(fileId: string): Promise<{ readonly revocation_reason:
 function atProvider(objectName: string, generation: string): { readonly status: string | undefined; readonly held: boolean | undefined } {
   const g = env.storage.generationsOf(env.storage.location("ACCEPTED"), objectName).find((x) => x.generation === generation);
   return { status: g?.status, held: g?.temporaryHold };
+}
+
+/** The metageneration of an accepted generation at the labelled storage fake (D-HOLD-4). */
+function metagenerationAt(objectName: string, generation: string): string | undefined {
+  return env.storage.generationsOf(env.storage.location("ACCEPTED"), objectName).find((x) => x.generation === generation)?.metageneration;
+}
+
+/** A release outside the platform's discipline (no claim fences it), at the generation's current metageneration. */
+function releaseOutOfBand(objectName: string, generation: string): Promise<HoldRelease> {
+  return env.storage.releaseHold(env.storage.location("ACCEPTED"), objectName, generation, metagenerationAt(objectName, generation) ?? "1");
+}
+
+/** The seal holds of a file (oracle), oldest first: [state, the metageneration its placement recorded]. */
+async function holdMetagenerationsOf(fileId: string): Promise<ReadonlyArray<readonly [string, string | null]>> {
+  const rows = await oracleRows<{ state: string; metageneration: string | null }>(env, "SELECT state, metageneration::text AS metageneration FROM kauro.object_holds WHERE file_id = $1 ORDER BY intended_at, hold_id", [fileId]);
+  return rows.map((r) => [r.state, r.metageneration] as const);
+}
+
+/** The release claims of an object (oracle), in claim order: [sequence, the metageneration it names, its answer]. */
+async function claimsOf(objectId: string): Promise<ReadonlyArray<readonly [number, string | null, string | null]>> {
+  const rows = await oracleRows<{ sequence: number; metageneration: string | null; result: string | null }>(
+    env,
+    "SELECT sequence, metageneration::text AS metageneration, release_result AS result FROM kauro.object_hold_releases WHERE object_id = $1 ORDER BY sequence",
+    [objectId],
+  );
+  return rows.map((r) => [r.sequence, r.metageneration, r.result] as const);
 }
 
 /** A process death: not a DomainFailure, so nothing of the unit of work it interrupts commits. */
@@ -329,6 +355,12 @@ test("B07-R1 RETENTION releases a sealed subject's provider hold when the retent
   assert.deepEqual(await holdsOf(ready.fileId), [["SEALED", null, null]]);
   assert.deepEqual(atProvider(ready.objectName, ready.generation), { status: "LIVE", held: true });
   await assert.rejects(env.storage.delete(env.storage.location("ACCEPTED"), ready.objectName, ready.generation), (e: { code?: string }) => e.code === "OBJECT_HELD", "the provider refuses to delete a held generation");
+  // D-HOLD-4: the hold recorded its placement's metageneration (2: the generation was written at 1), and the seal's re-assertion — a
+  // placement of its own — the newer one it observed held (3), which is the provider's now: the recorded incarnation moved on with it
+  assert.deepEqual(await holdMetagenerationsOf(ready.fileId), [["SEALED", "2"]]);
+  const reasserted = await oracleRows<{ metageneration: string | null }>(env, "SELECT a.metageneration::text AS metageneration FROM kauro.object_hold_reassertions a JOIN kauro.object_holds h ON h.hold_id = a.hold_id WHERE h.file_id = $1", [ready.fileId]);
+  assert.deepEqual(reasserted.map((r) => r.metageneration), ["3"]);
+  assert.equal(metagenerationAt(ready.objectName, ready.generation), "3");
 
   // never early: on the real clock the record is ACTIVE, the file admitted, the hold retained
   const now = await env.plane.sweepers.retention.sweep(env.plane.units, 100);
@@ -350,6 +382,9 @@ test("B07-R1 RETENTION releases a sealed subject's provider hold when the retent
   assert.notEqual(atProvider(ready.objectName, ready.generation).status, "LIVE");
   const order = env.storage.calls().filter((c) => c.request["objectName"] === ready.objectName && (c.operation === "releaseHold" || c.operation === "delete")).map((c) => `${c.operation} ${c.outcome.split(" ")[0] ?? ""}`);
   assert.deepEqual(order.slice(-2), ["releaseHold RELEASED", "delete DELETED"], "the hold is released before the deletion");
+  // the release claim named the re-assertion's metageneration — the greatest recorded — and the release carried it
+  assert.deepEqual(await claimsOf(await acceptedObjectIdOf(ready.fileId)), [[1, "3", "RELEASED"]]);
+  assert.deepEqual(releasesOn(ready.objectName).map((c) => c.request["metageneration"]), ["3"]);
 
   // a release the provider does not answer: the hold stays RELEASING and the still-held generation refuses its deletion
   const q = await project(env, t);
@@ -430,6 +465,11 @@ test("B07-R1 crash between the provider hold and the commit: a seal whose proces
   }
   assert.deepEqual(await holdsOf(ready.fileId), [["RELEASED", "ABANDONED", "RELEASED"]]);
   assert.deepEqual(atProvider(ready.objectName, ready.generation), { status: "LIVE", held: false });
+  // D-HOLD-4: the dead process recorded no metageneration, so the claim named none; its claimant observed the generation held at 2,
+  // recorded that under its live claim first, and released under it
+  assert.deepEqual(await holdMetagenerationsOf(ready.fileId), [["RELEASED", null]]);
+  assert.deepEqual(await claimsOf(await acceptedObjectIdOf(ready.fileId)), [[1, "2", "RELEASED"]]);
+  assert.deepEqual(releasesOn(ready.objectName).map((c) => [c.request["metageneration"], c.outcome]), [["2", `RELEASED ${ready.generation}`]]);
 
   // the positive control: the revision seals now, with a hold of its own
   completedView<SealRevisionView>(await app.command(t, "CMD017", { revisionId: p.revisionId }, { expectedVersion: version, selectionHash: ready.selectionHash }), 200);
@@ -470,14 +510,14 @@ test("B07-R1 (second re-check) the seal re-asserts its holds after its commit an
   const observing = env.storage.holdNext("stat");
   try {
     await commitA.reached;
-    assert.equal(await env.storage.releaseHold(accepted, a.objectName, a.generation), "RELEASED", "a release no claim fences, outside the platform's discipline");
+    assert.equal(await releaseOutOfBand(a.objectName, a.generation), "RELEASED", "a release no claim fences, outside the platform's discipline");
   } finally {
     commitA.release();
   }
   await observing.reached;
   // the re-assertion placed the hold again and is observing it: the hold is removed once more before the observation lands
   assert.equal(atProvider(a.objectName, a.generation).held, true);
-  await env.storage.releaseHold(accepted, a.objectName, a.generation);
+  await releaseOutOfBand(a.objectName, a.generation);
   observing.release();
   assert.equal(completedView<SealRevisionView>(await sealingA, 200).revision.state, "SEALED");
   assert.deepEqual(placementsOn(a.objectName), ["HELD", "HELD", "HELD"], "the seal's placement, the re-assertion, and the hold placed again once found missing");
@@ -494,7 +534,7 @@ test("B07-R1 (second re-check) the seal re-asserts its holds after its commit an
   const sealingB = product(env, { unitOfWork: holdingB.units }).command<{ expectedVersion: number; selectionHash: string }, SealRevisionView>(t, "CMD017", { revisionId: pb.revisionId }, { expectedVersion: await versionOf(pb.revisionId), selectionHash: b.selectionHash });
   try {
     await commitB.reached;
-    await env.storage.releaseHold(accepted, b.objectName, b.generation);
+    await releaseOutOfBand(b.objectName, b.generation);
     assert.equal(replaceAtProvider(b.objectName, "before-commit"), null);
   } finally {
     commitB.release();
@@ -552,4 +592,149 @@ test("B07-R1 (second re-check) the seal re-asserts its holds after its commit an
   await assert.rejects(env.h.app.runSource(asOwner(env, t), record("OBJECT_INVENTORY")), (e: unknown) => sqlState(e) === "42501");
   const bound = { kind: "SYSTEM", serviceId: "object-inventory", correlationId: ids.next() as CorrelationId, agencyId: t.ag.agencyId as AgencyId } as const;
   await assert.rejects(env.h.control.runSource(bound, record("SEAL")), (e: unknown) => sqlState(e) === "42501");
+});
+
+/** The provider's hold releases on an accepted name, in call order. */
+function releasesOn(objectName: string): ReturnType<ControlEnv["storage"]["calls"]> {
+  return env.storage.calls("releaseHold").filter((c) => c.request["objectName"] === objectName);
+}
+
+test("B07-R1 (third re-check) the reviewer's reproduction of the re-check of 09faf25: a seal fails before its commit and its own cleanup release is held at the provider (storage.holdNext releaseHold) until boundedProviderCall answers TIMEOUT while the call stays pending there; past that claim's 910-second in-flight bound (the TEST CLOCKs 960 s ahead) a retry releases and records RELEASED; a new SealRevision places its hold and waits at its journal commit; the original release then lands, an overwrite of the accepted object is attempted and the seal resumes — the delayed release names the metageneration of the hold incarnation it was sent for, so it fails its precondition (412) and clears nothing: the new hold survives, the overwrite is refused OBJECT_HELD and the seal commits the live held generation (on 09faf25 the delayed release cleared the new hold, the overwrite succeeded and the seal committed a replaced generation)", { timeout: 300_000 }, async () => {
+  const t = await tenant(env, "holds-delayed-release");
+  await activate(env, t);
+  await setSessionLimit(env, t, 10);
+  const p = await project(env, t);
+  const ready = await readyThroughProduct(t, p, "delayed-release");
+  const body = { expectedVersion: await versionOf(p.revisionId), selectionHash: ready.selectionHash };
+  const objectId = await acceptedObjectIdOf(ready.fileId);
+
+  // 1. the seal fails before its COMMIT; its cleanup release is held at the provider, and boundedProviderCall answers TIMEOUT
+  //    (PROVIDER_CALL_TIMEOUT_MS, the seal's own bound) while the call stays pending there
+  const failing = journalCommitHolds(env.h.app);
+  failing.arm({ fail: new SealFailure() });
+  const delayed = env.storage.holdNext("releaseHold");
+  await assert.rejects(product(env, { unitOfWork: failing.units }).command(t, "CMD017", { revisionId: p.revisionId }, body), (e: { cause?: unknown }) => e instanceof SealFailure || e.cause instanceof SealFailure);
+  await delayed.reached;
+  const delayedCall = releasesOn(ready.objectName).at(-1);
+  assert.equal(delayedCall?.outcome, "PENDING", "the timed-out release is still pending at the provider");
+  assert.deepEqual(await holdsOf(ready.fileId), [["RELEASING", "REFUSED", null]]);
+  assert.deepEqual(atProvider(ready.objectName, ready.generation), { status: "LIVE", held: true });
+
+  let heldAfterDelayed: boolean | undefined;
+  let overwrite: string | null | undefined;
+  let sealAnswer: CommandResult<SealRevisionView> | undefined;
+  const control = await controlUnitsAhead(env, BOUND_SECONDS + 60);
+  const requests = await appUnitsAhead(env, BOUND_SECONDS + 60);
+  try {
+    // 2. past the claim's in-flight bound a retry releases and records RELEASED
+    assert.deepEqual(await releaseObjectHolds(env.storage, control.units, retentionItem(t), objectId), { kind: "RELEASED", result: "RELEASED", holds: 1 });
+    assert.deepEqual(await holdsOf(ready.fileId), [["RELEASED", "REFUSED", "RELEASED"]]);
+    assert.equal(atProvider(ready.objectName, ready.generation).held, false);
+
+    // 3. a new SealRevision places its hold and waits at its journal commit
+    const sealing = journalCommitHolds(requests.units);
+    const atCommit = sealing.arm();
+    const answer = product(env, { unitOfWork: sealing.units }).command<typeof body, SealRevisionView>(t, "CMD017", { revisionId: p.revisionId }, body);
+    try {
+      const first = await Promise.race([atCommit.reached.then(() => "COMMIT" as const), answer.then(() => "ANSWERED" as const, () => "FAILED" as const)]);
+      assert.equal(first, "COMMIT", "the new seal reached its commit");
+      assert.equal(atProvider(ready.objectName, ready.generation).held, true, "the new seal's hold is placed");
+      // 4. the original release lands at the provider now (its effect runs once the hold point is released), then the overwrite
+      delayed.release();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      heldAfterDelayed = atProvider(ready.objectName, ready.generation).held;
+      overwrite = replaceAtProvider(ready.objectName, "after-delayed-release");
+    } finally {
+      atCommit.release();
+    }
+    // 5. the seal resumes
+    sealAnswer = await answer;
+  } finally {
+    await control.close();
+    await requests.close();
+  }
+
+  assert.equal(heldAfterDelayed, true, "the delayed release cleared the new seal's hold");
+  assert.equal(overwrite, "OBJECT_HELD", "the overwrite of the held generation is refused");
+  assert.equal(releasesOn(ready.objectName).find((c) => c.sequence === delayedCall?.sequence)?.outcome, "PRECONDITION_FAILED", "the delayed release failed its metageneration precondition (412) and cleared nothing");
+  assert.ok(sealAnswer !== undefined);
+  assert.equal(completedView<SealRevisionView>(sealAnswer, 200).revision.state, "SEALED");
+  assert.deepEqual(liveGenerationsOf(ready.objectName), [ready.generation], "the seal committed the live generation");
+  assert.deepEqual(atProvider(ready.objectName, ready.generation), { status: "LIVE", held: true }, "and the provider holds it");
+  assert.deepEqual(await holdsOf(ready.fileId), [["RELEASED", "REFUSED", "RELEASED"], ["SEALED", null, null]]);
+  assert.deepEqual(await reassertionsOf(ready.fileId), [["HELD", "SEAL"]]);
+  // the incarnations (D-HOLD-4): the failed seal's placement answered 2 (recorded as its hold closed) and both of its releases named
+  // 2; the retry's landed first (3); the new seal's placement answered 4 (SEALED with it), so the delayed release, landing after it,
+  // met 4 and failed; the seal's re-assertion then placed it again (5)
+  assert.deepEqual(await holdMetagenerationsOf(ready.fileId), [["RELEASED", "2"], ["SEALED", "4"]]);
+  assert.deepEqual(await claimsOf(objectId), [[1, "2", null], [2, "2", "RELEASED"]]);
+  assert.deepEqual(releasesOn(ready.objectName).map((c) => [c.request["metageneration"], c.outcome]), [["2", "PRECONDITION_FAILED"], ["2", `RELEASED ${ready.generation}`]]);
+  assert.equal(metagenerationAt(ready.objectName, ready.generation), "5");
+});
+
+test("B07-R1 (third re-check) a claimed release names the metageneration of the hold incarnation it clears, and a 412 is re-observed, never retried blindly (D-HOLD-4): (a) two claimants of one failed seal's release past their bounds — the first times out and its call stays pending, the second's call is held — the first lands and clears the hold, so the second's, naming the same incarnation, fails its precondition: re-observed live without a hold it is recorded NOT_HELD, clearing nothing and issuing no other release; (b) a placement whose answer was lost lands while a failed seal's release is on its way (the hold placed again: a newer metageneration no record names) — the release fails its precondition, the claimant re-observes the generation live and held, records that metageneration under its live claim and releases under it", { timeout: 300_000 }, async () => {
+  const t = await tenant(env, "holds-precondition");
+  await activate(env, t);
+  await setSessionLimit(env, t, 10);
+
+  // (a) a failed seal whose cleanup release the provider refused before any effect: RELEASING, its claim unanswered
+  const pa = await project(env, t);
+  const a = await readyThroughProduct(t, pa, "precondition-not-held");
+  const aRevision = pa.revisionId;
+  const aObject = await acceptedObjectIdOf(a.fileId);
+  const failingA = journalCommitHolds(env.h.app);
+  failingA.arm({ fail: new SealFailure() });
+  env.storage.failNext("releaseHold", { code: "UNAVAILABLE" });
+  await assert.rejects(product(env, { unitOfWork: failingA.units }).command(t, "CMD017", { revisionId: aRevision }, { expectedVersion: await versionOf(aRevision), selectionHash: a.selectionHash }), (e: { cause?: unknown }) => e instanceof SealFailure || e.cause instanceof SealFailure);
+  assert.deepEqual(await holdsOf(a.fileId), [["RELEASING", "REFUSED", null]]);
+  assert.deepEqual(await holdMetagenerationsOf(a.fileId), [["RELEASING", "2"]], "the placement's metageneration, recorded as the hold closed");
+  const firstClaimant = await controlUnitsAhead(env, BOUND_SECONDS + 60);
+  const secondClaimant = await controlUnitsAhead(env, 2 * (BOUND_SECONDS + 60));
+  let second: ReturnType<typeof releaseObjectHolds> | undefined;
+  try {
+    const firstAtProvider = env.storage.holdNext("releaseHold");
+    assert.deepEqual(await releaseObjectHolds(env.storage, firstClaimant.units, retentionItem(t), aObject, 200), { kind: "PENDING", cause: "TIMEOUT" }, "the first claimant's call times out and stays pending");
+    const secondAtProvider = env.storage.holdNext("releaseHold");
+    second = releaseObjectHolds(env.storage, secondClaimant.units, retentionItem(t), aObject);
+    await secondAtProvider.reached;
+    firstAtProvider.release();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(atProvider(a.objectName, a.generation).held, false, "the first claimant's call landed and cleared the hold");
+    secondAtProvider.release();
+    assert.deepEqual(await second, { kind: "RELEASED", result: "NOT_HELD", holds: 1 });
+  } finally {
+    await firstClaimant.close();
+    await secondClaimant.close();
+  }
+  assert.deepEqual(await holdsOf(a.fileId), [["RELEASED", "REFUSED", "NOT_HELD"]]);
+  assert.deepEqual(await claimsOf(aObject), [[1, "2", null], [2, "2", null], [3, "2", "NOT_HELD"]]);
+  assert.deepEqual(
+    releasesOn(a.objectName).map((c) => [c.request["metageneration"], c.outcome]),
+    [["2", "FAILED UNAVAILABLE"], ["2", `RELEASED ${a.generation}`], ["2", "PRECONDITION_FAILED"]],
+    "the 412 was re-observed, and no other release was issued",
+  );
+  assert.equal(env.storage.calls("stat").filter((c) => c.request["objectName"] === a.objectName).at(-1)?.outcome, `PRESENT ${a.generation}`);
+  assert.equal(metagenerationAt(a.objectName, a.generation), "3");
+
+  // (b) a failed seal's cleanup release held at the provider while a placement whose answer was lost lands: the hold at 3
+  const pb = await project(env, t);
+  const b = await readyThroughProduct(t, pb, "precondition-rebased");
+  const bObject = await acceptedObjectIdOf(b.fileId);
+  const failingB = journalCommitHolds(env.h.app);
+  failingB.arm({ fail: new SealFailure() });
+  const cleanup = env.storage.holdNext("releaseHold");
+  const sealing = product(env, { unitOfWork: failingB.units }).command(t, "CMD017", { revisionId: pb.revisionId }, { expectedVersion: await versionOf(pb.revisionId), selectionHash: b.selectionHash });
+  try {
+    await cleanup.reached;
+    const lost = await env.storage.placeHold(env.storage.location("ACCEPTED"), b.objectName, b.generation);
+    assert.equal(lost.outcome === "HELD" ? lost.metageneration : null, "3");
+  } finally {
+    cleanup.release();
+  }
+  await assert.rejects(sealing, (e: { cause?: unknown }) => e instanceof SealFailure || e.cause instanceof SealFailure);
+  assert.deepEqual(await holdsOf(b.fileId), [["RELEASED", "REFUSED", "RELEASED"]]);
+  assert.deepEqual(await holdMetagenerationsOf(b.fileId), [["RELEASED", "2"]]);
+  assert.deepEqual(await claimsOf(bObject), [[1, "3", "RELEASED"]], "the claim names the re-observed metageneration its claimant recorded before releasing under it");
+  assert.deepEqual(releasesOn(b.objectName).map((c) => [c.request["metageneration"], c.outcome]), [["2", "PRECONDITION_FAILED"], ["3", `RELEASED ${b.generation}`]]);
+  assert.deepEqual(atProvider(b.objectName, b.generation), { status: "LIVE", held: false });
 });

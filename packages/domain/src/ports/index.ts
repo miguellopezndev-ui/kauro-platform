@@ -57,6 +57,7 @@ export type {
   NewObjectHold,
   HoldReleaseDecision,
   HoldReleaseRecording,
+  HoldReleaseRebase,
   NewHoldReassertion,
   UnconfirmedSealedHold,
   ObjectHoldRepository,

@@ -59,6 +59,7 @@ import type {
   ObjectHoldReassertionRecord,
   ObjectHoldRecord,
   ObjectHoldReleaseRecord,
+  HoldReleaseAnswer,
   ProviderCancellationState,
   RejectionClass,
   RetentionAnchorRecord,
@@ -277,16 +278,26 @@ export type HoldReleaseDecision =
    * The release is this caller's: every CLOSED or SEALED hold of the object moved to RELEASING now (or a release whose last claim
    * lapsed unanswered is claimed again), and the claim `releaseId` is recorded — the fence token only this caller holds. The caller
    * releases this generation at the provider while its claim holds (issued within HOLD_RELEASE_CLAIM_SECONDS of the unit of work that
-   * took it, bounded by PROVIDER_CALL_TIMEOUT_MS), then records the answer under the same token (`recordRelease`).
+   * took it, bounded by PROVIDER_CALL_TIMEOUT_MS) under the precondition `metageneration` — the greatest the releasing holds recorded,
+   * the incarnation this release clears (D-HOLD-4; absent when none was recorded: the caller observes first) — then records the answer
+   * under the same token (`recordRelease`).
    */
   | {
       readonly kind: "RELEASE";
       readonly releaseId: HoldReleaseId;
       readonly generation: string;
+      readonly metageneration?: string;
       readonly holds: number;
       readonly claimedAt: UtcInstant;
       readonly claimExpiresAt: UtcInstant;
     };
+
+/** What recording a re-observed metageneration under a release claim did (D-HOLD-4). */
+export type HoldReleaseRebase =
+  /** The claim is the object's latest, unanswered and live on the server clock: it names the observed metageneration now. */
+  | { readonly kind: "REBASED" }
+  /** Not this claim's any more (lapsed, answered or superseded), or not a newer metageneration: nothing written, no release issued. */
+  | { readonly kind: "STALE" };
 
 /** What recording a provider's answer under a release claim did (D-HOLD-3). */
 export type HoldReleaseRecording =
@@ -302,6 +313,8 @@ export interface NewHoldReassertion {
   readonly result: HoldReassertionResult;
   /** The seal after its commit (a request handler), or OBJECT_INVENTORY (the control plane); row security binds each to its role. */
   readonly reassertedBy: "SEAL" | "OBJECT_INVENTORY";
+  /** HELD only: the metageneration the provider reported with the hold (D-HOLD-4); a later release names at least it. */
+  readonly metageneration?: string;
 }
 
 /** A sealed hold whose re-assertion OBJECT_INVENTORY owes (D-HOLD-2): never recorded past the bound, or found not live. */
@@ -336,12 +349,16 @@ export interface ObjectHoldRepository {
    */
   intend(hold: NewObjectHold): Promise<{ readonly kind: "INTENDED"; readonly record: ObjectHoldRecord } | { readonly kind: "RELEASE_PENDING" }>;
   /**
-   * INTENDED -> SEALED in the seal's own unit of work, after its sealed file set names the file at the held generation; STALE when the
-   * hold is no longer INTENDED (the control plane abandoned it) or its bound passed on the server clock.
+   * INTENDED -> SEALED in the seal's own unit of work, after its sealed file set names the file at the held generation, recording the
+   * metageneration the placement answered (D-HOLD-4); STALE when the hold is no longer INTENDED (the control plane abandoned it) or
+   * its bound passed on the server clock.
    */
-  seal(holdId: ObjectHoldId): Promise<{ readonly kind: "APPLIED"; readonly record: ObjectHoldRecord } | { readonly kind: "STALE"; readonly currentState: ObjectHoldRecord["state"] | null }>;
-  /** INTENDED -> CLOSED (REFUSED) for every hold of the attempt still INTENDED (its seal did not commit); returns them. */
-  closeAttempt(attemptId: SealAttemptId): Promise<ReadonlyArray<ObjectHoldRecord>>;
+  seal(holdId: ObjectHoldId, metageneration: string): Promise<{ readonly kind: "APPLIED"; readonly record: ObjectHoldRecord } | { readonly kind: "STALE"; readonly currentState: ObjectHoldRecord["state"] | null }>;
+  /**
+   * INTENDED -> CLOSED (REFUSED) for every hold of the attempt still INTENDED (its seal did not commit), recording for each placed one
+   * the metageneration its placement answered (`placed`, D-HOLD-4: the incarnation its release names); returns them.
+   */
+  closeAttempt(attemptId: SealAttemptId, placed?: ReadonlyArray<{ readonly holdId: ObjectHoldId; readonly metageneration: string }>): Promise<ReadonlyArray<ObjectHoldRecord>>;
   /** INTENDED -> CLOSED (ABANDONED) once its bound passed on the server clock (control plane); false when it is not due or not INTENDED. */
   abandon(holdId: ObjectHoldId): Promise<boolean>;
   /**
@@ -354,7 +371,15 @@ export interface ObjectHoldRepository {
    * instant and every RELEASING hold of the object RELEASED naming it — only when it is the object's latest claim and unanswered
    * (STALE otherwise, nothing written; the database refuses such a write itself, KA071).
    */
-  recordRelease(releaseId: HoldReleaseId, result: "RELEASED" | "ABSENT"): Promise<HoldReleaseRecording>;
+  recordRelease(releaseId: HoldReleaseId, result: HoldReleaseAnswer): Promise<HoldReleaseRecording>;
+  /**
+   * The claimant's re-observation (D-HOLD-4): after a release under the claim's metageneration failed its precondition (412), or when
+   * no metageneration was recorded, the claimant re-observed the generation live and held at `metageneration`; the claim names it now —
+   * only while the claim is the object's latest, unanswered and live on the server clock, and only a newer metageneration (STALE
+   * otherwise, nothing written; the database refuses such a write itself, KA071). Recorded before the release is issued, it proves the
+   * hold observed is no newer seal's: no hold of the object is intended while the claim is live and its holds are RELEASING.
+   */
+  rebaseRelease(releaseId: HoldReleaseId, metageneration: string): Promise<HoldReleaseRebase>;
   /** Every release claim of the object, in claim order (evidence). */
   releasesOf(objectId: StoredObjectId): Promise<ReadonlyArray<ObjectHoldReleaseRecord>>;
   /**

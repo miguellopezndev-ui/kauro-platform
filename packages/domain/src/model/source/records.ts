@@ -204,10 +204,25 @@ export interface ObjectHoldRecord {
   readonly closeReason?: ObjectHoldCloseReason;
   readonly releaseRequestedAt?: UtcInstant;
   readonly releasedAt?: UtcInstant;
-  readonly releaseResult?: "RELEASED" | "ABSENT";
+  readonly releaseResult?: HoldReleaseAnswer;
   /** The release claim whose claimant recorded the provider's answer (RELEASED rows only; D-HOLD-3). */
   readonly releasedBy?: HoldReleaseId;
+  /**
+   * The provider's metageneration of the generation right after this hold's placement (Cloud Storage `metageneration`, a decimal
+   * string: the incarnation of the generation's metadata, which every hold placement and release increments; D-HOLD-4) — recorded by
+   * the seal's own transaction (SEALED) or when its attempt closes (REFUSED), set once; absent while no placement answer was recorded.
+   * A later re-assertion's is on its re-assertion record.
+   */
+  readonly metageneration?: string;
 }
+
+/**
+ * What a claimed release of an object's seal holds came to at the provider (D-HOLD-3, D-HOLD-4): RELEASED — the release under the
+ * claim's metageneration cleared the hold; ABSENT — the generation is not the live one (another is, or none); NOT_HELD — the live
+ * generation carries no hold any more (the release's metageneration precondition failed, 412, and the re-observation found the hold
+ * already released by an earlier call), so this release cleared nothing.
+ */
+export type HoldReleaseAnswer = "RELEASED" | "ABSENT" | "NOT_HELD";
 
 /**
  * One release claim of an object's seal holds (B07-R1, second re-check; decision D-HOLD-3; table kauro.object_hold_releases,
@@ -225,10 +240,17 @@ export interface ObjectHoldReleaseRecord {
   readonly claimedAt: UtcInstant;
   /** claimedAt + HOLD_RELEASE_CLAIM_SECONDS: the claimant issues its provider call before it; another caller may claim after it. */
   readonly claimExpiresAt: UtcInstant;
-  /** claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS: no call of this claim can land after it. */
+  /** claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS: a call of this claim is not expected to land after it (defense in depth, D-HOLD-4). */
   readonly inFlightUntil: UtcInstant;
+  /**
+   * The metageneration the claim's release names (ifMetagenerationMatch, D-HOLD-4): at the claim, the greatest recorded for the
+   * releasing holds (their placements' and re-assertions'); raised only by its claimant, after a re-observation found the hold live at a
+   * newer one, while the claim is the object's latest, unanswered and live (`rebaseRelease`); absent while none was recorded (the
+   * claimant observes first).
+   */
+  readonly metageneration?: string;
   readonly answeredAt?: UtcInstant;
-  readonly releaseResult?: "RELEASED" | "ABSENT";
+  readonly releaseResult?: HoldReleaseAnswer;
 }
 
 /** What a re-assertion of a sealed hold found (D-HOLD-2): the generation live and held, or not the live generation any more. */
@@ -248,6 +270,8 @@ export interface ObjectHoldReassertionRecord {
   readonly result: HoldReassertionResult;
   readonly reassertedBy: "SEAL" | "OBJECT_INVENTORY";
   readonly observedAt: UtcInstant;
+  /** HELD only: the metageneration the re-observation reported with the hold (the hold's latest recorded incarnation, D-HOLD-4). */
+  readonly metageneration?: string;
 }
 
 // --- inspection -----------------------------------------------------------------------------------------------------------
