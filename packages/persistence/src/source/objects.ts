@@ -190,9 +190,13 @@ export class PgStoredObjectRepository implements StoredObjectRepository {
   async requestDeletion(objectIds: ReadonlyArray<StoredObjectId>, reason: string, _at: UtcInstant): Promise<number> {
     if (objectIds.length === 0) return 0;
     const ids = [...objectIds];
+    // the admission that retains a generation is found through the file's own reference to its accepted object as well as through
+    // the object's file link: UPLOAD_INSPECTION registers the accepted intent before the copy, when the file does not exist yet
+    // (stored_objects.file_id is set once, with a deferred key to the file), so its object carries no file link (D-CTRL-3)
     const retained = await execute<{ object_id: string }>(
       this.db,
-      `SELECT o.object_id FROM kauro.stored_objects o JOIN kauro.source_files f ON f.agency_id = o.agency_id AND f.file_id = o.file_id
+      `SELECT o.object_id FROM kauro.stored_objects o
+         JOIN kauro.source_files f ON f.agency_id = o.agency_id AND (f.file_id = o.file_id OR f.accepted_object_id = o.object_id)
         WHERE o.object_id = ANY($1::uuid[]) AND o.zone = 'ACCEPTED' AND f.state = 'ADMITTED'`,
       [ids],
     );

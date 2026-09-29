@@ -268,6 +268,20 @@ export interface SourceFileRepository {
   selectedBy(fileId: SourceFileId): Promise<ReadonlyArray<RevisionId>>;
   /** Sealed revisions whose manifest includes the file (they retain its accepted generation). */
   sealedBy(fileId: SourceFileId): Promise<ReadonlyArray<RevisionId>>;
+  /**
+   * Control-plane discovery on the server clock (unbound SYSTEM context, no customer text; design §12.5 RETENTION, D-RET-3): ADMITTED
+   * files some real seal included (D-SEAL-1) whose including revisions hold no ACTIVE retention record with an effective deadline
+   * still ahead — the RETENTION_EXPIRED revocations due. The database re-checks the same rule after the file's transition lock.
+   * (Decision D-CTRL-5, mandate B07-CONTROL.)
+   */
+  findRetentionEnded(limit: number): Promise<ReadonlyArray<{ readonly fileId: SourceFileId; readonly agencyId: AgencyId; readonly originRevisionId: RevisionId }>>;
+  /**
+   * Control-plane discovery (unbound SYSTEM context, no customer text; design §12.5 OBJECT_INVENTORY): ADMITTED files with the
+   * registry object and exact generation of their accepted bytes, in file-id order after `page.after` — the inventory compares each
+   * with what the provider holds (a missing or changed accepted generation revokes the file: GENERATION_MISSING,
+   * GENERATION_CHANGED). (Decision D-CTRL-5, mandate B07-CONTROL.)
+   */
+  admittedGenerations(page: SourcePage<SourceFileId>): Promise<ReadonlyArray<{ readonly fileId: SourceFileId; readonly agencyId: AgencyId; readonly originRevisionId: RevisionId; readonly acceptedObjectId: StoredObjectId; readonly providerGeneration: string }>>;
 }
 
 // --- selection, evaluation, seal -------------------------------------------------------------------------------------------------

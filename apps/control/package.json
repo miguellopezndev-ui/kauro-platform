@@ -1,0 +1,38 @@
+{
+  "name": "@kauro/control",
+  "version": "0.1.0",
+  "description": "Kauro control plane: the outbox dispatcher over the B06 dispatch store and leases, the source-lifecycle consumers (UPLOAD_INSPECTION, SELECTION_EVALUATION, STORAGE_LIFECYCLE, AUTHORITY_JOURNAL) and the source sweepers (upload deadlines, provider session reconciliation, retention, object inventory, deletion retries, location policy), each in SYSTEM units of work bound to the work item's agency, revision row first.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec --test-concurrency=2 \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/application": "workspace:*",
+    "@kauro/contracts": "workspace:*",
+    "@kauro/data-plane": "workspace:*",
+    "@kauro/domain": "workspace:*",
+    "@kauro/persistence": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}
