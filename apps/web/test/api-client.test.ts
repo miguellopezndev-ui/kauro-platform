@@ -192,3 +192,46 @@ test("D-GEN-1: an operation the contract documents with a default Problem and a 
   const stray = await harness(() => respond(404, "application/problem+json", JSON.stringify(problem(404, "NOT_FOUND")))).client.call("getLiveness");
   assert.equal(stray.kind, "PROBLEM", "the default reply of a probe is a Problem");
 });
+
+test("D-PRIV-1: an observer is told of every classified answer without changing it, and an observer that throws never costs the caller its answer", async () => {
+  const seen: string[] = [];
+  const answers: Array<() => FetchedResponse> = [
+    () => respond(200, "application/json", JSON.stringify({ kind: "READ", data: { items: [] } })),
+    () => respond(401, "application/problem+json", JSON.stringify(problem(401, "AUTHENTICATION_REQUIRED"))),
+    () => respond(200, "text/html", "<html></html>"),
+    () => {
+      throw new TypeError("network down");
+    },
+  ];
+  let next = 0;
+  const fetch: FetchLike = async () => (answers[next++] as () => FetchedResponse)();
+  const observed = new ApiClient({
+    fetch,
+    newCorrelationId: () => CORRELATION,
+    context: { csrfToken: () => null, activeAgency: () => null },
+    observe: (answer) => {
+      seen.push(answer.kind);
+    },
+  });
+  const returned: string[] = [];
+  for (let index = 0; index < 4; index += 1) returned.push((await observed.call("ListAgencies")).kind);
+  assert.deepEqual(returned, ["REPLY", "PROBLEM", "INTEGRITY", "NO_ANSWER"]);
+  assert.deepEqual(seen, returned, "the observer saw exactly what the caller got, in order");
+
+  const reported: unknown[] = [];
+  const throwing = new ApiClient({
+    fetch: async () => respond(200, "application/json", JSON.stringify({ kind: "READ", data: { items: [] } })),
+    newCorrelationId: () => CORRELATION,
+    context: { csrfToken: () => null, activeAgency: () => null },
+    observe: () => {
+      throw new RangeError("observer bug");
+    },
+    reportObserverFailure: (error) => {
+      reported.push(error);
+    },
+  });
+  const answer = await throwing.call("ListAgencies");
+  assert.equal(answer.kind, "REPLY", "the caller still gets its answer");
+  assert.equal(reported.length, 1, "the observer's failure is reported, not swallowed");
+  assert.ok(reported[0] instanceof RangeError);
+});

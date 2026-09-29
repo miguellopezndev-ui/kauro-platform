@@ -35,10 +35,27 @@ export interface ClientContext {
   activeAgency(): string | null;
 }
 
+/**
+ * An operation as the client sends it: a generated descriptor, or one an owning package declares itself (the session routes until the
+ * generator carries them). Schema names are strings so a supplementary schema table can name its own.
+ */
+export interface WireDescriptor extends Omit<OperationDescriptor, "request" | "replies"> {
+  readonly request: string | null;
+  readonly replies: Readonly<Record<string, string | null>>;
+}
+
 export interface ApiClientDeps {
   readonly fetch: FetchLike;
   readonly newCorrelationId: () => string;
   readonly context: ClientContext;
+  /**
+   * Told of every classified answer, after the caller's own classification is decided and without changing it. The session runtime
+   * listens here so that a 401 from any call ends the private view, whichever screen made the call. It must not throw; if it does, the
+   * failure goes to `reportObserverFailure` and the answer still reaches the caller (a command may already have committed).
+   */
+  readonly observe?: (answer: ApiAnswer<unknown>) => void;
+  /** Where an observer's failure is reported. Default: rethrown from a microtask, so the page's error reporting sees it. */
+  readonly reportObserverFailure?: (error: unknown) => void;
 }
 
 export interface CallInput {
@@ -56,7 +73,7 @@ const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
 const CORRELATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-function urlFor(descriptor: OperationDescriptor, input: CallInput): string {
+function urlFor(descriptor: WireDescriptor, input: CallInput): string {
   let path = descriptor.path;
   for (const name of descriptor.pathParameters) {
     const value = input.path?.[name];
@@ -89,8 +106,14 @@ export class ApiClient {
   }
 
   /** Calls any operation descriptor against a table of schemas (the generated one, or a supplement an owning package declares). */
-  async send<Body>(descriptor: OperationDescriptor, input: CallInput, schemas: Readonly<Record<string, SchemaNode>>): Promise<ApiAnswer<Body>> {
+  async send<Body>(descriptor: WireDescriptor, input: CallInput, schemas: Readonly<Record<string, SchemaNode>>): Promise<ApiAnswer<Body>> {
     const { url, init, correlationId } = this.#request(descriptor, input, schemas);
+    const answer = await this.#exchange<Body>(descriptor, url, init, schemas, correlationId);
+    this.#tell(answer);
+    return answer;
+  }
+
+  async #exchange<Body>(descriptor: WireDescriptor, url: string, init: FetchInit, schemas: Readonly<Record<string, SchemaNode>>, correlationId: string): Promise<ApiAnswer<Body>> {
     let response: FetchedResponse;
     try {
       response = await this.#deps.fetch(url, init);
@@ -106,7 +129,20 @@ export class ApiClient {
     return this.#classify<Body>(descriptor, response, text, schemas, correlationId);
   }
 
-  #request(descriptor: OperationDescriptor, input: CallInput, schemas: Readonly<Record<string, SchemaNode>>) {
+  #tell(answer: ApiAnswer<unknown>): void {
+    const observe = this.#deps.observe;
+    if (observe === undefined) return;
+    try {
+      observe(answer);
+    } catch (error) {
+      const report = this.#deps.reportObserverFailure ?? ((failure: unknown) => queueMicrotask(() => {
+        throw failure;
+      }));
+      report(error);
+    }
+  }
+
+  #request(descriptor: WireDescriptor, input: CallInput, schemas: Readonly<Record<string, SchemaNode>>) {
     const url = urlFor(descriptor, input);
     const correlationId = this.#deps.newCorrelationId();
     if (!CORRELATION_ID.test(correlationId)) throw new RangeError("a correlation id is a lowercase UUID of version 1 to 8");
@@ -146,7 +182,7 @@ export class ApiClient {
     return { url, init, correlationId };
   }
 
-  #classify<Body>(descriptor: OperationDescriptor, response: FetchedResponse, text: string, schemas: Readonly<Record<string, SchemaNode>>, sent: string): ApiAnswer<Body> {
+  #classify<Body>(descriptor: WireDescriptor, response: FetchedResponse, text: string, schemas: Readonly<Record<string, SchemaNode>>, sent: string): ApiAnswer<Body> {
     const status = response.status;
     // an answer the api did not write (a gateway page, a proxy timeout) says nothing about what the api did: the effect is unknown
     const unreadable: ApiAnswer<Body> = { kind: "NO_ANSWER", reason: "UNREADABLE", status };
@@ -189,9 +225,4 @@ function noAnswerReason(error: unknown): NoAnswerReason {
   if (name === "AbortError") return "ABORTED";
   if (name === "TimeoutError") return "TIMEOUT";
   return "NETWORK";
-}
-
-/** The api client of a page: the browser's fetch (same origin), a UUIDv7 correlation id, and the page's context. */
-export function browserApiClient(context: ClientContext, newCorrelationId: () => string): ApiClient {
-  return new ApiClient({ fetch: (url, init) => globalThis.fetch(url, init), newCorrelationId, context });
 }
