@@ -12,7 +12,7 @@ import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports
 import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
-import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
+import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -22,7 +22,7 @@ export interface ContractSchemaBundle {
 }
 
 const FIELD_ERROR_CODES = ["REQUIRED", "UNKNOWN_FIELD", "TYPE", "FORMAT", "RANGE", "UNKNOWN_REFERENCE", "ENUM", "PATCH_UNKNOWN_CANDIDATE", "PATCH_UNKNOWN_FIELD", "PATCH_EFFECT_NOT_PERMITTED", "PATCH_MALFORMED"] as const;
-const NEXT_ACTION_TOKENS = ["RELOAD", "COMPARE_VERSIONS", "REAUTHENTICATE", "STEP_UP", "RETRY_LATER", "RETRY_SAME_KEY", "REQUEST_NEW_REVIEW", "CONTACT_SUPPORT", "CHOOSE_ANOTHER_MODE"] as const;
+const NEXT_ACTION_TOKENS = ["RELOAD", "COMPARE_VERSIONS", "REAUTHENTICATE", "STEP_UP", "RETRY_LATER", "RETRY_SAME_KEY", "REQUEST_NEW_REVIEW", "CONTACT_SUPPORT", "CHOOSE_ANOTHER_MODE", "SECURE_UPLOAD"] as const;
 
 /**
  * Wire schema of a Problem (10 "Responses and safe errors"): closed, so a response can never carry a stack, SQL text, a raw
@@ -91,6 +91,7 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  Object.assign(roots, operationalRequestSchemas(operational));
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
   roots["Problem"] = PROBLEM_SCHEMA;

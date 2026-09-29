@@ -21,7 +21,7 @@
  * tools/openapi.mjs publishes them in the OpenAPI document. Nothing here is compiled from a runtime value (S093).
  */
 import type { ContractName } from "@kauro/contracts";
-import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
+import { AGENCY_CAPABILITIES, DomainFailure, INQUIRY_BUYER_TYPES, INQUIRY_DESTINATIONS, INQUIRY_RECORD_BANDS, INQUIRY_TIMINGS, OFFERED_CAPABILITY_STATES, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
 import { CURSOR_PATTERN } from "./cursor.js";
 import { RESOURCE_ACTIONS } from "./permitted-actions.js";
 import { LABEL_PATTERN } from "./request-schemas.js";
@@ -514,8 +514,19 @@ export const ACCEPTED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
 /** One declared reply of an operational route. */
 export interface OperationalResponse {
   readonly description: string;
-  readonly contentType: string;
-  /** A closed JSON Schema literal in the vocabulary of api/json-schema; compiled once at start-up, never from a runtime value. */
+  /** The media type of the reply's body, or null for a reply without one (204). */
+  readonly contentType: string | null;
+  /**
+   * A closed JSON Schema literal in the vocabulary of api/json-schema; compiled once at start-up, never from a runtime value.
+   * Null exactly when the reply has no body.
+   */
+  readonly schema: JsonSchema | null;
+}
+
+/** The body an operational route admits (B11 W2: the identity token of a sign-in or a step-up). */
+export interface OperationalRequest {
+  readonly contentType: "application/json";
+  /** A closed JSON Schema literal, compiled under `urn:kauro:api:v1:request:op:<operationId>`. */
   readonly schema: JsonSchema;
 }
 
@@ -536,6 +547,8 @@ export interface OperationalRoute {
   readonly authority: string;
   /** Declared replies by HTTP status; a status >= 400 that is not declared answers a Problem. */
   readonly responses: Readonly<Record<string, OperationalResponse>>;
+  /** The body the route admits, when it takes one (strict JSON, closed schema, admitted like a command's body). */
+  readonly request?: OperationalRequest;
 }
 
 /** The reply of GET /livez: the process is live; nothing else is checked (14 "Monitoring and service health"). */
@@ -582,6 +595,69 @@ export const READINESS_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
 
 const JSON_CONTENT_TYPE = "application/json";
 
+/** The reply of GET /api/v1/public/capability-publication: the offered mode capabilities in a public projection (no profile hash, no evidence). */
+export const CAPABILITY_PUBLICATION_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["observedAt", "capabilities"],
+  properties: {
+    observedAt: UTC,
+    capabilities: {
+      type: "array",
+      maxItems: SERVICE_MODES.length,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["capabilityId", "mode", "version", "state", "validFrom"],
+        properties: {
+          capabilityId: ID,
+          mode: { type: "string", enum: [...SERVICE_MODES] },
+          version: LABEL,
+          state: { type: "string", enum: [...OFFERED_CAPABILITY_STATES] },
+          validFrom: UTC,
+        },
+      },
+    },
+  },
+});
+
+/** A single-line label of the fit form (the control-character rule of every label). */
+const INQUIRY_LABEL = Object.freeze({ type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN });
+/** An address of the plain shape local@domain.tld: no quoted local part, no comment, no address literal; at most 254 characters. */
+export const INQUIRY_EMAIL_PATTERN = "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$";
+/** Free text: at least one visible character; line breaks and tabs allowed, every other control character refused. */
+export const INQUIRY_TEXT_PATTERN = "^(?=[\\s\\S]*\\S)[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]+$";
+
+/**
+ * The body of POST /api/v1/public/inquiries (A3 3.7 "the fit form collects business contact details, buyer type, destination,
+ * approximate record band and desired timing", 02 "Intake and project boundaries"): a closed object of strings from closed
+ * vocabularies. It carries no agency, client, project, price, quote or third-party CRM name.
+ */
+export const INQUIRY_REQUEST_SCHEMA: JsonSchema = Object.freeze({
+  description: "A fit inquiry from a visitor without an account. The buyer type never changes price or admission (A3 3.7).",
+  type: "object",
+  additionalProperties: false,
+  required: ["buyerType", "contactName", "contactEmail", "companyName", "destination", "recordBand", "timing"],
+  properties: {
+    buyerType: { type: "string", enum: [...INQUIRY_BUYER_TYPES] },
+    contactName: INQUIRY_LABEL,
+    contactEmail: { type: "string", minLength: 3, maxLength: 254, pattern: INQUIRY_EMAIL_PATTERN },
+    companyName: INQUIRY_LABEL,
+    destination: { type: "string", enum: [...INQUIRY_DESTINATIONS] },
+    recordBand: { type: "string", enum: [...INQUIRY_RECORD_BANDS] },
+    timing: { type: "string", enum: [...INQUIRY_TIMINGS] },
+    description: { type: "string", minLength: 1, maxLength: 2000, pattern: INQUIRY_TEXT_PATTERN },
+  },
+});
+
+/** The reply of POST /api/v1/public/inquiries: the inquiry's identity and the instant it was first received, nothing else. */
+export const INQUIRY_RECEIVED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["inquiryId", "receivedAt"],
+  properties: { inquiryId: ID, receivedAt: UTC },
+});
+
 /**
  * The operational routes of this edition: the platform's liveness and readiness probes, outside /api/v1, without a credential
  * and without a customer row (14 "Monitoring and service health": "Liveness checks process health ... Readiness checks the
@@ -612,10 +688,50 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
       "503": Object.freeze({ description: "Not ready: the process is draining, the database is unreachable, or its schema is behind or drifted.", contentType: JSON_CONTENT_TYPE, schema: READINESS_RESPONSE_SCHEMA }),
     }),
   }),
+  Object.freeze({
+    operationId: "getCapabilityPublication",
+    method: "GET",
+    path: "/api/v1/public/capability-publication",
+    summary: "The service modes that admit real customers, without authentication",
+    authority: '02 "Capability publication contract"; B11 D-PUB-1',
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "The MODE capabilities in an offered state (AVAILABLE_LIMITED or AVAILABLE), ordered by mode, and the instant they were read. Never cached; never a DESIGN, qualified, suspended or non-mode capability.", contentType: JSON_CONTENT_TYPE, schema: CAPABILITY_PUBLICATION_RESPONSE_SCHEMA }),
+    }),
+  }),
+  Object.freeze({
+    operationId: "createInquiry",
+    method: "POST",
+    path: "/api/v1/public/inquiries",
+    summary: "Submit a fit inquiry; the request's Origin must be exactly the public or the application origin",
+    authority: '02 "Intake and project boundaries"; A3 3.7; B11 D-PUB-2..D-PUB-6',
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: INQUIRY_REQUEST_SCHEMA }),
+    responses: Object.freeze({
+      "201": Object.freeze({ description: "The inquiry was received, or it repeats one received within the last 24 hours and answers the same identity and instant.", contentType: JSON_CONTENT_TYPE, schema: INQUIRY_RECEIVED_RESPONSE_SCHEMA }),
+    }),
+  }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {
   return `${RESPONSE_SCHEMA_PREFIX}op:${operationId}:${status}`;
+}
+
+export const OPERATIONAL_REQUEST_SCHEMA_PREFIX = "urn:kauro:api:v1:request:op:";
+export type OperationalRequestSchemaId = `${typeof OPERATIONAL_REQUEST_SCHEMA_PREFIX}${string}`;
+
+/** The request schema id of an operational route that takes a body. */
+export function operationalRequestSchemaId(operationId: string): OperationalRequestSchemaId {
+  return `${OPERATIONAL_REQUEST_SCHEMA_PREFIX}${operationId}`;
+}
+
+/** The request schemas of the operational routes that take a body, by schema id (compiled by the closed validator). */
+export function operationalRequestSchemas(routes: ReadonlyArray<OperationalRoute> = OPERATIONAL_ROUTES): Readonly<Record<OperationalRequestSchemaId, JsonSchema>> {
+  const out: Record<OperationalRequestSchemaId, JsonSchema> = {};
+  for (const route of routes) {
+    if (route.request === undefined) continue;
+    const id = operationalRequestSchemaId(route.operationId);
+    out[id] = { $schema: DIALECT, $id: id, title: `${route.operationId} request`, ...route.request.schema };
+  }
+  return out;
 }
 
 // --- forbidden response members ----------------------------------------------------------------------------------------------
@@ -797,6 +913,12 @@ function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<Opera
     seen.add(route.operationId);
     for (const [status, response] of Object.entries(route.responses)) {
       if (!/^[1-5][0-9]{2}$/.test(status)) refuse(`operational route ${route.operationId} declares status ${status}`);
+      // a reply without a body (204) declares neither a media type nor a schema; any other declares both
+      if ((response.schema === null) !== (response.contentType === null)) refuse(`operational route ${route.operationId} ${status} declares a body schema without a media type, or the reverse`);
+      if (response.schema === null) {
+        if (status !== "204") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 has none`);
+        continue;
+      }
       const id = operationalResponseSchemaId(route.operationId, status);
       roots[id] = { $schema: DIALECT, $id: id, title: `${route.operationId} ${status}`, ...response.schema };
     }

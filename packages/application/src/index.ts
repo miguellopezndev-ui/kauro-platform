@@ -36,6 +36,8 @@ export type {
   JsonSchema,
   ViewDefinition,
   OperationalRoute,
+  OperationalRequest,
+  OperationalRequestSchemaId,
   OperationalResponse,
   RegistryBundle,
   ResponseSchemaSet,
@@ -54,6 +56,9 @@ export {
   ACCEPTED_RESPONSE_SCHEMA,
   ACCEPTED_RESPONSE_SCHEMA_ID,
   OPERATIONAL_ROUTES,
+  OPERATIONAL_REQUEST_SCHEMA_PREFIX,
+  operationalRequestSchemaId,
+  operationalRequestSchemas,
   LIVENESS_RESPONSE_SCHEMA,
   READINESS_RESPONSE_SCHEMA,
   FORBIDDEN_RESPONSE_FIELDS,
@@ -65,7 +70,7 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, OPERATIONAL_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,
@@ -79,7 +84,7 @@ export {
   responseIntegrityProblem,
 } from "./api/response-contract.js";
 export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
+export { admitHeaders, admitStructure, admitOperationalBody, admitEmptyRequest, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,
@@ -120,3 +125,7 @@ export {
 } from "./commands/handlers/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
+export type { ContentFinding } from "./support/content-detector.js";
+export { detectRefusedContent } from "./support/content-detector.js";
+export type { InquiryBody, InquiryReceipt, InquiryServiceDependencies } from "./public/inquiries.js";
+export { receiveInquiry, inquiryContentOf, inquiryKeysOf, UNKNOWN_CLIENT_NETWORK } from "./public/inquiries.js";

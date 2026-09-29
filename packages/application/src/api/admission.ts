@@ -13,10 +13,11 @@ import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type { AgencyId, Clock, CorrelationId, Environment, FieldError, IdGenerator, UserId } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { CommandSpec } from "../ports/command-handler.js";
-import type { SchemaValidator } from "../ports/schema-validator.js";
+import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
 import { HEADERS, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, type AuthenticatedSubject, type CommandEnvelope } from "./envelope.js";
 import { problemOf, type Problem } from "./problems.js";
 import { requestSchemaId, type RequestSchemaCommand } from "./request-schemas.js";
+import { operationalRequestSchemaId, type OperationalRoute } from "./response-schemas.js";
 import { StrictJsonError, parseStrictJson } from "./strict-json.js";
 
 /** What admission needs from the head of a request, before any body byte is read. */
@@ -109,7 +110,7 @@ function isJsonContentType(value: string | undefined): boolean {
  * The head of the admission order that needs the headers only: a repeated single-valued envelope header (the request's
  * headers cannot be read unambiguously, so nothing that depends on them is decided — R41), then the content type.
  */
-function headerFailure(head: RequestHead): DomainFailure | null {
+function headerFailure(head: Pick<RequestHead, "headers" | "repeatedHeaders">): DomainFailure | null {
   if (head.repeatedHeaders.some((name) => SINGLE_VALUED_HEADERS.has(name))) return invalid("HEADER_REPEATED");
   if (!isJsonContentType(head.headers["content-type"])) return invalid("CONTENT_TYPE_UNSUPPORTED");
   return null;
@@ -131,34 +132,44 @@ export function admitHeaders(head: RequestHead): Extract<AdmissionOutcome<never>
  * Structural admission of one command request, in the order of manual 10. The first failure is the answer; the handler and
  * the database are never reached by a request that fails here.
  */
+/**
+ * Steps 0-4 of the admission order for a JSON body (a command's, or an operational route's that takes one): a repeated envelope
+ * header, the content type, the byte size, strict UTF-8 and strict JSON, then the closed schema. Throws the refusal.
+ */
+function admitJsonBody<Body>(raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "body">, schemaId: KnownSchemaId, validator: SchemaValidator): Body {
+  // 0-1. repeated envelope header, content type (the header-only head, also run by the transport before the body is read)
+  const early = headerFailure(raw);
+  if (early !== null) throw early;
+  // 2. byte size
+  if ((raw.body?.byteLength ?? 0) > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
+  // 3. UTF-8, JSON syntax, duplicate keys, depth, string length
+  if (raw.body === null) throw invalid("JSON_SYNTAX");
+  let text: string;
+  try {
+    text = UTF8.decode(raw.body);
+  } catch (e) {
+    if (e instanceof TypeError) throw invalid("JSON_SYNTAX");
+    throw e;
+  }
+  let parsed: unknown;
+  try {
+    parsed = parseStrictJson(text);
+  } catch (e) {
+    if (e instanceof StrictJsonError) throw invalid(e.reason);
+    throw e;
+  }
+  // 4. closed schema (no coercion, no defaults, unknown members refused: R2-058, R2-059)
+  const outcome = validator.validate<Body>(schemaId, parsed);
+  if (outcome.kind === "INVALID") throw invalid("SCHEMA_VIOLATION", outcome.fields);
+  return outcome.value;
+}
+
 export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, validator: SchemaValidator, clock: Clock): AdmissionOutcome<Body> {
   const correlationId = raw.correlationId;
   const fail = (f: DomainFailure): AdmissionOutcome<Body> => ({ kind: "PROBLEM", correlationId, problem: problemOf(f, correlationId) });
   try {
-    // 0-1. repeated envelope header, content type (the header-only head, also run by the transport before the body is read)
-    const early = headerFailure(raw);
-    if (early !== null) throw early;
-    // 2. byte size
-    if ((raw.body?.byteLength ?? 0) > REQUEST_LIMITS.jsonBytes) throw invalid("BODY_TOO_LARGE");
-    // 3. UTF-8, JSON syntax, duplicate keys, depth, string length
-    if (raw.body === null) throw invalid("JSON_SYNTAX");
-    let text: string;
-    try {
-      text = UTF8.decode(raw.body);
-    } catch (e) {
-      if (e instanceof TypeError) throw invalid("JSON_SYNTAX");
-      throw e;
-    }
-    let parsed: unknown;
-    try {
-      parsed = parseStrictJson(text);
-    } catch (e) {
-      if (e instanceof StrictJsonError) throw invalid(e.reason);
-      throw e;
-    }
-    // 4. closed schema (no coercion, no defaults, unknown members refused: R2-058, R2-059)
-    const outcome = validator.validate<Body>(requestSchemaId(spec.id as RequestSchemaCommand), parsed);
-    if (outcome.kind === "INVALID") throw invalid("SCHEMA_VIOLATION", outcome.fields);
+    // 0-4. repeated envelope header, content type, byte size, strict UTF-8 JSON, closed schema
+    const body = admitJsonBody<Body>(raw, requestSchemaId(spec.id as RequestSchemaCommand), validator);
     // 5. envelope: idempotency key, path ids, agency selector
     const key = raw.headers[HEADERS.idempotencyKey];
     if (key === undefined || key === "") throw invalid("IDEMPOTENCY_KEY_MISSING");
@@ -179,12 +190,40 @@ export function admitStructure<Body>(spec: CommandSpec<Body>, raw: RawRequest, v
     }
     return {
       kind: "ADMITTED",
-      admission: { correlationId, idempotencyKey: key, agencyId, path, body: outcome.value, receivedAt: clock.now(), clientAddressHash: raw.clientAddressHash },
+      admission: { correlationId, idempotencyKey: key, agencyId, path, body, receivedAt: clock.now(), clientAddressHash: raw.clientAddressHash },
     };
   } catch (e) {
     if (e instanceof DomainFailure) return fail(e);
     throw e;
   }
+}
+
+/**
+ * Admission of an operational route's body (B11 W2: POST /api/v1/sessions and POST /api/v1/assurance/step-ups): the same order
+ * as a command's steps 0-4 against the route's closed request schema; no idempotency key (these routes journal nothing), no
+ * path id, no agency selector.
+ */
+export function admitOperationalBody<Body>(route: OperationalRoute, raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "correlationId" | "body">, validator: SchemaValidator): { readonly kind: "ADMITTED"; readonly body: Body } | Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> {
+  if (route.request === undefined) throw new TypeError(`the operational route ${route.operationId} takes no body`);
+  try {
+    return { kind: "ADMITTED", body: admitJsonBody<Body>(raw, operationalRequestSchemaId(route.operationId), validator) };
+  } catch (e) {
+    if (e instanceof DomainFailure) return { kind: "PROBLEM", correlationId: raw.correlationId, problem: problemOf(e, raw.correlationId) };
+    throw e;
+  }
+}
+
+/**
+ * Admission of an operational route that takes neither a body nor a query (GET /api/v1/sessions/current, the logout, the
+ * identity configuration): a repeated envelope header, then any body byte or query parameter is refused (a closed request).
+ */
+export function admitEmptyRequest(raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "correlationId" | "body"> & { readonly query: Readonly<Record<string, unknown>> }): Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> | null {
+  const fail = (f: DomainFailure) => ({ kind: "PROBLEM" as const, correlationId: raw.correlationId, problem: problemOf(f, raw.correlationId) });
+  if (raw.repeatedHeaders.some((name) => SINGLE_VALUED_HEADERS.has(name))) return fail(invalid("HEADER_REPEATED"));
+  const names = Object.keys(raw.query);
+  if (names.length > 0) return fail(invalid("SCHEMA_VIOLATION", [{ field: "query", code: "UNKNOWN_FIELD" }]));
+  if ((raw.body?.byteLength ?? 0) > 0) return fail(invalid("SCHEMA_VIOLATION", [{ field: "body", code: "UNKNOWN_FIELD" }]));
+  return null;
 }
 
 /** The problem for a request whose subject could not be authenticated (401, next action REAUTHENTICATE). */

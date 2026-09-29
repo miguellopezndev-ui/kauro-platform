@@ -13,9 +13,9 @@
 import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
-import type { ResponseSchemaId } from "../api/response-schemas.js";
+import type { OperationalRequestSchemaId, ResponseSchemaId } from "../api/response-schemas.js";
 
-export type KnownSchemaId = ContractName | RequestSchemaId | ResponseSchemaId | "Problem";
+export type KnownSchemaId = ContractName | RequestSchemaId | OperationalRequestSchemaId | ResponseSchemaId | "Problem";
 
 export type ValidationOutcome<T> =
   | { readonly kind: "VALID"; readonly value: T }

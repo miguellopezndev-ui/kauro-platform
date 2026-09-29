@@ -239,6 +239,41 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetProject: readCatalogueOf("GetProject"),
 });
 
+// --- the operational routes with a closed catalogue (B11: the session boundary W2, the public routes W5b) -----------------------
+
+const TRANSPORT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "TRANSPORT"));
+const PLATFORM_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "PLATFORM"));
+/** A body admitted like a command's, without an idempotency key: content type, size, strict JSON, closed schema. */
+const BODY_ADMISSION: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "ADMISSION" && o.reason !== "IDEMPOTENCY_KEY_MISSING" && o.reason !== "IDEMPOTENCY_KEY_INVALID"));
+const NO_BODY = outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the route takes no body and no query parameter", { fieldCodes: ["UNKNOWN_FIELD"] });
+
+function sessionCatalogue(operationId: string, entries: ReadonlyArray<ProblemOutcome>): ReadonlyArray<ProblemOutcome> {
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const key = `${e.code}/${e.reason ?? "-"}`;
+    if (seen.has(key)) throw new TypeError(`${operationId}: the outcome ${key} is listed twice`);
+    seen.add(key);
+  }
+  return Object.freeze([...entries]);
+}
+
+/**
+ * The closed problem catalogues of the operational routes that have one. The api's send guard refuses any other problem on these
+ * routes, like a command's; the probes (liveness, readiness) answer any problem the Problem schema admits.
+ */
+export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  getCapabilityPublication: sessionCatalogue("getCapabilityPublication", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  createInquiry: sessionCatalogue("createInquiry", [
+    ...TRANSPORT_OUTCOMES,
+    outcome("ACCESS", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the request's Origin is absent or is not exactly the public or the application origin: decided before the body is read, nothing is stored or counted (D-PUB-2)"),
+    ...BODY_ADMISSION,
+    outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the description looks like a credential, a key or a token: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the description looks like customer records: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client-address hash has 5 accepted inquiries in the trailing hour, or the e-mail hash has 3 in the trailing day; retryAfterSeconds says when the first leaves the window (D-PUB-3)"),
+    ...PLATFORM_OUTCOMES,
+  ]),
+});
+
 /** The catalogue entry a problem is an instance of, or null. */
 export function outcomeOf(outcomes: ReadonlyArray<ProblemOutcome>, code: string, reason: string | undefined): ProblemOutcome | null {
   return outcomes.find((o) => o.code === code && o.reason === (reason ?? null)) ?? null;

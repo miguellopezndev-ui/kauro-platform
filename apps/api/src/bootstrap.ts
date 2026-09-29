@@ -74,8 +74,10 @@ export async function bootstrap(env: Readonly<Record<string, string | undefined>
   const passwordFile = config.migrateOnStart?.passwordFile ?? null;
   const migratorPassword = passwordFile === null ? undefined : readSecretFile(MIGRATOR_PASSWORD_FILE_VARIABLE, passwordFile);
   const cursorKey = config.cursorKeyFile === null ? undefined : readKeyFile(CURSOR_KEY_FILE_VARIABLE, config.cursorKeyFile);
+  const publicHashKey = config.publicApi === null ? undefined : readKeyFile("KAURO_PUBLIC_HASH_KEY_FILE", config.publicApi.hashKeyFile);
   const started = await startApi(config, {
     authenticator,
+    ...(publicHashKey !== undefined ? { publicHashKey } : {}),
     logger: options.logger ?? true,
     ...(migratorPassword !== undefined ? { migratorPassword } : {}),
     ...(cursorKey !== undefined ? { cursorKey } : {}),

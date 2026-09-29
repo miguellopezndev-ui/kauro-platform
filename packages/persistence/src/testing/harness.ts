@@ -388,9 +388,15 @@ export async function start(): Promise<Harness> {
 /**
  * Waits until a backend of `applicationName` whose current query contains `queryFragment` is blocked on a lock
  * (pg_stat_activity), which fixes the interleaving of two units of work deterministically (21 "Concurrency and crash matrix").
+ *
+ * The backend status snapshot of pg_stat_activity is cached for the rest of the transaction that first read it, while the wait
+ * event is read live: a caller that polls from inside its own transaction (a race that holds a table lock through the oracle)
+ * would see the wait event of a backend next to the query and state it had when the transaction first looked. Every poll
+ * therefore discards the cached snapshot first.
  */
 export async function waitForLockWait(oracle: Client, applicationName: string, queryFragment: string): Promise<number> {
   for (let i = 0; i < 400; i++) {
+    await oracle.query("SELECT pg_stat_clear_snapshot()");
     const r = await oracle.query<{ pid: number }>(
       "SELECT pid FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock' AND query LIKE '%' || $2 || '%'",
       [applicationName, queryFragment],

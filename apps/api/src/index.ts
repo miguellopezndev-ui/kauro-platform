@@ -14,6 +14,8 @@ export { HEALTH_ROUTES, HEALTH_PATHS, LIVENESS_RESPONSE_SCHEMA, READINESS_RESPON
 export type { DatabaseReadiness, HealthOptions, LivenessResponse, ProbeResponse, ProbeRoute, ProbeSchema, ReadinessResponse } from "./health.js";
 export { createBearerTokenAuthenticator, subjectOf, parseBearerTokenFile, loadBearerTokenFile, BearerTokenFileError } from "./authenticator.js";
 export type { Authenticator, SubjectFacts, BearerTokenEntry } from "./authenticator.js";
+export { registerPublicRoutes, assertOrigin, PUBLICATION_OPERATION, INQUIRY_OPERATION } from "./public-routes.js";
+export type { PublicApiOptions, PublicOrigins, PublicRoutesOptions } from "./public-routes.js";
 export { loadContractSchemas } from "./schemas.js";
 export {
   loadConfig,
@@ -25,9 +27,10 @@ export {
   MIGRATOR_PASSWORD_VARIABLE,
   MIGRATOR_PASSWORD_FILE_VARIABLE,
   CURSOR_KEY_FILE_VARIABLE,
+  PUBLIC_API_VARIABLES,
   readKeyFile,
 } from "./config.js";
-export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
+export type { ApiConfig, PublicApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
 export { openProjectsInspector, noExternalActionsInThisEdition, noCommercialConsequencesInThisEdition, unavailablePlanServices } from "./edition.js";
