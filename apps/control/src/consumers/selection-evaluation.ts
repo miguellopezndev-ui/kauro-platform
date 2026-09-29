@@ -16,8 +16,10 @@ import {
   PRICING_DEFINITION,
   evaluationHashOf,
   isUuidV7,
+  type AssociationDeclaration,
   type CausationId,
   type DomainEventRecord,
+  type EvaluatedTable,
   type EvaluationId,
   type RevisionId,
   type SelectionEvaluationRecord,
@@ -88,6 +90,14 @@ export class SelectionEvaluation implements OutboxConsumer {
     } catch {
       outcome = { result: "ERROR", failures: [{ code: "EVALUATOR_FAILED" }] };
     }
+    // B07-R2: the per-association edges the evaluator measured are recorded with their tables (the sealed subject's counts, D-CMD-8);
+    // a complete outcome that does not measure exactly the declared associations states counts nobody measured: an ERROR
+    let countedTables: ReadonlyArray<EvaluatedTable> = outcome.result === "ERROR" ? [] : outcome.tables;
+    if (outcome.result === "COMPLETE") {
+      const split = tablesWithAssociations(outcome.tables, read.manifest.body.associations, outcome.associations);
+      if (split === null) outcome = { result: "ERROR", failures: [{ code: "ASSOCIATION_COUNTS_INCOMPLETE" }] };
+      else countedTables = split;
+    }
 
     return units.runSource(boundTo(item), async (uow): Promise<ConsumerOutcome> => {
       const revision = await uow.sources.revisions.lock(revisionId);
@@ -107,7 +117,7 @@ export class SelectionEvaluation implements OutboxConsumer {
               fileCount: outcome.files.length,
               totalBytes: outcome.files.reduce((sum, f) => sum + f.bytes, 0),
               files: outcome.files,
-              tables: outcome.tables,
+              tables: countedTables,
               projections: outcome.projections,
               failures: [],
               pricingDefinition: PRICING_DEFINITION,
@@ -123,7 +133,7 @@ export class SelectionEvaluation implements OutboxConsumer {
               selectionHash,
               result: outcome.result,
               files: outcome.result === "ADMISSION_FAILED" ? outcome.files : [],
-              tables: outcome.result === "ADMISSION_FAILED" ? outcome.tables : [],
+              tables: outcome.result === "ADMISSION_FAILED" ? countedTables : [],
               projections: [],
               failures: outcome.failures.length > 0 ? outcome.failures : [{ code: "EVALUATION_FAILED" }],
               pricingDefinition: PRICING_DEFINITION,
@@ -161,4 +171,27 @@ export class SelectionEvaluation implements OutboxConsumer {
       return { kind: "DONE" };
     });
   }
+}
+
+/**
+ * The evaluated tables with the measured edges of each association the selection declares on them (B07-R2; D-CMD-8): every declared
+ * association measured exactly once, on a counted table, and nothing measured that the selection does not declare — otherwise null
+ * (the sealed subject never states a count nobody measured). A table without a declared association is left as the evaluator
+ * reported it.
+ */
+export function tablesWithAssociations(
+  tables: ReadonlyArray<EvaluatedTable>,
+  declared: ReadonlyArray<AssociationDeclaration>,
+  measured: ReadonlyArray<{ readonly associationKey: string; readonly edges: number }>,
+): ReadonlyArray<EvaluatedTable> | null {
+  const edges = new Map<string, number>();
+  for (const a of measured) {
+    if (edges.has(a.associationKey) || !Number.isSafeInteger(a.edges) || a.edges < 0) return null;
+    edges.set(a.associationKey, a.edges);
+  }
+  if (edges.size !== declared.length || declared.some((a) => !edges.has(a.associationKey) || !tables.some((t) => t.tableId === a.tableId))) return null;
+  return tables.map((t) => {
+    const own = declared.filter((a) => a.tableId === t.tableId);
+    return own.length === 0 ? t : { ...t, associations: own.map((a) => ({ associationKey: a.associationKey, edges: edges.get(a.associationKey) as number })) };
+  });
 }

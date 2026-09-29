@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { SOURCE_ROUTES, type CancelUploadView, type CreateRevisionView, type InspectionView, type ReserveUploadView, type SealRevisionView, type SelectInputTablesView, type SelectionManifestIntakeView, type SourceRevisionView, type TablePreviewView, type UploadPage, type UploadView } from "@kauro/application";
-import { inventoryHashOf, selectionHashOf, textDigest, type AgencyId, type RevisionId } from "@kauro/domain";
+import { inventoryHashOf, selectionHashOf, textDigest, type AgencyId, type RevisionId, type SelectionManifestDocument } from "@kauro/domain";
 import { completionRefOf } from "@kauro/application/testing";
 import { fixtureSelection } from "@kauro/persistence/testing";
 import { clock, startControlEnv, type ControlEnv } from "./support/env.js";
@@ -193,6 +193,76 @@ test("b07/integration end to end: ReserveUpload, the browser's upload through it
   assert.deepEqual(await drainAll(), { UPLOAD_INSPECTION: 0, SELECTION_EVALUATION: 0, STORAGE_LIFECYCLE: 0, AUTHORITY_JOURNAL: 1 });
   const tombstones = await env.journal.list(t.ag.agencyId as AgencyId, 0);
   assert.deepEqual(tombstones.map((x) => [x.kind, x.state, x.subjectId, x.revisionId]), [["REVISION_SUPERSEDED", "SUPERSEDED", p.revisionId, p.revisionId]]);
+  await assertEverythingDelivered(t.ag.agencyId);
+});
+
+test("B07-R2 end to end: a selection declaring two associations of one table is bound through SelectInputTables, counted by the real SELECTION_EVALUATION consumer — which persists each association's measured edges with its table, under the evaluation hash — and sealed by SealRevision with the sealed subject's per-association counts equal to an independent count, summing to the frozen association population", { timeout: 300_000 }, async () => {
+  const t = await activeTenant("e2e-associations");
+  const p = await project(env, t);
+  // contacts with a company and an owner; some rows without one or the other, companies and owners repeated
+  const rows: Array<[string, string, string, string]> = Array.from({ length: 24 }, (_, i) => [`c${i}@example.test`, `Contact ${i}`, i % 5 === 0 ? "" : `Company ${i % 4}`, i % 3 === 0 ? "" : `owner${i % 2}@example.test`]);
+  const content = buildCsv(["Email", "Name", "Company", "Owner"], rows);
+  // the independent count (03: an edge per counted row whose target key is present, before any deduplication)
+  const worksAt = rows.filter((r) => r[2] !== "").length;
+  const ownedBy = rows.filter((r) => r[3] !== "").length;
+  const companies = new Set(rows.map((r) => r[2]).filter((c) => c !== "")).size;
+  const owners = new Set(rows.map((r) => r[3]).filter((o) => o !== "")).size;
+  assert.ok(worksAt !== ownedBy && worksAt < rows.length && ownedBy < rows.length, "the two associations have distinct, partial edge counts");
+
+  const reserved = await reserveUpload(t, p.revisionId, content);
+  const uploadId = reserved.view.upload.uploadId;
+  const written = browserUpload(reserved.sessionUrl, content);
+  assert.equal((await app.command(t, "CMD014", { uploadId }, { providerCompletionRef: written.completionRef })).kind, "ACCEPTED");
+  assert.deepEqual(await drainAll(), { UPLOAD_INSPECTION: 1, SELECTION_EVALUATION: 0, STORAGE_LIFECYCLE: 0, AUTHORITY_JOURNAL: 0 });
+  const file = await oracle<{ file_id: string; table_id: string; structure_hash: string }>(
+    env,
+    "SELECT f.file_id, t.table_id, t.structure_hash FROM kauro.source_files f JOIN kauro.source_tables t ON t.file_id = f.file_id WHERE f.origin_upload_id = $1 AND f.state = 'ADMITTED'",
+    [uploadId],
+  );
+  const inventoryHash = inventoryHashOf(await env.h.app.runSource(asOwner(env, t), (uow) => uow.sources.revisions.inventory(p.revisionId as RevisionId)));
+  const base = fixtureSelection(p.revisionId, { fileId: file.file_id, tableId: file.table_id, structureHash: file.structure_hash, origin: "THIS_REVISION" }, inventoryHash);
+  const tableId = base.tables[0]?.tableId;
+  assert.ok(tableId !== undefined);
+  const document: SelectionManifestDocument = {
+    ...base,
+    projections: [
+      { projectionKey: "CONTACT", tableId, objectKind: "CONTACT", kind: "ROW", fieldOrdinals: [0, 1] },
+      { projectionKey: "COMPANY", tableId, objectKind: "COMPANY", kind: "REFERENCED_ENTITY", fieldOrdinals: [2], keyOrdinals: [2], keyConfirmed: true },
+      { projectionKey: "OWNER", tableId, objectKind: "USER", kind: "REFERENCED_ENTITY", fieldOrdinals: [3], keyOrdinals: [3], keyConfirmed: true },
+    ],
+    associations: [
+      { associationKey: "WORKS_AT", tableId, fromProjectionKey: "CONTACT", toProjectionKey: "COMPANY", relationType: "EMPLOYMENT" },
+      { associationKey: "OWNED_BY", tableId, fromProjectionKey: "CONTACT", toProjectionKey: "OWNER", relationType: "OWNERSHIP" },
+    ],
+  };
+  const stored = await app.submitManifest<SelectionManifestIntakeView>(t, p.revisionId, document);
+  const selected = completedView<SelectInputTablesView>(
+    await app.command(t, "CMD016", { revisionId: p.revisionId }, { expectedVersion: await versionOf("dataset_revisions", "revision_id", p.revisionId), selectionManifestRef: stored.view.selectionManifestId }),
+    200,
+  );
+  assert.equal(selected.revision.state, "INSPECTING");
+
+  // the real consumer counts the selection and records the evaluation with each association's edges on its table
+  assert.deepEqual(await drainAll(), { UPLOAD_INSPECTION: 0, SELECTION_EVALUATION: 1, STORAGE_LIFECYCLE: 0, AUTHORITY_JOURNAL: 0 });
+  const evaluation = await oracle<{ evaluation_hash: string; tables: Array<{ tableId: string; associations?: Array<{ associationKey: string; edges: number }> }>; association_edges: string }>(
+    env,
+    "SELECT e.evaluation_hash, e.tables, e.association_edges::text FROM kauro.selection_evaluations e JOIN kauro.dataset_revisions r ON r.evaluation_id = e.evaluation_id WHERE r.revision_id = $1",
+    [p.revisionId],
+  );
+  assert.equal(Number(evaluation.association_edges), worksAt + ownedBy);
+
+  // CMD017 seals the two associations with their measured split (unfixed: INTEGRITY_FAILURE, the split lost at the consumer)
+  const sealed = completedView<SealRevisionView>(
+    await app.command(t, "CMD017", { revisionId: p.revisionId }, { expectedVersion: await versionOf("dataset_revisions", "revision_id", p.revisionId), selectionHash: selectionHashOf(document) }),
+    200,
+  );
+  assert.equal(sealed.revision.state, "SEALED");
+  assert.deepEqual(evaluation.tables.map((x) => [x.tableId, x.associations]), [[tableId, [{ associationKey: "WORKS_AT", edges: worksAt }, { associationKey: "OWNED_BY", edges: ownedBy }]]], "each association's measured edges persisted with its table");
+  const subject = await oracle<{ subject: { evaluationHash: string; populations: Record<string, number>; associations: Array<{ associationKey: string; edges: number }>; projections: Array<{ logicalRecords: number }> } }>(env, "SELECT subject FROM kauro.sealed_manifests WHERE revision_id = $1", [p.revisionId]);
+  assert.deepEqual(subject.subject.associations, [{ associationKey: "WORKS_AT", edges: worksAt }, { associationKey: "OWNED_BY", edges: ownedBy }]);
+  assert.equal(subject.subject.evaluationHash, evaluation.evaluation_hash);
+  assert.deepEqual(subject.subject.populations, { physicalSourceRows: rows.length, logicalSourceRecords: rows.length + companies + owners, billableSourceUnits: rows.length + companies + owners, associationEdges: worksAt + ownedBy });
+  assert.deepEqual(subject.subject.projections.map((x) => x.logicalRecords), [rows.length, companies, owners]);
   await assertEverythingDelivered(t.ag.agencyId);
 });
 

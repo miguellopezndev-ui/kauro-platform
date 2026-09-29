@@ -32,6 +32,7 @@
  */
 import type { CommandId, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
+  EvaluatedTable,
   ProjectionId,
   RetentionAnchorId,
   RetentionId,
@@ -358,19 +359,26 @@ async function observe(storage: ObjectStoragePort, location: StorageLocation, ob
 }
 
 /**
- * The edges of each declared association (the sealed subject's per-association counts). The evaluation record keeps per-table
- * counts; an evaluation whose table entries carry the evaluator's per-association edges is read as is; with one declared
- * association its edges are the evaluation's total; several associations without their split are an integrity failure — the
- * subject never states a count nobody measured (decision D-CMD-8).
+ * The edges of each declared association (the sealed subject's per-association counts). The SELECTION_EVALUATION consumer records
+ * the evaluator's measured edges of every declared association with its table (B07-R2), under the evaluation hash; they are read as
+ * is, and together they must be exactly the evaluation's frozen association population. An evaluation without the split states
+ * the edges of a single declared association as its total; several associations without their split, a split that does not add
+ * up, or an association measured twice are an integrity failure — the subject never states a count nobody measured (D-CMD-8).
  */
-function associationEdges(keys: ReadonlyArray<string>, tables: ReadonlyArray<unknown>, total: number): SealedSubjectDocument["associations"] {
+function associationEdges(keys: ReadonlyArray<string>, tables: ReadonlyArray<EvaluatedTable>, total: number): SealedSubjectDocument["associations"] {
   if (keys.length === 0) return [];
   const measured = new Map<string, number>();
   for (const t of tables) {
-    const list = (t as { readonly associations?: ReadonlyArray<{ readonly associationKey?: unknown; readonly edges?: unknown }> }).associations;
-    for (const a of list ?? []) if (typeof a.associationKey === "string" && typeof a.edges === "number") measured.set(a.associationKey, (measured.get(a.associationKey) ?? 0) + a.edges);
+    for (const a of t.associations ?? []) {
+      if (measured.has(a.associationKey)) throw new DomainFailure("INTEGRITY_FAILURE", "the evaluation measures an association twice");
+      measured.set(a.associationKey, a.edges);
+    }
   }
-  if (keys.every((k) => measured.has(k))) return keys.map((k) => ({ associationKey: k, edges: measured.get(k) as number }));
-  if (keys.length === 1) return [{ associationKey: keys[0] as string, edges: total }];
-  throw new DomainFailure("INTEGRITY_FAILURE", "the evaluation records no per-association edges for a selection that declares several associations");
+  if (measured.size === 0 && keys.length === 1) return [{ associationKey: keys[0] as string, edges: total }];
+  if (measured.size !== keys.length || !keys.every((k) => measured.has(k))) {
+    throw new DomainFailure("INTEGRITY_FAILURE", "the evaluation records no per-association edges for the associations the selection declares");
+  }
+  const edges = keys.map((k) => ({ associationKey: k, edges: measured.get(k) as number }));
+  if (edges.reduce((n, a) => n + a.edges, 0) !== total) throw new DomainFailure("INTEGRITY_FAILURE", "the per-association edges are not the evaluation's association population");
+  return edges;
 }
