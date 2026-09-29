@@ -1320,6 +1320,10 @@ Verification of this branch: `pnpm run verify` (generate, build, typecheck, test
 Windows; the persistence suite applies 0001..0013 from empty on PostgreSQL 17 in every test file through the B06 runner and runs
 the 16 B09 schema tests, the 20 critique tests and every B06 and foundation test; no temporary cluster is left running.
 
+Verification at the B09 close (the commit that carries this sentence): `pnpm run verify` green on Windows and on Linux (WSL
+Ubuntu 24.04, a fresh clone, `pnpm install --frozen-lockfile`, `PGBIN=/usr/lib/postgresql/17/bin`); the residuals N4, FINAL-N1,
+FINAL-N2 and FINAL-N3 re-proven at this head (§16, "Revert proofs at the B09 close").
+
 ## 15. Integration obligations
 
 What the integrator must wire when `b07/design`'s implementation and this package are both on `main` (read from
@@ -1483,3 +1487,12 @@ cluster, the file restored and checked by SHA-256): the composition root's bindi
 restored `8bb11cd5…`; M3's `apps/api/src/payments/views.ts` restored and imported by `service-commands.ts` fails "INT-2 seam
 (D-INT2-B4): …" on the order awaiting the buyer (its nextActions lack CAPTURE), `service-commands.ts` restored `d1a1bc0f…` and the
 copy removed; before D-INT2-B5, "S058: …" failed with "AMOUNT_MISMATCH: never CONFIRMED" (the partial capture read CONFIRMED).
+
+Revert proofs at the B09 close (`b09/integration` @ `6438477`; each fix undone in place, the test run, the file restored and checked
+by SHA-256): N4 — `takenFromProvider` crediting the whole return to the funds state's balance fails domain "B09-N4 residual
+(D-LEDGER-B6): …" (PSP_RECEIVABLE 97125 where 91850 and PSP_AVAILABLE 5275 are expected), `ledger.ts` restored `e48a09d3…`;
+FINAL-N1 — `reconciliation_cases_refund_own_capture_fk` replaced by `CHECK (true)` fails "B09-FINAL-N1 (D-BIND-B2): …" ("Missing
+expected rejection"), 0012 restored `9941fcaa…`; FINAL-N2 — the D-PAY-B6 guard of `observation.ts` disabled fails
+"planObservation — D-PAY-B5 (B09-N3): …" and "CommerceReconciler — D-PAY-B6 (residual FINAL-N2): …" (`providerQueryRequired`
+false), restored `846b3bf9…`; FINAL-N3 — `edition.ts` back to the zero stubs fails both "FINAL-N3 (D-INSP-B1) …" route tests
+(CMD023 answers 201 and supersedes the paid plan; CMD010 reports 0 live authorizations), restored `09e39317…`.
