@@ -622,7 +622,8 @@ test("CMD036 at the database: a job binds exactly its authorization's project, p
     await refused(c, () => c.query("UPDATE kauro.processing_jobs SET version = 2, state = 'ADMITTED' WHERE job_id = $1", [job.jobId]), "42501", "a request handler admits a job");
     await refused(c, () => c.query("UPDATE kauro.processing_jobs SET holds = 'ACTIVE' WHERE job_id = $1", [job.jobId]), "42501", "a request handler takes a slot");
     await refused(c, () => c.query("UPDATE kauro.commercial_authorizations SET version = 2, state = 'CONSUMED', job_ref = $2, consumed_at = now() WHERE authorization_id = $1", [p.authorizationId, job.jobId]), "42501", "a request handler consumes the entitlement");
-    await refused(c, () => c.query("INSERT INTO kauro.processing_attempts (attempt_id, agency_id, project_id, job_id, ordinal, identity, staging_prefix) VALUES ($1, $2, $3, $4, 1, 'kauro-attempt-' || $1, 'staging/')", [ids.next(), A.agencyId, p.projectId, job.jobId]), "42501", "a request handler launches an attempt");
+    const rogue = ids.next();
+    await refused(c, () => c.query("INSERT INTO kauro.processing_attempts (attempt_id, agency_id, project_id, job_id, ordinal, identity, staging_prefix) VALUES ($1, $2, $3, $4, 1, $5, 'staging/')", [rogue, A.agencyId, p.projectId, job.jobId, `kauro-attempt-${rogue}`]), "42501", "a request handler launches an attempt");
     await refused(c, () => c.query("UPDATE kauro.package_versions SET state = 'AVAILABLE' WHERE job_id = $1", [job.jobId]), "42501", "a request handler publishes a package");
     await refused(c, () => c.query("INSERT INTO kauro.staged_manifests (attempt_id, agency_id, project_id, job_id, fence, input_binding_hash, object_name, generation, manifest_hash, artifact_count, declared_summary_hash) VALUES ($1, $2, $3, $4, 1, $5, 'staging/x/y', '1', $5, 1, $5)", [ids.next(), A.agencyId, p.projectId, job.jobId, sha("x")]), "42501", "a request handler stages a manifest");
     for (const type of [...JOB_EVENT_TYPES.filter((t) => t !== "processing_job.queued.v1" && t !== "processing_job.cancel_requested.v1"), ...PACKAGE_EVENT_TYPES]) {
@@ -655,7 +656,8 @@ test("CMD037 at the database: after cancel_command no attempt of the job is crea
   ]);
   // nothing after cancel_command: no new attempt, no launch (KA081); the cancellation is recorded once (KA004), never re-counted
   await asControl(env, A, async (c) => {
-    await refused(c, () => c.query("INSERT INTO kauro.processing_attempts (attempt_id, agency_id, project_id, job_id, ordinal, identity, staging_prefix) SELECT $1, $2, $3, $4, 2, 'kauro-attempt-' || $1, 'staging/' || $2 || '/' || $3 || '/' || $4 || '/' || $1 || '/'", [ids.next(), A.agencyId, p1.projectId, j1.jobId]), "KA081", "an attempt after cancel_command");
+    const late = ids.next();
+    await refused(c, () => c.query("INSERT INTO kauro.processing_attempts (attempt_id, agency_id, project_id, job_id, ordinal, identity, staging_prefix) VALUES ($1, $2, $3, $4, 2, $5, $6)", [late, A.agencyId, p1.projectId, j1.jobId, `kauro-attempt-${late}`, `staging/${A.agencyId}/${p1.projectId}/${j1.jobId}/${late}/`]), "KA081", "an attempt after cancel_command");
     await refused(c, () => c.query("UPDATE kauro.processing_jobs SET holds = 'ACTIVE' WHERE job_id = $1", [j1.jobId]), "KA081", "the active slot of a cancelled job");
     await refused(c, () => c.query("UPDATE kauro.processing_attempts SET state = 'STARTING', manifest_object_name = staging_prefix || $2 WHERE attempt_id = $1", [admitted.attempt.attemptId, ids.next()]), "KA081", "a launch intent after cancel_command");
     await refused(c, () => c.query("UPDATE kauro.processing_jobs SET cancel_reason_code = 'Another reason' WHERE job_id = $1", [j1.jobId]), "KA004", "a second reason for one cancellation");

@@ -49,6 +49,12 @@ function publication(job: Verified, seed: string, hold?: { readonly written: { o
   });
 }
 
+/**
+ * How the job row lock (PgExecutionStore.lockJob) shows in pg_stat_activity: the statement text is cut at track_activity_query_size
+ * (1024 bytes) before its FROM clause, so its select list is what identifies it; the application name and the lock wait do the rest.
+ */
+const JOB_ROW_LOCK = "SELECT job_id, agency_id, project_id, authorization_id, capture_id";
+
 /** The job's row as the oracle reads it. */
 async function jobRow(jobId: string) {
   const [row] = await oracle<{ state: string; version: number; cancel_version: number; published_package_id: string | null }>(
@@ -84,7 +90,7 @@ test("S062: cancel_command and the publication serialize on the job row in both 
   await cancelled.wait;
   const refusedPublication = publication(one, "one");
   // the publication is blocked on the job row CancelJob holds (its SELECT ... FOR UPDATE)
-  await waitForLockWait(env.h.oracle, "kauro-test-control", "FROM kauro.processing_jobs WHERE job_id = $1 FOR UPDATE");
+  await waitForLockWait(env.h.oracle, "kauro-test-control", JOB_ROW_LOCK);
   release.open();
   assert.equal((await cancellation).kind, "APPLIED");
   const outcome1 = await refusedPublication;
@@ -113,7 +119,7 @@ test("S062: cancel_command and the publication serialize on the job row in both 
     // CMD037 answers from the row it locked; a cancel_command at the version read before the publication is STALE
     return { locked, write: await uow.execution.requestCancellation(two.jobId, before2.version, { actor: { kind: "USER", userId: A.ownerUserId }, reasonCode: "CLIENT_STOPPED" }) };
   });
-  await waitForLockWait(env.h.oracle, "kauro-test-api", "FROM kauro.processing_jobs WHERE job_id = $1 FOR UPDATE");
+  await waitForLockWait(env.h.oracle, "kauro-test-api", JOB_ROW_LOCK);
   commit.open();
   assert.equal((await published).kind, "PUBLISHED");
   const late = await lateCancellation;

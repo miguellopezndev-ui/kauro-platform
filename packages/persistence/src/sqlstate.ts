@@ -1,7 +1,8 @@
 /**
  * SQLSTATE vocabulary raised by the kauro schema (migrations/0001; the KA07x class of the source lifecycle, migrations 0009..0012,
  * package B07; the KP class of the payments and fiscal workflow, migrations
- * 0013..0017, package B09) and its translation into the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
+ * 0013..0017, package B09; the KA08x class of processing authority, migrations 0019..0021, package B08) and its translation into
+ * the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
  * the SQL message never leaves the server (10 "Responses and safe errors").
  */
 import { DomainFailure, type FailureCode, type FailureReason } from "@kauro/domain";
@@ -44,6 +45,13 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // package B08 (migrations 0019..0021; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1): the fence of an attempt or a step, the
+  // authority an execution edge relies on, the capacity ledgers, the funded grant and the publication evidence
+  EXECUTION_FENCE: "KA080",
+  EXECUTION_AUTHORITY: "KA081",
+  CAPACITY_LEDGER: "KA082",
+  GRANT_UNFUNDED: "KA083",
+  PUBLICATION_EVIDENCE: "KA084",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -89,6 +97,14 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // package B08 (D8-SQL-1): the control plane treats a lost fence as "the attempt or step lost" (DONE); a lost authority refuses the
+  // edge; a ledger edited around its jobs and a publication without its evidence are integrity failures; an unfunded dispatch is
+  // BUDGET_EXHAUSTED
+  KA080: { code: "PRECONDITION_FAILED", reason: "EXECUTION_FENCED" },
+  KA081: { code: "PRECONDITION_FAILED", reason: "EXECUTION_AUTHORITY_LOST" },
+  KA082: { code: "INTEGRITY_FAILURE", reason: "CAPACITY_LEDGER" },
+  KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -131,6 +147,17 @@ export const SOURCE_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlS
   dataset_revisions_supersedes_once: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "PREDECESSOR_NOT_CURRENT" },
   retention_records_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
   upload_sessions_expiry_not_early: { sqlState: "23514", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+});
+
+/**
+ * Processing authority's capacity checks (package B08; D8-CAP-1, D8-CAP-2; migration 0019): no slot of the platform's active or
+ * waiting bound, or of the agency's live-job bound, is free — CAPACITY_UNAVAILABLE EXECUTION_QUEUE_FULL, retryable once a slot frees.
+ * Keyed by the constraint name the error carries, for its SQLSTATE.
+ */
+export const EXECUTION_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason: FailureReason; readonly retryable?: boolean }>> = Object.freeze({
+  execution_capacity_active_within_limit: { sqlState: "23514", code: "CAPACITY_UNAVAILABLE", reason: "EXECUTION_QUEUE_FULL", retryable: true },
+  execution_capacity_waiting_within_limit: { sqlState: "23514", code: "CAPACITY_UNAVAILABLE", reason: "EXECUTION_QUEUE_FULL", retryable: true },
+  agency_execution_capacity_live_within_limit: { sqlState: "23514", code: "CAPACITY_UNAVAILABLE", reason: "EXECUTION_QUEUE_FULL", retryable: true },
 });
 
 /**
@@ -194,7 +221,7 @@ export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
  */
 export function failureOfSqlState(sqlState: string | undefined, constraint?: string): DomainFailure | null {
   if (!sqlState) return null;
-  const source = constraint === undefined ? undefined : SOURCE_CONSTRAINT_FAILURES[constraint];
+  const source = constraint === undefined ? undefined : (SOURCE_CONSTRAINT_FAILURES[constraint] ?? EXECUTION_CONSTRAINT_FAILURES[constraint]);
   if (source !== undefined && source.sqlState === sqlState) {
     return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
   }

@@ -46,6 +46,8 @@ import {
   type CommerceUnitOfWork,
   type CommerceUnitOfWorkFactory,
   type EventProvenance,
+  type ExecutionUnitOfWork,
+  type ExecutionUnitOfWorkFactory,
   type ExecutionContext,
   type IdGenerator,
   type IsolationLevel,
@@ -62,6 +64,8 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgExecutionReads } from "./execution/reads.js";
+import { PgExecutionStore } from "./execution/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
 import { PgCommandJournal } from "./command-journal.js";
@@ -148,6 +152,11 @@ export class PgUnitOfWork implements UnitOfWork {
    * commercialInspectionsOf(uow) by the api composition.
    */
   readonly commercialInspections: PgCommercialInspections;
+  /**
+   * The readings of execution other packages' ports bind (package B08; D8-XPKG-3, D8-XPKG-4): B09's DeliveryCapacityPort over the
+   * capacity ledgers and the job and package halves of the inspectors, read through executionReadsOf(uow) by the api composition.
+   */
+  readonly executionReads: PgExecutionReads;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
 
@@ -180,6 +189,7 @@ export class PgUnitOfWork implements UnitOfWork {
     this.outboxDispatch = new PgOutboxDispatchStore(client);
     this.inbox = new PgInboxConsumerStore(client);
     this.commercialInspections = new PgCommercialInspections(client);
+    this.executionReads = new PgExecutionReads(client);
     this.#ids = ids;
     this.#clock = clock;
   }
@@ -632,4 +642,50 @@ export function commercialAuthorizationsOf(uow: UnitOfWork): Pick<CommercialAuth
   if (uow instanceof PgCommerceUnitOfWork) return uow.commerce.authorizations;
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the commercial authorizations are read in a unit of work of @kauro/persistence");
   return uow.commercialAuthorizationReads;
+}
+
+// --- processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION) ------------------------------------------------------------
+
+/**
+ * The readings of execution in any unit of work of this package (docs/design/B08-audit-approval-jobs.md §10): the api binds B09's
+ * DeliveryCapacityPort to executionReadsOf(uow).checkoutCapacity (D8-XPKG-4) and extends the inspectors B09 bound with its job and
+ * package readings, by composition (D8-XPKG-3). A unit of work of another adapter is refused (INTEGRITY_FAILURE).
+ */
+export function executionReadsOf(uow: UnitOfWork): PgExecutionReads {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the execution readings need a unit of work of @kauro/persistence");
+  return uow.executionReads;
+}
+
+/**
+ * A unit of work of processing authority (@kauro/domain ExecutionUnitOfWork; D8-XPKG-10): the commerce unit of work — B06's unit of
+ * work, B07's source store, B09's commerce repositories and scope adoption — with the execution store on the same connection. Its
+ * events carry the unit of work's provenance: the person of a TENANT context (CMD036, CMD037), the control plane's service identity
+ * of a SYSTEM context bound to the agency of its work item (B07 D-CTRL-1).
+ */
+export class PgExecutionUnitOfWork extends PgCommerceUnitOfWork implements ExecutionUnitOfWork {
+  readonly execution: PgExecutionStore;
+
+  constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
+    super(client, context, ids, clock);
+    this.execution = new PgExecutionStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
+  }
+}
+
+/**
+ * Runs execution units of work (@kauro/domain ExecutionUnitOfWorkFactory): the commerce factory's routing — TENANT on the request
+ * handlers' pool, SYSTEM on the control plane's, SERVICE on the payment service's — handing each an execution unit of work. The
+ * one routed factory that serves `run`, `runSource` and the commerce contexts (B07-B09 D-MERGE-1), never a fork of B06's.
+ */
+export class PgExecutionUnitOfWorkFactory extends PgCommerceUnitOfWorkFactory implements ExecutionUnitOfWorkFactory {
+  protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock): PgExecutionUnitOfWork {
+    return new PgExecutionUnitOfWork(client, context, ids, clock);
+  }
+
+  override run<T>(context: ExecutionContext, work: (uow: ExecutionUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    return super.run(context, (uow) => work(uow as PgExecutionUnitOfWork), options);
+  }
+}
+
+export function createExecutionUnitOfWorkFactory(pools: CommercePools, deps: UnitOfWorkDependencies): PgExecutionUnitOfWorkFactory {
+  return new PgExecutionUnitOfWorkFactory(pools, deps);
 }
