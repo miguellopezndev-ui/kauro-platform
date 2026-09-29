@@ -24669,7 +24669,7 @@
           },
           "endpoint": {
             "type": "string",
-            "pattern": "^https?://[^\\s/]+$",
+            "pattern": "^(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$",
             "maxLength": 200
           }
         },

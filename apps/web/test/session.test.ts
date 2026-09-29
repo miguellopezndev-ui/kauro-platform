@@ -17,11 +17,14 @@ import { withoutComments } from "../src/copy/lint.ts";
 const AGENCY_A = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1";
 const AGENCY_B = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
 const CORRELATION = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f99";
-const TOKEN_1 = "csrf-token-one-0123456789abcdef";
-const TOKEN_2 = "csrf-token-two-0123456789abcdef";
+const TOKEN_1 = "csrf_token_one_0123456789abcdef0123456789ab";
+const TOKEN_2 = "csrf_token_two_0123456789abcdef0123456789ab";
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-function view(userId = "user-1", csrfToken = TOKEN_1): SessionView {
+const USER_1 = "0199c1a2-7b3d-7c4e-8a5f-000000000001";
+const USER_2 = "0199c1a2-7b3d-7c4e-8a5f-000000000002";
+
+function view(userId = USER_1, csrfToken = TOKEN_1): SessionView {
   return { userId, emailVerified: true, mfaEnrolled: true, mfaAt: "2026-09-29T10:00:00Z", stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z", csrfToken };
 }
 
@@ -161,7 +164,7 @@ test("D-PRIV-1: a page restored from the back/forward cache draws only after the
   const restoring = world.runtime.onPageShow(true);
   assert.deepEqual(world.runtime.snapshot(), { kind: "CHECKING" }, "nothing is drawn while the read is out");
   assert.deepEqual(world.log, ["phase:CHECKING", "api:current"], "the wipe at pagehide, then one read");
-  world.answerRead(replied(view("user-1", TOKEN_2)));
+  world.answerRead(replied(view(USER_1, TOKEN_2)));
   await restoring;
   assert.equal(world.runtime.snapshot().kind, "SIGNED_IN");
   assert.equal(world.runtime.csrfToken(), TOKEN_2, "the token is the fresh session's");
@@ -179,7 +182,7 @@ test("D-PRIV-1: a tab that becomes visible reads the session again and reacts: e
   const unchanged = await signedIn();
   const first = unchanged.runtime.onBecameVisible();
   assert.equal(unchanged.runtime.snapshot().kind, "SIGNED_IN", "a background read does not blank a page that is showing a confirmed session (edits in memory survive a tab switch)");
-  unchanged.answerRead(replied(view("user-1", TOKEN_2)));
+  unchanged.answerRead(replied(view(USER_1, TOKEN_2)));
   await first;
   assert.equal(unchanged.runtime.csrfToken(), TOKEN_2, "the session's newest token is used");
 
@@ -192,7 +195,7 @@ test("D-PRIV-1: a tab that becomes visible reads the session again and reacts: e
 
   const handedOver = await signedIn();
   const third = handedOver.runtime.onBecameVisible();
-  handedOver.answerRead(replied(view("user-2", TOKEN_2)));
+  handedOver.answerRead(replied(view(USER_2, TOKEN_2)));
   await third;
   assert.deepEqual(handedOver.log, ["api:current", "phase:CHECKING", "replace:/agencies"], "another person's session: the page is wiped first, then reloaded from the agency switcher");
   assert.equal(handedOver.runtime.csrfToken(), null);
@@ -490,11 +493,17 @@ test("D-AUTH-4: a session reply that is not exactly the session shape is an inte
     assert.deepEqual(world.runtime.snapshot(), { kind: "UNAVAILABLE", reason: "INTEGRITY" }, name);
     assert.equal(world.runtime.csrfToken(), null, name);
   }
-  const minimal = browserWorld();
-  const { mfaAt: _a, stepUpFreshUntil: _b, ...withoutOptional } = view();
-  minimal.answers.set("GET /api/v1/sessions/current", () => minimal.respond(200, "application/json", JSON.stringify(withoutOptional)));
-  await minimal.runtime.start();
-  assert.equal(minimal.runtime.snapshot().kind, "SIGNED_IN", "the two optional instants may be absent");
+  // the served SessionView (W2, D-AUTH-4; read through the generated client since the stage-1 integration) always carries both instants,
+  // null when unset: a reply without them is not the session shape, and one with them null is a session
+  const absent = browserWorld();
+  const { mfaAt: _a, stepUpFreshUntil: _b, ...withoutInstants } = view();
+  absent.answers.set("GET /api/v1/sessions/current", () => absent.respond(200, "application/json", JSON.stringify(withoutInstants)));
+  await absent.runtime.start();
+  assert.deepEqual(absent.runtime.snapshot(), { kind: "UNAVAILABLE", reason: "INTEGRITY" }, "the two instants are always sent");
+  const unset = browserWorld();
+  unset.answers.set("GET /api/v1/sessions/current", () => unset.respond(200, "application/json", JSON.stringify({ ...view(), mfaAt: null, stepUpFreshUntil: null })));
+  await unset.runtime.start();
+  assert.equal(unset.runtime.snapshot().kind, "SIGNED_IN", "an unset instant is null");
 });
 
 // ---- no browser storage (D-PRIV-1) ----

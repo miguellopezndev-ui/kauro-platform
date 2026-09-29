@@ -11,6 +11,19 @@
  *   POST /v2/accounts/mfaEnrollment:start        {idToken, totpEnrollmentInfo:{}} → {totpSessionInfo}
  *   POST /v2/accounts/mfaEnrollment:finalize     {idToken, totpVerificationInfo:{sessionInfo, verificationCode}} → {idToken}
  *
+ * Beside the Identity Toolkit subset it serves the wire of the web adapter (W3's contract-fake IdentityClient, protocol
+ * `kauro-fake-identity-v1`, apps/web/src/client/identity/contract-fake.ts IDENTITY_FAKE_PROTOCOL; B11 design §12 D-W3-8, D-INT1-4):
+ * six POST routes over the same issuer, JSON in and out, each 200 a closed {outcome, ...} and each refusal {error: <name>}:
+ *
+ *   POST /v1/sign-in, /v1/reauthenticate        {email, password}
+ *   POST /v1/totp/verify, /v1/totp/enrol         {pendingToken, code}
+ *   POST /v1/email/verification/send, /status    {pendingToken}
+ *
+ * The pending handle is this server's: it holds the step the sign-in waits for (the issuer's MFA credential, a started TOTP
+ * enrolment, or an unverified e-mail with the password to resume the sign-in with), single use, five minutes on the issuer's
+ * clock. A sign-in without a second factor goes on to enrolment, and every completed sign-in of an unverified e-mail stops at
+ * EMAIL_UNVERIFIED, because the api admits neither (D-AUTH-4, the launch policy's verified e-mail and MFA).
+ *
  * Refusals are 400 {error: {code: 400, message: <Identity Toolkit token>}}. Test controls live under /__test/ and stand in
  * for what a person does outside the application: POST /__test/accounts (create an account), /__test/verify-email (open the
  * verification link), /__test/totp (read the authenticator app), /__test/clock (move the fake's clock).
@@ -25,6 +38,7 @@
  * JSON line {url, jwksFile, projectId, label, evidenceClass} and serves until SIGTERM/SIGINT. Its clock is real time plus an
  * offset /__test/clock moves; the api process keeps its own clock.
  */
+import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import http from "node:http";
 import { resolve } from "node:path";
@@ -92,6 +106,131 @@ function signInAnswer(outcome: FakeSignIn, email: string | null): Answer {
     case "REFUSED":
       return refused(outcome.code);
   }
+}
+
+// --- the web adapter's wire (kauro-fake-identity-v1) ----------------------------------------------------------------------------
+
+/** The routes of the web adapter's protocol (W3, IDENTITY_FAKE_PROTOCOL.routes), relative to the fake's base. */
+export const KAURO_FAKE_PROTOCOL_ROUTES = Object.freeze({
+  signIn: "/v1/sign-in",
+  reauthenticate: "/v1/reauthenticate",
+  totpVerify: "/v1/totp/verify",
+  totpEnrol: "/v1/totp/enrol",
+  verificationSend: "/v1/email/verification/send",
+  verificationStatus: "/v1/email/verification/status",
+} as const);
+
+const PROTOCOL_PENDING_LIFETIME_MS = 300_000;
+
+type Pending =
+  | { readonly kind: "TOTP"; readonly email: string; readonly password: string; readonly mfaPendingCredential: string; readonly mfaEnrollmentId: string; readonly expiresAtMs: number }
+  | { readonly kind: "ENROLMENT"; readonly email: string; readonly password: string; readonly idToken: string; readonly sessionInfo: string; readonly expiresAtMs: number }
+  | { readonly kind: "EMAIL"; readonly email: string; readonly password: string; readonly uid: string; readonly expiresAtMs: number };
+
+const protocolRefusal = (error: "INVALID_CREDENTIALS" | "CODE_INVALID" | "NO_PENDING_STEP"): Answer => ({ status: 400, body: { error } });
+const outcomeOf = (outcome: string, members: Readonly<Record<string, string>> = {}): Answer => ({ status: 200, body: { outcome, ...members } });
+
+/** The pending steps of the protocol, over one issuer. */
+function kauroProtocol(issuer: ContractFakeIdentityIssuer): (path: string, body: Record<string, unknown>) => Answer | null {
+  const pending = new Map<string, Pending>();
+  const hold = (step: Pending): string => {
+    const handle = randomBytes(32).toString("base64url");
+    pending.set(handle, step);
+    return handle;
+  };
+  const take = (body: Record<string, unknown>, kind: Pending["kind"]): { readonly handle: string; readonly step: Pending } | null => {
+    const handle = stringOf(body, "pendingToken");
+    const step = handle === null ? undefined : pending.get(handle);
+    if (handle === null || step === undefined) return null;
+    if (step.expiresAtMs <= issuer.clock.nowMs()) {
+      pending.delete(handle);
+      return null;
+    }
+    return step.kind === kind ? { handle, step } : null;
+  };
+  const expiry = (): number => issuer.clock.nowMs() + PROTOCOL_PENDING_LIFETIME_MS;
+  /** A completed sign-in: the token, unless the account's e-mail is still unverified (the api admits neither). */
+  const signedIn = (idToken: string, email: string, password: string): Answer => {
+    const uid = issuer.uidOf(idToken);
+    const account = uid === null ? null : issuer.account(uid);
+    if (uid === null || account === null) return protocolRefusal("INVALID_CREDENTIALS");
+    if (!account.emailVerified) return outcomeOf("EMAIL_UNVERIFIED", { pendingToken: hold({ kind: "EMAIL", email, password, uid, expiresAtMs: expiry() }) });
+    return outcomeOf("SIGNED_IN", { idToken });
+  };
+  /** The first step of a sign-in or a re-authentication: the password, then whatever the account still needs. */
+  const begin = (email: string, password: string): Answer => {
+    const first = issuer.signInWithPassword(email, password);
+    switch (first.kind) {
+      case "REFUSED":
+        // an unknown account, a wrong password and a disabled account answer alike (R2-134: no account enumeration)
+        return protocolRefusal("INVALID_CREDENTIALS");
+      case "MFA_REQUIRED":
+        return outcomeOf("TOTP_REQUIRED", { pendingToken: hold({ kind: "TOTP", email, password, mfaPendingCredential: first.mfaPendingCredential, mfaEnrollmentId: first.mfaEnrollmentId, expiresAtMs: expiry() }) });
+      case "SIGNED_IN": {
+        const account = issuer.account(first.localId);
+        if (account === null) return protocolRefusal("INVALID_CREDENTIALS");
+        if (!account.emailVerified) return outcomeOf("EMAIL_UNVERIFIED", { pendingToken: hold({ kind: "EMAIL", email, password, uid: account.uid, expiresAtMs: expiry() }) });
+        // no second factor yet: the launch policy needs one, so the sign-in goes on to a TOTP enrolment
+        const started = issuer.startTotpEnrollment(first.idToken);
+        if (started.kind === "REFUSED") return protocolRefusal("INVALID_CREDENTIALS");
+        const otpauthUri = `otpauth://totp/Kauro:${encodeURIComponent(account.email)}?secret=${started.sharedSecretKey}&issuer=Kauro&algorithm=SHA1&digits=6&period=30`;
+        return outcomeOf("TOTP_ENROLMENT_REQUIRED", { pendingToken: hold({ kind: "ENROLMENT", email, password, idToken: first.idToken, sessionInfo: started.sessionInfo, expiresAtMs: expiry() }), otpauthUri });
+      }
+    }
+  };
+  return (path, body) => {
+    switch (path) {
+      case KAURO_FAKE_PROTOCOL_ROUTES.signIn:
+      case KAURO_FAKE_PROTOCOL_ROUTES.reauthenticate: {
+        const email = stringOf(body, "email");
+        const password = stringOf(body, "password");
+        if (email === null || password === null) return protocolRefusal("INVALID_CREDENTIALS");
+        return begin(email, password);
+      }
+      case KAURO_FAKE_PROTOCOL_ROUTES.totpVerify: {
+        const held = take(body, "TOTP");
+        if (held === null || held.step.kind !== "TOTP") return protocolRefusal("NO_PENDING_STEP");
+        const done = issuer.finalizeTotp(held.step.mfaPendingCredential, stringOf(body, "code") ?? "", held.step.mfaEnrollmentId);
+        if (done.kind === "REFUSED") {
+          if (done.code === "INVALID_CODE") return protocolRefusal("CODE_INVALID");
+          pending.delete(held.handle);
+          return protocolRefusal("NO_PENDING_STEP");
+        }
+        if (done.kind !== "SIGNED_IN") return protocolRefusal("NO_PENDING_STEP");
+        pending.delete(held.handle);
+        return signedIn(done.idToken, held.step.email, held.step.password);
+      }
+      case KAURO_FAKE_PROTOCOL_ROUTES.totpEnrol: {
+        const held = take(body, "ENROLMENT");
+        if (held === null || held.step.kind !== "ENROLMENT") return protocolRefusal("NO_PENDING_STEP");
+        const done = issuer.finalizeTotpEnrollment(held.step.idToken, held.step.sessionInfo, stringOf(body, "code") ?? "");
+        if (done.kind === "REFUSED") {
+          if (done.code === "INVALID_CODE") return protocolRefusal("CODE_INVALID");
+          pending.delete(held.handle);
+          return protocolRefusal("NO_PENDING_STEP");
+        }
+        if (done.kind !== "SIGNED_IN") return protocolRefusal("NO_PENDING_STEP");
+        pending.delete(held.handle);
+        return signedIn(done.idToken, held.step.email, held.step.password);
+      }
+      case KAURO_FAKE_PROTOCOL_ROUTES.verificationSend: {
+        const held = take(body, "EMAIL");
+        // the verification link itself is the test's (POST /__test/verify-email stands in for the person opening it)
+        return held === null ? protocolRefusal("NO_PENDING_STEP") : outcomeOf("SENT");
+      }
+      case KAURO_FAKE_PROTOCOL_ROUTES.verificationStatus: {
+        const held = take(body, "EMAIL");
+        if (held === null || held.step.kind !== "EMAIL") return protocolRefusal("NO_PENDING_STEP");
+        const account = issuer.account(held.step.uid);
+        if (account === null) return protocolRefusal("NO_PENDING_STEP");
+        if (!account.emailVerified) return outcomeOf("EMAIL_UNVERIFIED", { pendingToken: held.handle });
+        pending.delete(held.handle);
+        return begin(held.step.email, held.step.password);
+      }
+      default:
+        return null;
+    }
+  };
 }
 
 /** The routes of the fake, over one issuer. */
@@ -174,6 +313,7 @@ function answer(issuer: ContractFakeIdentityIssuer, method: string, path: string
 
 export function startFakeIdentityServer(options: FakeIdentityServerOptions): Promise<FakeIdentityServer> {
   const allowed = new Set(options.allowedOrigins ?? []);
+  const protocol = kauroProtocol(options.issuer);
   const server = http.createServer((req, res) => {
     const origin = typeof req.headers.origin === "string" ? req.headers.origin : null;
     const headers: Record<string, string> = {
@@ -218,7 +358,7 @@ export function startFakeIdentityServer(options: FakeIdentityServerOptions): Pro
         }
       }
       const path = (req.url ?? "/").split("?")[0] as string;
-      send(answer(options.issuer, req.method ?? "GET", path, body));
+      send((req.method === "POST" ? protocol(path, body) : null) ?? answer(options.issuer, req.method ?? "GET", path, body));
     });
   });
   return new Promise((resolveStart, reject) => {

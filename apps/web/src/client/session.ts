@@ -52,8 +52,8 @@ function summaryOf(view: SessionView): SessionSummary {
     userId: view.userId,
     emailVerified: view.emailVerified,
     mfaEnrolled: view.mfaEnrolled,
-    ...(view.mfaAt === undefined ? {} : { mfaAt: view.mfaAt }),
-    ...(view.stepUpFreshUntil === undefined ? {} : { stepUpFreshUntil: view.stepUpFreshUntil }),
+    mfaAt: view.mfaAt,
+    stepUpFreshUntil: view.stepUpFreshUntil,
     idleExpiresAt: view.idleExpiresAt,
     absoluteExpiresAt: view.absoluteExpiresAt,
   };

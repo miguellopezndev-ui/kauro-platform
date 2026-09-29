@@ -23,7 +23,7 @@ import { type ShellInput, type ShellView, viewOf } from "../src/shell/view.ts";
 const AGENCY = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1";
 const OTHER = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
 const PROJECTS = `/agencies/${AGENCY}/projects`;
-const SESSION = { userId: "user-1", emailVerified: true, mfaEnrolled: true, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } as const;
+const SESSION = { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: null, stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } as const;
 const SIGNED_IN: SessionPhase = { kind: "SIGNED_IN", session: SESSION };
 const READY: AgencyContext = { kind: "READY", agencyId: AGENCY, displayName: "Northwind Data", state: "ACTIVE" };
 const ALL = new Set(["UI10", ...AGENCY_NAVIGATION.map((entry) => entry.screen)]);
@@ -223,8 +223,8 @@ test("D-A11Y-1: a public screen's frame is the skip link and the one main landma
 
 // ---- composition ----
 
-const TOKEN = "csrf-token-one-0123456789abcdef";
-const SESSION_BODY = { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: "2026-09-29T10:00:00Z", stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z", csrfToken: TOKEN };
+const TOKEN = "csrf_token_one_0123456789abcdef0123456789ab";
+const SESSION_BODY = { userId: "0199c1a2-7b3d-7c4e-8a5f-000000000001", emailVerified: true, mfaEnrolled: true, mfaAt: "2026-09-29T10:00:00Z", stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z", csrfToken: TOKEN };
 const AGENCY_BODY = { kind: "READ", data: { agencyId: AGENCY, version: 3, displayName: "Northwind Data", state: "ACTIVE", createdAt: "2026-09-01T09:00:00Z", permittedActions: ["VIEW"] } };
 
 /** A scripted browser: the fetch answers by method and path (or waits for the test), and the log records every request and every navigation. */

@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { OPERATIONS } from "../src/api/generated.ts";
 import type { SchemaNode } from "../src/api/schema-guard.ts";
 import { ApiClient, type FetchedResponse, type FetchInit, type WireDescriptor } from "../src/client/api-client.ts";
-import { CREATE_SESSION, GET_CURRENT_SESSION, REVOKE_CURRENT_SESSION, SESSION_SCHEMAS } from "../src/client/session-api.ts";
+import { CREATE_SESSION, GET_CURRENT_SESSION, REVOKE_CURRENT_SESSION, STAND_IN_SCHEMAS } from "./support/planned-stand-ins.ts";
 import { CONTROL_PREFIX, ContractFakeAgencyApi, createEdgeFake, type EdgeRequest, FakeMountError, mountOnEdge, type ReplyScript } from "../e2e/support/fake-routes.ts";
 
 const AGENCY = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1";
@@ -36,7 +36,7 @@ const SYNTHETIC: WireDescriptor = {
 };
 
 const SCHEMAS: Readonly<Record<string, SchemaNode>> = {
-  ...SESSION_SCHEMAS,
+  ...STAND_IN_SCHEMAS,
   SyntheticRequest: { type: "object", additionalProperties: false, required: ["note"], properties: { note: { type: "string", minLength: 1, maxLength: 20 } } },
   SyntheticView: { type: "object", additionalProperties: false, required: ["itemId", "note"], properties: { itemId: { type: "string" }, note: { type: "string" } } },
 };
@@ -296,7 +296,8 @@ test("D-E2E-2: the fake exists only for the local stack", () => {
     const error = mountError(() => createEdgeFake(environment), "OUTSIDE_LOCAL");
     assert.match(error.message, /KAURO_ENV=LOCAL/);
   }
-  assert.ok(createEdgeFake(LOCAL).plannedOperations().includes("GetCurrentSession"));
+  // the generated client plans nothing since W2's session routes are served: the edge carries the harness probe alone
+  assert.deepEqual(createEdgeFake(LOCAL).plannedOperations(), ["HarnessProbe"]);
 });
 
 async function listening(handler: http.RequestListener): Promise<{ readonly origin: string; close(): Promise<void> }> {

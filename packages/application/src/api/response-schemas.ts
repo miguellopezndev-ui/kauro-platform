@@ -702,7 +702,8 @@ export const IDENTITY_CONFIG_SCHEMA: JsonSchema = Object.freeze({
   properties: {
     adapter: { type: "string", enum: ["IDENTITY_PLATFORM", "CONTRACT_FAKE"] },
     projectId: { type: "string", pattern: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$" },
-    endpoint: { type: "string", pattern: "^https?://[^\\s/]+$", maxLength: 200 },
+    // the contract fake's address: a path of the application's own origin the edge routes to the fake (D-SEC-1 connect-src 'self')
+    endpoint: { type: "string", pattern: "^(/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$", maxLength: 200 },
   },
 });
 

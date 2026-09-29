@@ -82,7 +82,10 @@ export interface IdentityClient {
   cancel(): void;
 }
 
-/** What `GET /api/v1/public/identity-config` announces (D-AUTH-2; W2 serves it, and refuses to announce the fake outside LOCAL). */
+/**
+ * What the page makes of `GET /api/v1/public/identity-config` (D-AUTH-2; W2 serves it, and refuses to announce the fake outside LOCAL):
+ * the fake at the path of this origin the api announces as its endpoint, or the live provider (select.ts readIdentityConfig).
+ */
 export type IdentityConfig =
   | { readonly adapter: "CONTRACT_FAKE"; readonly baseUrl: string }
   | { readonly adapter: "LIVE" };

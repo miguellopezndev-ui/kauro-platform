@@ -498,7 +498,7 @@ export const sessionPaths = {
 
 /** The application origin the world's api accepts (KAURO_APP_ORIGINS) and the contract fake's announced endpoint. */
 export const APP_ORIGIN = "https://app.kauro.test";
-export const FAKE_IDENTITY_ENDPOINT = "https://identity.kauro.test";
+export const FAKE_IDENTITY_ENDPOINT = "/__kauro-identity";
 export const IDENTITY_PROJECT_ID = "kauro-local";
 
 /** What a browser holds after sign-in: the cookie it sends back, and the view (with the CSRF token) the page keeps in memory. */

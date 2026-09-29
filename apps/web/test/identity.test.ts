@@ -18,7 +18,7 @@ const ID_TOKEN = "aGVhZGVy.cGF5bG9hZA.c2lnbmF0dXJl";
 const OTHER_ID_TOKEN = "aGVhZGVy.b3RoZXI.c2lnbmF0dXJl";
 const PENDING = "pending-0123456789abcdef";
 const OTPAUTH = "otpauth://totp/Kauro:owner%40agency.example?secret=JBSWY3DPEHPK3PXP&issuer=Kauro";
-const CSRF = "csrf-token-one-0123456789abcdef";
+const CSRF = "csrf_token_one_0123456789abcdef0123456789ab";
 
 const ok = (body: unknown): IdentityTransportResponse => ({ status: 200, body });
 const denied = (error: string, status = 401): IdentityTransportResponse => ({ status, body: { error } });
@@ -400,15 +400,20 @@ test("D-AUTH-2: the announcement selects the fake only when it names the fake wi
 });
 
 test("D-AUTH-2: an announcement of unknown shape is read as one of the two configurations or as nothing", () => {
+  // the api's announcement is getIdentityConfig's reply (W2): {adapter, projectId[, endpoint]}, read through its generated guard
   const cases: Array<[unknown, IdentityConfig | null]> = [
-    [{ adapter: "LIVE" }, { adapter: "LIVE" }],
-    [{ adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }, { adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }],
-    [{ baseUrl: "/fake-identity", adapter: "CONTRACT_FAKE" }, { adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }],
-    [{ adapter: "LIVE", baseUrl: "/fake-identity" }, null],
-    [{ adapter: "LIVE", projectId: "x" }, null],
-    [{ adapter: "CONTRACT_FAKE" }, null],
-    [{ adapter: "CONTRACT_FAKE", baseUrl: 7 }, null],
-    [{ adapter: "CONTRACT_FAKE", baseUrl: "/x", extra: true }, null],
+    [{ adapter: "IDENTITY_PLATFORM", projectId: "kauro-live" }, { adapter: "LIVE" }],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local", endpoint: "/fake-identity" }, { adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }],
+    [{ endpoint: "/fake-identity", projectId: "kauro-local", adapter: "CONTRACT_FAKE" }, { adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }],
+    [{ adapter: "IDENTITY_PLATFORM", projectId: "kauro-live", endpoint: "/fake-identity" }, null],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local", endpoint: "https://identity.example" }, null],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local", endpoint: "/a/../b" }, null],
+    [{ adapter: "IDENTITY_PLATFORM" }, null],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local" }, null],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local", endpoint: 7 }, null],
+    [{ adapter: "CONTRACT_FAKE", projectId: "kauro-local", endpoint: "/x", extra: true }, null],
+    [{ adapter: "LIVE" }, null],
+    [{ adapter: "CONTRACT_FAKE", baseUrl: "/fake-identity" }, null],
     [{ adapter: "FIREBASE" }, null],
     [{ adapter: 1 }, null],
     [{}, null],
@@ -439,7 +444,7 @@ function apiWith(answer: () => FetchedResponse) {
   return { client, requests };
 }
 
-const SESSION_BODY = { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: "2026-09-29T10:00:00Z", stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z", csrfToken: CSRF };
+const SESSION_BODY = { userId: "0199c1a2-7b3d-7c4e-8a5f-000000000001", emailVerified: true, mfaEnrolled: true, mfaAt: "2026-09-29T10:00:00Z", stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z", csrfToken: CSRF };
 
 test("D-AUTH-4: a sign-in credential is exchanged for a session by sending its token once, and the credential is spent afterwards", async () => {
   const { transport } = scripted(signedIn());

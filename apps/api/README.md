@@ -85,7 +85,8 @@ I-INT-3). The transport and operability decisions are recorded in `docs/design/B
 
 The browser session boundary (B11 W2, `docs/design/B11-agency-app.md` D-AUTH-1..5, §12) is bound when the configuration
 names it (`KAURO_IDENTITY_KEY_SOURCE` = `GOOGLE_X509`, or `CONTRACT_FAKE` in LOCAL only with `KAURO_IDENTITY_FAKE_JWKS_FILE`
-and the optional `KAURO_IDENTITY_FAKE_ENDPOINT`; `KAURO_IDENTITY_PROJECT_ID`; `KAURO_APP_ORIGINS`, the exact browser origins;
+and the optional `KAURO_IDENTITY_FAKE_ENDPOINT`, the path of the application origin its edge routes to the fake;
+`KAURO_IDENTITY_PROJECT_ID`; `KAURO_APP_ORIGINS`, the exact browser origins;
 `KAURO_DB_ASSURANCE_USER`/`_PASSWORD`/`_POOL_MAX`, a login of `kauro_assurance` whose pool shares the four connections of
 the budget): `POST /api/v1/sessions`, `GET /api/v1/sessions/current`, `POST /api/v1/sessions/current/revoke`,
 `POST /api/v1/assurance/step-ups` and `GET /api/v1/public/identity-config`, and the SessionAuthenticator, which authenticates

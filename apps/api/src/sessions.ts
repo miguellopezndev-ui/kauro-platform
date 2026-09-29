@@ -48,7 +48,7 @@ import { sendProblem, singleValued } from "./http.js";
 export interface IdentityConfigView {
   readonly adapter: "IDENTITY_PLATFORM" | "CONTRACT_FAKE";
   readonly projectId: string;
-  /** The contract fake's public endpoint (LOCAL only). */
+  /** Where the page reaches the contract fake: a path of the application origin the edge routes to it (LOCAL only). */
   readonly endpoint?: string;
 }
 

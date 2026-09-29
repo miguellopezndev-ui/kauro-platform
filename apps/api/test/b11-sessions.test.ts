@@ -500,9 +500,9 @@ test("W2 identity configuration: GET /api/v1/public/identity-config announces th
     () => assembleApi({ environment: "SANDBOX", unitOfWork: w.db.unitOfWork, database: w.db, authenticator: { authenticate: async () => null }, sessions: { ...w.identity().assembly, identityConfig: { adapter: "CONTRACT_FAKE", projectId: id.issuer.projectId, endpoint: id.endpoint } } }),
     /CONTRACT_FAKE/,
   );
-  const base = { KAURO_ENVIRONMENT: "LOCAL", KAURO_DB_USER: "kauro_api", KAURO_DB_POOL_MAX: "3", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json", KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_PROJECT_ID: "kauro-local", KAURO_IDENTITY_FAKE_JWKS_FILE: "jwks.json", KAURO_IDENTITY_FAKE_ENDPOINT: "https://localhost:44310", KAURO_APP_ORIGINS: "https://localhost:44300", KAURO_DB_ASSURANCE_USER: "kauro_session", KAURO_DB_ASSURANCE_POOL_MAX: "1" };
+  const base = { KAURO_ENVIRONMENT: "LOCAL", KAURO_DB_USER: "kauro_api", KAURO_DB_POOL_MAX: "3", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json", KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_PROJECT_ID: "kauro-local", KAURO_IDENTITY_FAKE_JWKS_FILE: "jwks.json", KAURO_IDENTITY_FAKE_ENDPOINT: "/__kauro-identity", KAURO_APP_ORIGINS: "https://localhost:44300", KAURO_DB_ASSURANCE_USER: "kauro_session", KAURO_DB_ASSURANCE_POOL_MAX: "1" };
   const config = loadConfig(base);
-  assert.deepEqual(config.identity, { keySource: "CONTRACT_FAKE", projectId: "kauro-local", appOrigins: ["https://localhost:44300"], fakeJwksFile: "jwks.json", fakeEndpoint: "https://localhost:44310", assuranceDatabase: { user: "kauro_session", poolMax: 1 } });
+  assert.deepEqual(config.identity, { keySource: "CONTRACT_FAKE", projectId: "kauro-local", appOrigins: ["https://localhost:44300"], fakeJwksFile: "jwks.json", fakeEndpoint: "/__kauro-identity", assuranceDatabase: { user: "kauro_session", poolMax: 1 } });
   const refusedBy = (variable: string) => (e: unknown) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
   const live = { ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_IDENTITY_FAKE_JWKS_FILE: undefined, KAURO_IDENTITY_FAKE_ENDPOINT: undefined };
   assert.throws(() => loadConfig(live), refusedBy("KAURO_IDENTITY_KEY_SOURCE"), "CONTRACT_FAKE outside LOCAL");
@@ -690,7 +690,7 @@ test("W2 deployment path: bootstrap binds the session boundary from the environm
       KAURO_DB_ASSURANCE_USER: ROLES.assuranceLogin,
       KAURO_DB_ASSURANCE_POOL_MAX: "1",
     };
-    const local = await bootstrap({ ...base, KAURO_ENVIRONMENT: "LOCAL", KAURO_HTTP_PORT: String(await freePort()), KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_FAKE_JWKS_FILE: jwksFile, KAURO_IDENTITY_FAKE_ENDPOINT: "https://identity.kauro.test" }, { logger: false });
+    const local = await bootstrap({ ...base, KAURO_ENVIRONMENT: "LOCAL", KAURO_HTTP_PORT: String(await freePort()), KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_FAKE_JWKS_FILE: jwksFile, KAURO_IDENTITY_FAKE_ENDPOINT: "/__kauro-identity" }, { logger: false });
     try {
       issuer.createAccount({ uid: "w2-boot-person", email: "w2-boot-person@example.test", password: "password-boot-1", emailVerified: true, totp: true });
       const opened = await fetch(`${local.address}/api/v1/sessions`, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify({ idToken: issuer.mint("w2-boot-person") }) });
@@ -700,7 +700,7 @@ test("W2 deployment path: bootstrap binds the session boundary from the environm
       const view = (await opened.json()) as { csrfToken: string };
       assert.equal((await fetch(`${local.address}/api/v1/sessions/current`, { headers: { cookie } })).status, 200);
       const config = await fetch(`${local.address}/api/v1/public/identity-config`);
-      assert.deepEqual(await config.json(), { adapter: "CONTRACT_FAKE", projectId: "kauro-boot", endpoint: "https://identity.kauro.test" });
+      assert.deepEqual(await config.json(), { adapter: "CONTRACT_FAKE", projectId: "kauro-boot", endpoint: "/__kauro-identity" });
       const logout = await fetch(`${local.address}/api/v1/sessions/current/revoke`, { method: "POST", headers: { cookie, origin, "x-kauro-csrf": view.csrfToken } });
       assert.equal(logout.status, 204);
       assert.equal(logout.headers.get("clear-site-data"), '"cache", "cookies", "storage"');

@@ -1,6 +1,7 @@
 // Which IdentityClient a page uses (design D-AUTH-2): the one `GET /api/v1/public/identity-config` announces, checked before it is built.
 // The announcement is untrusted input: the fake is built only for an announcement that names it and gives a same-origin path, and an
 // announcement of the live adapter yields "not available" until W-IDP-LIVE ships it, never a silent fallback to the fake.
+import { isGetIdentityConfigResponse200 } from "../../api/generated.ts";
 import type { FetchLike } from "../api-client.ts";
 import { ContractFakeIdentityClient, fetchIdentityTransport } from "./contract-fake.ts";
 import type { IdentityConfig, Selection } from "./port.ts";
@@ -19,12 +20,13 @@ export function selectIdentityClient(config: IdentityConfig, fetch: FetchLike): 
   }
 }
 
-/** Reads an announcement of unknown shape into an IdentityConfig, or null. */
+/**
+ * Reads the api's announcement (the reply of getIdentityConfig, checked by its generated guard, D-GEN-1) into an IdentityConfig, or null.
+ * The live provider (IDENTITY_PLATFORM) is the live adapter; the fake is usable only with the endpoint it is reached at, a path of this
+ * origin (the api announces nothing else, B11 D-INT1-4). Anything the contract does not describe is null.
+ */
 export function readIdentityConfig(value: unknown): IdentityConfig | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  if (record["adapter"] === "LIVE" && keys.length === 1) return { adapter: "LIVE" };
-  if (record["adapter"] === "CONTRACT_FAKE" && keys.length === 2 && typeof record["baseUrl"] === "string") return { adapter: "CONTRACT_FAKE", baseUrl: record["baseUrl"] };
-  return null;
+  if (!isGetIdentityConfigResponse200(value)) return null;
+  if (value.adapter === "IDENTITY_PLATFORM") return value.endpoint === undefined ? { adapter: "LIVE" } : null;
+  return value.endpoint === undefined ? null : { adapter: "CONTRACT_FAKE", baseUrl: value.endpoint };
 }

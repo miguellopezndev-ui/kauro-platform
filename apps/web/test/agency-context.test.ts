@@ -14,7 +14,7 @@ const AGENCY_A = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fa1";
 const AGENCY_B = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5fb2";
 const CORRELATION = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f99";
 
-const SIGNED_IN: SessionPhase = { kind: "SIGNED_IN", session: { userId: "user-1", emailVerified: true, mfaEnrolled: true, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } };
+const SIGNED_IN: SessionPhase = { kind: "SIGNED_IN", session: { userId: "user-1", emailVerified: true, mfaEnrolled: true, mfaAt: null, stepUpFreshUntil: null, idleExpiresAt: "2026-09-29T10:30:00Z", absoluteExpiresAt: "2026-09-29T22:00:00Z" } };
 
 function agency(agencyId: string, displayName = "Northwind Data", state: AgencyView["state"] = "ACTIVE"): AgencyView {
   return { agencyId, version: 3, displayName, state, createdAt: "2026-09-01T09:00:00Z", permittedActions: ["VIEW"] };

@@ -1,6 +1,6 @@
 // ContractFakeAgencyApi (design section 6, D-E2E-2; label CONTRACT_FAKE, evidence class SIMULATED): the browser suite's stand-in for the
-// operations an owning branch has only PLANNED (`x-kauro-planned`, descriptor `planned: true`): the session routes until W2 serves
-// them, then B08's audit and plan reads, B16's invitation read and CMD004, B10's CMD002.
+// operations an owning branch has only PLANNED (`x-kauro-planned`, descriptor `planned: true`): the session routes were, until W2 served
+// them (B11 stage-1 integration); next B08's audit and plan reads, B16's invitation read and CMD004, B10's CMD002.
 //   - It answers a planned operation and nothing else. A route whose descriptor is served is never answered (the edge forwards it to
 //     the api or to the application), and a path no descriptor knows is left alone too. A fake that answered a served route would
 //     make a green run mean nothing.
@@ -16,10 +16,9 @@
 // Everything is data in, data out: `handle` takes a request and returns a response or null (not ours), so the same code runs in a
 // node test and behind the TLS edge (`mountOnEdge`, used by serve.mjs).
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { OPERATIONS, type Problem } from "../../src/api/generated.ts";
+import { OPERATIONS, SCHEMAS, type Problem } from "../../src/api/generated.ts";
 import { type SchemaNode, validateAgainst } from "../../src/api/schema-guard.ts";
 import type { WireDescriptor } from "../../src/client/api-client.ts";
-import { CREATE_SESSION, GET_CURRENT_SESSION, REVOKE_CURRENT_SESSION, SESSION_SCHEMAS } from "../../src/client/session-api.ts";
 
 /** The control endpoints a browser spec (another process) uses to script the fake, under the edge's own origin. */
 export const CONTROL_PREFIX = "/__kauro-fake/";
@@ -379,13 +378,36 @@ export class ContractFakeAgencyApi {
   }
 }
 
-/** The fake as the local stack's edge mounts it: every planned operation of the generated client and the session routes. */
+/**
+ * The one synthetic planned operation of the edge (B11 stage-1 integration, D-INT1-5). Once W2's session routes were served the generated
+ * client planned nothing, so the harness keeps this planned operation of no owning branch to hold the edge's planned path to its rules.
+ * It is no product operation: the api serves nothing at its path, no screen calls it, and like the fake it exists in the local stack only.
+ */
+export const HARNESS_PROBE: WireDescriptor = {
+  operationId: "HarnessProbe",
+  method: "get",
+  path: "/api/v1/__kauro-harness/probe",
+  command: null,
+  role: null,
+  idempotency: "NONE",
+  headers: ["X-Correlation-Id"],
+  pathParameters: [],
+  queryParameters: [],
+  request: null,
+  replies: { "200": "HarnessProbeView", "401": "Problem", default: "Problem" },
+  planned: true,
+};
+
+const HARNESS_SCHEMAS: Readonly<Record<string, SchemaNode>> = {
+  HarnessProbeView: { type: "object", additionalProperties: false, required: ["probe"], properties: { probe: { type: "string", minLength: 1, maxLength: 64 } } },
+};
+
+/** The fake as the local stack's edge mounts it: every planned operation of the generated client, and the harness probe. */
 export function createEdgeFake(environment: Readonly<Record<string, string | undefined>>): ContractFakeAgencyApi {
   return new ContractFakeAgencyApi({
-    operations: [...(Object.values(OPERATIONS) as readonly WireDescriptor[]), CREATE_SESSION, GET_CURRENT_SESSION, REVOKE_CURRENT_SESSION],
-    schemas: SESSION_SCHEMAS,
+    operations: [...(Object.values(OPERATIONS) as readonly WireDescriptor[]), HARNESS_PROBE],
+    schemas: { ...(SCHEMAS as unknown as Readonly<Record<string, SchemaNode>>), ...HARNESS_SCHEMAS },
     environment,
-    csrfExempt: ["CreateSession"],
   });
 }
 

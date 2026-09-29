@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
+import { ConfigError, loadConfig } from "../src/index.js";
 import { paymentRoutes } from "./commerce-support.js";
 import { sourceRoutes } from "./source-support.js";
 import { call, freshKey, outcome, sha, world, type BrowserSession, type Reply, type World } from "./support.js";
@@ -80,4 +81,33 @@ test("B11 INT-1 seam, the session boundary across B07 and B09 (D-AUTH-5): an uns
   assert.deepEqual([...new Set(facts.rows.map((f) => f.action))].sort(), ["CMD012", "CMD028", "SUBMIT_SELECTION_MANIFEST"]);
   assert.deepEqual([...new Set(facts.rows.map((f) => f.reason_code))].sort(), ["AMBIGUOUS_CREDENTIALS", "CSRF_TOKEN_INVALID", "ORIGIN_REJECTED"]);
   assert.deepEqual(w.internalErrors, [], "no refusal was a response-contract violation");
+});
+
+test("B11 INT-1 seam, one application origin and a same-origin identity endpoint (D-INT1-4, D-INT1-6): the configuration refuses a public inquiry origin (W5b) that the session boundary (W2) does not accept as an application origin, and a contract-fake endpoint that is not a path of the application origin", () => {
+  const base = {
+    KAURO_ENVIRONMENT: "LOCAL",
+    KAURO_DB_USER: "kauro_api",
+    KAURO_DB_POOL_MAX: "3",
+    KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json",
+    KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE",
+    KAURO_IDENTITY_PROJECT_ID: "kauro-local",
+    KAURO_IDENTITY_FAKE_JWKS_FILE: "jwks.json",
+    KAURO_IDENTITY_FAKE_ENDPOINT: "/__kauro-identity",
+    KAURO_APP_ORIGINS: "https://localhost:44300",
+    KAURO_DB_ASSURANCE_USER: "kauro_session",
+    KAURO_DB_ASSURANCE_POOL_MAX: "1",
+    KAURO_PUBLIC_ORIGIN: "https://localhost:44310",
+    KAURO_APP_ORIGIN: "https://localhost:44300",
+    KAURO_PUBLIC_HASH_KEY_FILE: "public-hash.key",
+  };
+  const refusedBy = (variable: string) => (e: unknown) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
+  const config = loadConfig(base);
+  assert.deepEqual([config.publicApi?.appOrigin, config.identity?.appOrigins, config.identity?.fakeEndpoint], ["https://localhost:44300", ["https://localhost:44300"], "/__kauro-identity"]);
+  // the public routes' application origin is one of the session boundary's
+  assert.throws(() => loadConfig({ ...base, KAURO_APP_ORIGIN: "https://localhost:44399" }), refusedBy("KAURO_APP_ORIGIN"));
+  assert.equal(loadConfig({ ...base, KAURO_APP_ORIGINS: "https://localhost:44399,https://localhost:44300" }).publicApi?.appOrigin, "https://localhost:44300");
+  // the page reaches the contract fake on its own origin (connect-src 'self'): a path, never another origin or a dot segment
+  for (const bad of ["https://identity.kauro.test", "//identity.kauro.test", "/", "/a/../b", "/./x", "relative"]) {
+    assert.throws(() => loadConfig({ ...base, KAURO_IDENTITY_FAKE_ENDPOINT: bad }), refusedBy("KAURO_IDENTITY_FAKE_ENDPOINT"), bad);
+  }
 });

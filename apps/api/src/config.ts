@@ -102,7 +102,10 @@ export interface IdentityConfig {
   readonly appOrigins: ReadonlyArray<string>;
   /** KAURO_IDENTITY_FAKE_JWKS_FILE: the contract fake's JWKS (CONTRACT_FAKE only). */
   readonly fakeJwksFile: string | null;
-  /** KAURO_IDENTITY_FAKE_ENDPOINT: the contract fake's public origin, announced to the page (CONTRACT_FAKE only, optional). */
+  /**
+   * KAURO_IDENTITY_FAKE_ENDPOINT: where the page reaches the contract fake, announced to it (CONTRACT_FAKE only, optional): a path of the
+   * application's own origin that the edge routes to the fake, so the page's connect-src stays 'self' (D-SEC-1; B11 D-INT1-4).
+   */
   readonly fakeEndpoint: string | null;
   /**
    * KAURO_DB_ASSURANCE_USER / _PASSWORD / _POOL_MAX: the login of the authentication boundary group (kauro_assurance) and its
@@ -293,6 +296,8 @@ export function loadConfig(env: Env = process.env): ApiConfig {
 }
 
 const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+/** The contract fake's address on the application origin (IdentityConfigView.endpoint). */
+const FAKE_ENDPOINT_PATH = /^(?=.{2,200}$)(\/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$/;
 
 /** The session boundary's variables, validated together (null when none is set). */
 function identityOf(env: Env, environment: Environment, runtimeUser: string, runtimePoolMax: number, migratorUser: string | null): IdentityConfig | null {
@@ -314,7 +319,7 @@ function identityOf(env: Env, environment: Environment, runtimeUser: string, run
   if (keySource === "CONTRACT_FAKE") {
     fakeJwksFile = required(env, "KAURO_IDENTITY_FAKE_JWKS_FILE");
     fakeEndpoint = optional(env, "KAURO_IDENTITY_FAKE_ENDPOINT") ?? null;
-    if (fakeEndpoint !== null && !isApplicationOrigin(fakeEndpoint, true)) throw new ConfigError("KAURO_IDENTITY_FAKE_ENDPOINT", "must be an origin (scheme, host and port only)");
+    if (fakeEndpoint !== null && !FAKE_ENDPOINT_PATH.test(fakeEndpoint)) throw new ConfigError("KAURO_IDENTITY_FAKE_ENDPOINT", "must be a path of the application origin (/segment[/segment]..., no dot segment, at most 200 characters)");
   } else {
     for (const name of ["KAURO_IDENTITY_FAKE_JWKS_FILE", "KAURO_IDENTITY_FAKE_ENDPOINT"]) {
       if (optional(env, name) !== undefined) throw new ConfigError(name, "is accepted with KAURO_IDENTITY_KEY_SOURCE=CONTRACT_FAKE only");
