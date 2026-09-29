@@ -12,9 +12,11 @@ import type { SelectionManifestDocument } from "./selection.js";
 import type {
   EvaluationId,
   InspectionReceiptId,
+  ObjectHoldId,
   ProjectionId,
   RetentionAnchorId,
   RetentionId,
+  SealAttemptId,
   SelectionManifestId,
   SourceFileId,
   SourceTableId,
@@ -167,6 +169,40 @@ export interface StorageLocationPolicyRecord {
   /** 21 "Evidence classes": a contract fake's read-back is SIMULATED, never EXECUTED_PROVIDER. */
   readonly evidenceClass: "EXECUTED_PROVIDER" | "SIMULATED";
   readonly observedAt: UtcInstant;
+}
+
+/**
+ * A provider hold of an accepted generation (B07-R1; decisions D-HOLD-1..D-HOLD-3; table kauro.object_holds, migration 0020):
+ * INTENDED before the provider placement, SEALED by the seal that commits with it, CLOSED when its attempt ended without sealing
+ * (REFUSED by the request handler that placed it, ABANDONED by the control plane past its bound), RELEASING once nothing needs it,
+ * RELEASED with the provider's answer. Not an aggregate: no version, no event (like the object registry, D-OBJ-3).
+ */
+export type ObjectHoldState = "INTENDED" | "SEALED" | "CLOSED" | "RELEASING" | "RELEASED";
+export type ObjectHoldCloseReason = "REFUSED" | "ABANDONED";
+
+export interface ObjectHoldRecord {
+  readonly holdId: ObjectHoldId;
+  readonly attemptId: SealAttemptId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly revisionId: RevisionId;
+  readonly fileId: SourceFileId;
+  readonly objectId: StoredObjectId;
+  /** The exact accepted generation held (the file's provider generation). */
+  readonly generation: string;
+  readonly holdKind: "TEMPORARY";
+  readonly reason: "SEAL_INTEGRITY";
+  readonly placedByUserId: UserId;
+  readonly state: ObjectHoldState;
+  readonly intendedAt: UtcInstant;
+  /** The attempt's bound: intendedAt + SEAL_HOLD_ATTEMPT_SECONDS. */
+  readonly attemptExpiresAt: UtcInstant;
+  readonly sealedAt?: UtcInstant;
+  readonly closedAt?: UtcInstant;
+  readonly closeReason?: ObjectHoldCloseReason;
+  readonly releaseRequestedAt?: UtcInstant;
+  readonly releasedAt?: UtcInstant;
+  readonly releaseResult?: "RELEASED" | "ABSENT";
 }
 
 // --- inspection -----------------------------------------------------------------------------------------------------------

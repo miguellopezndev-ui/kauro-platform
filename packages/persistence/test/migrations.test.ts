@@ -49,6 +49,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0018_payment_service_source_reads.sql",
     // the B09 package-close review: a provider refund no local refund explains is its own case (B09-R1)
     "0019_unknown_refund_cases.sql",
+    // the B07 package-close re-check: the provider hold record of a seal's accepted generations (B07-R1)
+    "0020_source_object_holds.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

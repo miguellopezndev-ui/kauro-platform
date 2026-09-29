@@ -34,7 +34,7 @@ import type { Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { ProjectRecord } from "../model/aggregates.js";
 import type { AgencyId, ApprovalId, ClientId, JournalEntryId, MembershipId, PlanId, ProjectId, RevisionId, UserId } from "../model/ids.js";
 import type { RevisionInventory } from "../model/source/digests.js";
-import type { EvaluationId, RetentionAnchorId, RetentionId, SelectionManifestId, SourceFileId, SourceTableId, StoredObjectId, UploadId } from "../model/source/ids.js";
+import type { EvaluationId, ObjectHoldId, RetentionAnchorId, RetentionId, SealAttemptId, SelectionManifestId, SourceFileId, SourceTableId, StoredObjectId, UploadId } from "../model/source/ids.js";
 import type {
   AdmissionRevocationReason,
   CompletionClaim,
@@ -42,6 +42,7 @@ import type {
   DeclaredFormat,
   DeletionResult,
   InspectionReceiptRecord,
+  ObjectHoldRecord,
   ProviderCancellationState,
   RejectionClass,
   RetentionAnchorRecord,
@@ -229,6 +230,77 @@ export interface StoredObjectRepository {
   findByName(provider: string, locationRef: string, objectName: string): Promise<ReadonlyArray<StoredObjectRecord>>;
   /** Control-plane discovery: objects awaiting a deletion attempt. */
   pendingDeletion(limit: number): Promise<ReadonlyArray<{ readonly objectId: StoredObjectId; readonly agencyId: AgencyId }>>;
+}
+
+// --- provider holds of accepted generations (B07-R1; decisions D-HOLD-1..D-HOLD-3; migration 0020) -----------------------------
+
+export interface NewObjectHold {
+  readonly holdId: ObjectHoldId;
+  readonly attemptId: SealAttemptId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  /** The READY_TO_SEAL revision whose seal places the hold. */
+  readonly revisionId: RevisionId;
+  /** An ADMITTED file, its accepted object and exactly its accepted generation. */
+  readonly fileId: SourceFileId;
+  readonly objectId: StoredObjectId;
+  readonly generation: string;
+  /** The acting person (the request's current user; the database refuses another). */
+  readonly placedByUserId: UserId;
+}
+
+/** What the release decision for one object found after the object's hold lock. */
+export type HoldReleaseDecision =
+  /** An attempt of the object is INTENDED, or a seal retains it (a SEALED hold while its file's admission stands): nothing moved. */
+  | { readonly kind: "NEEDED" }
+  /** Another releaser is carrying out a release requested less than SEAL_HOLD_ATTEMPT_SECONDS ago: nothing moved. */
+  | { readonly kind: "IN_FLIGHT" }
+  /** No hold of the object awaits a release (none was recorded, or every one is RELEASED). */
+  | { readonly kind: "NONE" }
+  /**
+   * Every CLOSED or SEALED hold of the object moved to RELEASING now (or a release requested longer than the bound ago is driven
+   * again): the caller releases this generation at the provider, then records the answer (`recordRelease`).
+   */
+  | { readonly kind: "RELEASE"; readonly generation: string; readonly holds: number };
+
+/**
+ * The record of the provider holds a seal places on its accepted generations (B07-R1). A hold is a provider effect across a transaction
+ * boundary: it is recorded INTENDED before the placement (a crash between the hold and the commit leaves an INTENDED row the control
+ * plane abandons after its bound and releases), SEALED by the seal's own transaction, and released only when nothing needs it — an
+ * intent and a release decision take the object's hold lock first (a transaction-level advisory lock the database's guards take as
+ * well), so the two are ordered for one object; a unit of work that intends or releases the holds of several objects does so in
+ * object-id order. Every instant is the server's (D-CLOCK-1). Not an aggregate: no version, no event.
+ */
+export interface ObjectHoldRepository {
+  /**
+   * INTENDED at the server's instant, bound = + SEAL_HOLD_ATTEMPT_SECONDS, after the object's hold lock — or RELEASE_PENDING (nothing
+   * written) while a release of the object is being carried out (the database refuses the row then too, KA071). The database also
+   * refuses a hold of a file whose admission does not stand, of an object not PRESENT or VERIFIED in ACCEPTED, or for a revision that is
+   * not READY_TO_SEAL (KA072).
+   */
+  intend(hold: NewObjectHold): Promise<{ readonly kind: "INTENDED"; readonly record: ObjectHoldRecord } | { readonly kind: "RELEASE_PENDING" }>;
+  /**
+   * INTENDED -> SEALED in the seal's own unit of work, after its sealed file set names the file at the held generation; STALE when the
+   * hold is no longer INTENDED (the control plane abandoned it) or its bound passed on the server clock.
+   */
+  seal(holdId: ObjectHoldId): Promise<{ readonly kind: "APPLIED"; readonly record: ObjectHoldRecord } | { readonly kind: "STALE"; readonly currentState: ObjectHoldRecord["state"] | null }>;
+  /** INTENDED -> CLOSED (REFUSED) for every hold of the attempt still INTENDED (its seal did not commit); returns them. */
+  closeAttempt(attemptId: SealAttemptId): Promise<ReadonlyArray<ObjectHoldRecord>>;
+  /** INTENDED -> CLOSED (ABANDONED) once its bound passed on the server clock (control plane); false when it is not due or not INTENDED. */
+  abandon(holdId: ObjectHoldId): Promise<boolean>;
+  /** The release decision for one object (see HoldReleaseDecision), after the object's hold lock. */
+  requestRelease(objectId: StoredObjectId): Promise<HoldReleaseDecision>;
+  /** RELEASING -> RELEASED at the server's instant for every releasing hold of the object, with the provider's answer; returns how many. */
+  recordRelease(objectId: StoredObjectId, result: "RELEASED" | "ABSENT"): Promise<number>;
+  forAttempt(attemptId: SealAttemptId): Promise<ReadonlyArray<ObjectHoldRecord>>;
+  forObject(objectId: StoredObjectId): Promise<ReadonlyArray<ObjectHoldRecord>>;
+  /** Control-plane discovery: holds still INTENDED past their bound on the server clock (an attempt that never ended). */
+  findAbandoned(limit: number): Promise<ReadonlyArray<{ readonly holdId: ObjectHoldId; readonly agencyId: AgencyId }>>;
+  /**
+   * Control-plane discovery: objects whose holds nothing needs any more and were not released (CLOSED holds, SEALED holds whose file's
+   * admission ended), and releases requested longer than SEAL_HOLD_ATTEMPT_SECONDS ago whose answer was never recorded.
+   */
+  findReleasable(limit: number): Promise<ReadonlyArray<{ readonly objectId: StoredObjectId; readonly agencyId: AgencyId }>>;
 }
 
 // --- inspection, files, inventory ------------------------------------------------------------------------------------------------
@@ -473,6 +545,7 @@ export interface SourceStore {
   readonly uploads: UploadSessionRepository;
   readonly sessionSecrets: SessionSecretRepository;
   readonly objects: StoredObjectRepository;
+  readonly holds: ObjectHoldRepository;
   readonly inspections: InspectionReceiptRepository;
   readonly files: SourceFileRepository;
   readonly selections: SelectionManifestRepository;

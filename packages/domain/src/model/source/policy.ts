@@ -76,6 +76,15 @@ export const PENDING_RESUME_GRACE_SECONDS = 30;
 /** Decision D-RUN-2: the bounded wait for one provider call made between the two units of work of a command. */
 export const PROVIDER_CALL_TIMEOUT_MS = 10_000;
 
+/**
+ * Decision D-HOLD-2 (B07-R1): the bound of one seal attempt's provider holds. A hold is recorded INTENDED before the provider call and
+ * must be SEALED by its seal's own transaction before this bound; past it the control plane may abandon and release it (a crash
+ * between the hold and the commit), and the database refuses to seal it (object_holds_attempt_bound = intended_at + 900 s, migration
+ * 0020). Longer than a seal's worst case — up to fifty bounded provider calls (PROVIDER_CALL_TIMEOUT_MS each) and its unit of work —
+ * and far shorter than any retention deadline, so an orphan hold never outlives its purpose by more than a sweep interval.
+ */
+export const SEAL_HOLD_ATTEMPT_SECONDS = 900;
+
 /** Decision D-SAPI-2: a completion reference longer than this is refused structurally (text field of CMD014). */
 export const COMPLETION_REF_MAX_CHARS = 4_096;
 

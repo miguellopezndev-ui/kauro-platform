@@ -438,6 +438,83 @@ test("the labelled object-storage fake answers a finalized session with the comp
   await assert.rejects(storage.createResumableSession({ location: quarantine, objectName: quarantineName(2), declaredBytes: 1, contentType: "text/csv", origin: `${ORIGIN}/path` }, 1), storageError("INVALID_REQUEST"));
 });
 
+test("the labelled object-storage fake places a temporary hold on exactly the live generation under a generation precondition (another generation or none: GENERATION_NOT_LIVE, nothing held) and, while it is held, refuses every deletion and replacement of it — the port's delete, an out-of-band overwrite or deletion, a session finalizing or a copy onto its name — with OBJECT_HELD and nothing changed; released (idempotently, never another generation), the same deletion proceeds; the hold calls take hold points and scripted faults like every call (B07-R1, D-HOLD-1)", async () => {
+  const t = providerClock();
+  const storage = new ContractFakeObjectStorage({ clock: t.clock });
+  const accepted = storage.location("ACCEPTED");
+  const quarantine = storage.location("QUARANTINE");
+  const name = acceptedObjectName(AGENCY, PROJECT, v7(700) as SourceFileId);
+  const first = storage.plantObject(accepted, name, content(64, 1));
+
+  // the precondition: a generation that is not the live one, or a name without a live object, is never held
+  assert.deepEqual(await storage.placeHold(accepted, name, "123456"), { outcome: "GENERATION_NOT_LIVE" });
+  assert.deepEqual(await storage.placeHold(accepted, acceptedObjectName(AGENCY, PROJECT, v7(701) as SourceFileId), first.generation), { outcome: "GENERATION_NOT_LIVE" });
+  assert.deepEqual(storage.generationsOf(accepted, name).map((g) => g.temporaryHold), [false]);
+  await assert.rejects(storage.placeHold(accepted, name, "not-a-generation"), storageError("INVALID_REQUEST"));
+
+  // held: the answer observes the held generation and its length; placing it again is HELD again (a flag, not a count)
+  const held = await storage.placeHold(accepted, name, first.generation);
+  assert.equal(held.outcome, "HELD");
+  if (held.outcome !== "HELD") throw new Error("unreachable");
+  assert.deepEqual([held.observation.generation, held.observation.bytes, held.observation.observedAt], [first.generation, 64, toUtcInstant(T0)]);
+  assert.equal((await storage.placeHold(accepted, name, first.generation)).outcome, "HELD");
+  assert.deepEqual(storage.generationsOf(accepted, name).map((g) => [g.generation, g.status, g.temporaryHold]), [[first.generation, "LIVE", true]]);
+
+  // every deletion and replacement of the held generation is refused, and nothing changed
+  await assert.rejects(storage.delete(accepted, name, first.generation), storageError("OBJECT_HELD"));
+  assert.throws(() => storage.plantObject(accepted, name, content(8, 2), { overwrite: true }), storageError("OBJECT_HELD"));
+  assert.throws(() => storage.deleteOutOfBand(accepted, name), storageError("OBJECT_HELD"));
+  await assert.rejects(storage.copy({ location: accepted, objectName: name, generation: first.generation }, { location: accepted, objectName: name }), storageError("PRECONDITION_FAILED"));
+  const onto = await storage.createResumableSession({ location: accepted, objectName: name, declaredBytes: 4, contentType: "text/csv", origin: ORIGIN }, PROVIDER_CALL_TIMEOUT_MS);
+  assert.deepEqual(storage.uploadThroughSession(onto.sessionRef, content(4, 3)), { outcome: "REFUSED", reason: "PRECONDITION_FAILED" });
+  assert.deepEqual(storage.generationsOf(accepted, name).map((g) => [g.generation, g.status, g.temporaryHold]), [[first.generation, "LIVE", true]]);
+  assert.deepEqual((await storage.stat(accepted, name))?.generation, first.generation);
+  assert.deepEqual(await drain(storage.read(accepted, name, first.generation)), content(64, 1), "a hold changes no byte and still serves reads");
+  assert.deepEqual(storage.calls("delete").map((c) => c.outcome), ["FAILED OBJECT_HELD"]);
+
+  // releasing another generation touches nothing; releasing the held one clears it (idempotently), then the deletion proceeds
+  assert.equal(await storage.releaseHold(accepted, name, "123456"), "ABSENT");
+  assert.equal(storage.generationsOf(accepted, name)[0]?.temporaryHold, true);
+  assert.equal(await storage.releaseHold(accepted, name, first.generation), "RELEASED");
+  assert.equal(await storage.releaseHold(accepted, name, first.generation), "RELEASED");
+  assert.equal(storage.generationsOf(accepted, name)[0]?.temporaryHold, false);
+  assert.equal(await storage.delete(accepted, name, first.generation), "DELETED");
+  assert.equal(await storage.releaseHold(accepted, name, first.generation), "ABSENT", "a deleted generation has nothing to release");
+  assert.deepEqual(storage.generationsOf(accepted, name).map((g) => [g.status, g.temporaryHold]), [["SOFT_DELETED", false]]);
+
+  // a replacement before the hold is placed wins, and the hold's precondition then fails: the provider never holds a vanished generation
+  const other = acceptedObjectName(AGENCY, PROJECT, v7(702) as SourceFileId);
+  const original = storage.plantObject(accepted, other, content(16, 4));
+  const hold = storage.holdNext("placeHold");
+  const placing = storage.placeHold(accepted, other, original.generation);
+  await hold.reached;
+  assert.equal(storage.calls("placeHold").at(-1)?.outcome, "PENDING");
+  const replacement = storage.plantObject(accepted, other, content(16, 5), { overwrite: true });
+  hold.release();
+  assert.deepEqual(await placing, { outcome: "GENERATION_NOT_LIVE" });
+  assert.deepEqual(storage.generationsOf(accepted, other).map((g) => [g.generation, g.status, g.temporaryHold]), [[original.generation, "SOFT_DELETED", false], [replacement.generation, "LIVE", false]]);
+
+  // scripted faults: UNAVAILABLE holds nothing; an applied TIMEOUT held it and lost the answer (the caller releases what it may have held)
+  storage.failNext("placeHold", { code: "UNAVAILABLE" });
+  await assert.rejects(storage.placeHold(accepted, other, replacement.generation), storageError("UNAVAILABLE"));
+  assert.equal(storage.generationsOf(accepted, other).at(-1)?.temporaryHold, false);
+  storage.failNext("placeHold", { code: "TIMEOUT", applied: true });
+  await assert.rejects(storage.placeHold(accepted, other, replacement.generation), storageError("TIMEOUT"));
+  assert.equal(storage.generationsOf(accepted, other).at(-1)?.temporaryHold, true, "the provider acted and the answer was lost");
+  storage.failNext("releaseHold", { code: "UNAVAILABLE" });
+  await assert.rejects(storage.releaseHold(accepted, other, replacement.generation), storageError("UNAVAILABLE"));
+  assert.equal(storage.generationsOf(accepted, other).at(-1)?.temporaryHold, true);
+  assert.equal(await storage.releaseHold(accepted, other, replacement.generation), "RELEASED");
+  assert.deepEqual(
+    storage.calls("placeHold").map((c) => c.outcome).slice(-3),
+    ["GENERATION_NOT_LIVE", "FAILED UNAVAILABLE", `HELD ${replacement.generation}; answer lost (TIMEOUT)`],
+  );
+  // a hold is a property of the accepted generation, not of a zone: a quarantine object takes one the same way
+  const q = storage.plantObject(quarantine, quarantineName(70), content(4, 6));
+  assert.equal((await storage.placeHold(quarantine, quarantineName(70), q.generation)).outcome, "HELD");
+  for (const c of storage.calls()) assert.deepEqual([c.provider, c.evidenceClass], [CONTRACT_FAKE_STORAGE_PROVIDER, "SIMULATED"]);
+});
+
 test("the labelled session-vault fake seals a session reference with AES-256-GCM under its test key, the binding — agency, upload, requester, attempt — as associated data, and refuses to open it under another binding, another key or a tampered secret, never returning another upload's plaintext; evidence class SIMULATED", async () => {
   const vault = new ContractFakeSessionVault();
   assert.deepEqual([vault.provider, vault.evidenceClass, vault.keyRef], [CONTRACT_FAKE_VAULT_PROVIDER, "SIMULATED", CONTRACT_FAKE_VAULT_KEY_REF]);

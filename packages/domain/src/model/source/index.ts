@@ -13,6 +13,8 @@ export type {
   InspectionReceiptId,
   RetentionId,
   RetentionAnchorId,
+  ObjectHoldId,
+  SealAttemptId,
 } from "./ids.js";
 export {
   INPUT_ENVELOPE,
@@ -24,6 +26,7 @@ export {
   SIGNATURE_MAX_AGE_SECONDS,
   PENDING_RESUME_GRACE_SECONDS,
   PROVIDER_CALL_TIMEOUT_MS,
+  SEAL_HOLD_ATTEMPT_SECONDS,
   COMPLETION_REF_MAX_CHARS,
   COMPLETION_POLL_AFTER_SECONDS,
 } from "./policy.js";
@@ -52,6 +55,9 @@ export type {
   DeletionResult,
   StoredObjectRecord,
   StorageLocationPolicyRecord,
+  ObjectHoldState,
+  ObjectHoldCloseReason,
+  ObjectHoldRecord,
   ScanState,
   StructureStatus,
   DetectedFormat,

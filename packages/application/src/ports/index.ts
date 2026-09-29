@@ -12,6 +12,7 @@ export type {
   ObjectObservation,
   ResumableSession,
   ProviderCancellationResult,
+  HoldPlacement,
   ObjectStoragePort,
   MalwareScannerPort,
   InspectionLimits,

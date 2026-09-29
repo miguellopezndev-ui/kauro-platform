@@ -27,6 +27,14 @@
  *   retention at the instant of its deletion, and the retention read-back reports the location's policy with the hash of the raw
  *   read-back document; a later policy change never shortens a retention already applied. With versioning, an overwritten
  *   generation stays readable as noncurrent.
+ * - Temporary holds (B07-R1, decision D-HOLD-1; Cloud Storage "Object holds": while an object has a hold it cannot be deleted or
+ *   replaced; its metadata can still change). `placeHold` sets the flag on exactly the name's live generation under a generation
+ *   precondition (another live generation, or none, is GENERATION_NOT_LIVE and nothing is held; an already held one answers HELD
+ *   again: a hold is a flag, not a count); `releaseHold` clears it on exactly that generation (RELEASED, also when it was not held;
+ *   ABSENT when it is not the live generation). A held generation refuses every deletion and replacement with OBJECT_HELD, whoever
+ *   asks: the port's `delete`, and outside the platform `plantObject(..., { overwrite: true })` and `deleteOutOfBand` — a
+ *   finalizing session or a copy to its name is already refused by their no-overwrite precondition. A held generation is therefore
+ *   never soft-deleted; its hold is visible in `generationsOf` (`temporaryHold`).
  * - A call log of every provider call (never the bearer session reference: its SHA-256 digest only), hold points that pause a
  *   call until the test releases it (interleavings without sleeps), and scripted faults (UNAVAILABLE before any effect; a TIMEOUT
  *   whose effect was or was not applied — the provider acted and the answer was lost).
@@ -41,6 +49,7 @@ import { canonicalBytes, canonicalize, compareCodePoints, parseCanonical, rawDig
 import type { Clock, CompletionClaim, StorageZone } from "@kauro/domain";
 import { COMPLETION_REF_MAX_CHARS, PROVIDER_SESSION_LIFETIME_SECONDS, isObjectName, textDigest, toUtcInstant } from "@kauro/domain";
 import type {
+  HoldPlacement,
   ObjectObservation,
   ObjectStoragePort,
   ProviderCancellationResult,
@@ -83,6 +92,8 @@ export type StorageOperation =
   | "read"
   | "copy"
   | "delete"
+  | "placeHold"
+  | "releaseHold"
   | "list"
   | "readRetentionPolicy"
   | "listSoftDeleted";
@@ -101,7 +112,12 @@ export type ContractFakeStorageErrorCode =
   /** The exact generation read or copied is not held (live or noncurrent) any more. */
   | "GENERATION_NOT_FOUND"
   /** A no-overwrite precondition failed: the destination name holds a live object. */
-  | "PRECONDITION_FAILED";
+  | "PRECONDITION_FAILED"
+  /**
+   * The generation is under a temporary hold: the provider refuses to delete or replace it (Cloud Storage answers 403 "Object is under
+   * active Temporary hold and cannot be deleted, overwritten or archived until hold is removed").
+   */
+  | "OBJECT_HELD";
 
 /** A failed provider call of the fake. `transient` is true only for the scripted UNAVAILABLE and TIMEOUT. */
 export class ContractFakeStorageError extends Error {
@@ -167,6 +183,8 @@ export interface StoredGenerationView {
   readonly md5: string;
   readonly origin: GenerationOrigin;
   readonly status: GenerationStatus;
+  /** Whether the generation is under a temporary hold (only a live generation can be: a held one cannot be replaced or deleted). */
+  readonly temporaryHold: boolean;
   readonly createdAt: UtcInstant;
   readonly softDeletedAt?: UtcInstant;
   readonly softDeleteExpiresAt?: UtcInstant;
@@ -251,6 +269,7 @@ interface GenerationRecord {
   readonly origin: GenerationOrigin;
   readonly createdMs: number;
   status: GenerationStatus;
+  temporaryHold: boolean;
   softDeletedMs?: number;
   expiresMs?: number;
 }
@@ -475,12 +494,39 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       const target = this.#readable(locationRef, objectName, generation);
       let result: "DELETED" | "ALREADY_ABSENT" | "PRECONDITION_FAILED";
       if (target !== undefined) {
+        refuseIfHeld(target, "deleted");
         this.#softDelete(target);
         result = "DELETED";
       } else {
         result = this.#live(locationRef, objectName) !== undefined ? "PRECONDITION_FAILED" : "ALREADY_ABSENT";
       }
       return { value: result, outcome: result };
+    });
+  }
+
+  placeHold(location: StorageLocation, objectName: string, generation: string): Promise<HoldPlacement> {
+    return this.#call("placeHold", { locationRef: location.locationRef, objectName, generation }, (): { readonly value: HoldPlacement; readonly outcome: string } => {
+      const locationRef = this.#knownLocation(location);
+      if (typeof objectName !== "string" || objectName.length === 0) throw invalid("objectName must be a non-empty string");
+      if (typeof generation !== "string" || !GENERATION.test(generation)) throw invalid("the generation is not a provider generation");
+      const live = this.#live(locationRef, objectName);
+      // ifGenerationMatch: another live generation is 412, no live object 404 — nothing is held either way
+      if (live === undefined || live.generation !== generation) return { value: Object.freeze({ outcome: "GENERATION_NOT_LIVE" }), outcome: "GENERATION_NOT_LIVE" };
+      live.temporaryHold = true;
+      const observation: ObjectObservation = Object.freeze({ generation: live.generation, bytes: live.content.length, crc32c: live.crc32c, md5: live.md5, observedAt: this.#clock.now() });
+      return { value: Object.freeze({ outcome: "HELD", observation }), outcome: `HELD ${live.generation}` };
+    });
+  }
+
+  releaseHold(location: StorageLocation, objectName: string, generation: string): Promise<"RELEASED" | "ABSENT"> {
+    return this.#call("releaseHold", { locationRef: location.locationRef, objectName, generation }, () => {
+      const locationRef = this.#knownLocation(location);
+      if (typeof objectName !== "string" || objectName.length === 0) throw invalid("objectName must be a non-empty string");
+      if (typeof generation !== "string" || !GENERATION.test(generation)) throw invalid("the generation is not a provider generation");
+      const live = this.#live(locationRef, objectName);
+      if (live === undefined || live.generation !== generation) return { value: "ABSENT" as const, outcome: "ABSENT" };
+      live.temporaryHold = false;
+      return { value: "RELEASED" as const, outcome: `RELEASED ${live.generation}` };
     });
   }
 
@@ -695,7 +741,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
   /**
    * Writes an object outside the platform (an orphan, a late object, an out-of-band overwrite): no call is logged. Refused when
    * the name holds a live object unless `overwrite` — then the overwritten generation becomes noncurrent (versioning) or
-   * soft-deleted for the location's retention.
+   * soft-deleted for the location's retention; a held live generation refuses the overwrite (OBJECT_HELD), as the provider does.
    */
   plantObject(location: StorageLocation, objectName: string, content: Uint8Array, options: { readonly overwrite?: boolean } = {}): { readonly generation: string } {
     const locationRef = this.#knownLocation(location);
@@ -719,14 +765,18 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
     if ((this.#objects.get(key) ?? []).length > 0) throw new ContractFakeStorageError("PRECONDITION_FAILED", "the name already held a generation");
     const bytes = content.slice();
     const { crc32c, md5 } = providerChecksumsOf(bytes);
-    this.#objects.set(key, [{ locationRef, objectName, generation, content: bytes, sha256: rawDigest(bytes), crc32c, md5, origin: "PLANTED", createdMs: this.#clock.nowMs(), status: "LIVE" }]);
+    this.#objects.set(key, [{ locationRef, objectName, generation, content: bytes, sha256: rawDigest(bytes), crc32c, md5, origin: "PLANTED", createdMs: this.#clock.nowMs(), status: "LIVE", temporaryHold: false }]);
     return Object.freeze({ generation });
   }
 
-  /** Deletes the live generation of a name outside the platform (a lost generation); null when the name holds none. */
+  /**
+   * Deletes the live generation of a name outside the platform (a lost generation); null when the name holds none. A held generation
+   * refuses it (OBJECT_HELD), as the provider refuses any deletion of a held object.
+   */
   deleteOutOfBand(location: StorageLocation, objectName: string): { readonly generation: string } | null {
     const live = this.#live(this.#knownLocation(location), objectName);
     if (live === undefined) return null;
+    refuseIfHeld(live, "deleted");
     this.#softDelete(live);
     return Object.freeze({ generation: live.generation });
   }
@@ -825,6 +875,8 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
     const generations = this.#objects.get(key) ?? [];
     const previous = generations.find((g) => g.status === "LIVE");
     if (previous !== undefined) {
+      // a held generation is never replaced (before anything changes)
+      refuseIfHeld(previous, "replaced");
       const policy = this.#retention.get(locationRef) ?? CONTRACT_FAKE_DEFAULT_RETENTION;
       if (policy.objectVersioning) previous.status = "NONCURRENT";
       else this.#softDelete(previous);
@@ -841,6 +893,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       origin,
       createdMs: this.#clock.nowMs(),
       status: "LIVE",
+      temporaryHold: false,
     };
     generations.push(record);
     this.#objects.set(key, generations);
@@ -887,11 +940,17 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       md5: g.md5,
       origin: g.origin,
       status: g.status,
+      temporaryHold: g.temporaryHold,
       createdAt: toUtcInstant(g.createdMs),
       ...(g.softDeletedMs === undefined ? {} : { softDeletedAt: toUtcInstant(g.softDeletedMs) }),
       ...(g.expiresMs === undefined ? {} : { softDeleteExpiresAt: toUtcInstant(g.expiresMs) }),
     });
   }
+}
+
+/** A held generation refuses its deletion or replacement, before anything changes (Cloud Storage "Object holds"; D-HOLD-1). */
+function refuseIfHeld(g: GenerationRecord, what: "deleted" | "replaced"): void {
+  if (g.temporaryHold) throw new ContractFakeStorageError("OBJECT_HELD", `generation ${g.generation} is under a temporary hold and cannot be ${what} until the hold is released`);
 }
 
 function refused(reason: SessionWriteRefusal): SessionWriteResult {

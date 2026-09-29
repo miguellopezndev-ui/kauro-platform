@@ -39,7 +39,7 @@ import {
 } from "@kauro/application";
 import { createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import { IsolatedTablePreviewReader, inspectionLimits } from "@kauro/data-plane";
-import { textDigest, type CorrelationId, type UserId } from "@kauro/domain";
+import { textDigest, type CorrelationId, type SourceUnitOfWorkFactory, type UserId } from "@kauro/domain";
 import { commercialAuthorizationsOf, sourceStoreOf } from "@kauro/persistence";
 import { clock, ids, type ControlEnv } from "./env.js";
 import { asRequestHandler, type Tenant } from "./fixtures.js";
@@ -76,9 +76,14 @@ export interface Product {
   submitManifest<View>(t: Tenant, revisionId: string, document: unknown): Promise<{ readonly created: boolean; readonly view: View }>;
 }
 
-export function product(env: ControlEnv): Product {
+/**
+ * The product over the environment. `unitOfWork` replaces the request handlers' unit-of-work factory (default the harness's
+ * kauro_app_test factory): a test decorates it to stand for a process that dies at a chosen point (B07-R1: between the seal's provider
+ * hold and its commit).
+ */
+export function product(env: ControlEnv, options: { readonly unitOfWork?: SourceUnitOfWorkFactory } = {}): Product {
   const authorizer = createAuthorizer({ clock, assurance: createAssuranceVerifier() });
-  const runtime: SourceRuntime = { unitOfWork: env.h.app, authorizer, clock, ids };
+  const runtime: SourceRuntime = { unitOfWork: options.unitOfWork ?? env.h.app, authorizer, clock, ids };
   const sources = {
     providers: { storage: env.storage, vault: env.vault, origin: ORIGIN },
     preview: { reader: new IsolatedTablePreviewReader(), limits: inspectionLimits(), scratchDir: join(env.scratch, "preview") },

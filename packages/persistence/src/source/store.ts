@@ -5,6 +5,7 @@
  */
 import type { SourceStore } from "@kauro/domain";
 import type { Queryable } from "../sql.js";
+import { PgObjectHoldRepository } from "./holds.js";
 import { PgInspectionReceiptRepository, PgSourceFileRepository } from "./inspection.js";
 import { PgStoredObjectRepository } from "./objects.js";
 import { PgRevisionLineageReader, PgSourceAvailabilityReader } from "./readers.js";
@@ -19,6 +20,7 @@ export class PgSourceStore implements SourceStore {
   readonly uploads: PgUploadSessionRepository;
   readonly sessionSecrets: PgSessionSecretRepository;
   readonly objects: PgStoredObjectRepository;
+  readonly holds: PgObjectHoldRepository;
   readonly inspections: PgInspectionReceiptRepository;
   readonly files: PgSourceFileRepository;
   readonly selections: PgSelectionManifestRepository;
@@ -36,6 +38,7 @@ export class PgSourceStore implements SourceStore {
     this.uploads = new PgUploadSessionRepository(db, audience);
     this.sessionSecrets = new PgSessionSecretRepository(db);
     this.objects = new PgStoredObjectRepository(db);
+    this.holds = new PgObjectHoldRepository(db);
     this.inspections = new PgInspectionReceiptRepository(db);
     this.files = new PgSourceFileRepository(db, audience);
     this.selections = new PgSelectionManifestRepository(db);

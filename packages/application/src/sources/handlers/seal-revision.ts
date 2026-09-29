@@ -16,27 +16,35 @@
  * projection and counts at the server's instant (dataset_revision.sealed.v1) → journal 200 SealRevisionView. The database checks the
  * whole sealed subject at COMMIT (dataset_revisions_sealed_subject).
  *
- * The provider's current generation (B07-R1; S053 "observe actual bytes/generation before admission or sealing"; catalogue CMD017
- * failure "a changed generation ... leaves no executable sealed revision"). Neither the stored file nor the evaluation changes when
- * the provider replaces or loses an accepted object out of band; until OBJECT_INVENTORY revokes the file (§12.5), only the provider
- * knows. So before its unit of work — no transaction spans a provider call (§5) — the seal observes, through the storage port, the
- * current generation of the accepted name of every included file of the bound selection: a read-only unit of work behind the same
- * access decision as the command reads which names (nothing when the caller is refused or the revision is not the READY_TO_SEAL
- * revision of the body's version and selection: the pipeline then answers its own refusal and no provider is asked), then
- * `ObjectStoragePort.stat` bounded by PROVIDER_CALL_TIMEOUT_MS. Inside the unit of work each included file, after its transition
- * lock and the recorded checks, must be exactly what the provider answered: another generation or length, or no object, is
- * 409 GENERATION_CHANGED; an unanswered observation (or a file the observation did not reach, the revision having become ready
- * between the two) is 503 CAPACITY_UNAVAILABLE / GENERATION_NOT_OBSERVED, retryable under the same key since a refusal leaves no
- * journal row. A replacement after the observation is the object inventory's incident (GENERATION_CHANGED revokes the file
- * whatever retains it, migration 0010). Unbound providers answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
+ * The provider's accepted generations, held from before the unit of work through the retention of the sealed bytes (B07-R1;
+ * S053 "observe actual bytes/generation before admission or sealing"; catalogue CMD017 failure "a changed generation ... leaves no
+ * executable sealed revision"; decisions D-HOLD-1..D-HOLD-3). Neither the stored file nor the evaluation changes when the provider
+ * replaces or loses an accepted object out of band, and no transaction spans a provider call (§5), so the seal cannot lock the
+ * provider inside its unit of work. Instead, before it, the seal places a provider hold on the exact accepted generation of every
+ * included file of the bound selection: a unit of work behind the same access decision as the command records each hold INTENDED
+ * under one attempt id (nothing when the caller is refused or the revision is not the READY_TO_SEAL revision of the body's version
+ * and selection: the pipeline then answers its own refusal and no provider is asked), then `ObjectStoragePort.placeHold` with a
+ * generation precondition, bounded by PROVIDER_CALL_TIMEOUT_MS. From a HELD answer on, the provider refuses to replace or delete that
+ * generation. Inside the unit of work each included file, after its transition lock and the recorded checks, must be exactly what
+ * the provider held: GENERATION_NOT_LIVE (another generation, or none) or another length is 409 GENERATION_CHANGED; an unanswered
+ * placement (or a file the placement did not reach, a release of its object in progress, or a hold the control plane abandoned
+ * past its bound) is 503 CAPACITY_UNAVAILABLE / GENERATION_NOT_OBSERVED, retryable under the same key since a refusal leaves no
+ * journal row. The seal marks its holds SEALED in its own transaction, after its sealed file set: a sealed subject keeps them until
+ * its retention ends (the RETENTION sweeper releases them with the file's admission, D-RET-3). A seal that is refused, fails or is
+ * answered by a replay closes its attempt's holds (REFUSED) and releases what nothing else needs; a crash between the hold and the
+ * commit leaves them INTENDED, and RETENTION abandons and releases them past their bound (SEAL_HOLD_ATTEMPT_SECONDS). The clauses that
+ * rest on the provider honouring the hold are SIMULATED (the labelled storage fake) until B15 binds Cloud Storage. Unbound providers
+ * answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
  */
 import type { CommandId, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
   EvaluatedTable,
+  ObjectHoldId,
   ProjectionId,
   RetentionAnchorId,
   RetentionId,
   RevisionId,
+  SealAttemptId,
   SealedFileEntry,
   SealedProjection,
   SealedSubjectDocument,
@@ -45,10 +53,11 @@ import type {
   SourceRevisionManifest,
   SourceTableId,
   SourceTableRecord,
+  StoredObjectId,
   UserId,
 } from "@kauro/domain";
 import { DomainFailure, INPUT_ENVELOPE, PROVIDER_CALL_TIMEOUT_MS, RETENTION_POLICY_VERSION, StaleVersionFailure, UPLOAD_LIVE_STATES, projectionHashOf, sealedSubjectHashOf, sourceRevisionManifestHashOf, unpaidSealedDeadlines } from "@kauro/domain";
-import type { CommandEnvelope } from "../../api/envelope.js";
+import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { applied, checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { contextOf, identityOf } from "../../commands/runtime.js";
 import type { ObjectStoragePort, StorageLocation } from "../../ports/source-providers.js";
@@ -56,15 +65,26 @@ import { SEAL_REVISION, type SealRevisionBody, type SealRevisionHandler, type Se
 import { readRevisionView, retentionView } from "./projections.js";
 import { reachedOnServer, requireProviders, runSourceCommand, versionAt, type B07Collaborators, type SourceRuntime } from "./shared.js";
 
-/** What the storage port answered for the accepted name of one included file at seal time (B07-R1). */
-type GenerationObservation = { readonly kind: "PRESENT"; readonly generation: string; readonly bytes: number } | { readonly kind: "ABSENT" } | { readonly kind: "UNOBSERVED" };
+/** What the provider answered the hold placement on the accepted generation of one included file at seal time (B07-R1, D-HOLD-1). */
+type PlacedHold =
+  | { readonly kind: "HELD"; readonly holdId: ObjectHoldId; readonly objectId: StoredObjectId; readonly generation: string; readonly bytes: number }
+  | { readonly kind: "GENERATION_NOT_LIVE"; readonly holdId: ObjectHoldId }
+  | { readonly kind: "UNOBSERVED" };
+
+/** One execution's holds: the attempt id they are recorded under, and the placement of each included file (by file id). */
+interface SealAttempt {
+  readonly attemptId: SealAttemptId;
+  readonly placed: Map<string, PlacedHold>;
+  /** Whether any hold was recorded INTENDED (then a seal that did not commit closes and releases them). */
+  intended: boolean;
+}
 
 export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Collaborators): SealRevisionHandler {
   return {
     spec: SEAL_REVISION,
     execute: async (envelope) => {
-      const observed = await observeIncludedGenerations(runtime, collaborators, envelope);
-      return runSourceCommand<SealRevisionBody, SealRevisionView>(
+      const attempt = await holdIncludedGenerations(runtime, collaborators, envelope);
+      const sealing = runSourceCommand<SealRevisionBody, SealRevisionView>(
         SEAL_REVISION,
         runtime,
         envelope,
@@ -111,12 +131,10 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
             if (counted === undefined || counted.generation !== file.providerGeneration || counted.sha256 !== file.sha256 || counted.bytes !== file.bytes) {
               throw new DomainFailure("PRECONDITION_FAILED", "an included file is not the generation the evaluation counted", { reason: "GENERATION_CHANGED", ...current });
             }
-            // B07-R1: the provider's current generation of the accepted name, observed at seal time, is exactly the counted one
-            const seen = observed.get(file.fileId);
-            if (seen === undefined || seen.kind === "UNOBSERVED") {
-              throw new DomainFailure("CAPACITY_UNAVAILABLE", "the provider's current generation of an included file was not observed at seal time", { reason: "GENERATION_NOT_OBSERVED", retryAfterSeconds: 1 }, true);
-            }
-            if (seen.kind === "ABSENT" || seen.generation !== file.providerGeneration || seen.bytes !== file.bytes) {
+            // B07-R1: the provider holds exactly the counted generation (placed before this unit of work, D-HOLD-1)
+            const placed = attempt.placed.get(file.fileId);
+            if (placed === undefined || placed.kind === "UNOBSERVED") throw generationNotObserved("the provider's hold on the generation of an included file was not placed at seal time");
+            if (placed.kind === "GENERATION_NOT_LIVE" || placed.generation !== file.providerGeneration || placed.bytes !== file.bytes) {
               throw new DomainFailure("PRECONDITION_FAILED", "the provider no longer holds the counted generation of an included file", { reason: "GENERATION_CHANGED", ...current });
             }
           }
@@ -230,6 +248,12 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
             { revisionId, agencyId, projectId: revision.projectId, manifestHash, projectionHash, selectionHash: revision.selectionHash as Sha256Hex, evaluationHash: revision.evaluationHash, subjectHash, manifest, subject },
             fileSet,
           );
+          // the holds this seal commits with (D-HOLD-2): SEALED in this transaction, after the sealed file set names each generation, in
+          // object-id order; one the control plane abandoned past its bound is not the seal's any more
+          const held = included.map((f) => attempt.placed.get(f.fileId)).filter((h): h is Extract<PlacedHold, { kind: "HELD" }> => h !== undefined && h.kind === "HELD");
+          for (const hold of [...held].sort((a, b) => (a.objectId < b.objectId ? -1 : a.objectId > b.objectId ? 1 : 0))) {
+            if ((await uow.sources.holds.seal(hold.holdId)).kind !== "APPLIED") throw generationNotObserved("the provider hold of an included file is no longer this seal's (past its bound)");
+          }
           const anchor = await uow.sources.retention.appendAnchor({ anchorId: uow.ids.next() as RetentionAnchorId, agencyId, projectId: revision.projectId, revisionId, kind: "REVISION_SEALED", sourceEvidenceHash: manifestHash });
           const record = await uow.sources.retention.insertUnpaidRecord({
             retentionId: uow.ids.next() as RetentionId,
@@ -287,27 +311,58 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
         },
         versionAt("revision"),
       );
+      return settleAttempt(runtime, collaborators, envelope, attempt, sealing);
     },
   };
 }
 
 /**
- * B07-R1: the provider's current generation of the accepted name of every included file of the bound selection, observed through
- * the storage port outside any transaction (see the module comment). The names are read in a read-only unit of work behind the
- * command's own access decision; nothing is observed — and no provider is asked — when the caller is refused, no provider is bound,
- * or the revision is not the READY_TO_SEAL revision of the body's version and selection (the pipeline then answers its refusal, or
- * replays a journaled seal). A DomainFailure of that read (no connection, a context the pipeline refuses) observes nothing either:
- * the pipeline meets the same condition and answers it.
+ * The seal's answer, once its holds are settled (D-HOLD-3): only a seal that committed now marked its holds SEALED; any other end — a
+ * refusal, a replay of another execution, a failure — closes and releases the attempt's holds before the answer (or the failure)
+ * leaves the handler.
  */
-async function observeIncludedGenerations(runtime: SourceRuntime, collaborators: B07Collaborators, envelope: CommandEnvelope<SealRevisionBody>): Promise<ReadonlyMap<string, GenerationObservation>> {
-  const observed = new Map<string, GenerationObservation>();
-  if (collaborators.providers === null) return observed;
+async function settleAttempt(runtime: SourceRuntime, collaborators: B07Collaborators, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt, sealing: Promise<CommandResult<SealRevisionView>>): Promise<CommandResult<SealRevisionView>> {
+  let result: CommandResult<SealRevisionView> | undefined;
+  try {
+    result = await sealing;
+    return result;
+  } finally {
+    const committed = result !== undefined && result.kind === "COMPLETED" && !result.replayed;
+    if (attempt.intended && !committed && collaborators.providers !== null) await releaseAttemptHolds(runtime, collaborators.providers.storage, envelope, attempt);
+  }
+}
+
+/** 503 CAPACITY_UNAVAILABLE / GENERATION_NOT_OBSERVED: retryable under the same key (a refusal leaves no journal row). */
+function generationNotObserved(message: string): DomainFailure {
+  return new DomainFailure("CAPACITY_UNAVAILABLE", message, { reason: "GENERATION_NOT_OBSERVED", retryAfterSeconds: 1 }, true);
+}
+
+/** The id-ordered comparison of two ids (the hold locks' order, D-HOLD-2). */
+function byId(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * B07-R1 (D-HOLD-1, D-HOLD-2): the provider hold on the exact accepted generation of every included file of the bound selection,
+ * placed outside any transaction (see the module comment). The holds are recorded INTENDED first — in a unit of work behind the
+ * command's own access decision, under this execution's attempt id, in object-id order — so a crash after a placement leaves a
+ * record the control plane reconciles; nothing is recorded and no provider is asked when the caller is refused, no provider is
+ * bound, or the revision is not the READY_TO_SEAL revision of the body's version and selection (the pipeline then answers its
+ * refusal, or replays a journaled seal). A file whose admission no longer stands is left to the seal's own refusal; a file whose
+ * object is being released is not placed (UNOBSERVED: retry). A DomainFailure of that unit of work (no connection, a context the
+ * pipeline refuses, a hold the database refuses because the file was revoked meanwhile) records nothing: the pipeline meets the same
+ * condition and answers it.
+ */
+async function holdIncludedGenerations(runtime: SourceRuntime, collaborators: B07Collaborators, envelope: CommandEnvelope<SealRevisionBody>): Promise<SealAttempt> {
+  const attempt: SealAttempt = { attemptId: runtime.ids.next() as SealAttemptId, placed: new Map(), intended: false };
+  if (collaborators.providers === null) return attempt;
   const storage = collaborators.providers.storage;
-  let names: ReadonlyArray<{ readonly fileId: string; readonly location: StorageLocation; readonly objectName: string }>;
+  type Intent = { readonly fileId: string; readonly holdId: ObjectHoldId; readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string } | { readonly fileId: string; readonly releasePending: true };
+  let intents: ReadonlyArray<Intent>;
   try {
     const context = contextOf(SEAL_REVISION, envelope);
     const agencyId = identityOf(SEAL_REVISION, envelope).agencyId;
-    names = await runtime.unitOfWork.runSource(context, async (uow) => {
+    intents = await runtime.unitOfWork.runSource(context, async (uow) => {
       const access = await runtime.authorizer.authorize(uow, { command: SEAL_REVISION.id as CommandId, identity: envelope.subject.identity, agencyId });
       if (access.kind === "DENY") return [];
       const revision = await uow.sources.revisions.get(envelope.path["revisionId"] as RevisionId);
@@ -323,38 +378,106 @@ async function observeIncludedGenerations(runtime: SourceRuntime, collaborators:
       }
       const manifest = await uow.sources.selections.get(revision.revisionId, revision.selectionManifestId);
       if (manifest === null) return [];
-      const out: Array<{ readonly fileId: string; readonly location: StorageLocation; readonly objectName: string }> = [];
+      const candidates: Array<{ readonly file: SourceFileRecord; readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string }> = [];
       for (const entry of manifest.body.files) {
         if (entry.disposition !== "INCLUDE") continue;
         const file = await uow.sources.files.get(entry.fileId);
-        const object = file === null ? null : await uow.sources.objects.get(file.storageRef);
-        if (file === null || object === null) continue;
-        out.push({ fileId: file.fileId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName });
+        if (file === null || file.state !== "ADMITTED") continue;
+        const object = await uow.sources.objects.get(file.storageRef);
+        if (object === null) continue;
+        candidates.push({ file, objectId: object.objectId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName });
+      }
+      const out: Intent[] = [];
+      for (const c of candidates.sort((a, b) => byId(a.objectId, b.objectId))) {
+        const holdId = uow.ids.next() as ObjectHoldId;
+        const intended = await uow.sources.holds.intend({
+          holdId,
+          attemptId: attempt.attemptId,
+          agencyId: revision.agencyId,
+          projectId: revision.projectId,
+          revisionId: revision.revisionId,
+          fileId: c.file.fileId,
+          objectId: c.objectId,
+          generation: c.file.providerGeneration,
+          placedByUserId: envelope.userId as UserId,
+        });
+        out.push(intended.kind === "INTENDED" ? { fileId: c.file.fileId, holdId, objectId: c.objectId, location: c.location, objectName: c.objectName, generation: c.file.providerGeneration } : { fileId: c.file.fileId, releasePending: true });
       }
       return out;
     });
   } catch (e) {
-    if (e instanceof DomainFailure) return observed;
+    if (e instanceof DomainFailure) return attempt;
     throw e;
   }
-  for (const name of names) observed.set(name.fileId, await observe(storage, name.location, name.objectName));
-  return observed;
+  for (const intent of intents) {
+    if ("releasePending" in intent) {
+      attempt.placed.set(intent.fileId, { kind: "UNOBSERVED" });
+      continue;
+    }
+    attempt.intended = true;
+    attempt.placed.set(intent.fileId, await place(storage, intent));
+  }
+  return attempt;
 }
 
-/** One stat of the storage port, bounded by PROVIDER_CALL_TIMEOUT_MS; a failure or no answer in time is UNOBSERVED. */
-async function observe(storage: ObjectStoragePort, location: StorageLocation, objectName: string): Promise<GenerationObservation> {
+/**
+ * One hold placement of the storage port with its generation precondition, bounded by PROVIDER_CALL_TIMEOUT_MS; a failure or no answer
+ * in time is UNOBSERVED (the placement may still have landed: the attempt's release covers it, D-HOLD-3).
+ */
+async function place(storage: ObjectStoragePort, intent: { readonly holdId: ObjectHoldId; readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }): Promise<PlacedHold> {
+  const answer = await bounded(storage.placeHold(intent.location, intent.objectName, intent.generation));
+  if (answer === null) return { kind: "UNOBSERVED" };
+  if (answer.outcome === "GENERATION_NOT_LIVE") return { kind: "GENERATION_NOT_LIVE", holdId: intent.holdId };
+  return { kind: "HELD", holdId: intent.holdId, objectId: intent.objectId, generation: answer.observation.generation, bytes: answer.observation.bytes };
+}
+
+/** A provider call bounded by PROVIDER_CALL_TIMEOUT_MS: its answer, or null when it failed or did not answer in time. */
+async function bounded<T>(call: Promise<T>): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const bound = new Promise<"TIMEOUT">((resolve) => {
-    timer = setTimeout(() => resolve("TIMEOUT"), PROVIDER_CALL_TIMEOUT_MS);
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), PROVIDER_CALL_TIMEOUT_MS);
   });
   try {
-    const seen = await Promise.race([storage.stat(location, objectName), bound]);
-    if (seen === "TIMEOUT") return { kind: "UNOBSERVED" };
-    return seen === null ? { kind: "ABSENT" } : { kind: "PRESENT", generation: seen.generation, bytes: seen.bytes };
+    return await Promise.race([call, timeout]);
   } catch {
-    return { kind: "UNOBSERVED" };
+    return null;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * D-HOLD-3: a seal that did not commit — refused, failed, or answered by a replay of another execution — closes the holds its attempt
+ * recorded (REFUSED) and releases, at the provider, every object whose hold nothing else needs any more (no other attempt in flight,
+ * no seal retaining it), recording the provider's answer. Best effort and never the command's answer: whatever it does not finish
+ * (a lost connection, an unanswered release) stays recorded — INTENDED past its bound, or RELEASING — and the RETENTION sweeper
+ * abandons and releases it.
+ */
+async function releaseAttemptHolds(runtime: SourceRuntime, storage: ObjectStoragePort, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt): Promise<void> {
+  try {
+    const context = contextOf(SEAL_REVISION, envelope);
+    const releases = await runtime.unitOfWork.runSource(context, async (uow) => {
+      const closed = await uow.sources.holds.closeAttempt(attempt.attemptId);
+      const out: Array<{ readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }> = [];
+      for (const objectId of [...new Set(closed.map((h) => h.objectId))].sort(byId)) {
+        const decision = await uow.sources.holds.requestRelease(objectId);
+        if (decision.kind !== "RELEASE") continue;
+        const object = await uow.sources.objects.get(objectId);
+        if (object !== null) out.push({ objectId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName, generation: decision.generation });
+      }
+      return out;
+    });
+    const answers: Array<{ readonly objectId: StoredObjectId; readonly result: "RELEASED" | "ABSENT" }> = [];
+    for (const r of releases) {
+      const result = await bounded(storage.releaseHold(r.location, r.objectName, r.generation));
+      if (result !== null) answers.push({ objectId: r.objectId, result });
+    }
+    if (answers.length === 0) return;
+    await runtime.unitOfWork.runSource(context, async (uow) => {
+      for (const a of answers) await uow.sources.holds.recordRelease(a.objectId, a.result);
+    });
+  } catch {
+    // left recorded for the RETENTION sweeper (D-HOLD-3)
   }
 }
 

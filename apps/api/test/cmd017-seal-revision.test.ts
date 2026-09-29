@@ -12,7 +12,7 @@ import type { CreateRevisionView, SealRevisionView, SelectInputTablesView } from
 import { canonicalize } from "@kauro/contracts";
 import { acceptedObjectName, type AgencyId, type ProjectId, type SourceFileId } from "@kauro/domain";
 import { admitSourceFile, readySourceRevision, sealSourceRevision } from "@kauro/persistence/testing";
-import { SimulatedCrash, asProblem, completed, freshKey, outcome, replayTextOf, rootCause, waitForApiLockWait, world, type Reply, type World } from "./support.js";
+import { SimulatedCrash, asProblem, completed, freshKey, ids, outcome, replayTextOf, rootCause, waitForApiLockWait, world, type Reply, type World } from "./support.js";
 import { LOCKS, activate, controlStepOn, createRevision, evaluate, exactInstant, fixtureSessions, intakeExpiryWrites, inventoryHashOfRoute, manifestOf, readyRevision, reuseReadyAt, revokeAdmission, seal, select, setSessionLimit, storedManifest, type ReadyRevision } from "./source-support.js";
 import { boundControlWriter, reachedHold, waitForWriterLockWait } from "./writers.js";
 
@@ -180,9 +180,28 @@ function acceptedOf(ready: ReadyRevision): { readonly location: ReturnType<World
   return { location: w.storage.location("ACCEPTED"), objectName: acceptedObjectName(w.A.agencyId as AgencyId, ready.projectId as ProjectId, ready.file.fileId as SourceFileId) };
 }
 
-/** The storage port's stat calls on one accepted name, with their answers (the fake's call log; never a bearer reference). */
-function statsOf(accepted: { readonly objectName: string }): ReadonlyArray<string> {
-  return w.storage.calls("stat").filter((c) => c.request["objectName"] === accepted.objectName).map((c) => c.outcome);
+/** The storage port's hold placements on one accepted name, with their answers (the fake's call log; never a bearer reference). */
+function placementsOf(accepted: { readonly objectName: string }): ReadonlyArray<string> {
+  return w.storage.calls("placeHold").filter((c) => c.request["objectName"] === accepted.objectName).map((c) => c.outcome);
+}
+
+/** The storage port's hold releases on one accepted name, with their answers. */
+function releasesOf(accepted: { readonly objectName: string }): ReadonlyArray<string> {
+  return w.storage.calls("releaseHold").filter((c) => c.request["objectName"] === accepted.objectName).map((c) => c.outcome);
+}
+
+/** Whether the provider holds the live generation of an accepted name under a temporary hold (the labelled fake, SIMULATED). */
+function heldAtProvider(accepted: { readonly location: ReturnType<World["storage"]["location"]>; readonly objectName: string }): boolean | undefined {
+  return w.storage.generationsOf(accepted.location, accepted.objectName).find((g) => g.status === "LIVE")?.temporaryHold;
+}
+
+/** The seal holds recorded for a file (superuser oracle), oldest first: [state, close reason, release result]. */
+async function holdsOf(fileId: string): Promise<ReadonlyArray<readonly [string, string | null, string | null]>> {
+  const r = await w.h.oracle.query<{ state: string; close_reason: string | null; release_result: string | null }>(
+    "SELECT state, close_reason, release_result FROM kauro.object_holds WHERE file_id = $1 ORDER BY intended_at, hold_id",
+    [fileId],
+  );
+  return r.rows.map((x) => [x.state, x.close_reason, x.release_result] as const);
 }
 
 /** A refused seal leaves nothing: no manifest, file set, record, anchor or event, the revision READY_TO_SEAL at its version, the file ADMITTED. */
@@ -195,7 +214,7 @@ async function assertNothingSealed(ready: ReadyRevision, eventsBefore: number): 
   assert.deepEqual(file && [file.state, file.revocation_reason], ["ADMITTED", null], "no object inventory ran: the admission still stands in the database");
 }
 
-test("DENY (B07-R1): the provider replaced or lost an included file's accepted generation after the evaluation and before any object inventory revoked it — the file still ADMITTED, the stored file and evaluation still agreeing — so the seal observes the provider's current generation through the storage port and answers 409 GENERATION_CHANGED; a provider that cannot answer is 503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED; nothing is sealed, and the same key seals once the provider answers the counted generation", async () => {
+test("DENY (B07-R1): the provider replaced or lost an included file's accepted generation after the evaluation and before any object inventory revoked it — the file still ADMITTED, the stored file and evaluation still agreeing — so the seal's provider hold, placed with the counted generation as its precondition, is refused and the seal answers 409 GENERATION_CHANGED; a provider that cannot answer is 503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED; nothing is sealed, each refused attempt's hold record is closed and released, and the same key seals once the provider holds the counted generation", async () => {
   // (a) replaced: after the evaluation counted the admitted generation, another generation replaces it at the provider (out of band);
   //     no object inventory runs, so nothing in the database knows
   const replaced = await readyRevision(w);
@@ -207,7 +226,9 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   assert.equal(refused.status, 409, `the seal of a replaced generation answered ${refused.status}: ${refused.text.slice(0, 160)}`);
   assert.equal(outcome(w, refused), "409 PRECONDITION_FAILED GENERATION_CHANGED");
   assert.deepEqual(asProblem(w, refused).current, { version: replaced.version, state: "READY_TO_SEAL" });
-  assert.deepEqual(statsOf(accepted), [`PRESENT ${planted.generation}`], "the seal asked the provider for the current generation of the accepted name");
+  assert.deepEqual(placementsOf(accepted), ["GENERATION_NOT_LIVE"], "the seal's hold, placed on the counted generation, found another one live");
+  assert.equal(heldAtProvider(accepted), false, "nothing is held: the replacing generation is not the seal's");
+  assert.deepEqual(await holdsOf(replaced.file.fileId), [["RELEASED", "REFUSED", "ABSENT"]], "the refused attempt's hold is closed and its release answered ABSENT");
   await assertNothingSealed(replaced, replacedEvents);
 
   // (b) lost: the provider no longer holds any generation at the accepted name
@@ -216,52 +237,202 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   assert.equal(w.storage.deleteOutOfBand(lostObject.location, lostObject.objectName)?.generation, lost.file.acceptedGeneration);
   const lostEvents = await w.count("domain_events", "aggregate_id = $1", [lost.revisionId]);
   assert.equal(outcome(w, await seal(w, lost.revisionId, lost.version, lost.selectionHash)), "409 PRECONDITION_FAILED GENERATION_CHANGED");
-  assert.deepEqual(statsOf(lostObject), ["ABSENT"]);
+  assert.deepEqual(placementsOf(lostObject), ["GENERATION_NOT_LIVE"]);
+  assert.deepEqual(await holdsOf(lost.file.fileId), [["RELEASED", "REFUSED", "ABSENT"]]);
   await assertNothingSealed(lost, lostEvents);
 
-  // (c) unobserved: the provider refuses the observation; nothing is sealed and the answer is retryable under the same key, which
-  //     seals once the provider answers with exactly the counted generation (the positive control)
+  // (c) unobserved: the provider refuses the placement; nothing is sealed and the answer is retryable under the same key, which
+  //     seals once the provider holds exactly the counted generation (the positive control)
   const unobserved = await readyRevision(w);
   const unobservedObject = acceptedOf(unobserved);
   const unobservedEvents = await w.count("domain_events", "aggregate_id = $1", [unobserved.revisionId]);
   const key = freshKey("cmd017-unobserved");
-  w.storage.failNext("stat", { code: "UNAVAILABLE" });
+  w.storage.failNext("placeHold", { code: "UNAVAILABLE" });
   const unavailable = await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key });
   assert.equal(outcome(w, unavailable), "503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED");
   assert.equal(await w.journal(key), null, "a refusal leaves no journal row: the same key executes again");
+  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "RELEASED"]], "the unanswered attempt's hold is closed and released all the same");
   await assertNothingSealed(unobserved, unobservedEvents);
   const sealed = completed<SealRevisionView>(await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key }), 200);
   assert.deepEqual([sealed.replayed, sealed.data.revision.state], [false, "SEALED"]);
-  assert.deepEqual(statsOf(unobservedObject), ["FAILED UNAVAILABLE", `PRESENT ${unobserved.file.acceptedGeneration}`]);
+  assert.deepEqual(placementsOf(unobservedObject), ["FAILED UNAVAILABLE", `HELD ${unobserved.file.acceptedGeneration}`]);
+  assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "RELEASED"], ["SEALED", null, null]]);
+  assert.equal(heldAtProvider(unobservedObject), true, "the sealed generation stays held");
   const fileSet = await w.h.oracle.query<{ provider_generation: string }>("SELECT provider_generation FROM kauro.sealed_revision_files WHERE revision_id = $1", [unobserved.revisionId]);
-  assert.deepEqual(fileSet.rows, [{ provider_generation: unobserved.file.acceptedGeneration }], "the sealed generation is the one the provider answered and the evaluation counted");
+  assert.deepEqual(fileSet.rows, [{ provider_generation: unobserved.file.acceptedGeneration }], "the sealed generation is the one the provider holds and the evaluation counted");
   // an identical retry replays the journaled seal without asking the provider again
   const replay = await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key });
   assert.equal(replay.status, 200);
   assert.equal(replay.json<{ replayed: boolean }>().replayed, true);
-  assert.equal(statsOf(unobservedObject).length, 2, "a replay performs no provider call");
+  assert.equal(placementsOf(unobservedObject).length, 2, "a replay performs no provider call");
+  assert.equal(releasesOf(unobservedObject).length, 1);
 });
 
-test("RACE (B07-R1): the seal's observation of the provider held at the storage port while the provider replaces the accepted generation — released, the seal reads the replaced generation and answers 409 GENERATION_CHANGED with nothing sealed; the seal never answers from an observation made before the replacement", async () => {
+test("RACE (B07-R1): the seal's hold placement held at the storage port while the provider replaces the accepted generation — released, the placement's generation precondition fails and the seal answers 409 GENERATION_CHANGED with nothing sealed; the seal never answers from what the provider held before the replacement", async () => {
   const ready = await readyRevision(w);
   const accepted = acceptedOf(ready);
   const eventsBefore = await w.count("domain_events", "aggregate_id = $1", [ready.revisionId]);
-  const hold = w.storage.holdNext("stat");
+  const hold = w.storage.holdNext("placeHold");
   const sealing = seal(w, ready.revisionId, ready.version, ready.selectionHash);
   let planted: { readonly generation: string } | undefined;
   try {
-    // the storage fake's hold point: the seal's stat arrived and waits (never a timer)
+    // the storage fake's hold point: the seal's placement arrived and waits (never a timer)
     const first = await Promise.race([hold.reached.then(() => "REACHED" as const), sealing.then(() => "FINISHED" as const, () => "FINISHED" as const)]);
     assert.equal(first, "REACHED", "the seal asks the provider before it answers");
-    // the seal is asking the provider; the provider replaces the accepted generation before it answers
+    // the seal is asking the provider; the provider replaces the accepted generation before the hold lands
     planted = w.storage.plantObject(accepted.location, accepted.objectName, new TextEncoder().encode("Email,Name\nraced@example.com,Raced\n"), { overwrite: true });
   } finally {
     hold.release();
   }
   const refused = await sealing;
   assert.equal(outcome(w, refused), "409 PRECONDITION_FAILED GENERATION_CHANGED");
-  assert.deepEqual(statsOf(accepted), [`PRESENT ${planted?.generation}`]);
+  assert.deepEqual(placementsOf(accepted), ["GENERATION_NOT_LIVE"]);
+  assert.deepEqual(liveGenerationsOf(accepted), [planted?.generation]);
+  assert.equal(heldAtProvider(accepted), false);
+  assert.deepEqual(await holdsOf(ready.file.fileId), [["RELEASED", "REFUSED", "ABSENT"]]);
   await assertNothingSealed(ready, eventsBefore);
+});
+
+/** The generations the labelled storage fake holds LIVE under an accepted name (the provider's truth, SIMULATED). */
+function liveGenerationsOf(accepted: { readonly location: ReturnType<World["storage"]["location"]>; readonly objectName: string }): ReadonlyArray<string> {
+  return w.storage
+    .generationsOf(accepted.location, accepted.objectName)
+    .filter((g) => g.status === "LIVE")
+    .map((g) => g.generation);
+}
+
+/** Replaces the accepted object at the provider out of band; the provider's refusal (or null when it replaced it). */
+function replaceAtProvider(accepted: { readonly location: ReturnType<World["storage"]["location"]>; readonly objectName: string }, label: string): { readonly refusal: string | null } {
+  try {
+    w.storage.plantObject(accepted.location, accepted.objectName, new TextEncoder().encode(`Email,Name\n${label}@example.com,Replaced\n`), { overwrite: true });
+    return { refusal: null };
+  } catch (e) {
+    return { refusal: String((e as { code?: unknown }).code ?? (e instanceof Error ? e.message : e)) };
+  }
+}
+
+test("RACE (B07-R1, provider hold): the seal stopped AFTER its provider observation and hold and BEFORE its commit — (a) at its journal commit, the whole seal written; (b) waiting on the revision row another transaction holds — while the provider is asked to replace the accepted generation: the held generation refuses the replacement (OBJECT_HELD), the seal commits, and what it sealed is the generation the provider still holds live; nothing seals a generation that vanished", async () => {
+  // (a) the seal held at its journal commit: the provider was asked, the manifest, file set, record and transition are written
+  const ready = await readyRevision(w);
+  const accepted = acceptedOf(ready);
+  const hold = w.holds.arm("journal.commit");
+  const sealing = seal(w, ready.revisionId, ready.version, ready.selectionHash);
+  let replaced: { readonly refusal: string | null } = { refusal: null };
+  try {
+    await reachedHold(hold, sealing);
+    replaced = replaceAtProvider(accepted, "after-hold");
+  } finally {
+    hold.release();
+  }
+  const sealed = completed<SealRevisionView>(await sealing, 200);
+  assert.equal(sealed.data.revision.state, "SEALED");
+  const fileSet = await w.h.oracle.query<{ provider_generation: string }>("SELECT provider_generation FROM kauro.sealed_revision_files WHERE revision_id = $1", [ready.revisionId]);
+  assert.deepEqual(fileSet.rows, [{ provider_generation: ready.file.acceptedGeneration }]);
+  assert.deepEqual(liveGenerationsOf(accepted), [ready.file.acceptedGeneration], "the sealed generation is the generation the provider holds live: it did not vanish under the seal");
+  assert.equal(replaced.refusal, "OBJECT_HELD", "the provider refused to replace the held generation");
+
+  // (b) the reviewer's interleaving: the revision row held by another transaction, the seal observed waiting on it after its
+  //     provider call; the replacement is attempted there; the other transaction ends unchanged and the seal commits
+  const waiting = await readyRevision(w);
+  const waitingObject = acceptedOf(waiting);
+  const writer = await boundControlWriter(w, w.A);
+  let sealingB: Promise<Reply> | undefined;
+  let replacedB: { readonly refusal: string | null } = { refusal: null };
+  try {
+    await writer.query("SELECT revision_id FROM kauro.dataset_revisions WHERE revision_id = $1 FOR NO KEY UPDATE", [waiting.revisionId]);
+    sealingB = seal(w, waiting.revisionId, waiting.version, waiting.selectionHash);
+    await waitForApiLockWait(w, LOCKS.revision);
+    replacedB = replaceAtProvider(waitingObject, "while-waiting");
+  } finally {
+    await writer.close();
+  }
+  const sealedB = completed<SealRevisionView>(await (sealingB as Promise<Reply>), 200);
+  assert.equal(sealedB.data.revision.state, "SEALED");
+  assert.deepEqual(liveGenerationsOf(waitingObject), [waiting.file.acceptedGeneration], "the sealed generation is still the provider's live generation");
+  assert.equal(replacedB.refusal, "OBJECT_HELD");
+});
+
+test("B07-R1 hold record: a seal that commits keeps its provider hold SEALED (the generation held at the provider, OBJECT_HELD to a deletion); a seal refused after its hold was placed (reused bytes past their window, 409) and a seal that failed before its COMMIT (500) close their attempt's hold REFUSED and release it at the provider — the same key then holds again and seals; the loser of two seals on one version closes its hold and releases nothing the committed seal retains; the database refuses a hold of a revoked file, a second seal of a closed hold, and a release while a seal retains the generation", async () => {
+  // committed: the hold is SEALED in the seal's own transaction; the provider holds the generation and refuses its deletion
+  const committed = await readyRevision(w);
+  const committedObject = acceptedOf(committed);
+  completed<SealRevisionView>(await seal(w, committed.revisionId, committed.version, committed.selectionHash), 200);
+  assert.deepEqual(await holdsOf(committed.file.fileId), [["SEALED", null, null]]);
+  assert.equal(heldAtProvider(committedObject), true);
+  await assert.rejects(w.storage.delete(committedObject.location, committedObject.objectName, committed.file.acceptedGeneration), (e: { code?: string }) => e.code === "OBJECT_HELD");
+  const sealedHold = await w.row<{ hold_id: string; attempt_expires_at: Date; intended_at: Date; sealed_at: Date; placed_by_user_id: string; generation: string; reason: string; hold_kind: string }>("object_holds", "file_id = $1", [committed.file.fileId]);
+  assert.ok(sealedHold);
+  assert.deepEqual([sealedHold.generation, sealedHold.reason, sealedHold.hold_kind, sealedHold.placed_by_user_id], [committed.file.acceptedGeneration, "SEAL_INTEGRITY", "TEMPORARY", w.operator.userId]);
+  assert.equal(sealedHold.attempt_expires_at.getTime() - sealedHold.intended_at.getTime(), 900_000, "the attempt's bound");
+  assert.equal(await exactInstant(w, "SELECT sealed_at FROM kauro.object_holds WHERE hold_id = $1", [sealedHold.hold_id]), await exactInstant(w, "SELECT sealed_at FROM kauro.dataset_revisions WHERE revision_id = $1", [committed.revisionId]), "sealed with the seal, at its instant");
+
+  // refused after the placement: the reused bytes' window closed (sealed sixteen days ago by the fixture, reused and counted
+  // fifteen days ago); the placement held the generation, the seal refused REUSE_NOT_AVAILABLE, and the hold is released
+  const old = await w.project(w.A, w.clientA);
+  const oldSeal = await sealSourceRevision(fixtureSessions(w, w.A), scopeOf(old.projectId), { seed: "cmd017-hold-reuse", base: new Date(Date.now() - 16 * DAY_MS) });
+  await providerHoldsFixtureFile(old.projectId, oldSeal.fileId);
+  const reuse = await reuseReadyAt(w, old.projectId, { revisionId: oldSeal.revisionId, fileId: oldSeal.fileId }, new Date(Date.parse(oldSeal.sealedAt) + DAY_MS));
+  const reuseObject = { location: w.storage.location("ACCEPTED"), objectName: acceptedObjectName(w.A.agencyId as AgencyId, old.projectId, oldSeal.fileId as SourceFileId) };
+  assert.equal(outcome(w, await seal(w, reuse.revisionId, reuse.version, reuse.selectionHash)), "409 PRECONDITION_FAILED REUSE_NOT_AVAILABLE");
+  const reusePlacements = placementsOf(reuseObject);
+  assert.equal(reusePlacements.length, 1);
+  assert.match(reusePlacements[0] ?? "", /^HELD /, "the hold was placed before the unit of work refused");
+  assert.deepEqual(await holdsOf(oldSeal.fileId), [["RELEASED", "REFUSED", "RELEASED"]]);
+  assert.equal(heldAtProvider(reuseObject), false, "the refused seal released its hold at the provider");
+
+  // failed before COMMIT: the whole seal written, then a crash; the attempt's hold is closed and released; the same key seals
+  const failing = await readyRevision(w);
+  const failingObject = acceptedOf(failing);
+  const key = freshKey("cmd017-hold-crash");
+  w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT, after the provider hold") });
+  assert.equal(outcome(w, await seal(w, failing.revisionId, failing.version, failing.selectionHash, { key })), "500 INTERNAL_ERROR -");
+  assert.deepEqual(await holdsOf(failing.file.fileId), [["RELEASED", "REFUSED", "RELEASED"]]);
+  assert.equal(heldAtProvider(failingObject), false);
+  assert.deepEqual(await sealFacts(failing.revisionId), NOTHING_SEALED);
+  completed<SealRevisionView>(await seal(w, failing.revisionId, failing.version, failing.selectionHash, { key }), 200);
+  assert.deepEqual(await holdsOf(failing.file.fileId), [["RELEASED", "REFUSED", "RELEASED"], ["SEALED", null, null]]);
+  assert.equal(heldAtProvider(failingObject), true);
+
+  // two seals on one version: the loser's hold is closed, and nothing the committed seal retains is released
+  const racing = await readyRevision(w);
+  const racingObject = acceptedOf(racing);
+  const first = w.holds.arm("journal.commit");
+  const a = seal(w, racing.revisionId, racing.version, racing.selectionHash);
+  let b: Promise<Reply> | undefined;
+  try {
+    await reachedHold(first, a);
+    b = seal(w, racing.revisionId, racing.version, racing.selectionHash);
+    await waitForApiLockWait(w, LOCKS.revision);
+  } finally {
+    first.release();
+  }
+  completed<SealRevisionView>(await a, 200);
+  assert.equal(outcome(w, await (b as Promise<Reply>)), "409 STALE_VERSION -");
+  assert.deepEqual(await holdsOf(racing.file.fileId), [["SEALED", null, null], ["CLOSED", "REFUSED", null]]);
+  assert.equal(heldAtProvider(racingObject), true, "the committed seal's generation stays held");
+  assert.deepEqual(releasesOf(racingObject), [], "no release was even asked for");
+
+  // the database's own refusals (the guards are the backstop of the adapter's reads)
+  const tenant = async (sql: string, params: ReadonlyArray<unknown>): Promise<unknown> => w.asTenant(w.A, (c) => c.query(sql, [...params]));
+  const revoked = await readyRevision(w);
+  await revokeAdmission(w, w.A.agencyId, revoked.file.fileId, "GENERATION_MISSING");
+  const revokedFile = await w.row<{ accepted_object_id: string }>("source_files", "file_id = $1", [revoked.file.fileId]);
+  await assert.rejects(
+    tenant(
+      `INSERT INTO kauro.object_holds (hold_id, attempt_id, agency_id, project_id, revision_id, file_id, object_id, generation, hold_kind, reason, placed_by_user_id, state, intended_at, attempt_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'TEMPORARY', 'SEAL_INTEGRITY', $9, 'INTENDED', kauro.server_now(), kauro.server_now() + interval '900 seconds', now(), now())`,
+      [ids.next(), ids.next(), w.A.agencyId, revoked.projectId, revoked.revisionId, revoked.file.fileId, revokedFile?.accepted_object_id, revoked.file.acceptedGeneration, w.A.ownerUserId],
+    ),
+    (e: { code?: string }) => e.code === "KA072",
+    "no hold of a file whose admission ended",
+  );
+  const closedHold = await w.row<{ hold_id: string }>("object_holds", "file_id = $1 AND state = 'CLOSED'", [racing.file.fileId]);
+  await assert.rejects(tenant("UPDATE kauro.object_holds SET state = 'SEALED', sealed_at = kauro.server_now() WHERE hold_id = $1", [closedHold?.hold_id]), (e: { code?: string }) => e.code === "KA008", "a closed hold never seals");
+  await assert.rejects(
+    tenant("UPDATE kauro.object_holds SET state = 'RELEASING', release_requested_at = kauro.server_now() WHERE hold_id = $1", [closedHold?.hold_id]),
+    (e: { code?: string }) => e.code === "KA071",
+    "no release while a seal retains the generation",
+  );
 });
 
 test("RACE: two seals on one version → one 200, one 409; identical retry replays; the same key with another hash → 409; a crash leaves the revision READY_TO_SEAL; a seal racing the intake-expiry sweeper through the product", async () => {

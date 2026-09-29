@@ -1,7 +1,8 @@
 /**
  * The storage effects the control-plane pipelines share (docs/design/B07-upload-source-lifecycle.md §12.3, §12.5; decisions D-OBJ-1,
- * D-OBJ-2, D-ROLE-3, D-SESSION-1, D-SESSION-3, D-CLOCK-1): the deletion of a registered generation, the discard of a promotion a
- * stale attempt made, and the cancellation of a provider session with its recorded answer.
+ * D-OBJ-2, D-ROLE-3, D-SESSION-1, D-SESSION-3, D-CLOCK-1, D-HOLD-3): the deletion of a registered generation (an accepted one's seal
+ * hold released first), the release of the seal holds nothing needs any more, the discard of a promotion a stale attempt made, and
+ * the cancellation of a provider session with its recorded answer.
  *
  * No transaction spans a provider call (07): each effect reads what it needs in one unit of work, calls the provider outside any
  * transaction, and records the provider's answer in another unit of work — at the server's instant, bound to the object's agency.
@@ -42,6 +43,9 @@ export async function executeDeletion(storage: ObjectStoragePort, units: SourceU
     return object.state === "DELETION_REQUESTED" ? object : null;
   });
   if (pending === null) return { kind: "NOT_PENDING" };
+  // an accepted generation may be held by a seal (D-HOLD-1): the provider refuses to delete a held generation, so the hold nothing
+  // needs any more is released first (a hold still needed makes the delete fail, DELETION_FAILED, and DELETION_RETRIES comes back)
+  if (pending.zone === "ACCEPTED" && pending.generation !== undefined) await releaseBeforeDeletion(storage, units, item, pending);
   let result: DeletionResult;
   if (pending.generation === undefined) result = "ALREADY_ABSENT";
   else {
@@ -56,6 +60,76 @@ export async function executeDeletion(storage: ObjectStoragePort, units: SourceU
     return { kind: "RECORDED", result, record };
   } catch (e) {
     return { kind: "PENDING", cause: e instanceof Error ? e.name : "UNRECORDED" };
+  }
+}
+
+/** What the release of one object's seal holds did (decision D-HOLD-3). */
+export type HoldReleaseOutcome =
+  /** An attempt of the object is in flight, or a seal retains it (its file's admission stands): nothing is released. */
+  | { readonly kind: "NEEDED" }
+  /** Another releaser is carrying out a release requested less than the attempt bound ago: left to it. */
+  | { readonly kind: "IN_FLIGHT" }
+  /** No hold of the object awaits a release. */
+  | { readonly kind: "NONE" }
+  /** The provider answered and its answer is recorded on every releasing hold of the object. */
+  | { readonly kind: "RELEASED"; readonly result: "RELEASED" | "ABSENT"; readonly holds: number }
+  /** The provider call or its record failed: the holds stay RELEASING and a later sweep drives the release again past the bound. */
+  | { readonly kind: "PENDING"; readonly cause: string };
+
+/**
+ * Releases the provider hold of one accepted object's generation once nothing needs it (D-HOLD-3): the decision is the database's,
+ * after the object's hold lock (no attempt of it INTENDED, no seal retaining it — its file's admission ended), every CLOSED or SEALED
+ * hold moving to RELEASING in that unit of work, so no new hold is intended while the provider release is carried out; then the
+ * provider release of exactly that generation (ifGenerationMatch) outside any transaction; then its answer, recorded at the server's
+ * instant. A release requested longer than the attempt bound ago and never recorded is driven again.
+ */
+export async function releaseObjectHolds(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, objectId: StoredObjectId, timeoutMs: number = PROVIDER_CALL_TIMEOUT_MS): Promise<HoldReleaseOutcome> {
+  const decided = await units.runSource(boundTo(item), async (uow) => {
+    const decision = await uow.sources.holds.requestRelease(objectId);
+    return { decision, object: decision.kind === "RELEASE" ? await uow.sources.objects.get(objectId) : null };
+  });
+  const { decision, object } = decided;
+  if (decision.kind !== "RELEASE") return { kind: decision.kind };
+  if (object === null) return { kind: "PENDING", cause: "OBJECT_NOT_VISIBLE" };
+  let result: "RELEASED" | "ABSENT";
+  try {
+    result = await withTimeout(storage.releaseHold(locationOf(object), object.objectName, decision.generation), timeoutMs);
+  } catch (e) {
+    return { kind: "PENDING", cause: e instanceof Error ? e.name : "PROVIDER_FAILURE" };
+  }
+  try {
+    const holds = await units.runSource(boundTo(item), (uow) => uow.sources.holds.recordRelease(objectId, result));
+    return { kind: "RELEASED", result, holds };
+  } catch (e) {
+    return { kind: "PENDING", cause: e instanceof Error ? e.name : "UNRECORDED" };
+  }
+}
+
+/**
+ * Before an accepted generation is deleted: its seal holds are released when nothing needs them (`releaseObjectHolds`), and when no
+ * hold record awaits a release the provider is still asked to release that exact generation — a placement whose answer was lost can
+ * have landed after its attempt's release, and releasing an unheld generation changes nothing. The deletion's own answer decides
+ * the rest (a generation still held fails the delete, recorded DELETION_FAILED and retried).
+ */
+async function releaseBeforeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, object: StoredObjectRecord): Promise<void> {
+  try {
+    const released = await releaseObjectHolds(storage, units, item, object.objectId);
+    if (released.kind === "NONE" && object.generation !== undefined) await withTimeout(storage.releaseHold(locationOf(object), object.objectName, object.generation), PROVIDER_CALL_TIMEOUT_MS);
+  } catch {
+    // the deletion's own answer is recorded; a generation still held fails it and DELETION_RETRIES comes back
+  }
+}
+
+/** A provider call bounded by `timeoutMs` (a TIMEOUT error when it does not answer in time). */
+async function withTimeout<T>(call: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error("the provider did not answer in time"), { name: "TIMEOUT" })), timeoutMs);
+  });
+  try {
+    return await Promise.race([call, timeout]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

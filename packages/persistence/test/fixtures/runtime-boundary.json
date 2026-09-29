@@ -28,6 +28,18 @@
           "revoked_at"
         ]
       },
+      "kauro.object_holds": {
+        "UPDATE": [
+          "close_reason",
+          "closed_at",
+          "release_requested_at",
+          "release_result",
+          "released_at",
+          "sealed_at",
+          "state",
+          "updated_at"
+        ]
+      },
       "kauro.payment_attempts": {
         "UPDATE": [
           "dispatch_deadline_at",
@@ -156,6 +168,18 @@
           "terminal_reason",
           "updated_at",
           "version"
+        ]
+      },
+      "kauro.object_holds": {
+        "UPDATE": [
+          "close_reason",
+          "closed_at",
+          "release_requested_at",
+          "release_result",
+          "released_at",
+          "sealed_at",
+          "state",
+          "updated_at"
         ]
       },
       "kauro.retention_records": {
@@ -1090,6 +1114,46 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "object_holds/object_holds_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "object_holds/object_holds_control_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['CLOSED'::text, 'RELEASING'::text, 'RELEASED'::text])) AND ((state <> 'CLOSED'::text) OR (close_reason = 'ABANDONED'::text)))"
+    },
+    "object_holds/object_holds_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "object_holds/object_holds_tenant_edges": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "true",
+      "check": "((state = ANY (ARRAY['SEALED'::text, 'CLOSED'::text, 'RELEASING'::text, 'RELEASED'::text])) AND ((state <> 'CLOSED'::text) OR (close_reason = 'REFUSED'::text)))"
+    },
+    "object_holds/object_holds_tenant_placer": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(placed_by_user_id = kauro.current_user_id())"
     },
     "outbox_records/outbox_records_commerce_subscribers": {
       "command": "INSERT",
@@ -2155,6 +2219,10 @@
         "SELECT",
         "UPDATE"
       ],
+      "kauro.object_holds": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.outbox_records": [
         "INSERT",
         "SELECT"
@@ -2357,6 +2425,9 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.object_holds": [
+        "SELECT"
       ],
       "kauro.outbox_records": [
         "INSERT",

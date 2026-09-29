@@ -42,6 +42,7 @@ export {
   PgUploadSessionRepository,
   PgSessionSecretRepository,
   PgStoredObjectRepository,
+  PgObjectHoldRepository,
   PROVIDER_SOFT_DELETED_REASON,
   PgInspectionReceiptRepository,
   PgSourceFileRepository,

@@ -27,3 +27,7 @@ export type InspectionReceiptId = Branded<Id, "InspectionReceiptId">;
 export type RetentionId = Branded<Id, "RetentionId">;
 /** One immutable retention anchor fact. */
 export type RetentionAnchorId = Branded<Id, "RetentionAnchorId">;
+/** One provider hold record: one included file's accepted generation, held by one seal attempt (B07-R1, D-HOLD-1). */
+export type ObjectHoldId = Branded<Id, "ObjectHoldId">;
+/** One seal attempt: the holds one execution of SealRevision placed, under one id (D-HOLD-2). */
+export type SealAttemptId = Branded<Id, "SealAttemptId">;

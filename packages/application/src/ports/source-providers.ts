@@ -70,6 +70,17 @@ export interface ResumableSession {
 
 export type ProviderCancellationResult = "CONFIRMED" | "UNSUPPORTED" | "UNCERTAIN";
 
+/**
+ * What the provider answered a hold placement on an exact generation (B07-R1, decision D-HOLD-1; Cloud Storage "Object holds": a
+ * temporary hold set by objects.patch {temporaryHold: true} with ifGenerationMatch = the generation). While a generation is held the
+ * provider refuses to delete or replace it — so from the placement on, the accepted generation a seal names cannot vanish under it.
+ */
+export type HoldPlacement =
+  /** The generation is the name's live generation and is now held (also when it already was: a hold is a flag, not a count). */
+  | { readonly outcome: "HELD"; readonly observation: ObjectObservation }
+  /** The precondition failed (412: the live generation is another one) or no live object is under the name (404): nothing is held. */
+  | { readonly outcome: "GENERATION_NOT_LIVE" };
+
 export interface ObjectStoragePort {
   readonly provider: string;
   readonly evidenceClass: ProviderEvidenceClass;
@@ -88,8 +99,24 @@ export interface ObjectStoragePort {
   read(location: StorageLocation, objectName: string, generation: string): AsyncIterable<Uint8Array>;
   /** Copies an exact source generation to a destination that must not exist (ifGenerationMatch=0); returns the new generation. */
   copy(from: { readonly location: StorageLocation; readonly objectName: string; readonly generation: string }, to: { readonly location: StorageLocation; readonly objectName: string }): Promise<{ readonly generation: string }>;
-  /** Deletes exactly `generation` (generation precondition). */
+  /**
+   * Deletes exactly `generation` (generation precondition). A held generation is refused by the provider (an error, Cloud Storage
+   * 403): its hold is released first (`releaseHold`, D-HOLD-1).
+   */
   delete(location: StorageLocation, objectName: string, generation: string): Promise<"DELETED" | "ALREADY_ABSENT" | "PRECONDITION_FAILED">;
+  /**
+   * Places a temporary hold on exactly `generation` with a generation precondition (Cloud Storage: objects.patch {temporaryHold:
+   * true}, ifGenerationMatch). From a HELD answer on, the provider refuses to delete or replace that generation until the hold is
+   * released. A temporary hold, never an event-based one: it does not interact with a bucket retention policy, so its release lets a
+   * lawful early deletion proceed at once (09 "Soft delete, versioning and holds"; decision D-HOLD-1). Called outside any transaction.
+   */
+  placeHold(location: StorageLocation, objectName: string, generation: string): Promise<HoldPlacement>;
+  /**
+   * Releases the temporary hold of exactly `generation` (objects.patch {temporaryHold: false}, ifGenerationMatch): RELEASED when that
+   * generation is the name's live generation and is no longer held (also when it was not held); ABSENT when it is not the live
+   * generation (nothing is released, no other generation is touched).
+   */
+  releaseHold(location: StorageLocation, objectName: string, generation: string): Promise<"RELEASED" | "ABSENT">;
   /** Provider inventory of a prefix (09: periodic inventory detects objects missing from the registry). */
   list(location: StorageLocation, prefix: string, page?: string): Promise<{ readonly objects: ReadonlyArray<{ readonly objectName: string; readonly generation: string; readonly bytes: number }>; readonly next?: string }>;
   /**
