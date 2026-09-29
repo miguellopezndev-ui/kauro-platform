@@ -186,6 +186,7 @@ map. **W-IDP-LIVE** starts after the owner opens Google Cloud. Binding mandates 
 | same, clean clone as WSL user `miguel`, `PGBIN=/usr/lib/postgresql/17/bin` | Ubuntu 24.04, Node 24.21.0 | `d85e322` | exit 0: same counts, api 118; clone deleted |
 | `pnpm --filter @kauro/web run e2e`, `KAURO_E2E_ENGINES=all` | Windows 11 | `3abde5b` tree | 6/6 (Chromium 153, Firefox 155, WebKit 26.6) |
 | cookie and back/forward probe (scratch, not committed) | Windows, three engines | — | `__Host-` cookie dropped by WebKit over http://localhost, kept over https; `no-store` page re-fetched after logout in all engines |
+| `pnpm install --frozen-lockfile && pnpm run verify` (mandate W1, branch `b11/w1-ui-primitives`) | Windows 11, Node 24.14.1, pnpm 10.16.1, PostgreSQL 17 | `708fa5d` tree (+ doc-only edits) | exit 0 in 6 m 46 s: ui 58 (S069, R2-062, R2-065 and 55 more: formatting, fields, table, status, guard, source rules, stylesheet, tokens), contracts 12, web 4, domain 54, application 55, persistence 107, authorization 11, api 118 (+1 Linux-only skip of B06), tools 30; gate 8 packages / 14 edges; openapi 14 routes; matrix; clean-consume (`@kauro/ui` is private and not packed) |
 
 ## 12. Decisions register (stage-1 implementation)
 
