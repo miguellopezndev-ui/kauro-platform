@@ -9,13 +9,16 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { EXECUTION_POLICY, JOB_EVENT_TYPES, PACKAGE_EVENT_TYPES, isDomainFailure, jobInputBindingHashOf, type CommerceUnitOfWork, type EventProvenance, type ProcessingJobId } from "@kauro/domain";
+import { STATE_MACHINES } from "@kauro/contracts";
+import { EXECUTION_AGGREGATE_KINDS, EXECUTION_EVENT_TYPES, EXECUTION_PLATFORM_MACHINES, EXECUTION_POLICY, JOB_EVENT_TYPES, PACKAGE_EVENT_TYPES, fairAdmissionOrder, isDomainFailure, jobInputBindingHashOf, type CommerceUnitOfWork, type EventProvenance, type ProcessingJobId } from "@kauro/domain";
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { PgExecutionStore } from "../src/execution/store.js";
+import { executionReadsOf } from "../src/unit-of-work.js";
 import { backendPid, settlesOrWaits } from "../src/testing/harness.js";
 import { clockAt } from "../src/testing/source-lifecycle.js";
 import {
   admitJob,
+  controlOf,
   endJob,
   fixtureArtifacts,
   fixtureGeneration,
@@ -562,6 +565,15 @@ test("R2-046 at the database: the ledgers admit at most one ACTIVE and three WAI
   // three live jobs of agency A; the fourth is refused with nothing written and its authorization ACTIVE (CAPACITY_UNAVAILABLE)
   const jobs: Awaited<ReturnType<typeof queueJob>>[] = [];
   for (const p of purchases.slice(0, 3)) jobs.push(await queueJob(env.h, A, p.authorizationId));
+  // the adapters read the same ledgers: checkout sees agency A's bound reached and agency B's free (D8-CAP-2), the control plane's
+  // snapshot counts the three, and its admission candidates come in the pure scheduler's order (D8-SCHED-1)
+  const checkout = (ag: typeof A) => env.h.execution.run(env.h.tenant(ag.agencyId, ag.ownerUserId), (uow) => executionReadsOf(uow).checkoutCapacity({ agencyId: ag.agencyId }));
+  assert.deepEqual(await checkout(A), { available: false, reason: "ADMISSION_QUEUE_FULL" });
+  assert.equal((await checkout(B)).available, true);
+  const seen = await env.h.execution.run(controlOf(A.agencyId), async (uow) => ({ snapshot: await uow.execution.capacity(A.agencyId), candidates: await uow.execution.admissionCandidates(10) }));
+  assert.deepEqual(seen.snapshot, { activeJobs: 0, waitingJobs: 0, agencyLiveJobs: 3 });
+  assert.deepEqual(seen.candidates.map((c) => c.jobId), jobs.map((j) => j.jobId), "one agency's jobs by their queue instants");
+  assert.deepEqual(fairAdmissionOrder(seen.candidates), seen.candidates);
   await assert.rejects(queueJob(env.h, A, purchases[3]!.authorizationId), (e: unknown) => isDomainFailure(e) && e.code === "CAPACITY_UNAVAILABLE" && e.reason === "EXECUTION_QUEUE_FULL" && causeConstraint(e) === "agency_execution_capacity_live_within_limit");
   assert.deepEqual(await oracle(env, "SELECT state, (SELECT count(*)::int FROM kauro.processing_jobs WHERE authorization_id = $1) AS jobs FROM kauro.commercial_authorizations WHERE authorization_id = $1", [purchases[3]!.authorizationId]), [{ state: "ACTIVE", jobs: 0 }]);
   // three admissions fill the platform's three WAITING slots; another agency's fourth admission is refused
@@ -707,4 +719,23 @@ test("CMD037 at the database: after cancel_command no attempt of the job is crea
   });
   assert.deepEqual(await oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [pkg.packageVersionId]), [{ state: "VERIFIED_PRIVATE" }]);
   await endJob(env.h, A, j3.jobId);
+});
+
+test("B08 seeds: the Job edges and initial state equal the registry and the ProcessingAttempt and PackageVersion seeds equal the domain's platform machines; the execution event types and aggregate kinds are registered with their tables", async () => {
+  const job = STATE_MACHINES.find((m) => m.contract === "Job");
+  assert.ok(job);
+  for (const m of [job, ...EXECUTION_PLATFORM_MACHINES]) {
+    const edges = await oracle<{ edge: string }>(env, "SELECT from_state || '>' || to_state AS edge FROM kauro.state_transitions WHERE machine = $1 ORDER BY 1", [m.contract]);
+    assert.deepEqual(edges.map((r) => r.edge), [...new Set(m.transitions.map((t) => `${t.from}>${t.to}`))].sort(), m.contract);
+    assert.deepEqual(await oracle(env, "SELECT initial_state FROM kauro.state_machines WHERE machine = $1", [m.contract]), [{ initial_state: m.initial }], m.contract);
+  }
+  const types = new Set((await oracle<{ event_type: string }>(env, "SELECT event_type FROM kauro.event_types")).map((r) => r.event_type));
+  for (const t of EXECUTION_EVENT_TYPES) assert.ok(types.has(t), t);
+  assert.deepEqual(
+    await oracle(env, "SELECT aggregate_kind, table_name, id_column FROM kauro.aggregate_kinds WHERE aggregate_kind = ANY($1::text[]) ORDER BY 1", [[...EXECUTION_AGGREGATE_KINDS]]),
+    [
+      { aggregate_kind: "package_version", table_name: "package_versions", id_column: "package_version_id" },
+      { aggregate_kind: "processing_job", table_name: "processing_jobs", id_column: "job_id" },
+    ],
+  );
 });

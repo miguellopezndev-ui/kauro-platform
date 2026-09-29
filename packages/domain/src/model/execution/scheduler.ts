@@ -25,8 +25,15 @@ export interface AdmissionCandidate {
   readonly agencyLastAdmittedAt: UtcInstant | null;
 }
 
+/** The microseconds past the millisecond of an instant (the database stamps microseconds; Date.parse keeps milliseconds). */
+function subMillisecondMicros(instant: UtcInstant): number {
+  const fraction = /\.(\d+)Z$/.exec(instant)?.[1] ?? "";
+  return Number(fraction.padEnd(6, "0").slice(3, 6));
+}
+
+/** Chronological order of two instants, exact to the microsecond as the database orders them (D8-CLOCK-1). */
 function instantOrder(a: UtcInstant, b: UtcInstant): number {
-  const d = Date.parse(a) - Date.parse(b);
+  const d = Date.parse(a) - Date.parse(b) || subMillisecondMicros(a) - subMillisecondMicros(b);
   return d < 0 ? -1 : d > 0 ? 1 : 0;
 }
 

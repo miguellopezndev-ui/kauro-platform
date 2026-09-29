@@ -75,6 +75,12 @@ test("R2-046: the fair scheduler orders queued jobs by the agency's held slots, 
   const subsetOrder = fairAdmissionOrder(subset).map((c) => c.jobId);
   assert.deepEqual(subsetOrder, [job(5), job(6), job(7), job(8), job(3), job(1)]);
   for (const permuted of permutations(subset)) assert.deepEqual(fairAdmissionOrder(permuted).map((c) => c.jobId), subsetOrder);
+  // the database stamps microseconds (D8-CLOCK-1): two jobs queued within one millisecond keep the database's order, not the ids'
+  const withinOneMillisecond = [
+    { ...candidates[6]!, jobId: job(9), queuedAt: at("2026-09-29T12:00:00.000200Z") },
+    { ...candidates[6]!, jobId: job(10), queuedAt: at("2026-09-29T12:00:00.0001Z") },
+  ];
+  assert.deepEqual(fairAdmissionOrder(withinOneMillisecond).map((c) => c.jobId), [job(10), job(9)]);
   // the input is not reordered, and a malformed count or instant is refused rather than ordered
   const copy = [...candidates];
   fairAdmissionOrder(copy);
