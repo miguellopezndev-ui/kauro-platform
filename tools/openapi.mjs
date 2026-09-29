@@ -186,7 +186,7 @@ export function generateOpenApi(sources) {
   const served = new Set(application.SERVED_COMMAND_IDS);
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
-    const spec = application.B06_COMMANDS[command.id];
+    const spec = application.B06_COMMANDS[command.id] ?? application.SUPPORT_COMMANDS[command.id];
     if (!spec) throw new Error(`${command.id} has a declared response but no command spec`);
     if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
       throw new Error(`${command.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);

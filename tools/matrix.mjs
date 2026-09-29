@@ -183,6 +183,9 @@ export const EDGE_OWNERS = {
     request_deletion: { command: "CMD042", event: null },
     deletion_verified: { owner: "B16", why: "verified managed deletion", event: null },
   },
+  SupportCase: {
+    "(initial OPEN)": { command: "CMD044", event: "support_case.opened.v1", note: "the registry gives SupportCase a state enum and no machine, so no edge past OPEN exists in this edition (decision D-SUP-6)" },
+  },
 };
 
 // --- the contract-test applicability record (10 "Contract tests and compatibility") -------------------------------------------
@@ -250,6 +253,17 @@ export const APPLICABILITY = {
     "wrong agency": [["cmd026-withdraw-approval.test.ts", "DENY: VIEWER → 403; another APPROVER → 403 NOT_APPROVAL_CONTROLLER; foreign → 404"]],
     "stale version": [["cmd026-withdraw-approval.test.ts", "RACE: two withdrawals → one 200, one 409"]],
   },
+  CMD044: {
+    ...common,
+    "legitimate state": [["cmd044-create-support-case.test.ts", "OK: a member with access to the project opens a classified case"]],
+    "wrong role": [["cmd044-create-support-case.test.ts", "DENY: a foreign tenant, a wrong role and then one missing prerequisite"], ROLE_MATRIX],
+    "wrong agency": [["cmd044-create-support-case.test.ts", "DENY: a foreign tenant, a wrong role and then one missing prerequisite"]],
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: category, summary, evidenceRefs); a case is born OPEN at version 1 and this edition has no command that changes it",
+    "duplicate request": [...common["duplicate request"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
+    "invalid schema": [...common["invalid schema"], ["request-validation.test.ts", "CMD044 closed request"]],
+    "lost response": [...common["lost response"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
+  },
 };
 
 // --- sources --------------------------------------------------------------------------------------------------------------------
@@ -269,7 +283,7 @@ export async function loadMatrixSources() {
     }
   }
   // the events each served command's handler publishes
-  const HANDLER_FILES = { CMD001: "create-agency.ts", CMD009: "create-client.ts", CMD010: "archive-client.ts", CMD011: "create-project.ts", CMD023: "revise-plan.ts", CMD025: "approve-plan.ts", CMD026: "withdraw-approval.ts" };
+  const HANDLER_FILES = { CMD001: "create-agency.ts", CMD009: "create-client.ts", CMD010: "archive-client.ts", CMD011: "create-project.ts", CMD023: "revise-plan.ts", CMD025: "approve-plan.ts", CMD026: "withdraw-approval.ts", CMD044: "create-support-case.ts" };
   const published = {};
   for (const [id, file] of Object.entries(HANDLER_FILES)) {
     const text = readFileSync(join(root, "packages", "application", "src", "commands", "handlers", file), "utf8");
@@ -287,7 +301,7 @@ export async function loadMatrixSources() {
     commands,
     eventTypes: new Set(domain.EVENT_TYPES),
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
-    specs: application.B06_COMMANDS,
+    specs: { ...application.B06_COMMANDS, ...application.SUPPORT_COMMANDS },
     outcomes: application.COMMAND_OUTCOMES,
     reads: application.READ_ROUTES,
     readOutcomes: application.READ_OUTCOMES,
@@ -357,7 +371,7 @@ export function generateMatrix(s) {
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
   line("`commands.json` and `cases.json` (provenance-verified, `@kauro/contracts`), the platform machines EndClient and Project and");
   line("the event registry of `@kauro/domain` (`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome");
-  line("catalogues of `@kauro/application` (`B06_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the transition");
+  line("catalogues of `@kauro/application` (`B06_COMMANDS`, `SUPPORT_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
