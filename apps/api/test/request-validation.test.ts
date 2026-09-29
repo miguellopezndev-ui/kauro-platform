@@ -305,3 +305,54 @@ test("N6: every label member refuses exactly the Unicode control characters (C0,
   const withdrawn = completed<{ approval: { withdrawReasonCode?: string } }>(await call(w, members[3]!.call(reason)), 200);
   assert.equal(withdrawn.data.approval.withdrawReasonCode, reason);
 });
+
+test("CMD044 closed request: the category is one of six, the summary 20..4000 characters of visible text, evidenceRefs an empty list until uploads exist, and every other member unknown — each refusal is a 400 before any transaction, and the limits are the table's own", async () => {
+  const url = routes.createSupportCase(projectId);
+  const summary = "The export button on the results page does nothing when clicked.";
+  const refuse = async (what: string, body: unknown, errors: ReadonlyArray<{ field: string; code: string }>) => {
+    const res = await refusedAtTheBoundary(what, () => call(w, { url, token: w.operator.token, body }));
+    assert.equal(outcome(w, res), "400 INVALID_REQUEST SCHEMA_VIOLATION", what);
+    assert.deepEqual(asProblem(w, res).errors, errors, what);
+  };
+  // members: missing, mistyped, unknown; the server owns severity, state, next review and the opener
+  await refuse("category missing", { summary }, [{ field: "category", code: "REQUIRED" }]);
+  await refuse("summary missing", { category: "GENERAL" }, [{ field: "summary", code: "REQUIRED" }]);
+  await refuse("a category outside the six", { category: "OTHER", summary }, [{ field: "category", code: "ENUM" }]);
+  await refuse("a lowercase category", { category: "general", summary }, [{ field: "category", code: "ENUM" }]);
+  await refuse("a numeric summary", { category: "GENERAL", summary: 12345678901234567890 }, [{ field: "summary", code: "TYPE" }]);
+  await refuse("a severity chosen by the requester", { category: "GENERAL", summary, severity: "S1" }, [{ field: "severity", code: "UNKNOWN_FIELD" }]);
+  await refuse("a state chosen by the requester", { category: "GENERAL", summary, state: "RESOLVED", nextReviewAt: "2026-01-01T00:00:00.000Z" }, [{ field: "state", code: "UNKNOWN_FIELD" }, { field: "nextReviewAt", code: "UNKNOWN_FIELD" }]);
+  await refuse("evidenceRefs as a string", { category: "GENERAL", summary, evidenceRefs: "none" }, [{ field: "evidenceRefs", code: "TYPE" }]);
+  await refuse("evidenceRefs null", { category: "GENERAL", summary, evidenceRefs: null }, [{ field: "evidenceRefs", code: "TYPE" }]);
+  await refuse("an upload id before uploads exist", { category: "GENERAL", summary, evidenceRefs: [ids.next()] }, [{ field: "evidenceRefs", code: "RANGE" }]);
+
+  // the summary's length is counted in characters, the way the table counts it: 19 is short, 20 and 4000 pass, 4001 is long
+  await refuse("a 19-character summary", { category: "GENERAL", summary: "a".repeat(19) }, [{ field: "summary", code: "RANGE" }]);
+  await refuse("a 4001-character summary", { category: "GENERAL", summary: "a".repeat(4001) }, [{ field: "summary", code: "RANGE" }]);
+  await refuse("4001 astral characters (8002 UTF-16 units)", { category: "GENERAL", summary: "\u{1F600}".repeat(4001) }, [{ field: "summary", code: "RANGE" }]);
+  // text: no control character but the tab, line feed and carriage return, and at least one visible character
+  for (const [what, text] of [
+    ["a bell character", `The export button does nothing\u0007 when clicked.`],
+    ["a NUL character", `The export button does nothing\u0000 when clicked.`],
+    ["a DEL character", `The export button does nothing\u007f when clicked.`],
+    ["a C1 control character", `The export button does nothing\u0085 when clicked.`],
+    ["only spaces", " ".repeat(30)],
+    ["only line breaks and tabs", "\n\t\r".repeat(10)],
+  ] as const) {
+    await refuse(what, { category: "GENERAL", summary: text }, [{ field: "summary", code: "FORMAT" }]);
+  }
+
+  // the bounds themselves and ordinary multi-line text are admitted, and each admitted request opens exactly one case
+  const before = await w.count("support_cases", "project_id = $1", [projectId]);
+  const accepted: ReadonlyArray<string> = [
+    "a".repeat(20),
+    "\u{1F600}".repeat(4000),
+    "The export fails.\n\tFirst: the button does nothing.\r\n\tSecond: no error is shown.",
+  ];
+  for (const text of accepted) {
+    const reply = completed<{ summary: string; state: string }>(await call(w, { url, token: w.operator.token, body: { category: "GENERAL", summary: text } }), 201);
+    assert.equal(reply.data.summary, text, "the summary is stored and answered exactly as sent");
+    assert.equal(reply.data.state, "OPEN");
+  }
+  assert.equal(await w.count("support_cases", "project_id = $1", [projectId]), before + accepted.length);
+});
