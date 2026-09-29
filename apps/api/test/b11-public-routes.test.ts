@@ -632,7 +632,7 @@ test("the runtime role can only insert an inquiry: no read, update, delete or tr
   };
   assert.deepEqual(await privileges("kauro_app", "inquiries"), ["INSERT"]);
   assert.deepEqual(await privileges("kauro_app", "inquiry_events"), ["INSERT"]);
-  assert.deepEqual(await privileges("kauro_app", "inquiry_admissions"), ["INSERT", "SELECT"]);
+  assert.deepEqual(await privileges("kauro_app", "inquiry_admissions"), ["SELECT", "INSERT"]);
   for (const table of ["inquiries", "inquiry_events", "inquiry_admissions"]) {
     // no reader role exists yet: the package that reads inquiries (the owner queue) grants itself its own read with its own migration
     for (const role of ["kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress"]) assert.deepEqual(await privileges(role, table), [], `${role} on ${table}`);
