@@ -92,6 +92,7 @@ export function runtimeSchemas(sources) {
   const responses = application.buildResponseSchemas(bundle, operationalRoutes);
   const byId = { ...responses.roots, Problem: application.PROBLEM_SCHEMA };
   for (const [command, schema] of Object.entries(application.REQUEST_SCHEMAS)) byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  Object.assign(byId, application.operationalRequestSchemas(operationalRoutes));
   const defs = { ...bundle.$defs, ...responses.defs };
   return { byId, defs };
 }
@@ -164,6 +165,22 @@ export function generateOpenApi(sources) {
   };
   const REPLY_HEADERS = { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" }, "Cache-Control": { $ref: "#/components/headers/CacheControl" } };
   components.securitySchemes.bearerAuth = { type: "http", scheme: "bearer", description: "Authenticated subject (08 \"Authentication and assurance\")." };
+  components.securitySchemes.sessionCookie = {
+    type: "apiKey",
+    in: "cookie",
+    name: application.SESSION_COOKIE,
+    description:
+      "The browser session (B11 design D-AUTH-1, D-AUTH-5): Secure; HttpOnly; SameSite=Lax. An unsafe request it authenticates needs the exact application Origin, a same-origin Sec-Fetch-Site and the session's X-Kauro-CSRF token; a cookie beside an Authorization header is AMBIGUOUS_CREDENTIALS.",
+  };
+  components.parameters.CsrfToken = {
+    name: "X-Kauro-CSRF",
+    in: "header",
+    required: false,
+    description: "The session's CSRF token (SessionView.csrfToken): required on an unsafe request the session cookie authenticates (B11 D-AUTH-5); refused as CSRF_TOKEN_INVALID otherwise.",
+    schema: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+  };
+  components.headers.SetSessionCookie = { description: "The session cookie (__Host-kauro_session): set by sign-in, cleared (Max-Age=0) by logout.", schema: { type: "string" } };
+  components.headers.ClearSiteData = { description: "The logout clears the site's cache, cookies and storage where the browser allows it (08 \"Browser, API and cache isolation\").", schema: { type: "string", const: application.CLEAR_SITE_DATA } };
 
   const problemResponse = {
     description: "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
@@ -222,8 +239,8 @@ export function generateOpenApi(sources) {
         "x-kauro-idempotency": command.idempotency,
         "x-kauro-gate": command.gate,
         "x-kauro-cases": command.testIds ?? [],
-        security: [{ bearerAuth: [] }],
-        parameters,
+        security: [{ bearerAuth: [] }, { sessionCookie: [] }],
+        parameters: [...parameters, { $ref: "#/components/parameters/CsrfToken" }],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${command.name}Request` } } } },
         responses,
       },
@@ -250,7 +267,7 @@ export function generateOpenApi(sources) {
         summary: spec.summary,
         description: `Authority: ${spec.authority}`,
         "x-kauro-read": true,
-        security: [{ bearerAuth: [] }],
+        security: [{ bearerAuth: [] }, { sessionCookie: [] }],
         parameters,
         responses: {
           200: {
@@ -264,23 +281,42 @@ export function generateOpenApi(sources) {
     };
   }
 
+  // the session routes' extra reply headers (B11 D-AUTH-1, D-PRIV-1): sign-in sets the cookie, logout clears it and the site data
+  const sessionReplyHeaders = {
+    openSession: { "Set-Cookie": { $ref: "#/components/headers/SetSessionCookie" } },
+    revokeCurrentSession: { "Set-Cookie": { $ref: "#/components/headers/SetSessionCookie" }, "Clear-Site-Data": { $ref: "#/components/headers/ClearSiteData" } },
+  };
+  const cookieRoutes = new Set(["getCurrentSession", "revokeCurrentSession", "createStepUp"]);
   for (const route of operationalRoutes) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);
     const responses = {};
     for (const [status, declared] of Object.entries(contract.declared)) {
+      const headers = { ...REPLY_HEADERS, ...(sessionReplyHeaders[route.operationId] ?? {}) };
+      if (declared.schemaId === null) {
+        responses[status] = { description: route.responses[status].description, headers };
+        continue;
+      }
       const name = `${route.operationId}Response${status}`;
       addComponent(name, byId[declared.schemaId], declared.schemaId);
       responses[status] = {
         description: route.responses[status].description,
-        headers: REPLY_HEADERS,
+        headers,
         content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}${name}` } } },
       };
     }
-    responses.default = problemResponse;
-    paths[route.path] = {
-      ...(paths[route.path] ?? {}),
-      [route.method.toLowerCase()]: { operationId: route.operationId, summary: route.summary, description: `Authority: ${route.authority}`, "x-kauro-operational": true, responses },
-    };
+    if (contract.outcomes === null) responses.default = problemResponse;
+    else Object.assign(responses, problemResponses(contract.outcomes));
+    const operation = { operationId: route.operationId, summary: route.summary, description: `Authority: ${route.authority}`, "x-kauro-operational": true };
+    if (cookieRoutes.has(route.operationId)) operation.security = [{ sessionCookie: [] }, ...(route.operationId === "createStepUp" ? [{ bearerAuth: [] }] : [])];
+    const unsafe = route.method === "POST";
+    if (route.path.startsWith("/api/v1/")) operation.parameters = [{ $ref: "#/components/parameters/CorrelationId" }, ...(unsafe && route.operationId !== "openSession" ? [{ $ref: "#/components/parameters/CsrfToken" }] : [])];
+    if (route.request !== undefined) {
+      const requestId = application.operationalRequestSchemaId(route.operationId);
+      addComponent(`${route.operationId}Request`, byId[requestId], requestId);
+      operation.requestBody = { required: true, content: { [route.request.contentType]: { schema: { $ref: `${COMPONENTS}${route.operationId}Request` } } } };
+    }
+    operation.responses = responses;
+    paths[route.path] = { ...(paths[route.path] ?? {}), [route.method.toLowerCase()]: operation };
   }
 
   addComponent("Problem", byId.Problem, "Problem");
@@ -328,6 +364,7 @@ export async function registeredRoutes() {
   const [api, persistence] = await Promise.all([load("apps/api/dist/src/index.js"), load("packages/persistence/dist/src/index.js")]);
   // the real pg adapter, never connected: route registration opens no transaction, and the assertion below proves it
   const pool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
+  const boundaryPool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory_sessions", max: 1, applicationName: "kauro-openapi-inventory-sessions" });
   try {
     const unitOfWork = persistence.createUnitOfWorkFactory(pool, { clock: api.systemClock });
     // the readiness side of the database handle: the build's schema version, and a readiness read that refuses loudly, since
@@ -336,14 +373,23 @@ export async function registeredRoutes() {
       codeSchemaVersion: persistence.listMigrations().reduce((max, file) => Math.max(max, file.version), 0),
       readiness: () => Promise.reject(new Error("the route inventory serves no request: readiness must not be read")),
     };
-    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()) });
+    // the session boundary (B11 W2) bound as a deployment binds it, over a never-connected kauro_assurance pool and a verifier
+    // that refuses loudly: registering the session routes verifies no token and opens no session
+    const sessions = {
+      verifier: { verify: () => Promise.reject(new Error("the route inventory serves no request: no token is verified")) },
+      store: new persistence.PgWebSessionStore(boundaryPool),
+      appOrigins: ["https://app.kauro.invalid"],
+      identityConfig: { adapter: "IDENTITY_PLATFORM", projectId: "kauro-inventory" },
+    };
+    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), sessions });
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();
-    if (pool.raw.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
+    if (pool.raw.totalCount !== 0 || boundaryPool.raw.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
     return inventory;
   } finally {
     await pool.end();
+    await boundaryPool.end();
   }
 }
 
@@ -473,6 +519,10 @@ export function checkOpenApi({ document, expected, inventory, sources }) {
     }
     for (const [status, declared] of [...Object.entries(contract.declared), ...problemStatuses.map((s) => [s, contract.problem])]) {
       const content = responses[status]?.content;
+      if (declared.schemaId === null) {
+        if (responses[status] === undefined || content !== undefined) failures.push(`response schema mismatch on ${key}: status ${status} is declared without a body and must be documented without content`);
+        continue;
+      }
       const media = content?.[declared.contentType];
       if (!media) {
         failures.push(`response schema mismatch on ${key}: status ${status} is not documented as ${declared.contentType}`);

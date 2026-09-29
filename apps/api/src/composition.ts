@@ -21,14 +21,16 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { B06Collaborators, CommandRuntime, SchemaValidator } from "@kauro/application";
-import { createB06Handlers, createReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import { SESSION_POLICY_VERSION, createB06Handlers, createReadHandlers, createSessionService, isCursorKey, refuseAnonymously, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, Environment, IdGenerator, RandomBytes, UnitOfWorkFactory } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { PgWebSessionStore, applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
-import type { ApiConfig, MigratorConfig } from "./config.js";
+import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
+import { createIdentityTokenVerifier, type IdentityKeySource } from "./identity-verifier.js";
+import { assertIdentityConfig, createSessionAuthenticator, type SessionAssembly } from "./sessions.js";
 import { noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
@@ -42,11 +44,16 @@ export const systemRandom: RandomBytes = (n) => new Uint8Array(randomBytes(n));
 /** Application name every runtime connection announces (pg_stat_activity; 07 "Connection budget"). */
 export const API_APPLICATION_NAME = "kauro-api";
 
+/** Application name of the session boundary's connections (kauro_assurance; B11 W2). */
+export const SESSIONS_APPLICATION_NAME = `${API_APPLICATION_NAME}-sessions`;
+
 /** Bound of the readiness ledger read: a probe answers promptly or reports the database as unavailable. */
 export const READINESS_STATEMENT_TIMEOUT_MS = 2_000;
 
 export interface DatabaseHandle {
   readonly pool: KauroPool;
+  /** The authentication boundary's pool (a login of kauro_assurance), when the session boundary is bound; null otherwise. */
+  readonly assurancePool: KauroPool | null;
   readonly unitOfWork: UnitOfWorkFactory;
   /** The migrations applied at start, or null when KAURO_DB_MIGRATE_ON_START is off. */
   readonly migrations: ApplyResult | null;
@@ -78,8 +85,8 @@ export function applyMigrationsWith(migrator: MigratorConfig, password: string |
   );
 }
 
-/** What opening the database needs from the configuration. */
-export type DatabaseConfig = Pick<ApiConfig, "database" | "migrateOnStart">;
+/** What opening the database needs from the configuration (the session boundary's login, when it is bound). */
+export type DatabaseConfig = Pick<ApiConfig, "database" | "migrateOnStart"> & { readonly identity?: Pick<IdentityConfig, "assuranceDatabase"> | null };
 
 /**
  * Opens the database side of the process: applies pending migrations as the migrator when configured (its own connection,
@@ -106,9 +113,28 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
     await pool.end();
     throw e;
   }
+  let assurancePool: KauroPool | null = null;
+  const boundary = config.identity?.assuranceDatabase;
+  if (boundary !== undefined) {
+    const { poolMax: boundaryMax, ...login } = boundary;
+    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    try {
+      const { client, connection: verified } = await assurancePool.acquire();
+      client.release();
+      if (verified.role !== "kauro_assurance") {
+        throw new Error(`the session boundary's login must be a member of kauro_assurance; ${verified.loginRole} is a member of ${verified.role} (B06 D-EVID-1, B11 D-AUTH-1)`);
+      }
+    } catch (e) {
+      await assurancePool.end();
+      await pool.end();
+      throw e;
+    }
+  }
   const unitOfWork = createUnitOfWorkFactory(pool, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
+  const sessionsPool = assurancePool;
   return {
     pool,
+    assurancePool,
     unitOfWork,
     migrations,
     codeSchemaVersion,
@@ -122,7 +148,10 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
       }
       return { database: "AVAILABLE", schema: compareSchema(ledger, shipped) };
     },
-    close: () => pool.end(),
+    close: async () => {
+      await pool.end();
+      if (sessionsPool !== null) await sessionsPool.end();
+    },
   };
 }
 
@@ -189,6 +218,14 @@ export interface ApiAssembly {
    */
   readonly cursorKey?: Uint8Array;
   readonly limits?: HttpLimits;
+  /**
+   * The browser session boundary (B11 W2): the identity token verifier, the authentication boundary's store, the application
+   * origins and the identity configuration the page reads. When bound, the api authenticates the session cookie (with the CSRF
+   * rule) beside `authenticator`, and serves the session routes.
+   */
+  readonly sessions?: SessionAssembly;
+  /** Entropy of the session secrets; node:crypto by default. */
+  readonly random?: RandomBytes;
 }
 
 /** Binds the authorizer, the seven command handlers, the five reads and the HTTP server over an open unit-of-work factory. */
@@ -211,12 +248,23 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const cursorKey = assembly.cursorKey ?? systemRandom(32);
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
+  let authenticator = assembly.authenticator;
+  let sessions: ApiServerOptions["sessions"];
+  if (assembly.sessions !== undefined) {
+    const bound = assembly.sessions;
+    assertIdentityConfig(assembly.environment, bound.identityConfig);
+    const service = createSessionService({ unitOfWork: runtime.unitOfWork, clock, ids, random: assembly.random ?? systemRandom, verifier: bound.verifier, store: bound.store });
+    authenticator = createSessionAuthenticator(assembly.authenticator, service, bound.appOrigins);
+    sessions = { service, authenticator, appOrigins: bound.appOrigins, identityConfig: bound.identityConfig };
+  }
   return createApiServer({
     environment: assembly.environment,
     handlers: createB06Handlers(runtime, collaborators),
     reads: createReadHandlers({ unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey }),
-    authenticator: assembly.authenticator,
+    authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
+    refuseCredentials: (action, request, failure) => refuseAnonymously(runtime, action, request, failure, SESSION_POLICY_VERSION),
+    ...(sessions !== undefined ? { sessions } : {}),
     validator: assembly.validator ?? loadContractSchemas(),
     clock,
     ids,
@@ -229,10 +277,30 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   });
 }
 
-export interface StartOptions extends Omit<ApiAssembly, "environment" | "unitOfWork" | "database" | "trustedProxyHops" | "limits"> {
+export interface StartOptions extends Omit<ApiAssembly, "environment" | "unitOfWork" | "database" | "trustedProxyHops" | "limits" | "sessions"> {
   readonly random?: RandomBytes;
   readonly migratorPassword?: string;
   readonly onPoolError?: PoolErrorSink;
+  /**
+   * The key source of the identity token verifier when the configuration binds the session boundary: bootstrap reads the
+   * contract fake's JWKS file (LOCAL); Google's securetoken document otherwise (the default).
+   */
+  readonly identityKeySource?: IdentityKeySource;
+}
+
+/** The session boundary a configuration binds, over the open database (its kauro_assurance pool). */
+export function sessionAssemblyOf(environment: ApiConfig["environment"], identity: IdentityConfig, database: Pick<DatabaseHandle, "assurancePool">, keySource: IdentityKeySource, clock?: Clock): SessionAssembly {
+  if (database.assurancePool === null) throw new Error("the session boundary is configured but its kauro_assurance pool is not open");
+  if ((keySource.kind === "CONTRACT_FAKE") !== (identity.keySource === "CONTRACT_FAKE")) throw new Error(`the key source ${keySource.kind} is not the configured ${identity.keySource}`);
+  return {
+    verifier: createIdentityTokenVerifier({ projectId: identity.projectId, environment, keySource, ...(clock !== undefined ? { clock } : {}) }),
+    store: new PgWebSessionStore(database.assurancePool),
+    appOrigins: identity.appOrigins,
+    identityConfig:
+      identity.keySource === "CONTRACT_FAKE"
+        ? { adapter: "CONTRACT_FAKE", projectId: identity.projectId, ...(identity.fakeEndpoint !== null ? { endpoint: identity.fakeEndpoint } : {}) }
+        : { adapter: "IDENTITY_PLATFORM", projectId: identity.projectId },
+  };
 }
 
 export interface StartedApi {
@@ -244,7 +312,7 @@ export interface StartedApi {
 
 /** The deployment path: database first (migrations, verified pool), then the server; nothing is left open on failure. */
 export async function startApi(config: ApiConfig, options: StartOptions): Promise<StartedApi> {
-  const { random, migratorPassword, onPoolError, ...assembly } = options;
+  const { random, migratorPassword, onPoolError, identityKeySource, ...assembly } = options;
   const database = await openDatabase(config, {
     ...(assembly.clock !== undefined ? { clock: assembly.clock } : {}),
     ...(random !== undefined ? { random } : {}),
@@ -255,6 +323,8 @@ export async function startApi(config: ApiConfig, options: StartOptions): Promis
   try {
     app = assembleApi({
       ...assembly,
+      ...(random !== undefined ? { random } : {}),
+      ...(config.identity !== null ? { sessions: sessionAssemblyOf(config.environment, config.identity, database, identityKeySource ?? { kind: "GOOGLE_X509" }, assembly.clock) } : {}),
       environment: config.environment,
       unitOfWork: database.unitOfWork,
       database,

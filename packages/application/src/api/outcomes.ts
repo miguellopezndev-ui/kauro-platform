@@ -60,6 +60,7 @@ const EVERY_ROUTE: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("ADMISSION", "INVALID_REQUEST", "IDEMPOTENCY_KEY_INVALID", "the Idempotency-Key header is not a key of the accepted shape"),
   outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", null, "no authenticated subject: the anonymous denial is recorded"),
   outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", "SUBJECT_UNAUTHENTICATED", "the subject is not the identity the unit of work is bound to"),
+  outcome("AUTHENTICATION", "INVALID_REQUEST", "AMBIGUOUS_CREDENTIALS", "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"),
   outcome("ACCESS", "NOT_AUTHORIZED", "IDENTITY_DISABLED", "the token's or the stored identity state is DISABLED"),
   outcome("ACCESS", "NOT_AUTHORIZED", "IDENTITY_UNVERIFIED", "the launch policy needs a verified email and enrolled MFA"),
   outcome("IDEMPOTENCY", "IDEMPOTENCY_CONFLICT", "REQUEST_DIGEST_DIFFERS", "the key was used with another request: nothing was executed again"),
@@ -68,6 +69,15 @@ const EVERY_ROUTE: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("PLATFORM", "INTERNAL_ERROR", null, "an unexpected exception, recorded under the correlation id; retry with the same key"),
   outcome("PLATFORM", "INTEGRITY_FAILURE", null, "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"),
   outcome("PLATFORM", "INTEGRITY_FAILURE", "RESPONSE_CONTRACT_VIOLATION", "the reply its route's contract refused was not sent (R23, N13)"),
+]);
+
+/**
+ * The CSRF rule of an unsafe request authenticated by the session cookie (B11 D-AUTH-5), decided at authentication, before the
+ * journal is reserved: no idempotency key is consumed and the anonymous denial is recorded. A read (GET) never reaches it.
+ */
+const COOKIE_CSRF: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("AUTHENTICATION", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"),
+  outcome("AUTHENTICATION", "NOT_AUTHORIZED", "CSRF_TOKEN_INVALID", "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"),
 ]);
 
 /** Routes whose path carries ids. */
@@ -168,6 +178,7 @@ const HEADER_COMMANDS: ReadonlySet<ServedCommandId> = new Set(["CMD010", "CMD011
 function catalogueOf(command: ServedCommandId): ReadonlyArray<ProblemOutcome> {
   const entries = [
     ...EVERY_ROUTE,
+    ...COOKIE_CSRF,
     ...(TENANT_COMMANDS.has(command) ? [...PATH_IDS, ...TENANT] : []),
     ...(HEADER_COMMANDS.has(command) ? AGENCY_HEADER : []),
     ...COMMAND_SPECIFIC[command],
@@ -237,6 +248,58 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   ListMembers: readCatalogueOf("ListMembers"),
   ListClients: readCatalogueOf("ListClients"),
   GetProject: readCatalogueOf("GetProject"),
+});
+
+// --- the browser session boundary (B11 W2, design D-AUTH-1..5) ---------------------------------------------------------------
+
+const TRANSPORT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "TRANSPORT"));
+const PLATFORM_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "PLATFORM"));
+/** A body admitted like a command's, without an idempotency key: content type, size, strict JSON, closed schema. */
+const BODY_ADMISSION: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "ADMISSION" && o.reason !== "IDEMPOTENCY_KEY_MISSING" && o.reason !== "IDEMPOTENCY_KEY_INVALID"));
+const AMBIGUOUS = EVERY_ROUTE.find((o) => o.reason === "AMBIGUOUS_CREDENTIALS") as ProblemOutcome;
+const ANONYMOUS = EVERY_ROUTE.find((o) => o.code === "AUTHENTICATION_REQUIRED" && o.reason === null) as ProblemOutcome;
+const TOKEN_INVALID = outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", "IDENTITY_TOKEN_INVALID", "the identity token failed verification — shape, algorithm, key, signature, issuer, audience, lifetime or subject — one answer for every defect, which never says whether an account exists (D-AUTH-4)");
+const NO_BODY = outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the route takes no body and no query parameter", { fieldCodes: ["UNKNOWN_FIELD"] });
+
+function sessionCatalogue(operationId: string, entries: ReadonlyArray<ProblemOutcome>): ReadonlyArray<ProblemOutcome> {
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const key = `${e.code}/${e.reason ?? "-"}`;
+    if (seen.has(key)) throw new TypeError(`${operationId}: the outcome ${key} is listed twice`);
+    seen.add(key);
+  }
+  return Object.freeze([...entries]);
+}
+
+/**
+ * The closed problem catalogues of the operational routes that have one (the session boundary's; the probes answer any problem
+ * the Problem schema admits). The api's send guard refuses any other problem on these routes, like a command's.
+ */
+export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  openSession: sessionCatalogue("openSession", [
+    ...TRANSPORT_OUTCOMES,
+    ...BODY_ADMISSION,
+    AMBIGUOUS,
+    outcome("AUTHENTICATION", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the sign-in's Origin is not exactly an application origin, or the browser reports a cross-site request (login CSRF)"),
+    TOKEN_INVALID,
+    outcome("AUTHENTICATION", "ASSURANCE_REQUIRED", "EMAIL_NOT_VERIFIED", "the token proves the account, whose e-mail is not verified yet: verify it, then sign in again"),
+    ...PLATFORM_OUTCOMES,
+  ]),
+  getCurrentSession: sessionCatalogue("getCurrentSession", [...TRANSPORT_OUTCOMES, NO_BODY, AMBIGUOUS, outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", null, "no live session: no cookie, or its session is unknown, revoked or past its idle or absolute deadline"), ...PLATFORM_OUTCOMES]),
+  revokeCurrentSession: sessionCatalogue("revokeCurrentSession", [...TRANSPORT_OUTCOMES, NO_BODY, AMBIGUOUS, ...COOKIE_CSRF, ...PLATFORM_OUTCOMES]),
+  createStepUp: sessionCatalogue("createStepUp", [
+    ...TRANSPORT_OUTCOMES,
+    ...BODY_ADMISSION,
+    AMBIGUOUS,
+    ...COOKIE_CSRF,
+    ANONYMOUS,
+    TOKEN_INVALID,
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the re-authentication is another person's than the caller's"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "the re-authentication has no second factor"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the re-authentication is more than 300 s old"),
+    ...PLATFORM_OUTCOMES,
+  ]),
+  getIdentityConfig: sessionCatalogue("getIdentityConfig", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
 });
 
 /** The catalogue entry a problem is an instance of, or null. */

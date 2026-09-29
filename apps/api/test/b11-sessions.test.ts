@@ -8,10 +8,15 @@
 // without anyone sleeping.
 import assert from "node:assert/strict";
 import { createHash, createHmac, generateKeyPairSync, randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import type { AgencyMembershipView, Page } from "@kauro/application";
 import { ContractFakeIdentityIssuer, testClock } from "@kauro/application/testing";
-import { API_APPLICATION_NAME, ConfigError, assembleApi, createIdentityTokenVerifier, loadConfig, type IdentityTokenVerifierOptions } from "../src/index.js";
+import { ROLES } from "@kauro/persistence/testing";
+import { API_APPLICATION_NAME, ConfigError, assembleApi, bootstrap, createIdentityTokenVerifier, loadConfig, type IdentityTokenVerifierOptions } from "../src/index.js";
 import { startFakeIdentityServer } from "./support/fake-identity-server.js";
 import { selfSignedCertificatePem } from "./support/x509.js";
 import {
@@ -350,6 +355,11 @@ test("W2 revocation: a logout takes effect on the next request of that session â
   const replay = await browser(tabB, { url: routes.createClient(w.A.agencyId), body, key });
   assert.equal(replay.status, 201);
   assert.equal(replay.json<{ replayed: boolean }>().replayed, true);
+  // signing in again from the browser that holds tabB's cookie replaces that session: the old cookie reads nothing afterwards
+  const again = await browser(tabB, { url: sessionPaths.open, body: { idToken: await id.freshToken(w.admin) }, csrf: null });
+  assert.equal(again.status, 201, again.text);
+  assert.equal(outcome(w, await browser(tabB, { method: "GET", url: sessionPaths.current })), "401 AUTHENTICATION_REQUIRED -");
+  assert.equal((await sessionRow(tabB))["revoke_reason"], "REPLACED");
 });
 
 test("W2 expiry by the test clock: the idle window (1 800 s) restarts with each request, last-seen is written at most once a minute, and the absolute lifetime (43 200 s) ends a session whatever its activity", async () => {
@@ -649,6 +659,71 @@ test("W2 contract fake: the fake identity server (CONTRACT_FAKE, SIMULATED) serv
     assert.equal(foreign.headers.get("access-control-allow-origin"), null);
   } finally {
     await server.close();
+  }
+});
+
+test("W2 deployment path: bootstrap binds the session boundary from the environment â€” LOCAL with the contract fake's JWKS file signs in, reads and logs out over a real socket; SANDBOX with GOOGLE_X509 starts and announces the Identity Platform adapter; a boundary login outside kauro_assurance refuses the start", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "kauro-w2-boot-"));
+  const freePort = (): Promise<number> =>
+    new Promise((resolvePort, reject) => {
+      const srv = createServer();
+      srv.once("error", reject);
+      srv.listen(0, "127.0.0.1", () => {
+        const address = srv.address();
+        srv.close(() => resolvePort(typeof address === "object" && address !== null ? address.port : 0));
+      });
+    });
+  try {
+    const issuer = new ContractFakeIdentityIssuer({ projectId: "kauro-boot" });
+    const jwksFile = join(dir, "jwks.json");
+    writeFileSync(jwksFile, JSON.stringify(issuer.jwks()));
+    const origin = "https://app.kauro.test";
+    const base = {
+      KAURO_DB_HOST: "127.0.0.1",
+      KAURO_DB_PORT: String(w.h.pg.port),
+      KAURO_DB_NAME: ROLES.database,
+      KAURO_DB_USER: ROLES.appLogin,
+      KAURO_DB_POOL_MAX: "2",
+      KAURO_HTTP_HOST: "127.0.0.1",
+      KAURO_IDENTITY_PROJECT_ID: "kauro-boot",
+      KAURO_APP_ORIGINS: origin,
+      KAURO_DB_ASSURANCE_USER: ROLES.assuranceLogin,
+      KAURO_DB_ASSURANCE_POOL_MAX: "1",
+    };
+    const local = await bootstrap({ ...base, KAURO_ENVIRONMENT: "LOCAL", KAURO_HTTP_PORT: String(await freePort()), KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_FAKE_JWKS_FILE: jwksFile, KAURO_IDENTITY_FAKE_ENDPOINT: "https://identity.kauro.test" }, { logger: false });
+    try {
+      issuer.createAccount({ uid: "w2-boot-person", email: "w2-boot-person@example.test", password: "password-boot-1", emailVerified: true, totp: true });
+      const opened = await fetch(`${local.address}/api/v1/sessions`, { method: "POST", headers: { "content-type": "application/json", origin }, body: JSON.stringify({ idToken: issuer.mint("w2-boot-person") }) });
+      assert.equal(opened.status, 201);
+      const cookie = /^(__Host-kauro_session=[A-Za-z0-9_-]{43});/.exec(opened.headers.get("set-cookie") ?? "")?.[1];
+      assert.ok(cookie !== undefined, "the session cookie");
+      const view = (await opened.json()) as { csrfToken: string };
+      assert.equal((await fetch(`${local.address}/api/v1/sessions/current`, { headers: { cookie } })).status, 200);
+      const config = await fetch(`${local.address}/api/v1/public/identity-config`);
+      assert.deepEqual(await config.json(), { adapter: "CONTRACT_FAKE", projectId: "kauro-boot", endpoint: "https://identity.kauro.test" });
+      const logout = await fetch(`${local.address}/api/v1/sessions/current/revoke`, { method: "POST", headers: { cookie, origin, "x-kauro-csrf": view.csrfToken } });
+      assert.equal(logout.status, 204);
+      assert.equal(logout.headers.get("clear-site-data"), '"cache", "cookies", "storage"');
+      assert.equal((await fetch(`${local.address}/api/v1/sessions/current`, { headers: { cookie } })).status, 401);
+    } finally {
+      await local.close();
+    }
+    // outside LOCAL the verifier's key source is Google's (live qualification is B15's): the process starts and announces it
+    const cursorKey = join(dir, "cursor.key");
+    writeFileSync(cursorKey, Buffer.alloc(32, 7));
+    const sandbox = await bootstrap({ ...base, KAURO_ENVIRONMENT: "SANDBOX", KAURO_HTTP_PORT: String(await freePort()), KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: cursorKey, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }, { logger: false });
+    try {
+      assert.deepEqual(await (await fetch(`${sandbox.address}/api/v1/public/identity-config`)).json(), { adapter: "IDENTITY_PLATFORM", projectId: "kauro-boot" });
+    } finally {
+      await sandbox.close();
+    }
+    // the boundary's login must be a member of kauro_assurance: a request handler's login cannot keep the sessions
+    await assert.rejects(
+      bootstrap({ ...base, KAURO_ENVIRONMENT: "LOCAL", KAURO_HTTP_PORT: String(await freePort()), KAURO_IDENTITY_KEY_SOURCE: "CONTRACT_FAKE", KAURO_IDENTITY_FAKE_JWKS_FILE: jwksFile, KAURO_DB_ASSURANCE_USER: ROLES.controlLogin }, { logger: false }),
+      /member of kauro_assurance/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

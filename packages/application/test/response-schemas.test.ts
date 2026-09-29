@@ -154,12 +154,28 @@ test("R23: every response schema is closed and none declares a forbidden member;
 test("R23: the validator compiles the COMPLETED envelope of every served command, the ACCEPTED envelope and the declared replies of operational routes; operational routes are declared and checked like command routes", () => {
   for (const command of SERVED_COMMAND_IDS) assert.ok(validator.knownSchemaIds.includes(commandResponseSchemaId(command)), command);
   assert.ok(validator.knownSchemaIds.includes(ACCEPTED_RESPONSE_SCHEMA_ID));
-  // the operational routes of this edition are the two probes (14 "Monitoring and service health"); the default validator
-  // compiles exactly their declared replies, and a probe's reply is checked like a command's
-  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [["GET", "/livez", "getLiveness", ["200"]], ["GET", "/readyz", "getReadiness", ["200", "503"]]]);
+  // the operational routes of this edition are the two probes (14 "Monitoring and service health") and the five routes of the
+  // browser session boundary (B11 W2, D-AUTH-4); the default validator compiles exactly their declared reply bodies (the logout's
+  // 204 has none), and a probe's or a session route's reply is checked like a command's
+  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [
+    ["GET", "/livez", "getLiveness", ["200"]],
+    ["GET", "/readyz", "getReadiness", ["200", "503"]],
+    ["POST", "/api/v1/sessions", "openSession", ["201"]],
+    ["GET", "/api/v1/sessions/current", "getCurrentSession", ["200"]],
+    ["POST", "/api/v1/sessions/current/revoke", "revokeCurrentSession", ["204"]],
+    ["POST", "/api/v1/assurance/step-ups", "createStepUp", ["201"]],
+    ["GET", "/api/v1/public/identity-config", "getIdentityConfig", ["200"]],
+  ]);
   for (const route of OPERATIONAL_ROUTES) {
-    for (const status of Object.keys(route.responses)) assert.ok(validator.knownSchemaIds.includes(operationalResponseSchemaId(route.operationId, status)), `${route.operationId} ${status}`);
+    for (const [status, response] of Object.entries(route.responses)) {
+      assert.equal(validator.knownSchemaIds.includes(operationalResponseSchemaId(route.operationId, status)), response.schema !== null, `${route.operationId} ${status}`);
+    }
   }
+  // a reply declared without a body is checked as one: nothing sent, no media type
+  const logout = operationalRouteResponses("revokeCurrentSession");
+  checkReply(validator, logout, 204, undefined, undefined);
+  assert.throws(() => checkReply(validator, logout, 204, "application/json", { ended: true }), (e: unknown) => e instanceof ResponseContractViolation);
+  assert.throws(() => checkReply(validator, logout, 204, "application/json", undefined), (e: unknown) => e instanceof ResponseContractViolation);
   const live = operationalRouteResponses("getLiveness");
   assert.deepEqual(live.declared, { "200": { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getLiveness:200" } });
   checkReply(validator, live, 200, "application/json; charset=utf-8", { status: "LIVE" });

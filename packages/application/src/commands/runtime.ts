@@ -40,6 +40,7 @@ import type {
   TenantContext,
   UnitOfWork,
   UnitOfWorkFactory,
+  UserId,
 } from "@kauro/domain";
 import { DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
 import { unauthenticatedProblem } from "../api/admission.js";
@@ -319,4 +320,67 @@ export async function refuseUnauthenticated(runtime: Pick<CommandRuntime, "unitO
     return problemOf(e, request.correlationId);
   }
   return unauthenticatedProblem(request.correlationId);
+}
+
+/**
+ * The answer to a request whose credentials were refused at authentication (B11 design D-AUTH-5: AMBIGUOUS_CREDENTIALS, and the
+ * CSRF rule's ORIGIN_REJECTED and CSRF_TOKEN_INVALID): like an unauthenticated request, the refusal is a durable anonymous DENY
+ * fact before it is an answer — the request is not trusted to be the act of the person its cookie names, so it belongs to no
+ * person's stream — naming the refusal's reason and the policy that decided it. When the fact cannot be recorded the answer
+ * is that failure, never the refusal without its fact.
+ */
+export async function refuseAnonymously(runtime: Pick<CommandRuntime, "unitOfWork" | "clock">, action: string, request: UnauthenticatedRequest, failure: DomainFailure, policyVersion: string): Promise<Problem> {
+  try {
+    await runtime.unitOfWork.run({ kind: "ANONYMOUS", correlationId: request.correlationId }, (uow) =>
+      uow.securityEvents.append({
+        agencyId: null,
+        requestedAgencyId: request.agencyId,
+        actor: { kind: "ANONYMOUS" },
+        action,
+        outcome: "DENY",
+        reasonCode: failure.details.reason ?? failure.code,
+        policyVersion,
+        assuranceClass: "NONE",
+        correlationId: request.correlationId,
+        occurredAt: runtime.clock.now(),
+      }),
+    );
+  } catch (e) {
+    if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
+    return problemOf(e, request.correlationId);
+  }
+  return problemOf(failure, request.correlationId);
+}
+
+/** A fact of a person's own identity stream (agency_id NULL, actor = the person): a session opened or ended, a step-up. */
+export interface IdentityFact {
+  readonly userId: UserId;
+  readonly action: string;
+  readonly outcome: "ALLOW" | "DENY";
+  readonly reasonCode: string;
+  readonly assuranceClass: "SESSION" | "STEP_UP";
+  readonly policyVersion: string;
+  readonly correlationId: CorrelationId;
+}
+
+/**
+ * Records one fact of the person's own identity stream in its own unit of work under the person's IDENTITY context (the insert
+ * policy of migration 0007 admits exactly that: no agency, actor = the context's user).
+ */
+export async function recordIdentityFact(runtime: Pick<CommandRuntime, "unitOfWork" | "clock">, fact: IdentityFact): Promise<void> {
+  const context: IdentityContext = { kind: "IDENTITY", userId: fact.userId, correlationId: fact.correlationId };
+  await runtime.unitOfWork.run(context, (uow) =>
+    uow.securityEvents.append({
+      agencyId: null,
+      requestedAgencyId: null,
+      actor: actorOf(context),
+      action: fact.action,
+      outcome: fact.outcome,
+      reasonCode: fact.reasonCode,
+      policyVersion: fact.policyVersion,
+      assuranceClass: fact.assuranceClass,
+      correlationId: fact.correlationId,
+      occurredAt: runtime.clock.now(),
+    }),
+  );
 }

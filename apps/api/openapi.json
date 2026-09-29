@@ -28,6 +28,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -36,6 +39,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -68,7 +74,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 11 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 12 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -158,6 +164,12 @@
                 "reason": "IDEMPOTENCY_KEY_INVALID",
                 "layer": "ADMISSION",
                 "meaning": "the Idempotency-Key header is not a key of the accepted shape"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               }
             ]
           },
@@ -194,7 +206,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -222,6 +234,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               }
             ]
           },
@@ -383,6 +407,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -416,7 +443,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -444,6 +471,12 @@
                 "reason": "REQUEST_MALFORMED",
                 "layer": "TRANSPORT",
                 "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -625,6 +658,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -662,7 +698,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -690,6 +726,12 @@
                 "reason": "REQUEST_MALFORMED",
                 "layer": "TRANSPORT",
                 "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -924,6 +966,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -942,6 +987,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -974,7 +1022,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 14 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -1067,6 +1115,12 @@
               },
               {
                 "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              },
+              {
+                "code": "INVALID_REQUEST",
                 "reason": "PATH_ID_INVALID",
                 "fieldCodes": [
                   "FORMAT"
@@ -1118,7 +1172,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -1146,6 +1200,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -1338,6 +1404,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1381,7 +1450,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -1409,6 +1478,12 @@
                 "reason": "REQUEST_MALFORMED",
                 "layer": "TRANSPORT",
                 "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -1643,6 +1718,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1686,7 +1764,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -1714,6 +1792,12 @@
                 "reason": "REQUEST_MALFORMED",
                 "layer": "TRANSPORT",
                 "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -1939,6 +2023,314 @@
         }
       }
     },
+    "/api/v1/assurance/step-ups": {
+      "post": {
+        "operationId": "createStepUp",
+        "summary": "Record a recent second-factor re-authentication of the caller as a STEP_UP proof",
+        "description": "Authority: 08 \"Authentication and assurance\"; B11 design D-AUTH-1..5; B06 D-ASSUR-1, D-EVID-1",
+        "x-kauro-operational": true,
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/createStepUpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The proof, cited by CMD025 (and later CMD005, CMD007, CMD043) as assuranceProofRef until expiresAt.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/createStepUpResponse201"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "CONTENT_TYPE_UNSUPPORTED",
+                "layer": "ADMISSION",
+                "meaning": "the body is not application/json (UTF-8)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_SYNTAX",
+                "layer": "ADMISSION",
+                "meaning": "the body is not strict UTF-8 JSON"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DUPLICATE_KEY",
+                "layer": "ADMISSION",
+                "meaning": "an object of the body repeats a member name"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DEPTH_EXCEEDED",
+                "layer": "ADMISSION",
+                "meaning": "the body nests deeper than the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_STRING_TOO_LONG",
+                "layer": "ADMISSION",
+                "meaning": "a string of the body exceeds the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "REQUIRED",
+                  "UNKNOWN_FIELD",
+                  "TYPE",
+                  "FORMAT",
+                  "RANGE",
+                  "ENUM"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": null,
+                "layer": "AUTHENTICATION",
+                "meaning": "no authenticated subject: the anonymous denial is recorded"
+              },
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "IDENTITY_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the identity token failed verification — shape, algorithm, key, signature, issuer, audience, lifetime or subject — one answer for every defect, which never says whether an account exists (D-AUTH-4)"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "ASSURANCE_REQUIRED",
+                "reason": "STEP_UP_NOT_OWNED",
+                "layer": "ASSURANCE",
+                "meaning": "the re-authentication is another person's than the caller's"
+              },
+              {
+                "code": "ASSURANCE_REQUIRED",
+                "reason": "STEP_UP_MISSING",
+                "layer": "ASSURANCE",
+                "meaning": "the re-authentication has no second factor"
+              },
+              {
+                "code": "ASSURANCE_REQUIRED",
+                "reason": "STEP_UP_STALE",
+                "layer": "ASSURANCE",
+                "meaning": "the re-authentication is more than 300 s old"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
     "/api/v1/clients/{clientId}/archive": {
       "post": {
         "operationId": "ArchiveClient",
@@ -1956,6 +2348,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -1977,6 +2372,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -2009,7 +2407,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 14 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -2102,6 +2500,12 @@
               },
               {
                 "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              },
+              {
+                "code": "INVALID_REQUEST",
                 "reason": "PATH_ID_INVALID",
                 "fieldCodes": [
                   "FORMAT"
@@ -2150,7 +2554,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -2178,6 +2582,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -2387,6 +2803,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2408,6 +2827,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -2440,7 +2862,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 14 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 15 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -2533,6 +2955,12 @@
               },
               {
                 "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              },
+              {
+                "code": "INVALID_REQUEST",
                 "reason": "PATH_ID_INVALID",
                 "fieldCodes": [
                   "FORMAT"
@@ -2590,7 +3018,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -2618,6 +3046,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -2833,6 +3273,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -2854,6 +3297,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -2886,7 +3332,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 14 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -2979,6 +3425,12 @@
               },
               {
                 "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              },
+              {
+                "code": "INVALID_REQUEST",
                 "reason": "PATH_ID_INVALID",
                 "fieldCodes": [
                   "FORMAT"
@@ -3027,7 +3479,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -3055,6 +3507,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -3354,6 +3818,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3375,6 +3842,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -3407,7 +3877,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 18 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 19 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -3497,6 +3967,12 @@
                 "reason": "IDEMPOTENCY_KEY_INVALID",
                 "layer": "ADMISSION",
                 "meaning": "the Idempotency-Key header is not a key of the accepted shape"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -3593,7 +4069,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -3621,6 +4097,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -3876,6 +4364,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -3897,6 +4388,9 @@
           },
           {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
         "requestBody": {
@@ -3929,7 +4423,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 14 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -4022,6 +4516,12 @@
               },
               {
                 "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              },
+              {
+                "code": "INVALID_REQUEST",
                 "reason": "PATH_ID_INVALID",
                 "fieldCodes": [
                   "FORMAT"
@@ -4070,7 +4570,7 @@
             ]
           },
           "403": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -4098,6 +4598,18 @@
                 "reason": "IDENTITY_UNVERIFIED",
                 "layer": "ACCESS",
                 "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               },
               {
                 "code": "NOT_AUTHORIZED",
@@ -4305,6 +4817,9 @@
         "security": [
           {
             "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -4345,7 +4860,7 @@
             }
           },
           "400": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -4373,6 +4888,12 @@
                 "reason": "REQUEST_MALFORMED",
                 "layer": "TRANSPORT",
                 "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
               },
               {
                 "code": "INVALID_REQUEST",
@@ -4512,6 +5033,838 @@
                 "reason": null,
                 "layer": "COMMAND",
                 "meaning": "the project is not visible to the caller's agency"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/public/identity-config": {
+      "get": {
+        "operationId": "getIdentityConfig",
+        "summary": "Which identity client the application loads (public, no credential)",
+        "description": "Authority: B11 design D-AUTH-2",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The identity client adapter and its public configuration.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getIdentityConfigResponse200"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "UNKNOWN_FIELD"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the route takes no body and no query parameter"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "operationId": "openSession",
+        "summary": "Exchange a verified identity token for a browser session (Set-Cookie __Host-kauro_session)",
+        "description": "Authority: 08 \"Authentication and assurance\"; B11 design D-AUTH-1..5",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/openSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The session is open; the cookie carries its secret (Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age = the absolute lifetime).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetSessionCookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/openSessionResponse201"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "CONTENT_TYPE_UNSUPPORTED",
+                "layer": "ADMISSION",
+                "meaning": "the body is not application/json (UTF-8)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_SYNTAX",
+                "layer": "ADMISSION",
+                "meaning": "the body is not strict UTF-8 JSON"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DUPLICATE_KEY",
+                "layer": "ADMISSION",
+                "meaning": "an object of the body repeats a member name"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DEPTH_EXCEEDED",
+                "layer": "ADMISSION",
+                "meaning": "the body nests deeper than the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_STRING_TOO_LONG",
+                "layer": "ADMISSION",
+                "meaning": "a string of the body exceeds the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "REQUIRED",
+                  "UNKNOWN_FIELD",
+                  "TYPE",
+                  "FORMAT",
+                  "RANGE",
+                  "ENUM"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "IDENTITY_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the identity token failed verification — shape, algorithm, key, signature, issuer, audience, lifetime or subject — one answer for every defect, which never says whether an account exists (D-AUTH-4)"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the sign-in's Origin is not exactly an application origin, or the browser reports a cross-site request (login CSRF)"
+              },
+              {
+                "code": "ASSURANCE_REQUIRED",
+                "reason": "EMAIL_NOT_VERIFIED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the token proves the account, whose e-mail is not verified yet: verify it, then sign in again"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/current": {
+      "get": {
+        "operationId": "getCurrentSession",
+        "summary": "The session the cookie names, while it is live",
+        "description": "Authority: 08 \"Authentication and assurance\"; B11 design D-AUTH-1..5",
+        "x-kauro-operational": true,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live session; last-seen moves at most once a minute.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getCurrentSessionResponse200"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "UNKNOWN_FIELD"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the route takes no body and no query parameter"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": null,
+                "layer": "AUTHENTICATION",
+                "meaning": "no live session: no cookie, or its session is unknown, revoked or past its idle or absolute deadline"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/current/revoke": {
+      "post": {
+        "operationId": "revokeCurrentSession",
+        "summary": "Logout: end the session, clear the cookie and the site's cache, cookies and storage (idempotent)",
+        "description": "Authority: 08 \"Authentication and assurance\"; B11 design D-AUTH-1..5; 08 \"Browser, API and cache isolation\"",
+        "x-kauro-operational": true,
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Ended (or already ended): Set-Cookie clears the session cookie and Clear-Site-Data names cache, cookies and storage.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Set-Cookie": {
+                "$ref": "#/components/headers/SetSessionCookie"
+              },
+              "Clear-Site-Data": {
+                "$ref": "#/components/headers/ClearSiteData"
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "UNKNOWN_FIELD"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the route takes no body and no query parameter"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AMBIGUOUS_CREDENTIALS",
+                "layer": "AUTHENTICATION",
+                "meaning": "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ORIGIN_REJECTED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "CSRF_TOKEN_INVALID",
+                "layer": "AUTHENTICATION",
+                "meaning": "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"
               }
             ]
           },
@@ -5974,6 +7327,11 @@
               "STEP_UP_STALE",
               "STEP_UP_NOT_OWNED",
               "TENANT_CONTEXT_MISSING",
+              "IDENTITY_TOKEN_INVALID",
+              "EMAIL_NOT_VERIFIED",
+              "AMBIGUOUS_CREDENTIALS",
+              "ORIGIN_REJECTED",
+              "CSRF_TOKEN_INVALID",
               "UNLISTED_TRANSITION",
               "AGENCY_NOT_OPEN",
               "AGENCY_NOT_ACTIVE",
@@ -6599,6 +7957,131 @@
           }
         }
       },
+      "createStepUpRequest": {
+        "title": "createStepUp request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "idToken"
+        ],
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "pattern": "^[\\u0021-\\u007e]+$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:createStepUp"
+      },
+      "createStepUpResponse201": {
+        "title": "StepUpProofView",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "proofId",
+          "expiresAt"
+        ],
+        "properties": {
+          "proofId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:createStepUp:201"
+      },
+      "getCurrentSessionResponse200": {
+        "title": "SessionView",
+        "description": "The signed-in person and the session: verification facts as flags, the deadlines of the session, the freshness of its latest step-up and its CSRF token (B11 design D-AUTH-4).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "emailVerified",
+          "mfaEnrolled",
+          "mfaAt",
+          "stepUpFreshUntil",
+          "idleExpiresAt",
+          "absoluteExpiresAt",
+          "csrfToken"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "mfaEnrolled": {
+            "type": "boolean"
+          },
+          "mfaAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "stepUpFreshUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "idleExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "absoluteExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "csrfToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getCurrentSession:200"
+      },
+      "getIdentityConfigResponse200": {
+        "title": "IdentityConfigView",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "projectId"
+        ],
+        "properties": {
+          "adapter": {
+            "type": "string",
+            "enum": [
+              "IDENTITY_PLATFORM",
+              "CONTRACT_FAKE"
+            ]
+          },
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"
+          },
+          "endpoint": {
+            "type": "string",
+            "pattern": "^https?://[^\\s/]+$",
+            "maxLength": 200
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getIdentityConfig:200"
+      },
       "getLivenessResponse200": {
         "title": "getLiveness 200",
         "type": "object",
@@ -6767,6 +8250,82 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getReadiness:503"
+      },
+      "openSessionRequest": {
+        "title": "openSession request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "idToken"
+        ],
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384,
+            "pattern": "^[\\u0021-\\u007e]+$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:openSession"
+      },
+      "openSessionResponse201": {
+        "title": "SessionView",
+        "description": "The signed-in person and the session: verification facts as flags, the deadlines of the session, the freshness of its latest step-up and its CSRF token (B11 design D-AUTH-4).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "emailVerified",
+          "mfaEnrolled",
+          "mfaAt",
+          "stepUpFreshUntil",
+          "idleExpiresAt",
+          "absoluteExpiresAt",
+          "csrfToken"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "mfaEnrolled": {
+            "type": "boolean"
+          },
+          "mfaAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "stepUpFreshUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "idleExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "absoluteExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "csrfToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:openSession:201"
       }
     },
     "parameters": {
@@ -6822,6 +8381,16 @@
           "pattern": "^[A-Za-z0-9_-]{8,512}\\.[A-Za-z0-9_-]{43}$",
           "maxLength": 600
         }
+      },
+      "CsrfToken": {
+        "name": "X-Kauro-CSRF",
+        "in": "header",
+        "required": false,
+        "description": "The session's CSRF token (SessionView.csrfToken): required on an unsafe request the session cookie authenticates (B11 D-AUTH-5); refused as CSRF_TOKEN_INVALID otherwise.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
       }
     },
     "headers": {
@@ -6839,6 +8408,19 @@
           "type": "string",
           "const": "no-store"
         }
+      },
+      "SetSessionCookie": {
+        "description": "The session cookie (__Host-kauro_session): set by sign-in, cleared (Max-Age=0) by logout.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ClearSiteData": {
+        "description": "The logout clears the site's cache, cookies and storage where the browser allows it (08 \"Browser, API and cache isolation\").",
+        "schema": {
+          "type": "string",
+          "const": "\"cache\", \"cookies\", \"storage\""
+        }
       }
     },
     "securitySchemes": {
@@ -6846,6 +8428,12 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Authenticated subject (08 \"Authentication and assurance\")."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-kauro_session",
+        "description": "The browser session (B11 design D-AUTH-1, D-AUTH-5): Secure; HttpOnly; SameSite=Lax. An unsafe request it authenticates needs the exact application Origin, a same-origin Sec-Fetch-Site and the session's X-Kauro-CSRF token; a cookie beside an Authorization header is AMBIGUOUS_CREDENTIALS."
       }
     }
   }

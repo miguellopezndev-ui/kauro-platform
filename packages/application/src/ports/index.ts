@@ -6,3 +6,4 @@ export type { SchemaValidator, KnownSchemaId, ValidationOutcome } from "./schema
 export type { ArtifactResolver, DecisionPatch, PlanPatchCompiler, PatchCompilation, DisclosureComposer, DisclosureSet } from "./plan-services.js";
 export type { ActiveWorkInspector, ActiveWorkSummary, ExternalActionInspector, CompletedExternalAction, CommercialConsequenceInspector, UnreconciledConsequence } from "./work-inspectors.js";
 export type { CommandSpec, CommandHandler, CommandBus } from "./command-handler.js";
+export type { IdentityTokenVerifier, IdentityTokenVerification, IdentityTokenDefect, VerifiedIdentityToken, WebSessionStore, WebSessionRecord, NewWebSession } from "./sessions.js";

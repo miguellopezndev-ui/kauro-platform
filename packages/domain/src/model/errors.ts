@@ -121,6 +121,15 @@ export const FAILURE_REASONS = [
   "STEP_UP_STALE",
   "STEP_UP_NOT_OWNED",
   "TENANT_CONTEXT_MISSING",
+  // the browser session boundary (B11 design D-AUTH-4, D-AUTH-5): every defect of an identity token is one reason (no account
+  // enumeration); a proven account whose e-mail is unverified; a request carrying a session cookie and another credential (or
+  // two session cookies); an unsafe cookie-authenticated request from outside the exact application origin, or without the
+  // session's CSRF token
+  "IDENTITY_TOKEN_INVALID",
+  "EMAIL_NOT_VERIFIED",
+  "AMBIGUOUS_CREDENTIALS",
+  "ORIGIN_REJECTED",
+  "CSRF_TOKEN_INVALID",
   // aggregate state (07 state machines, reference/TRANSITIONS_AND_EVENT_EFFECTS.md)
   "UNLISTED_TRANSITION",
   "AGENCY_NOT_OPEN",

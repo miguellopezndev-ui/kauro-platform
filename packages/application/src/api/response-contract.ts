@@ -16,7 +16,7 @@ import type { FieldError } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { KnownSchemaId, SchemaValidator } from "../ports/schema-validator.js";
 import { HEADERS } from "./envelope.js";
-import { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
+import { COMMAND_OUTCOMES, OPERATIONAL_OUTCOMES, READ_OUTCOMES, outcomeOf, type ProblemOutcome } from "./outcomes.js";
 import { problemOf, type Problem } from "./problems.js";
 import {
   COMMAND_RESPONSES,
@@ -29,9 +29,10 @@ import {
   type ServedCommandId,
 } from "./response-schemas.js";
 
+/** A declared reply: its media type and schema, or both null for a reply without a body (204). */
 export interface DeclaredResponse {
-  readonly contentType: string;
-  readonly schemaId: KnownSchemaId;
+  readonly contentType: string | null;
+  readonly schemaId: KnownSchemaId | null;
 }
 
 /** What a route may answer: its declared replies by status, and the Problem document for every other status >= 400. */
@@ -80,8 +81,10 @@ export function operationalRouteResponses(operationId: string, routes: ReadonlyA
   const route = routes.find((r) => r.operationId === operationId);
   if (!route) throw new DomainFailure("INTEGRITY_FAILURE", `no operational route ${operationId} is declared`);
   const declared: Record<string, DeclaredResponse> = {};
-  for (const [status, response] of Object.entries(route.responses)) declared[status] = Object.freeze({ contentType: response.contentType, schemaId: operationalResponseSchemaId(operationId, status) });
-  return Object.freeze({ operationId, declared: Object.freeze(declared), problem: PROBLEM_RESPONSE, outcomes: null });
+  for (const [status, response] of Object.entries(route.responses)) {
+    declared[status] = Object.freeze(response.schema === null ? { contentType: null, schemaId: null } : { contentType: response.contentType, schemaId: operationalResponseSchemaId(operationId, status) });
+  }
+  return Object.freeze({ operationId, declared: Object.freeze(declared), problem: PROBLEM_RESPONSE, outcomes: OPERATIONAL_OUTCOMES[operationId] ?? null });
 }
 
 export function isServedCommand(id: string): id is ServedCommandId {
@@ -117,6 +120,13 @@ export function checkReply(validator: SchemaValidator, responses: RouteResponses
   const declared = responses.declared[String(status)];
   const expected = declared ?? (status >= 400 && status <= 599 ? responses.problem : null);
   if (expected === null) throw new ResponseContractViolation(responses.operationId, status, null, `status ${status} is not declared`);
+  if (expected.schemaId === null || expected.contentType === null) {
+    // a reply declared without a body (204) carries none, and no media type
+    if (body !== undefined && body !== null && body !== "") throw new ResponseContractViolation(responses.operationId, status, null, `status ${status} is declared without a body`);
+    if (mediaTypeOf(contentType) !== "") throw new ResponseContractViolation(responses.operationId, status, null, `status ${status} is declared without a body; it names the media type ${mediaTypeOf(contentType)}`);
+    return;
+  }
+  if (body === undefined || body === null || body === "") throw new ResponseContractViolation(responses.operationId, status, expected.schemaId, "the reply has no body");
   if (mediaTypeOf(contentType) !== expected.contentType) {
     throw new ResponseContractViolation(responses.operationId, status, expected.schemaId, `content type ${mediaTypeOf(contentType) || "(none)"} is not ${expected.contentType}`);
   }

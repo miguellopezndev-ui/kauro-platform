@@ -17,12 +17,18 @@
  * both outcomes. A hold armed with a failure throws as soon as it is reached — a simulated crash before COMMIT
  * (journal.commit) or a lost response after COMMIT (after.commit). No sleep synchronizes anything; the only polling is the
  * observation of pg_stat_activity.
+ *
+ * With `sessions: true` the world also binds the browser session boundary of B11 W2 (design D-AUTH-*): the api's own
+ * kauro_assurance pool, the shipped identity token verifier over the JWKS of the contract-fake issuer (ContractFakeIdentityIssuer
+ * of @kauro/application/testing, CONTRACT_FAKE, SIMULATED; it shares the api's clock) and the application origin; `identity()`
+ * signs people in through the real POST /api/v1/sessions.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, SessionView } from "@kauro/application";
+import { ContractFakeIdentityIssuer } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -48,8 +54,22 @@ import type {
   ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
+import { PgWebSessionStore } from "@kauro/persistence";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
+import {
+  API_APPLICATION_NAME,
+  assembleApi,
+  createBearerTokenAuthenticator,
+  createIdentityTokenVerifier,
+  loadContractSchemas,
+  noCommercialConsequencesInThisEdition,
+  noExternalActionsInThisEdition,
+  openDatabase,
+  openProjectsInspector,
+  subjectOf,
+  type DatabaseHandle,
+  type SessionAssembly,
+} from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -382,7 +402,58 @@ export interface World {
   journal(key: string): Promise<JournalRow | null>;
   /** Superuser oracle: the security events of a command, in order. */
   securityEvents(action: string): Promise<ReadonlyArray<SecurityEventRow>>;
+  /** The session boundary's fixture (a world built with `sessions: true`; throws otherwise). */
+  identity(): IdentityFixture;
   stop(): Promise<void>;
+}
+
+// --- the browser session boundary (B11 W2) ---------------------------------------------------------------------------------
+
+/** The routes of the session boundary. */
+export const sessionPaths = {
+  open: "/api/v1/sessions",
+  current: "/api/v1/sessions/current",
+  revoke: "/api/v1/sessions/current/revoke",
+  stepUp: "/api/v1/assurance/step-ups",
+  identityConfig: "/api/v1/public/identity-config",
+} as const;
+
+/** The application origin the world's api accepts (KAURO_APP_ORIGINS) and the contract fake's announced endpoint. */
+export const APP_ORIGIN = "https://app.kauro.test";
+export const FAKE_IDENTITY_ENDPOINT = "https://identity.kauro.test";
+export const IDENTITY_PROJECT_ID = "kauro-local";
+
+/** What a browser holds after sign-in: the cookie it sends back, and the view (with the CSRF token) the page keeps in memory. */
+export interface BrowserSession {
+  /** The Cookie header value: `__Host-kauro_session=<secret>`. */
+  readonly cookie: string;
+  readonly secret: string;
+  /** SHA-256 of the secret's bytes: the only form in which the database holds the session. */
+  readonly secretSha256: string;
+  readonly view: SessionView;
+}
+
+/** An account of the contract-fake identity provider (password + TOTP). */
+export interface SessionAccount {
+  readonly uid: string;
+  readonly email: string;
+  readonly password: string;
+  readonly userId: UserId;
+}
+
+export interface IdentityFixture {
+  readonly issuer: ContractFakeIdentityIssuer;
+  readonly origin: string;
+  readonly endpoint: string;
+  /** The session boundary the world's api is assembled with (a test assembles another api over it). */
+  readonly assembly: SessionAssembly;
+  /** The fake account of a world person (uid = the person's name) or of a new uid; created once, with TOTP enrolled. */
+  account(who: Person | string, opts?: { readonly emailVerified?: boolean }): SessionAccount;
+  /** A fresh ID token of a password + TOTP sign-in at the fake, now. */
+  freshToken(who: Person | SessionAccount): Promise<string>;
+  /** Signs the account in through POST /api/v1/sessions (201 expected). */
+  signInAs(account: SessionAccount): Promise<{ readonly reply: Reply; readonly session: BrowserSession }>;
+  signIn(who: Person): Promise<BrowserSession>;
 }
 
 export interface WorldOptions {
@@ -390,6 +461,8 @@ export interface WorldOptions {
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
   /** The clock the api (authorizer, handlers) runs on; the fixture clock by default. */
   readonly clock?: Clock;
+  /** Binds the browser session boundary (B11 W2) with the contract-fake identity issuer on the api's clock. */
+  readonly sessions?: boolean;
 }
 
 export interface RawEvent {
@@ -416,7 +489,21 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const db = await openDatabase({
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: 10_000 },
     migrateOnStart: null,
+    ...(options.sessions === true ? { identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 2 } } } : {}),
   });
+  const apiClock = options.clock ?? clock;
+  let sessionAssembly: SessionAssembly | undefined;
+  let issuer: ContractFakeIdentityIssuer | null = null;
+  if (options.sessions === true) {
+    if (db.assurancePool === null) throw new Error("the session boundary's pool did not open");
+    issuer = new ContractFakeIdentityIssuer({ projectId: IDENTITY_PROJECT_ID, clock: apiClock });
+    sessionAssembly = {
+      verifier: createIdentityTokenVerifier({ projectId: IDENTITY_PROJECT_ID, environment: "LOCAL", keySource: { kind: "CONTRACT_FAKE", jwks: issuer.jwks() }, clock: apiClock }),
+      store: new PgWebSessionStore(db.assurancePool),
+      appOrigins: [APP_ORIGIN],
+      identityConfig: { adapter: "CONTRACT_FAKE", projectId: IDENTITY_PROJECT_ID, endpoint: FAKE_IDENTITY_ENDPOINT },
+    };
+  }
   const holds = new HoldPoints();
   const stats: UnitOfWorkStats = { runs: 0 };
   const validator = loadContractSchemas();
@@ -452,9 +539,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     validator,
-    clock: options.clock ?? clock,
+    clock: apiClock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
+    ...(sessionAssembly !== undefined ? { sessions: sessionAssembly } : {}),
   });
   await app.ready();
 
@@ -722,13 +810,68 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       return r.rows.map((x) => ({ outcome: x.outcome, reason: x.reason_code, agencyId: x.agency_id, actorId: x.actor_id, policyVersion: x.policy_version, assuranceClass: x.assurance_class }));
     },
 
+    identity() {
+      if (identityFixture === null) throw new Error("this world was built without the session boundary (world({ sessions: true }))");
+      return identityFixture;
+    },
+
     async stop() {
       await app.close();
       await db.close();
       await h.stop();
     },
   };
+  const identityFixture = issuer === null || sessionAssembly === undefined ? null : identityFixtureOf(w, issuer, sessionAssembly);
   return w;
+}
+
+function identityFixtureOf(w: World, issuer: ContractFakeIdentityIssuer, assembly: SessionAssembly): IdentityFixture {
+  const accounts = new Map<string, SessionAccount>();
+  const account = (who: Person | string, opts: { readonly emailVerified?: boolean } = {}): SessionAccount => {
+    const uid = typeof who === "string" ? who : who.name;
+    const known = accounts.get(uid);
+    if (known !== undefined) return known;
+    const created: SessionAccount = { uid, email: `${uid}@example.test`, password: `password-${uid}-1`, userId: identityUserId("identity-platform", uid) };
+    issuer.createAccount({ uid, email: created.email, password: created.password, emailVerified: opts.emailVerified ?? true, totp: true });
+    accounts.set(uid, created);
+    return created;
+  };
+  const freshToken = async (who: Person | SessionAccount): Promise<string> => {
+    const a = "uid" in who ? who : account(who);
+    const first = issuer.signInWithPassword(a.email, a.password);
+    if (first.kind === "SIGNED_IN") return first.idToken;
+    if (first.kind !== "MFA_REQUIRED") throw new Error(`the fake refused the sign-in of ${a.uid}: ${first.code}`);
+    const second = issuer.finalizeTotp(first.mfaPendingCredential, issuer.totpCodeFor(a.uid), first.mfaEnrollmentId);
+    if (second.kind !== "SIGNED_IN") throw new Error(`the fake refused the second factor of ${a.uid}`);
+    return second.idToken;
+  };
+  const signInAs = async (a: SessionAccount): Promise<{ readonly reply: Reply; readonly session: BrowserSession }> => {
+    const reply = await call(w, { url: sessionPaths.open, token: null, key: null, agency: null, body: { idToken: await freshToken(a) }, headers: { origin: APP_ORIGIN } });
+    if (reply.status !== 201) throw new Error(`sign-in of ${a.uid} answered ${reply.status}: ${reply.text}`);
+    const setCookie = reply.headers["set-cookie"];
+    const value = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    const secret = typeof value === "string" ? /^__Host-kauro_session=([A-Za-z0-9_-]{43});/.exec(value)?.[1] : undefined;
+    if (secret === undefined) throw new Error("the sign-in set no session cookie");
+    return {
+      reply,
+      session: {
+        cookie: `__Host-kauro_session=${secret}`,
+        secret,
+        secretSha256: createHash("sha256").update(Buffer.from(secret, "base64url")).digest("hex"),
+        view: reply.json<SessionView>(),
+      },
+    };
+  };
+  return {
+    issuer,
+    origin: APP_ORIGIN,
+    endpoint: FAKE_IDENTITY_ENDPOINT,
+    assembly,
+    account,
+    freshToken,
+    signInAs,
+    signIn: async (who) => (await signInAs(account(who))).session,
+  };
 }
 
 // --- HTTP calls ------------------------------------------------------------------------------------------------------------

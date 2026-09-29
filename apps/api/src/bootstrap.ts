@@ -4,9 +4,11 @@
  * database (LOCAL migrations on start when configured, verified pool) → server → listen. `main.ts` calls this and wires the signals; the tests call it against a temporary cluster to prove the
  * deployment path itself.
  *
- * Authentication in this edition (I-INT-3): the LOCAL environment reads the bearer-token file; SANDBOX and LIVE need the
- * Identity Platform verifier, which is not bound here, so the process refuses to start in those environments instead of
- * serving requests nobody can authenticate.
+ * Authentication in this edition (I-INT-3, extended by B11 W2): when the configuration binds the browser session boundary
+ * (KAURO_IDENTITY_*, KAURO_APP_ORIGINS, KAURO_DB_ASSURANCE_*), the api authenticates session cookies with the identity token
+ * verifier of D-AUTH-3 (Google's securetoken certificates; in LOCAL, the contract fake's JWKS file) — beside the LOCAL
+ * bearer-token file when one is configured. Without the session boundary, LOCAL reads the bearer-token file and SANDBOX and
+ * LIVE refuse to start instead of serving requests nobody can authenticate.
  *
  * The serving process never holds the owner's credential in its environment (review R44 and re-check finding N7; 07
  * "Migration roles are separate from runtime"; 08 "privileged migration roles are never used by request handlers"):
@@ -18,16 +20,44 @@
  * every answer from then on closes its connection — and the pool, and gives up at the configured deadline, below the
  * platform's grace period, closing whatever connections remain.
  */
+import { readFileSync } from "node:fs";
 import { createBearerTokenAuthenticator, loadBearerTokenFile, type Authenticator } from "./authenticator.js";
 import { startApi, type StartedApi, type StartOptions } from "./composition.js";
 import { CURSOR_KEY_FILE_VARIABLE, ConfigError, MIGRATOR_PASSWORD_FILE_VARIABLE, loadConfig, readKeyFile, readSecretFile, type ApiConfig } from "./config.js";
+import type { IdentityKeySource, JsonWebKeySet } from "./identity-verifier.js";
 
+/**
+ * The bearer side of authentication: the LOCAL bearer-token file when one is configured; none (every bearer token refused) when
+ * the session boundary authenticates instead. Without either, the process refuses to start.
+ */
 export function authenticatorOf(config: ApiConfig): Authenticator {
-  if (config.environment === "LOCAL") {
-    if (config.bearerTokensFile === null) throw new ConfigError("KAURO_AUTH_BEARER_TOKENS_FILE", "is required in the LOCAL environment of this edition");
-    return createBearerTokenAuthenticator(loadBearerTokenFile(config.bearerTokensFile));
+  if (config.environment === "LOCAL" && config.bearerTokensFile !== null) return createBearerTokenAuthenticator(loadBearerTokenFile(config.bearerTokensFile));
+  if (config.identity !== null) return createBearerTokenAuthenticator(new Map());
+  if (config.environment === "LOCAL") throw new ConfigError("KAURO_AUTH_BEARER_TOKENS_FILE", "is required in the LOCAL environment of this edition unless the session boundary is configured (KAURO_IDENTITY_*)");
+  throw new ConfigError("KAURO_ENVIRONMENT", `${config.environment} needs the Identity Platform verifier of the session boundary (KAURO_IDENTITY_KEY_SOURCE=GOOGLE_X509 and the other KAURO_IDENTITY_*, KAURO_APP_ORIGINS, KAURO_DB_ASSURANCE_* variables; I-INT-3, B11 W2)`);
+}
+
+/** The contract fake's JWKS as the configuration names it (LOCAL only); every refusal names the variable, never the content. */
+export function readFakeJwks(path: string): JsonWebKeySet {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    const code = e instanceof Error && typeof (e as NodeJS.ErrnoException).code === "string" ? String((e as NodeJS.ErrnoException).code) : "not JSON";
+    throw new ConfigError("KAURO_IDENTITY_FAKE_JWKS_FILE", `names a file that cannot be read as JSON (${code})`);
   }
-  throw new ConfigError("KAURO_ENVIRONMENT", `${config.environment} needs the Identity Platform verifier, which this edition does not bind (I-INT-3)`);
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { keys?: unknown }).keys) || (parsed as { keys: unknown[] }).keys.length === 0) {
+    throw new ConfigError("KAURO_IDENTITY_FAKE_JWKS_FILE", "names a document that is not a JSON Web Key Set with at least one key");
+  }
+  return parsed as JsonWebKeySet;
+}
+
+/** The verifier's key source the configuration names. */
+export function identityKeySourceOf(config: ApiConfig): IdentityKeySource | undefined {
+  if (config.identity === null) return undefined;
+  if (config.identity.keySource === "GOOGLE_X509") return { kind: "GOOGLE_X509" };
+  if (config.identity.fakeJwksFile === null) throw new ConfigError("KAURO_IDENTITY_FAKE_JWKS_FILE", "is required with KAURO_IDENTITY_KEY_SOURCE=CONTRACT_FAKE");
+  return { kind: "CONTRACT_FAKE", jwks: readFakeJwks(config.identity.fakeJwksFile) };
 }
 
 /** CLOSED: the drain finished in time. DEADLINE_EXCEEDED: the remaining connections were closed; `closing` settles later. */
@@ -74,8 +104,10 @@ export async function bootstrap(env: Readonly<Record<string, string | undefined>
   const passwordFile = config.migrateOnStart?.passwordFile ?? null;
   const migratorPassword = passwordFile === null ? undefined : readSecretFile(MIGRATOR_PASSWORD_FILE_VARIABLE, passwordFile);
   const cursorKey = config.cursorKeyFile === null ? undefined : readKeyFile(CURSOR_KEY_FILE_VARIABLE, config.cursorKeyFile);
+  const identityKeySource = identityKeySourceOf(config);
   const started = await startApi(config, {
     authenticator,
+    ...(identityKeySource !== undefined ? { identityKeySource } : {}),
     logger: options.logger ?? true,
     ...(migratorPassword !== undefined ? { migratorPassword } : {}),
     ...(cursorKey !== undefined ? { cursorKey } : {}),

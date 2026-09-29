@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { EndClientView, KnownSchemaId, ProjectView } from "@kauro/application";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, commandResponseSchemaId, operationalResponseSchemaId, readResponseSchemaId, requestSchemaId } from "@kauro/application";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, commandResponseSchemaId, operationalRequestSchemaId, operationalResponseSchemaId, readResponseSchemaId, requestSchemaId } from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import { asProblem, call, completed, effectCounts, ids, outcome, routes, sha, world, type World } from "./support.js";
@@ -86,11 +86,14 @@ test("the validator the api composes is closed: exactly the contract names, the 
   const responseIds = [
     ...SERVED_COMMAND_IDS.map(commandResponseSchemaId),
     ACCEPTED_RESPONSE_SCHEMA_ID,
-    ...OPERATIONAL_ROUTES.flatMap((r) => Object.keys(r.responses).map((s) => operationalResponseSchemaId(r.operationId, s))),
+    // (a reply declared without a body, the logout's 204, has no schema)
+    ...OPERATIONAL_ROUTES.flatMap((r) => Object.entries(r.responses).filter(([, response]) => response.schema !== null).map(([s]) => operationalResponseSchemaId(r.operationId, s))),
     // the READ envelopes of the manual-10 reads (N16)
     ...READ_OPERATION_IDS.map(readResponseSchemaId),
   ];
-  const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, ...responseIds, "Problem"].sort();
+  // the request bodies of the operational routes that take one (B11 W2: the identity token of a sign-in and of a step-up)
+  const operationalRequestIds = OPERATIONAL_ROUTES.filter((r) => r.request !== undefined).map((r) => operationalRequestSchemaId(r.operationId));
+  const expected = [...CONTRACT_NAMES, ...REQUEST_SCHEMA_IDS, ...operationalRequestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(Object.keys(w.validator).sort(), ["knownSchemaIds", "validate"], "validate and the closed id list: nothing compiles or registers a schema");

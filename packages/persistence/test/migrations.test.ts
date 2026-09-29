@@ -22,7 +22,8 @@ after(async () => {
 
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
-  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md)
+  // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md); 0009 is B11 W2's
+  // web sessions (docs/design/B11-agency-app.md D-AUTH-1), numbered on its own branch and renumbered by the B11 integrator
   assert.deepEqual(files.map((f) => f.file), [
     "0001_schema_roles_helpers.sql",
     "0002_identity_agencies_memberships.sql",
@@ -32,6 +33,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0006_journals_leases.sql",
     "0007_security_events.sql",
     "0008_aggregate_kind_registry.sql",
+    "0009_web_sessions.sql",
   ]);
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
   const owner = await pg.connect("kauro_owner");

@@ -25,8 +25,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.equal(readFileSync(DOCUMENT_PATH, "utf8"), serialize(expected));
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
-  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16) and the two
-  // operational probes
+  // the seven registry commands B06 serves, under their registry paths and names, the five manual-10 reads (N16), the two
+  // operational probes and the five routes of the browser session boundary (B11 W2)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -35,15 +35,20 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/public/identity-config getIdentityConfig",
+      "GET /api/v1/sessions/current getCurrentSession",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
+      "POST /api/v1/assurance/step-ups createStepUp",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/sessions openSession",
+      "POST /api/v1/sessions/current/revoke revokeCurrentSession"
     ],
   );
   for (const command of sources.registryCommands.filter((c) => sources.application.SERVED_COMMAND_IDS.includes(c.id))) {
@@ -65,14 +70,28 @@ test("the committed document is the generated one, byte for byte, and matches ev
     const problemStatuses = sources.application.outcomesByStatus(sources.application.READ_OUTCOMES[read.operationId]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), ["200", ...problemStatuses].sort());
   }
-  // the probes are the operational routes of @kauro/application (R42 connected to R23): documented with the replies they declare
+  // the probes and the session routes are the operational routes of @kauro/application (R42 connected to R23): documented with
+  // the replies they declare — a probe with the one Problem default, a session route with one Problem per status of its closed
+  // catalogue (like a command's), a body-less 204 without content, a request body where the route takes one
   for (const route of sources.operationalRoutes) {
     const op = expected.paths[route.path][route.method.toLowerCase()];
     assert.equal(op.operationId, route.operationId);
     assert.equal(op["x-kauro-operational"], true);
-    assert.deepEqual(Object.keys(op.responses).sort(), [...Object.keys(route.responses), "default"].sort());
+    const outcomes = sources.application.OPERATIONAL_OUTCOMES[route.operationId];
+    const problemStatuses = outcomes === undefined ? ["default"] : sources.application.outcomesByStatus(outcomes).map(([status]) => String(status));
+    assert.deepEqual(Object.keys(op.responses).sort(), [...Object.keys(route.responses), ...problemStatuses].sort());
+    for (const [status, response] of Object.entries(route.responses)) assert.equal(op.responses[status].content === undefined, response.schema === null, `${route.operationId} ${status}`);
+    assert.equal(op.requestBody !== undefined, route.request !== undefined, route.operationId);
   }
-  assert.deepEqual(sources.operationalRoutes.map((r) => `${r.method} ${r.path} ${r.operationId}`), ["GET /livez getLiveness", "GET /readyz getReadiness"]);
+  assert.deepEqual(sources.operationalRoutes.map((r) => `${r.method} ${r.path} ${r.operationId}`), [
+    "GET /livez getLiveness",
+    "GET /readyz getReadiness",
+    "POST /api/v1/sessions openSession",
+    "GET /api/v1/sessions/current getCurrentSession",
+    "POST /api/v1/sessions/current/revoke revokeCurrentSession",
+    "POST /api/v1/assurance/step-ups createStepUp",
+    "GET /api/v1/public/identity-config getIdentityConfig",
+  ]);
   // the ApprovalView component carries every member of the KAURO_PLAN_APPROVAL_V1 preimage (R29)
   const approval = expected.components.schemas.ApprovalView;
   for (const member of ["approvalId", "actorId", "agencyId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "createdAt"]) {

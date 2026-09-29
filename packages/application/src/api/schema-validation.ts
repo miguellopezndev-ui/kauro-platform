@@ -12,7 +12,7 @@ import type { KnownSchemaId, SchemaValidator, ValidationOutcome } from "../ports
 import { compileSchemaBundle, type CompiledSchemaSet } from "./json-schema.js";
 import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
-import { OPERATIONAL_ROUTES, buildResponseSchemas, type OperationalRoute } from "./response-schemas.js";
+import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -91,6 +91,7 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[name] = def;
   }
   for (const [command, schema] of Object.entries(REQUEST_SCHEMAS)) roots[`${REQUEST_SCHEMA_PREFIX}${command as RequestSchemaCommand}`] = schema;
+  Object.assign(roots, operationalRequestSchemas(operational));
   const responses = buildResponseSchemas(bundle, operational);
   Object.assign(roots, responses.roots);
   roots["Problem"] = PROBLEM_SCHEMA;

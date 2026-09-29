@@ -37,6 +37,8 @@ export type {
   ViewDefinition,
   OperationalRoute,
   OperationalResponse,
+  OperationalRequest,
+  OperationalRequestSchemaId,
   RegistryBundle,
   ResponseSchemaSet,
   ReadOperationId,
@@ -54,6 +56,15 @@ export {
   ACCEPTED_RESPONSE_SCHEMA,
   ACCEPTED_RESPONSE_SCHEMA_ID,
   OPERATIONAL_ROUTES,
+  SESSION_ROUTES,
+  SESSION_OPERATION_IDS,
+  SESSION_VIEW_SCHEMA,
+  STEP_UP_PROOF_SCHEMA,
+  IDENTITY_CONFIG_SCHEMA,
+  IDENTITY_TOKEN_REQUEST_SCHEMA,
+  OPERATIONAL_REQUEST_SCHEMA_PREFIX,
+  operationalRequestSchemaId,
+  operationalRequestSchemas,
   LIVENESS_RESPONSE_SCHEMA,
   READINESS_RESPONSE_SCHEMA,
   FORBIDDEN_RESPONSE_FIELDS,
@@ -65,7 +76,7 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, OPERATIONAL_OUTCOMES, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,
@@ -79,7 +90,7 @@ export {
   responseIntegrityProblem,
 } from "./api/response-contract.js";
 export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome } from "./api/admission.js";
-export { admitHeaders, admitStructure, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
+export { admitHeaders, admitStructure, admitOperationalBody, admitEmptyRequest, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {
   CreateAgencyBody,
   CreateAgencyView,
@@ -103,8 +114,29 @@ export type {
   B06CommandId,
 } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS } from "./commands/contracts.js";
-export type { CommandRuntime, CommandContext, CommandOutcome, UnauthenticatedRequest } from "./commands/runtime.js";
-export { runCommand, contextOf, identityOf, refuseUnauthenticated, recordDenialFact, ALLOW_REASONS } from "./commands/runtime.js";
+export type { CommandRuntime, CommandContext, CommandOutcome, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
+export { runCommand, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
+export type { PresentedCredential } from "./sessions/protocol.js";
+export {
+  SESSION_COOKIE,
+  CSRF_HEADER,
+  CSRF_CONTEXT,
+  SESSION_POLICY,
+  CLEAR_SITE_DATA,
+  mintSessionSecret,
+  sessionSecretBytes,
+  sessionSecretDigest,
+  csrfTokenOf,
+  sessionCookie,
+  clearedSessionCookie,
+  sessionCookieValues,
+  isUnsafeMethod,
+  isApplicationOrigin,
+  assertApplicationOrigin,
+  presentedCredential,
+} from "./sessions/protocol.js";
+export type { SessionView, StepUpProofView, SessionService, SessionServiceDependencies, SessionOutcome, ResumedSession } from "./sessions/service.js";
+export { createSessionService, SESSION_POLICY_VERSION, SESSION_ACTIONS, SESSION_ALLOW_REASONS, LOGOUT_REASON, REPLACED_REASON } from "./sessions/service.js";
 export type { B06Collaborators, B06Handlers, ApprovalPreimage } from "./commands/handlers/index.js";
 export {
   createB06Handlers,

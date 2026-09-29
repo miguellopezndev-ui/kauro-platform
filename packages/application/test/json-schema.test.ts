@@ -7,18 +7,23 @@ import { test } from "node:test";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
 import type { ContractSchemaBundle } from "../src/index.js";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, OPERATIONAL_ROUTES, SESSION_ROUTES, operationalRequestSchemaId, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, SERVED_COMMAND_IDS, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas, the 3 declared replies of the operational routes, the 5 read replies and Problem, and nothing else", () => {
-  const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.keys(route.responses).map((status) => operationalResponseSchemaId(route.operationId, status)));
-  assert.equal(operationalIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
+test("the validator compiles exactly the 73 contracts, the 7 request schemas, the 8 response schemas, the 3 declared replies of the probes, the 4 reply bodies and 2 request bodies of the session routes (B11 W2), the 5 read replies and Problem, and nothing else", () => {
+  const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.entries(route.responses).filter(([, r]) => r.schema !== null).map(([status]) => operationalResponseSchemaId(route.operationId, status)));
+  const probeIds = OPERATIONAL_ROUTES.filter((route) => !SESSION_ROUTES.includes(route)).flatMap((route) => Object.keys(route.responses));
+  assert.equal(probeIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
+  assert.equal(operationalIds.length, 7, "and the session routes four reply bodies (their logout answers 204 without one)");
+  const operationalRequestIds = OPERATIONAL_ROUTES.filter((route) => route.request !== undefined).map((route) => operationalRequestSchemaId(route.operationId));
+  assert.deepEqual(operationalRequestIds, [operationalRequestSchemaId("openSession"), operationalRequestSchemaId("createStepUp")], "the identity token of a sign-in and of a step-up");
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
   assert.equal(readIds.length, 5, "the five manual-10 reads (N16)");
   const responseIds = [...SERVED_COMMAND_IDS.map(commandResponseSchemaId), ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds];
-  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + responseIds.length + 1);
+  assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + REQUEST_SCHEMA_IDS.length + operationalRequestIds.length + responseIds.length + 1);
+  for (const id of operationalRequestIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);
   for (const id of REQUEST_SCHEMA_IDS) assert.ok(validator.knownSchemaIds.includes(id), id);
   for (const id of responseIds) assert.ok(validator.knownSchemaIds.includes(id), id);

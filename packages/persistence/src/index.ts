@@ -26,6 +26,8 @@ export { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
+export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
+export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";

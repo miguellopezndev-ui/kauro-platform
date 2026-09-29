@@ -77,7 +77,9 @@ import {
 } from "@kauro/application";
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import type { Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type Authenticator } from "./authenticator.js";
+import { sendProblem, singleValued } from "./http.js";
+import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
 import { HEALTH_PATHS, registerHealthRoutes, type HealthOptions } from "./health.js";
 
 /** Request and socket deadlines (10 "Request envelope": a reverse proxy's limit is not the only guard; review R36). */
@@ -129,6 +131,14 @@ export interface ApiServerOptions {
    * The composition root binds the runtime's `refuseUnauthenticated`.
    */
   readonly refuseUnauthenticated: (action: string, request: UnauthenticatedRequest) => Promise<Problem>;
+  /**
+   * Answers a request whose credentials the authenticator refused as such (B11 D-AUTH-5: AMBIGUOUS_CREDENTIALS, ORIGIN_REJECTED,
+   * CSRF_TOKEN_INVALID): records the durable anonymous DENY fact and returns the problem. The composition root binds the
+   * runtime's refuseAnonymously; without it the refusal is answered without a fact.
+   */
+  readonly refuseCredentials?: (action: string, request: UnauthenticatedRequest, failure: DomainFailure) => Promise<Problem>;
+  /** The routes of the browser session boundary (B11 W2), registered when the boundary is bound. */
+  readonly sessions?: Omit<SessionRoutesOptions, "validator" | "refuseUnauthenticated" | "refuseCredentials" | "sink">;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -156,21 +166,6 @@ export function fastifyPath(cataloguePath: string): string {
   return cataloguePath.replace(/\{([a-zA-Z]+)\}/g, ":$1");
 }
 
-function singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>> {
-  const out: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(headers)) out[k.toLowerCase()] = typeof v === "string" ? v : undefined;
-  return out;
-}
-
-function sendProblem(reply: FastifyReply, problem: Problem): FastifyReply {
-  // the headers every reply carries are set here too: a framework error is answered outside the hooks that set them (N15)
-  return reply
-    .code(problem.status)
-    .header(HEADERS.correlationId, problem.correlationId)
-    .header(HEADERS.cacheControl, PRIVATE_CACHE_POLICY)
-    .type(HEADERS.problemContentType)
-    .send(problem);
-}
 
 /** The safe classification of an unexpected exception: class names only (the adapter attaches the original error as cause). */
 export function classifyInternalError(error: unknown): string {
@@ -287,6 +282,16 @@ function installResponseGuard(app: FastifyInstance, options: ApiServerOptions, s
     if (checked.has(reply)) return payload;
     const responses = request.routeOptions.config.responses ?? UNROUTED_RESPONSES;
     checked.add(reply);
+    if (payload === undefined || payload === null || payload === "") {
+      // a reply without a body (204): checked against its declaration like any other — declared without a body, no media type
+      try {
+        checkReply(options.validator, responses, reply.statusCode, headerText(reply.getHeader("content-type")), undefined);
+        return payload;
+      } catch (e) {
+        const violation = e instanceof ResponseContractViolation ? e : new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the response check could not run", [], { cause: e });
+        return JSON.stringify(refuse(request, reply, violation));
+      }
+    }
     const violation = new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the reply was sent without passing the response check (not a JSON object body)");
     return JSON.stringify(refuse(request, reply, violation));
   });
@@ -410,7 +415,44 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
     registerRead(app, options, handler, sink);
   }
+  if (options.sessions !== undefined) {
+    registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
+  }
   return app;
+}
+
+/** The answer to refused credentials: the bound refusal (with its durable fact), or the problem alone. */
+function refusalOfCredentials(options: ApiServerOptions): (action: string, request: UnauthenticatedRequest, failure: DomainFailure) => Promise<Problem> {
+  return options.refuseCredentials ?? (async (_action, request, failure) => problemOf(failure, request.correlationId));
+}
+
+/**
+ * The subject of a request, or the answer that refuses it: refused credentials (their anonymous fact), or no subject at all (the
+ * anonymous fact of an unauthenticated request). An authenticator's failure to decide (its store unavailable) is its failure.
+ */
+async function subjectOrRefusal(
+  options: ApiServerOptions,
+  request: FastifyRequest,
+  headers: Readonly<Record<string, string | undefined>>,
+  action: string,
+  refused: UnauthenticatedRequest,
+  sink: (correlationId: string, error: unknown) => void,
+): Promise<{ readonly kind: "SUBJECT"; readonly subject: Extract<Authentication, { kind: "SUBJECT" }>["subject"] } | { readonly kind: "PROBLEM"; readonly problem: Problem }> {
+  let authentication: Authentication;
+  try {
+    authentication = await authenticationOf(options.authenticator, { method: request.method, headers });
+  } catch (error) {
+    if (error instanceof DomainFailure && error.code !== "INTERNAL_ERROR") return { kind: "PROBLEM", problem: problemOf(error, refused.correlationId) };
+    sink(refused.correlationId, error);
+    return { kind: "PROBLEM", problem: internalProblem(refused.correlationId) };
+  }
+  if (authentication.kind === "SUBJECT") return { kind: "SUBJECT", subject: authentication.subject };
+  try {
+    return { kind: "PROBLEM", problem: authentication.kind === "REFUSED" ? await refusalOfCredentials(options)(action, refused, authentication.failure) : await options.refuseUnauthenticated(action, refused) };
+  } catch (error) {
+    sink(refused.correlationId, error);
+    return { kind: "PROBLEM", problem: internalProblem(refused.correlationId) };
+  }
 }
 
 /**
@@ -436,17 +478,9 @@ function registerRead<View>(app: FastifyInstance, options: ApiServerOptions, han
       });
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
       const correlationId = admission.correlationId;
-      const subject = await options.authenticator.authenticate(headers);
-      if (!subject) {
-        let refusal: Problem;
-        try {
-          refusal = await options.refuseUnauthenticated(spec.action, { correlationId, agencyId: admission.agencyId });
-        } catch (error) {
-          sink(correlationId, error);
-          return sendProblem(reply, internalProblem(correlationId));
-        }
-        return sendProblem(reply, refusal);
-      }
+      const authenticated = await subjectOrRefusal(options, request, headers, spec.action, { correlationId, agencyId: admission.agencyId }, sink);
+      if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
+      const subject = authenticated.subject;
       let result: ReadResult<View>;
       try {
         result = await handler.execute({ correlationId, subject, agencyId: admission.agencyId, path: admission.path, query: admission.query });
@@ -500,19 +534,11 @@ function registerCommand<Body, View>(
       };
       const admission = admitStructure(spec, raw, options.validator, options.clock);
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
-      const subject = await options.authenticator.authenticate(headers);
-      if (!subject) {
-        // the refusal of an unauthenticated consequential command is a durable fact before it is an answer (08 "Audit events")
-        const correlationId = admission.admission.correlationId;
-        let refusal: Problem;
-        try {
-          refusal = await options.refuseUnauthenticated(spec.id as CommandId, { correlationId, agencyId: admission.admission.agencyId });
-        } catch (error) {
-          sink(correlationId, error);
-          return sendProblem(reply, internalProblem(correlationId));
-        }
-        return sendProblem(reply, refusal);
-      }
+      // the refusal of an unauthenticated consequential command — or of refused credentials (B11 D-AUTH-5: decided here, before
+      // the journal is reserved, so no idempotency key is consumed) — is a durable fact before it is an answer (08 "Audit events")
+      const authenticated = await subjectOrRefusal(options, request, headers, spec.id as CommandId, { correlationId: admission.admission.correlationId, agencyId: admission.admission.agencyId }, sink);
+      if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
+      const subject = authenticated.subject;
       const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
       let result: CommandResult<View>;
       try {
