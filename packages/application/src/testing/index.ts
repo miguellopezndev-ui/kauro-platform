@@ -70,3 +70,8 @@ export const CONTRACT_FAKES: ReadonlyArray<ContractFakeEntry> = Object.freeze([
   Object.freeze({ port: "SessionVaultPort", fake: "ContractFakeSessionVault", provider: CONTRACT_FAKE_VAULT_PROVIDER, evidenceClass: "SIMULATED", owner: "B07-PROVIDER-FAKES" }),
   Object.freeze({ port: "AuthorityJournalPort", fake: "ContractFakeAuthorityJournal", provider: CONTRACT_FAKE_JOURNAL_PROVIDER, evidenceClass: "SIMULATED", owner: "B07-PROVIDER-FAKES" }),
 ] as const);
+
+// Package B09's labelled contract fakes (payments and fiscal workflow; design docs/design/B09-payments-fiscal.md §14 M2, decision
+// D-FAKE-B1): one test-only subpath, one index re-exporting both packages' sets (B07 design §17 item 15). Each fake keeps its single
+// owner and its label (CONTRACT_FAKE, evidence class SIMULATED); no composition root binds any of them.
+export * from "../commerce/testing/index.js";

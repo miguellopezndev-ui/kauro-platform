@@ -12,7 +12,13 @@
  *   carries a user id and never runs a browser command;
  * - ANONYMOUS: the edge recording the denial of a request that carried no authenticated subject (08 "Threat model and
  *   assets": an unauthenticated visitor is a threat actor and every trust boundary has an audit event). It binds neither an
- *   agency nor a user, so it sees no row, and the only thing it can write is an anonymous DENY security fact (migration 0007).
+ *   agency nor a user, so it sees no row, and the only thing it can write is an anonymous DENY security fact (migration 0007);
+ * - SERVICE (package B09, decision D-CTX-B1): the payment service — a verified technical service identity — under its own
+ *   runtime group kauro_payment, with no user; it adopts the one agency of the stored operation it acts on (kauro.agency_id,
+ *   commerce rows and the column-scoped commercial prerequisites only), or none for platform-level finance facts;
+ * - OPERATOR (package B09, decision D-CTX-B2): a corporate identity (KAURO_OWNER) under kauro_app with its own user id; it
+ *   adopts a finance scope (kauro.finance_agency_id), never a tenant scope, so the commerce rows of that agency become visible
+ *   to it — only while its corporate grant is ACTIVE — and the agency's customer rows never do.
  */
 import type { Id, UtcInstant } from "@kauro/contracts";
 import { NotFoundFailure } from "./errors.js";
@@ -54,10 +60,37 @@ export interface AnonymousContext {
   readonly correlationId: CorrelationId;
 }
 
-export type ExecutionContext = TenantContext | IdentityContext | SystemContext | AnonymousContext;
+/**
+ * SERVICE (package B09, decision D-CTX-B1): the payment service acting on one stored operation (COMMAND_CATALOGUE "Service
+ * commands require a verified service identity and audience, with scope derived from the stored operation"; 10 "Internal
+ * command authentication"). It runs on the pool of its own runtime group (kauro_payment), binds no user, and starts with no
+ * agency: the commerce unit of work adopts the agency of the stored operation once (`adoptScope`), and every write of the
+ * transaction is then that agency's. `serviceId` is the verified service identity (a lowercase token such as payment-service).
+ */
+export interface ServiceContext {
+  readonly kind: "SERVICE";
+  readonly serviceId: string;
+  readonly correlationId: CorrelationId;
+}
+
+/**
+ * OPERATOR (package B09, decision D-CTX-B2): a corporate identity acting under a corporate role (KAURO_OWNER; 08 "Corporate
+ * operators ... use individually managed corporate identities"). It binds its own user id — its identity row, step-up proofs
+ * and corporate grants are read under the self policies — and adopts a finance scope, never a tenant scope: the commerce rows
+ * of that agency become visible while the database finds its ACTIVE corporate grant, and the agency's customer rows never do
+ * (08 "Private Owner ... has no automatic customer-record bypass"; "Finance capability and customer-data support access are
+ * separate").
+ */
+export interface OperatorContext {
+  readonly kind: "OPERATOR";
+  readonly userId: UserId;
+  readonly correlationId: CorrelationId;
+}
+
+export type ExecutionContext = TenantContext | IdentityContext | SystemContext | AnonymousContext | ServiceContext | OperatorContext;
 
 /** The contexts that act as someone: every context but ANONYMOUS, which records denials and never acts. */
-export type ActingContext = TenantContext | IdentityContext | SystemContext;
+export type ActingContext = TenantContext | IdentityContext | SystemContext | ServiceContext | OperatorContext;
 
 /** Who a security fact is about: an actor, or nobody (the denial of a request without an authenticated subject). */
 export type SecurityActor = ActorRef | { readonly kind: "ANONYMOUS" };
@@ -66,9 +99,25 @@ export function actorOf(context: ActingContext): ActorRef {
   switch (context.kind) {
     case "TENANT":
     case "IDENTITY":
+    case "OPERATOR":
       return { kind: "USER", userId: context.userId };
     case "SYSTEM":
+    case "SERVICE":
       return { kind: "SERVICE", serviceId: context.serviceId };
+  }
+}
+
+/** The person a unit of work runs for (TENANT, IDENTITY, OPERATOR); null for SYSTEM, SERVICE and ANONYMOUS, which carry none. */
+export function userIdOf(context: ExecutionContext): UserId | null {
+  switch (context.kind) {
+    case "TENANT":
+    case "IDENTITY":
+    case "OPERATOR":
+      return context.userId;
+    case "SYSTEM":
+    case "SERVICE":
+    case "ANONYMOUS":
+      return null;
   }
 }
 

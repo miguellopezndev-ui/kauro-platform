@@ -18,18 +18,26 @@ import type { EndClientView, KnownSchemaId, ProjectView } from "@kauro/applicati
 import {
   ACCEPTED_RESPONSE_SCHEMA_ID,
   COMMAND_RESPONSES,
+  COMMERCE_COMMAND_RESPONSES,
+  COMMERCE_READ_ROUTES,
+  COMMERCE_REQUEST_SCHEMAS,
   INTAKE_OPERATION_IDS,
   OPERATIONAL_ROUTES,
   READ_OPERATION_IDS,
   REQUEST_SCHEMA_IDS,
+  REQUEST_SCHEMA_PREFIX,
   SELECTION_MANIFEST_SCHEMA_ID,
   SERVED_COMMAND_IDS,
   SOURCE_REQUEST_SCHEMA_IDS,
   commandResponseSchemaId,
+  commerceCommandResponseSchemaId,
+  commerceReadResponseSchemaId,
   intakeResponseSchemaId,
   operationalResponseSchemaId,
   readResponseSchemaId,
   requestSchemaId,
+  type CommerceReadOperationId,
+  type CommerceServedCommandId,
 } from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
@@ -107,9 +115,14 @@ test("the validator the api composes is closed: exactly the contract names, the 
     ...READ_OPERATION_IDS.map(readResponseSchemaId),
     // the STORED envelope of the selection manifest intake (B07 D-SEL-2)
     ...INTAKE_OPERATION_IDS.map(intakeResponseSchemaId),
+    // package B09 (D-REQ-B7): the COMPLETED envelope of every payment command and the READ envelope of every payment read, derived
+    // under the same rules — compiled whole, so the routes of both B09 sides validate against one closed set
+    ...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId),
+    ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId),
   ];
-  // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID];
+  // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits, and B09's seven
+  const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds];
   const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

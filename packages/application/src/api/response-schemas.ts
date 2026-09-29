@@ -641,6 +641,16 @@ function refuse(message: string): never {
   throw new DomainFailure("INTEGRITY_FAILURE", `response schemas: ${message}`);
 }
 
+/**
+ * The closed schema of one view definition, derived from the registry bundle under the view kit's rules (api/view-kit viewSchema: a
+ * registry member selected or withheld with a reason, required stays required, narrowing only adds keywords). Exported so a later
+ * package derives its own views with the same rules before its routes are served (package B09, docs/design/B09-payments-fiscal.md
+ * §10.3).
+ */
+export function viewSchemaOf(bundle: RegistryBundle, view: ViewDefinition): JsonSchema {
+  return viewSchema(bundle, view);
+}
+
 function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<OperationalResponseSchemaId, JsonSchema> {
   const roots: Record<OperationalResponseSchemaId, JsonSchema> = {};
   const seen = new Set<string>();

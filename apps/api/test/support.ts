@@ -29,7 +29,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
 import { ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
@@ -41,6 +41,8 @@ import type {
   ClientId,
   Clock,
   CommandJournal,
+  CommerceUnitOfWork,
+  CommerceUnitOfWorkFactory,
   ExecutionContext,
   IdGenerator,
   MembershipId,
@@ -58,7 +60,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialAuthorizationsBeforePayments, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, noCommercialAuthorizationsBeforePayments, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle, type PaymentService, type RequestUnitOfWorkFactory } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 
@@ -206,11 +208,12 @@ export interface UnitOfWorkStats {
 
 /**
  * Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. Both kinds of
- * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07).
+ * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07). The factory is the commerce one (package
+ * B09): its units of work carry the commerce repositories beside B06's, and the decoration keeps them.
  */
-export function instrumentedFactory(inner: SourceUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): SourceUnitOfWorkFactory {
+export function instrumentedFactory(inner: RequestUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): RequestUnitOfWorkFactory {
   return {
-    async run<T>(context: ExecutionContext, work: (uow: UnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    async run<T>(context: ExecutionContext, work: (uow: CommerceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
       stats.runs += 1;
       const out = await inner.run(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
       await holds.pass("after.commit");
@@ -460,6 +463,18 @@ export interface WorldOptions {
   readonly clock?: Clock;
   /** Replaces or extends the source lifecycle's collaborators (the storage and vault fakes, the origin, no preview reader). */
   readonly sources?: (base: B07Collaborators) => Partial<B07Collaborators>;
+  /**
+   * Package B09: the payment collaborators the api binds over the harness (the payment service's units of work and the labelled
+   * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
+   */
+  readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
+  /**
+   * Package B09 (stage-2 integration): the payment service the api binds (ApiAssembly.payments), built over the harness and the
+   * api's verified request-handler pool before the server is assembled — so one api serves the B06 routes, the request side and the
+   * payment service's routes with the world's people — and closed by stop() after the server, before the database
+   * (test/payment-support.ts paymentWorld({ requestSide: true })).
+   */
+  readonly payments?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly service: PaymentService; close(): Promise<void> }>;
 }
 
 export interface RawEvent {
@@ -498,13 +513,14 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const vault = new ContractFakeSessionVault();
   const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: noCommercialAuthorizationsBeforePayments };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
+  const payments = options.payments !== undefined ? await options.payments(h, db) : null;
 
   const base: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
     activeWork: {
       async inspectClient(uow, clientId) {
         await holds.pass("collaborator");
-        return openProjectsInspector.inspectClient(uow, clientId);
+        return activeWorkInspector.inspectClient(uow, clientId);
       },
     },
     artifacts: plans.artifacts,
@@ -516,7 +532,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
         return noExternalActionsInThisEdition.completedForPlan(uow, planId);
       },
     },
-    commercialConsequences: noCommercialConsequencesInThisEdition,
+    commercialConsequences: commercialConsequencesInspector,
   };
   const collaborators = options.collaborators ? options.collaborators(base) : base;
 
@@ -527,6 +543,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     sources,
+    ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
+    ...(payments !== null ? { payments: payments.service } : {}),
     validator,
     clock: options.clock ?? processClock,
     ids,
@@ -803,6 +821,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stop() {
       await app.close();
+      if (payments !== null) await payments.close();
       await db.close();
       await h.stop();
     },

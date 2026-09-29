@@ -7,17 +7,22 @@
 //   node tools/evidence.mjs run [--out <dir>]
 //
 // Refuses a working tree that differs from HEAD (the bundle names exactly one commit and tree). Then, in this order:
-//   1. seals the expected truth before anything runs: every case row of docs/design/B06-case-map.md — its status, the tests it
-//      cites and what a sealed check observes — with the SHA-256 of the file and of the canonical rows (truth.json);
+//   1. seals the expected truth before anything runs: every case row of every case map of CASE_MAPS — docs/design/B06-case-map.md
+//      and docs/design/B09-case-map.md (package B09, implementation mandate M4) — its status, the tests it cites, what a sealed
+//      check observes and, for B09, the later packages it depends on, with the SHA-256 of each file and of its canonical rows
+//      (truth.json);
 //   2. records the subject and the environment: commit and tree, node, pnpm and PostgreSQL versions, the operating system, the
 //      start time (environment.json), and the input manifest: the lockfile, every migration, every registry file, the OpenAPI
-//      document, the matrix and the case map, each by SHA-256 (inputs.json);
+//      document, the matrix and the case maps, each by SHA-256 (inputs.json);
 //   3. builds the workspace and runs every test suite exactly as its package runs it, each with a JUnit report (junit/*.xml),
 //      recording each command, its exit status and its start and end (results.json);
-//   4. maps every cited test of every case to its result by file and name (cases.json): PASSED, FAILED, SKIPPED or MISSING;
+//   4. maps every cited test of every case to its result by file and name (cases.json): PASSED, FAILED, SKIPPED or MISSING — or
+//      PLANNED, when the test's file is not on the branch yet and its row states a PLANNED clause (a stage-2 mandate's or the
+//      stage-2 integrator's test the B09 case map names by exact title; such a case is not proven);
 //   5. writes MANIFEST.sha256 over every file of the bundle.
-// Exit 0 only when the build and every suite exit 0 and every cited test of every case PASSED. The bundle is committed after the
-// candidate commit it names (docs/evidence/b06/README.md), per platform.
+// Exit 0 only when the build and every suite exit 0 and every cited test of every case PASSED, a PLANNED citation excepted (it
+// leaves its case unproven, never passed). The bundle is committed after the candidate commit it names, per platform, under the
+// directory of the newest package whose case map it seals (docs/evidence/b06/README.md describes the files).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -27,6 +32,13 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const CASE_MAP_PATH = join(root, "docs", "design", "B06-case-map.md");
+export const B09_CASE_MAP_PATH = join(root, "docs", "design", "B09-case-map.md");
+
+/** The case maps a bundle seals: the package whose registry cases each maps, its repository path and its file. */
+export const CASE_MAPS = [
+  { package: "B06", file: "docs/design/B06-case-map.md", path: CASE_MAP_PATH },
+  { package: "B09", file: "docs/design/B09-case-map.md", path: B09_CASE_MAP_PATH },
+];
 
 /** The suites of `pnpm run test`, each exactly as its package's test script runs it (the check refuses a drifted script). */
 export const SUITES = [
@@ -92,19 +104,27 @@ export function citationsOf(cell, carriedFile) {
   return { citations: out, file };
 }
 
-/** Every case row of the case map: id, registry expectation, cited tests, status, what a sealed check observes. */
+/**
+ * Every case row of a case map: id, registry expectation, cited tests, status, what a sealed check observes and — in a map with a
+ * sixth column (B09's) — the later packages the case depends on.
+ */
 export function readCaseMap(text) {
   const rows = [];
   let carried = null;
   for (const line of text.split(/\r?\n/)) {
     if (!line.startsWith("| ")) continue;
     const cells = cellsOf(line);
-    if (cells.length !== 5 || !/^(S\d{3}|R2-\d{3}|CMD\d{3}-(OK|DENY|RACE))$/.test(cells[0])) continue;
+    if ((cells.length !== 5 && cells.length !== 6) || !/^(S\d{3}|R2-\d{3}|CMD\d{3}-(OK|DENY|RACE))$/.test(cells[0])) continue;
     const { citations, file } = citationsOf(cells[2], carried);
     carried = file;
-    rows.push({ caseId: cells[0], expected: cells[1], citations, status: cells[3], observes: cells[4] });
+    rows.push({ caseId: cells[0], expected: cells[1], citations, status: cells[3], observes: cells[4], ...(cells.length === 6 ? { later: cells[5] } : {}) });
   }
   return rows;
+}
+
+/** A row that states a PLANNED clause: a stage-2 mandate's or the stage-2 integrator's test it names is still to be written (B09). */
+export function plansTests(row) {
+  return /PLANNED \((M3|M4|INT-2)\)/.test(row.status);
 }
 
 // --- JUnit ---------------------------------------------------------------------------------------------------------------------------
@@ -138,8 +158,11 @@ export function sourceOf(compiledAbsolute) {
   return rel.replace(/\/dist\/test\/(.+)\.test\.js$/, "/test/$1.test.ts");
 }
 
-/** Each cited test of each case, with its result (PASSED, FAILED, SKIPPED or MISSING). */
-export function caseResults(rows, results) {
+/**
+ * Each cited test of each case, with its result: PASSED, FAILED, SKIPPED or MISSING — or PLANNED, for a test whose file is not on
+ * the branch (`onBranch`) in a row that states a PLANNED clause. A case is proven only when every cited test PASSED.
+ */
+export function caseResults(rows, results, onBranch = (file) => existsSync(join(root, file))) {
   const byKey = new Map();
   for (const r of results) {
     const key = `${r.source} ${r.name}`;
@@ -147,9 +170,24 @@ export function caseResults(rows, results) {
     byKey.set(key, r);
   }
   return rows.map((row) => {
-    const tests = row.citations.map((c) => ({ file: c.file, title: c.title, outcome: byKey.get(`${c.file} ${c.title}`)?.outcome ?? "MISSING" }));
+    const tests = row.citations.map((c) => {
+      const found = byKey.get(`${c.file} ${c.title}`)?.outcome;
+      const outcome = found ?? (plansTests(row) && !onBranch(c.file) ? "PLANNED" : "MISSING");
+      return { file: c.file, title: c.title, outcome };
+    });
     return { caseId: row.caseId, status: row.status, tests, allPassed: tests.length > 0 && tests.every((t) => t.outcome === "PASSED") };
   });
+}
+
+/**
+ * What a run's cases decide: the cases every cited test of which PASSED, the cases left unproven only by PLANNED citations, and
+ * the failing ones — a cited test FAILED, SKIPPED or MISSING, or no test cited — which fail the run.
+ */
+export function verdictOf(cases) {
+  const proven = cases.filter((c) => c.allPassed);
+  const planned = cases.filter((c) => !c.allPassed && c.tests.length > 0 && c.tests.every((t) => t.outcome === "PASSED" || t.outcome === "PLANNED"));
+  const failing = cases.filter((c) => !c.allPassed && !planned.includes(c));
+  return { proven, planned, failing };
 }
 
 // --- the run ---------------------------------------------------------------------------------------------------------------------------
@@ -203,21 +241,28 @@ async function main() {
   const tree = git("rev-parse", "HEAD^{tree}");
   const platformName = platform() === "win32" ? "windows" : platform();
   const outIndex = rest.indexOf("--out");
-  const out = outIndex >= 0 && rest[outIndex + 1] ? resolve(rest[outIndex + 1]) : join(root, "docs", "evidence", "b06", `${commit.slice(0, 12)}-${platformName}`);
+  // the directory of the newest package whose case map the bundle seals (docs/evidence/b06 holds the bundles of B06's branch)
+  const packageDir = CASE_MAPS[CASE_MAPS.length - 1].package.toLowerCase();
+  const out = outIndex >= 0 && rest[outIndex + 1] ? resolve(rest[outIndex + 1]) : join(root, "docs", "evidence", packageDir, `${commit.slice(0, 12)}-${platformName}`);
   if (existsSync(out)) throw new Error(`${out} exists: a bundle is written once`);
   mkdirSync(join(out, "junit"), { recursive: true });
   const write = (name, value) => writeFileSync(join(out, name), typeof value === "string" ? value : JSON.stringify(value, null, 2) + "\n");
 
-  // 1. the expected truth, sealed before anything runs
-  const caseMapText = readFileSync(CASE_MAP_PATH, "utf8");
-  const rows = readCaseMap(caseMapText);
+  // 1. the expected truth of every case map, sealed before anything runs
+  const sealed = CASE_MAPS.map((map) => {
+    const text = readFileSync(map.path, "utf8");
+    return { map, text, rows: readCaseMap(text) };
+  });
   const truth = {
-    caseMap: "docs/design/B06-case-map.md",
-    caseMapSha256: sha256(caseMapText),
-    rowsSha256: sha256(canonical(rows)),
-    observesSha256: sha256(canonical(rows.map((r) => [r.caseId, r.observes]))),
-    cases: rows.length,
-    rows,
+    caseMaps: sealed.map(({ map, text, rows }) => ({
+      package: map.package,
+      caseMap: map.file,
+      caseMapSha256: sha256(text),
+      rowsSha256: sha256(canonical(rows)),
+      observesSha256: sha256(canonical(rows.map((r) => [r.caseId, r.observes]))),
+      cases: rows.length,
+      rows,
+    })),
   };
   write("truth.json", truth);
   const sealedAt = new Date().toISOString();
@@ -234,7 +279,7 @@ async function main() {
     truthSealedAt: sealedAt,
     truthSha256: sha256(readFileSync(join(out, "truth.json"))),
   });
-  const inputs = ["pnpm-lock.yaml", "apps/api/openapi.json", "docs/design/B06-state-command-event-matrix.md", "docs/design/B06-case-map.md"];
+  const inputs = ["pnpm-lock.yaml", "apps/api/openapi.json", "docs/design/B06-state-command-event-matrix.md", ...CASE_MAPS.map((m) => m.file)];
   for (const dir of ["packages/persistence/migrations", "packages/contracts/registry"]) {
     for (const f of readdirSync(join(root, dir)).sort()) inputs.push(`${dir}/${f}`);
   }
@@ -259,8 +304,9 @@ async function main() {
     suites.push({ name: suite.name, command: `node ${args.map((a) => (a.includes(" ") || a.includes("*") ? JSON.stringify(a) : a)).join(" ").replace(junit, `junit/${suite.name}.xml`)}`, cwd: suite.cwd, exitCode: r.status, started: r.started, ended: r.ended, tests: cases.length, passed: count("PASSED"), failed: count("FAILED"), skipped: count("SKIPPED") });
   }
 
-  // 4. every cited test of every case
-  const cases = caseResults(rows, results);
+  // 4. every cited test of every case of every case map
+  const byMap = sealed.map(({ map, rows }) => ({ map, cases: caseResults(rows, results).map((c) => ({ package: map.package, ...c })) }));
+  const cases = byMap.flatMap((m) => m.cases);
   write("results.json", { subject: { commit, tree }, suites, tests: results.length });
   write("cases.json", { subject: { commit, tree }, cases });
 
@@ -273,11 +319,15 @@ async function main() {
   write("MANIFEST.sha256", manifest.join("\n") + "\n");
 
   const failedSuites = suites.filter((s) => s.exitCode !== 0);
-  const unproven = cases.filter((c) => !c.allPassed);
-  process.stdout.write(`evidence: ${relative(root, out)} for ${commit.slice(0, 12)} (${results.length} tests; ${suites.length - failedSuites.length}/${suites.length} steps exit 0; ${cases.length - unproven.length}/${cases.length} cases with every cited test PASSED)\n`);
+  const verdicts = byMap.map(({ map, cases: mapped }) => ({ map, ...verdictOf(mapped) }));
+  const perMap = verdicts.map((v) => `${v.map.package} ${v.proven.length}/${v.proven.length + v.planned.length + v.failing.length} cases with every cited test PASSED${v.planned.length > 0 ? `, ${v.planned.length} awaiting planned tests` : ""}`).join("; ");
+  process.stdout.write(`evidence: ${relative(root, out)} for ${commit.slice(0, 12)} (${results.length} tests; ${suites.length - failedSuites.length}/${suites.length} steps exit 0; ${perMap})\n`);
   for (const s of failedSuites) process.stderr.write(`evidence: ${s.name} exited ${String(s.exitCode)}\n`);
-  for (const c of unproven) process.stderr.write(`evidence: ${c.caseId}: ${c.tests.filter((t) => t.outcome !== "PASSED").map((t) => `${t.outcome} ${t.file} :: ${t.title.slice(0, 80)}`).join("; ") || "no cited test"}\n`);
-  if (failedSuites.length > 0 || unproven.length > 0) process.exitCode = 1;
+  for (const v of verdicts) {
+    for (const c of v.planned) process.stdout.write(`evidence: ${v.map.package} ${c.caseId} awaits ${c.tests.filter((t) => t.outcome === "PLANNED").map((t) => t.file).join(", ")} (PLANNED)\n`);
+    for (const c of v.failing) process.stderr.write(`evidence: ${v.map.package} ${c.caseId}: ${c.tests.filter((t) => t.outcome !== "PASSED").map((t) => `${t.outcome} ${t.file} :: ${t.title.slice(0, 80)}`).join("; ") || "no cited test"}\n`);
+  }
+  if (failedSuites.length > 0 || verdicts.some((v) => v.failing.length > 0)) process.exitCode = 1;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

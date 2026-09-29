@@ -30,7 +30,7 @@ export {
 export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
-export { openProjectsInspector, noExternalActionsInThisEdition, noCommercialConsequencesInThisEdition, noCommercialAuthorizationsBeforePayments, unavailablePlanServices } from "./edition.js";
+export { activeWorkInspector, noExternalActionsInThisEdition, commercialConsequencesInspector, noCommercialAuthorizationsBeforePayments, unavailablePlanServices, commerceEdition, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
 export type { PlanServices } from "./edition.js";
 export {
   openDatabase,
@@ -45,6 +45,11 @@ export {
   API_APPLICATION_NAME,
   READINESS_STATEMENT_TIMEOUT_MS,
 } from "./composition.js";
-export type { DatabaseHandle, DatabaseConfig, DatabaseDependencies, ApiAssembly, StartOptions, StartedApi } from "./composition.js";
+export type { DatabaseHandle, DatabaseConfig, DatabaseDependencies, ApiAssembly, RequestUnitOfWorkFactory, StartOptions, StartedApi } from "./composition.js";
 export { bootstrap, authenticatorOf, shutdownWithin } from "./bootstrap.js";
 export type { BootstrappedApi, BootstrapOptions, ShutdownOutcome } from "./bootstrap.js";
+// the payment service's side of package B09 (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8.2, §14)
+export * from "./payments/index.js";
+export { registerPaymentRoutes } from "./payments/routes.js";
+export type { PaymentRouteDependencies } from "./payments/routes.js";
+export type { RouteKit } from "./server.js";

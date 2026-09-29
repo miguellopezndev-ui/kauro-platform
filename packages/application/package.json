@@ -1,7 +1,7 @@
 {
   "name": "@kauro/application",
   "version": "0.1.0",
-  "description": "Kauro application layer: command contracts (inputs, DTO views, outcomes) for the public API, the request envelope and safe problem contract, closed request schemas, and the ports (authorizer, assurance, admission, schema validation, artifact resolution) that orchestration depends on. The labelled contract fakes of the object-storage, session-vault and authority-journal ports (evidence class SIMULATED) are the test-only subpath @kauro/application/testing.",
+  "description": "Kauro application layer: command contracts (inputs, DTO views, outcomes) for the public API, the request envelope and safe problem contract, closed request schemas, and the ports (authorizer, assurance, admission, schema validation, artifact resolution) that orchestration depends on. The labelled contract fakes of the object-storage, session-vault and authority-journal ports (B07, evidence class SIMULATED) and of the payment provider, webhook verifier, evidence store, fiscal bridge, service authenticator and B08 ports (B09, CONTRACT_FAKE) are the test-only subpath @kauro/application/testing.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,

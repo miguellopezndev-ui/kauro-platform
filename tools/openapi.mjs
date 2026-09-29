@@ -22,13 +22,17 @@
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
 // never connected, and the check asserts that it opened no connection.
 //
-// Planned operations (package B07, docs/design/B07-upload-source-lifecycle.md §9.5; finding B07-F13): a route specified with its
-// request schema, closed response schemas and outcome catalogue before its handler exists is generated from the same application
-// contracts into the root member "x-kauro-planned" (keyed "METHOD path"), never into "paths": the check proves no planned route is
-// registered (a registered route must be documented under "paths") or also served, and a specified route missing from the document
-// fails the generated-document comparison. Mandate B07-COMMANDS served every B07 route, so they moved into "paths" and B07 plans
-// nothing any more; the mechanism stays (the planned block is empty) for the packages that plan their routes the same way (B09's
-// payment routes: the integrator keeps this one copy of the mechanism and their planned block).
+// Planned operations (package B07, docs/design/B07-upload-source-lifecycle.md §9.5; finding B07-F13; package B09,
+// docs/design/B09-payments-fiscal.md §10): a route specified with its request schema, closed response schemas and outcome
+// catalogue before its handler exists is generated from the same application contracts into the root member "x-kauro-planned"
+// (keyed "METHOD path"), never into "paths": the check proves no planned route is registered (a registered route must be
+// documented under "paths") or also served, and a specified route missing from the document fails the generated-document
+// comparison. One copy of the mechanism serves both packages (B07 design §17 item 12). Mandate B07-COMMANDS served every B07
+// route, so they moved into "paths" and B07 plans nothing any more. Package B09's payment routes name their served state in the
+// application's served lists (COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS; decisions D-REQ-B7, D-INT2-B1): the same
+// generated operation moves out of the planned list into "paths", where it is checked against the registered route like every
+// served one — implementation mandate M4 serves the request side (CMD028, CMD029, CMD031, CMD032 and the four reads), M3 the
+// payment service's side (CMD030, CMD033, CMD034); after the stage-2 integration every B09 operation is served.
 //
 // Requires the workspace to be built (pnpm run build); the root "verify" script runs it after the build and the tests.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -102,14 +106,22 @@ export function runtimeSchemas(sources) {
   const { application, bundle, operationalRoutes } = sources;
   // the served replies of every route, B06's and B07's alike (one build: the views, the envelopes, the intake's STORED envelope)
   const responses = application.buildResponseSchemas(bundle, operationalRoutes);
-  const byId = { ...responses.roots, Problem: application.PROBLEM_SCHEMA };
+  // package B09: the planned payment routes' closed schemas, derived under the same rules (they never shadow a served one)
+  const commerce = application.buildCommerceResponseSchemas(bundle);
+  for (const id of Object.keys(commerce.roots)) if (id in responses.roots) throw new Error(`the B09 schema ${id} collides with a served one`);
+  for (const name of Object.keys(commerce.defs)) if (name in responses.defs) throw new Error(`the B09 view ${name} collides with a served one`);
+  const byId = { ...responses.roots, ...commerce.roots, Problem: application.PROBLEM_SCHEMA };
   for (const [command, schema] of Object.entries(application.REQUEST_SCHEMAS)) byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   for (const [command, schema] of Object.entries(application.SOURCE_REQUEST_SCHEMAS)) {
     if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B07 request schema of ${command} collides with another one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   }
   byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
-  const defs = { ...bundle.$defs, ...responses.defs };
+  for (const [command, schema] of Object.entries(application.COMMERCE_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B09 request schema of ${command} collides with a served one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
+  const defs = { ...bundle.$defs, ...responses.defs, ...commerce.defs };
   return { byId, defs };
 }
 
@@ -181,6 +193,12 @@ export function generateOpenApi(sources) {
   };
   const REPLY_HEADERS = { "X-Correlation-Id": { $ref: "#/components/headers/CorrelationId" }, "Cache-Control": { $ref: "#/components/headers/CacheControl" } };
   components.securitySchemes.bearerAuth = { type: "http", scheme: "bearer", description: "Authenticated subject (08 \"Authentication and assurance\")." };
+  components.securitySchemes.serviceAuth = {
+    type: "http",
+    scheme: "bearer",
+    description:
+      "A verified service identity: issuer, audience, expected identity and environment (COMMAND_CATALOGUE \"Service commands require a verified service identity and audience, with scope derived from the stored operation\"; package B09 D-AUTHZ-B3).",
+  };
 
   const problemResponse = {
     description: "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
@@ -324,8 +342,112 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // planned operations (see the header): none since mandate B07-COMMANDS served the B07 routes; the block and its check remain
+  // package B09: the payment routes (see the header), generated from the application contracts; a served one under "paths" with
+  // exactly the replies its route declares, a planned one under "x-kauro-planned" keyed "METHOD path"
   const planned = {};
+  const serve = (method, path, operation) => {
+    paths[path] = { ...(paths[path] ?? {}), [method.toLowerCase()]: operation };
+  };
+  const PROVIDER_LABEL = { type: "string", pattern: "^[a-z][a-z0-9_-]{1,63}$" };
+  for (const spec of Object.values(application.COMMERCE_COMMANDS)) {
+    const command = registryCommands.find((c) => c.id === spec.id);
+    if (!command) throw new Error(`${spec.id} is planned but absent from the registry`);
+    if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
+      throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
+    }
+    if (served.has(spec.id)) continue;
+    const webhook = spec.idempotencyStore === "PROVIDER_INBOX";
+    const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
+    addComponent(`${spec.name}Request`, byId[requestId], requestId);
+    const reply = application.COMMERCE_COMMAND_RESPONSES[spec.id];
+    const replyId = application.commerceCommandResponseSchemaId(spec.id);
+    addComponent(`${spec.name}Completed`, byId[replyId], replyId);
+    const responses = {
+      [String(reply.status)]: {
+        description: `COMPLETED: ${command.effect}`,
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } },
+      },
+    };
+    if (reply.accepted) {
+      responses["202"] = {
+        description: "ACCEPTED: the provider effect was dispatched and its outcome is not known yet; the durable operation, its state and the polling guidance (package B09 D-PROTO-B2)",
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
+      };
+    }
+    Object.assign(responses, problemResponses(application.COMMERCE_COMMAND_OUTCOMES[spec.id]));
+    const operation = {
+      operationId: spec.name,
+      summary: `${spec.id} ${spec.name}`,
+      description: `Precondition: ${command.precondition}\n\nEffect: ${command.effect}\n\nFailure: ${command.failure}`,
+      "x-kauro-command": spec.id,
+      "x-kauro-role": spec.role,
+      "x-kauro-principal": spec.principal,
+      "x-kauro-runtime-role": spec.runtimeRole,
+      "x-kauro-settle-runtime-role": spec.settleRuntimeRole,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-idempotency": webhook ? "PROVIDER_INBOX" : command.idempotency,
+      "x-kauro-step-up": spec.stepUp,
+      "x-kauro-external-effect": spec.externalEffect,
+      "x-kauro-gate": command.gate,
+      "x-kauro-cases": command.testIds ?? [],
+      "x-kauro-package": "B09",
+      security: webhook ? [] : [{ [spec.principal === "PAYMENT_SERVICE" ? "serviceAuth" : "bearerAuth"]: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) =>
+          name === "provider"
+            ? { name, in: "path", required: true, description: "The provider label; an unconfigured provider is PROVIDER_UNKNOWN.", schema: PROVIDER_LABEL }
+            : { name, in: "path", required: true, description: "Path id, resolved with server-owned scope (the agency selector, or the stored operation's scope index).", schema: ID },
+        ),
+        ...(webhook ? [] : [{ $ref: "#/components/parameters/IdempotencyKey" }]),
+        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      requestBody: webhook
+        ? {
+            required: true,
+            description:
+              "The provider's raw event: authenticated by the provider-specific signature over the exact bytes, freshness and environment, bounded by the provider's body limit; never validated as a Kauro schema. The ingress records it and builds the normalized inbox command (x-kauro-normalized-command).",
+            content: { "application/json": { schema: { type: "object" } } },
+          }
+        : { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
+      ...(webhook ? { "x-kauro-normalized-command": { $ref: `${COMPONENTS}${spec.name}Request` } } : {}),
+      responses,
+    };
+    if (application.isServedCommerceCommand(spec.id)) {
+      // the route's own contract: the statuses it declares are the ones documented, nothing more (the check compares the schemas)
+      const contract = application.commerceCommandRouteResponses(spec.id);
+      const documented = Object.keys(responses).filter((status) => Number(status) < 400);
+      if (!isDeepStrictEqual(documented.sort(), Object.keys(contract.declared).sort())) throw new Error(`${spec.id}: the documented replies ${documented} differ from the route's ${Object.keys(contract.declared)}`);
+      serve(spec.method, spec.path, operation);
+    } else planned[`${spec.method} ${spec.path}`] = operation;
+  }
+  for (const [operationId, spec] of Object.entries(application.COMMERCE_READ_ROUTES)) {
+    const schemaId = application.commerceReadResponseSchemaId(operationId);
+    addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
+    const operation = {
+      operationId,
+      summary: spec.summary,
+      description: `Authority: ${spec.authority}`,
+      "x-kauro-read": true,
+      "x-kauro-role": spec.role,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-package": "B09",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned scope.", schema: ID })),
+        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      responses: {
+        200: { description: `READ: ${spec.summary}`, headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${operationId}Reply` } } } },
+        ...problemResponses(application.COMMERCE_READ_OUTCOMES[operationId]),
+      },
+    };
+    if (application.isServedCommerceRead(operationId)) serve("GET", spec.path, operation);
+    else planned[`GET ${spec.path}`] = operation;
+  }
 
   for (const route of operationalRoutes) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);
@@ -393,7 +515,8 @@ export async function registeredRoutes() {
   // the real pg adapter, never connected: route registration opens no transaction, and the assertion below proves it
   const pool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
   try {
-    const unitOfWork = persistence.createUnitOfWorkFactory(pool, { clock: api.systemClock });
+    // the composition root's own factory: the commerce unit of work over the app pool (the request side's reads bind to it)
+    const unitOfWork = persistence.createCommerceUnitOfWorkFactory({ app: pool }, { clock: api.systemClock });
     // the readiness side of the database handle: the build's schema version, and a readiness read that refuses loudly, since
     // registering the routes serves no request (a probe answered here would be a defect of this tool, never a silent answer)
     const database = {

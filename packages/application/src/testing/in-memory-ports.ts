@@ -75,7 +75,7 @@ import type {
   ValidationReceiptRecord,
   VersionedWrite,
 } from "@kauro/domain";
-import { DomainFailure, EVENT_SCHEMA_VERSION, assertAllowlistedPayload, consumersOf, payloadDigest } from "@kauro/domain";
+import { DomainFailure, EVENT_SCHEMA_VERSION, assertAllowlistedPayload, consumersOf, payloadDigest, userIdOf } from "@kauro/domain";
 
 export interface OutboxRow {
   readonly outboxId: OutboxId;
@@ -181,7 +181,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
   };
 
   const tenantId = (): AgencyId | null => (context.kind === "TENANT" ? context.agencyId : null);
-  const userId = (): UserId | null => (context.kind === "TENANT" || context.kind === "IDENTITY" ? context.userId : null);
+  const userId = (): UserId | null => userIdOf(context);
   /** A tenant-owned row is visible only under its own tenant context (RLS USING); a write outside it fails (WITH CHECK). */
   const visible = <T extends { readonly agencyId: AgencyId }>(row: T | undefined): T | null => (row !== undefined && tenantId() !== null && row.agencyId === tenantId() ? row : null);
   const checkWrite = (agencyId: AgencyId): void => {
@@ -250,7 +250,8 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
     async commit(entryId, result: JournalCommit) {
       for (const [k, e] of s.journal) {
         if (e.entryId === entryId) {
-          if (e.state !== "RESERVED") throw new DomainFailure("INTEGRITY_FAILURE", "journal entry is final");
+          // RESERVED → COMMITTED, and the provider-effect path RESERVED → UNCERTAIN → COMMITTED (package B09, D-JOURNAL-B1)
+          if (e.state !== "RESERVED" && e.state !== "UNCERTAIN") throw new DomainFailure("INTEGRITY_FAILURE", "journal entry is final");
           const committed: CommandJournalEntry = { ...e, state: "COMMITTED", responseStatus: result.responseStatus, responseBody: structuredClone(result.responseBody), resourceKind: result.resourceKind, resourceId: result.resourceId, committedAt: clock.now() };
           s.journal.set(k, committed);
           return committed;

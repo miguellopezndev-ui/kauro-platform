@@ -10,6 +10,7 @@
  */
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
+import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
 import type { ActorRef } from "./tenant.js";
@@ -83,6 +84,8 @@ export const EVENT_TYPES = [
   // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of
   "source_file.admitted.v1",
   "source_file.admission_revoked.v1",
+  // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0013)
+  ...COMMERCE_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -90,9 +93,10 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * The aggregate kinds an event may name. The database registry `kauro.aggregate_kinds` (migration 0008, the foundation shared by
  * every package: docs/design/FOUNDATION-aggregate-kinds.md) holds the same kinds, each bound to its table and uuid primary-key
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
- * its own migration and adds it here.
+ * its own migration and adds it here (B07: upload_session, source_file, retention_record, registered by migrations 0009, 0010 and
+ * 0012; B09: the commerce kinds, registered by migrations 0013..0017).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -157,6 +161,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "source_file.admitted.v1": ["fileId", "agencyId", "projectId", "originRevisionId", "originUploadId", "inspectionReceiptHash", "bytes", "format"],
   // the revisions whose selection or seal names the file travel as ids so EXECUTION_CONTROL (B08) can revoke stale authority
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
+  // payments and fiscal workflow (package B09, commerce/events.ts)
+  ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -165,8 +171,9 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
  * hashes, inspects, scans and promotes a reported completion; SELECTION_EVALUATION counts a bound selection; STORAGE_LIFECYCLE
  * cancels provider sessions and deletes quarantined, late and unsealed objects under generation preconditions; AUTHORITY_JOURNAL
  * appends the tombstones that must survive a database restore (14 "Minimal durable facts outside the primary restore boundary").
+ * The commerce consumers are package B09's (commerce/events.ts COMMERCE_CONSUMERS).
  */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL"] as const;
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", ...COMMERCE_CONSUMERS] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -209,6 +216,7 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.expired.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "dataset_revision.expired.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
+  ...COMMERCE_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

@@ -69,6 +69,7 @@ export {
   READINESS_RESPONSE_SCHEMA,
   FORBIDDEN_RESPONSE_FIELDS,
   buildResponseSchemas,
+  viewSchemaOf,
   commandResponseSchemaId,
   operationalResponseSchemaId,
   declaredMembers,
@@ -76,7 +77,7 @@ export {
 } from "./api/response-schemas.js";
 export type { DeclaredResponse, RouteResponses } from "./api/response-contract.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./api/outcomes.js";
-export { COMMAND_OUTCOMES, READ_OUTCOMES, INTAKE_OUTCOMES, OUTCOME_BLOCKS, problemOutcome, closedCatalogue, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
+export { COMMAND_OUTCOMES, READ_OUTCOMES, INTAKE_OUTCOMES, OUTCOME_BLOCKS, ROUTE_OUTCOME_FRAGMENTS, problemOutcome, closedCatalogue, outcomeOf, outcomesByStatus } from "./api/outcomes.js";
 export {
   PROBLEM_RESPONSE,
   UNROUTED_RESPONSES,
@@ -134,3 +135,6 @@ export {
 export * from "./sources/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
+
+// payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
+export * from "./commerce/index.js";

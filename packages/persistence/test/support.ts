@@ -263,10 +263,12 @@ export function sourceSessions(clients: SourceClients, ag: AgencyFixture): Sourc
 /**
  * A revision of the project sealed as the B07 source lifecycle leaves it (@kauro/persistence/testing sealSourceRevision: the
  * reservation, completion, inspection and admission, selection, evaluation and seal, each written by the runtime role that owns
- * it); its manifest hash is the source hash a plan names (plans_source_fk). Sealed fifteen days ago, so a test may expire it.
+ * it); its manifest hash is the source hash a plan names (plans_source_fk). Sealed fifteen days ago, so a test may expire it —
+ * unless `base` names when the intake began (a commercial fixture that quotes the source seals it recently: a quote promises no
+ * more than the retention the seal left, B09 quotes_source_binding).
  */
-export async function sealedSource(clients: SourceClients, ag: AgencyFixture, projectId: string, seed: string, state: "SEALED" | "EXPIRED" = "SEALED"): Promise<{ revisionId: string; manifestHash: string }> {
-  const sealed = await sealSourceRevision(sourceSessions(clients, ag), { agencyId: ag.agencyId, projectId, ownerUserId: ag.ownerUserId, ownerMembershipId: ag.ownerMembershipId }, { seed, state });
+export async function sealedSource(clients: SourceClients, ag: AgencyFixture, projectId: string, seed: string, state: "SEALED" | "EXPIRED" = "SEALED", base?: Date): Promise<{ revisionId: string; manifestHash: string }> {
+  const sealed = await sealSourceRevision(sourceSessions(clients, ag), { agencyId: ag.agencyId, projectId, ownerUserId: ag.ownerUserId, ownerMembershipId: ag.ownerMembershipId }, { seed, state, ...(base !== undefined ? { base } : {}) });
   return { revisionId: sealed.revisionId, manifestHash: sealed.manifestHash };
 }
 

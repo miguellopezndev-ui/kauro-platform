@@ -14,11 +14,23 @@ import type { ContractName } from "@kauro/contracts";
 import type { FieldError } from "@kauro/domain";
 import type { RequestSchemaId } from "../api/request-schemas.js";
 import type { ResponseSchemaId } from "../api/response-schemas.js";
+import type { CommerceRequestSchemaCommand } from "../commerce/request-schemas.js";
+import type { CommerceReadOperationId, CommerceServedCommandId } from "../commerce/response-schemas.js";
 import type { SELECTION_MANIFEST_SCHEMA_ID, SourceRequestSchemaId } from "../sources/request-schemas.js";
 
 /**
+ * The request and response schemas of the payments workflow (package B09; commerce/request-schemas, commerce/response-schemas): the
+ * closed request schema of each of its seven commands, the COMPLETED envelope of each and the READ envelope of each of its reads,
+ * compiled by the same validator as the B06 ones (decision D-REQ-B7 of docs/design/B09-payments-fiscal.md).
+ */
+export type CommerceSchemaId =
+  | `urn:kauro:api:v1:request:${CommerceRequestSchemaCommand}`
+  | `urn:kauro:api:v1:response:${CommerceServedCommandId}`
+  | `urn:kauro:api:v1:response:read:${CommerceReadOperationId}`;
+
+/**
  * B07 adds its six command schemas and the selection manifest document schema to the closed set (application-owned, reviewed
- * schemas only — S093).
+ * schemas only — S093); B09 its payment schemas (CommerceSchemaId).
  */
 export type KnownSchemaId =
   | ContractName
@@ -26,6 +38,7 @@ export type KnownSchemaId =
   | ResponseSchemaId
   | SourceRequestSchemaId
   | typeof SELECTION_MANIFEST_SCHEMA_ID
+  | CommerceSchemaId
   | "Problem";
 
 export type ValidationOutcome<T> =

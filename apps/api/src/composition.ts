@@ -20,19 +20,22 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, B07Collaborators, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
-import { createB06Handlers, createB07Handlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import type { B06Collaborators, B07Collaborators, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
+import { createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
-import type { Clock, Environment, IdGenerator, RandomBytes, SourceUnitOfWorkFactory } from "@kauro/domain";
+import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { applyMigrationsAs, classifyError, compareSchema, createPool, createUnitOfWorkFactory, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { noCommercialAuthorizationsBeforePayments, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openProjectsInspector, unavailablePlanServices } from "./edition.js";
+import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, noCommercialAuthorizationsBeforePayments, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
+import type { PaymentService } from "./payments/index.js";
+import { registerPaymentRoutes } from "./payments/routes.js";
+import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -45,10 +48,23 @@ export const API_APPLICATION_NAME = "kauro-api";
 /** Bound of the readiness ledger read: a probe answers promptly or reports the database as unavailable. */
 export const READINESS_STATEMENT_TIMEOUT_MS = 2_000;
 
+/**
+ * The request handlers' unit-of-work factory: B06's `run`, the source lifecycle's `runSource` (B07) and the commerce unit of work of
+ * the payments workflow (B09) — one factory on the verified kauro_app pool (@kauro/persistence PgCommerceUnitOfWorkFactory, which
+ * extends the source-lifecycle factory of B07).
+ */
+export interface RequestUnitOfWorkFactory extends CommerceUnitOfWorkFactory {
+  runSource<T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T>;
+}
+
 export interface DatabaseHandle {
   readonly pool: KauroPool;
-  /** The unit-of-work factory of the runtime pool; it also opens source units of work (runSource, B07). */
-  readonly unitOfWork: SourceUnitOfWorkFactory;
+  /**
+   * The request handlers' units of work on the verified runtime pool (kauro_app): B06's commands and reads, the source lifecycle's
+   * (runSource, B07) and — the same transaction with the commerce repositories — the request side of the payments workflow
+   * (package B09, D-REQ-B1).
+   */
+  readonly unitOfWork: RequestUnitOfWorkFactory;
   /** The migrations applied at start, or null when KAURO_DB_MIGRATE_ON_START is off. */
   readonly migrations: ApplyResult | null;
   /** The highest migration version this build ships (readiness compares the database's ledger with the shipped set). */
@@ -107,7 +123,9 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
     await pool.end();
     throw e;
   }
-  const unitOfWork = createUnitOfWorkFactory(pool, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
+  // one factory on the one verified pool: TENANT, IDENTITY, ANONYMOUS and OPERATOR contexts run under kauro_app; the payment
+  // service's SERVICE contexts run on its own pool, which this process does not open here (the payment service's composition)
+  const unitOfWork = createCommerceUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
   return {
     pool,
     unitOfWork,
@@ -148,7 +166,7 @@ export function writeNotReady(correlationId: string, response: ReadinessResponse
  * continue unchanged: the answer stays a retryable 503, and the operator can tell a database outage from capacity pressure. Both
  * kinds of unit of work are reported alike (`run` and the source lifecycle's `runSource`).
  */
-export function reportingUnavailability(inner: SourceUnitOfWorkFactory, report: (correlationId: string, cause: unknown) => void): SourceUnitOfWorkFactory {
+export function reportingUnavailability(inner: RequestUnitOfWorkFactory, report: (correlationId: string, cause: unknown) => void): RequestUnitOfWorkFactory {
   const reported = async <T>(correlationId: string, work: () => Promise<T>): Promise<T> => {
     try {
       return await work();
@@ -165,7 +183,8 @@ export function reportingUnavailability(inner: SourceUnitOfWorkFactory, report: 
 
 export interface ApiAssembly {
   readonly environment: Environment;
-  readonly unitOfWork: SourceUnitOfWorkFactory;
+  /** The request handlers' units of work (DatabaseHandle.unitOfWork): B06's, B07's source units of work and the request side of the payments workflow. */
+  readonly unitOfWork: RequestUnitOfWorkFactory;
   readonly authenticator: Authenticator;
   /** The database side of readiness and the build's schema version (the DatabaseHandle). */
   readonly database: Pick<DatabaseHandle, "readiness" | "codeSchemaVersion">;
@@ -181,6 +200,13 @@ export interface ApiAssembly {
    * (D-SAPI-6) and B15 binds the real adapters.
    */
   readonly sources?: Partial<B07Collaborators>;
+  /**
+   * The payment collaborators that replace the edition's (edition.ts commerceEdition; package B09, D-REQ-B1): the payment service's
+   * units of work (SERVICE on kauro_payment), the payment provider adapter and the platform port of B08. A deployment of this
+   * edition binds none and answers the provider-effect commands PROVIDER_SERVICES_UNAVAILABLE; the acceptance tests bind the
+   * labelled contract fakes of @kauro/application/testing here (D-FAKE-B1), never the production wiring.
+   */
+  readonly commerce?: Partial<CommerceRequestCollaborators>;
   /** The closed validator; loaded from the contract bundle when absent (a test passes the instance it asserts on). */
   readonly validator?: SchemaValidator;
   readonly clock?: Clock;
@@ -200,26 +226,36 @@ export interface ApiAssembly {
    */
   readonly cursorKey?: Uint8Array;
   readonly limits?: HttpLimits;
+  /**
+   * The payment service of package B09 (payments/index.ts createPaymentService; stage-2 mandate M3): its routes — the provider
+   * webhook (CMD030), ExecuteRefund (CMD033), ReconcilePayment (CMD034) — are registered in every edition; without a bound payment
+   * service the webhook knows no provider and the service routes find no verified service identity (D-FAKE-B1: nothing in the
+   * product wiring binds a contract fake; the provider adapters are the integration package's, B15). Bound, it is also where the
+   * request side's CreatePaymentOrder and CapturePayment settle (its units of work and provider adapter; D-INT2-B3).
+   */
+  readonly payments?: PaymentService;
 }
 
 /**
- * Binds the authorizer, the thirteen command handlers (B06's seven, B07's six), the twelve reads, the selection manifest intake and
- * the HTTP server over an open unit-of-work factory.
+ * Binds the authorizer, the thirteen command handlers (B06's seven, B07's six), the twelve reads, the selection manifest intake,
+ * the request side of the payments workflow (CMD028, CMD029, CMD031, CMD032 and the four B09 reads), the payment service's routes
+ * (CMD030, CMD033, CMD034) and the HTTP server over an open unit-of-work factory.
  */
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
+  const unitOfWork = reportingUnavailability(assembly.unitOfWork, assembly.onUnavailable ?? writeUnavailable);
   const runtime: SourceRuntime = {
-    unitOfWork: reportingUnavailability(assembly.unitOfWork, assembly.onUnavailable ?? writeUnavailable),
+    unitOfWork,
     authorizer: createAuthorizer({ clock, assurance: createAssuranceVerifier() }),
     clock,
     ids,
   };
   const collaborators: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
-    activeWork: openProjectsInspector,
+    activeWork: activeWorkInspector,
     externalActions: noExternalActionsInThisEdition,
-    commercialConsequences: noCommercialConsequencesInThisEdition,
+    commercialConsequences: commercialConsequencesInspector,
     ...unavailablePlanServices(),
     ...assembly.collaborators,
   };
@@ -232,16 +268,34 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const cursorKey = assembly.cursorKey ?? systemRandom(32);
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
   const readRuntime: SourceReadRuntime = { unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey };
+  const validator = assembly.validator ?? loadContractSchemas();
+  // package B09: the request side of the payments workflow over the same units of work and authorizer, with the corporate owner's
+  // authorizer and the payment collaborators of the edition, replaced by the assembly's (D-REQ-B1). A bound payment service is the
+  // one the request side's provider commands settle through (D-INT2-B3): their settle step (T3) runs in its SERVICE units of work on
+  // its kauro_payment pool, as its own verified identity, with its provider adapter — the adapter its webhook, its refunds and its
+  // reconciliation use — unless the assembly binds these collaborators itself.
+  const commerceRuntime: CommerceRequestRuntime = {
+    unitOfWork,
+    authorizer: runtime.authorizer,
+    commerceAuthorizer: createCommerceAuthorizer({ clock, assurance: createAssuranceVerifier() }),
+    clock,
+    ids,
+  };
+  const paymentService: Partial<CommerceRequestCollaborators> =
+    assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
+  const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...paymentService, ...assembly.commerce });
   return createApiServer({
     environment: assembly.environment,
     handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
     intakes: createSourceIntakeHandlers(readRuntime),
+    commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
-    validator: assembly.validator ?? loadContractSchemas(),
+    validator,
     clock,
     ids,
+    paymentRoutes: (app, kit) => registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) }),
     health: { readiness: () => assembly.database.readiness(), codeSchemaVersion: assembly.database.codeSchemaVersion, onNotReady: assembly.onNotReady ?? writeNotReady },
     ...(assembly.logger !== undefined ? { logger: assembly.logger } : {}),
     ...(assembly.onInternalError !== undefined ? { onInternalError: assembly.onInternalError } : {}),

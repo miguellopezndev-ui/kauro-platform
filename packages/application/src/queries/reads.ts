@@ -34,8 +34,8 @@ import { recordDenialFact, type CommandRuntime } from "../commands/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION, type AuthorizationDecision } from "../ports/authorizer.js";
 import { SOURCE_READ_ROUTES } from "../sources/read-specs.js";
 
-export interface ReadSpec {
-  readonly operationId: ReadOperationId;
+export interface ReadSpec<Id extends string = ReadOperationId> {
+  readonly operationId: Id;
   readonly method: "GET";
   /** OpenAPI path template. */
   readonly path: string;
@@ -131,7 +131,7 @@ function schemaViolation(field: string, code: "UNKNOWN_FIELD" | "TYPE" | "FORMAT
  * page); any other read takes nothing. A repeated member is refused. A cursor that is not of the cursor's shape cannot have been
  * issued here and is CURSOR_INVALID, as is one that does not verify (checked by the read, after access).
  */
-export function admitReadQuery(spec: ReadSpec, query: Readonly<Record<string, unknown>>): ReadQuery {
+export function admitReadQuery(spec: ReadSpec<string>, query: Readonly<Record<string, unknown>>): ReadQuery {
   let limit: number = REQUEST_LIMITS.pageDefault;
   let cursor: string | null = null;
   for (const [name, value] of Object.entries(query)) {
@@ -165,7 +165,7 @@ export type ReadAdmission =
  * (R41), the path ids, the closed query, the agency selector. The authenticated subject and the access decision follow; nothing
  * here reads a row or echoes a value.
  */
-export function admitRead(spec: ReadSpec, head: ReadHead): ReadAdmission {
+export function admitRead(spec: ReadSpec<string>, head: ReadHead): ReadAdmission {
   const correlationId = head.correlationId;
   try {
     if (head.repeatedHeaders.some((name) => SINGLE_VALUED_HEADERS.has(name))) throw new DomainFailure("INVALID_REQUEST", "request refused: HEADER_REPEATED", { reason: "HEADER_REPEATED" });

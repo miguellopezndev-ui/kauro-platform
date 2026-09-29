@@ -12,6 +12,7 @@
  * policy so the same guard applies; the persistence migrations seed the same edges (migration 0003).
  */
 import { STATE_MACHINES, type StateMachine, type StateTransition } from "@kauro/contracts";
+import { COMMERCE_PLATFORM_MACHINES, type CommercePlatformMachineName } from "../commerce/machines.js";
 import { PreconditionFailure } from "./errors.js";
 import { SOURCE_LIFECYCLE_STATE_MACHINES } from "./source/machines.js";
 
@@ -31,9 +32,10 @@ export type RegistryMachineName =
 
 /**
  * EndClient and Project are B06's (D-AGG-1, D-AGG-2); UploadSession, StoredObject, SourceFile and RetentionRecord are B07's
- * (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2; @kauro/domain SOURCE_LIFECYCLE_STATE_MACHINES).
+ * (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2; @kauro/domain SOURCE_LIFECYCLE_STATE_MACHINES); the commerce machines are package B09's
+ * (commerce/machines.ts).
  */
-export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord";
+export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord" | CommercePlatformMachineName;
 
 export type MachineName = RegistryMachineName | PlatformMachineName;
 
@@ -68,6 +70,7 @@ export const PLATFORM_STATE_MACHINES: ReadonlyArray<StateMachine> = Object.freez
     ],
     unlistedTransition: UNLISTED_TRANSITION_POLICY,
   },
+  ...COMMERCE_PLATFORM_MACHINES,
 ]);
 
 export function machine(name: MachineName): StateMachine {

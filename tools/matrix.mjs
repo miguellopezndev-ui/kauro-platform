@@ -13,10 +13,16 @@
 // Sources (nothing in the document is written by hand except the owner table below, which the check keeps complete): the
 // registry's state_transitions.json (via @kauro/contracts STATE_MACHINES, provenance-verified) and commands.json/cases.json, the
 // platform machines of @kauro/domain (EndClient, Project; since B07 the source-lifecycle machines UploadSession, StoredObject,
-// SourceFile, RetentionRecord), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs and their outcome catalogues of
-// @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the source reads and the selection
-// manifest intake — the transition seeds of the migrations, the events each handler publishes (read from its source), and the api
-// test sources the applicability rows cite. Requires the workspace to be built.
+// SourceFile, RetentionRecord; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs
+// and their outcome catalogues of @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the
+// source reads and the selection manifest intake — the transition seeds of the migrations, the events each handler publishes (read
+// from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
+//
+// Package B09's served commands and reads (decision D-REQ-B7) join the served sections from the application's served lists
+// (COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS): their specs (COMMERCE_COMMANDS), outcome catalogues
+// (COMMERCE_COMMAND_OUTCOMES, COMMERCE_READ_OUTCOMES) and the events their units of work publish (COMMERCE_COMMAND_EVENTS — the
+// request handler's intent and claim and the payment service's settle step through the reconciler's planners, which no handler
+// source spells out; the route tests prove every event a run publishes is listed for its command).
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -143,17 +149,19 @@ export const EDGE_OWNERS = {
     fatal_resource_or_integrity_error: { owner: "B08", why: "fenced execution", event: null },
     verification_failure: { owner: "B08", why: "verification", event: null },
   },
+  // package B09 (docs/design/B09-payments-fiscal.md §4): the provider-effect protocol of CMD028 (CREATE_ORDER), CMD029 (CAPTURE)
+  // and CMD033 (REFUND) — intent, dispatch, settle — and the reconciliation of CMD030/CMD034
   PaymentAttempt: {
-    "(initial PREPARED)": { command: "CMD028", event: null },
-    dispatch_intent_committed: { command: "CMD029", event: null },
-    cancel_before_dispatch: { owner: "B09", why: "payment intent cancellation", event: null },
-    authenticated_pending: { command: "CMD030", event: null },
-    authenticated_completed: { command: "CMD030", event: null },
-    ambiguous_transport_result: { owner: "B09", why: "provider adapter result classification", event: null },
-    proved_no_effect: { command: "CMD034", event: null },
-    observation_lost: { owner: "B09", why: "provider adapter result classification", event: null },
-    reconciliation_completed: { command: "CMD034", event: null },
-    reconciliation_proves_no_effect: { command: "CMD034", event: null },
+    "(initial PREPARED)": { command: "CMD028", event: "payment_attempt.prepared.v1", note: "CMD029 prepares CAPTURE attempts and CMD033 REFUND attempts the same way (D-PROTO-B1)" },
+    dispatch_intent_committed: { command: "CMD029", event: "payment_attempt.dispatching.v1", note: "CMD028 and CMD033 commit their attempts' dispatch intent the same way" },
+    cancel_before_dispatch: { owner: "B09", why: "the payment service's resume of an intent whose dispatch never committed: no provider call was possible (D-PROTO-B2)", event: "payment_attempt.cancelled_before_dispatch.v1" },
+    authenticated_pending: { command: "CMD030", event: "payment_attempt.provider_pending.v1" },
+    authenticated_completed: { command: "CMD030", event: "payment_attempt.confirmed.v1", note: "the dispatching command's own settle step records an authenticated response the same way" },
+    ambiguous_transport_result: { owner: "B09", why: "the settle step of the provider-effect protocol classifies a timeout, reset or unreadable response (D-PROTO-B1)", event: "payment_attempt.uncertain.v1" },
+    proved_no_effect: { command: "CMD034", event: "payment_attempt.failed_no_effect.v1" },
+    observation_lost: { owner: "B09", why: "the payment service's watchdog past the dispatch deadline (D-PROTO-B4)", event: "payment_attempt.uncertain.v1" },
+    reconciliation_completed: { command: "CMD034", event: "payment_attempt.confirmed.v1" },
+    reconciliation_proves_no_effect: { command: "CMD034", event: "payment_attempt.failed_no_effect.v1" },
   },
   ImportStage: {
     "(initial PREPARED)": { owner: "B08", why: "fenced staging prepares the stage", event: null },
@@ -179,7 +187,8 @@ export const EDGE_OWNERS = {
   },
   CostGrant: {
     "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: null },
-    actual_authorization_and_funding: { owner: "B09", why: "funding evidence", event: null },
+    // B09 funds no cost grant: the grant's own package records the owner's funding evidence (B09 open question Q-B09-9; B09-F17)
+    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: null },
     remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: null },
     reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: null },
     expiry_reached: { owner: "B03", why: "the grant's expiry", event: null },
@@ -187,16 +196,16 @@ export const EDGE_OWNERS = {
     all_effects_reconciled: { owner: "B03", why: "grant closure", event: null },
   },
   TaxDocument: {
-    "(initial DRAFT)": { owner: "B09", why: "fiscal-document workflow", event: null },
-    fiscal_profile_validated: { owner: "B09", why: "fiscal-document workflow", event: null },
-    issue_intent_committed: { command: "CMD035", event: null },
-    authenticated_issuance: { command: "CMD035", event: null },
-    ambiguous_result: { command: "CMD035", event: null },
-    authenticated_rejection: { command: "CMD035", event: null },
-    issued_document_found: { command: "CMD035", event: null },
-    no_effect_and_rejection_proved: { command: "CMD035", event: null },
-    corrected_draft_version: { owner: "B09", why: "fiscal correction", event: null },
-    lawful_credit_or_correction_issued: { owner: "B09", why: "fiscal correction", event: null },
+    "(initial DRAFT)": { owner: "B09", why: "the fiscal consumer drafts the invoice of a completed capture and the credit note of a completed refund, blocked when the treatment is not reviewed (D-FISC-B1)", event: "tax_document.drafted.v1" },
+    fiscal_profile_validated: { owner: "B09", why: "the fiscal consumer validates a draft whose reviewed treatment resolves; the database re-checks it (KP011, D-FISC-B1)", event: "tax_document.validated.v1" },
+    issue_intent_committed: { command: "CMD035", event: "tax_document.submitting.v1" },
+    authenticated_issuance: { command: "CMD035", event: "tax_document.issued.v1" },
+    ambiguous_result: { command: "CMD035", event: "tax_document.uncertain.v1" },
+    authenticated_rejection: { command: "CMD035", event: "tax_document.rejected.v1" },
+    issued_document_found: { command: "CMD035", event: "tax_document.issued.v1" },
+    no_effect_and_rejection_proved: { command: "CMD035", event: "tax_document.rejected.v1" },
+    corrected_draft_version: { owner: "B09", why: "the fiscal consumer drafts the corrected successor naming the rejected document (D-FISC-B3)", event: "tax_document.corrected.v1" },
+    lawful_credit_or_correction_issued: { command: "CMD035", event: "tax_document.corrected.v1", note: "the authenticated issuance of the credit note that corrects the invoice" },
   },
   CommissionLine: {
     "(initial ACCRUED_PENDING)": { owner: "B10", why: "commission accrual", event: null },
@@ -220,6 +229,96 @@ export const EDGE_OWNERS = {
     request_deletion: { command: "CMD042", event: null },
     deletion_verified: { owner: "B16", why: "verified managed deletion", event: null },
   },
+  // package B09's platform machines (decisions D-MACH-B1..B10 of docs/design/B09-payments-fiscal.md)
+  Quote: {
+    "(initial DRAFT)": { command: "CMD027", event: "quote.drafted.v1", note: "drafted and issued in one transaction" },
+    issue_quote: { command: "CMD027", event: "quote.issued.v1" },
+    withdraw_quote: { owner: "B10", why: "the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it", event: "quote.withdrawn.v1" },
+    accept_terms_for_checkout: { command: "CMD028", event: "quote.accepted_for_checkout.v1", note: "a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6)" },
+    price_expiry_reached: { owner: "B10", why: "the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED)", event: "quote.expired.v1" },
+    superseding_quote_issued: { command: "CMD027", event: "quote.superseded.v1", note: "the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6)" },
+  },
+  PaymentOrder: {
+    "(initial INTENT_CREATED)": { command: "CMD028", event: "payment_order.intent_created.v1" },
+    dispatch_intent_committed: { command: "CMD028", event: "payment_order.creating.v1" },
+    cancel_before_dispatch: { owner: "B09", why: "the payment service's resume of a CMD028 intent whose dispatch never committed (D-PROTO-B2)", event: "payment_order.cancelled.v1" },
+    provider_order_created: { command: "CMD028", event: "payment_order.created.v1" },
+    creation_proved_no_effect: { command: "CMD034", event: "payment_order.failed.v1" },
+    buyer_approval_observed: { command: "CMD030", event: "payment_order.approved.v1" },
+    capture_dispatch_committed: { command: "CMD029", event: "payment_order.capturing.v1" },
+    capture_observed: { command: "CMD030", event: "payment_order.captured.v1", note: "CMD029's settle step and CMD034 record an observed capture the same way" },
+    capture_ambiguous: { command: "CMD029", event: "payment_order.capture_uncertain.v1" },
+    capture_proved_no_effect: { command: "CMD029", event: "payment_order.approved.v1" },
+    capture_proved_no_effect_unapproved: { command: "CMD029", event: "payment_order.created.v1" },
+    reconciliation_proves_no_capture: { command: "CMD034", event: "payment_order.approved.v1" },
+    reconciliation_proves_no_capture_unapproved: { command: "CMD034", event: "payment_order.created.v1" },
+    order_voided: { command: "CMD030", event: "payment_order.cancelled.v1" },
+    order_expired: { command: "CMD030", event: "payment_order.expired.v1", note: "or CMD034 when a provider query shows the expiry" },
+  },
+  CaptureFact: {
+    "(initial PENDING)": { command: "CMD030", event: "capture.pending.v1", note: "a fact is born in the status its first authenticated observation shows (D-INIT-B1); CMD029 and CMD034 record captures too" },
+    provider_completed: { command: "CMD030", event: "capture.completed.v1" },
+    provider_denied: { command: "CMD030", event: "capture.denied.v1" },
+    provider_reversed: { command: "CMD030", event: "capture.reversed.v1", note: "from COMPLETED only: a capture first seen reversed is recorded COMPLETED, then REVERSED, in one transaction (D-PAY-B5)" },
+  },
+  CommercialAuthorization: {
+    "(initial ACTIVE)": { command: "CMD029", event: "commercial_authorization.issued.v1", note: "or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction" },
+    execution_admitted: { command: "CMD036", event: "commercial_authorization.consumed.v1" },
+    package_published: { owner: "B08", why: "atomic publication of the purchased package", event: "commercial_authorization.delivered.v1" },
+    authority_revoked: { command: "CMD030", event: "commercial_authorization.revoked.v1", note: "a reversal; CMD033 revokes it when a completed refund leaves no service basis" },
+  },
+  Refund: {
+    "(initial REQUESTED)": { command: "CMD031", event: "refund.requested.v1", note: "the reconciler requests EXCESS_CAPTURE and KAURO_REMEDY refunds the same way" },
+    approve_refund: { command: "CMD032", event: "refund.approved.v1" },
+    reject_refund: { owner: "B12", why: "the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3)", event: "refund.rejected.v1" },
+    dispatch_intent_committed: { command: "CMD033", event: "refund.submitting.v1" },
+    authorization_lapsed: { owner: "B09", why: "the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch", event: "refund.failed.v1" },
+    authenticated_completed: { command: "CMD033", event: "refund.completed.v1" },
+    ambiguous_transport_result: { command: "CMD033", event: "refund.uncertain.v1" },
+    proved_no_effect: { command: "CMD033", event: "refund.approved.v1" },
+    provider_refused: { command: "CMD033", event: "refund.failed.v1" },
+    reconciliation_completed: { command: "CMD034", event: "refund.completed.v1" },
+    reconciliation_proves_no_effect: { command: "CMD034", event: "refund.approved.v1" },
+    reconciliation_proves_refusal: { command: "CMD034", event: "refund.failed.v1" },
+  },
+  ReconciliationCase: {
+    "(initial OPEN)": { command: "CMD034", event: "reconciliation_case.opened.v1", note: "CMD029 and CMD030 open cases the same way" },
+    case_resolved: { owner: "B12", why: "the owner's finance review records the explaining facts or decision; no registry command names it (Q-B09-3)", event: "reconciliation_case.resolved.v1" },
+  },
+  PaymentRoute: {
+    "(initial CONFIGURED)": { owner: "B15", why: "the payment integration configures the merchant route (owner action: merchant and KYC identity)", event: null },
+    route_qualified: { owner: "B15", why: "merchant eligibility, environment, capture, refund and settlement verified with live evidence (G-PAYMENT)", event: null },
+    route_suspended: { owner: "B16", why: "an incident or account fact invalidates the route", event: null },
+  },
+  FiscalIssuerRoute: {
+    "(initial CONFIGURED)": { owner: "B15", why: "the fiscal integration configures the issuer route (owner action: fiscal identity and numbering authorization)", event: null },
+    route_qualified: { owner: "B15", why: "observed or professionally confirmed legal facts, a numbering authorization and verified issuance entitlement", event: null },
+    route_suspended: { owner: "B16", why: "an incident or legal fact invalidates the route", event: null },
+  },
+  CorporateGrant: {
+    "(initial ACTIVE)": { owner: "B12", why: "the owner application provisions an individually managed corporate identity's grant (08)", event: null },
+    grant_revoked: { owner: "B12", why: "the owner application revokes it", event: null },
+  },
+  RefundPolicy: {
+    "(initial ACTIVE)": { owner: "B12", why: "a KAURO_OWNER records a standing refund policy under a fresh step-up; no registry command names it (Q-B09-3)", event: null },
+    policy_retired: { owner: "B12", why: "the owner retires it", event: null },
+  },
+};
+
+/** Which decision declares each platform machine (the registry machines are the registry's). */
+const PLATFORM_DECISIONS = {
+  EndClient: "decisions D-AGG-1, D-AGG-2",
+  Project: "decisions D-AGG-1, D-AGG-2",
+  Quote: "B09 decision D-MACH-B1",
+  PaymentOrder: "B09 decision D-MACH-B2",
+  CaptureFact: "B09 decision D-MACH-B3",
+  CommercialAuthorization: "B09 decision D-MACH-B4",
+  Refund: "B09 decision D-MACH-B5",
+  ReconciliationCase: "B09 decision D-MACH-B6",
+  PaymentRoute: "B09 decision D-MACH-B7",
+  FiscalIssuerRoute: "B09 decision D-MACH-B8",
+  CorporateGrant: "B09 decision D-MACH-B9",
+  RefundPolicy: "B09 decision D-MACH-B10",
 };
 
 // --- the contract-test applicability record (10 "Contract tests and compatibility") -------------------------------------------
@@ -348,6 +447,90 @@ export const APPLICABILITY = {
     "wrong agency": [["cmd017-seal-revision.test.ts", "DENY: a revoked admission → 409 INPUT_NOT_ADMITTED"], SOURCE_ROLE_MATRIX],
     "stale version": [["cmd017-seal-revision.test.ts", "RACE: two seals on one version → one 200, one 409"]],
   },
+  // package B09's request side (implementation mandate M4; docs/design/B09-case-map.md CMD028..CMD032)
+  CMD028: {
+    "legitimate state": [["cmd028-create-payment-order.test.ts", "OK: an AGENCY_BILLING member creates one order for an issued quote"]],
+    "wrong role": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND"]],
+    "stale version": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms"]],
+    "duplicate request": [["cmd028-create-payment-order.test.ts", "RACE: an identical retry replays the one order"]],
+    "changed-body same key": [["cmd028-create-payment-order.test.ts", "RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": [["b09-request-side.test.ts", "B09 admission: each served payment command refuses a malformed body at the boundary"]],
+    "lost response": [["cmd028-create-payment-order.test.ts", "RACE: an identical retry replays the one order"], ["cmd028-create-payment-order.test.ts", "DENY (ambiguous): a creation timeout answers 202 and the same key observes by request identity"]],
+    "external uncertainty": [["cmd028-create-payment-order.test.ts", "DENY (ambiguous): a creation timeout answers 202"], ["cmd028-create-payment-order.test.ts", "D-REQ-B8: a creation the provider proved had no effect takes a new deliberate attempt"]],
+  },
+  CMD029: {
+    "legitimate state": [["cmd029-capture-payment.test.ts", "OK: capture through the server adapter"]],
+    "wrong role": [["cmd029-capture-payment.test.ts", "DENY: a foreign tenant's order is NOT_FOUND, a wrong role is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd029-capture-payment.test.ts", "DENY: a foreign tenant's order is NOT_FOUND"]],
+    "stale version": "NOT_APPLICABLE: CapturePayment carries no expectedVersion (registry field: providerApprovalRef); the order's state is read before its transition lock and again under it, and a capture already paid or in flight answers ALREADY_PAID or PAYMENT_PENDING with the current state",
+    "duplicate request": [["cmd029-capture-payment.test.ts", "RACE: an identical retry replays"]],
+    "changed-body same key": [["cmd029-capture-payment.test.ts", "RACE: an identical retry replays, the same key with another providerApprovalRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": [["b09-request-side.test.ts", "B09 admission: each served payment command refuses a malformed body at the boundary"]],
+    "lost response": [["cmd029-capture-payment.test.ts", "RACE: an identical retry replays"]],
+    "external uncertainty": [["cmd029-capture-payment.test.ts", "DENY: a foreign tenant's order is NOT_FOUND"], ["cmd029-capture-payment.test.ts", "RACE: an identical retry replays"]],
+  },
+  CMD031: {
+    "legitimate state": [["cmd031-request-refund.test.ts", "OK: an AGENCY_BILLING member requests a refund of a paid project"]],
+    "wrong role": [["cmd031-request-refund.test.ts", "DENY: a foreign tenant's project is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd031-request-refund.test.ts", "DENY: a foreign tenant's project is NOT_FOUND"]],
+    "stale version": "NOT_APPLICABLE: a request creates the refund and carries no expectedVersion (registry fields: reasonCode, evidenceRef); the capture it names is read after its transition lock, and a second open request is REFUND_REQUEST_OPEN",
+    "duplicate request": [["cmd031-request-refund.test.ts", "RACE: an identical retry replays"]],
+    "changed-body same key": [["cmd031-request-refund.test.ts", "RACE: an identical retry replays, the same key with another reasonCode is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": [["b09-request-side.test.ts", "B09 admission: each served payment command refuses a malformed body at the boundary"]],
+    "lost response": [["cmd031-request-refund.test.ts", "RACE: an identical retry replays"]],
+    "external uncertainty": "NOT_APPLICABLE: a refund request reaches no provider (customer cancellation is no permission to send PSP refunds); the provider effect belongs to CMD033 after an owner's approval",
+  },
+  CMD032: {
+    "legitimate state": [["cmd032-approve-refund.test.ts", "OK: a KAURO_OWNER with a fresh step-up approves the remaining service"], ["cmd032-approve-refund.test.ts", "D-REF-B4: a standing policy that covers the refund as it stands authorizes the approval without a step-up"]],
+    "wrong role": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND"]],
+    "stale version": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION"]],
+    "duplicate request": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
+    "changed-body same key": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": [["b09-request-side.test.ts", "B09 admission: each served payment command refuses a malformed body at the boundary"]],
+    "lost response": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
+    "external uncertainty": "NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service)",
+  },
+};
+
+// package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
+const WEBHOOK = "cmd030-payment-webhook.test.ts";
+const EXECUTE = "cmd033-execute-refund.test.ts";
+const RECONCILE = "cmd034-reconcile-payment.test.ts";
+const SERVICE_ADMISSION = ["b09-payment-service.test.ts", "the payment service's routes admit their requests in manual-10 order"];
+APPLICABILITY.CMD030 = {
+  "legitimate state": [[WEBHOOK, "OK: a verified capture event is stored once in the inbox and applied to its order"]],
+  "wrong role": [[WEBHOOK, "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial"]],
+  "wrong agency": [[WEBHOOK, "DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial; an event of a foreign tenant's environment or an unknown provider reference is an exception"]],
+  "stale version": "NOT_APPLICABLE: a provider event carries no expectedVersion; an observation older in provider chronology than the latest applied one is kept as history and changes nothing (STALE_IGNORED, D-PAY-B3)",
+  "duplicate request": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record"]],
+  "changed-body same key": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[WEBHOOK, "RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED, a crash between the ingress commit and the application applies the record once"]],
+  "external uncertainty": "NOT_APPLICABLE: the webhook performs no provider effect; an event that reports a completion without its instant is applied only after a stored provider query of its order (D-PAY-B6), and a verification that calls the provider does so before anything is stored",
+};
+APPLICABILITY.CMD033 = {
+  "legitimate state": [[EXECUTE, "OK: the payment service executes an approved refund once"]],
+  "wrong role": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND"]],
+  "stale version": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
+  "duplicate request": [[EXECUTE, "RACE: an identical retry resumes the one operation"]],
+  "changed-body same key": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing"]],
+  "external uncertainty": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
+};
+APPLICABILITY.CMD034 = {
+  "legitimate state": [[RECONCILE, "OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization"]],
+  "wrong role": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND"]],
+  "stale version": "NOT_APPLICABLE: ReconcilePayment carries no expectedVersion (registry fields: observationRef); observations are ordered by provider chronology and applied once per stored artifact and subject",
+  "duplicate request": [[RECONCILE, "RACE: an identical retry replays"]],
+  "changed-body same key": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": [SERVICE_ADMISSION],
+  "lost response": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry"]],
+  "external uncertainty": "NOT_APPLICABLE: the command applies a stored, authenticated provider query and calls no provider; the uncertainty it settles is the dispatching command's (the watchdog stores the query, D-PROTO-B4)",
 };
 
 // --- sources --------------------------------------------------------------------------------------------------------------------
@@ -387,6 +570,24 @@ export async function loadMatrixSources() {
     const text = readFileSync(join(root, "packages", "application", "src", ...file.split("/")), "utf8");
     published[id] = [...new Set([...text.matchAll(/eventType: "([a-z_.0-9]+)"/g)].map((m) => m[1]))];
   }
+  // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS };
+  const outcomes = { ...application.COMMAND_OUTCOMES };
+  for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
+    const c = application.COMMERCE_COMMANDS[id];
+    specs[id] = { name: c.name, method: c.method, path: c.path, role: c.role, scope: c.scope, stepUpRequired: c.stepUp !== "NEVER", stepUp: c.stepUp };
+    outcomes[id] = application.COMMERCE_COMMAND_OUTCOMES[id];
+    published[id] = [...application.COMMERCE_COMMAND_EVENTS[id]];
+  }
+  const reads = { ...application.READ_ROUTES };
+  const readOutcomes = { ...application.READ_OUTCOMES };
+  const readViews = { ...application.READ_RESPONSES };
+  for (const operationId of application.COMMERCE_SERVED_READ_IDS) {
+    const r = application.COMMERCE_READ_ROUTES[operationId];
+    reads[operationId] = { operationId, path: r.path, scope: r.scope, paginated: false, action: r.action, authority: r.authority };
+    readOutcomes[operationId] = application.COMMERCE_READ_OUTCOMES[operationId];
+    readViews[operationId] = { view: r.view };
+  }
   // test titles of the api package, by file
   const testDir = join(root, "apps", "api", "test");
   const tests = {};
@@ -404,17 +605,17 @@ export async function loadMatrixSources() {
     commands,
     eventTypes: new Set(domain.EVENT_TYPES),
     subscriptions: domain.EVENT_SUBSCRIPTIONS,
-    specs: { ...application.B06_COMMANDS, ...application.B07_COMMANDS },
-    outcomes: application.COMMAND_OUTCOMES,
-    reads: application.READ_ROUTES,
-    readOutcomes: application.READ_OUTCOMES,
-    readViews: application.READ_RESPONSES,
+    specs,
+    outcomes,
+    reads,
+    readOutcomes,
+    readViews,
     intakes: application.SOURCE_INTAKE_ROUTES,
     intakeOutcomes: application.INTAKE_OUTCOMES,
     intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
-    served: new Set(application.SERVED_COMMAND_IDS),
+    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS]),
     seeded,
     published,
     tests,
@@ -480,17 +681,21 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06 and B07 served)");
+  line("# State, command and event matrix (B06, B07 and B09 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
   line("`commands.json` and `cases.json` (provenance-verified, `@kauro/contracts`), the platform machines of `@kauro/domain` (EndClient");
-  line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07) and its event registry");
+  line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07; the commerce machines of B09)");
+  line("and its event registry");
   line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
   line("(`B06_COMMANDS` and `B07_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
   line("intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
-  line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Authority:");
+  line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
+  line("commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision");
+  line("D-REQ-B7): their specs, catalogues (`COMMERCE_COMMAND_OUTCOMES`, `COMMERCE_READ_OUTCOMES`) and published events");
+  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
   line("obligations\". Re-check finding N13.");
   line();
@@ -500,7 +705,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();
@@ -510,7 +715,7 @@ export function generateMatrix(s) {
       ? "registry machine"
       : s.sourceMachines.has(m.contract)
         ? `platform machine of the source lifecycle (B07 decision ${SOURCE_MACHINE_DECISIONS[m.contract]})`
-        : "platform machine (decisions D-AGG-1, D-AGG-2)";
+        : `platform machine (${PLATFORM_DECISIONS[m.contract] ?? "undeclared"})`;
     line(`### ${m.contract}`);
     line();
     line(`${kind}; initial ${m.initial}; terminal ${m.terminal.join(", ")}; unlisted edges: ${m.unlistedTransition}.`);
@@ -535,6 +740,9 @@ export function generateMatrix(s) {
   line();
   line("## 2. The served commands");
   line();
+  line("A B09 provider command's events are those of its whole run: the request handler's intent and claim and the payment service's");
+  line("settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh step-up unless a standing policy covers the refund.");
+  line();
   line("| Command | Route | Role | Scope | Step-up | Edges | Events published | Outbox consumers |");
   line("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const id of s.served) {
@@ -543,7 +751,7 @@ export function generateMatrix(s) {
     for (const [machine, table] of Object.entries(EDGE_OWNERS)) for (const [event, o] of Object.entries(table)) if (o.command === id) edges.push(`${machine} ${event}`);
     const events = s.published[id];
     const consumers = [...new Set(s.subscriptions.filter((x) => events.includes(x.eventType)).map((x) => `${x.eventType} → ${x.consumer}`))];
-    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
+    line(`| ${id} ${spec.name} | ${spec.method} ${cell(spec.path)} | ${spec.role} | ${spec.scope} | ${spec.stepUp === "UNLESS_STANDING_POLICY" ? "fresh, or a covering standing policy" : spec.stepUpRequired ? "fresh" : "—"} | ${cell(edges.join("; "))} | ${cell(events.join(", "))} | ${cell(consumers.join("; ") || "—")} |`);
   }
   line();
   line("## 2a. The source-lifecycle routes (B07)");
@@ -600,7 +808,9 @@ export function generateMatrix(s) {
   line("durable security fact under the read's action token. Lists page by keyset with an opaque cursor bound to the caller, the agency,");
   line("the list, its filter and its order (`api/cursor`, KEYSET_V1). What differs by role is the projection: a team manager");
   line("(MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view");
-  line("carries the caller's permitted actions (`api/permitted-actions`).");
+  line("carries the caller's permitted actions (`api/permitted-actions`). Package B09's reads (D-REQ-B7) follow the same rules: the agency");
+  line("reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),");
+  line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER).");
   line();
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");

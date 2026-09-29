@@ -48,6 +48,9 @@ import type {
   CommandEnvelope,
   CommandHandler,
   CommandResult,
+  CommandSpec,
+  CommerceCommandHandler,
+  CommerceReadHandler,
   CompletedResponse,
   IntakeHandler,
   IntakeResult,
@@ -55,7 +58,9 @@ import type {
   RawRequest,
   ReadHandler,
   ReadHandlers,
+  ReadRequest,
   ReadResult,
+  ReadSpec,
   RouteResponses,
   SchemaValidator,
   SourceIntakeHandlers,
@@ -74,11 +79,15 @@ import {
   admitStructure,
   checkReply,
   commandRouteResponses,
+  commerceCommandRouteResponses,
+  commerceReadRouteResponses,
   correlationIdOf,
   envelopeOf,
   internalProblem,
   intakeRouteResponses,
   isServedCommand,
+  isServedCommerceCommand,
+  isServedCommerceRead,
   problemOf,
   readRouteResponses,
   repeatedHeaderNames,
@@ -134,6 +143,15 @@ export interface ApiServerOptions {
   readonly reads: ReadHandlers & SourceReadHandlers;
   /** The document intakes: the selection manifest (B07 D-SEL-2). */
   readonly intakes: SourceIntakeHandlers;
+  /**
+   * The served routes of the payments workflow (package B09; docs/design/B09-payments-fiscal.md §10, D-REQ-B7): its commands and its
+   * reads, each registered with its own admission spec and its declared replies (the 202 ACCEPTED envelope of a provider effect
+   * included), under the same admission pipeline, send guard and route inventory as the B06 routes.
+   */
+  readonly commerce?: {
+    readonly commands: ReadonlyArray<CommerceCommandHandler<unknown, unknown>>;
+    readonly reads: ReadonlyArray<CommerceReadHandler<unknown>>;
+  };
   readonly authenticator: Authenticator;
   /**
    * Answers a structurally admitted command request that carried no authenticated subject: records the durable anonymous
@@ -159,6 +177,20 @@ export interface ApiServerOptions {
   /** Key of the client-address hash; a fresh random key per process when absent (the admission limiter is process-local). */
   readonly clientAddressKey?: Uint8Array;
   readonly limits?: HttpLimits;
+  /**
+   * Registers the payment service's routes (package B09, stage-2 mandate M3: CMD030, CMD033, CMD034; payments/routes.ts) on the
+   * server, with the same transport pieces the command routes use (the problem sender, the single-valued header view, the
+   * internal-error sink and the framework-error answer). Every route declares its replies and passes the send guard.
+   */
+  readonly paymentRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
+}
+
+/** The transport pieces a route registered outside this module answers with (package B09's payment routes). */
+export interface RouteKit {
+  sendProblem(reply: FastifyReply, problem: Problem): FastifyReply;
+  singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>>;
+  readonly sink: (correlationId: string, error: unknown) => void;
+  answerFrameworkError(error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply;
 }
 
 export type CommandReply<View> = CompletedResponse<View> | AcceptedResponse | Problem;
@@ -417,14 +449,29 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
 
   registerHealthRoutes(app, { ...options.health, draining: () => draining });
   for (const handler of Object.values(options.handlers) as ReadonlyArray<CommandHandler<unknown, unknown>>) {
-    registerCommand(app, options, handler, sink, hashAddress);
+    const spec = handler.spec;
+    if (!isServedCommand(spec.id)) throw new Error(`${spec.id} has a handler but no declared response contract (COMMAND_RESPONSES of @kauro/application)`);
+    // the operation id is the registry command name (commands.json), as the OpenAPI document names it
+    registerCommand(app, options, spec, commandRouteResponses(spec.id, spec.name), (envelope) => handler.execute(envelope), sink, hashAddress);
   }
   for (const handler of Object.values(options.reads) as ReadonlyArray<ReadHandler<unknown>>) {
-    registerRead(app, options, handler, sink);
+    registerRead(app, options, handler.spec, readRouteResponses(handler.spec.operationId), (request) => handler.execute(request), sink);
   }
   for (const handler of Object.values(options.intakes) as ReadonlyArray<IntakeHandler<unknown>>) {
     registerIntake(app, options, handler, sink);
   }
+  // package B09: each served command with the spec its admission reads and its declared replies (202 for a provider effect)
+  for (const handler of options.commerce?.commands ?? []) {
+    const spec = handler.spec;
+    if (!isServedCommerceCommand(spec.id)) throw new Error(`${spec.id} has a handler but is not a served B09 command (COMMERCE_SERVED_COMMAND_IDS of @kauro/application)`);
+    registerCommand(app, options, handler.admission, commerceCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress);
+  }
+  for (const handler of options.commerce?.reads ?? []) {
+    const spec = handler.spec;
+    if (!isServedCommerceRead(spec.operationId)) throw new Error(`${spec.operationId} has a handler but is not a served B09 read (COMMERCE_SERVED_READ_IDS of @kauro/application)`);
+    registerRead(app, options, handler.admission, commerceReadRouteResponses(spec.operationId), (request) => handler.execute(request), sink);
+  }
+  options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   return app;
 }
 
@@ -499,12 +546,18 @@ function registerIntake<View>(app: FastifyInstance, options: ApiServerOptions, h
  * command's — then the read, whose access decision and projection belong to @kauro/application (queries/reads). The reply is
  * the READ envelope, validated against the route's declared schema before it is sent like every reply.
  */
-function registerRead<View>(app: FastifyInstance, options: ApiServerOptions, handler: ReadHandler<View>, sink: (correlationId: string, error: unknown) => void): void {
-  const spec = handler.spec;
+function registerRead<View>(
+  app: FastifyInstance,
+  options: ApiServerOptions,
+  spec: ReadSpec<string>,
+  responses: RouteResponses,
+  execute: (request: ReadRequest) => Promise<ReadResult<View>>,
+  sink: (correlationId: string, error: unknown) => void,
+): void {
   app.route<{ Params: Record<string, string>; Querystring: Record<string, unknown>; Reply: ReadReply<View> | Problem }>({
     method: spec.method,
     url: fastifyPath(spec.path),
-    config: { responses: readRouteResponses(spec.operationId) },
+    config: { responses },
     handler: async (request, reply) => {
       const headers = singleValued(request.headers);
       const admission = admitRead(spec, {
@@ -529,7 +582,7 @@ function registerRead<View>(app: FastifyInstance, options: ApiServerOptions, han
       }
       let result: ReadResult<View>;
       try {
-        result = await handler.execute({ correlationId, subject, agencyId: admission.agencyId, path: admission.path, query: admission.query });
+        result = await execute({ correlationId, subject, agencyId: admission.agencyId, path: admission.path, query: admission.query });
       } catch (error) {
         sink(correlationId, error);
         return sendProblem(reply, internalProblem(correlationId));
@@ -550,17 +603,16 @@ export interface ReadReply<View> {
 function registerCommand<Body, View>(
   app: FastifyInstance,
   options: ApiServerOptions,
-  handler: CommandHandler<Body, View>,
+  spec: CommandSpec<Body>,
+  responses: RouteResponses,
+  execute: (envelope: CommandEnvelope<Body>) => Promise<CommandResult<View>>,
   sink: (correlationId: string, error: unknown) => void,
   hashAddress: (ip: string | undefined) => Sha256Hex | null,
 ): void {
-  const spec = handler.spec;
-  if (!isServedCommand(spec.id)) throw new Error(`${spec.id} has a handler but no declared response contract (COMMAND_RESPONSES of @kauro/application)`);
   app.route<{ Params: Record<string, string>; Body: Buffer | undefined; Reply: CommandReply<View> }>({
     method: spec.method,
     url: fastifyPath(spec.path),
-    // the operation id is the registry command name (commands.json), as the OpenAPI document names it
-    config: { responses: commandRouteResponses(spec.id, spec.name) },
+    config: { responses },
     // manual 10 decides the content type before the byte size: the head is admitted before the body is read, so the parser's
     // body limit cannot answer first for a request whose head already refuses it
     onRequest: async (request, reply) => {
@@ -596,7 +648,7 @@ function registerCommand<Body, View>(
       const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
       let result: CommandResult<View>;
       try {
-        result = await handler.execute(envelope);
+        result = await execute(envelope);
       } catch (error) {
         sink(envelope.correlationId, error);
         return sendProblem(reply, internalProblem(envelope.correlationId));

@@ -180,6 +180,20 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/revisions/:revisionId/tables/:tableId/preview", "PreviewTable", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTable" } }],
       // the selection manifest intake: 201 stored, 200 the same document again (B07 D-SEL-2)
       ["POST", "/api/v1/revisions/:revisionId/selection-manifests", "SubmitSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" } }],
+      // package B09's request side (M4, D-REQ-B7): a provider command declares its 202 accepted observation beside its success
+      ["POST", "/api/v1/quotes/:quoteId/payment-orders", "CreatePaymentOrder", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD028" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/capture", "CapturePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD029" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/projects/:projectId/refund-requests", "RequestRefund", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD031" } }],
+      ["POST", "/api/v1/refunds/:refundId/approve", "ApproveRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD032" } }],
+      ["GET", "/api/v1/quotes/:quoteId", "GetQuote", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetQuote" } }],
+      ["GET", "/api/v1/payment-orders/:orderId", "GetPaymentOrder", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetPaymentOrder" } }],
+      ["GET", "/api/v1/refunds/:refundId", "GetRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefund" } }],
+      ["GET", "/api/v1/operations/refunds/:refundId", "GetRefundReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefundReview" } }],
+      // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
+      // where a provider effect may stay unknown (CMD033)
+      ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],
+      ["POST", "/api/v1/refunds/:refundId/execute", "ExecuteRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD033" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/reconcile", "ReconcilePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD034" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request
