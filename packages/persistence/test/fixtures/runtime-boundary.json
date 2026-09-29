@@ -431,6 +431,16 @@
           "version"
         ]
       },
+      "kauro.retention_records": {
+        "SELECT": [
+          "agency_id",
+          "effective_deadline",
+          "hard_deadline",
+          "retention_id",
+          "revision_id",
+          "state"
+        ]
+      },
       "kauro.target_contracts": {
         "SELECT": [
           "agency_id",
@@ -1596,6 +1606,14 @@
         "kauro_control"
       ],
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "retention_records/retention_records_payment_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
     "retention_records/retention_records_tenant_insert": {

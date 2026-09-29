@@ -441,6 +441,13 @@ export interface SourceAvailabilityReader {
 export interface RevisionLineageReader {
   /** The successors created after `revisionId` in this project, oldest first, with how each replaced its predecessor. */
   replacementsSince(revisionId: RevisionId): Promise<ReadonlyArray<{ readonly revisionId: RevisionId; readonly supersedesRevisionId: RevisionId; readonly predecessorOutcome: "SUPERSEDED" | "CANCELLED" | "UNCHANGED"; readonly createdAt: UtcInstant }>>;
+  /**
+   * Whether `successorId` descends from `ancestorId` through the same lineage (supersedes_revision_id, one successor per
+   * predecessor), with the successor's state and the path from the ancestor to it, oldest first; null when it does not. It reads
+   * only the revisions' ids, state and lineage column — B06's columns, which the payment service's column grant covers (the B07 +
+   * B09 merge: package B09's re-binding of a paid capture to a replacement, D-QUOTE-B6, reads no B07 column).
+   */
+  descendsFrom(successorId: RevisionId, ancestorId: RevisionId): Promise<{ readonly successorState: SourceRevisionRecord["state"]; readonly path: ReadonlyArray<RevisionId> } | null>;
 }
 
 /** The two-phase command journal operations (D-RUN-2) over the B06 command_journal table. */

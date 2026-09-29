@@ -21,10 +21,14 @@
  *   nonretryable outcome "until the subject or implementation changes"; 07 "Acceptance obligations" — "a downstream team must
  *   not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" — a local result is never
  *   presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md.
- * - `noCommercialAuthorizationsBeforePayments` (B07): CMD012's impact map names the live commercial authorizations bound to the
- *   revision it replaces (docs/design/B07-upload-source-lifecycle.md §17 item 7). CommercialAuthorization is the payments
- *   package's aggregate (B09; 07 "Aggregate ownership"): no table of it exists before B09, so no authorization can be bound and the
- *   set is empty by construction — the edition's production answer, not a stand-in. B09 binds its reader through the same port.
+ * - `commercialScopeInspector` (B07 port, bound by the B07 + B09 merge): CMD012's impact map names the live commercial
+ *   authorizations bound to the revision it replaces (docs/design/B07-upload-source-lifecycle.md §17 item 7; B09 design §15 item 6):
+ *   the replaced revision's manifest hash read in CMD012's own source unit of work (B07's source store), then package B09's
+ *   CommercialAuthorizationRepository.findLiveByRevisionHash under the same tenant context, mapped to the authorization ids.
+ * - `sourceAvailabilityReader` and `sourceLineageReader` (B09 ports, bound by the B07 + B09 merge): the availability of a
+ *   quoted source (checkout and capture re-check SOURCE_EXPIRED, D-QUOTE-B7) and the lineage of a replacement (the re-binding,
+ *   D-QUOTE-B6) are the source lifecycle's own answers over its tables (@kauro/persistence commercialSourceReadsOf: B07's
+ *   SourceAvailabilityReader, retention records and RevisionLineageReader), never a contract fake (D-FAKE-B1).
  * - The source-lifecycle provider adapters (object storage, session vault) and the preview reader are not bound by this edition
  *   (B07 D-SAPI-6): the composition root leaves them null, so every source command and read that needs one answers
  *   INTEGRITY_FAILURE / SOURCE_SERVICES_UNAVAILABLE and reserves nothing; B15 binds the real adapters.
@@ -40,9 +44,11 @@ import type {
   ExternalActionInspector,
   PlanPatchCompiler,
   PurchasedSubjectReader,
+  SourceAvailabilityReader,
+  SourceLineageReader,
 } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
-import { commerceRequestReadsOf, commercialInspectionsOf, purchasedSubjectsOf } from "@kauro/persistence";
+import { commerceRequestReadsOf, commercialAuthorizationsOf, commercialInspectionsOf, commercialSourceReadsOf, purchasedSubjectsOf, sourceStoreOf } from "@kauro/persistence";
 
 export const activeWorkInspector: ActiveWorkInspector = {
   async inspectClient(uow, clientId) {
@@ -66,10 +72,25 @@ export const commercialConsequencesInspector: CommercialConsequenceInspector = {
   },
 };
 
-export const noCommercialAuthorizationsBeforePayments: CommercialScopeInspector = {
-  async authorizationsBoundTo() {
-    return [];
+export const commercialScopeInspector: CommercialScopeInspector = {
+  async authorizationsBoundTo(uow, agencyId, revisionId) {
+    const revision = await sourceStoreOf(uow).revisions.get(revisionId);
+    if (revision === null || revision.manifestHash === undefined) return [];
+    const live = await commercialAuthorizationsOf(uow).findLiveByRevisionHash(agencyId, revision.manifestHash);
+    return live.map((a) => a.authorizationId);
   },
+};
+
+/** The source lifecycle's availability of a quoted source (B07), as the payments workflow asks for it (B09 D-QUOTE-B7). */
+export const sourceAvailabilityReader: SourceAvailabilityReader = {
+  binding: "PLATFORM",
+  availabilityOf: (uow, request) => commercialSourceReadsOf(uow).availabilityOf(request),
+};
+
+/** The source lifecycle's lineage of a replacement revision (B07 CMD012), as the re-binding asks for it (B09 D-QUOTE-B6). */
+export const sourceLineageReader: SourceLineageReader = {
+  binding: "PLATFORM",
+  replacementOf: (uow, request) => commercialSourceReadsOf(uow).replacementOf(request),
 };
 
 function unavailable(service: string): DomainFailure {
@@ -130,9 +151,9 @@ export const commerceRequestQueries: CommerceRequestQueries = {
  * service's composition (ApiAssembly.payments: the composition root then takes both from the bound payment service, D-INT2-B3);
  * without them CreatePaymentOrder and CapturePayment answer INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE inside the unit of work
  * with nothing written; B08's admission is not bound, so deliverable capacity is "unanswered" and checkout answers
- * CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (D-CAP-B1); B07's source availability is not bound, so a quote's own promise
- * (Quote.sourceAvailableUntil, D-QUOTE-B7) and its revision's SEALED state decide. A deployment, and the tests, bind the rest through
- * ApiAssembly.commerce; nothing here is a fake (D-FAKE-B1: no production wiring binds one).
+ * CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (D-CAP-B1); B07's source availability is the platform's own
+ * (sourceAvailabilityReader, bound since the B07 + B09 merge). A deployment, and the tests, bind the rest through ApiAssembly.commerce;
+ * nothing here is a fake (D-FAKE-B1: no production wiring binds one).
  */
 export function commerceEdition(): CommerceRequestCollaborators {
   return {
@@ -142,6 +163,6 @@ export function commerceEdition(): CommerceRequestCollaborators {
     subjects: purchasedSubjectReader,
     queries: commerceRequestQueries,
     capacity: null,
-    sources: null,
+    sources: sourceAvailabilityReader,
   };
 }

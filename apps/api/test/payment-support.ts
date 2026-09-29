@@ -8,12 +8,13 @@
  *
  * What the tests bind that no deployment of this edition binds (D-FAKE-B1; evidence class SIMULATED, never integration — the real
  * adapters are package B15's): M2's labelled contract fakes of @kauro/application/testing — the PayPal Orders v2 provider, its
- * webhook verifier, the restricted evidence store, the service authenticator, the fiscal bridge and B07's lineage reader.
+ * webhook verifier, the restricted evidence store, the service authenticator and the fiscal bridge. B07's lineage and source
+ * availability are the platform's own since the B07 + B09 merge (apps/api edition.ts), never a fake.
  *
  * With `requestSide: true` (the stage-2 integration's scenario tests, apps/api/test/b09-scenarios.test.ts) the world's one api —
  * built by support.ts world() with its people — also binds this payment service (ApiAssembly.payments) and serves the request side
  * (CMD028, CMD029, CMD031, CMD032 and the four reads) beside the payment service's routes: its provider commands settle through the
- * bound payment service (D-INT2-B3), and the platform ports of B07 and B08 are M2's labelled contract fakes (`sources`, `capacity`).
+ * bound payment service (D-INT2-B3), and the platform port of B08 is M2's labelled contract fake (`capacity`); B07's are the platform's.
  *
  * Preconditions are written through M1's adapters (@kauro/persistence/testing paidPurchase, checkoutOrder, activateAgency and
  * recordReviewedFiscalProfile, the commerce unit of work for refunds and profiles) and, where a precondition is a provider effect
@@ -31,16 +32,12 @@ import {
   createFiscalBridgeFake,
   createPayPalContractFake,
   createServiceAuthenticatorFake,
-  createSourceAvailabilityFake,
-  createSourceLineageFake,
   createWebhookVerifierFake,
   type DeliveryCapacityFake,
   type EvidenceStoreFake,
   type FiscalBridgeFake,
   type PayPalContractFake,
   type ServiceAuthenticatorFake,
-  type SourceAvailabilityFake,
-  type SourceLineageFake,
   type WebhookVerifierFake,
 } from "@kauro/application/testing";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
@@ -113,9 +110,10 @@ export interface PaymentWorld {
   readonly evidence: EvidenceStoreFake;
   readonly services: ServiceAuthenticatorFake;
   readonly fiscalBridge: FiscalBridgeFake;
-  readonly lineage: SourceLineageFake;
-  /** The platform ports of B07 (source availability) and B08 (deliverable capacity): bound to the request side with `requestSide`. */
-  readonly sources: SourceAvailabilityFake;
+  /**
+   * The platform port of B08 (deliverable capacity), bound to the request side with `requestSide`. B07's source availability and
+   * lineage are the platform's own since the B07 + B09 merge (apps/api edition.ts): no world binds a fake of them.
+   */
   readonly capacity: DeliveryCapacityFake;
   /** The platform's qualified merchant route (the fake's merchant) and fiscal issuer route. */
   readonly route: QualifiedRoute;
@@ -136,8 +134,6 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
   const evidence = createEvidenceStoreFake({ clock });
   const services = createServiceAuthenticatorFake({ clock });
   const fiscalBridge = createFiscalBridgeFake();
-  const lineage = createSourceLineageFake({ clock });
-  const sources = createSourceAvailabilityFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
   const holds = new PaymentHolds();
   const backgroundFailures: Array<{ correlationId: string; error: unknown }> = [];
@@ -146,7 +142,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
     const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
     const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
     const service = createPaymentService({
-      assembly: { commerce: pools.commerce, ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, lineage, hold: (command, point) => holds.pass(command, point) },
+      assembly: { commerce: pools.commerce, ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, hold: (command, point) => holds.pass(command, point) },
       environment: "LOCAL",
       clock,
       ids,
@@ -160,7 +156,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
   const w = await world(
     options.requestSide === true
       ? {
-          commerce: () => ({ capacity, sources }),
+          commerce: () => ({ capacity }),
           payments: async (h, db) => {
             const opened = await open(h, db);
             holder.bound = opened;
@@ -198,8 +194,6 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
     evidence,
     services,
     fiscalBridge,
-    lineage,
-    sources,
     capacity,
     route,
     issuerRef,
@@ -251,7 +245,8 @@ export async function approvedPlan(pw: PaymentWorld, seed: string, agency: Agenc
     await uow.events.publish({ aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: revision.version, agencyId: agency.agencyId, eventType: "dataset_revision.created.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { revisionId, agencyId: agency.agencyId, projectId: id, state: revision.state } });
     return id;
   });
-  const source = await w.revision(agency, projectId, "SEALED");
+  // sealed recently through the source lifecycle (B07): a quote promises no more source than the retention its seal left
+  const source = await w.revision(agency, projectId, "SEALED", { recent: true });
   const contractId = ids.next();
   const targetContractHash = sha(`hubspot-target-${contractId}`);
   await w.asTenant(agency, async (c) => {

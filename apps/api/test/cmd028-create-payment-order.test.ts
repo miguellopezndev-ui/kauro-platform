@@ -8,7 +8,6 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CapturePaymentView, CreatePaymentOrderView, PaymentOrderDetailView } from "@kauro/application";
 import { COMMERCE_COMMAND_EVENTS } from "@kauro/application";
-import { sealedAvailability } from "@kauro/application/testing";
 import { accepted, paymentRoutes, paymentsWorld, read, readData, subscribersOf, type PaymentsWorld, type ReadyQuote } from "./commerce-support.js";
 import { asProblem, call, completed, freshKey, ids, outcome, rawEvent, replayTextOf, sha, type Reply } from "./support.js";
 import { controlWriter, tenantWriter } from "./writers.js";
@@ -144,11 +143,13 @@ test("DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_
   const denial = (await w.securityEvents("CMD028")).slice(deniedBefore);
   assert.deepEqual(denial.map((f) => [f.outcome, f.reason, f.agencyId, f.actorId]), [["DENY", "ROLE_INSUFFICIENT", w.A.agencyId, w.viewer.userId]]);
 
-  // expired source: B07's retention record says the sealed revision's effective deadline has passed (S060)
-  const sealedAt = new Date(Date.parse(quote.issuedAt) - HOUR_MS).toISOString();
-  pw.sources.set(quote.revisionHash, sealedAvailability(quote.revisionId, sealedAt, new Date(Date.now() - 60_000).toISOString()));
-  await refusedWithNothing("expired source", () => createOrder(quote), "422 SOURCE_EXPIRED -");
-  pw.sources.set(quote.revisionHash, sealedAvailability(quote.revisionId, sealedAt, quote.sourceAvailableUntil));
+  // expired source (S060): B07's retention sweeper expired the quoted revision's UNPAID record and the revision (retention_expires,
+  // the source lifecycle's own record read by the platform's SourceAvailabilityReader; the B07 + B09 merge). An expiry cannot be
+  // undone, so it is shown on a second quote of its own while this quote's source stays available for the prerequisites below.
+  const expiring = await pw.readyQuote("cmd028-deny-expired-source");
+  await w.h.expireRevision(w.A, expiring.projectId as never, expiring.revisionId as never);
+  await refusedWithNothing("expired source", () => createOrder(expiring), "422 SOURCE_EXPIRED -");
+  assert.equal(await orderOf(expiring.quoteId), null, "expired source: no order of the expiring quote");
 
   // stale terms: the terms the agency accepted are not the quote's
   const stale = await createOrder(quote, { termsHash: sha("terms the agency never saw") });
@@ -206,15 +207,8 @@ test("DENY (race): a source expiry committed between the intent and the capture 
   const hold = pw.holds.arm("CMD029", "AFTER_CLAIM", "PAUSE");
   const capture = call(w, { url: paymentRoutes.capturePayment(orderId), token: w.billing.token, key: freshKey("cmd028-race-capture"), body: { providerApprovalRef: providerOrderId } });
   await hold.reached;
-  const lifecycle = await tenantWriter(w, w.A);
-  try {
-    const moved = await lifecycle.query<{ version: string }>("UPDATE kauro.dataset_revisions SET state = 'EXPIRED', version = version + 1 WHERE revision_id = $1 AND state = 'SEALED' RETURNING version", [quote.revisionId]);
-    const version = Number(moved.rows[0]?.version);
-    await rawEvent(lifecycle.client, { aggregateKind: "dataset_revision", aggregateId: quote.revisionId, aggregateVersion: version, agencyId: w.A.agencyId, eventType: "dataset_revision.expired.v1", actorUserId: w.A.ownerUserId, payload: { revisionId: quote.revisionId, agencyId: w.A.agencyId, projectId: quote.projectId } });
-    await lifecycle.commit();
-  } finally {
-    await lifecycle.close();
-  }
+  // B07's retention sweeper (control plane, retention_expires on the server clock past the record's deadline) commits the expiry
+  await w.h.expireRevision(w.A, quote.projectId as never, quote.revisionId as never);
   hold.release();
   const reply = completed<CapturePaymentView>(await capture, 200);
   // the real capture is recorded and allocated, the order CAPTURED — and no authority: the subject no longer binds (S060, KP004)

@@ -4,18 +4,19 @@
 // that binds no payment service, the PAYMENT_SERVICE consumer's refund executor and watchdog through the payment dispatcher, the
 // cancel-before-dispatch sweep, the provider query a completion without its instant asks for, the price-expiry check of the
 // column-scoped purchased-subject read, and the PurchaseRebinder. Everything runs through the api the composition root builds and
-// a real PostgreSQL 17; the provider, its webhooks, the service identities and the source lifecycle's lineage are M2's labelled
+// a real PostgreSQL 17; the provider, its webhooks and the service identities are M2's labelled (B07's lineage is the platform's own)
 // contract fakes (CONTRACT_FAKE, SIMULATED). A later instant is a payment service built over the same pools with a clock past a
 // deadline (the database's own time bounds are unaffected: nothing here claims an attempt); nothing sleeps.
 import assert from "node:assert/strict";
 import { connect } from "node:net";
 import { after, before, test } from "node:test";
-import type { ReconcilePaymentView, WebhookAck } from "@kauro/application";
+import type { CreateRevisionView, ReconcilePaymentView, WebhookAck } from "@kauro/application";
 import { REQUEST_LIMITS } from "@kauro/application";
 import type { CausationId, Clock, PaymentOrderId, PlanId, ProjectId, QuoteId, EligibilitySnapshotId, MembershipId } from "@kauro/domain";
 import { DISPATCH_DEADLINE_SECONDS, DomainFailure, toUtcInstant } from "@kauro/domain";
-import { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, createPaymentDispatcher, createPaymentService, refundExecutionKey, type PaymentService } from "../src/index.js";
+import { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, createPaymentDispatcher, createPaymentService, createPurchaseRebinder, refundExecutionKey, type PaymentService } from "../src/index.js";
 import { SimulatedCrash, approvedRefund, captureRun, checkout, deliver, dispatch, paid, paymentWorld, postWebhook, reconcile, rows, serviceToken, storeQuery, type PaymentWorld } from "./payment-support.js";
+import { createRevision, projectPointer } from "./source-support.js";
 import { approveThroughRoute, call, clock, completed, freshKey, ids, outcome, rawEvent, rootCause, sha, type Call, type Reply } from "./support.js";
 
 let pw: PaymentWorld;
@@ -255,30 +256,22 @@ test("D-AUTH-B3: a capture completed after its quote's price expired is honored 
 
 /**
  * The replacement subject B10's replacement flow prepares before it calls the re-binder: a revision of the purchase's project that
- * supersedes the paid one (born DRAFT and walked to SEALED as B07's lifecycle leaves it), a VALIDATED plan over it and the same
- * target approved through CMD025, and the replacement quote (the paid purchase's commercial terms, replacesQuoteId) issued through
- * M1's quote adapter.
+ * supersedes the paid one — B07's CMD012 CreateRevision through its route (the paid revision SUPERSEDED, a DRAFT successor naming
+ * it, the project's pointer moved), then sealed through the source lifecycle (upload, inspection, selection, evaluation, seal and
+ * its retention record; the B07 + B09 merge) — a VALIDATED plan over it and the same target approved through CMD025, and the
+ * replacement quote (the paid purchase's commercial terms, replacesQuoteId) issued through M1's quote adapter.
  */
 async function replacementOf(purchase: Awaited<ReturnType<typeof paid>>, seed: string) {
   const { w } = pw;
   const A = w.A;
   const projectId = purchase.projectId as ProjectId;
   const replaced = (await rows<{ revision_id: string }>(pw, "SELECT revision_id FROM kauro.dataset_revisions WHERE project_id = $1 AND manifest_hash = $2", [projectId, purchase.plan.revisionHash]))[0]!.revision_id;
-  const revisionId = ids.next();
-  const revisionHash = sha(`${seed}-manifest-${revisionId}`);
-  await w.asTenant(A, async (c) => {
-    const event = (version: number, eventType: string, payload: Record<string, string> = {}) =>
-      rawEvent(c, { aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: version, agencyId: A.agencyId, eventType, actorUserId: A.ownerUserId, payload: { revisionId, agencyId: A.agencyId, projectId, ...payload } });
-    await c.query("INSERT INTO kauro.dataset_revisions (revision_id, agency_id, project_id, version, state, supersedes_revision_id, created_at, updated_at) VALUES ($1, $2, $3, 1, 'DRAFT', $4, now(), now())", [revisionId, A.agencyId, projectId, replaced]);
-    await event(1, "dataset_revision.created.v1", { state: "DRAFT" });
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'INSPECTING', version = 2 WHERE revision_id = $1", [revisionId]);
-    await event(2, "dataset_revision.inspecting.v1");
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'READY_TO_SEAL', version = 3 WHERE revision_id = $1", [revisionId]);
-    await event(3, "dataset_revision.ready_to_seal.v1");
-    const projectionHash = sha(`${seed}-projection-${revisionId}`);
-    await c.query("UPDATE kauro.dataset_revisions SET state = 'SEALED', version = 4, manifest_hash = $2, projection_hash = $3, sealed_at = now() WHERE revision_id = $1", [revisionId, revisionHash, projectionHash]);
-    await event(4, "dataset_revision.sealed.v1", { manifestHash: revisionHash, projectionHash });
-  });
+  const pointer = await projectPointer(w, projectId);
+  const created = completed<CreateRevisionView>(await createRevision(w, projectId, pointer.version, replaced), 201);
+  const revisionId = created.data.revision.revisionId;
+  const sealed = await w.revision(A, projectId, "SEALED", { recent: true });
+  assert.equal(sealed.revisionId, revisionId, "the source lifecycle sealed CMD012's successor");
+  const revisionHash = sealed.revisionHash;
   const plan = await w.plan(A, projectId, { revisionHash, targetContractHash: purchase.plan.targetContractHash, seed, state: "VALIDATED" });
   await approveThroughRoute(w, plan);
   const quoteId = await w.h.commerce.run(w.h.tenant(A.agencyId, A.ownerUserId), async (uow) => {
@@ -363,10 +356,16 @@ test("D-QUOTE-B6: the PurchaseRebinder re-binds a paid capture to the included p
     (e: unknown) => e,
   );
   assert.ok(unadopted instanceof DomainFailure && unadopted.code === "INTEGRITY_FAILURE", String(unadopted));
-  assert.deepEqual(await rebind(purchase, replacement.quoteId), { kind: "REFUSED", blockers: ["LINEAGE_MISSING"] });
+  // a re-binder without the source lifecycle's lineage reader (the port unbound) finds no lineage
+  const unbound = createPurchaseRebinder({});
+  const withoutLineage = await pw.pools.commerce.run({ kind: "SERVICE", serviceId: "payment-service", correlationId: pw.w.h.service().correlationId }, async (uow) => {
+    if ((await uow.adoptScope("PAYMENT_ORDER", purchase.orderId)) === null) throw new Error("the payment service cannot adopt the paid order's scope");
+    return unbound.rebind(uow, { captureId: purchase.captureId, fromQuoteId: purchase.quoteId, toQuoteId: replacement.quoteId, requestedByMembershipId: pw.w.A.ownerMembershipId as MembershipId, causationId: ids.next() as CausationId, now: clock.now() });
+  });
+  assert.deepEqual(withoutLineage, { kind: "REFUSED", blockers: ["LINEAGE_MISSING"] });
   assert.deepEqual(await written(), before, "a refused re-binding writes nothing");
 
-  pw.lineage.set(purchase.plan.revisionHash, replacement.revisionHash, { replacedRevisionId: replacement.replacedRevisionId, replacementRevisionId: replacement.revisionId, replacementSealed: true });
+  // the payment service's re-binder reads B07's lineage (CMD012's supersedes_revision_id, the platform's reader since the merge)
   const correlationId = pw.w.h.service().correlationId;
   const rebound = await rebind(purchase, replacement.quoteId, correlationId);
   assert.equal(rebound.kind, "REBOUND");

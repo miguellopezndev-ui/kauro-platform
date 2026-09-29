@@ -24,11 +24,8 @@ import {
   createFiscalBridgeFake,
   createPayPalContractFake,
   createServiceAuthenticatorFake,
-  createSourceAvailabilityFake,
-  createSourceLineageFake,
   createWebhookVerifierFake,
   normalizePayPalWebhook,
-  sealedAvailability,
 } from "../src/commerce/testing/index.js";
 
 const sha = (s: string | Uint8Array): string => createHash("sha256").update(s).digest("hex");
@@ -354,34 +351,18 @@ test("ServiceAuthenticator contract fake: a signed service token verifies to its
   assert.equal(auth.calls.length, 9);
 });
 
-test("platform contract fakes of B07 and B08 (binding CONTRACT_FAKE until their package is on main): source availability and lineage answer what was programmed and null otherwise, the capacity admission answers capacity, a stated refusal or nothing at all; each is read inside the caller's unit of work and logs it", async () => {
+test("the platform contract fake of B08 (binding CONTRACT_FAKE until its package is on main): the capacity admission answers capacity, a stated refusal or nothing at all; it is read inside the caller's unit of work and logs it (B07's source availability and lineage are the platform's own readers since the B07 + B09 merge: no fake of them remains)", async () => {
   const w = world();
   const ports = createInMemoryPorts(w.clock, w.ids, emptyStore());
-  const availability = createSourceAvailabilityFake({ clock: w.clock });
-  const lineage = createSourceLineageFake({ clock: w.clock });
   const capacity = createDeliveryCapacityFake({ clock: w.clock });
-  for (const f of [availability, lineage, capacity]) {
-    assert.equal(f.binding, CONTRACT_FAKE);
-    assert.equal(f.evidenceClass, FAKE_EVIDENCE_CLASS);
-  }
+  assert.equal(capacity.binding, CONTRACT_FAKE);
+  assert.equal(capacity.evidenceClass, FAKE_EVIDENCE_CLASS);
+  const testing: Record<string, unknown> = await import("../src/testing/index.js");
+  for (const removed of ["createSourceAvailabilityFake", "createSourceLineageFake", "sealedAvailability"]) assert.equal(testing[removed], undefined, removed);
   const agencyId = w.ids.next() as never;
   const projectId = w.ids.next() as never;
   const context = { kind: "TENANT" as const, agencyId, userId: w.ids.next() as never, correlationId: w.ids.next() as CorrelationId };
-  const revisionHash = sha("manifest");
   await ports.unitOfWork.run(context, async (uow) => {
-    assert.equal(await availability.availabilityOf(uow, { agencyId, projectId, revisionHash }), null);
-    availability.set(revisionHash, sealedAvailability("rev-1", w.clock.now(), inFuture(w, 7 * 24 * HOUR)));
-    const a = await availability.availabilityOf(uow, { agencyId, projectId, revisionHash });
-    assert.deepEqual([a?.state, a?.effectiveDeadline], ["SEALED", inFuture(w, 7 * 24 * HOUR)]);
-    assert.match(a?.evidenceHash ?? "", /^[0-9a-f]{64}$/);
-    availability.set(revisionHash, null);
-    assert.equal(await availability.availabilityOf(uow, { agencyId, projectId, revisionHash }), null, "a revision the lifecycle no longer knows");
-
-    const replacement = sha("manifest-2");
-    assert.equal(await lineage.replacementOf(uow, { agencyId, projectId, replacedRevisionHash: revisionHash, replacementRevisionHash: replacement }), null);
-    lineage.set(revisionHash, replacement, { replacedRevisionId: "rev-1", replacementRevisionId: "rev-2", replacementSealed: true });
-    assert.equal((await lineage.replacementOf(uow, { agencyId, projectId, replacedRevisionHash: revisionHash, replacementRevisionHash: replacement }))?.replacementRevisionId, "rev-2");
-
     const request = { agencyId, projectId, mode: "CLEAN" as const, billableUnits: 1000, at: w.clock.now() };
     const yes = await capacity.checkoutCapacity(uow, request);
     assert.ok(yes.available && /^[0-9a-f]{64}$/.test(yes.evidenceHash));
@@ -390,9 +371,7 @@ test("platform contract fakes of B07 and B08 (binding CONTRACT_FAKE until their 
     capacity.set({ noAnswer: true });
     await assert.rejects(capacity.checkoutCapacity(uow, request), CapacityUnansweredError);
   });
-  assert.deepEqual(availability.calls.map((c) => c.operation), ["AVAILABILITY_OF TENANT", "AVAILABILITY_OF TENANT", "AVAILABILITY_OF TENANT"]);
   assert.deepEqual(capacity.calls.map((c) => c.operation), ["CHECKOUT_CAPACITY TENANT", "CHECKOUT_CAPACITY TENANT", "CHECKOUT_CAPACITY TENANT"]);
-  assert.equal(lineage.calls.length, 2);
 });
 
 // --- the fakes are test-only (architecture.rules.json testOnlySubpaths; D-FAKE-B1) --------------------------------------------------

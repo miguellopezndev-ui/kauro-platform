@@ -9,6 +9,7 @@ import type { AgencyId, Clock, Environment, IdGenerator } from "@kauro/domain";
 import type { PaymentServiceAssembly } from "./assembly.js";
 import { fiscalConsumer, financeConsumer, paymentServiceEffect, unitOfWorkEffect, type DeliveryEffect } from "./consumers.js";
 import { createPaymentDispatcher, type PaymentDispatcher } from "./dispatcher.js";
+import { sourceLineageReader } from "../edition.js";
 import { createPurchaseRebinder } from "./rebinder.js";
 import { createPaymentRuntime, type PaymentRuntime } from "./runtime.js";
 import { executeRefund, reconcilePayment, type ServiceCommandRequest } from "./service-commands.js";
@@ -56,7 +57,7 @@ export function createPaymentService(input: {
     runSweepPass: (options) => runSweepPass(runtime, options),
     dispatcher: createPaymentDispatcher(runtime, effects),
     effects,
-    rebinder: createPurchaseRebinder(input.assembly.lineage !== undefined ? { lineage: input.assembly.lineage } : {}),
+    rebinder: createPurchaseRebinder({ lineage: sourceLineageReader }),
   };
 }
 

@@ -13,7 +13,7 @@ export type { WebhookVerifierFakeOptions, WebhookVerifierFake } from "./webhook-
 export { PAYPAL_WEBHOOK_HEADERS, normalizePayPalWebhook, createWebhookVerifierFake } from "./webhook-verifier-fake.js";
 export type { EvidenceStoreFake, FiscalBridgeFake, ServiceAuthenticatorFake, ServiceAuthenticatorFakeOptions } from "./evidence-and-services.js";
 export { FISCAL_ISSUANCE_DOMAIN, createEvidenceStoreFake, createFiscalBridgeFake, createServiceAuthenticatorFake } from "./evidence-and-services.js";
-export type { SourceAvailabilityFake, SourceLineageFake, CapacityAnswer, DeliveryCapacityFake } from "./platform-fakes.js";
-export { CapacityUnansweredError, createSourceAvailabilityFake, createSourceLineageFake, createDeliveryCapacityFake, sealedAvailability } from "./platform-fakes.js";
+export type { CapacityAnswer, DeliveryCapacityFake } from "./platform-fakes.js";
+export { CapacityUnansweredError, createDeliveryCapacityFake } from "./platform-fakes.js";
 export type { InMemoryCommerceStore, InMemoryCommercePorts, InMemoryCommerceOptions } from "./in-memory-commerce.js";
 export { emptyCommerceStore, createInMemoryCommercePorts } from "./in-memory-commerce.js";

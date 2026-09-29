@@ -26,7 +26,7 @@ export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, commerceReplay
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf } from "./unit-of-work.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -80,3 +80,6 @@ export type { IngressFact, IngressFactRecorder } from "./ingress-facts.js";
 // the request side's reads (implementation mandate M4; D-REQ-B2); its purchased subject is PgPurchasedSubjects above (D-INT2-B2)
 export { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
 export type { RequestTransitionSubject } from "./repositories/commerce-request-reads.js";
+// the seams of the B07 + B09 merge: the source lifecycle's answers to the payments workflow (docs/design/B07-B09-merge.md)
+export { PgCommercialSourceReads } from "./source/commercial-reads.js";
+export type { CommercialSourceAvailability, CommercialSourceLineage } from "./source/commercial-reads.js";

@@ -123,6 +123,8 @@ export {
   evaluationHashOf,
   retentionAnchorHashOf,
   authorityTombstoneHashOf,
+  sourceAvailabilityHashOf,
+  sourceLineageHashOf,
   textDigest,
 } from "./digests.js";
 export { uploadApplicationDeadline, providerSessionHorizon, effectiveDeadline, unpaidSealedDeadlines, firstSealOfBytes, unpaidSoftDeadline, unsealedIntakeDeadline, isPast } from "./retention.js";

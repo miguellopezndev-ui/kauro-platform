@@ -40,7 +40,8 @@ async function freshClient(label: string): Promise<ClientId> {
 /** A CLEAN project of the client created through CMD011, its plan approved through CMD025, and a purchase of it paid. */
 async function paidProject(clientId: ClientId, seed: string) {
   const project = completed<ProjectView>(await call(w, { url: routes.createProject(clientId), token: w.operator.token, body: { mode: "CLEAN", purpose: seed } }), 201);
-  const plan = await w.approvable(w.A, project.data.projectId as ProjectId, seed);
+  // a source sealed recently through the source lifecycle (B07): a quote promises no more than the retention its seal left
+  const plan = await w.approvable(w.A, project.data.projectId as ProjectId, seed, "SET", { recent: true });
   await approveThroughRoute(w, plan);
   const purchase = await paidPurchase(w.h, { agency: w.A, planId: plan.planId as PlanId, route, issuerRef, profileId });
   return { projectId: project.data.projectId as ProjectId, plan, purchase };

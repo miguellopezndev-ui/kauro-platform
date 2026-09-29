@@ -133,7 +133,8 @@ test("B09 reads: an agency reads its quote with checkout readiness and the actio
 
 test("D-REQ-B1: the composition root binds the payment collaborators a deployment supplies and names the ones it does not — with none bound, as this edition deploys, checkout answers 503 CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (B08's admission unanswered); with the admission bound and still no provider adapter or payment service, CreatePaymentOrder answers 422 INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE; the quote shows no merchant route, nothing is written and no provider is called", async () => {
   const deployments = [
-    { what: "the edition as deployed", unbound: ["payment", "provider", "capacity", "sources"], blockers: ["DELIVERY_CAPACITY_UNAVAILABLE", "PAYMENT_ROUTE_UNQUALIFIED"], answer: "503 CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE" },
+    // B07's source availability is the edition's own since the B07 + B09 merge (the platform's reader): bound in both deployments
+    { what: "the edition as deployed", unbound: ["payment", "provider", "capacity"], blockers: ["DELIVERY_CAPACITY_UNAVAILABLE", "PAYMENT_ROUTE_UNQUALIFIED"], answer: "503 CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE" },
     { what: "B08's admission and B07's availability bound", unbound: ["payment", "provider"], blockers: ["PAYMENT_ROUTE_UNQUALIFIED"], answer: "422 INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE" },
   ] as const;
   for (const d of deployments) {

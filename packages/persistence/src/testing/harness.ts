@@ -49,7 +49,7 @@ import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
 import { createCommerceUnitOfWorkFactory, createUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
 import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
-import { sealSourceRevision } from "./source-lifecycle.js";
+import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -134,10 +134,18 @@ export interface Harness {
    * inspection and admission, selection, evaluation, seal with its manifest and retention record; each write under the runtime
    * role that owns it) — upload_reserved → all_uploads_completed → all_selected_inputs_admitted → seal_command — or on to
    * EXPIRED by the retention sweeper (retention_expires), one version and one event per edge. The project's pristine current
-   * revision is sealed first; later calls seal a further revision beside it. Sealed fifteen days ago, so a test may expire it.
-   * The manifest hash is the revision's source hash (plans_source_fk).
+   * revision is sealed first; later calls seal a further revision beside it. Sealed fifteen days ago, so a test may expire it —
+   * unless `options.base` names when the intake began (the commercial packages seal recently: a quote promises no more source than
+   * the retention its seal left, B09 quotes_source_binding; the B07+B09 merge). The manifest hash is the revision's source hash
+   * (plans_source_fk).
    */
-  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED"): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
+  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
+  /**
+   * The retention sweeper's retention_expires of a SEALED revision (source-lifecycle.ts expireSealedRevision: its governing records
+   * past their effective deadline expire, then SEALED -> EXPIRED), in one control-plane transaction bound to the agency whose labelled
+   * TEST CLOCK stands at `at` (default: fifteen days ahead, past the UNPAID hard cap of any recent seal). Returns the new version.
+   */
+  expireRevision(agency: AgencyFixture, projectId: ProjectId, revisionId: RevisionId, at?: Date): Promise<number>;
   processingAuthority(agency: AgencyFixture): Promise<ProcessingAuthorityId>;
   endClient(agency: AgencyFixture, authority: ProcessingAuthorityId, displayName?: string): Promise<ClientId>;
   /**
@@ -337,7 +345,7 @@ export async function start(): Promise<Harness> {
       await receipts.record(receipt, clock.now());
     },
 
-    async sealedRevision(agency, projectId, state = "SEALED") {
+    async sealedRevision(agency, projectId, state = "SEALED", options = {}) {
       // the B07 source lifecycle, each write under the role that owns it (source-lifecycle.ts); sealed fifteen days ago, so a test
       // may take the retention sweeper's retention_expires at any time (the database refuses an expiry before its deadline)
       const sealed = await sealSourceRevision(
@@ -346,9 +354,16 @@ export async function start(): Promise<Harness> {
           control: (fn) => asControlFor(agency.agencyId, fn),
         },
         { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId },
-        { seed: `harness-${projectId}`, state },
+        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}) },
       );
       return { revisionId: sealed.revisionId as RevisionId, revisionHash: sealed.manifestHash as Sha256Hex, version: sealed.version };
+    },
+
+    async expireRevision(agency, projectId, revisionId, at = new Date(Date.now() + 15 * 86_400_000)) {
+      return asControlFor(agency.agencyId, async (c) => {
+        await clockAt(c, at);
+        return expireSealedRevision(c, { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId }, revisionId);
+      });
     },
 
     async processingAuthority(agency) {

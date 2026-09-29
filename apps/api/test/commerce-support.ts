@@ -26,12 +26,9 @@ import { createCommerceReconciler } from "@kauro/application";
 import {
   createDeliveryCapacityFake,
   createPayPalContractFake,
-  createSourceAvailabilityFake,
   createWebhookVerifierFake,
-  sealedAvailability,
   type DeliveryCapacityFake,
   type PayPalContractFake,
-  type SourceAvailabilityFake,
   type WebhookVerifierFake,
 } from "@kauro/application/testing";
 import type { CausationId, Clock, FiscalIssuerRef, FiscalProfileId, InboxId, PlanId, ProjectId, UserId } from "@kauro/domain";
@@ -124,7 +121,6 @@ export interface PaymentsWorld {
   /** The labelled contract fakes (SIMULATED; D-FAKE-B1). */
   readonly provider: PayPalContractFake;
   readonly capacity: DeliveryCapacityFake;
-  readonly sources: SourceAvailabilityFake;
   readonly verifier: WebhookVerifierFake;
   readonly holds: ProtocolHolds;
   /** The QUALIFIED merchant route of the fake's provider, environment and payee, and the qualified fiscal issuer. */
@@ -159,14 +155,17 @@ export interface ReadyQuote extends IssuedQuote {
   readonly revisionId: string;
 }
 
-/** A payment collaborator the world can leave to the edition (edition.ts commerceEdition: not bound, as a deployment runs; D-REQ-B1). */
-export type EditionCollaborator = "payment" | "provider" | "capacity" | "sources";
+/**
+ * A payment collaborator the world can leave to the edition (edition.ts commerceEdition: not bound, as a deployment runs; D-REQ-B1).
+ * The source availability is not one of them since the B07 + B09 merge: the edition binds the source lifecycle's own reader (B07),
+ * which every world uses.
+ */
+export type EditionCollaborator = "payment" | "provider" | "capacity";
 
 export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator> } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
-  const sources = createSourceAvailabilityFake({ clock });
   const verifier = createWebhookVerifierFake({ clock });
   const holds = new ProtocolHolds();
   // every collaborator the test binds replaces the edition's; one it leaves unbound stays the edition's (null)
@@ -177,7 +176,6 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
       ...(unbound.has("payment") ? {} : { payment: h.commerce }),
       ...(unbound.has("provider") ? {} : { provider }),
       ...(unbound.has("capacity") ? {} : { capacity }),
-      ...(unbound.has("sources") ? {} : { sources }),
       protocolHold: holds.hook,
     }),
   });
@@ -194,7 +192,8 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
 
   const approvedPlan = async (label: string): Promise<{ readonly plan: PlanFixture; readonly projectId: ProjectId }> => {
     const { projectId } = await w.project(w.A, w.clientA);
-    const plan = await w.approvable(w.A, projectId, label);
+    // a source sealed recently through the source lifecycle (B07): a quote promises no more than the retention its seal left
+    const plan = await w.approvable(w.A, projectId, label, "SET", { recent: true });
     await approveThroughRoute(w, plan);
     return { plan, projectId };
   };
@@ -204,7 +203,6 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
     clock,
     provider,
     capacity,
-    sources,
     verifier,
     holds,
     route,
@@ -222,8 +220,6 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
       const r = await oracle.query<{ revision_id: string; sealed_at: Date }>("SELECT revision_id, sealed_at FROM kauro.dataset_revisions WHERE manifest_hash = $1", [quote.revisionHash]);
       const revision = r.rows[0];
       if (!revision) throw new Error("the quoted revision is not sealed");
-      // B07's retention record of the sealed revision (SIMULATED until B07 is on main): available for the quote's promise
-      sources.set(quote.revisionHash as Sha256Hex, sealedAvailability(revision.revision_id, toUtcInstant(revision.sealed_at.getTime()), quote.sourceAvailableUntil));
       return { ...quote, plan, revisionId: revision.revision_id };
     },
 

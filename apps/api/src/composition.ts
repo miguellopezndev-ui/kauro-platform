@@ -29,7 +29,7 @@ import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/
 import { applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, noCommercialAuthorizationsBeforePayments, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
+import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
@@ -262,7 +262,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const sources: B07Collaborators = {
     providers: null,
     preview: null,
-    commercialScope: noCommercialAuthorizationsBeforePayments,
+    commercialScope: commercialScopeInspector,
     ...assembly.sources,
   };
   const cursorKey = assembly.cursorKey ?? systemRandom(32);

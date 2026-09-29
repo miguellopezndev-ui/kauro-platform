@@ -14,14 +14,14 @@
  * is bound, and without one the webhook answers PROVIDER_UNKNOWN (no provider is configured) and the service routes find no
  * verified service identity (AUTHENTICATION_REQUIRED, with the anonymous denial recorded).
  */
-import type { DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, ProtocolPoint, ProviderEvidenceStore, ServiceAuthenticator, SourceLineageReader, WebhookVerifier } from "@kauro/application";
+import type { DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, ProtocolPoint, ProviderEvidenceStore, ServiceAuthenticator, WebhookVerifier } from "@kauro/application";
 import type { Clock, CommerceUnitOfWorkFactory, InboxIngress, RandomBytes } from "@kauro/domain";
 import { createIdGenerator } from "@kauro/domain";
 import type { IngressFactRecorder, KauroPool, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
 import { PgInboxIngress, PgIngressFactRecorder, createCommerceUnitOfWorkFactory, createPool } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
-/** The external and platform ports an edition binds to the payment service (B15 provider adapters; B07 lineage). */
+/** The external ports an edition binds to the payment service (B15 provider adapters); B07's lineage is the platform's own (edition.ts). */
 export interface PaymentServiceAdapters {
   readonly provider: PaymentProviderAdapter;
   /** One verifier per provider whose webhooks the ingress accepts (the route's `{provider}`). */
@@ -30,8 +30,6 @@ export interface PaymentServiceAdapters {
   readonly serviceAuthenticator: ServiceAuthenticator;
   /** The fiscal adapter/bridge (prepare only in B09; issuance is CMD035, B15). */
   readonly fiscalBridge?: FiscalDocumentBridge;
-  /** The source lifecycle's lineage of a replacement revision (B07; D-QUOTE-B6): the re-binder answers LINEAGE_MISSING without it. */
-  readonly lineage?: SourceLineageReader;
 }
 
 /** The command a hold point belongs to. */

@@ -40,6 +40,7 @@ import {
 import { createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import { IsolatedTablePreviewReader, inspectionLimits } from "@kauro/data-plane";
 import { textDigest, type CorrelationId, type UserId } from "@kauro/domain";
+import { commercialAuthorizationsOf, sourceStoreOf } from "@kauro/persistence";
 import { clock, ids, type ControlEnv } from "./env.js";
 import { asRequestHandler, type Tenant } from "./fixtures.js";
 
@@ -47,12 +48,15 @@ import { asRequestHandler, type Tenant } from "./fixtures.js";
 export const ORIGIN = "https://app.kauro.test";
 
 /**
- * CMD012's commercial-scope inspector before the payments package: no CommercialAuthorization table exists before B09, so none can
- * be bound — the api edition's production answer (apps/api edition.ts, noCommercialAuthorizationsBeforePayments), not a provider fake.
+ * CMD012's commercial-scope inspector as the api edition binds it since the B07 + B09 merge (apps/api edition.ts
+ * commercialScopeInspector): the replaced revision's manifest hash read in the command's own source unit of work, then package B09's
+ * CommercialAuthorizationRepository.findLiveByRevisionHash under the same tenant context — the platform's own reader, not a fake.
  */
-const noCommercialAuthorizationsBeforePayments: CommercialScopeInspector = {
-  async authorizationsBoundTo() {
-    return [];
+const commercialScopeInspector: CommercialScopeInspector = {
+  async authorizationsBoundTo(uow, agencyId, revisionId) {
+    const revision = await sourceStoreOf(uow).revisions.get(revisionId);
+    if (revision === null || revision.manifestHash === undefined) return [];
+    return (await commercialAuthorizationsOf(uow).findLiveByRevisionHash(agencyId, revision.manifestHash)).map((a) => a.authorizationId);
   },
 };
 
@@ -78,7 +82,7 @@ export function product(env: ControlEnv): Product {
   const sources = {
     providers: { storage: env.storage, vault: env.vault, origin: ORIGIN },
     preview: { reader: new IsolatedTablePreviewReader(), limits: inspectionLimits(), scratchDir: join(env.scratch, "preview") },
-    commercialScope: noCommercialAuthorizationsBeforePayments,
+    commercialScope: commercialScopeInspector,
   };
   mkdirSync(sources.preview.scratchDir, { recursive: true });
   const handlers = createB07Handlers(runtime, sources);

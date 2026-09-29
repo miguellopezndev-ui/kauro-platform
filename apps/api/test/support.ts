@@ -60,7 +60,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, noCommercialAuthorizationsBeforePayments, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle, type PaymentService, type RequestUnitOfWorkFactory } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle, type PaymentService, type RequestUnitOfWorkFactory } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 
@@ -429,14 +429,18 @@ export interface World {
   person(name: string, opts?: { readonly verified?: boolean; readonly sync?: boolean; readonly state?: "ACTIVE" | "DISABLED" }): Promise<Person>;
   /** An OPEN CLEAN project with its DRAFT revision, written through the ports under the owner's context. */
   project(agency: AgencyFixture, clientId: ClientId): Promise<{ projectId: ProjectId; revisionId: RevisionId }>;
-  /** A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. */
-  revision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED"): Promise<{ revisionId: RevisionId; revisionHash: Sha256Hex }>;
+  /**
+   * A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. Sealed
+   * fifteen days ago unless `options.recent` (sealed about an hour ago: a source the payments workflow can still quote, B09
+   * quotes_source_binding against B07's fourteen-day UNPAID cap; the B07 + B09 merge).
+   */
+  revision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly recent?: boolean }): Promise<{ revisionId: RevisionId; revisionHash: Sha256Hex }>;
   /** A target contract as B08's observation/confirmation leaves it: confirmed and current (default) or superseded. */
   targetContract(agency: AgencyFixture, projectId: ProjectId, opts?: { readonly superseded?: boolean }): Promise<{ contractId: string; targetContractHash: Sha256Hex }>;
   /** A plan revision at VALIDATION_REQUIRED (v2) or VALIDATED (v4, receipt bound), whose subjects name the given hashes. */
   plan(agency: AgencyFixture, projectId: ProjectId, subjects: { readonly revisionHash: Sha256Hex; readonly targetContractHash: Sha256Hex; readonly seed: string; readonly state?: "VALIDATION_REQUIRED" | "VALIDATED"; readonly intent?: "SET" | "CLEAR"; readonly storedBodyHash?: Sha256Hex }): Promise<PlanFixture>;
-  /** A complete approvable subject: sealed revision, confirmed target contract and a VALIDATED plan naming both. */
-  approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR"): Promise<PlanFixture>;
+  /** A complete approvable subject: sealed revision (recently when `options.recent`), confirmed target contract and a VALIDATED plan naming both. */
+  approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR", options?: { readonly recent?: boolean }): Promise<PlanFixture>;
   /** A step-up proof of the person: fresh (issued now) or stale (issued twenty minutes ago). */
   stepUp(person: Person, freshness?: "FRESH" | "STALE"): Promise<AssuranceProofId>;
   /** Runs statements as the runtime role under the agency owner's tenant context (direct writes for fixtures and negative controls). */
@@ -496,6 +500,9 @@ export async function rawEvent(c: PoolClient, e: RawEvent): Promise<void> {
   );
 }
 
+/** How long before now a recent fixture seal's intake began (World.revision's `recent`): the seal follows within minutes. */
+export const RECENT_SEAL_MS = 3_600_000;
+
 export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
@@ -511,7 +518,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const processClock = movableClock();
   const storage = new ContractFakeObjectStorage();
   const vault = new ContractFakeSessionVault();
-  const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: noCommercialAuthorizationsBeforePayments };
+  const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: commercialScopeInspector };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
   const payments = options.payments !== undefined ? await options.payments(h, db) : null;
 
@@ -670,9 +677,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       });
     },
 
-    async revision(agency, projectId, state = "SEALED") {
+    async revision(agency, projectId, state = "SEALED", options = {}) {
       // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED)
-      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state);
+      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state, options.recent === true ? { base: new Date(Date.now() - RECENT_SEAL_MS) } : {});
       return { revisionId, revisionHash };
     },
 
@@ -751,8 +758,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       return { planId, projectId, version, state, body, bodyHash, revisionHash: subjects.revisionHash, targetContractHash: subjects.targetContractHash, receiptHash, affectedRows };
     },
 
-    async approvable(agency, projectId, seed, intent = "SET") {
-      const source = await w.revision(agency, projectId, "SEALED");
+    async approvable(agency, projectId, seed, intent = "SET", options = {}) {
+      const source = await w.revision(agency, projectId, "SEALED", options);
       const target = await w.targetContract(agency, projectId);
       return w.plan(agency, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed, state: "VALIDATED", intent });
     },

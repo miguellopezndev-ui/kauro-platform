@@ -45,6 +45,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0015_orders_attempts_captures_authorizations.sql",
     "0016_refunds_cases_exceptions.sql",
     "0017_tax_documents_ledger_settlements.sql",
+    // the B07 + B09 merge: the payment service's read of the source lifecycle's retention (docs/design/B07-B09-merge.md D-MERGE-3)
+    "0018_payment_service_source_reads.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

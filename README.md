@@ -55,7 +55,7 @@ and `docs/design/B09-case-map.md` (its 30 acceptance cases, their tests and thei
 
 Migration ownership (`packages/persistence/migrations`): B06 owns `0001`–`0007`; `0008` is the shared aggregate-kind registry
 (foundation); B07 owns `0009`–`0012`; B09 owns `0013`–`0017` (numbered `0009`–`0013` on its branch and renumbered by the B07+B09
-merge, `docs/design/B07-B09-merge.md`). Every later package numbers its own migrations from the next free version upward on its
+merge, `docs/design/B07-B09-merge.md`); `0018` is the merge's own (the payment service's read of the source retention). Every later package numbers its own migrations from the next free version upward on its
 branch and references only tables that exist on `main`, never another unmerged package's; when two packages built in parallel
 merge, the integrator renumbers the second (the runner requires contiguous versions from `0001` and records each file's checksum).
 

@@ -82,4 +82,24 @@ export class PgRevisionLineageReader implements RevisionLineageReader {
       createdAt: instantText(x["created_at"]),
     }));
   }
+
+  async descendsFrom(successorId: RevisionId, ancestorId: RevisionId): Promise<{ readonly successorState: SourceRevisionRecord["state"]; readonly path: ReadonlyArray<RevisionId> } | null> {
+    // walked from the successor back to the ancestor over supersedes_revision_id only (ids, state and lineage: B06's columns)
+    const r = await execute<Row>(
+      this.db,
+      `WITH RECURSIVE chain (revision_id, supersedes_revision_id, state, depth) AS (
+         SELECT s.revision_id, s.supersedes_revision_id, s.state, 0 FROM kauro.dataset_revisions s WHERE s.revision_id = $1
+         UNION ALL
+         SELECT p.revision_id, p.supersedes_revision_id, p.state, c.depth + 1 FROM kauro.dataset_revisions p JOIN chain c ON p.revision_id = c.supersedes_revision_id
+          WHERE c.depth < 1000 AND c.revision_id <> $2
+       )
+       SELECT revision_id, state, depth FROM chain ORDER BY depth DESC`,
+      [successorId, ancestorId],
+    );
+    const rows = r.rows;
+    const top = rows[0];
+    const successor = rows[rows.length - 1];
+    if (top === undefined || successor === undefined || rows.length < 2 || str<RevisionId>(top["revision_id"]) !== ancestorId) return null;
+    return { successorState: str<SourceRevisionRecord["state"]>(successor["state"]), path: rows.map((x) => str<RevisionId>(x["revision_id"])) };
+  }
 }

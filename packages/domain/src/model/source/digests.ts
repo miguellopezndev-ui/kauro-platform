@@ -37,6 +37,13 @@ export const SOURCE_DIGEST_DOMAINS = Object.freeze({
    * manifest hash. The manifest hash itself stays exactly the HASHING preimage (KAURO_SOURCE_REVISION_V1).
    */
   SEALED_SUBJECT: "KAURO_SOURCE_SEALED_SUBJECT_V1",
+  /**
+   * The availability of a quoted source as the source lifecycle answers the payments workflow (the B07 + B09 merge; B09 D-QUOTE-B7):
+   * the revision, its manifest hash, state, seal instant, governing retention record and its effective and hard deadlines.
+   */
+  AVAILABILITY: "KAURO_SOURCE_AVAILABILITY_V1",
+  /** The lineage of a replacement revision as the source lifecycle answers a re-binding (the B07 + B09 merge; B09 D-QUOTE-B6). */
+  LINEAGE: "KAURO_SOURCE_LINEAGE_V1",
 } as const);
 
 export type SourceDigestDomain = (typeof SOURCE_DIGEST_DOMAINS)[keyof typeof SOURCE_DIGEST_DOMAINS];
@@ -137,6 +144,31 @@ export function retentionAnchorHashOf(anchor: {
 
 export function authorityTombstoneHashOf(tombstone: Readonly<Record<string, unknown>>): Sha256Hex {
   return sourceDigest(SOURCE_DIGEST_DOMAINS.AUTHORITY_TOMBSTONE, tombstone);
+}
+
+/** The evidence hash of a source availability answer (SOURCE_DIGEST_DOMAINS.AVAILABILITY). */
+export function sourceAvailabilityHashOf(answer: {
+  readonly revisionId: string;
+  readonly manifestHash: Sha256Hex;
+  readonly state: string;
+  readonly sealedAt: string;
+  readonly retentionId: string;
+  readonly effectiveDeadline: string;
+  readonly hardDeadline: string;
+}): Sha256Hex {
+  return sourceDigest(SOURCE_DIGEST_DOMAINS.AVAILABILITY, answer);
+}
+
+/** The evidence hash of a replacement lineage answer (SOURCE_DIGEST_DOMAINS.LINEAGE): both revisions, their hashes and the path. */
+export function sourceLineageHashOf(answer: {
+  readonly replacedRevisionId: string;
+  readonly replacementRevisionId: string;
+  readonly replacedRevisionHash: Sha256Hex;
+  readonly replacementRevisionHash: Sha256Hex;
+  readonly replacementSealed: boolean;
+  readonly path: ReadonlyArray<string>;
+}): Sha256Hex {
+  return sourceDigest(SOURCE_DIGEST_DOMAINS.LINEAGE, answer);
 }
 
 /** Digest of a raw text value that must never be stored (a completion reference, a provider session reference, a label). */

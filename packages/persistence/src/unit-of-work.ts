@@ -41,6 +41,7 @@ import {
   type AgencyId,
   type CausationId,
   type Clock,
+  type CommercialAuthorizationRepository,
   type CommerceRepositories,
   type CommerceUnitOfWork,
   type CommerceUnitOfWorkFactory,
@@ -61,12 +62,14 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
 import { PgCommandJournal } from "./command-journal.js";
 import { PgEventPublisher } from "./event-publisher.js";
 import { PgInboxConsumerStore, PgOutboxDispatchStore } from "./inbox-outbox.js";
 import { PgLeaseStore } from "./lease-store.js";
 import type { KauroPool, RuntimeRole } from "./pool.js";
+import { PgCommercialAuthorizationRepository } from "./repositories/commerce-captures.js";
 import { PgCommercialInspections } from "./repositories/commerce-inspections.js";
 import { createCommerceRepositories } from "./repositories/commerce-repositories.js";
 import { PgPurchasedSubjects } from "./repositories/commerce-subject.js";
@@ -177,6 +180,26 @@ export class PgUnitOfWork implements UnitOfWork {
     this.outboxDispatch = new PgOutboxDispatchStore(client);
     this.inbox = new PgInboxConsumerStore(client);
     this.commercialInspections = new PgCommercialInspections(client);
+    this.#ids = ids;
+    this.#clock = clock;
+  }
+
+  readonly #ids: TrackingIdGenerator;
+  readonly #clock: Clock;
+  #authorizationReads: PgCommercialAuthorizationRepository | null = null;
+
+  /** B09's commercial authorization repository on this connection, for reads only (commercialAuthorizationsOf). */
+  get commercialAuthorizationReads(): Pick<CommercialAuthorizationRepository, "findLiveByRevisionHash"> {
+    this.#authorizationReads ??= new PgCommercialAuthorizationRepository({
+      db: this.client,
+      ids: this.#ids,
+      clock: this.#clock,
+      events: this.events,
+      provenance: () => {
+        throw new DomainFailure("INTEGRITY_FAILURE", "a read-only binding of the commercial authorizations publishes nothing");
+      },
+    });
+    return this.#authorizationReads;
   }
 
   /** The journal entry this unit of work reserved or resumed (a subclass causes its events by it). */
@@ -262,6 +285,11 @@ function asFailure(e: unknown, correlationId: string): DomainFailure {
  */
 export class PgSourceUnitOfWork extends PgUnitOfWork implements SourceUnitOfWork {
   readonly sources: PgSourceStore;
+  /**
+   * The source lifecycle's answers to the payments workflow over this store (the B07 + B09 merge): the api binds package B09's
+   * SourceAvailabilityReader and SourceLineageReader to them through commercialSourceReadsOf(uow).
+   */
+  readonly commercialSources: PgCommercialSourceReads;
   readonly #db: PoolClient;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
@@ -269,6 +297,7 @@ export class PgSourceUnitOfWork extends PgUnitOfWork implements SourceUnitOfWork
     this.#db = client;
     // the control plane never reads customer text (D-CTRL-1): its source reads omit the columns it holds no grant on
     this.sources = new PgSourceStore(client, context.kind === "SYSTEM" ? "CONTROL" : "REQUEST");
+    this.commercialSources = new PgCommercialSourceReads(client, this.sources);
   }
 
   async serverInstant(): Promise<string> {
@@ -415,14 +444,16 @@ export function paymentSweepsOf(uow: UnitOfWork): PgPaymentSweeps {
 
 /**
  * A unit of work of the payments and fiscal workflow (@kauro/domain CommerceUnitOfWork): B06's unit of work plus the commerce
- * repositories and the scope index on the same connection, and the adoption of one scope per unit of work (D-SCOPE-B1).
+ * repositories and the scope index on the same connection, and the adoption of one scope per unit of work (D-SCOPE-B1). Since the
+ * B07 + B09 merge it is also a source unit of work (B07's source store on the same connection), so the source lifecycle answers the
+ * payments workflow in the caller's own transaction and context (commercialSourceReadsOf).
  *
  * The events its repositories publish carry the provenance of the unit of work (D-EVT-B4): the actor of its context (a person for
  * TENANT and OPERATOR, the verified service for SERVICE), its correlation id, and as causation the causation its caller named with
  * causedBy (a consumer's source event, the reconciler's inbox record), else the command journal entry it reserved or resumed, else
  * its correlation id.
  */
-export class PgCommerceUnitOfWork extends PgUnitOfWork implements CommerceUnitOfWork {
+export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements CommerceUnitOfWork {
   readonly commerce: CommerceRepositories;
   readonly scopes: ScopeIndex;
   /**
@@ -569,4 +600,36 @@ export function createCommerceUnitOfWorkFactory(pools: CommercePools, deps: Unit
 export function commerceRequestReadsOf(uow: UnitOfWork): PgCommerceRequestReads {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the request side's reads need a commerce unit of work of @kauro/persistence");
   return uow.requestReads;
+}
+
+// --- the seams of the B07 + B09 merge (docs/design/B07-B09-merge.md) -----------------------------------------------------------------
+
+/**
+ * The source lifecycle's answers to the payments workflow in the caller's unit of work (B07 persistence over its own tables; B09
+ * design §15 item 5): the api binds package B09's SourceAvailabilityReader and SourceLineageReader to them. A unit of work that
+ * carries no source store is refused (INTEGRITY_FAILURE), as commercialInspectionsOf refuses a foreign one.
+ */
+export function commercialSourceReadsOf(uow: UnitOfWork): PgCommercialSourceReads {
+  if (!(uow instanceof PgSourceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the source lifecycle answers the payments workflow in a source unit of work of @kauro/persistence");
+  return uow.commercialSources;
+}
+
+/**
+ * The source store of a source unit of work (B07's repositories on the caller's connection), for the composition's bindings that
+ * read what the source lifecycle recorded: CMD012's commercial scope reads the replaced revision's manifest hash here.
+ */
+export function sourceStoreOf(uow: UnitOfWork): PgSourceStore {
+  if (!(uow instanceof PgSourceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the source store is read in a source unit of work of @kauro/persistence");
+  return uow.sources;
+}
+
+/**
+ * Package B09's commercial authorizations on the connection of any unit of work of this package, for reads (B07 design §17 item 7,
+ * B09 design §15 item 6): CMD012's CommercialScopeInspector is bound to findLiveByRevisionHash. A commerce unit of work answers
+ * with its own repository; any other with one that publishes nothing (a read-only binding).
+ */
+export function commercialAuthorizationsOf(uow: UnitOfWork): Pick<CommercialAuthorizationRepository, "findLiveByRevisionHash"> {
+  if (uow instanceof PgCommerceUnitOfWork) return uow.commerce.authorizations;
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the commercial authorizations are read in a unit of work of @kauro/persistence");
+  return uow.commercialAuthorizationReads;
 }

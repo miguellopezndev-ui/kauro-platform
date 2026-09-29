@@ -619,11 +619,13 @@ export async function insertAuthorization(c: Client, ag: AgencyFixture, order: O
  * capture_observed from CREATED): the capture fact, the order CAPTURED, and — when the capture alone pays the obligation — the
  * authorization, in one transaction under the adopted agency.
  */
-export async function observedCapture(payment: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, capabilityId: string | null, orderVersion = 3): Promise<{ captureId: string; authorizationId: string | null }> {
+export async function observedCapture(payment: Client, ag: AgencyFixture, order: OrderFixture, routes: Routes, input: CaptureInput, capabilityId: string | null, orderVersion = 3, beforeCommit?: () => Promise<void>): Promise<{ captureId: string; authorizationId: string | null }> {
   return within(payment, service(ag.agencyId), async (c) => {
     const captureId = await insertCapture(c, ag, order, routes, input, PAYMENT_SERVICE);
     await asDatabase(async () => applied(await adapters(c, PAYMENT_SERVICE).commerce.orders.transition(order.orderId as PaymentOrderId, orderVersion, { state: "CAPTURED" }, clock.now()), "the order's capture"));
     const authorizationId = capabilityId === null ? null : await insertAuthorization(c, ag, order, captureId, capabilityId, PAYMENT_SERVICE);
+    // a race test holds the open transaction here (its shared transition locks held) until another transaction is seen waiting
+    if (beforeCommit !== undefined) await beforeCommit();
     return { captureId, authorizationId };
   });
 }

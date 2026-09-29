@@ -11,9 +11,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ApproveRefundView, CapturePaymentView, CreatePaymentOrderView, ExecuteRefundView, PaymentOrderDetailView, QuoteView, ReconcilePaymentView, RequestRefundView, WebhookAck } from "@kauro/application";
 import { COMMERCE_COMMAND_EVENTS } from "@kauro/application";
-import { sealedAvailability } from "@kauro/application/testing";
 import type { Sha256Hex } from "@kauro/contracts";
-import type { PlanId, UserId } from "@kauro/domain";
+import type { PlanId, ProjectId, RevisionId, UserId } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
 import { issueQuote, type IssuedQuote } from "@kauro/persistence/testing";
 import { accepted, paymentRoutes, read, readData } from "./commerce-support.js";
@@ -39,12 +38,10 @@ interface ReadyQuote extends IssuedQuote {
   readonly revisionId: string;
 }
 
-/** The retention record of a sealed revision as B07's lifecycle would answer it (SIMULATED until B07 is on main). */
-async function programSource(revisionHash: Sha256Hex, state: "SEALED" | "EXPIRED", effectiveDeadline: string): Promise<string> {
-  const revision = (await rows<{ revision_id: string; sealed_at: Date }>(pw, "SELECT revision_id, sealed_at FROM kauro.dataset_revisions WHERE manifest_hash = $1", [revisionHash]))[0];
+/** The sealed revision a quote names (its source's retention is the source lifecycle's own record, B07; the B07 + B09 merge). */
+async function revisionOf(revisionHash: Sha256Hex): Promise<string> {
+  const revision = (await rows<{ revision_id: string }>(pw, "SELECT revision_id FROM kauro.dataset_revisions WHERE manifest_hash = $1 AND state = 'SEALED'", [revisionHash]))[0];
   if (revision === undefined) throw new Error("the quoted revision is not sealed");
-  const sealed = sealedAvailability(revision.revision_id, toUtcInstant(revision.sealed_at.getTime()), toUtcInstant(Date.parse(effectiveDeadline)));
-  pw.sources.set(revisionHash, { ...sealed, state });
   return revision.revision_id;
 }
 
@@ -52,8 +49,7 @@ async function programSource(revisionHash: Sha256Hex, state: "SEALED" | "EXPIRED
 async function readyQuote(seed: string, plan?: PlanFixture): Promise<ReadyQuote> {
   const approved = plan ?? (await approvedPlan(pw, seed));
   const quote = await issueQuote(pw.w.h, { agency: pw.w.A, planId: approved.planId as PlanId, issuerRef: pw.issuerRef, profileId: pw.profileId });
-  const revisionId = await programSource(quote.revisionHash, "SEALED", quote.sourceAvailableUntil);
-  return { ...quote, plan: approved, revisionId };
+  return { ...quote, plan: approved, revisionId: await revisionOf(quote.revisionHash) };
 }
 
 function createOrder(quote: Pick<IssuedQuote, "quoteId" | "termsHash">, key = freshKey("scenario-order")): Promise<Reply> {
@@ -368,18 +364,9 @@ test("S059: a reversal before the local capture observation is recorded, allocat
 test("S060: a price-valid quote whose source expired blocks CreatePaymentOrder with SOURCE_EXPIRED; a new sealed revision of the same bytes still needs a new approval and a new quote", async () => {
   const { w } = pw;
   const quote = await readyQuote("s060");
-  // the source expires within the quote's price lifetime: B07's retention record says EXPIRED (SIMULATED) and its lifecycle moves
-  // the revision SEALED → EXPIRED (the listed DatasetRevision edge, written as the agency's lifecycle writes it)
-  await programSource(quote.revisionHash, "EXPIRED", new Date(Date.now() - 60_000).toISOString());
-  await w.asTenant(w.A, async (c) => {
-    const moved = await c.query<{ version: string }>("UPDATE kauro.dataset_revisions SET state = 'EXPIRED', version = version + 1 WHERE revision_id = $1 AND state = 'SEALED' RETURNING version", [quote.revisionId]);
-    const version = Number(moved.rows[0]!.version);
-    await c.query(
-      `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
-       VALUES ($1, 'dataset_revision', $2, $3, $4, 'dataset_revision.expired.v1', 'USER', $5, $6, $7, $8::jsonb, $9, '1', now())`,
-      [ids.next(), quote.revisionId, version, w.A.agencyId, w.A.ownerUserId, ids.next(), ids.next(), JSON.stringify({ revisionId: quote.revisionId, agencyId: w.A.agencyId, projectId: quote.projectId }), sha(JSON.stringify({ revisionId: quote.revisionId, agencyId: w.A.agencyId, projectId: quote.projectId }))],
-    );
-  });
+  // the source expires within the quote's price lifetime: B07's retention sweeper expires its UNPAID record and moves the revision
+  // SEALED → EXPIRED (retention_expires, the control plane on the server clock past the record's deadline; the B07 + B09 merge)
+  await w.h.expireRevision(w.A, quote.projectId as ProjectId, quote.revisionId as RevisionId);
   assert.ok(Date.parse(quote.expiresAt) > Date.now(), "the price is still valid");
   const view = readData<QuoteView>(await read(w, paymentRoutes.getQuote(quote.quoteId), w.billing.token));
   assert.deepEqual([view.checkoutReady, view.checkoutBlockers.includes("SOURCE_EXPIRED" as never)], [false, true]);
@@ -391,10 +378,9 @@ test("S060: a price-valid quote whose source expired blocks CreatePaymentOrder w
   assert.equal(pw.paypal.calls.length, effectsBefore, "no provider call");
 
   // the same bytes uploaded again are a new revision with its own identity: the old quote and its approval cannot bind it
-  const again = await w.revision(w.A, quote.projectId, "SEALED");
+  const again = await w.revision(w.A, quote.projectId, "SEALED", { recent: true });
   assert.notEqual(again.revisionId, quote.revisionId);
   assert.notEqual(again.revisionHash, quote.revisionHash);
-  await programSource(again.revisionHash, "SEALED", new Date(Date.now() + 168 * 3_600_000).toISOString());
   assert.equal(outcome(w, await createOrder(quote)), "422 SOURCE_EXPIRED -", "the old quote still names the expired source");
   // it needs a new approval of a plan over the new revision (CMD025 through its route) and a new quote before any checkout: the
   // recurrence package's CMD027 withdraws the unsellable quote and issues the new one (LATER B10; written here through the quote
