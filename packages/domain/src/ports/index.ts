@@ -140,3 +140,28 @@ export type {
   ExecutionUnitOfWork,
   ExecutionUnitOfWorkFactory,
 } from "./execution-store.js";
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §10)
+export type {
+  NewAudit,
+  StartedAudit,
+  AuditCancellation,
+  StepClaim,
+  StepResult,
+  AuditEdge,
+  SystemDraft,
+  SystemDraftRecord,
+  ValidationRequest,
+  ValidationSettlement,
+  ValidationSettled,
+  NewModelTask,
+  DispatchIntent,
+  DispatchOutcome,
+  JournalAppend,
+  JournalAppendOutcome,
+  NewDecisionArtifact,
+  StoredDecisionArtifact,
+  GrantEdge,
+  AuditStore,
+  AuditUnitOfWork,
+  AuditUnitOfWorkFactory,
+} from "./audit-store.js";

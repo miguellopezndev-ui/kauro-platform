@@ -201,3 +201,6 @@ export * from "./commerce/index.js";
 
 // processing authority (package B08; docs/design/B08-audit-approval-jobs.md)
 export * from "./model/execution/index.js";
+
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md)
+export * from "./model/audit/index.js";
