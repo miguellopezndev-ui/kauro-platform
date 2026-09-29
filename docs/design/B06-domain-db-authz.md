@@ -111,6 +111,7 @@ Decisions added by the package-close review of `main` at `a7203f0` (§12d.7; rev
 | id | decision | why (authority) |
 |---|---|---|
 | D-LEASE-3 | The expiry decides what a lease claim is. A live lease is HELD for another owner and renewed under the same fence for its holder, who names exactly the checkpoint stored. An expired lease is resumed by whoever claims it — its former owner included — as a new attempt: the fence advances by one (fencing out the attempt that expired, whoever ran it) and the claim names exactly the checkpoint stored. A spending operation (MODEL_TASK, JOB_ATTEMPT) that expired without storing a checkpoint is not resumed at all: rerunning it is a new attempt under a new lease, through its own admission. `leases_guard` carries the rule for every writer (the control plane holds UPDATE on `leases`): a change of owner or fence is a takeover, admitted only over a lease expired at the claim's instant and only with the stored checkpoint. Migration 0006 is corrected in place, not by a new migration number: nothing had been deployed anywhere, and the tests of §12d.7 fail on `a7203f0` and pass on the correction; the correction changes the checksum of 0006, which only a database that applied the earlier text could notice, and none exists. | S090 ("RESUME lacks a checkpoint → reject restart; preserve original subject, clock, cost and checkpoint identity"); R2-076 ("recover only from durable source/checkpoint contracts, or rerun under the same authorized job"); contract Lease; 07 "Job and attempt states" (a claim creates a monotonically increasing fence); 07 "Restoration and migration" (checksums and applied versions). Review finding B06-R1. |
+| D-SRC-1 | CMD025 approves only a current source: after the revision's transition lock (D-TX-2) `lockSealedByHash` answers the revision with `availableUntil`, the latest effective deadline of a governing retention record that is ACTIVE and ahead of `kauro.server_now()` — the rule of B07's `PgSourceAvailabilityReader` (D-RET-2) — and the handler refuses SOURCE_EXPIRED when the revision is not SEALED or nothing lies ahead. A SEALED revision whose retention lapsed is an expired source whether or not the sweeper has taken retention_expires; the command does not expire it (that edge stays the sweeper's). The deadline is judged on the database's clock, which the fixtures move only through the labelled TEST CLOCK. The acceptance fixtures of `apps/api` seal a SEALED source an hour ago (its retention ahead) and an EXPIRED one fifteen days ago; a sweeper racing an approval stands on the TEST CLOCK past the deadline. | CMD025 failure ("Any changed effect, expired source or stale receipt requires new review"); 09 "Quotes, reuploads and retention" (availability is the retention deadline); B07 D-RET-2, D-CLOCK-1. Review finding B06-R2. |
 
 ## 2. Topology and packages (07 "Platform topology")
 
@@ -547,7 +548,8 @@ Body `{expectedVersion, planHash, validationReceiptHash, disclosuresHash, assura
    body.validationReceiptHash`, `receipts.findByHash` exists, `result = VALID`, no blocking codes, receipt hashes equal the
    plan's body/revision/target — else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or RECEIPT_BLOCKING; 8. source:
    `revisions.lockSealedByHash(plan.revisionHash)` SEALED (not EXPIRED/DELETED/SUPERSEDED), read FOR SHARE and held to COMMIT
-   (D-TX-1), else SOURCE_EXPIRED; 9. target: `targetContracts.lockCurrentByHash(plan.targetContractHash)` confirmed and
+   (D-TX-1), else SOURCE_EXPIRED; since the package-close review also available — a governing retention record ACTIVE with its
+   effective deadline ahead of `kauro.server_now()` — else SOURCE_EXPIRED (finding B06-R2, D-SRC-1); 9. target: `targetContracts.lockCurrentByHash(plan.targetContractHash)` confirmed and
    unsuperseded, FOR SHARE, else TARGET_STALE;
 10. `DisclosureComposer.compose(plan, body, receipt)` → `disclosuresHash` must equal the body value else STALE_VERSION
     `mismatch: [disclosuresHash]` (an approval displayed without the CLEAR set cannot authorize it, D-PLAN-3);
@@ -561,8 +563,8 @@ The database enforces 6–7 again as foreign keys, binds the actor to its own me
 insert to the acting session, and refuses a second live approval (tests `discipline`, `integrity-guards`). The wire names
 `planHash`, not the source and target hashes manual 10 lists for approval commands: open question Q9 and its interim binding.
 DENY: OPERATOR → NOT_AUTHORIZED; foreign → NOT_FOUND; missing/stale step-up → ASSURANCE_REQUIRED; stale receipt →
-PLAN_NOT_VALIDATED; disclosures without CLEAR → STALE_VERSION; expired source → SOURCE_EXPIRED; superseded target →
-TARGET_STALE; nothing committed.
+PLAN_NOT_VALIDATED; disclosures without CLEAR → STALE_VERSION; expired source (EXPIRED, or SEALED with its retention lapsed
+before the sweeper ran) → SOURCE_EXPIRED; superseded target → TARGET_STALE; nothing committed.
 RACE: two approvers, same expected version → one APPROVED, one STALE_VERSION; identical retry → replay; conflicting → 409; a
 crash before COMMIT leaves the plan VALIDATED; a source expiry or target supersession racing the approval waits for it or,
 committed first, refuses it (D-TX-1).

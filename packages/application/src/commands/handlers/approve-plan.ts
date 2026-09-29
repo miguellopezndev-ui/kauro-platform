@@ -16,7 +16,8 @@
  * state VALIDATED (else PLAN_NOT_VALIDATED, or PRECONDITION_FAILED for SUPERSEDED / WITHDRAWN / APPROVED) → planHash equals
  * the plan body hash (else STALE_VERSION mismatch [planHash]) → the named receipt is the plan's current receipt, exists, is
  * VALID with no blocking codes and binds this body/source/target (else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or
- * RECEIPT_BLOCKING) → the source revision is SEALED (else SOURCE_EXPIRED) → the target contract is confirmed and current
+ * RECEIPT_BLOCKING) → the source revision is SEALED and its retention lies ahead on the server clock (else SOURCE_EXPIRED;
+ * review finding B06-R2) → the target contract is confirmed and current
  * (else TARGET_STALE); both read after their transition locks, held to COMMIT (plan → source → target is the lock order, D-TX-2) → the server-composed disclosure set hashes to the echoed disclosuresHash (else STALE_VERSION mismatch
  * [disclosuresHash]: an approval displayed without the CLEAR set cannot authorize it) → INSERT approval (v1, actor membership
  * version, proof, five hashes, KAURO_PLAN_APPROVAL_V1 approval hash) → plan APPROVED (version + 1) → approval.created.v1 +
@@ -86,9 +87,12 @@ export function approvePlanHandler(runtime: CommandRuntime, disclosures: Disclos
         // source: the plan's own project's revision (re-check finding N9) that the plan was validated against must still be
         // SEALED (not EXPIRED, SUPERSEDED, DELETED), read after its transition lock kept to COMMIT (D-TX-2): an expiry or
         // supersession issued meanwhile waits for this approval (and then sees it), one committed first is refused here —
-        // never an approval committed over a source that stopped being SEALED
+        // never an approval committed over a source that stopped being SEALED. And it must still be available: a governing
+        // retention record ACTIVE with its effective deadline ahead on the server clock (review finding B06-R2, D-SRC-1) — a
+        // SEALED revision whose retention lapsed is an expired source whether or not the sweeper has taken retention_expires yet
         const source = await uow.revisions.lockSealedByHash(membership.agencyId, plan.projectId, plan.revisionHash);
         if (!source || source.state !== "SEALED") throw new DomainFailure("SOURCE_EXPIRED", "source revision is no longer sealed");
+        if (source.availableUntil === null) throw new DomainFailure("SOURCE_EXPIRED", "source retention deadline has passed");
         // target: the plan's own project's contract with the plan's target hash (findings N4, N9), confirmed and unsuperseded,
         // under the same transition-lock discipline
         const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, plan.projectId, plan.targetContractHash);

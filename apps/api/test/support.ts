@@ -430,16 +430,18 @@ export interface World {
   /** An OPEN CLEAN project with its DRAFT revision, written through the ports under the owner's context. */
   project(agency: AgencyFixture, clientId: ClientId): Promise<{ projectId: ProjectId; revisionId: RevisionId }>;
   /**
-   * A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. Sealed
-   * fifteen days ago unless `options.recent` (sealed about an hour ago: a source the payments workflow can still quote, B09
-   * quotes_source_binding against B07's fourteen-day UNPAID cap; the B07 + B09 merge).
+   * A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. A SEALED
+   * revision is a current source: sealed about an hour ago, its UNPAID retention (fourteen days from the seal) ahead — what an
+   * approval (CMD025, review finding B06-R2) and a quote (B09 quotes_source_binding) require; `options.recent` states it
+   * explicitly (the B07 + B09 merge). An EXPIRED revision was sealed fifteen days ago and taken through retention_expires. A
+   * test that needs a SEALED revision whose retention has lapsed seals it in the past itself (Harness.sealedRevision `base`).
    */
   revision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly recent?: boolean }): Promise<{ revisionId: RevisionId; revisionHash: Sha256Hex }>;
   /** A target contract as B08's observation/confirmation leaves it: confirmed and current (default) or superseded. */
   targetContract(agency: AgencyFixture, projectId: ProjectId, opts?: { readonly superseded?: boolean }): Promise<{ contractId: string; targetContractHash: Sha256Hex }>;
   /** A plan revision at VALIDATION_REQUIRED (v2) or VALIDATED (v4, receipt bound), whose subjects name the given hashes. */
   plan(agency: AgencyFixture, projectId: ProjectId, subjects: { readonly revisionHash: Sha256Hex; readonly targetContractHash: Sha256Hex; readonly seed: string; readonly state?: "VALIDATION_REQUIRED" | "VALIDATED"; readonly intent?: "SET" | "CLEAR"; readonly storedBodyHash?: Sha256Hex }): Promise<PlanFixture>;
-  /** A complete approvable subject: sealed revision (recently when `options.recent`), confirmed target contract and a VALIDATED plan naming both. */
+  /** A complete approvable subject: a current sealed revision (World.revision), confirmed target contract and a VALIDATED plan naming both. */
   approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR", options?: { readonly recent?: boolean }): Promise<PlanFixture>;
   /** A step-up proof of the person: fresh (issued now) or stale (issued twenty minutes ago). */
   stepUp(person: Person, freshness?: "FRESH" | "STALE"): Promise<AssuranceProofId>;
@@ -678,8 +680,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     },
 
     async revision(agency, projectId, state = "SEALED", options = {}) {
-      // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED)
-      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state, options.recent === true ? { base: new Date(Date.now() - RECENT_SEAL_MS) } : {});
+      // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED); a
+      // SEALED source is current (its retention ahead), an EXPIRED one was sealed fifteen days ago and swept
+      const recent = options.recent ?? state === "SEALED";
+      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state, recent ? { base: new Date(Date.now() - RECENT_SEAL_MS) } : {});
       return { revisionId, revisionHash };
     },
 

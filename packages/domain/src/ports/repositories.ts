@@ -241,16 +241,28 @@ export interface ProjectRepository {
   transition(projectId: ProjectId, expectedVersion: number, change: { readonly state: ProjectState }, now: UtcInstant): Promise<VersionedWrite<ProjectRecord>>;
 }
 
+/**
+ * A source revision as CMD025 reads it after its transition lock: the revision and how long its data stays available — the
+ * latest effective deadline of a governing retention record that is ACTIVE and still ahead on the server clock (B07 decision
+ * D-RET-2, the rule of the SourceAvailabilityReader), null when the revision is not SEALED or no governing record lies ahead.
+ */
+export interface LockedSourceRevision extends DatasetRevisionRecord {
+  readonly availableUntil: UtcInstant | null;
+}
+
 export interface DatasetRevisionRepository {
   get(revisionId: RevisionId): Promise<DatasetRevisionRecord | null>;
   /**
    * The revision of `projectId` whose manifest hash is `revisionHash` (CMD025 source binding: the plan's own project, re-check
    * finding N9), read after its transition lock, held until the unit of work ends (decision D-TX-2): a transition of that
    * revision (SEALED -> EXPIRED / SUPERSEDED) issued meanwhile waits for this unit of work, one committed first is what is
-   * returned, and an approval arriving after a queued transition waits behind it. The caller checks the state is SEALED: an
-   * approval can never commit bound to a source that stopped being SEALED while it was in flight (07 "Transaction discipline").
+   * returned, and an approval arriving after a queued transition waits behind it. The caller checks the state is SEALED and
+   * that the source is still available (`availableUntil` not null — review finding B06-R2, decision D-SRC-1: a SEALED revision
+   * whose retention deadline passed is expired although the sweeper has not yet taken retention_expires): an approval can never
+   * commit bound to a source that stopped being SEALED while it was in flight, nor to one whose retention has lapsed (07
+   * "Transaction discipline"; CMD025 "expired source ... requires new review").
    */
-  lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null>;
+  lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<LockedSourceRevision | null>;
 }
 
 export interface TargetContractRepository {

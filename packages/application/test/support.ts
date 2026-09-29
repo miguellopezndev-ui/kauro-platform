@@ -193,6 +193,8 @@ export function world(): World {
   const revisionId = ids.next() as RevisionId;
   const revisionHash = sha("manifest");
   store.revisions.set(revisionId, { revisionId, agencyId, projectId, scope: { agencyId, clientId, projectId }, version: 3, state: "SEALED", manifestHash: revisionHash, projectionHash: sha("projection"), sealedAt: now, createdAt: now, updatedAt: now });
+  // its UNPAID retention: fourteen days from the seal (the source is current)
+  store.retentionDeadlines.set(revisionId, new Date(clock.nowMs() + 14 * 86_400_000).toISOString() as UtcInstant);
   store.projects.set(projectId, { projectId, agencyId, clientId, version: 1, state: "OPEN", mode: "CLEAN", purpose: "Dedupe", capabilityId, capabilityVersion: "R2-INITIAL", currentRevisionId: revisionId, createdByMembershipId: ownerMembershipId, createdAt: now, updatedAt: now });
 
   const targetContractHash = sha("target-body");

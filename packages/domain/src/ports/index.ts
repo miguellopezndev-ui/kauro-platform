@@ -22,6 +22,7 @@ export type {
   NewProject,
   ProjectRepository,
   DatasetRevisionRepository,
+  LockedSourceRevision,
   TargetContractRepository,
   NewPlanRevision,
   PlanRepository,
