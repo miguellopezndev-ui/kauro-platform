@@ -24,6 +24,7 @@ export type InvitationId = Branded<Id, "InvitationId">;
 export type ProcessingAuthorityId = Branded<Id, "ProcessingAuthorityId">;
 export type ClientId = Branded<Id, "ClientId">;
 export type ProjectId = Branded<Id, "ProjectId">;
+export type SupportCaseId = Branded<Id, "SupportCaseId">;
 export type RevisionId = Branded<Id, "RevisionId">;
 export type TargetContractId = Branded<Id, "TargetContractId">;
 export type PlanId = Branded<Id, "PlanId">;

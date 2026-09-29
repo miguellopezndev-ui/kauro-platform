@@ -12,6 +12,7 @@ import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
+import { isUtcInstant } from "../ports/clock.js";
 import type { ActorRef } from "./tenant.js";
 
 export const EVENT_TYPES = [
@@ -59,6 +60,8 @@ export const EVENT_TYPES = [
   "plan.withdrawn.v1",
   "approval.created.v1",
   "approval.withdrawn.v1",
+  // Support (B11 CMD044: a case is born OPEN; the summary never travels in an event, D-SUP-5)
+  "support_case.opened.v1",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -68,7 +71,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here.
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "support_case"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -111,6 +114,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "approval.created.v1": ["approvalId", "agencyId", "planId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "actorMembershipId", "approvalHash"],
   // the withdrawal reason is a label (CMD026 reasonCode, decision D-API-1): it stays on the approval row, never in a payload
   "approval.withdrawn.v1": ["approvalId", "agencyId", "planId", "withdrawnByMembershipId", "completedExternalActions", "supersededByPlanId"],
+  // nextReviewAt is a canonical UTC instant, admitted by the payload gate (D-SUP-5); the summary and the evidence are never in it
+  "support_case.opened.v1": ["caseId", "projectId", "category", "severity", "nextReviewAt"],
 });
 
 /** Registered destinations (07: "consumer: Registered destination"). Dispatchers arrive with their owning packages. */
@@ -144,7 +149,7 @@ export function isSafeToken(value: unknown): value is string {
 function isSafeScalar(v: unknown): boolean {
   if (typeof v === "boolean") return true;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0;
-  if (typeof v === "string") return isUuid(v) || isSha256Hex(v) || TOKEN.test(v);
+  if (typeof v === "string") return isUuid(v) || isSha256Hex(v) || TOKEN.test(v) || isUtcInstant(v);
   return false;
 }
 

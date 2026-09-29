@@ -88,6 +88,10 @@
       "kauro.state_transitions": [
         "SELECT"
       ],
+      "kauro.support_cases": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.target_contracts": [
         "INSERT",
         "SELECT",
@@ -575,6 +579,14 @@
       ],
       "using": null,
       "check": "(((agency_id IS NOT NULL) AND (agency_id = kauro.current_agency_id()) AND (actor_kind = 'USER'::text) AND (actor_id = (kauro.current_user_id())::text) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = security_events.agency_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = ANY (ARRAY['INVITED'::text, 'ACTIVE'::text, 'SUSPENDED'::text])))))) OR ((agency_id IS NULL) AND (actor_kind = 'USER'::text) AND (actor_id = (kauro.current_user_id())::text)) OR ((agency_id IS NULL) AND (actor_kind = 'ANONYMOUS'::text) AND (kauro.current_user_id() IS NULL) AND (kauro.current_agency_id() IS NULL)))"
+    },
+    "support_cases/support_cases_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
     },
     "target_contracts/target_contracts_tenant": {
       "command": "ALL",

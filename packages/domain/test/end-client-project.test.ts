@@ -166,7 +166,7 @@ test("CMD011 guards: archived client, agency not open, unoffered mode before any
 });
 
 test("platform machines EndClient (D-AGG-2) and Project (D-AGG-1) obey the registry's unlisted-transition policy", () => {
-  assert.deepEqual(PLATFORM_STATE_MACHINES.map((m) => m.contract), ["EndClient", "Project"]);
+  assert.deepEqual(PLATFORM_STATE_MACHINES.map((m) => m.contract), ["EndClient", "Project", "SupportCase"]);
   for (const m of PLATFORM_STATE_MACHINES) assert.equal(m.unlistedTransition, "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED");
   assert.deepEqual([...statesOf("EndClient")].sort(), ["ACTIVE", "ARCHIVED"]);
   assert.equal(transition("EndClient", "ACTIVE", "archive_client"), "ARCHIVED");

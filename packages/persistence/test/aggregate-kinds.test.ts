@@ -14,7 +14,7 @@ import type { Client } from "pg";
 import { AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
-import { constraintOf, event, ids, plan, project, sha, sqlState, tx, type PlanFixture } from "./support.js";
+import { constraintOf, event, ids, plan, project, sha, sqlState, supportCase, tx, type PlanFixture } from "./support.js";
 
 let h: Harness;
 let app: Client;
@@ -41,6 +41,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   dataset_revision: ["dataset_revisions", "revision_id"],
   plan: ["plans", "plan_id"],
   approval: ["approvals", "approval_id"],
+  support_case: ["support_cases", "case_id"],
 });
 
 const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin] as const;
@@ -114,6 +115,7 @@ before(async () => {
     dataset_revision: revisionId,
     plan: p.planId,
     approval: approvalId,
+    support_case: (await supportCase(app, A, projectId)).caseId,
   };
   for (const kind of AGGREGATE_KINDS) {
     const [table, column] = TABLE_OF[kind];
