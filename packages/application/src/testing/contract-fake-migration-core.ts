@@ -18,11 +18,14 @@
  *   another generation) and a declared summary that says "clean" over a package that is not are all independent problems,
  *   and any of them is INVALID (manual 04 "Missing artifacts, unexpected executable files, ... false summary flags ...
  *   reject").
+ * - `validate` answers VALID with a receipt of exactly the request's source, target and plan, naming the one core package hash of
+ *   this installed fake (`CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH`, never one per plan) and the simulated counts of
+ *   `CONTRACT_FAKE_MIGRATION_CORE_COUNTS` (decisions D8-CAU-3, D8-CAU-6).
  * - A call log of every port call, and a hold point before each awaited step of `execute` (cancellation, the scratch
  *   write, the artifact write, the artifact close) so a test can interleave without a sleep.
  */
 import { createHash } from "node:crypto";
-import type { Sha256Hex } from "@kauro/contracts";
+import type { RowCounts, Sha256Hex } from "@kauro/contracts";
 import type {
   CoreEvidenceClass,
   ExecutionEnvelopePort,
@@ -48,6 +51,28 @@ import type {
 export const CONTRACT_FAKE_MIGRATION_CORE_TOKEN = "contract-fake-migration-core";
 /** The `coreVersion` a validation receipt or a verification expects when checked against this fake. */
 export const CONTRACT_FAKE_MIGRATION_CORE_VERSION = "contract-fake-migration-core-2.0.3";
+/**
+ * The core package hash every receipt of this fake names: one per installed core (registry ValidationReceipt.corePackageHash, "Actual
+ * consumed MC package bytes"; ReleaseCandidate.corePackageHashes, "Actual installed MC/IC bytes"), never one per plan — so a platform
+ * can bind the core it expects and refuse a receipt of another (decision D8-CAU-3).
+ */
+export const CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH: Sha256Hex = digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, version: CONTRACT_FAKE_MIGRATION_CORE_VERSION });
+/**
+ * The counts every receipt of this fake reports (registry ValidationReceipt.counts, "Independent denominators and dispositions"): a
+ * simulated source of one record, emitted once and conserved — SIMULATED, never a measurement of a real source (decision D8-CAU-6).
+ */
+export const CONTRACT_FAKE_MIGRATION_CORE_COUNTS: RowCounts = Object.freeze({
+  physicalSourceRows: 1,
+  logicalSourceRecords: 1,
+  billableSourceUnits: 1,
+  associationEdges: 0,
+  emittedRepresentatives: 1,
+  mergedNonSurvivors: 0,
+  rejected: 0,
+  withheld: 0,
+  unresolved: 0,
+  emittedArtifactRows: 1,
+});
 
 export type MigrationCoreOperation = "profile" | "validate" | "execute" | "verify";
 /** A hold point on one awaited step inside `execute` (D8-CANCEL-1: the worker checks its channel after every await). */
@@ -154,7 +179,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
   async validate(request: ValidateRequest): Promise<ValidateResult> {
     return this.#record("validate", async () => {
       await request.cancellation.check();
-      const corePackageHash = digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, planHash: request.planHash });
+      const corePackageHash = CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH;
       return {
         evidenceClass: this.evidenceClass,
         outcome: "VALID" as const,
@@ -166,6 +191,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
           profileEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "profile", planHash: request.planHash }),
           dispositionEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "disposition", planHash: request.planHash }),
           artifactEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "artifact", planHash: request.planHash }),
+          counts: CONTRACT_FAKE_MIGRATION_CORE_COUNTS,
         },
         problems: [],
       };

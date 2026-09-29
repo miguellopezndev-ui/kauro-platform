@@ -26,4 +26,4 @@ export type { ExecutionReadHandlers, ExecutionReadRuntime, ExecutionRuntime } fr
 export { createExecutionHandlers, createExecutionReadHandlers } from "./handlers/index.js";
 export { activeProviderStateOf, jobActions, jobView } from "./handlers/projections.js";
 export { EXECUTION_SWEEPERS } from "./pipeline-contracts.js";
-export type { ExecutionSweeperName, ExecutionSweeper, ExecutionUnits } from "./pipeline-contracts.js";
+export type { ExecutionSweeperName, ExecutionSweeper, ExecutionUnits, AuditUnits } from "./pipeline-contracts.js";

@@ -83,11 +83,11 @@ test("GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a prov
   // r1 is never sent; r2 is sent and its answer lost (UNCERTAIN); r3 is answered with a known usage and consumed
   await a.control(w.A.agencyId, async (uow) => {
     const j = uow.requestJournal;
-    await j.markDispatching(r2.requestId, r2.fence, "provider-request-2", w.now());
-    await j.markUncertain(r2.requestId, r2.fence, w.now());
-    await j.markDispatching(r3.requestId, r3.fence, "provider-request-3", w.now());
-    await j.storeResponse(r3.requestId, r3.fence, sha("response-3"), { usageState: "KNOWN", actualCents: "50" as never }, w.now());
-    await j.markConsumed(r3.requestId, r3.fence, w.now());
+    await j.markDispatching(r2.requestId as RequestId, r2.fence, "provider-request-2", w.now());
+    await j.markUncertain(r2.requestId as RequestId, r2.fence, w.now());
+    await j.markDispatching(r3.requestId as RequestId, r3.fence, "provider-request-3", w.now());
+    await j.storeResponse(r3.requestId as RequestId, r3.fence, sha("response-3"), { usageState: "KNOWN", actualCents: "50" as never }, w.now());
+    await j.markConsumed(r3.requestId as RequestId, r3.fence, w.now());
   });
   const gx0 = await a.grant(grantX);
   assert.deepEqual([gx0.state, gx0.ceiling, gx0.reserved, gx0.spent], ["AUTHORIZED", 150, 150, 0]);
@@ -141,8 +141,8 @@ test("GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a prov
 
   // --- the provider's usage of the uncertain send becomes known (the adapter's reconciliation): the grant closes -----------------------
   await a.control(w.A.agencyId, async (uow) => {
-    await uow.requestJournal.storeResponse(r2.requestId, r2.fence, sha("response-2-reconciled"), { usageState: "KNOWN", actualCents: "30" as never }, w.now());
-    await uow.requestJournal.markConsumed(r2.requestId, r2.fence, w.now());
+    await uow.requestJournal.storeResponse(r2.requestId as RequestId, r2.fence, sha("response-2-reconciled"), { usageState: "KNOWN", actualCents: "30" as never }, w.now());
+    await uow.requestJournal.markConsumed(r2.requestId as RequestId, r2.fence, w.now());
   });
   await sweep();
   assert.deepEqual(await usage(r2), ["CONSUMED", "RECONCILED", 30]);

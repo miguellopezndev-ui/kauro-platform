@@ -14,14 +14,18 @@
  *   against the funded ceiling (never past it: with no room, it answers FAILED and reserves nothing, so a dispatch never
  *   happens without a reservation preceding it in the journal) and then commits the scripted outcome — COMPILED,
  *   NEEDS_DECISION, UNSUPPORTED or FAILED, queued in call order by `scriptInterpretOutcomes` — as the response.
+ * - A COMPILED interpretation's candidate decisions carry the system draft's plan body of the candidate manifest's own source and
+ *   target — one MODEL_ASSISTED mapping per planned candidate — so `compile` of them yields that body, as the real compiler compiles
+ *   the core's DraftMigrationPlan (decision D8-CAU-4).
  * - `compile` (`PlanCompilerPort`) turns a candidate decision already shaped as `{ body: PlanBody }` into B06's
- *   `PatchCompilation` (`COMPILED` with the body and its hash, or `REJECTED MALFORMED_PATCH`), so CMD022 and CMD023
- *   answer with one compiler-reason vocabulary.
+ *   `PatchCompilation` (`COMPILED` with the body and its KAURO_PLAN_BODY_V1 digest, the hash B06's compilation names and every
+ *   consumer recomputes, D-PLAN-5; or `REJECTED MALFORMED_PATCH`), so CMD022 and CMD023 answer with one compiler-reason vocabulary
+ *   (decision D8-CAU-4).
  * - A call log of every port call, and a hold point before each awaited step (`planCandidates`'s plan, `interpret`'s
  *   journal read, reservation and commit, `compile`'s own step) so a test can interleave without a sleep.
  */
 import { createHash } from "node:crypto";
-import type { Sha256Hex } from "@kauro/contracts";
+import { DOMAINS, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { PlanBody } from "@kauro/domain";
 import type { PatchCompilation } from "../ports/plan-services.js";
 import type {
@@ -63,6 +67,49 @@ interface HoldRecord {
 
 function digestOf(value: unknown): Sha256Hex {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+const SHA256 = /^[0-9a-f]{64}$/;
+
+/** A UUIDv7-shaped identity derived from a digest (deterministic: a replayed interpretation compiles the same body). */
+function idOf(seed: unknown): string {
+  const hex = digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, seed });
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-7${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** The system draft's body of a candidate manifest this fake planned: its source and target, one mapping per candidate. */
+function draftBodyOf(manifest: CandidateManifest): PlanBody | null {
+  const document = manifest.document as { readonly revisionHash?: unknown; readonly targetContractHash?: unknown; readonly candidates?: unknown } | null;
+  if (document === null || typeof document !== "object") return null;
+  const { revisionHash, targetContractHash } = document;
+  if (typeof revisionHash !== "string" || !SHA256.test(revisionHash) || typeof targetContractHash !== "string" || !SHA256.test(targetContractHash)) return null;
+  const candidates = Array.isArray(document.candidates) ? (document.candidates as ReadonlyArray<{ readonly candidateRef?: unknown; readonly sourceFieldRef?: unknown }>) : [];
+  const body = {
+    revisionHash,
+    targetContractHash,
+    policyHash: digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, policy: manifest.candidateSetHash }),
+    mappings: candidates.map((candidate) => ({
+      mappingId: idOf({ mapping: candidate.candidateRef, candidateSetHash: manifest.candidateSetHash }),
+      sourceTableId: idOf({ table: candidate.sourceFieldRef }),
+      sourceFieldId: idOf({ field: candidate.sourceFieldRef }),
+      targetObject: "Contact",
+      targetField: "Email",
+      intent: { kind: "SET", reasonCode: "MAPPED" },
+      evidence: {
+        evidenceId: idOf({ evidence: candidate.candidateRef, candidateSetHash: manifest.candidateSetHash }),
+        candidateId: idOf({ candidate: candidate.candidateRef }),
+        provenance: "MODEL_ASSISTED",
+        factHashes: [],
+        ruleVersion: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN,
+        comparisonHash: digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, comparison: candidate.candidateRef }),
+        fragmentHash: digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, fragment: candidate.candidateRef }),
+      },
+    })),
+    identities: [],
+    transforms: [],
+    relationships: [],
+  };
+  return body as unknown as PlanBody;
 }
 
 export interface ContractFakeIntelligenceCoreOptions {
@@ -135,6 +182,7 @@ export class ContractFakeIntelligenceCore implements InterpretPort, PlanCompiler
         sourceProfileHash: request.sourceProfileHash,
         targetContractHash: request.targetContractHash,
       });
+      // the manifest names the source and target it was planned for (the draft body of a compiled interpretation binds them)
       return {
         evidenceClass: this.evidenceClass,
         candidateSetHash,
@@ -142,6 +190,7 @@ export class ContractFakeIntelligenceCore implements InterpretPort, PlanCompiler
           token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN,
           complete: true,
           revisionHash: request.revisionHash,
+          targetContractHash: request.targetContractHash,
           candidates: [Object.freeze({ candidateRef: `${CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN}-candidate-1`, sourceFieldRef: `${CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN}-field-1` })],
         }),
       };
@@ -177,7 +226,11 @@ export class ContractFakeIntelligenceCore implements InterpretPort, PlanCompiler
 
       await this.#wait("dispatch");
       const outcome = this.#outcomes.shift() ?? "FAILED";
-      const candidateDecisions = outcome === "COMPILED" || outcome === "NEEDS_DECISION" ? { token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, outcome, candidateSetHash: request.candidateManifest.candidateSetHash } : null;
+      const body = outcome === "COMPILED" ? draftBodyOf(request.candidateManifest) : null;
+      const candidateDecisions =
+        outcome === "COMPILED" || outcome === "NEEDS_DECISION"
+          ? { token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, outcome, candidateSetHash: request.candidateManifest.candidateSetHash, ...(body === null ? {} : { body }) }
+          : null;
 
       await this.#wait("commit");
       const afterReservation = await request.journal.read(request.auditAttemptId);
@@ -200,7 +253,7 @@ export class ContractFakeIntelligenceCore implements InterpretPort, PlanCompiler
         return { kind: "REJECTED", reason: "MALFORMED_PATCH" } as const;
       }
       const body = decisions.body;
-      return { kind: "COMPILED", body, bodyHash: digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, body }) } as const;
+      return { kind: "COMPILED", body, bodyHash: structuredDigest(DOMAINS.PLAN_BODY, 1, body) } as const;
     });
   }
 }

@@ -31,6 +31,7 @@ import type {
   PlanValidationRecord,
   PlanValidationResult,
 } from "../model/audit/records.js";
+import type { AuditDiscovery } from "./audit-discovery.js";
 import type { ExecutionUnitOfWork, ExecutionUnitOfWorkFactory } from "./execution-store.js";
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
@@ -238,6 +239,8 @@ export interface AuditStore {
 /** A unit of work of audit authority: the execution unit of work with the audit store on the same connection. */
 export interface AuditUnitOfWork extends ExecutionUnitOfWork {
   readonly audits: AuditStore;
+  /** The control plane's discovery reads of audit work (mandate B08-CONTROL-AUDIT, D8-CAU-1). */
+  readonly auditDiscovery: AuditDiscovery;
 }
 
 export interface AuditUnitOfWorkFactory extends ExecutionUnitOfWorkFactory {

@@ -10,16 +10,21 @@
  * D8-LOCK-1, and the hand-over of the ACTIVE slot), ATTEMPT_MONITOR (observe by identity, heartbeat under the fence, the ambiguous
  * launch reconciled before any create, the lapsed lease abandoned after its provider job is terminal, the takeover at fence + 1;
  * D8-ATT-1, D8-ATT-2, D8-HOST-1), JOB_DEADLINES (never early, the exact provider job terminated first; D8-DL-1) and STAGING_JANITOR
- * (one attempt, its exact prefix, its scratch, one cleanup record; D8-JAN-1). B08-CONTROL-AUDIT adds AUDIT_DEADLINES and
- * GRANT_RECONCILIATION (decision D8-CEX-2).
+ * (one attempt, its exact prefix, its scratch, one cleanup record; D8-JAN-1). B08-CONTROL-AUDIT adds AUDIT_DEADLINES (an audit's
+ * absolute deadline on the server clock, never early; D8-DL-1) and GRANT_RECONCILIATION (a grant's known usage into its spend, an
+ * intent the database can no longer send released, unknown usage kept reserved, its edges on the server clock; D8-GRANT-2) — decision
+ * D8-CEX-2 — and the consumers AUDIT_ORCHESTRATION and PLAN_VALIDATION, over the audit units of work (`AuditUnits`, a superset).
  */
-import type { ExecutionUnitOfWorkFactory, SourceUnitOfWorkFactory } from "@kauro/domain";
+import type { AuditUnitOfWorkFactory, ExecutionUnitOfWorkFactory, SourceUnitOfWorkFactory } from "@kauro/domain";
 
-export const EXECUTION_SWEEPERS = Object.freeze(["JOB_ADMISSION", "ATTEMPT_MONITOR", "JOB_DEADLINES", "STAGING_JANITOR"] as const);
+export const EXECUTION_SWEEPERS = Object.freeze(["JOB_ADMISSION", "ATTEMPT_MONITOR", "JOB_DEADLINES", "STAGING_JANITOR", "AUDIT_DEADLINES", "GRANT_RECONCILIATION"] as const);
 export type ExecutionSweeperName = (typeof EXECUTION_SWEEPERS)[number];
 
 /** The units of work the execution control plane runs: the execution factory, which also opens source units (D8-XPKG-10). */
 export type ExecutionUnits = ExecutionUnitOfWorkFactory & SourceUnitOfWorkFactory;
+
+/** The units of work of the control plane's audit work: the audit factory, a superset of the execution one (D8-PAU-9, D8-CAU-1). */
+export type AuditUnits = AuditUnitOfWorkFactory & SourceUnitOfWorkFactory;
 
 /** Periodic execution work with no triggering event, on the server clock (D8-CLOCK-1), each item in a unit bound to its agency. */
 export interface ExecutionSweeper {

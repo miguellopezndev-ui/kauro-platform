@@ -10,13 +10,15 @@
  *   EXECUTION_CONTROL  processing_job.cancel_requested.v1 -> the cancellation's continuation; the loss of a fact a job relies on —
  *                      commercial_authorization.revoked.v1 (B09), approval.withdrawn.v1, plan.withdrawn.v1, plan.superseded.v1 (B06),
  *                      dataset_revision.superseded.v1, .expired.v1, source_file.admission_revoked.v1 (B07) — cancels the live jobs
- *                      relying on it with its reason (a SERVICE actor) and reconciles them; commercial_authorization.issued.v1 is
- *                      DONE (nothing relies on an entitlement before CMD036 binds it).
+ *                      relying on it with its reason (a SERVICE actor) and reconciles them, and a lost source also cancels the
+ *                      live audits of its revision (cancellation_wins, D8-CANCEL-2; mandate B08-CONTROL-AUDIT);
+ *                      commercial_authorization.issued.v1 is DONE (nothing relies on an entitlement before CMD036 binds it).
  * A RETRY or WAITING step (an uncertain termination, a provider's transient failure, an uncertain launch inside its horizon) answers
  * RETRY after its hint; everything else is DONE.
  */
 import type { ConsumerOutcome, OutboxConsumer } from "@kauro/application";
 import type { AgencyId, ApprovalId, CommercialAuthorizationId, DomainEventRecord, ExecutionFact, PlanId, ProcessingJobId, RevisionId, SystemContext } from "@kauro/domain";
+import type { AuditCancellations } from "../audit/cancellation.js";
 import type { JobAdmission } from "./admission.js";
 import type { CancellationReconciler } from "./cancellation.js";
 import type { JobPipeline } from "./pipeline.js";
@@ -97,19 +99,22 @@ function lossOf(event: DomainEventRecord): { readonly facts: ReadonlyArray<Execu
 export class ExecutionControlConsumer implements OutboxConsumer {
   readonly consumer = "EXECUTION_CONTROL" as const;
 
-  constructor(private readonly deps: { readonly cancellations: CancellationReconciler; readonly pipeline: JobPipeline; readonly retryAfterSeconds: number }) {}
+  constructor(private readonly deps: { readonly cancellations: CancellationReconciler; readonly audits: AuditCancellations; readonly pipeline: JobPipeline; readonly retryAfterSeconds: number }) {}
 
   async handle(event: DomainEventRecord, _context: SystemContext): Promise<ConsumerOutcome> {
     const steps: ExecutionStep[] = [];
+    const audited: ExecutionStep[] = [];
     if (event.eventType === "processing_job.cancel_requested.v1") {
       steps.push(await this.deps.cancellations.reconcile(event.aggregateId as ProcessingJobId));
     } else {
       const loss = lossOf(event);
       if (loss === null || event.agencyId === undefined || event.agencyId === null) return { kind: "DONE" };
       for (const fact of loss.facts) steps.push(...(await this.deps.cancellations.cancelRelying(event.agencyId as AgencyId, fact, loss.reason)));
+      // a lost source also cancels the live audits of its revision (D8-CANCEL-2); their steps in flight then record nothing
+      for (const fact of loss.facts) if (fact.kind === "REVISION") audited.push(...(await this.deps.audits.cancelOfRevision(event.agencyId as AgencyId, fact.revisionId, loss.reason)));
     }
     // the slots a cancellation released go to the next admitted job (JOB_EXECUTION's launch)
     if (steps.some((s) => s.kind === "APPLIED")) await this.deps.pipeline.launchNext();
-    return outcomeOf(steps, this.deps.retryAfterSeconds);
+    return outcomeOf([...steps, ...audited], this.deps.retryAfterSeconds);
   }
 }
