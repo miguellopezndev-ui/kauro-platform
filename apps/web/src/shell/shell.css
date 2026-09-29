@@ -1,0 +1,100 @@
+/* The look of the application frames (design D-A11Y-1, D-SEC-1): tokens only, no inline style anywhere, reflow at 320 CSS px. */
+body {
+  margin: 0;
+}
+
+/* Off screen until it takes focus, so it is the first stop of the keyboard and never covers content otherwise. */
+.kauro-skip-link {
+  position: absolute;
+  inset-block-start: var(--kauro-space-2);
+  inset-inline-start: var(--kauro-space-2);
+  z-index: 1;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  transform: translateY(-300%);
+}
+
+.kauro-skip-link:focus {
+  transform: none;
+}
+
+.kauro-shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3) var(--kauro-space-5);
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+
+.kauro-shell-brand {
+  font-weight: 700;
+}
+
+.kauro-agency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--kauro-space-2);
+  min-width: 0;
+}
+
+.kauro-agency-label,
+.kauro-agency-state {
+  color: var(--kauro-color-text-muted);
+  font-size: var(--kauro-font-size-dense);
+}
+
+.kauro-agency-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.kauro-shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  margin-inline-start: auto;
+}
+
+.kauro-shell-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-2) var(--kauro-space-5);
+  margin: 0;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  list-style: none;
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+
+.kauro-shell-nav a[aria-current="page"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.kauro-main {
+  padding: var(--kauro-space-5) var(--kauro-space-4);
+}
+
+.kauro-live:empty {
+  display: none;
+}
+
+.kauro-button {
+  min-block-size: 44px;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.kauro-button:hover {
+  border-color: var(--kauro-color-primary-hover);
+}

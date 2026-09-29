@@ -152,6 +152,15 @@ export function matchRoute(pathname: string): RouteMatch | null {
   return null;
 }
 
+/** An agency id as the api issues it: a UUID (any version 1 to 8, RFC 4122 variant), lower case. */
+export const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** The agency a pathname is in, or null for a path outside an agency (or one whose agency segment is not an agency id). */
+export function agencyOfPathname(pathname: string): string | null {
+  const agency = matchRoute(pathname)?.params["agencyId"];
+  return agency !== undefined && AGENCY_ID.test(agency) ? agency : null;
+}
+
 /** Which origin's group a pathname belongs to, or null for a path no screen owns (system routes, unknown paths). */
 export function originOfPath(pathname: string): Origin | null {
   return matchRoute(pathname)?.screen.origin ?? null;

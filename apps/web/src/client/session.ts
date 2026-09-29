@@ -10,7 +10,7 @@
 //   - nothing is ever written to a browser store: no localStorage, sessionStorage, IndexedDB, cache or cookie is touched here (a test
 //     reads the source for it and runs the runtime with every store made to throw).
 // The object holds no React and no DOM: the shell subscribes to it, and `bindPageEvents` connects the page's events to it.
-import { matchRoute, pathOf } from "../screens.ts";
+import { AGENCY_ID, agencyOfPathname, pathOf } from "../screens.ts";
 import type { ApiAnswer } from "./answer.ts";
 import type { ClientContext } from "./api-client.ts";
 import type { SessionApi, SessionSummary, SessionView } from "./session-api.ts";
@@ -44,13 +44,7 @@ export interface SessionDeps {
 export type SignOutResult = "LEFT" | "UNCONFIRMED" | "SUPERSEDED";
 export type BoundaryResult = "SAME_AGENCY" | "HARD_NAVIGATION";
 
-const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const LOCAL_PATH = /^\/[A-Za-z0-9_\-/]*$/;
-
-function agencyOfPath(pathname: string): string | null {
-  const agency = matchRoute(pathname)?.params["agencyId"];
-  return agency !== undefined && AGENCY_ID.test(agency) ? agency : null;
-}
 
 /** Copies the fields the page may see, one by one, so a member added to the wire shape later is not exposed by accident. */
 function summaryOf(view: SessionView): SessionSummary {
@@ -81,7 +75,7 @@ export class SessionRuntime implements ClientContext {
 
   constructor(deps: SessionDeps) {
     this.#deps = deps;
-    this.#agency = agencyOfPath(deps.initialPathname);
+    this.#agency = agencyOfPathname(deps.initialPathname);
   }
 
   // ---- what the page and the api client read ----
@@ -244,8 +238,8 @@ export class SessionRuntime implements ClientContext {
    */
   checkAgencyBoundary(destination: string): BoundaryResult {
     if (!LOCAL_PATH.test(destination) || destination.includes("//")) throw new RangeError("a destination is a plain path of this application");
-    if (agencyOfPath(destination) === this.#agency) return "SAME_AGENCY";
-    this.#clearAndNavigate(agencyOfPath(destination), destination);
+    if (agencyOfPathname(destination) === this.#agency) return "SAME_AGENCY";
+    this.#clearAndNavigate(agencyOfPathname(destination), destination);
     return "HARD_NAVIGATION";
   }
 

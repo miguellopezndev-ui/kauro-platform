@@ -24,6 +24,13 @@ export const EN = {
   "shell.session.unavailable.title": "We could not check your session",
   "shell.session.unavailable.body": "Nothing is shown until your session is confirmed. Check again in a moment.",
   "shell.session.check-again.label": "Check again",
+  "shell.session.sign-out-failed.title": "We could not confirm that you signed out",
+  "shell.session.sign-out-failed.body": "You may still be signed in. Try signing out again.",
+  "shell.agency.state.DRAFT.label": "Draft",
+  "shell.agency.state.ACTIVE.label": "Active",
+  "shell.agency.state.RESTRICTED.label": "Restricted",
+  "shell.agency.state.CLOSING.label": "Closing",
+  "shell.agency.state.CLOSED.label": "Closed",
   // navigation entries of an agency (one per real screen; an entry appears only when its screen exists)
   "nav.projects.label": "Projects",
   "nav.clients.label": "Clients",

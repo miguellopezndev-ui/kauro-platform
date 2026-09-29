@@ -5,16 +5,27 @@
     "outDir": "dist",
     "declaration": false,
     "declarationMap": false,
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "jsx": "react-jsx"
   },
   "include": [
     "src/api/**/*.ts",
     "src/client/**/*.ts",
     "src/copy/**/*.ts",
     "src/server/**/*.ts",
+    "src/shell/**/*.ts",
+    "src/shell/**/*.tsx",
     "src/screens.ts",
     "test/**/*.ts",
     "e2e/**/*.ts",
     "playwright.config.ts"
+  ],
+  "exclude": [
+    "src/shell/app-shell.tsx",
+    "src/shell/browser-page.ts"
   ]
 }
