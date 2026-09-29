@@ -70,7 +70,10 @@ export interface PageMetadata {
   readonly description: string;
 }
 
-/** The document title and description of a page (the title gets the site name from the layout's template). */
+/**
+ * The document title and description of a page. The title gets the site name from the layout's template, except the home page: a layout's
+ * template does not reach a page of its own route segment, so the home title (copy "home.meta.title") carries the site name itself.
+ */
 export function pageMetadata(key: PageKey): PageMetadata {
   return { title: PUBLIC_COPY[`${key}.meta.title`], description: PUBLIC_COPY[`${key}.meta.description`] };
 }

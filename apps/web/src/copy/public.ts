@@ -39,7 +39,7 @@ export const PUBLIC_COPY = {
   "pricing.in-house.body": "In-house CRM and data teams can use Kauro too.",
 
   // ---- UI01 Home ----------------------------------------------------------------------------------------------------------------------
-  "home.meta.title": "Home",
+  "home.meta.title": "Kauro: prepare and verify CRM data from files",
   "home.meta.description": "Kauro cleans, explains and verifies exported CRM files and spreadsheets, and delivers an import package that your team runs in its own systems.",
   "home.title": "Prepare and verify CRM data from files.",
   "home.hero.lead": "Kauro cleans your exported CRM files and spreadsheets, explains every change, and delivers an import package that your agency runs in its own systems. It never connects to or changes a live CRM.",
@@ -299,7 +299,7 @@ export const PUBLIC_COPY = {
   "contact.limited.later": "a little while",
   "contact.failed.heading": "The inquiry could not be sent",
   "contact.failed.body": "Check your connection and send it again. It is safe to retry: the same inquiry is never recorded twice.",
-  "contact.fields.body": "The inquiry was not accepted as written. Check the answers marked below and send it again.",
+  "contact.fields.body": "The inquiry was not accepted as written. Check each answer below and send it again.",
 
   // ---- UI08 Service status ------------------------------------------------------------------------------------------------------------
   "status.meta.title": "Service status",
