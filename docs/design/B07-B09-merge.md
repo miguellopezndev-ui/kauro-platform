@@ -73,3 +73,14 @@ B08: EXECUTION_CONTROL on `dataset_revision.superseded.v1` / `.expired.v1`, the 
 B15: live providers. B16: DeletionReceipt.
 
 ## Verification
+
+`pnpm install --frozen-lockfile` then `pnpm run verify` at `9b41162` (the lockfile is B07's; B09 changed none):
+
+| host | result | tests (pass / skip) |
+|---|---|---|
+| Windows 11, Node 24.14.1, pnpm 10.16.1, `C:\Tools\pgsql17\bin` | VERIFY_EXIT 0 | contracts 12, domain 107, application 125, persistence 218, authorization 11, data-plane 12, control 15, api 200 + 1 skipped (B06's Linux-only test), tools 41; 0 failed |
+| WSL Ubuntu 24.04, fresh clone, Node 24.21.0, `PGBIN=/usr/lib/postgresql/17/bin` | VERIFY_EXIT 0 | the same, api 201; 0 failed; clone removed, 0 postgres processes left |
+
+Both: architecture gate 8 packages, 23 edges, no violation; OpenAPI 39 operations served, 0 planned; matrix 28 machines, 252
+edges and initial states owned, 20 commands, 16 reads, 1 intake; clean-consume green. The Windows run began at `818ec51`; the
+one later commit changes `packages/persistence/README.md` only. The next commit adds this section only.
