@@ -38,6 +38,20 @@ Registry verification clauses:
 Counts at design: 13 cases — 0 EXECUTED_LOCAL, 0 SIMULATED, 0 PARTIAL, 13 MISSING (all planned). Target at B11 closure: 4
 EXECUTED_LOCAL (S067, CMD044-OK, CMD044-DENY, CMD044-RACE), 9 PARTIAL (owners B08, B10, B13, B15, B16, B17).
 
+## Stage 1 records
+
+What each stage-1 mandate has demonstrated, one row per case: case | test file :: exact title | status | commit. The table above keeps the
+case's status at closure; a record here is evidence of one half of a case, never of the case. Deviations of the implementation from the
+design are in design §12 (D-W3-n for W3).
+
+| case | test | status | commit |
+|---|---|---|---|
+| S066 | `apps/web/test/operation-runner.test.ts` :: "S066: one logical intent keeps one idempotency key — a double activation, a lost response and a reload of CreatePaymentOrder and CapturePayment reuse the key derived from the quote version and the order, and never mint another" | EXECUTED_LOCAL — unit half (runner and api client against a scripted transport); the browser half is planned for W9 | 082564c test first, ebb06d1 code |
+| R2-064 | `apps/web/test/navigation-guard.test.ts` :: "R2-064: local edits, saved draft, validated and approved are four separate statuses; leaving with local edits needs Stay, Save draft or Discard, and no status is derived from local edits" | EXECUTED_LOCAL — unit half (the guard and its four statuses); the browser half is planned for W8 | 082564c test first, ebb06d1 code |
+
+W3 also holds the harness tests of the ContractFakeAgencyApi (`apps/web/test/fake-routes.test.ts`, `apps/web/e2e/fake-routes.spec.ts`, design
+D-E2E-2): no case of B11 is demonstrated by them.
+
 ## Gates
 
 ### G-UX (owner manual 11, package B11; 8 cases)
