@@ -1,0 +1,239 @@
+{
+  "verdict": "ACCEPT",
+  "summary": "All five prior B09 findings are FIXED at 4b33e264db0bf938126f27e9a950a2c35d4e3318. Implementation changes and passing regression evidence address the original reproductions. Acceptance preserves the case map's disclosed provider simulations and later-package deferrals.",
+  "verify_observed": "verify.log ends with 'verify exit 0' at line 1009. Nine test summaries total 769 tests, 769 passes, zero failures and zero skips. B09-R1 through B09-R4 regressions pass at lines 670–673; the three corrected tenant-isolation DENY tests pass at lines 791, 795 and 798. Architecture, OpenAPI, matrix and clean-consumer checks also succeed. No tests or builds were started during this read-only review.",
+  "cases": [
+    {
+      "id": "S057",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior coverage assessment retained; verification now confirms execution. Provider simulation and B15 deferral remain explicit."
+    },
+    {
+      "id": "S058",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior negative-control assessment retained; verification confirms execution with provider verification simulated."
+    },
+    {
+      "id": "S059",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R2 is fixed; b09-review.test.ts:226 covers refund completion before, with and after reversal."
+    },
+    {
+      "id": "S060",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior source-expiry assessment retained; B10 quote issuance remains deferred."
+    },
+    {
+      "id": "R2-077",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "The previously missing execution evidence is supplied by the successful verification log."
+    },
+    {
+      "id": "R2-078",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R2 and B09-R4 are fixed with passing ledger regressions; B15 statement settlement remains deferred."
+    },
+    {
+      "id": "R2-081",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior exact cumulative-refund assessment retained; B10 commission consumption remains deferred."
+    },
+    {
+      "id": "R2-128",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior reviewed-treatment and blocked-issuance assessment retained; live issuance remains deferred."
+    },
+    {
+      "id": "R2-140",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior distinct-capture, excess-obligation and deduplication assessment retained."
+    },
+    {
+      "id": "CMD028-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior durable-intent assessment retained; live provider creation remains B15."
+    },
+    {
+      "id": "CMD028-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior source-expiry and ambiguous-creation assessment retained."
+    },
+    {
+      "id": "CMD028-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior crash-boundary, replay and request-identity assessment retained."
+    },
+    {
+      "id": "CMD029-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior authenticated capture and authorization assessment retained with provider simulation disclosed."
+    },
+    {
+      "id": "CMD029-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior forged-event, uncertainty and prerequisite-denial assessment retained."
+    },
+    {
+      "id": "CMD029-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior competing-observation and crash-recovery assessment retained."
+    },
+    {
+      "id": "CMD030-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R1 is fixed; the passing regression preserves separate refund identities and incidents."
+    },
+    {
+      "id": "CMD030-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Prior ingress mismatch and duplicate-delivery assessment retained."
+    },
+    {
+      "id": "CMD030-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "b09-review.test.ts:118 now exercises the separate refund webhook arriving between CMD033's call and settlement."
+    },
+    {
+      "id": "CMD031-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Successful verification resolves the previous execution-evidence objection."
+    },
+    {
+      "id": "CMD031-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Successful verification confirms the previously accepted tenant, role and prerequisite controls."
+    },
+    {
+      "id": "CMD031-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Successful verification confirms the previously accepted rollback, replay and conflict coverage."
+    },
+    {
+      "id": "CMD032-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Successful verification confirms the previously accepted immutable approval evidence."
+    },
+    {
+      "id": "CMD032-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "B09-R5 is fixed: cmd032-approve-refund.test.ts:160 creates agency B's real refund and checks unauthorized access and adopted-scope isolation."
+    },
+    {
+      "id": "CMD032-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Successful verification confirms the previously accepted transaction and reversal races."
+    },
+    {
+      "id": "CMD033-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R1 and B09-R2 are fixed; provider identity and return accounting regressions pass. B10/B15 deferrals remain explicit."
+    },
+    {
+      "id": "CMD033-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R3 and B09-R5 are fixed: watchdog recovery and real foreign-refund scope controls pass."
+    },
+    {
+      "id": "CMD033-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing B09-R1/R2 regressions cover distinct same-amount refunds and delayed refund/reversal observations."
+    },
+    {
+      "id": "CMD034-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing B09-R1 through B09-R4 regressions resolve the prior refund, reversal, absence-proof and fee objections."
+    },
+    {
+      "id": "CMD034-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B09-R5 is fixed: cmd034-reconcile-payment.test.ts:95 creates agency B's real order/query and checks cross-scope refusals."
+    },
+    {
+      "id": "CMD034-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing B09-R1/R2 regressions supplement the previously accepted capture-serialization evidence."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B09-R1",
+      "severity": "BLOCKING",
+      "title": "Same-amount matching can attach an unrelated provider refund to a local attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 1366,
+      "detail": "FIXED. refundFor now binds by stored provider identity, the originating attempt or the platform refund reference; the amount-based fallback is gone. Unknown refunds create provider-specific UNKNOWN_REFUND cases at line 1381. A different provider ID for an already-bound refund also creates a case at lines 1316–1321. apps/api/test/b09-review.test.ts:118 reproduces the webhook/settlement interleaving and checks both distinct identities and incident amounts; packages/application/test/commerce-planners.test.ts:429 additionally checks a conflicting dispatch response. Both tests pass in verify.log.",
+      "reproduction": "Checked the original separate 1000-cent refund arriving while CMD033 waits after its provider call. The regression asserts that the local refund stays SUBMITTING, the separate return opens its own case, and settlement completes the local refund with its own provider ID.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R2",
+      "severity": "BLOCKING",
+      "title": "A reversal observed before its completed refund double-counts returned money",
+      "file": "packages/persistence/src/repositories/commerce-refunds.ts",
+      "line": 393,
+      "detail": "FIXED. Refund completion reads the capture status under a share lock at lines 342–350 and publishes zero returned components and zero movable balance when that capture is already REVERSED. packages/domain/src/commerce/ledger.ts:156 defines this rule; packages/application/src/commerce/core/observation.ts:540 mirrors it, and core/postings.ts:122 consumes the returned components. apps/api/test/b09-review.test.ts:226 checks all three observation orders, with and without the 5275-cent fee, and asserts exact ledger balances and event-delivery independence. verify.log:671 records its pass.",
+      "reproduction": "Checked the original 97125-cent capture with a 1000-cent refund completing in the same query as, or after, reversal. The regression asserts total returned service of exactly 97125 cents and zero residual balances without a fee.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R3",
+      "severity": "MAJOR",
+      "title": "An earlier refund prevents the watchdog from resolving a later no-effect attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 837,
+      "detail": "FIXED. The absence check now compares each in-flight refund's provider ID or platform refund reference instead of treating any refund of the same capture as its trace. After authoritative deadline-qualified absence, line 839 invokes provedNoEffect. apps/api/test/b09-review.test.ts:286 exercises an earlier completed refund alongside a timed-out no-effect refund and a claimed-but-never-sent refund. Assertions at lines 317–322 confirm both later attempts FAILED_NO_EFFECT, both refunds APPROVED again, and the earlier refund unchanged. verify.log:673 records its pass.",
+      "reproduction": "Checked repeated watchAttempt calls against a post-deadline authoritative order view containing only the earlier completed refund. Both absent later attempts now resolve without another provider refund effect.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R4",
+      "severity": "BLOCKING",
+      "title": "Provider fees learned with or after reversal are silently discarded",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 987,
+      "detail": "FIXED. Fee learning now runs for both COMPLETED and REVERSED captures. learnFee at line 1138 accounts for all money already returned; packages/persistence/src/repositories/commerce-captures.ts:372 implements the same reversed-capture balance rule. apps/api/test/b09-review.test.ts:248 checks a fee supplied with reversal, after reversal and through the reversal webhook, including duplicate suppression. Its ledger assertions leave 5275 cents of processor expense and the corresponding merchant available-balance debit. verify.log:672 records its pass.",
+      "reproduction": "Checked a 97125-cent capture whose previously unknown 5275-cent fee is learned with or after reversal. The regression verifies one fee event, a persisted fee fact and the correct retained-fee ledger balances.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R5",
+      "severity": "MAJOR",
+      "title": "Three advertised foreign-tenant denial checks use no foreign-tenant resource",
+      "file": "apps/api/test/cmd032-approve-refund.test.ts",
+      "line": 160,
+      "detail": "FIXED. CMD032 now creates agency B's real refund, refuses access outside the corporate grant at lines 170–175, and checks invisibility, prohibited approval and prohibited scope switching from agency A's adopted scope at lines 184–195. apps/api/test/cmd033-execute-refund.test.ts:95 creates B's real approved refund and checks cross-scope reads, transition denial and unchanged state at lines 110–120. apps/api/test/cmd034-reconcile-payment.test.ts:95 creates B's real order and query, refuses the query against A's order and tests cross-scope reconciler access at lines 111–129. These are meaningful controls for the global operator/service roles. All three DENY tests pass at verify.log:791, 795 and 798.",
+      "reproduction": "Traced each foreign fixture to existing agency B commerce rows and inspected assertions attempting access or mutation after adopting agency A's scope. The controls now address actual foreign refunds/orders and verify that their state remains untouched.",
+      "status": "FIXED"
+    }
+  ]
+}

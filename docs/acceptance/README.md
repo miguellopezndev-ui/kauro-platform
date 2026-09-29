@@ -12,5 +12,6 @@ operator host).
 
 | Package | Cases | Status | Commit on main | Review rounds | CI | Waiting for |
 |---|---|---|---|---|---|---|
-| B07 Upload, inspection and source lifecycle | 23: 11 EXECUTED_LOCAL, 12 PARTIAL (later packages named) | REVIEW_ACCEPTED | `d23af32` | 5: REJECT `0f15636` (1 blocking, 2 major, 1 minor) → R1 partial `6b670e3`, `77d5fa6`, `09faf25` → ACCEPT `d23af32` | run 36634076565 success | B06 review; B05 → B02, B04 |
-| B09 Payments and fiscal workflow | 30: 7 EXECUTED_LOCAL, 23 PARTIAL (later packages named) | REVIEW_ACCEPTED | `d23af32` | 3: REJECT `0f15636` (3 blocking, 2 major) → ACCEPT `6b670e3` → ACCEPT `d23af32` | run 36634076565 success | B06 review; B05 → B02, B04 |
+| B06 Domain, database and authorization | 29: 18 EXECUTED_LOCAL, 11 PARTIAL (later packages named) | REVIEW_ACCEPTED | `4b33e26` | 2: REJECT `a7203f0` (2 blocking, 1 major) → ACCEPT `4b33e26` | run 36644790719 success | B05 → B02, B04 |
+| B07 Upload, inspection and source lifecycle | 23: 11 EXECUTED_LOCAL, 12 PARTIAL (later packages named) | REVIEW_ACCEPTED | `4b33e26` | 6: REJECT `0f15636` (1 blocking, 2 major, 1 minor) → R1 partial `6b670e3`, `77d5fa6`, `09faf25` → ACCEPT `d23af32` → ACCEPT `4b33e26` | run 36644790719 success | B05 → B02, B04 |
+| B09 Payments and fiscal workflow | 30: 7 EXECUTED_LOCAL, 23 PARTIAL (later packages named) | REVIEW_ACCEPTED | `4b33e26` | 4: REJECT `0f15636` (3 blocking, 2 major) → ACCEPT `6b670e3`, `d23af32`, `4b33e26` | run 36644790719 success | B05 → B02, B04 |
