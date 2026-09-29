@@ -118,3 +118,25 @@ export type {
   CommerceUnitOfWork,
   CommerceUnitOfWorkFactory,
 } from "./commerce.js";
+// processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §10)
+export type {
+  TransitionSubject,
+  ExecutionAuthorityFacts,
+  NewProcessingJob,
+  JobCancellation,
+  AdmissionRecord,
+  LaunchIntent,
+  ObjectLocation,
+  ManifestSubmission,
+  StagingRecord,
+  ReadbackInput,
+  VerificationInput,
+  DeliveryCopyInput,
+  PublicationInput,
+  PublicationOutcome,
+  CleanupInput,
+  TakeoverOutcome,
+  ExecutionStore,
+  ExecutionUnitOfWork,
+  ExecutionUnitOfWorkFactory,
+} from "./execution-store.js";

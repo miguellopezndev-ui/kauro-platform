@@ -326,6 +326,8 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   { eventType: "commercial_authorization.issued.v1", consumer: "NOTIFICATIONS" },
   { eventType: "commercial_authorization.revoked.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "commercial_authorization.revoked.v1", consumer: "NOTIFICATIONS" },
+  // the processing package's delivery of the entitlement reaches the agency (package B08, migration 0020; D8-XPKG-7)
+  { eventType: "commercial_authorization.delivered.v1", consumer: "NOTIFICATIONS" },
   { eventType: "refund.requested.v1", consumer: "NOTIFICATIONS" },
   // an approved refund (and one returned to APPROVED after a proved no-effect) is executed by the payment service (CMD033)
   { eventType: "refund.approved.v1", consumer: "PAYMENT_SERVICE" },

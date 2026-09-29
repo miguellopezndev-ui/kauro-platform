@@ -299,6 +299,8 @@ test("every B07 event type carries an allowlist without customer-text keys, and 
     "dataset_revision.cancelled.v1", "dataset_revision.deleted.v1", "dataset_revision.expired.v1", "dataset_revision.inspecting.v1", "dataset_revision.ready_to_seal.v1",
     "dataset_revision.rejected.v1", "dataset_revision.sealed.v1", "dataset_revision.selection_changed.v1", "dataset_revision.superseded.v1", "dataset_revision.uploading.v1",
     "project.current_revision_changed.v1", "retention_record.created.v1", "retention_record.expired.v1",
+    // package B08 adds the soft-deadline version its publication writes on a PAID_ORDINARY record (migration 0020, D8-RET-1)
+    "retention_record.soft_deadline_set.v1",
     "source_file.admission_revoked.v1", "source_file.admitted.v1",
     "upload_session.admitted.v1", "upload_session.cancelled.v1", "upload_session.completion_not_observed.v1", "upload_session.completion_observed.v1",
     "upload_session.completion_reported.v1", "upload_session.expired.v1", "upload_session.provider_cancellation_recorded.v1", "upload_session.rejected.v1",
