@@ -13,11 +13,12 @@ import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import { SOURCE_ROUTES, type CancelUploadView, type CreateRevisionView, type InspectionView, type ReserveUploadView, type SealRevisionView, type SelectInputTablesView, type SelectionManifestIntakeView, type SourceRevisionView, type TablePreviewView, type UploadPage, type UploadView } from "@kauro/application";
 import { inventoryHashOf, selectionHashOf, textDigest, type AgencyId, type RevisionId } from "@kauro/domain";
+import { completionRefOf } from "@kauro/application/testing";
 import { fixtureSelection } from "@kauro/persistence/testing";
 import { clock, startControlEnv, type ControlEnv } from "./support/env.js";
 import { asOwner, issue, oracle, oracleRows, project, reserve, setSessionLimit, tenant, type Tenant } from "./support/fixtures.js";
 import { activate, completedView, problemOf, product, type Product } from "./support/product.js";
-import { buildCsv } from "./support/workbook.js";
+import { buildCsv, buildWorkbook } from "./support/workbook.js";
 
 let env: ControlEnv;
 let app: Product;
@@ -55,9 +56,9 @@ async function versionOf(table: "dataset_revisions" | "projects", column: "revis
 }
 
 /** CMD013 through its handler: the reservation and the session the requester's browser receives. */
-async function reserveUpload(t: Tenant, revisionId: string, content: Uint8Array): Promise<{ readonly view: ReserveUploadView; readonly sessionUrl: string }> {
+async function reserveUpload(t: Tenant, revisionId: string, content: Uint8Array, format: "CSV" | "XLSX" = "CSV"): Promise<{ readonly view: ReserveUploadView; readonly sessionUrl: string }> {
   const view = completedView<ReserveUploadView>(
-    await app.command(t, "CMD013", { revisionId }, { expectedVersion: await versionOf("dataset_revisions", "revision_id", revisionId), declaredBytes: content.length, declaredFormat: "CSV", displayName: "contacts export.csv" }),
+    await app.command(t, "CMD013", { revisionId }, { expectedVersion: await versionOf("dataset_revisions", "revision_id", revisionId), declaredBytes: content.length, declaredFormat: format, displayName: format === "CSV" ? "contacts export.csv" : "contacts workbook.xlsx" }),
     201,
   );
   const session = view.session as { readonly delivery: string; readonly uploadUrl?: string };
@@ -299,4 +300,75 @@ test("FINAL-N3 on b07/integration: R2-051 across both halves — a reservation i
   const polled = await app.read<UploadView>(t, "GetUpload", { uploadId: up.uploadId });
   assert.deepEqual([polled.state, polled.providerCancellationState], ["EXPIRED", "CONFIRMED"]);
   await assertEverythingDelivered(t.ag.agencyId);
+});
+
+test("b07/integration end to end: S024 and S053 through the handlers — a hostile workbook and a completion claiming a false size, each reported through CompleteUpload, are REJECTED by UPLOAD_INSPECTION with their class while an honest workbook's worksheet is admitted; GetUpload and GetInspection answer the control plane's receipts within their routes' contracts; STORAGE_LIFECYCLE deletes the rejected quarantine generations and AUTHORITY_JOURNAL tombstones both rejections; a whole control-plane cycle then finds nothing to repair", { timeout: 300_000 }, async () => {
+  const t = await activeTenant("e2e-reject");
+  const p = await project(env, t);
+  const rows = [["Email", "Name"], ["ana@example.test", "Ana"], ["bo@example.test", "Bo"]];
+  const hostile = buildWorkbook({ sheet: "Contacts", rows, extra: [{ name: "../../outside.xml", data: "<x/>" }] });
+  const honest = buildWorkbook({ sheet: "Contacts", rows });
+  const forged = csv("forged", 2);
+
+  // three uploads through CMD013, the browser and CMD014: the hostile workbook, a CSV whose completion claims a false size, an honest workbook
+  const hostileUp = await reserveUpload(t, p.revisionId, hostile, "XLSX");
+  const hostileWritten = browserUpload(hostileUp.sessionUrl, hostile);
+  const forgedUp = await reserveUpload(t, p.revisionId, forged);
+  const forgedWritten = browserUpload(forgedUp.sessionUrl, forged);
+  const claimed = env.storage.parseCompletionClaim(forgedWritten.completionRef);
+  if (claimed.kind !== "CLAIM") throw new Error("unreachable");
+  const falseClaim = completionRefOf({ generation: forgedWritten.generation, bytes: (claimed.claim.bytes ?? forged.length) + 1 });
+  const honestUp = await reserveUpload(t, p.revisionId, honest, "XLSX");
+  const honestWritten = browserUpload(honestUp.sessionUrl, honest);
+  for (const [up, ref] of [[hostileUp, hostileWritten.completionRef], [forgedUp, falseClaim], [honestUp, honestWritten.completionRef]] as const) {
+    const accepted = await app.command(t, "CMD014", { uploadId: up.view.upload.uploadId }, { providerCompletionRef: ref });
+    assert.equal(accepted.kind, "ACCEPTED", JSON.stringify(accepted));
+  }
+
+  assert.deepEqual(await drainAll(), { UPLOAD_INSPECTION: 3, SELECTION_EVALUATION: 0, STORAGE_LIFECYCLE: 2, AUTHORITY_JOURNAL: 2 });
+  const expected: ReadonlyArray<readonly [string, string, string]> = [
+    [hostileUp.view.upload.uploadId, "REJECTED", "CORRUPT_STRUCTURE"],
+    [forgedUp.view.upload.uploadId, "REJECTED", "CLAIM_MISMATCH"],
+  ];
+  for (const [uploadId, state, rejectionClass] of expected) {
+    const polled = await app.read<UploadView>(t, "GetUpload", { uploadId });
+    assert.deepEqual([polled.state, polled.inspection?.rejectionClass, polled.fileId], [state, rejectionClass, undefined], rejectionClass);
+    const quarantine = await oracle<{ state: string; deletion_result: string; object_name: string; generation: string }>(env, "SELECT state, deletion_result, object_name, generation FROM kauro.stored_objects WHERE upload_id = $1 AND zone = 'QUARANTINE'", [uploadId]);
+    assert.deepEqual([quarantine.state, quarantine.deletion_result], ["DELETED", "DELETED"], `${rejectionClass}: the rejected quarantine generation deleted by STORAGE_LIFECYCLE`);
+    assert.equal(env.storage.generationsOf(env.storage.location("QUARANTINE"), quarantine.object_name).find((g) => g.generation === quarantine.generation)?.status, "SOFT_DELETED");
+    assert.equal((await oracle<{ n: string }>(env, "SELECT count(*)::text AS n FROM kauro.source_files WHERE origin_upload_id = $1", [uploadId])).n, "0", `${rejectionClass}: nothing admitted`);
+  }
+  const hostilePolled = await app.read<UploadView>(t, "GetUpload", { uploadId: hostileUp.view.upload.uploadId });
+  assert.ok(hostilePolled.inspection?.problems.includes("PATH_TRAVERSAL"), JSON.stringify(hostilePolled.inspection));
+  const forgedPolled = await app.read<UploadView>(t, "GetUpload", { uploadId: forgedUp.view.upload.uploadId });
+  assert.equal(forgedPolled.inspection?.claimConsistent, false, "the claim is judged against the server's own observation (S053)");
+
+  // the honest workbook: admitted with its worksheet; the inspection read carries every upload's outcome and the admitted inventory
+  const inspection = await app.read<InspectionView>(t, "GetInspection", { revisionId: p.revisionId });
+  assert.deepEqual(
+    inspection.uploads.map((u) => [u.uploadId, u.state]).sort(),
+    [[hostileUp.view.upload.uploadId, "REJECTED"], [forgedUp.view.upload.uploadId, "REJECTED"], [honestUp.view.upload.uploadId, "ADMITTED"]].sort(),
+  );
+  assert.deepEqual(
+    inspection.files.map((f) => [f.uploadId, f.format, f.scanState, f.tables.map((x) => [x.kind, x.name, x.visibility, x.columnCount])]),
+    [[honestUp.view.upload.uploadId, "XLSX", "COVERED_CLEAN", [["WORKSHEET", "Contacts", "VISIBLE", 2]]]],
+  );
+  const tombstones = await env.journal.list(t.ag.agencyId as AgencyId, 0);
+  assert.deepEqual(
+    tombstones.map((x) => [x.kind, x.state, x.subjectId]),
+    [
+      ["UPLOAD_ACCEPTANCE_REVOKED", "REJECTED", hostileUp.view.upload.uploadId],
+      ["UPLOAD_ACCEPTANCE_REVOKED", "REJECTED", forgedUp.view.upload.uploadId],
+    ],
+  );
+  await assertEverythingDelivered(t.ag.agencyId);
+
+  // one whole control-plane cycle over everything the handlers and the control plane registered: the object inventory parses every
+  // name CMD013 and UPLOAD_INSPECTION reserved and finds each generation the provider lists in the registry — nothing to repair
+  const cycle = await env.plane.runCycle(clock.now());
+  for (const [name, sweep] of Object.entries(cycle.sweeps)) assert.deepEqual(sweep?.failed, [], `${name}: no failure`);
+  const inventory = env.plane.sweepers.objectInventory;
+  const again = await inventory.sweep(env.plane.units, 100);
+  assert.deepEqual([again.failed, again.residualsDeleted, again.admissionsRevoked], [[], 0, 0], "no unregistered generation, no missing or changed accepted generation");
+  for (const counts of Object.values(cycle.dispatched)) assert.deepEqual([counts.retried, counts.deadLettered], [0, 0]);
 });
