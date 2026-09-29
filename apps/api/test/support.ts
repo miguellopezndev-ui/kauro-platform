@@ -855,6 +855,7 @@ export const EFFECT_TABLES = [
   "plans",
   "validation_receipts",
   "approvals",
+  "support_cases",
   "capabilities",
   "domain_events",
   "outbox_records",

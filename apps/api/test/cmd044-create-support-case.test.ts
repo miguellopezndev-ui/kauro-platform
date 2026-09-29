@@ -184,6 +184,22 @@ async function tablesHolding(fragment: string): Promise<ReadonlyArray<string>> {
 test("DENY: a foreign tenant, a wrong role and then one missing prerequisite — another agency's project answers 404 like a nonexistent one, a suspended membership 403, a summary with a private key or CRM rows 422 with the secure-upload next action; no case, event, outbox record or log line holds the submitted text", async () => {
   const url = routes.createSupportCase(projectA);
   const safe = { category: "GENERAL", summary: "The export button on the results page does nothing when clicked." };
+  // setup first, so the baselines below hold only what the calls under test do: a revoked membership is written directly (its
+  // own event and outbox record are the fixture's, not the command's)
+  const revoked = await w.person("revoked-member");
+  const revokedMembershipId = await w.h.addMember(w.A, revoked.userId, "OPERATOR");
+  await w.asTenant(w.A, async (c) => {
+    const moved = await c.query<{ version: string }>("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE membership_id = $1 RETURNING version", [revokedMembershipId]);
+    await rawEvent(c, {
+      aggregateKind: "membership",
+      aggregateId: revokedMembershipId,
+      aggregateVersion: Number(moved.rows[0]?.version),
+      agencyId: w.A.agencyId,
+      eventType: "membership.revoked.v1",
+      actorUserId: w.owner.userId,
+      payload: { membershipId: revokedMembershipId, agencyId: w.A.agencyId, byMembershipId: w.A.ownerMembershipId, reasonCode: "OFFBOARDED" },
+    });
+  });
   const casesBefore = await w.count("support_cases");
   const eventsBefore = await w.count("domain_events", "event_type = $1", [OPENED]);
   const outboxBefore = await w.count("outbox_records");
@@ -199,20 +215,6 @@ test("DENY: a foreign tenant, a wrong role and then one missing prerequisite —
   assert.equal(outcome(w, await call(w, { url, token: w.stranger.token, body: safe })), "404 NOT_FOUND NOT_A_MEMBER", "the stranger has no membership in A");
 
   // a membership that is not live: revoked answers like no membership (404), invited and suspended are known and refused (403)
-  const revoked = await w.person("revoked-member");
-  const revokedMembershipId = await w.h.addMember(w.A, revoked.userId, "OPERATOR");
-  await w.asTenant(w.A, async (c) => {
-    const moved = await c.query<{ version: string }>("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE membership_id = $1 RETURNING version", [revokedMembershipId]);
-    await rawEvent(c, {
-      aggregateKind: "membership",
-      aggregateId: revokedMembershipId,
-      aggregateVersion: Number(moved.rows[0]?.version),
-      agencyId: w.A.agencyId,
-      eventType: "membership.revoked.v1",
-      actorUserId: w.owner.userId,
-      payload: { membershipId: revokedMembershipId, agencyId: w.A.agencyId, byMembershipId: w.A.ownerMembershipId, reasonCode: "OFFBOARDED" },
-    });
-  });
   assert.equal(outcome(w, await call(w, { url, token: revoked.token, body: safe })), "404 NOT_FOUND NOT_A_MEMBER", "a revoked membership");
   assert.equal(outcome(w, await call(w, { url, token: w.invited.token, body: safe })), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE", "an invited membership");
   assert.equal(outcome(w, await call(w, { url, token: w.suspended.token, body: safe })), "403 NOT_AUTHORIZED MEMBERSHIP_SUSPENDED", "a suspended membership");
@@ -288,12 +290,13 @@ test("RACE: an identical retry, the same key with another digest (IDEMPOTENCY_CO
   // a crash at the intent/commit boundary: the case row and its event were written, the journal entry was about to complete
   const crashKey = freshKey("cmd044-crash");
   const crashBody = { category: "PRIVACY", summary: "Crashed case: a former client asks which of their records the agency still holds." };
+  const eventsBeforeCrash = await w.count("domain_events", "event_type = $1", [OPENED]);
   w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
   const crashed = await call(w, { url, token: w.operator.token, key: crashKey, body: crashBody });
   assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
   assert.equal(rootCause(w.internalErrors.at(-1)?.error) instanceof SimulatedCrash, true);
   assert.equal(await w.count("support_cases", "summary = $1", [crashBody.summary]), 0, "no case survives a crash before COMMIT");
-  assert.equal(await w.count("domain_events", "event_type = $1 AND payload->>'category' = 'PRIVACY'", [OPENED]), 0, "nor its event");
+  assert.equal(await w.count("domain_events", "event_type = $1", [OPENED]), eventsBeforeCrash, "nor its event");
   assert.equal(await w.journal(crashKey), null, "nor its journal entry");
   // the retry with the same key is the first execution of that logical operation: exactly one case, once
   const retried = completed<CaseView>(await call(w, { url, token: w.operator.token, key: crashKey, body: crashBody }), 201);

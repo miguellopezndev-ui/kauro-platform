@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { B06_COMMANDS, COMMAND_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { B06_COMMANDS, COMMAND_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
@@ -31,9 +31,12 @@ function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: Readon
   );
 }
 
+/** The spec of every served command: the seven of B06 and CMD044 of the support package. */
+const SPEC_OF = { ...B06_COMMANDS, ...SUPPORT_COMMANDS } as const;
+
 function refused(command: ServedCommandId, problem: ReturnType<typeof problemOf>): ResponseContractViolation {
   try {
-    checkReply(validator, commandRouteResponses(command, B06_COMMANDS[command].name), problem.status, CONTENT_TYPE, problem);
+    checkReply(validator, commandRouteResponses(command, SPEC_OF[command].name), problem.status, CONTENT_TYPE, problem);
   } catch (e) {
     if (e instanceof ResponseContractViolation) return e;
     throw e;
@@ -44,7 +47,7 @@ function refused(command: ServedCommandId, problem: ReturnType<typeof problemOf>
 test("N13: every listed outcome of every served command passes the send guard of its route — with its field codes and its current version — and a problem outside the catalogue, a field code or a current the entry does not list, or a missing current it always carries, is refused", () => {
   let listed = 0;
   for (const command of SERVED_COMMAND_IDS) {
-    const contract = commandRouteResponses(command, B06_COMMANDS[command].name);
+    const contract = commandRouteResponses(command, SPEC_OF[command].name);
     assert.equal(contract.outcomes, COMMAND_OUTCOMES[command]);
     for (const entry of COMMAND_OUTCOMES[command]) {
       const problem = problemFor(entry);
@@ -193,6 +196,7 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, string>> = {
   CMD023: "revise-plan.ts",
   CMD025: "approve-plan.ts",
   CMD026: "withdraw-approval.ts",
+  CMD044: "create-support-case.ts",
 };
 
 /**
@@ -219,7 +223,7 @@ test("N13: every failure site of the pipeline (transport, runtime, admission, au
   const tenantOnly = new Set(["TENANT_CONTEXT_MISSING", "NOT_A_MEMBER", "MEMBERSHIP_SUSPENDED", "MEMBERSHIP_NOT_ACTIVE", "ROLE_INSUFFICIENT", "PATH_ID_INVALID", "AGENCY_SELECTOR_INVALID"]);
   const unreachableSeen = new Set<string>();
   for (const command of SERVED_COMMAND_IDS) {
-    const spec = B06_COMMANDS[command];
+    const spec = SPEC_OF[command];
     const handlerSites = sitesOf(source(`packages/application/src/commands/handlers/${HANDLER_FILES[command]}`), HANDLER_FILES[command]);
     assert.ok(handlerSites.length > 0, `${command} has failure sites`);
     const reached = [...pipeline, ...(spec.stepUpRequired ? assurance : []), ...handlerSites];

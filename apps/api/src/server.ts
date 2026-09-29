@@ -1,5 +1,5 @@
 /**
- * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands, registered from
+ * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands and the support package's CMD044, registered from
  * the command specs of @kauro/application (method, path, scope), with the admission pipeline of manual 10 (content type, byte
  * size, strict JSON, closed schema, envelope headers, authenticated subject) in front of every handler, typed replies
  * (CompletedResponse / AcceptedResponse / Problem) and the safe problem translation of every failure (opaque INTERNAL_ERROR by
@@ -53,6 +53,7 @@ import type {
   ReadResult,
   RouteResponses,
   SchemaValidator,
+  SupportHandlers,
   UnauthenticatedRequest,
 } from "@kauro/application";
 import {
@@ -119,8 +120,9 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  readonly handlers: B06Handlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16). */
+  /** The seven B06 commands and the support package's CMD044 (B11 W4). */
+  readonly handlers: B06Handlers & SupportHandlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16) and the two support reads. */
   readonly reads: ReadHandlers;
   readonly authenticator: Authenticator;
   /**

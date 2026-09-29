@@ -21,7 +21,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { B06Collaborators, CommandRuntime, SchemaValidator } from "@kauro/application";
-import { createB06Handlers, createReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import { createB06Handlers, createReadHandlers, createSupportHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, Environment, IdGenerator, RandomBytes, UnitOfWorkFactory } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
@@ -213,7 +213,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
   return createApiServer({
     environment: assembly.environment,
-    handlers: createB06Handlers(runtime, collaborators),
+    handlers: { ...createB06Handlers(runtime, collaborators), ...createSupportHandlers(runtime) },
     reads: createReadHandlers({ unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey }),
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),

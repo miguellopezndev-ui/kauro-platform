@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, READ_ROUTES, REQUEST_LIMITS, requestSchemaId } from "@kauro/application";
+import { B06_COMMANDS, READ_ROUTES, REQUEST_LIMITS, SUPPORT_COMMANDS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -227,9 +227,10 @@ test("the correlation id is echoed when supplied, generated otherwise, and prese
   assert.equal(asProblem(w, wrongMethod).correlationId, wrongMethod.headers["x-correlation-id"]);
 });
 
-test("exactly the seven catalogue routes are registered as POST and the five manual-10 reads as GET, under /api/v1", async () => {
+test("exactly the eight catalogue routes are registered as POST and the seven reads as GET, under /api/v1", async () => {
   const reads = new Set(Object.values(READ_ROUTES).map((r) => r.path));
-  for (const spec of Object.values(B06_COMMANDS)) {
+  const commands = { ...B06_COMMANDS, ...SUPPORT_COMMANDS };
+  for (const spec of Object.values(commands)) {
     assert.ok(w.app.hasRoute({ method: "POST", url: fastifyPath(spec.path) }), spec.path);
     // a command path is readable only where manual 10 names the read on the same path (GET /agencies, GET .../clients)
     assert.equal(w.app.hasRoute({ method: "GET", url: fastifyPath(spec.path) }), reads.has(spec.path), `GET on ${spec.path}`);
@@ -237,15 +238,15 @@ test("exactly the seven catalogue routes are registered as POST and the five man
   }
   for (const read of Object.values(READ_ROUTES)) {
     assert.ok(w.app.hasRoute({ method: "GET", url: fastifyPath(read.path) }), read.path);
-    assert.ok(!w.app.hasRoute({ method: "POST", url: fastifyPath(read.path) }) || Object.values(B06_COMMANDS).some((c) => c.path === read.path), `no POST on ${read.path} unless a command owns it`);
+    assert.ok(!w.app.hasRoute({ method: "POST", url: fastifyPath(read.path) }) || Object.values(commands).some((c) => c.path === read.path), `no POST on ${read.path} unless a command owns it`);
     assert.ok(read.path.startsWith("/api/v1/"), read.path);
   }
   assert.equal(fastifyPath("/api/v1/agencies/{agencyId}/clients"), "/api/v1/agencies/:agencyId/clients");
   const inventory = routeInventoryOf(w.app);
-  assert.equal(inventory.filter((r) => r.method === "POST").length, 7);
-  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/")).length, 5);
+  assert.equal(inventory.filter((r) => r.method === "POST").length, 8);
+  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/")).length, 7);
   // each route validates its body against its own closed request schema
-  for (const id of Object.keys(B06_COMMANDS) as Array<keyof typeof B06_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
+  for (const id of Object.keys(commands) as Array<keyof typeof commands>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
 });
 
 test("an unexpected exception is 500 INTERNAL_ERROR with only the correlation id, RETRY_SAME_KEY and the safe classification handed to the sink; no stack, SQL or message reaches the wire", async () => {
