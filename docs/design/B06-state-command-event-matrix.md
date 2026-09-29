@@ -1054,12 +1054,14 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | REVISION_NOT_READY_TO_SEAL | — | always | COMMAND | the revision's selected scope is not evaluated and admitted (not READY_TO_SEAL) |
 | 409 | PRECONDITION_FAILED | UPLOADS_UNRESOLVED | — | always | COMMAND | a reservation, session or verification of the revision is still open: selection and seal need a settled inventory (D-SEL-3) |
 | 409 | PRECONDITION_FAILED | INPUT_NOT_ADMITTED | — | always | COMMAND | an included file's admission was revoked (its intake expired or its generation was lost): no executable sealed revision is left |
-| 409 | PRECONDITION_FAILED | GENERATION_CHANGED | — | always | COMMAND | an included file's accepted generation, digest or length is not the one the evaluation counted |
+| 409 | PRECONDITION_FAILED | GENERATION_CHANGED | — | always | COMMAND | an included file's accepted generation, digest or length is not the one the evaluation counted — as recorded, or as the provider holds it when the seal observes it (B07-R1) |
 | 409 | PRECONDITION_FAILED | REUSE_NOT_AVAILABLE | — | always | COMMAND | a reused file's bytes were first sealed fourteen days ago or more: their hard cap is behind this seal, so reuse needs a new upload (D-RET-3) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | SOURCE_SERVICES_UNAVAILABLE | — | — | COMMAND | no object-storage adapter is bound in this edition (until the integration package binds one, D-SAPI-6); nothing was reserved |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | GENERATION_NOT_OBSERVED | — | — | COMMAND | the provider's current generation of an included file could not be observed at seal time; nothing was sealed, and a retry with the same key seals |
 
 ### CMD028 CreatePaymentOrder
 

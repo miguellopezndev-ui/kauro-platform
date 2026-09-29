@@ -705,6 +705,24 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
     return Object.freeze({ generation: created.generation });
   }
 
+  /**
+   * Writes an object outside the platform at an exact generation (no call is logged): the accepted generation a fixture of
+   * @kauro/persistence/testing recorded on the labelled TEST CLOCK for a file it admitted without this fake (admitSourceFile), so the
+   * provider holds what the registry names when a command observes it (the seal's generation observation, B07-R1). Only a name that
+   * never held a generation, and a generation of the provider's form; the fake's own generation sequence is left as it is.
+   */
+  plantGeneration(location: StorageLocation, objectName: string, content: Uint8Array, generation: string): { readonly generation: string } {
+    const locationRef = this.#knownLocation(location);
+    if (!isObjectName(objectName)) throw invalid("not an opaque platform object name");
+    if (!/^[1-9][0-9]{0,19}$/.test(generation)) throw invalid("not a provider generation");
+    const key = objectKey(locationRef, objectName);
+    if ((this.#objects.get(key) ?? []).length > 0) throw new ContractFakeStorageError("PRECONDITION_FAILED", "the name already held a generation");
+    const bytes = content.slice();
+    const { crc32c, md5 } = providerChecksumsOf(bytes);
+    this.#objects.set(key, [{ locationRef, objectName, generation, content: bytes, sha256: rawDigest(bytes), crc32c, md5, origin: "PLANTED", createdMs: this.#clock.nowMs(), status: "LIVE" }]);
+    return Object.freeze({ generation });
+  }
+
   /** Deletes the live generation of a name outside the platform (a lost generation); null when the name holds none. */
   deleteOutOfBand(location: StorageLocation, objectName: string): { readonly generation: string } | null {
     const live = this.#live(this.#knownLocation(location), objectName);

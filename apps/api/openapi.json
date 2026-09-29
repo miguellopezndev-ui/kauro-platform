@@ -10348,7 +10348,7 @@
                 "reason": "GENERATION_CHANGED",
                 "current": "ALWAYS",
                 "layer": "COMMAND",
-                "meaning": "an included file's accepted generation, digest or length is not the one the evaluation counted"
+                "meaning": "an included file's accepted generation, digest or length is not the one the evaluation counted — as recorded, or as the provider holds it when the seal observes it (B07-R1)"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -10360,7 +10360,7 @@
             ]
           },
           "422": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -10388,6 +10388,12 @@
                 "reason": "RESPONSE_CONTRACT_VIOLATION",
                 "layer": "PLATFORM",
                 "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "SOURCE_SERVICES_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "no object-storage adapter is bound in this edition (until the integration package binds one, D-SAPI-6); nothing was reserved"
               }
             ]
           },
@@ -10418,7 +10424,7 @@
             ]
           },
           "503": {
-            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -10440,6 +10446,12 @@
                 "reason": null,
                 "layer": "PLATFORM",
                 "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "GENERATION_NOT_OBSERVED",
+                "layer": "COMMAND",
+                "meaning": "the provider's current generation of an included file could not be observed at seal time; nothing was sealed, and a retry with the same key seals"
               }
             ]
           }
@@ -17526,6 +17538,7 @@
               "SELECTION_BYTES_LIMIT",
               "REUSE_NOT_AVAILABLE",
               "GENERATION_CHANGED",
+              "GENERATION_NOT_OBSERVED",
               "QUOTA_LEDGER",
               "FENCE_DISCIPLINE",
               "LIFECYCLE_BINDING_MISSING",
