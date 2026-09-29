@@ -106,6 +106,12 @@ Decisions added by the re-check of the integration (§12d.5; re-check findings N
 | D-EVIDENCE-1 | The evidence of a candidate commit is a bundle per platform (`tools/evidence.mjs`, `pnpm run evidence`, `docs/evidence/b06/<commit>-<platform>/`): subject, environment, input manifest, the case map's truth sealed before the run, every suite's JUnit report, command, exit status and times, every cited test of every case with its outcome, and the SHA-256 of every file; it is committed after the commit it names. The case map's citations are proven to exist on every verify. | prompts/B06 "Deliverables" (durable artifacts rather than narrative confidence); registry requiredEvidence; 21 "Evidence classes"; CMD011 verification. Re-check N14. |
 | D-GATE-1 | One PARTIAL criterion for every case (a clause shown only through a test-bound port is SIMULATED; a clause of another package's command or aggregate is not demonstrated in B06 and names its owner); G-DOMAIN and G-TENANT have gate records in the case map (R2-044 deferred to B08; what B06 contributes to each G-TENANT case of B16); the registry verification clauses of other packages' domains are answered NOT_APPLICABLE with their reason. | 21 "Gate registry"; 21 "Evidence classes"; 21 "Gate aliases and scoped closures". Re-checks N12, N18. |
 
+Decisions added by the package-close review of `main` at `a7203f0` (§12d.7; review findings B06-R1–B06-R3):
+
+| id | decision | why (authority) |
+|---|---|---|
+| D-LEASE-3 | The expiry decides what a lease claim is. A live lease is HELD for another owner and renewed under the same fence for its holder, who names exactly the checkpoint stored. An expired lease is resumed by whoever claims it — its former owner included — as a new attempt: the fence advances by one (fencing out the attempt that expired, whoever ran it) and the claim names exactly the checkpoint stored. A spending operation (MODEL_TASK, JOB_ATTEMPT) that expired without storing a checkpoint is not resumed at all: rerunning it is a new attempt under a new lease, through its own admission. `leases_guard` carries the rule for every writer (the control plane holds UPDATE on `leases`): a change of owner or fence is a takeover, admitted only over a lease expired at the claim's instant and only with the stored checkpoint. Migration 0006 is corrected in place, not by a new migration number: nothing had been deployed anywhere, and the tests of §12d.7 fail on `a7203f0` and pass on the correction; the correction changes the checksum of 0006, which only a database that applied the earlier text could notice, and none exists. | S090 ("RESUME lacks a checkpoint → reject restart; preserve original subject, clock, cost and checkpoint identity"); R2-076 ("recover only from durable source/checkpoint contracts, or rerun under the same authorized job"); contract Lease; 07 "Job and attempt states" (a claim creates a monotonically increasing fence); 07 "Restoration and migration" (checksums and applied versions). Review finding B06-R1. |
+
 ## 2. Topology and packages (07 "Platform topology")
 
 Dependencies flow contracts → domain ports → application → adapters; `architecture.rules.json` and `tools/architecture-gate.mjs`
@@ -617,7 +623,10 @@ it nor `plan.withdrawn.v1` carries the withdrawal reason, which is a label (D-AP
   (RESUME_WITHOUT_CHECKPOINT) or names another one (CHECKPOINT_MISMATCH), refuses a changed `deadline_at` (clock),
   `subject_hash` or `cost_authority_id` (IMMUTABLE_COLUMN; the adapter answers DEADLINE_IMMUTABLE, SUBJECT_IMMUTABLE,
   COST_IMMUTABLE), never extends a lease past the deadline, refuses claims after the deadline, advances the fence by exactly one
-  per takeover and fences out the previous owner's heartbeats and checkpoints. The cost identity is the funding authority the
+  per takeover and fences out the previous owner's heartbeats and checkpoints. Since the package-close review (finding B06-R1,
+  D-LEASE-3) the expiry is decided before the owner: an expired lease is resumed only as a takeover under the next fence, by
+  another owner or its former one, with exactly the stored checkpoint, and a MODEL_TASK or JOB_ATTEMPT that expired without a
+  checkpoint is not resumed at all (RESUME_WITHOUT_CHECKPOINT). The cost identity is the funding authority the
   leased operation spends against (D-LEASE-1), so a takeover continues under the same grant or entitlement and cannot reset what
   the operation already spent. No command of the catalogue performs a resume (a takeover is a worker's claim); the `LeaseStore`
   port is the boundary. Tests `journals-leases` and `adapters-leases` walk the full interleaving.

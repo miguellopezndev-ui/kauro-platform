@@ -113,6 +113,107 @@ test("S090 through the adapter: claim, HELD, checkpoint under the fence, refused
   assert.equal(grantBound.kind === "CLAIMED" && grantBound.lease.costAuthorityId, cost);
 });
 
+/** The lease row as the superuser oracle reads it (independent of the adapter under test). */
+async function leaseRow(kind: string, resource: ResourceId): Promise<{ owner: string; fence: number; checkpoint: string | null; expiresAt: string } | null> {
+  const r = await h.oracle.query("SELECT owner_id, fence, checkpoint_hash, expires_at FROM kauro.leases WHERE resource_kind = $1 AND resource_id = $2", [kind, resource]);
+  const row = r.rows[0];
+  return row ? { owner: row.owner_id, fence: Number(row.fence), checkpoint: row.checkpoint_hash, expiresAt: new Date(row.expires_at).toISOString() } : null;
+}
+
+test("B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one", async () => {
+  // Review finding B06-R1 (first half): S090 "RESUME lacks a checkpoint → reject restart; preserve original subject, clock, cost
+  // and checkpoint identity". A spending operation that never checkpointed has nothing to resume from: restarting it under the
+  // same lease would spend its cost identity again from nothing (R2-076: recover only from a durable checkpoint, or rerun as a
+  // new attempt under the same authorized job — a new lease, never a takeover of this one). The instants are the lease
+  // functions' own clock parameter (p_now): the lease expires at t0 + 120 s and every claim below states when it happens.
+  const t0 = Date.now();
+  const deadline = at(t0, 3_600_000);
+  const owner1 = ids.next() as LeaseOwnerId;
+  const owner2 = ids.next() as LeaseOwnerId;
+  for (const resourceKind of ["JOB_ATTEMPT", "MODEL_TASK"] as const) {
+    const resource = ids.next() as ResourceId;
+    const cost = ids.next();
+    const claim = (ownerId: LeaseOwnerId, now: string, checkpointHash: string | null) =>
+      h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind, resourceId: resource, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("subject"), costAuthorityId: cost, checkpointHash }, now));
+    const first = await claim(owner1, at(t0, 0), null);
+    assert.deepEqual(first.kind === "CLAIMED" && [first.lease.fence, first.lease.checkpointHash], [1, null], resourceKind);
+    // positive control: while the lease is live another owner gets HELD, whatever it names
+    assert.equal((await claim(owner2, at(t0, 60_000), null)).kind, "HELD", resourceKind);
+    // the lease expired (t0 + 120 s) without a checkpoint: no takeover resumes it, with nothing or with a checkpoint never stored
+    assert.deepEqual(await claim(owner2, at(t0, 130_000), null), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, `${resourceKind} without a checkpoint`);
+    assert.deepEqual(await claim(owner2, at(t0, 130_000), sha("invented checkpoint")), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, `${resourceKind} with an invented checkpoint`);
+    assert.deepEqual(await leaseRow(resourceKind, resource), { owner: owner1, fence: 1, checkpoint: null, expiresAt: at(t0, 120_000) }, `${resourceKind}: every refusal left the lease as its first owner left it`);
+  }
+  // an OUTBOX_DISPATCH lease spends nothing: an expired one is taken over without a checkpoint (fence 1 -> 2), but a claim that
+  // names a checkpoint the lease never stored is still no resume of it
+  const dispatch = ids.next() as ResourceId;
+  const claimDispatch = (ownerId: LeaseOwnerId, now: string, checkpointHash: string | null) =>
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: dispatch, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("dispatch"), costAuthorityId: null, checkpointHash }, now));
+  assert.equal((await claimDispatch(owner1, at(t0, 0), null)).kind, "CLAIMED");
+  assert.deepEqual(await claimDispatch(owner2, at(t0, 130_000), sha("invented checkpoint")), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" });
+  const taken = await claimDispatch(owner2, at(t0, 130_000), null);
+  assert.deepEqual(taken.kind === "CLAIMED" && [taken.lease.ownerId, taken.lease.fence, taken.lease.checkpointHash], [owner2, 2, null]);
+});
+
+test("B06-R1: an expired owner re-claiming its own lease is a resume, not a renewal — without the stored checkpoint or with another it is REFUSED RESUME_WITHOUT_CHECKPOINT and keeps no fence; with the stored checkpoint it resumes under a new fence (1 -> 2) that fences its old one out; while the lease is live the holder's re-claim keeps its fence only when it names the stored checkpoint", async () => {
+  // Review finding B06-R1 (second half): claim_lease's same-owner branch ran before the expiry check and ignored p_checkpoint,
+  // so an expired owner restarted with a missing or wrong checkpoint and kept its old fence. The reviewer's reproduction comes
+  // first: a checkpoint stored during the first live lease, then the original owner's claim after expiry.
+  const t0 = Date.now();
+  const deadline = at(t0, 3_600_000);
+  const owner1 = ids.next() as LeaseOwnerId;
+  const resource = ids.next() as ResourceId;
+  const subject = sha("subject");
+  const cost = ids.next();
+  const claim = (now: string, checkpointHash: string | null, resourceId: ResourceId = resource) =>
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "JOB_ATTEMPT", resourceId, ownerId: owner1, ttlSeconds: 120, deadlineAt: deadline, subjectHash: subject, costAuthorityId: cost, checkpointHash }, now));
+  const storeCheckpoint = (resourceId: ResourceId, checkpointHash: string, now: string) =>
+    h.control.run(h.system(), async (uow) => assert.equal((await uow.leases.checkpoint("JOB_ATTEMPT", resourceId, owner1, 1, checkpointHash, now))?.checkpointHash, checkpointHash));
+  assert.equal((await claim(at(t0, 0), null)).kind, "CLAIMED");
+  const checkpoint = sha("checkpoint-1");
+  await storeCheckpoint(resource, checkpoint, at(t0, 10_000));
+  // expired (t0 + 120 s): the owner's own restart without the checkpoint or with another is refused and changes nothing
+  assert.deepEqual(await claim(at(t0, 200_000), null), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, "expired re-claim without the checkpoint");
+  assert.deepEqual(await claim(at(t0, 200_000), sha("another checkpoint")), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, "expired re-claim with another checkpoint");
+  assert.deepEqual(await leaseRow("JOB_ATTEMPT", resource), { owner: owner1, fence: 1, checkpoint, expiresAt: at(t0, 120_000) }, "the refusals left the lease as its owner left it");
+  // with the stored checkpoint it resumes: a new fence, the same subject, clock, cost and checkpoint identity
+  const resumed = await claim(at(t0, 200_000), checkpoint);
+  assert.equal(resumed.kind, "CLAIMED");
+  if (resumed.kind === "CLAIMED") {
+    assert.deepEqual([resumed.lease.ownerId, resumed.lease.fence, resumed.lease.checkpointHash, resumed.lease.deadlineAt, resumed.lease.subjectHash, resumed.lease.costAuthorityId], [owner1, 2, checkpoint, deadline, subject, cost]);
+    assert.equal(resumed.lease.expiresAt, at(t0, 320_000));
+  }
+  await h.control.run(h.system(), async (uow) => {
+    assert.equal(await uow.leases.heartbeat("JOB_ATTEMPT", resource, owner1, 1, 120, at(t0, 201_000)), null, "the attempt that expired under fence 1 is fenced out");
+    assert.equal(await uow.leases.checkpoint("JOB_ATTEMPT", resource, owner1, 1, sha("late checkpoint"), at(t0, 201_000)), null, "and cannot publish a checkpoint");
+    assert.equal((await uow.leases.heartbeat("JOB_ATTEMPT", resource, owner1, 2, 120, at(t0, 201_000)))?.fence, 2);
+  });
+  // a spending lease its owner let expire before any checkpoint: the owner's own restart is refused too
+  const bare = ids.next() as ResourceId;
+  assert.equal((await claim(at(t0, 0), null, bare)).kind, "CLAIMED");
+  assert.deepEqual(await claim(at(t0, 130_000), null, bare), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, "own restart of a spending lease that never checkpointed");
+  assert.deepEqual(await leaseRow("JOB_ATTEMPT", bare), { owner: owner1, fence: 1, checkpoint: null, expiresAt: at(t0, 120_000) });
+  // live (expires at t0 + 120 s): a re-claim that lacks the stored checkpoint or names another is a restart, refused; one
+  // naming it renews under the same fence
+  const held = ids.next() as ResourceId;
+  assert.equal((await claim(at(t0, 0), null, held)).kind, "CLAIMED");
+  await storeCheckpoint(held, checkpoint, at(t0, 10_000));
+  assert.deepEqual(await claim(at(t0, 20_000), null, held), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, "live re-claim without the checkpoint");
+  assert.deepEqual(await claim(at(t0, 20_000), sha("another checkpoint"), held), { kind: "REFUSED", reason: "RESUME_WITHOUT_CHECKPOINT" }, "live re-claim with another checkpoint");
+  const renewed = await claim(at(t0, 20_000), checkpoint, held);
+  assert.deepEqual(renewed.kind === "CLAIMED" && [renewed.lease.fence, renewed.lease.expiresAt, renewed.lease.checkpointHash], [1, at(t0, 140_000), checkpoint], "the live holder renews under its fence");
+  // OUTBOX_DISPATCH (spends nothing, never checkpoints): its owner's claim after expiry is a takeover too — fence 1 -> 2
+  const dispatch = ids.next() as ResourceId;
+  const claimDispatch = (now: string) =>
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId: dispatch, ownerId: owner1, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha("dispatch"), costAuthorityId: null, checkpointHash: null }, now));
+  assert.equal((await claimDispatch(at(t0, 0))).kind, "CLAIMED");
+  const live = await claimDispatch(at(t0, 60_000));
+  assert.deepEqual(live.kind === "CLAIMED" && live.lease.fence, 1, "a live re-claim renews under the same fence");
+  const again = await claimDispatch(at(t0, 200_000));
+  assert.deepEqual(again.kind === "CLAIMED" && again.lease.fence, 2, "a re-claim after expiry is a new attempt");
+  await h.control.run(h.system(), async (uow) => assert.equal(await uow.leases.heartbeat("OUTBOX_DISPATCH", dispatch, owner1, 1, 120, at(t0, 201_000)), null));
+});
+
 test("a refused claim does not abort the unit of work: a sweeper claims several leases in one transaction and answers each refusal on its own", async () => {
   const t0 = Date.now();
   const deadline = at(t0, 3_600_000);

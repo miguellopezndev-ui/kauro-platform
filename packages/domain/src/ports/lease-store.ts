@@ -7,7 +7,11 @@
  * every owner change; the absolute deadline and the immutable subject cannot change after the first claim; a renewal cannot
  * extend a lease past the deadline; the cost identity (the funding authority the operation spends against) cannot change
  * after the first claim; a resume that omits or swaps the stored checkpoint identity is refused
- * (S090: reject restart; preserve original subject, clock, cost and checkpoint identity).
+ * (S090: reject restart; preserve original subject, clock, cost and checkpoint identity). The expiry decides what a claim is
+ * (review finding B06-R1, decision D-LEASE-3): a live lease is HELD for another owner and renewed under the same fence for its
+ * holder; an expired lease is resumed by whoever claims it — its former owner included — as a new attempt under the next fence,
+ * and only with the stored checkpoint; a spending operation (MODEL_TASK, JOB_ATTEMPT) that expired before storing a checkpoint
+ * cannot be resumed at all (it is rerun as a new attempt, under a new lease, through its own admission).
  */
 import type { Lease, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { LeaseOwnerId, ResourceId } from "../model/ids.js";
@@ -42,7 +46,11 @@ export interface LeaseClaim {
   readonly subjectHash: Sha256Hex;
   /** Required for MODEL_TASK and JOB_ATTEMPT, null otherwise; must equal the stored value on every later claim. */
   readonly costAuthorityId: string | null;
-  /** Present on a resume: must equal the checkpoint the previous owner stored (null means a fresh start with no checkpoint). */
+  /**
+   * The checkpoint the claim continues from: null on the first claim; on every later claim — a renewal by the live holder or a
+   * resume of an expired lease — exactly the checkpoint stored (null only when none was stored, which a spending operation
+   * cannot resume from). Anything else is REFUSED RESUME_WITHOUT_CHECKPOINT.
+   */
   readonly checkpointHash: Sha256Hex | null;
 }
 
@@ -52,7 +60,10 @@ export type ClaimOutcome =
   | { readonly kind: "REFUSED"; readonly reason: "RESUME_WITHOUT_CHECKPOINT" | "DEADLINE_IMMUTABLE" | "SUBJECT_IMMUTABLE" | "COST_IMMUTABLE" | "DEADLINE_PASSED" | "CANCELLED" };
 
 export interface LeaseStore {
-  /** Atomically claims a free or expired lease (fence + 1) or returns HELD with the live lease. */
+  /**
+   * Atomically claims a free lease (fence 1), renews the caller's own live lease (same fence), resumes an expired lease — the
+   * caller's own included — under the next fence, or returns HELD with another owner's live lease.
+   */
   claim(claim: LeaseClaim, now: UtcInstant): Promise<ClaimOutcome>;
   /** Renews the lease if the caller still holds the fence; null when fenced out (the caller must stop publishing). */
   heartbeat(resourceKind: LeaseResourceKind, resourceId: ResourceId, ownerId: LeaseOwnerId, fence: number, ttlSeconds: number, now: UtcInstant): Promise<LeaseRecord | null>;

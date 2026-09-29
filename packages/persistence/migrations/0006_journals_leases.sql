@@ -8,7 +8,8 @@
 -- registry contracts RequestJournal (persist response before marking consumed; ambiguity is an explicit state) and Lease
 -- (an old live worker cannot publish after another owner advances the fence), 07 "Job and attempt states" (a claim creates a
 -- monotonically increasing fence and a lease; a lease renewal cannot change the immutable execution subject).
--- Decisions D-IDEM-1..3 and D-LEASE-1 in the design document.
+-- Decisions D-IDEM-1..3, D-LEASE-1 and D-LEASE-3 in the design document. Corrected in place by the package-close review of
+-- `a7203f0` (finding B06-R1, decision D-LEASE-3): nothing had been deployed, and a test proves the defect it removes.
 
 -- --- command journal -----------------------------------------------------------------------------------------------------------
 CREATE TABLE kauro.command_journal (
@@ -189,7 +190,15 @@ CREATE TRIGGER leases_touch BEFORE UPDATE ON kauro.leases FOR EACH ROW EXECUTE F
 CREATE TRIGGER leases_immutable BEFORE UPDATE ON kauro.leases
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('resource_kind,resource_id,deadline_at,subject_hash,cost_authority_id,created_at');
 
--- fence discipline and checkpoint identity (Lease invariant; S090)
+-- Fence discipline and checkpoint identity (Lease invariant; S090; decisions D-LEASE-1, D-LEASE-3). A change of owner or fence is
+-- a takeover: a resume of the logical operation by a new attempt, whoever claims it — another owner, or the same owner once its
+-- lease expired (review finding B06-R1: an expired owner's own restart is a resume too, never a renewal that keeps its old
+-- fence). A takeover advances the fence by exactly one, only over a lease that had expired at the claim's instant (the
+-- heartbeat it writes), and names exactly the checkpoint the operation stored — none when none was stored. A spending operation
+-- (MODEL_TASK, JOB_ATTEMPT) that never stored a checkpoint cannot be resumed at all: it has nothing to resume from, and a restart
+-- under the same lease would spend its cost identity again from nothing (S090 "reject restart"; R2-076: recover only from a
+-- durable checkpoint, or rerun as a new attempt under the same authorized job — a new lease, never a takeover of this one). A
+-- live holder never changes its own fence.
 CREATE OR REPLACE FUNCTION kauro.leases_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
@@ -197,18 +206,22 @@ BEGIN
   IF NEW.cancel_version < OLD.cancel_version THEN
     RAISE EXCEPTION 'LEASE: cancel version of % cannot decrease', OLD.resource_id USING ERRCODE = 'KA005';
   END IF;
-  IF NEW.owner_id <> OLD.owner_id THEN
+  IF NEW.owner_id <> OLD.owner_id OR NEW.fence <> OLD.fence THEN
     IF NEW.fence <> OLD.fence + 1 THEN
       RAISE EXCEPTION 'LEASE_FENCED: takeover of % must advance the fence by one (% -> %)', OLD.resource_id, OLD.fence, NEW.fence USING ERRCODE = 'KA005';
+    END IF;
+    IF NEW.heartbeat_at < OLD.expires_at THEN
+      RAISE EXCEPTION 'LEASE_FENCED: % is held until %; only an expired lease is taken over', OLD.resource_id, OLD.expires_at USING ERRCODE = 'KA005';
+    END IF;
+    IF OLD.checkpoint_hash IS NULL AND OLD.resource_kind IN ('MODEL_TASK', 'JOB_ATTEMPT') THEN
+      RAISE EXCEPTION 'RESUME_WITHOUT_CHECKPOINT: % never stored a checkpoint; a spending operation is not restarted under its lease', OLD.resource_id USING ERRCODE = 'KA005';
     END IF;
     IF OLD.checkpoint_hash IS NOT NULL AND NEW.checkpoint_hash IS NULL THEN
       RAISE EXCEPTION 'RESUME_WITHOUT_CHECKPOINT: % has checkpoint %, a resume must name it', OLD.resource_id, OLD.checkpoint_hash USING ERRCODE = 'KA005';
     END IF;
-    IF OLD.checkpoint_hash IS NOT NULL AND NEW.checkpoint_hash <> OLD.checkpoint_hash THEN
-      RAISE EXCEPTION 'CHECKPOINT_MISMATCH: % resumes from % but the stored checkpoint is %', OLD.resource_id, NEW.checkpoint_hash, OLD.checkpoint_hash USING ERRCODE = 'KA005';
+    IF NEW.checkpoint_hash IS DISTINCT FROM OLD.checkpoint_hash THEN
+      RAISE EXCEPTION 'CHECKPOINT_MISMATCH: % resumes from % but the stored checkpoint is %', OLD.resource_id, NEW.checkpoint_hash, coalesce(OLD.checkpoint_hash, 'none') USING ERRCODE = 'KA005';
     END IF;
-  ELSIF NEW.fence <> OLD.fence THEN
-    RAISE EXCEPTION 'LEASE_FENCED: the holder of % cannot change its own fence', OLD.resource_id USING ERRCODE = 'KA005';
   END IF;
   RETURN NEW;
 END
@@ -218,7 +231,11 @@ CREATE TRIGGER leases_guard BEFORE UPDATE ON kauro.leases FOR EACH ROW EXECUTE F
 -- Atomic claim. Returns the resulting row: the caller compares owner_id with its own id (a different owner means HELD).
 -- The first claim fixes deadline, subject and cost identity; a later claim passes them again and the immutability trigger
 -- refuses a change (S090 "resets an absolute deadline" -> KA004 DEADLINE_IMMUTABLE; another cost authority -> KA004
--- COST_IMMUTABLE); a resume passes the checkpoint it continues from.
+-- COST_IMMUTABLE); every later claim names the checkpoint it continues from, which must be exactly the stored one (none when
+-- none was stored). The expiry is decided first (review finding B06-R1): a live lease is HELD for another owner and renewed
+-- for its holder under the same fence; an expired lease is resumed by whoever claims it — its former owner included — as a
+-- takeover under the next fence, which leases_guard admits only with the stored checkpoint (and, for a spending operation,
+-- only when one was stored).
 CREATE OR REPLACE FUNCTION kauro.claim_lease(
   p_kind text, p_resource uuid, p_owner uuid, p_ttl_seconds integer, p_deadline timestamptz, p_subject text, p_cost_authority uuid, p_checkpoint text, p_now timestamptz
 ) RETURNS kauro.leases
@@ -240,7 +257,17 @@ BEGIN
     RETURNING * INTO cur;
     RETURN cur;
   END IF;
-  IF cur.owner_id = p_owner THEN
+  IF cur.expires_at > p_now THEN
+    IF cur.owner_id <> p_owner THEN
+      RETURN cur; -- HELD by a live owner
+    END IF;
+    -- the live holder renews under its fence; a re-claim that lacks the checkpoint it holds, or names another, is a restart
+    IF cur.checkpoint_hash IS NOT NULL AND p_checkpoint IS NULL THEN
+      RAISE EXCEPTION 'RESUME_WITHOUT_CHECKPOINT: the holder of % has checkpoint %, a re-claim must name it', p_resource, cur.checkpoint_hash USING ERRCODE = 'KA005';
+    END IF;
+    IF p_checkpoint IS DISTINCT FROM cur.checkpoint_hash THEN
+      RAISE EXCEPTION 'CHECKPOINT_MISMATCH: the holder of % re-claims from % but the stored checkpoint is %', p_resource, p_checkpoint, coalesce(cur.checkpoint_hash, 'none') USING ERRCODE = 'KA005';
+    END IF;
     UPDATE kauro.leases
        SET expires_at = LEAST(p_now + make_interval(secs => p_ttl_seconds), deadline_at), heartbeat_at = p_now,
            deadline_at = p_deadline, subject_hash = p_subject, cost_authority_id = p_cost_authority
@@ -248,9 +275,7 @@ BEGIN
      RETURNING * INTO cur;
     RETURN cur;
   END IF;
-  IF cur.expires_at > p_now THEN
-    RETURN cur; -- HELD by a live owner
-  END IF;
+  -- expired: a resume by a new attempt, the former owner's own included (fence + 1; leases_guard checks the checkpoint)
   UPDATE kauro.leases
      SET owner_id = p_owner, fence = fence + 1,
          expires_at = LEAST(p_now + make_interval(secs => p_ttl_seconds), deadline_at), heartbeat_at = p_now,
