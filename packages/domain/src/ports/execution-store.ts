@@ -42,6 +42,7 @@ import type {
 } from "../model/execution/records.js";
 import type { AdmissionCandidate } from "../model/execution/scheduler.js";
 import type { CommerceUnitOfWork, CommerceUnitOfWorkFactory } from "./commerce.js";
+import type { ExecutionDiscovery } from "./execution-discovery.js";
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
 import type { UnitOfWorkOptions } from "./unit-of-work.js";
@@ -280,9 +281,13 @@ export interface ExecutionStore {
   recordCleanup(cleanup: CleanupInput): Promise<AttemptCleanupRecord>;
 }
 
-/** A unit of work of processing authority: the commerce unit of work with the execution store on the same connection. */
+/**
+ * A unit of work of processing authority: the commerce unit of work with the execution store on the same connection, and the control
+ * plane's discovery reads of execution work (ports/execution-discovery.ts; mandate B08-CONTROL-EXECUTION, D8-CEX-1).
+ */
 export interface ExecutionUnitOfWork extends CommerceUnitOfWork {
   readonly execution: ExecutionStore;
+  readonly executionDiscovery: ExecutionDiscovery;
 }
 
 export interface ExecutionUnitOfWorkFactory extends CommerceUnitOfWorkFactory {

@@ -64,7 +64,7 @@ test("R2-046: one agency's three paid-ready jobs and another agency's waiting jo
     [jobA1.jobId, jobA2.jobId, jobB1.jobId].sort((x, y) => x.localeCompare(y)),
   );
   const order1 = [await admittedAt(jobA1.jobId), await admittedAt(jobB1.jobId), await admittedAt(jobA2.jobId)];
-  assert.ok(order1[0] < order1[1] && order1[1] < order1[2], `admitted A1 < B1 < A2: ${order1.join(" ")}`);
+  assert.ok(order1[0]! < order1[1]! && order1[1]! < order1[2]!, `admitted A1 < B1 < A2: ${order1.join(" ")}`);
   assert.equal((await w.capacity(A.agencyId)).live, 3, "agency A holds its three live jobs");
   assert.equal((await w.capacity(B.agencyId)).live, 1);
 
@@ -78,7 +78,7 @@ test("R2-046: one agency's three paid-ready jobs and another agency's waiting jo
   assert.deepEqual(third.admitted, [jobA3.jobId]);
   assert.deepEqual(await w.capacity(), { active: 1, waiting: 3, live: 0 });
   const order = [await admittedAt(jobA1.jobId), await admittedAt(jobB1.jobId), await admittedAt(jobA2.jobId), await admittedAt(jobA3.jobId)];
-  assert.ok(order[0] < order[1] && order[1] < order[2] && order[2] < order[3], `the fair order A1, B1, A2, A3: ${order.join(" ")}`);
+  assert.ok(order[0]! < order[1]! && order[1]! < order[2]! && order[2]! < order[3]!, `the fair order A1, B1, A2, A3: ${order.join(" ")}`);
   const nothing = await w.x.sweepers.jobAdmission.admitRound();
   assert.deepEqual(nothing.admitted, [], "no slot is left: nothing more is admitted");
 

@@ -66,6 +66,7 @@ import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
+import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
 import { PgCommandJournal } from "./command-journal.js";
@@ -664,10 +665,13 @@ export function executionReadsOf(uow: UnitOfWork): PgExecutionReads {
  */
 export class PgExecutionUnitOfWork extends PgCommerceUnitOfWork implements ExecutionUnitOfWork {
   readonly execution: PgExecutionStore;
+  /** The control plane's discovery reads of execution work (mandate B08-CONTROL-EXECUTION, D8-CEX-1). */
+  readonly executionDiscovery: PgExecutionDiscovery;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
     this.execution = new PgExecutionStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
+    this.executionDiscovery = new PgExecutionDiscovery(client);
   }
 }
 

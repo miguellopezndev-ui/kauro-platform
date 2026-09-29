@@ -246,13 +246,13 @@ test("S061: a staged manifest naming a partial blob, another attempt's object or
 
 test("stale authority at publication: a source revision superseded or expired, an approval withdrawn, a target contract superseded or a capability suspended after verification refuses the publication with its reason and the package is REVOKED, never AVAILABLE", async () => {
   const A = await w.agency("stale");
-  const suspended = await w.offeredCapability("R2-STALE-CAPABILITY");
-  const cases: ReadonlyArray<readonly [string, (p: Purchase) => Promise<void>, { readonly capabilityId?: string }]> = [
+  // SUSPENDED is terminal: the capability case buys under the SALESFORCE mode's own capability, which nothing else here uses
+  const cases: ReadonlyArray<readonly [string, (p: Purchase) => Promise<void>, { readonly mode?: "SALESFORCE" }]> = [
     ["SOURCE_SUPERSEDED", (p) => w.supersedeSource(p), {}],
     ["SOURCE_EXPIRED", (p) => w.expireSource(p), {}],
     ["APPROVAL_WITHDRAWN", (p) => w.withdrawApproval(p), {}],
     ["TARGET_STALE", (p) => w.supersedeTarget(p), {}],
-    ["CAPABILITY_UNAVAILABLE", (p) => w.suspendCapability(p.capabilityId), { capabilityId: suspended }],
+    ["CAPABILITY_UNAVAILABLE", (p) => w.suspendCapability(p.capabilityId), { mode: "SALESFORCE" }],
   ];
   for (const [reason, makeStale, options] of cases) {
     const p = await w.paid(A, `stale-${reason.toLowerCase()}`, options);

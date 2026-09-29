@@ -72,7 +72,7 @@ import {
   type Harness,
   type QualifiedRoute,
 } from "@kauro/persistence/testing";
-import { assembleControlPlane, platformParsers, type ControlPlane, type ExecutionPlane, type ExecutionUnits } from "../../src/index.js";
+import { assembleControlPlane, platformParsers, type ControlPlane, type DispatchCounts, type ExecutionPlane, type ExecutionUnits } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -89,8 +89,12 @@ export const TEST_LIMITS: ExecutionLimits = Object.freeze({ hardMemoryBytes: 8 *
 
 // --- the labelled TEST CLOCK of the control plane's own units of work -----------------------------------------------------------
 
-type RawClient = Awaited<ReturnType<KauroPool["raw"]["connect"]>>;
-type QueryClient = Pick<RawClient, "query">;
+const connectTo = (pool: KauroPool) => pool.raw.connect();
+type RawClient = Awaited<ReturnType<typeof connectTo>>;
+/** What the world's raw statements need of a pg connection. */
+interface QueryClient {
+  query(text: string, values?: unknown[]): Promise<{ readonly rowCount: number | null }>;
+}
 
 /**
  * The control plane's execution units of work (@kauro/persistence PgExecutionUnitOfWorkFactory, unchanged) whose transactions stand
@@ -106,7 +110,7 @@ export class TestClockExecutionUnits extends PgExecutionUnitOfWorkFactory {
       // queued on the connection before the work's first statement (a pg client runs its queries in order)
       client.query("SELECT set_config('kauro_test.clock_offset_seconds', $1, true)", [String(this.offsetSeconds)]).catch(() => undefined);
     }
-    return super.createUnitOfWork(client as never, context, idGenerator as never, unitClock);
+    return super.createUnitOfWork(client as unknown as RawClient, context, idGenerator as never, unitClock);
   }
 
   override runSource<T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
@@ -253,8 +257,8 @@ export interface ExecutionWorld {
   readonly B: AgencyFixture;
   readonly capabilityId: string;
   agency(label: string): Promise<AgencyFixture>;
-  /** A paid purchase of a fresh HUBSPOT project of the agency (optionally bound to another offered capability). */
-  paid(agency: AgencyFixture, label: string, options?: { readonly capabilityId?: string }): Promise<Purchase>;
+  /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
+  paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<Purchase>;
   /** CMD036's write (the request handlers' TENANT unit of work through the execution store): one QUEUED job with its outbox record. */
   queue(p: Purchase): Promise<ProcessingJobRecord>;
   /** CMD037's write (the request handlers' TENANT unit of work): cancel_command at the job's version, as the agency's owner. */
@@ -269,14 +273,14 @@ export interface ExecutionWorld {
   expireSource(p: Purchase): Promise<void>;
   /** A newer observation supersedes the purchase's target contract (the request handlers' write). */
   supersedeTarget(p: Purchase): Promise<void>;
-  /** A capability suspended (material_counterexample) by the control plane's operations. */
+  /** A capability suspended (material_counterexample) by the control plane's operations (SUSPENDED is terminal: use a mode no other test needs). */
   suspendCapability(capabilityId: string): Promise<void>;
-  /** A HUBSPOT capability of its own (another version), offered AVAILABLE_LIMITED. */
-  offeredCapability(version: string): Promise<string>;
   /** The process instant the dispatcher claims at, moved with the TEST CLOCK. */
   now(): UtcInstant;
   /** Moves the control plane's TEST CLOCK and the worker host's clock forward by `seconds`. */
   advance(seconds: number): void;
+  /** B07's dispatcher delivers every due record of the consumer (at `now()`, again for what its deliveries published), until none is due. */
+  drain(consumer: OutboxConsumer): Promise<DispatchCounts>;
   job(jobId: string): Promise<JobRow>;
   attempts(jobId: string): Promise<ReadonlyArray<AttemptRow>>;
   attempt(jobId: string, ordinal?: number): Promise<AttemptRow>;
@@ -479,11 +483,11 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   const oracle = h.oracle;
 
   async function asTenant<T>(ag: AgencyFixture, fn: (c: QueryClient) => Promise<T>): Promise<T> {
-    const c = await h.appPool.raw.connect();
+    const c: RawClient = await connectTo(h.appPool);
     try {
       await c.query("BEGIN");
       await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [ag.agencyId, ag.ownerUserId]);
-      const out = await fn(c);
+      const out = await fn(c as unknown as QueryClient);
       await c.query("COMMIT");
       return out;
     } catch (e) {
@@ -495,11 +499,21 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   }
 
   /** A VALIDATED plan over a recently sealed source and a confirmed target, approved by the owner with a fresh step-up (CMD025). */
-  async function approved(ag: AgencyFixture, label: string, withCapability: string): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
+  const capabilities = new Map<string, string>([["HUBSPOT", capabilityId]]);
+  const capabilityOf = async (mode: "HUBSPOT" | "SALESFORCE"): Promise<string> => {
+    const known = capabilities.get(mode);
+    if (known !== undefined) return known;
+    const offered = await h.offeredCapability(mode);
+    capabilities.set(mode, offered);
+    return offered;
+  };
+
+  async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
+    const withCapability = await capabilityOf(mode);
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
     const capabilityVersion = (await oracle.query<{ version: string }>("SELECT version FROM kauro.capabilities WHERE capability_id = $1", [withCapability])).rows[0]?.version ?? "R2-INITIAL";
-    // CMD011: the project (HUBSPOT) and its DRAFT revision
+    // CMD011: the project (its mode) and its DRAFT revision
     const projectId = await h.app.run(tenant(), async (uow) => {
       const pid = uow.ids.next() as ProjectId;
       const revisionId = uow.ids.next() as RevisionId;
@@ -508,7 +522,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         projectId: pid,
         agencyId: ag.agencyId,
         clientId,
-        mode: "HUBSPOT",
+        mode,
         purpose: "Execution control plane",
         targetInstanceRef: uow.ids.next() as never,
         capabilityId: withCapability as never,
@@ -518,7 +532,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         createdAt: clock.now(),
       });
       const causationId = uow.ids.next() as CausationId;
-      await uow.events.publish({ aggregateKind: "project", aggregateId: pid, aggregateVersion: project.version, agencyId: ag.agencyId, eventType: "project.created.v1", actor, causationId, correlationId: uow.context.correlationId, payload: { projectId: pid, agencyId: ag.agencyId, clientId, mode: "HUBSPOT", capabilityId: withCapability, capabilityVersion, initialRevisionId: revisionId, createdByMembershipId: ag.ownerMembershipId } });
+      await uow.events.publish({ aggregateKind: "project", aggregateId: pid, aggregateVersion: project.version, agencyId: ag.agencyId, eventType: "project.created.v1", actor, causationId, correlationId: uow.context.correlationId, payload: { projectId: pid, agencyId: ag.agencyId, clientId, mode, capabilityId: withCapability, capabilityVersion, initialRevisionId: revisionId, createdByMembershipId: ag.ownerMembershipId } });
       await uow.events.publish({ aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: revision.version, agencyId: ag.agencyId, eventType: "dataset_revision.created.v1", actor, causationId, correlationId: uow.context.correlationId, payload: { revisionId, agencyId: ag.agencyId, projectId: pid, state: revision.state } });
       return pid;
     });
@@ -530,8 +544,8 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     await asTenant(ag, (c) =>
       c.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-         VALUES ($1, $2, $3, 'HUBSPOT', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, $9, now())`,
-        [contractId, ag.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
+         VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, now(), now(), $9, $10, now())`,
+        [contractId, ag.agencyId, projectId, mode, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
       ),
     );
     // the plan: DRAFT -> VALIDATION_REQUIRED -> VALIDATING by the request handlers, the validator's VALID receipt, VALIDATED
@@ -637,7 +651,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     agency,
 
     async paid(ag, label, options = {}) {
-      const subject = await approved(ag, label, options.capabilityId ?? capabilityId);
+      const subject = await approved(ag, label, options.mode ?? "HUBSPOT");
       const paid = await paidPurchase(h, { agency: ag, planId: subject.planId, issuerRef, profileId: profiles.get(ag.agencyId) as FiscalProfileId, treatment: "EXEMPT_EXPORT", route });
       return { ...subject, authorizationId: paid.authorizationId, orderId: paid.orderId, captureId: paid.captureId };
     },
@@ -713,10 +727,6 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
       assert.equal(r.rowCount, 1, "the capability was offered and is now SUSPENDED");
     },
 
-    offeredCapability(version) {
-      return h.offeredCapability("HUBSPOT", "AVAILABLE_LIMITED", { version });
-    },
-
     now() {
       return toUtcInstant(Date.now() + units.offsetSeconds * 1000);
     },
@@ -724,6 +734,21 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     advance(seconds) {
       units.offsetSeconds += seconds;
       hostClock.advance(seconds * 1000);
+    },
+
+    async drain(consumer) {
+      // B07's drain claims what is due at one instant; the records its deliveries publish are due at the next pass
+      let delivered = 0;
+      let retried = 0;
+      let deadLettered = 0;
+      for (let pass = 0; pass < 10; pass++) {
+        const counts = await plane.drain(consumer, world.now());
+        delivered += counts.delivered;
+        retried += counts.retried;
+        deadLettered += counts.deadLettered;
+        if (counts.delivered + counts.retried + counts.deadLettered === 0) break;
+      }
+      return { delivered, retried, deadLettered };
     },
 
     job: jobRow,

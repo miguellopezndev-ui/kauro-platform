@@ -138,3 +138,7 @@ export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds 
 
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
+
+// processing authority's control plane (package B08, mandate B08-CONTROL-EXECUTION; docs/design/B08-audit-approval-jobs.md §11)
+export { EXECUTION_SWEEPERS } from "./execution/pipeline-contracts.js";
+export type { ExecutionSweeperName, ExecutionSweeper, ExecutionUnits } from "./execution/pipeline-contracts.js";

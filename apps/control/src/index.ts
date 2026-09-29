@@ -36,3 +36,21 @@ export { boundTo, discovery, publish, applied, lostTheSubject, SettledElsewhere,
 export type { WorkItem } from "./work.js";
 export { assembleControlPlane, platformParsers, openControlDatabase, CONTROL_APPLICATION_NAME, controlClock } from "./composition.js";
 export type { ControlPlane, ControlPlaneOptions, ControlProviders, ControlParsers, ControlConsumers, ControlSweepers, ControlCycleReport, ControlDatabase, ControlDatabaseConfig } from "./composition.js";
+// processing authority (package B08, mandate B08-CONTROL-EXECUTION; docs/design/B08-audit-approval-jobs.md §4..§7, §11)
+export { assembleExecutionPlane } from "./execution/plane.js";
+export type { ControlExecutionOptions, ExecutionPlane, ExecutionConsumers, ExecutionSweepers } from "./execution/plane.js";
+export type { ExecutionUnits } from "@kauro/application";
+export { JobAdmission } from "./execution/admission.js";
+export type { AdmissionRound, JobAdmissionDependencies } from "./execution/admission.js";
+export { JobPipeline, readbackProblem } from "./execution/pipeline.js";
+export type { PipelineDependencies } from "./execution/pipeline.js";
+export { CancellationReconciler } from "./execution/cancellation.js";
+export { JobExecutionConsumer, ExecutionControlConsumer } from "./execution/consumers.js";
+export { AttemptMonitor } from "./execution/monitor.js";
+export { JobDeadlines } from "./execution/deadlines.js";
+export { StagingJanitor, ATTEMPT_CLEANUP } from "./execution/janitor.js";
+export { lostAuthority, LOST_AUTHORITY_REASONS } from "./execution/authority.js";
+export type { LostAuthorityReason } from "./execution/authority.js";
+export { deliveryObjectNameOf, expectedAuthorityHashOf, DELIVERY_OBJECT_NAME_DOMAIN, EXPECTED_AUTHORITY_DOMAIN } from "./execution/names.js";
+export { EXECUTION_SERVICES } from "./execution/work.js";
+export type { ExecutionStep } from "./execution/work.js";
