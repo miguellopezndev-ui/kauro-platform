@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@kauro/application": "workspace:*",
+    "@kauro/authorization": "workspace:*",
     "@kauro/contracts": "workspace:*",
     "@kauro/data-plane": "workspace:*",
     "@kauro/domain": "workspace:*",

@@ -54,6 +54,9 @@ importers:
       '@kauro/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@kauro/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
       '@kauro/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
