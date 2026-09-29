@@ -5,9 +5,16 @@
 //
 //   CONTRACT FAKES, evidence class SIMULATED (never EXECUTED_PROVIDER; D8-FAKE-1):
 //   - B07's ContractFakeObjectStorage (@kauro/application/testing): staging, delivery and the holder side of its sessions;
-//   - B08-CORE-PORTS' ContractFakeMigrationCore (@kauro/application/testing/cores): the execution envelope and the verifier;
+//   - B08-CORE-PORTS' ContractFakeMigrationCore (@kauro/application/testing/cores): the execution envelope and the verifier, and
+//     for an audit the profiler and the validator;
+//   - B08-CORE-PORTS' ContractFakeIntelligenceCore (@kauro/application/testing/cores): an audit's candidate planning, interpretation
+//     over the platform's own model-task journal, and the plan compiler;
 //   - B08-WORKER-HOST's ContractFakeWorkerHost (@kauro/data-plane/testing/worker-host): a local executor running the core inside the
 //     REAL attempt envelope of @kauro/data-plane (AttemptScratchStore, FencedArtifactWriter, GenerationSourceReader).
+//
+// The control plane's units of work are audit units of work (PgAuditUnitOfWorkFactory, a superset of the execution factory; mandate
+// B08-CONTROL-AUDIT), and its validation receipts are written by the validator's own verified pool (kauro_validator_test) through
+// @kauro/persistence's PgValidationReceiptRecorder — never a fake.
 //
 // The entitlements are B09's own (D8-PAY-1): each purchase is a plan approved through B06's adapters over a source sealed through
 // B07's lifecycle fixture, then paid through @kauro/persistence/testing paidPurchase (an ACTIVE CommercialAuthorization written by
@@ -26,9 +33,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { DOMAINS, structuredDigest } from "@kauro/contracts";
-import type { ConsumerOutcome, ExecutionLimits, OutboxConsumer, PackageVerifierPort, ResumableUploadAnswer, ResumableUploadPort, WorkerHostPort } from "@kauro/application";
+import type {
+  ConsumerOutcome,
+  ExecutionLimits,
+  InterpretPort,
+  OutboxConsumer,
+  PackageVerifierPort,
+  PlanCompilerPort,
+  ProfilePort,
+  ResumableUploadAnswer,
+  ResumableUploadPort,
+  ValidatePort,
+  WorkerHostPort,
+} from "@kauro/application";
 import { ContractFakeAuthorityJournal, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
-import { CONTRACT_FAKE_MIGRATION_CORE_VERSION, ContractFakeMigrationCore } from "@kauro/application/testing/cores";
+import { CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH, CONTRACT_FAKE_MIGRATION_CORE_VERSION, ContractFakeIntelligenceCore, ContractFakeMigrationCore } from "@kauro/application/testing/cores";
 import { ContractFakeMalwareScanner } from "@kauro/data-plane/testing";
 import { ContractFakeWorkerHost } from "@kauro/data-plane/testing/worker-host";
 import {
@@ -36,6 +55,7 @@ import {
   toUtcInstant,
   type ApprovalId,
   type AssuranceProofId,
+  type AuditUnitOfWork,
   type CausationId,
   type ClientId,
   type Clock,
@@ -60,7 +80,7 @@ import {
   type ValidationReceiptId,
   type VersionedWrite,
 } from "@kauro/domain";
-import { PgExecutionUnitOfWorkFactory, type KauroPool, type PgExecutionUnitOfWork } from "@kauro/persistence";
+import { PgAuditUnitOfWorkFactory, PgValidationReceiptRecorder, type KauroPool, type PgAuditUnitOfWork } from "@kauro/persistence";
 import {
   activateAgency,
   paidPurchase,
@@ -72,7 +92,7 @@ import {
   type Harness,
   type QualifiedRoute,
 } from "@kauro/persistence/testing";
-import { assembleControlPlane, platformParsers, type ControlPlane, type DispatchCounts, type ExecutionPlane, type ExecutionUnits } from "../../src/index.js";
+import { assembleControlPlane, platformParsers, type AuditUnits, type ControlPlane, type DispatchCounts, type ExecutionPlane, type ValidationReceipts } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -97,15 +117,16 @@ interface QueryClient {
 }
 
 /**
- * The control plane's execution units of work (@kauro/persistence PgExecutionUnitOfWorkFactory, unchanged) whose transactions stand
- * `offsetSeconds` ahead on the labelled TEST CLOCK: each unit of work sets kauro_test.clock_offset_seconds transaction-locally before
- * its first statement (the TEST CLOCK function of @kauro/persistence/testing reads it; a deployment has no such function). The source
- * units of work run as execution units too, so every unit the control plane opens reads the same clock.
+ * The control plane's units of work (@kauro/persistence PgAuditUnitOfWorkFactory, unchanged: the execution factory with the audit
+ * store and discovery on the same connection) whose transactions stand `offsetSeconds` ahead on the labelled TEST CLOCK: each unit of
+ * work sets kauro_test.clock_offset_seconds transaction-locally before its first statement (the TEST CLOCK function of
+ * @kauro/persistence/testing reads it; a deployment has no such function). The source units of work run as these units too, so every
+ * unit the control plane opens reads the same clock.
  */
-export class TestClockExecutionUnits extends PgExecutionUnitOfWorkFactory {
+export class TestClockExecutionUnits extends PgAuditUnitOfWorkFactory {
   offsetSeconds = 0;
 
-  protected override createUnitOfWork(client: QueryClient, context: ExecutionContext, idGenerator: IdGenerator, unitClock: Clock): PgExecutionUnitOfWork {
+  protected override createUnitOfWork(client: QueryClient, context: ExecutionContext, idGenerator: IdGenerator, unitClock: Clock): PgAuditUnitOfWork {
     if (this.offsetSeconds !== 0) {
       // queued on the connection before the work's first statement (a pg client runs its queries in order)
       client.query("SELECT set_config('kauro_test.clock_offset_seconds', $1, true)", [String(this.offsetSeconds)]).catch(() => undefined);
@@ -131,7 +152,16 @@ export interface UnitHold {
  * held — until the test releases it (21 "Concurrency and crash matrix": interleavings by hold points, never a sleep). Everything else
  * is forwarded to the unchanged adapters.
  */
-export function heldUnits(inner: ExecutionUnits, method: keyof ExecutionUnitOfWork["execution"], when: "AFTER" | "BEFORE" = "AFTER"): { readonly units: ExecutionUnits; readonly hold: UnitHold } {
+export function heldUnits(inner: AuditUnits, method: keyof ExecutionUnitOfWork["execution"], when: "AFTER" | "BEFORE" = "AFTER"): { readonly units: AuditUnits; readonly hold: UnitHold } {
+  return heldStoreUnits(inner, "execution", method, when);
+}
+
+/** The same, on one method of the audit store (the audit units of work; mandate B08-CONTROL-AUDIT). */
+export function heldAuditUnits(inner: AuditUnits, method: keyof AuditUnitOfWork["audits"], when: "AFTER" | "BEFORE" = "AFTER"): { readonly units: AuditUnits; readonly hold: UnitHold } {
+  return heldStoreUnits(inner, "audits", method, when);
+}
+
+function heldStoreUnits(inner: AuditUnits, storeName: "execution" | "audits", method: string, when: "AFTER" | "BEFORE"): { readonly units: AuditUnits; readonly hold: UnitHold } {
   let armed = true;
   let signal: () => void = () => undefined;
   let release: () => void = () => undefined;
@@ -141,7 +171,7 @@ export function heldUnits(inner: ExecutionUnits, method: keyof ExecutionUnitOfWo
     new Proxy(uow, {
       get(target, prop) {
         const value = Reflect.get(target, prop, target) as unknown;
-        if (prop === "execution") {
+        if (prop === storeName) {
           const store = value as Record<string | symbol, unknown>;
           return new Proxy(store, {
             get(s, p) {
@@ -171,7 +201,7 @@ export function heldUnits(inner: ExecutionUnits, method: keyof ExecutionUnitOfWo
     });
   const units = new Proxy(inner, {
     get(target, prop) {
-      if (prop === "run") return <T>(context: ExecutionContext, work: (uow: ExecutionUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions) => target.run(context, (uow) => work(instrument(uow)), options);
+      if (prop === "run") return <T>(context: ExecutionContext, work: (uow: AuditUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions) => target.run(context, (uow) => work(instrument(uow)), options);
       if (prop === "runSource") return <T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions) => target.runSource(context, (uow) => work(instrument(uow)), options);
       const value = Reflect.get(target, prop, target) as unknown;
       return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
@@ -195,6 +225,29 @@ export interface Purchase {
   readonly revisionHash: Sha256Hex;
   readonly contractId: string;
   readonly capabilityId: string;
+}
+
+/** What an audit is of (D8-AUD-1): a fresh project of the agency, its revision sealed recently and a confirmed, current target. */
+export interface AuditSubject {
+  readonly agency: AgencyFixture;
+  readonly projectId: ProjectId;
+  readonly revisionId: RevisionId;
+  readonly revisionHash: Sha256Hex;
+  readonly contractId: string;
+  readonly targetContractHash: Sha256Hex;
+  readonly capabilityId: string;
+}
+
+/** What a second control-plane process may bind instead of the world's own units, providers and cores (each a test decorator). */
+export interface PlaneOverrides {
+  readonly units?: AuditUnits;
+  readonly host?: WorkerHostPort;
+  readonly verifier?: PackageVerifierPort;
+  readonly profile?: ProfilePort;
+  readonly interpret?: InterpretPort;
+  readonly compiler?: PlanCompilerPort;
+  readonly validate?: ValidatePort;
+  readonly receipts?: ValidationReceipts;
 }
 
 export interface JobRow {
@@ -248,6 +301,10 @@ export interface ExecutionWorld {
   readonly x: ExecutionPlane;
   readonly storage: ContractFakeObjectStorage;
   readonly core: ContractFakeMigrationCore;
+  /** The labelled Intelligence-core fake an audit's INTERPRET step and the plan compiler are bound to (B08-CORE-PORTS). */
+  readonly intelligence: ContractFakeIntelligenceCore;
+  /** The validator's write path: PgValidationReceiptRecorder over the kauro_validator_test pool (the only writer of receipts). */
+  readonly receipts: ValidationReceipts;
   readonly host: ContractFakeWorkerHost;
   /** The worker host's (provider) clock; `advance` moves it with the control plane's TEST CLOCK. */
   readonly hostClock: Clock & { advance(ms: number): void };
@@ -257,6 +314,8 @@ export interface ExecutionWorld {
   readonly B: AgencyFixture;
   readonly capabilityId: string;
   agency(label: string): Promise<AgencyFixture>;
+  /** A fresh project of the agency (HUBSPOT, or SALESFORCE), its revision sealed recently through B07's lifecycle and its target confirmed. */
+  subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<AuditSubject>;
   /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
   paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<Purchase>;
   /** CMD036's write (the request handlers' TENANT unit of work through the execution store): one QUEUED job with its outbox record. */
@@ -298,7 +357,7 @@ export interface ExecutionWorld {
    * Another control-plane process over the same database and providers (a second scheduler, or one whose units of work, worker
    * host or verifier a test decorates with a hold point): its own dispatcher owner, the same composition root.
    */
-  planeWith(overrides: { readonly units?: ExecutionUnits; readonly host?: WorkerHostPort; readonly verifier?: PackageVerifierPort }): ControlPlane;
+  planeWith(overrides: PlaneOverrides): ControlPlane;
   /** The event a job's (or an aggregate's) version published, as the dispatcher reads it. */
   eventOf(aggregateId: string, eventType: string): Promise<DomainEventRecord>;
   /** Hands `event` to `consumer` again, as an at-least-once redelivery does (a SYSTEM context bound to the event's agency). */
@@ -432,12 +491,14 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   const hostClock = hostClockOf();
   const storage = new ContractFakeObjectStorage();
   const core = new ContractFakeMigrationCore();
+  const intelligence = new ContractFakeIntelligenceCore();
+  const receipts: ValidationReceipts = new PgValidationReceiptRecorder(h.validatorPool);
   const host = new ContractFakeWorkerHost({ core, storage, uploads: holderOf(storage), scratchRoot, clock: hostClock, creationHorizonSeconds: 300 });
   const units = new TestClockExecutionUnits({ app: h.appPool, payment: h.paymentPool, control: h.controlPool }, { clock });
   const vault = new ContractFakeSessionVault();
   const journal = new ContractFakeAuthorityJournal({ path: join(scratch, "authority-journal.jsonl") });
   const scanner = new ContractFakeMalwareScanner({ databaseClock: () => Promise.resolve(clock.now()), read: (location, objectName, generation) => storage.read(location, objectName, generation) });
-  const assemble = (overrides: { readonly units?: ExecutionUnits; readonly host?: WorkerHostPort; readonly verifier?: PackageVerifierPort } = {}): ControlPlane =>
+  const assemble = (overrides: PlaneOverrides = {}): ControlPlane =>
     assembleControlPlane({
       units: overrides.units ?? units,
       ids,
@@ -453,6 +514,12 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         limits: TEST_LIMITS,
         workerScratchRoot: scratchRoot,
         retryAfterSeconds: 30,
+        profile: overrides.profile ?? core,
+        interpret: overrides.interpret ?? intelligence,
+        compiler: overrides.compiler ?? intelligence,
+        validate: overrides.validate ?? core,
+        receipts: overrides.receipts ?? receipts,
+        corePackageHash: CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH,
       },
     });
   const plane = assemble();
@@ -508,7 +575,8 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     return offered;
   };
 
-  async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
+  /** A fresh project of the agency, its revision sealed recently through B07's lifecycle, and a confirmed, current target contract. */
+  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<AuditSubject> {
     const withCapability = await capabilityOf(mode);
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -548,6 +616,14 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         [contractId, ag.agencyId, projectId, mode, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
       ),
     );
+    return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
+  }
+
+  async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
+    const { projectId, revisionId, revisionHash, contractId, targetContractHash, capabilityId: withCapability } = await subjectOf(ag, label, mode);
+    const source = { revisionId, revisionHash };
+    const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
+    const actor = { kind: "USER", userId: ag.ownerUserId } as const;
     // the plan: DRAFT -> VALIDATION_REQUIRED -> VALIDATING by the request handlers, the validator's VALID receipt, VALIDATED
     const body = planBodyOf(source.revisionHash, targetContractHash, `${label}-${projectId}`);
     const bodyHash = structuredDigest(DOMAINS.PLAN_BODY, 1, body);
@@ -642,6 +718,8 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     x,
     storage,
     core,
+    intelligence,
+    receipts,
     host,
     hostClock,
     scratchRoot,
@@ -649,6 +727,10 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     B,
     capabilityId,
     agency,
+
+    subject(ag, label, options = {}) {
+      return subjectOf(ag, label, options.mode ?? "HUBSPOT");
+    },
 
     async paid(ag, label, options = {}) {
       const subject = await approved(ag, label, options.mode ?? "HUBSPOT");
