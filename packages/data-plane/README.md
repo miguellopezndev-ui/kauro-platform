@@ -25,12 +25,31 @@ tests too (S024 is decided by them). Every parse of an untrusted file runs in an
   refusals. The OS-level egress denial of a production worker host is LATER: B15, and is not claimed here.
 - `rejectionClassOfScan`, `rejectionClassOfInspection` — the receipt's rejection class (D-INSP-3).
 
+The attempt envelope of a processing attempt (design `docs/design/B08-audit-approval-jobs.md` D8-STG-1..5, mandate
+B08-WORKER-HOST), real in tests too:
+
+- `AttemptScratchStore` — `ScratchStore` (kauro-migration-core 2.0.3's host contract "1.0.0"): one directory per attempt, a byte
+  quota checked before any byte lands, a SHA-256 per segment; SCRATCH_EXHAUSTED, SHORT_WRITE and CORRUPT_INTERMEDIATE are distinct
+  terminal causes; cleanup removes exactly that directory and never follows a link (`removeAttemptScratch` for the janitor).
+- `FencedArtifactWriter` — `ArtifactWriter`: names only inside the capability's staging prefix, spools into the scratch quota,
+  writes through a resumable session with the generation-0 precondition, re-reads the exact generation, then writes the
+  KAURO_STAGED_MANIFEST_V1 object once; a failed close, short write or read-back mismatch is never a staged artifact.
+- `GenerationSourceReader` — `SourceReader`: exactly the sealed ACCEPTED generations of the capability, digest and length
+  re-verified on every pass.
+
 `@kauro/data-plane/testing` is test-only (architecture rule `testOnlySubpaths`): the single labelled contract fake of
 `MalwareScannerPort`, `ContractFakeMalwareScanner` — CONTRACT FAKE, evidence class SIMULATED, `contract-fake-*` tokens in every
 record, bound by no composition root. It models the engine's hazards (skips with exit code 0, a spent scan budget, timeouts,
 encrypted and failing parts, the EICAR token, stale or future signatures, configuration drift) and reads its scan instant from the
 database clock the caller binds (D-INSP-4). The real engine is LATER: B15.
 
+`@kauro/data-plane/testing/worker-host` is test-only as well: `ContractFakeWorkerHost`, the single labelled contract fake of
+`WorkerHostPort` (B08-WORKER-HOST; SIMULATED, `contract-fake-worker-host*` tokens). A local executor running the bound
+`ExecutionEnvelopePort` inside the real envelope above, with create-by-identity, scripted ambiguous launches and creation
+horizon, heartbeats, termination of one identity, crashes at hold points, a worker surviving its termination and VM, disk and cost
+reports. It is a subpath of its own because `@kauro/data-plane/testing` is B07's closed inventory. The real host is LATER: B14.
+
 Tests (`test/`): `container-inspection.test.ts` (S024 corpus, D-ISO-1 negative controls, inventory, CSV facts, preview),
 `scan-coverage.test.ts` (S054 with the fake, on a real PostgreSQL 17 clock), `selection-evaluation.test.ts` (exact counts against
-an independent counter; hidden worksheets; inert formulas).
+an independent counter; hidden worksheets; inert formulas), `attempt-scratch.test.ts` and `fenced-artifact-writer.test.ts`
+(S035), `worker-host-fake.test.ts` (S056, S075).
