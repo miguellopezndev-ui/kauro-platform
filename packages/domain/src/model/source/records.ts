@@ -342,6 +342,12 @@ export interface EvaluatedTable {
   readonly columnCount: number;
   readonly excludedHiddenRows: number;
   readonly issues: ReadonlyArray<string>;
+  /**
+   * The measured edges of each association the selection declares on this table, in declaration order (present only on a table
+   * that has one): what the sealed subject's per-association counts are taken from (D-CMD-8; B07-R2). The SELECTION_EVALUATION
+   * consumer records them with the table, under the evaluation hash.
+   */
+  readonly associations?: ReadonlyArray<{ readonly associationKey: string; readonly edges: number }>;
 }
 
 export interface EvaluatedProjection {

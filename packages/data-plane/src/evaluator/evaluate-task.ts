@@ -17,7 +17,9 @@
  * under NOT_PRESENT so does any formula (FORMULA_POLICY_MISMATCH); under USE_PRESENT_CACHED_VALUES_WITH_DISCLOSURE the stored cache
  * is the value and a counted formula without one, with an error cache or with an external dependency fails the table
  * (FORMULA_CACHE_MISSING, FORMULA_CACHE_ERROR, FORMULA_EXTERNAL_DEPENDENCY). A counted cell is one of a data row that is counted,
- * in a selected column (every column when none is listed), not in a hidden column the choice excludes. A table whose bytes violate
+ * in a selected column (every column when none is listed), not in a hidden column the choice excludes; only counted cells feed a
+ * projection, and a projection whose key or fields name a hidden column the choice excludes fails the table
+ * (PROJECTION_COLUMN_HIDDEN, B07-R3) — an excluded column neither counts nor escapes the formula policy. A table whose bytes violate
  * a parser bound or cannot be decoded as chosen fails with that code.
  *
  * Loaded inside the isolated child.
@@ -188,7 +190,9 @@ async function countWorksheet(index: PackageIndex, partName: string, plan: Table
           if (externalDependency(cell.formula ?? "")) counters.failures.add("FORMULA_EXTERNAL_DEPENDENCY");
         }
       }
-      if (counters.neededOrdinals.has(ordinal)) byColumn.set(ordinal, cell);
+      // only a counted cell feeds a projection (B07-R3): a value of an unselected or excluded hidden column is never read, so no
+      // formula outside the formula policy's reach is ever counted
+      if (counted && counters.neededOrdinals.has(ordinal)) byColumn.set(ordinal, cell);
     }
     counters.dataRow((ordinal) => {
       const cell = byColumn.get(ordinal);
@@ -205,6 +209,13 @@ async function countWorksheet(index: PackageIndex, partName: string, plan: Table
   for await (const chunk of expandEntry(index.archive, entry, meter)) scanner.write(chunk);
   scanner.end();
   if (excludeHiddenRows && counters.excludedHiddenRows > 0) counters.issues.add("HIDDEN_ROWS_EXCLUDED");
+  // B07-R3: a projection whose key or fields name a column the choice excludes as hidden declares values the selection does not
+  // count; the worksheet's hidden columns are known only from its own part, so the refusal is the counting pass's (no silent
+  // removal: the table fails, nothing of it is counted)
+  if (excludeHiddenColumns) {
+    const declared = plan.projections.flatMap((p) => [...p.keyOrdinals, ...p.fieldOrdinals]);
+    if (declared.some((ordinal) => isHiddenColumn(reader.facts.hiddenColumns, ordinal + 1))) counters.failures.add("PROJECTION_COLUMN_HIDDEN");
+  }
 }
 
 export async function run(payload: EvaluatePayload, context: { readonly workDir: string }): Promise<EvaluateResult> {

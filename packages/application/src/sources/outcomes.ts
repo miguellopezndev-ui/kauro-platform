@@ -93,7 +93,11 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
     outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_READY_TO_SEAL", "the revision's selected scope is not evaluated and admitted (not READY_TO_SEAL)", { current: "ALWAYS" }),
     UPLOADS_UNRESOLVED,
     outcome("COMMAND", "PRECONDITION_FAILED", "INPUT_NOT_ADMITTED", "an included file's admission was revoked (its intake expired or its generation was lost): no executable sealed revision is left", { current: "ALWAYS" }),
-    outcome("COMMAND", "PRECONDITION_FAILED", "GENERATION_CHANGED", "an included file's accepted generation, digest or length is not the one the evaluation counted", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "GENERATION_CHANGED", "an included file's accepted generation, digest or length is not the one the evaluation counted — as recorded, or as the provider holds it when the seal observes it (B07-R1)", { current: "ALWAYS" }),
+    // B07-R1: the seal observes the provider's current generation of every included file through the storage port before its unit
+    // of work; an observation the provider did not answer seals nothing and is retried under the same key
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "GENERATION_NOT_OBSERVED", "the provider's current generation of an included file could not be observed at seal time; nothing was sealed, and a retry with the same key seals"),
+    SERVICES,
     // design §11 CMD017 step 8 (D-RET-3): the first seal of the bytes is fourteen days old or more — the record would be born
     // expired; reuse after the window needs a new upload (decision D-CMD-6: the specified answer the catalogue had omitted)
     outcome("COMMAND", "PRECONDITION_FAILED", "REUSE_NOT_AVAILABLE", "a reused file's bytes were first sealed fourteen days ago or more: their hard cap is behind this seal, so reuse needs a new upload (D-RET-3)", { current: "ALWAYS" }),

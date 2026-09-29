@@ -258,6 +258,7 @@ export const FAILURE_REASONS = [
   "SELECTION_BYTES_LIMIT",
   "REUSE_NOT_AVAILABLE",
   "GENERATION_CHANGED",
+  "GENERATION_NOT_OBSERVED",
   // source lifecycle: integrity (migrations 0009..0012) and deployment completeness
   "QUOTA_LEDGER",
   "FENCE_DISCIPLINE",
