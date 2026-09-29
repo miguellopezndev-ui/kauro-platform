@@ -137,6 +137,11 @@ export interface PaymentsWorld {
   /** A purchase paid by one capture with its entitlement, written through the commerce adapters (paidPurchase). */
   paidProject(label: string, treatment?: "EXEMPT_EXPORT" | "DOMESTIC_TAXABLE"): Promise<PaidPurchase & { readonly plan: PlanFixture }>;
   /**
+   * A foreign tenant's real refund request (B09-R5): agency B made a seller once (ACTIVE, its own reviewed profile), a purchase of
+   * B's own plan approved by B's owner, and B's owner's refund request of it through the real CMD031 route under B's selector.
+   */
+  foreignRefund(label: string): Promise<{ readonly sale: PaidPurchase; readonly refundId: string }>;
+  /**
    * A fiscal profile version recorded by the corporate owner in the agency's finance scope, superseding the current one at its own
    * instant (FiscalRepository.recordProfile; D-FISC-B6): REVIEW_REQUIRED (the explicit unknown), EXEMPT_EXPORT or DOMESTIC_TAXABLE 19%.
    */
@@ -187,6 +192,8 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
   const koraGrantId = await w.h.grantKauroOwner(kora.userId);
   // the agency's current reviewed profile version: the quotes of this world are issued under it (recordProfileVersion moves it)
   let profileId = await recordReviewedFiscalProfile(w.h, { operatorUserId: kora.userId as UserId, agencyId: w.A.agencyId, issuerRef });
+  // agency B's reviewed profile, recorded the first time a test needs a foreign tenant that sells (foreignRefund)
+  let profileB: FiscalProfileId | null = null;
   const reconciler = createCommerceReconciler({ subjects: purchasedSubjectReader, approvalHosts: provider.approvalHosts });
   const oracle = w.h.oracle;
 
@@ -227,6 +234,20 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
       const { plan } = await approvedPlan(label);
       const purchase = await paidPurchase(w.h, { agency: w.A, planId: plan.planId as PlanId, route, issuerRef, profileId, treatment });
       return { ...purchase, plan };
+    },
+
+    async foreignRefund(label) {
+      if (profileB === null) {
+        await activateAgency(w.h, w.B);
+        profileB = await recordReviewedFiscalProfile(w.h, { operatorUserId: kora.userId as UserId, agencyId: w.B.agencyId, issuerRef });
+      }
+      const { projectId } = await w.project(w.B, w.clientB);
+      const plan = await w.approvable(w.B, projectId, label, "SET", { recent: true });
+      await approveThroughRoute(w, plan, w.stranger, w.B.agencyId);
+      const sale = await paidPurchase(w.h, { agency: w.B, planId: plan.planId as PlanId, route, issuerRef, profileId: profileB, treatment: "EXEMPT_EXPORT" });
+      const requested = await call(w, { url: paymentRoutes.requestRefund(sale.projectId), token: w.stranger.token, agency: w.B.agencyId, key: freshKey(`${label}-request`), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } });
+      if (requested.status !== 201) throw new Error(`agency B's refund request was refused: ${requested.status} ${requested.text}`);
+      return { sale, refundId: requested.json<{ data: { refund: { refundId: string } } }>().data.refund.refundId };
     },
 
     recordProfileVersion(treatment) {

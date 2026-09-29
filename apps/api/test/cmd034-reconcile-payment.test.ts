@@ -5,12 +5,13 @@
 // view of an order, kept in the evidence store fake — CONTRACT_FAKE, SIMULATED; real provider queries are package B15's).
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { ReconcilePaymentView, WebhookAck } from "@kauro/application";
-import type { PaymentOrderId } from "@kauro/domain";
+import type { ProviderOrderObservation, ReconcilePaymentView, WebhookAck } from "@kauro/application";
+import type { CausationId, EvidenceArtifactRef, PaymentOrderId } from "@kauro/domain";
+import { DomainFailure } from "@kauro/domain";
 import { waitForLockWait } from "@kauro/persistence/testing";
 import { PAYMENT_APPLICATION_NAME } from "../src/index.js";
-import { captureRun, checkout, deliver, dispatch, paid, paymentWorld, reconcile, rows, serviceToken, storeQuery, type PaymentWorld } from "./payment-support.js";
-import { completed, freshKey, outcome } from "./support.js";
+import { captureRun, checkout, deliver, dispatch, inServiceScope, paid, paymentWorld, reconcile, rows, serviceToken, storeQuery, type PaymentWorld } from "./payment-support.js";
+import { asProblem, clock, completed, freshKey, ids, outcome } from "./support.js";
 
 let pw: PaymentWorld;
 before(async () => {
@@ -84,24 +85,55 @@ test("OK: a stored provider query advances an uncertain capture to CAPTURED with
   assert.equal((await rows(pw, "SELECT 1 FROM kauro.commercial_authorizations WHERE order_id = $1", [partial.orderId])).length, 0);
 });
 
-test("DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (no stored evidence; evidence of another order) is refused; a held or pending provider balance stays HELD and is never bank cash", async () => {
+test("DENY: a foreign tenant's real order is out of reach — agency B's quote and capture at the order route are NOT_FOUND exactly like an id nobody holds, agency B's stored provider query applied to agency A's order is refused OBSERVATION_SUBJECT_MISMATCH naming nothing of B's, and the payment service's scope adopted through agency A's order neither sees agency B's order nor lets the reconciler apply B's query to it —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (no stored evidence; evidence of another order) is refused; a held or pending provider balance stays HELD and is never bank cash", async () => {
   const order = await checkout(pw, "reconcile-deny");
   const other = await checkout(pw, "reconcile-deny-other");
   const artifactRef = await storeQuery(pw, order.providerOrderId);
   const journalRows = async () => Number((await rows<{ n: string }>(pw, "SELECT count(*)::text AS n FROM kauro.command_journal WHERE operation = 'CMD034'"))[0]!.n);
   const before = await journalRows();
 
-  // a foreign tenant of the payment service: an id the scope index does not hold as a payment order (another kind, or none)
-  for (const foreign of [order.quoteId, "0190d9a1-0000-7000-8000-000000000002"]) {
-    assert.equal(outcome(pw.api, await reconcile(pw, foreign, { observationRef: artifactRef })), "404 NOT_FOUND -");
+  // a foreign tenant: agency B's own paid purchase and a stored provider query of its order, real rows of another agency (B09-R5)
+  const foreignSale = await paid(pw, "reconcile-deny-foreign", { agency: pw.w.B });
+  const foreignQuery = await storeQuery(pw, foreignSale.providerOrderId);
+  const foreignOrder = async () => rows(pw, "SELECT state, version::text FROM kauro.payment_orders WHERE order_id = $1", [foreignSale.orderId]);
+  const foreignBefore = { order: await foreignOrder(), observations: (await observationsOf(foreignSale.orderId)).length };
+  const serviceFacts = (correlationId: unknown) => rows<{ reason_code: string; agency_id: string | null }>(pw, "SELECT reason_code, agency_id FROM kauro.security_events WHERE action = 'CMD034' AND correlation_id = $1", [correlationId]);
+  // the stored operation is the order the path names: agency B's quote and capture are no order, and answer exactly as an id nobody
+  // holds — the same problem, nothing adopted (the fact names no agency)
+  const nobody = await reconcile(pw, "0190d9a1-0000-7000-8000-000000000002", { observationRef: artifactRef });
+  for (const foreign of [foreignSale.quoteId, foreignSale.captureId]) {
+    const denied = await reconcile(pw, foreign, { observationRef: artifactRef });
+    assert.equal(outcome(pw.api, denied), "404 NOT_FOUND -");
+    assert.deepEqual({ ...asProblem(pw.api, denied), correlationId: "" }, { ...asProblem(pw.api, nobody), correlationId: "" }, "a foreign resource and an unknown id answer alike");
+    assert.deepEqual(await serviceFacts(denied.headers["x-correlation-id"]), [{ reason_code: "NOT_FOUND", agency_id: null }]);
   }
+  // agency B's real provider query under agency A's stored operation: refused, and the answer names nothing of agency B's
+  const crossed = await reconcile(pw, order.orderId, { observationRef: foreignQuery });
+  assert.equal(outcome(pw.api, crossed), "409 PRECONDITION_FAILED OBSERVATION_SUBJECT_MISMATCH");
+  for (const id of [pw.w.B.agencyId, foreignSale.orderId, foreignSale.captureId, foreignSale.providerOrderId]) assert.ok(!crossed.text.includes(id), "the refusal reveals nothing of agency B's");
+  // the cross-scope negative control of the global service role: the payment service's own unit of work, adopted through agency A's
+  // order as CMD034 adopts it, does not see agency B's order or capture, and the reconciler it runs cannot apply B's stored query to
+  // B's order from A's scope (NOT_FOUND); no second scope is adopted
+  const stored = await pw.evidence.get(foreignQuery);
+  assert.ok(stored !== null && "orderStatus" in stored.normalized);
+  await inServiceScope(pw, { kind: "PAYMENT_ORDER", key: order.orderId }, async (uow, adopted) => {
+    assert.equal(adopted, pw.w.A.agencyId);
+    assert.equal(await uow.commerce.orders.get(foreignSale.orderId), null);
+    assert.equal(await uow.commerce.captures.get(foreignSale.captureId), null);
+    await assert.rejects(
+      pw.service.runtime.reconciler.applyOrderObservation(uow, { orderId: foreignSale.orderId as PaymentOrderId, source: "PROVIDER_QUERY", observation: stored!.normalized as ProviderOrderObservation, artifactRef: foreignQuery as EvidenceArtifactRef, causationId: ids.next() as CausationId, now: clock.now() }),
+      (e: unknown) => e instanceof DomainFailure && e.code === "NOT_FOUND",
+    );
+    await assert.rejects(uow.adoptScope("PAYMENT_ORDER", foreignSale.orderId), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");
+  });
+  assert.deepEqual({ order: await foreignOrder(), observations: (await observationsOf(foreignSale.orderId)).length }, foreignBefore, "agency B's order is untouched");
   // a wrong service identity: without PAYMENT_SERVICE, or issued for another environment
   assert.equal(outcome(pw.api, await reconcile(pw, order.orderId, { observationRef: artifactRef }, { token: serviceToken(pw, { serviceId: "fiscal-service" }) })), "403 NOT_AUTHORIZED SERVICE_NOT_PERMITTED");
   assert.equal(outcome(pw.api, await reconcile(pw, order.orderId, { observationRef: artifactRef }, { token: serviceToken(pw, { environment: "SANDBOX" }) })), "403 NOT_AUTHORIZED SERVICE_ENVIRONMENT_MISMATCH");
   // one missing prerequisite: no stored evidence under the reference; a stored query of another order
   assert.equal(outcome(pw.api, await reconcile(pw, order.orderId, { observationRef: "0190d9a1-0000-7000-8000-000000000003" })), "404 NOT_FOUND EVIDENCE_NOT_FOUND");
-  const foreignQuery = await storeQuery(pw, other.providerOrderId);
-  assert.equal(outcome(pw.api, await reconcile(pw, order.orderId, { observationRef: foreignQuery })), "409 PRECONDITION_FAILED OBSERVATION_SUBJECT_MISMATCH");
+  const otherQuery = await storeQuery(pw, other.providerOrderId);
+  assert.equal(outcome(pw.api, await reconcile(pw, order.orderId, { observationRef: otherQuery })), "409 PRECONDITION_FAILED OBSERVATION_SUBJECT_MISMATCH");
   // nothing written on a refusal: no journal entry, no observation, the order as it was
   assert.equal(await journalRows(), before);
   assert.equal((await observationsOf(order.orderId)).length, 0);
