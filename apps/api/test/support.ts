@@ -49,7 +49,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type DatabaseHandle } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, noCommercialConsequencesInThisEdition, noExternalActionsInThisEdition, openDatabase, openProjectsInspector, subjectOf, type ApiLogger, type DatabaseHandle } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -390,6 +390,8 @@ export interface WorldOptions {
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
   /** The clock the api (authorizer, handlers) runs on; the fixture clock by default. */
   readonly clock?: Clock;
+  /** The api's logger (silent by default): a test that inspects what the api logs passes a sink here. */
+  readonly logger?: ApiLogger;
 }
 
 export interface RawEvent {
@@ -455,6 +457,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     clock: options.clock ?? clock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
   await app.ready();
 
@@ -892,7 +895,7 @@ export async function approveThroughRoute(w: World, plan: PlanFixture, approver:
   return completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(plan.planId), token: approver.token, agency: agencyId, key: freshKey("approve"), body: approvalBodyOf(plan, proof) }), 201);
 }
 
-/** The routes of the seven commands. */
+/** The routes of the seven commands, and of the support cases (CMD044 and its two reads). */
 export const routes = {
   createAgency: () => "/api/v1/agencies",
   createClient: (agencyId: string) => `/api/v1/agencies/${agencyId}/clients`,
@@ -901,4 +904,7 @@ export const routes = {
   revisePlan: (planId: string) => `/api/v1/plans/${planId}/revisions`,
   approvePlan: (planId: string) => `/api/v1/plans/${planId}/approve`,
   withdrawApproval: (planId: string) => `/api/v1/plans/${planId}/withdraw`,
+  createSupportCase: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
+  listSupportCases: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
+  getSupportCase: (caseId: string) => `/api/v1/support-cases/${caseId}`,
 };
