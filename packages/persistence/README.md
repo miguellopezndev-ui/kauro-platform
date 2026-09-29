@@ -50,7 +50,10 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   `PgApprovalRepository` (`plans`). Reads return `null` for rows the policies hide; versioned writes are compare-and-swap on
   `version` and answer `STALE` with the current safe version and state, or `NOT_FOUND` for an invisible row; foreign
   references fail on the composite keys as `INVALID_REQUEST / UNKNOWN_REFERENCE`.
-- `migrations/0022_web_sessions.sql` (B11 W2, numbered 0009 on its branch and renumbered by the B11 stage-1 integrator; `0019`–`0021` are B08's numbers, reserved by `0019_reserved_b08.sql`…`0021_reserved_b08.sql` until B08 lands) and
+- B11's migrations, each numbered 0009 on its mandate's branch and renumbered by the B11 stage-1 integrator (`0019`–`0021` are B08's
+  numbers, reserved by `0019_reserved_b08.sql`…`0021_reserved_b08.sql` until B08 lands): `0023_support_cases.sql` (W4, CMD044) and
+  `0024_inquiries.sql` (W5b, the public inquiry: no tenant, `kauro_app` INSERT only, with `src/inquiries` and
+  `src/capability-publication`), and `migrations/0022_web_sessions.sql` (W2) and
   `src/web-sessions` — `PgWebSessionStore` on a `kauro_assurance` pool: the browser sessions of the authentication boundary
   (only the SHA-256 of a session secret; RLS forced and keyed on the secret hash the transaction presents, so a transaction
   sees, moves or ends one session and the request handlers hold no privilege at all; the identity reference and the latest

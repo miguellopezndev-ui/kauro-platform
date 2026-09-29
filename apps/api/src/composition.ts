@@ -40,7 +40,7 @@ import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } fro
 import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { PgWebSessionStore, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
 import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
@@ -48,6 +48,7 @@ import { createIdentityTokenVerifier, type IdentityKeySource } from "./identity-
 import { assertIdentityConfig, createSessionAuthenticator, type SessionAssembly } from "./sessions.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
+import type { PublicApiOptions } from "./public-routes.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
 import type { PaymentService } from "./payments/index.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
@@ -285,6 +286,11 @@ export interface ApiAssembly {
   readonly sessions?: SessionAssembly;
   /** Entropy of the session secrets; node:crypto by default. */
   readonly random?: RandomBytes;
+  /**
+   * The two public routes (B11 W5b): the exact public and application origins, the inquiry store, the capability publication
+   * reader and the key of the inquiry digests. Absent, neither route exists.
+   */
+  readonly publicApi?: PublicApiOptions;
 }
 
 /**
@@ -363,13 +369,16 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     health: { readiness: () => assembly.database.readiness(), codeSchemaVersion: assembly.database.codeSchemaVersion, onNotReady: assembly.onNotReady ?? writeNotReady },
     ...(assembly.logger !== undefined ? { logger: assembly.logger } : {}),
     ...(assembly.onInternalError !== undefined ? { onInternalError: assembly.onInternalError } : {}),
+    ...(assembly.publicApi !== undefined ? { publicApi: assembly.publicApi, onUnavailable: assembly.onUnavailable ?? writeUnavailable } : {}),
     ...(assembly.trustedProxyHops !== undefined ? { trustedProxyHops: assembly.trustedProxyHops } : {}),
     ...(assembly.clientAddressKey !== undefined ? { clientAddressKey: assembly.clientAddressKey } : {}),
     ...(assembly.limits !== undefined ? { limits: assembly.limits } : {}),
   });
 }
 
-export interface StartOptions extends Omit<ApiAssembly, "environment" | "unitOfWork" | "database" | "trustedProxyHops" | "limits" | "sessions"> {
+export interface StartOptions extends Omit<ApiAssembly, "environment" | "unitOfWork" | "database" | "trustedProxyHops" | "limits" | "sessions" | "publicApi"> {
+  /** The key of the inquiry digests, read from the file the configuration names; required when the configuration binds the public routes. */
+  readonly publicHashKey?: Uint8Array;
   readonly random?: RandomBytes;
   readonly migratorPassword?: string;
   readonly onPoolError?: PoolErrorSink;
@@ -404,7 +413,8 @@ export interface StartedApi {
 
 /** The deployment path: database first (migrations, verified pool), then the server; nothing is left open on failure. */
 export async function startApi(config: ApiConfig, options: StartOptions): Promise<StartedApi> {
-  const { random, migratorPassword, onPoolError, identityKeySource, ...assembly } = options;
+  const { random, migratorPassword, onPoolError, identityKeySource, publicHashKey, ...assembly } = options;
+  if (config.publicApi !== null && publicHashKey === undefined) throw new RangeError("the configuration binds the public routes: the key of the inquiry digests must be given");
   const database = await openDatabase(config, {
     ...(assembly.clock !== undefined ? { clock: assembly.clock } : {}),
     ...(random !== undefined ? { random } : {}),
@@ -417,6 +427,16 @@ export async function startApi(config: ApiConfig, options: StartOptions): Promis
       ...assembly,
       ...(random !== undefined ? { random } : {}),
       ...(config.identity !== null ? { sessions: sessionAssemblyOf(config.environment, config.identity, database, identityKeySource ?? { kind: "GOOGLE_X509" }, assembly.clock) } : {}),
+      ...(config.publicApi !== null && publicHashKey !== undefined
+        ? {
+            publicApi: {
+              origins: { public: config.publicApi.publicOrigin, app: config.publicApi.appOrigin },
+              inquiries: new PgInquiryStore(database.pool),
+              capabilities: new PgCapabilityPublication(database.pool),
+              hashKey: publicHashKey,
+            },
+          }
+        : {}),
       environment: config.environment,
       unitOfWork: database.unitOfWork,
       database,

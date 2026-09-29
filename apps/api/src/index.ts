@@ -21,6 +21,8 @@ export { createIdentityTokenVerifier, GOOGLE_SECURETOKEN_X509_URL, IDENTITY_PLAT
 export type { IdentityTokenVerifierOptions, IdentityKeySource, JsonWebKeySet, KeyDocumentFetch } from "./identity-verifier.js";
 export { createSessionAuthenticator, registerSessionRoutes, assertIdentityConfig } from "./sessions.js";
 export type { SessionAssembly, SessionRoutesOptions, IdentityConfigView } from "./sessions.js";
+export { registerPublicRoutes, assertOrigin, PUBLICATION_OPERATION, INQUIRY_OPERATION } from "./public-routes.js";
+export type { PublicApiOptions, PublicOrigins, PublicRoutesOptions } from "./public-routes.js";
 export { loadContractSchemas } from "./schemas.js";
 export {
   loadConfig,
@@ -34,9 +36,10 @@ export {
   CURSOR_KEY_FILE_VARIABLE,
   IDENTITY_VARIABLES,
   ASSURANCE_POOL_CEILING,
+  PUBLIC_API_VARIABLES,
   readKeyFile,
 } from "./config.js";
-export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig, IdentityConfig } from "./config.js";
+export type { ApiConfig, PublicApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig, IdentityConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
 export { activeWorkInspector, noExternalActionsInThisEdition, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, unavailablePlanServices, commerceEdition, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";

@@ -99,6 +99,7 @@ import { DomainFailure } from "@kauro/domain";
 import { authenticationOf, type Authentication, type Authenticator } from "./authenticator.js";
 import { sendProblem, singleValued } from "./http.js";
 import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
+import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
 import { HEALTH_PATHS, registerHealthRoutes, type HealthOptions } from "./health.js";
 
 /** Request and socket deadlines (10 "Request envelope": a reverse proxy's limit is not the only guard; review R36). */
@@ -170,6 +171,8 @@ export interface ApiServerOptions {
   readonly refuseCredentials?: (action: string, request: UnauthenticatedRequest, failure: DomainFailure) => Promise<Problem>;
   /** The routes of the browser session boundary (B11 W2), registered when the boundary is bound. */
   readonly sessions?: Omit<SessionRoutesOptions, "validator" | "refuseUnauthenticated" | "refuseCredentials" | "sink">;
+  /** The two public routes of B11 W5b (no authentication), registered when bound; without it neither route exists. */
+  readonly publicApi?: PublicApiOptions;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -179,6 +182,8 @@ export interface ApiServerOptions {
   readonly logger?: ApiLogger;
   /** Receives every unexpected exception with its correlation id; the default writes the safe classification to stderr. */
   readonly onInternalError?: (correlationId: string, error: unknown) => void;
+  /** Receives the cause of a CAPACITY_UNAVAILABLE answer of a public route by correlation id; the internal-error sink by default. */
+  readonly onUnavailable?: (correlationId: string, cause: unknown) => void;
   /**
    * Proxy hops in front of this process whose X-Forwarded-For entries are trusted (14 "Initial architecture": the external
    * HTTPS load balancer in front of Cloud Run). 0 — the default — trusts none: the socket peer is the client and a
@@ -480,6 +485,17 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   if (options.sessions !== undefined) {
     registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
+  }
+  if (options.publicApi !== undefined) {
+    registerPublicRoutes(app, {
+      ...options.publicApi,
+      validator: options.validator,
+      clock: options.clock,
+      ids: options.ids,
+      clientNetwork: (address) => (address === undefined || address === "" ? null : clientNetworkOf(address)),
+      sink,
+      onUnavailable: options.onUnavailable ?? sink,
+    });
   }
   return app;
 }

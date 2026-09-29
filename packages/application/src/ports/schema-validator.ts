@@ -31,7 +31,7 @@ export type CommerceSchemaId =
 /**
  * B07 adds its six command schemas and the selection manifest document schema to the closed set (application-owned, reviewed
  * schemas only — S093); B09 its payment schemas (CommerceSchemaId); B11 the request schemas of its operational routes
- * (OperationalRequestSchemaId: the session boundary's bodies).
+ * (OperationalRequestSchemaId: the session boundary's bodies and the public inquiry's).
  */
 export type KnownSchemaId =
   | ContractName

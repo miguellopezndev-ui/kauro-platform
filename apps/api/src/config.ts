@@ -56,6 +56,16 @@ export interface MigratorConfig {
   readonly passwordFile: string | null;
 }
 
+/**
+ * The two public routes (B11 W5b; D-TOPO-2, D-PUB-2): the exact browser origins of the public site and of the application, and the
+ * file of the key the inquiry digests are computed with (identical on every instance that shares the database).
+ */
+export interface PublicApiConfig {
+  readonly publicOrigin: string;
+  readonly appOrigin: string;
+  readonly hashKeyFile: string;
+}
+
 export interface ApiConfig {
   readonly environment: Environment;
   readonly http: HttpConfig;
@@ -78,6 +88,8 @@ export interface ApiConfig {
    * the bearer-token file, SANDBOX and LIVE refuse to start, I-INT-3). All of its variables come together or none does.
    */
   readonly identity: IdentityConfig | null;
+  /** Present when KAURO_PUBLIC_ORIGIN, KAURO_APP_ORIGIN and KAURO_PUBLIC_HASH_KEY_FILE are all set; the public routes exist only then. */
+  readonly publicApi: PublicApiConfig | null;
 }
 
 /** The session boundary's configuration (B11 W2). */
@@ -267,8 +279,14 @@ export function loadConfig(env: Env = process.env): ApiConfig {
     bearerTokensFile,
     cursorKeyFile: optional(env, CURSOR_KEY_FILE_VARIABLE) ?? null,
     identity: null,
+    publicApi: publicApiOf(env, environment),
   };
   const identity = identityOf(env, environment, runtimeUser, config.database.poolMax, migrateOnStart?.user ?? null);
+  // one application origin (B11 stage-1 integration, D-INT1-6): the origin the public inquiry accepts as the application's (W5b,
+  // KAURO_APP_ORIGIN) is one of the origins the session boundary's CSRF rule accepts (W2, KAURO_APP_ORIGINS)
+  if (identity !== null && config.publicApi !== null && !identity.appOrigins.includes(config.publicApi.appOrigin)) {
+    throw new ConfigError("KAURO_APP_ORIGIN", "must be one of KAURO_APP_ORIGINS: the public routes and the session boundary serve one application origin");
+  }
   // every instance behind the load balancer must open the cursors another one sealed (10 "Pagination, search and exports")
   if (config.cursorKeyFile === null && environment !== "LOCAL") throw new ConfigError(CURSOR_KEY_FILE_VARIABLE, "is required outside LOCAL: every instance seals and opens the same list cursors");
   return identity === null ? config : { ...config, identity };
@@ -310,6 +328,33 @@ function identityOf(env: Env, environment: Environment, runtimeUser: string, run
   }
   const password = optional(env, "KAURO_DB_ASSURANCE_PASSWORD");
   return { keySource, projectId, appOrigins: origins, fakeJwksFile, fakeEndpoint, assuranceDatabase: { user, ...(password === undefined ? {} : { password }), poolMax } };
+}
+
+/** The variables that bind the public routes: all three or none. */
+export const PUBLIC_API_VARIABLES = Object.freeze(["KAURO_PUBLIC_ORIGIN", "KAURO_APP_ORIGIN", "KAURO_PUBLIC_HASH_KEY_FILE"] as const);
+
+/**
+ * An exact browser origin as the Origin header carries it: https://host[:port], lowercase, no path or trailing slash; http only
+ * for localhost in the LOCAL environment.
+ */
+function originOf(env: Env, name: string, environment: Environment): string {
+  const value = required(env, name);
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(value);
+  } catch {
+    parsed = undefined;
+  }
+  const local = environment === "LOCAL" && parsed !== undefined && parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  if (parsed === undefined || parsed.origin !== value || (parsed.protocol !== "https:" && !local)) {
+    throw new ConfigError(name, "must be an exact origin (https://host[:port], lowercase, no path; http only for localhost in LOCAL)");
+  }
+  return value;
+}
+
+function publicApiOf(env: Env, environment: Environment): PublicApiConfig | null {
+  if (PUBLIC_API_VARIABLES.every((name) => optional(env, name) === undefined)) return null;
+  return { publicOrigin: originOf(env, "KAURO_PUBLIC_ORIGIN", environment), appOrigin: originOf(env, "KAURO_APP_ORIGIN", environment), hashKeyFile: required(env, "KAURO_PUBLIC_HASH_KEY_FILE") };
 }
 
 /** The list cursors' key as a file (N16). */

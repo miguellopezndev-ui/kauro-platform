@@ -162,9 +162,9 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
   }
   assert.deepEqual(SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view === null), ["CMD014"]);
   assert.ok(validator.knownSchemaIds.includes(ACCEPTED_RESPONSE_SCHEMA_ID));
-  // the operational routes of this edition are the two probes (14 "Monitoring and service health") and the five routes of the
-  // browser session boundary (B11 W2, D-AUTH-4); the default validator compiles exactly their declared reply bodies (the logout's
-  // 204 has none), and a probe's or a session route's reply is checked like a command's
+  // the operational routes of this edition are the two probes (14 "Monitoring and service health"), the five routes of the
+  // browser session boundary (B11 W2, D-AUTH-4) and the two public routes (B11 W5b, D-PUB-1..D-PUB-6); the default validator
+  // compiles exactly their declared reply bodies (the logout's 204 has none), and their replies are checked like a command's
   assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [
     ["GET", "/livez", "getLiveness", ["200"]],
     ["GET", "/readyz", "getReadiness", ["200", "503"]],
@@ -173,6 +173,8 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["POST", "/api/v1/sessions/current/revoke", "revokeCurrentSession", ["204"]],
     ["POST", "/api/v1/assurance/step-ups", "createStepUp", ["201"]],
     ["GET", "/api/v1/public/identity-config", "getIdentityConfig", ["200"]],
+    ["GET", "/api/v1/public/capability-publication", "getCapabilityPublication", ["200"]],
+    ["POST", "/api/v1/public/inquiries", "createInquiry", ["201"]],
   ]);
   for (const route of OPERATIONAL_ROUTES) {
     for (const [status, response] of Object.entries(route.responses)) {

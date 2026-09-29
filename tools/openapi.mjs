@@ -176,6 +176,14 @@ export function generateOpenApi(sources) {
       "Opaque correlation id (10 \"Request envelope\"): adopted when it is an id of this shape; any other value is ignored — never refused, never echoed — and the server mints one, as when it is absent (review decision E-CORR-1). Every reply carries the id the request was handled under.",
     schema: { type: "string", pattern: application.REQUEST_LIMITS.correlationIdPattern.source },
   };
+  components.parameters.InquiryOrigin = {
+    name: "Origin",
+    in: "header",
+    required: true,
+    description:
+      "The exact origin of the public site or of the application as a browser writes it (B11 D-PUB-2, D-AUTH-5): compared as a whole string before the body is read; an absent header or any other origin is NOT_AUTHORIZED ORIGIN_REJECTED. The api never answers with a cross-origin header.",
+    schema: { type: "string", pattern: "^https?://[^/?#\\s]+$" },
+  };
   components.headers.CorrelationId = { description: "The correlation id of the request, on every reply.", schema: { type: "string", minLength: 1, maxLength: 128 } };
   components.parameters.PageLimit = {
     name: "limit",
@@ -499,8 +507,17 @@ export function generateOpenApi(sources) {
     else Object.assign(responses, problemResponses(contract.outcomes));
     const operation = { operationId: route.operationId, summary: route.summary, description: `Authority: ${route.authority}`, "x-kauro-operational": true };
     if (cookieRoutes.has(route.operationId)) operation.security = [{ sessionCookie: [] }, ...(route.operationId === "createStepUp" ? [{ bearerAuth: [] }] : [])];
+    // the public routes (B11 W5b) take no credential: an explicit empty security requirement, not the document's silence
+    if (route.path.startsWith("/api/v1/public/")) operation.security = [];
+    // an unsafe route the session cookie authenticates carries the CSRF token; the fit inquiry names the Origin it demands
     const unsafe = route.method === "POST";
-    if (route.path.startsWith("/api/v1/")) operation.parameters = [{ $ref: "#/components/parameters/CorrelationId" }, ...(unsafe && route.operationId !== "openSession" ? [{ $ref: "#/components/parameters/CsrfToken" }] : [])];
+    if (route.path.startsWith("/api/v1/")) {
+      operation.parameters = [
+        { $ref: "#/components/parameters/CorrelationId" },
+        ...(unsafe && cookieRoutes.has(route.operationId) ? [{ $ref: "#/components/parameters/CsrfToken" }] : []),
+        ...(route.operationId === "createInquiry" ? [{ $ref: "#/components/parameters/InquiryOrigin" }] : []),
+      ];
+    }
     if (route.request !== undefined) {
       const requestId = application.operationalRequestSchemaId(route.operationId);
       addComponent(`${route.operationId}Request`, byId[requestId], requestId);
@@ -574,7 +591,15 @@ export async function registeredRoutes() {
       appOrigins: ["https://app.kauro.invalid"],
       identityConfig: { adapter: "IDENTITY_PLATFORM", projectId: "kauro-inventory" },
     };
-    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), sessions });
+    // the public routes (B11 W5b) bound as a deployment binds them, over the never-connected runtime pool: registering them reads no
+    // capability and stores no inquiry
+    const publicApi = {
+      origins: { public: "https://www.kauro.invalid", app: "https://app.kauro.invalid" },
+      inquiries: new persistence.PgInquiryStore(pool),
+      capabilities: new persistence.PgCapabilityPublication(pool),
+      hashKey: new Uint8Array(32),
+    };
+    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), sessions, publicApi });
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();

@@ -1023,6 +1023,38 @@
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.payment_routes r\n  WHERE (r.provider = inbox_records.provider)))",
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.payment_routes r\n  WHERE (r.provider = inbox_records.provider)))"
     },
+    "inquiries/inquiries_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
+    "inquiry_admissions/inquiry_admissions_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
+    "inquiry_admissions/inquiry_admissions_public_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "inquiry_events/inquiry_events_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
     "inspection_receipts/inspection_receipts_control_insert": {
       "command": "INSERT",
       "roles": [
@@ -2183,6 +2215,16 @@
       ],
       "kauro.identities": [
         "SELECT"
+      ],
+      "kauro.inquiries": [
+        "INSERT"
+      ],
+      "kauro.inquiry_admissions": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.inquiry_events": [
+        "INSERT"
       ],
       "kauro.inspection_receipts": [
         "SELECT"

@@ -117,7 +117,8 @@ a placeholder, 11 "Every navigation link resolves to real content or an explicit
 
 ## 5. api additions owned by B11
 
-Each mandate numbers its migration `0009` on its own branch; the B11 integrator renumbers (README "Migration ownership").
+Each mandate numbers its migration `0009` on its own branch; the B11 integrator renumbers (README "Migration ownership"): INT-1 gave
+W2 `0022`, W4 `0023` and W5b `0024` on the B07+B09 candidate, with B08's `0019`–`0021` reserved (§12 D-INT1-1).
 
 | mandate | routes | tables / roles | notes |
 |---|---|---|---|
@@ -245,3 +246,25 @@ departure from the text above.
 | D-W3-17 | W3 | The public frame is the skip link and `<main>` only (no site header or footer: the public pages of W5a own them); no error boundary is written, a render failure reaching the framework's own error page. `ShellContext`/`useShell` gives screens the session summary, the agency and the api client. | D-A11Y-1 |
 | D-W3-18 | W3 | The `NavigationGuard` is a pure runtime with no wiring to `next/link` yet: the screens that hold edits (W8) connect it to in-app navigation, back and `beforeunload`. | D-OPS-3 |
 | D-W3-19 | W3 | `ContractFakeAgencyApi` answers planned operations only (a served route is refused when a script is mounted and forwarded at the edge), validates each static script when it is mounted, answers a request that breaks a rule with the operation's own INVALID_REQUEST Problem, is scripted from another process through `/__kauro-fake/*`, exists only when `KAURO_ENV=LOCAL`, and treats only `CreateSession` as exempt from the CSRF token. | D-E2E-2, section 6 |
+
+## 13. W5b decisions (public api)
+
+The two routes of §5 W5b, `apps/api/src/public-routes.ts`, tested on real PostgreSQL 17 in `apps/api/test/b11-public-routes.test.ts`.
+*Deviation* marks a departure from the text above.
+
+| id | decision | authority |
+|---|---|---|
+| D-PUB-1 | `GET /api/v1/public/capability-publication` reads no credential (an Authorization header or a cookie changes nothing), answers `Cache-Control: no-store`, and lists only `kind = MODE` capabilities in `AVAILABLE_LIMITED` or `AVAILABLE` with a `valid_from`: id, mode, version, state, instant. A DESIGN, implemented, qualified or suspended capability, and any non-mode one, is never listed; no hash or evidence field is projected. | 02 "Capability publication contract"; 08 "Abuse controls" |
+| D-PUB-2 | The Origin of `POST /api/v1/public/inquiries` must equal the public or the application origin as a whole string (`KAURO_PUBLIC_ORIGIN`, `KAURO_APP_ORIGIN`); an absent or other origin is `403 NOT_AUTHORIZED` reason `ORIGIN_REJECTED`, decided in `onRequest` before the content type or a body byte is read, and writes and counts nothing. No reply carries a CORS header, so a preflight is a 404. The routes exist only when both origins and `KAURO_PUBLIC_HASH_KEY_FILE` are configured. | D-AUTH-5, D-SEC-1, D-TOPO-2 |
+| D-PUB-3 | Content idempotence: three HMAC-SHA256 digests under one stable key, each with its own domain label (client network, whole content, e-mail address; the e-mail is compared without case). The same content within 24 h answers `201` with the first inquiry's id and instant and adds no row and no limiter count. | A3 3.7; 08 "Abuse controls"; 10 "Idempotency" |
+| D-PUB-4 | The description (at most 2 000 characters, optional) goes through the bounded detector first; a refusal is `422 CONTENT_REFUSED` (`SECRET_LIKE_CONTENT` or `RECORD_LIKE_CONTENT`) with next action `SECURE_UPLOAD`, never echoes the text and stores and counts nothing. The closed schema admits `buyerType` `agency` or `in-house` only, and a destination enum with no third-party CRM name (`listed-crm`, `other-crm`, `files-only`, `not-chosen`). | D-SUP-1, D-SUP-2, D-COPY-1; A3 3.3, 3.7 |
+| D-PUB-5 | Limiter: 5 accepted inquiries per hour per client-network digest, 3 per day per e-mail digest, trailing windows from admission instants, `429 ADMISSION_LIMITED` with `retryAfterSeconds`. A client address is its own address (IPv4) or its /64 (IPv6), through the trusted-proxy hops; an unknown address shares one bucket. Two concurrent requests for one key serialize on a transaction advisory lock, so the limits and the replay hold under a race. | 08 "Abuse controls"; 07 "Connection budget" |
+| D-PUB-6 | Migration `0024_inquiries.sql` (0009 on the W5b branch; INT-1 renumbered it, D-INT1-1): `inquiries` has no tenant and `kauro_app` may only INSERT it; `inquiry_events` holds `inquiry.received.v1` whose payload is the inquiry id only (CHECK-enforced; `kauro.domain_events` is tenant-scoped); `inquiry_admissions` holds digests and instants (SELECT and INSERT for the runtime role). All three force RLS; no reader role is granted. | 07 "Outbox, inbox and event ordering"; 08 "Database isolation", "Audit events and retention" |
+| D-PUB-7 | The notification e-mail to the owner is BLOCKED_OWNER (Resend, §8); the inquiry emits its ids-only event and nothing sends. | §8 |
+| D-PUB-8 | Both routes are operational routes (`getCapabilityPublication`, `createInquiry`) with closed reply catalogues, so the send guard and the OpenAPI document cover them; the operational request-body mechanism (closed request schema per route, `admitOperationalBody`, request schema ids) is shared with W2's session routes, and the CONTENT_REFUSED code and its two reasons with W4's. | B06 D-RESP-1, D-OUT-1; D-AUTH-4 |
+
+| id | deviation | authority |
+|---|---|---|
+| D-PUB-D1 | *Deviation from the mandate's test.* `apps/api/test/b11-public-routes.test.ts` line 635 expected `["INSERT", "SELECT"]` for `kauro_app` on `inquiry_admissions`, an order its own SELECT-then-INSERT loop cannot produce; only that literal became `["SELECT", "INSERT"]` (commit 30f5fe0), the assertion still requires exactly those two privileges. | mandate: acceptance tests first, unedited |
+| D-PUB-D2 | *Deviation (shared harness).* `waitForLockWait` calls `pg_stat_clear_snapshot()` before every poll: the polling session reads `pg_stat_activity` inside a transaction, whose cached snapshot keeps a waiter's `state` and `query` stale while `wait_event` is live. | mandate: no sleeps as synchronization |
+| D-PUB-D3 | *INT-1.* `packages/application/src/support/content-detector.ts` is byte-identical to W4's (keep one); the operational-request hunks in `tools/openapi.mjs`, the admission and the response schemas run parallel to W2's; the migration is 0009 here, 0024 after INT-1 (W2 0022, W4 0023; D-INT1-1). | mandate INT-1 |

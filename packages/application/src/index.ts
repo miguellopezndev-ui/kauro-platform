@@ -39,9 +39,9 @@ export type {
   DerivedMember,
   PlatformMember,
   OperationalRoute,
-  OperationalResponse,
   OperationalRequest,
   OperationalRequestSchemaId,
+  OperationalResponse,
   RegistryBundle,
   ResponseSchemaSet,
   ReadOperationId,
@@ -193,3 +193,7 @@ export {
   severityOf,
   supportWindowOf,
 } from "./support/index.js";
+
+// the public routes (package B11 W5b): the fit inquiry service; its bounded detector is the support cases' one (support/)
+export type { InquiryBody, InquiryReceipt, InquiryServiceDependencies } from "./public/inquiries.js";
+export { receiveInquiry, inquiryContentOf, inquiryKeysOf, UNKNOWN_CLIENT_NETWORK } from "./public/inquiries.js";

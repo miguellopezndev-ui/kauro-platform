@@ -20,12 +20,12 @@
  * validator of api/schema-validation; every reply of the api is validated against them before it is sent (apps/api), and
  * tools/openapi.mjs publishes them in the OpenAPI document. Nothing here is compiled from a runtime value (S093).
  */
-import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
+import { AGENCY_CAPABILITIES, DomainFailure, INQUIRY_BUYER_TYPES, INQUIRY_DESTINATIONS, INQUIRY_RECORD_BANDS, INQUIRY_TIMINGS, OFFERED_CAPABILITY_STATES, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
 import { SOURCE_ROUTES } from "../sources/contracts.js";
 import type { B07CommandId } from "../sources/contracts.js";
 import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
-import { TEXT_PATTERN } from "./request-schemas.js";
+import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
@@ -777,6 +777,71 @@ export const SESSION_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the public routes (B11 W5b, design section 5; D-PUB-1..D-PUB-6) ---------------------------------------------------------
+
+/** The reply of GET /api/v1/public/capability-publication: the offered mode capabilities in a public projection (no profile hash, no evidence). */
+export const CAPABILITY_PUBLICATION_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["observedAt", "capabilities"],
+  properties: {
+    observedAt: UTC,
+    capabilities: {
+      type: "array",
+      maxItems: SERVICE_MODES.length,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["capabilityId", "mode", "version", "state", "validFrom"],
+        properties: {
+          capabilityId: ID,
+          mode: { type: "string", enum: [...SERVICE_MODES] },
+          version: LABEL,
+          state: { type: "string", enum: [...OFFERED_CAPABILITY_STATES] },
+          validFrom: UTC,
+        },
+      },
+    },
+  },
+});
+
+/** A single-line label of the fit form (the control-character rule of every label). */
+const INQUIRY_LABEL = Object.freeze({ type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN });
+/** An address of the plain shape local@domain.tld: no quoted local part, no comment, no address literal; at most 254 characters. */
+export const INQUIRY_EMAIL_PATTERN = "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$";
+/** Free text: at least one visible character; line breaks and tabs allowed, every other control character refused. */
+export const INQUIRY_TEXT_PATTERN = "^(?=[\\s\\S]*\\S)[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]+$";
+
+/**
+ * The body of POST /api/v1/public/inquiries (A3 3.7 "the fit form collects business contact details, buyer type, destination,
+ * approximate record band and desired timing", 02 "Intake and project boundaries"): a closed object of strings from closed
+ * vocabularies. It carries no agency, client, project, price, quote or third-party CRM name.
+ */
+export const INQUIRY_REQUEST_SCHEMA: JsonSchema = Object.freeze({
+  description: "A fit inquiry from a visitor without an account. The buyer type never changes price or admission (A3 3.7).",
+  type: "object",
+  additionalProperties: false,
+  required: ["buyerType", "contactName", "contactEmail", "companyName", "destination", "recordBand", "timing"],
+  properties: {
+    buyerType: { type: "string", enum: [...INQUIRY_BUYER_TYPES] },
+    contactName: INQUIRY_LABEL,
+    contactEmail: { type: "string", minLength: 3, maxLength: 254, pattern: INQUIRY_EMAIL_PATTERN },
+    companyName: INQUIRY_LABEL,
+    destination: { type: "string", enum: [...INQUIRY_DESTINATIONS] },
+    recordBand: { type: "string", enum: [...INQUIRY_RECORD_BANDS] },
+    timing: { type: "string", enum: [...INQUIRY_TIMINGS] },
+    description: { type: "string", minLength: 1, maxLength: 2000, pattern: INQUIRY_TEXT_PATTERN },
+  },
+});
+
+/** The reply of POST /api/v1/public/inquiries: the inquiry's identity and the instant it was first received, nothing else. */
+export const INQUIRY_RECEIVED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
+  type: "object",
+  additionalProperties: false,
+  required: ["inquiryId", "receivedAt"],
+  properties: { inquiryId: ID, receivedAt: UTC },
+});
+
 /**
  * The operational routes of this edition: the platform's liveness and readiness probes, outside /api/v1, without a credential
  * and without a customer row (14 "Monitoring and service health": "Liveness checks process health ... Readiness checks the
@@ -809,6 +874,27 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
     }),
   }),
   ...SESSION_ROUTES,
+  Object.freeze({
+    operationId: "getCapabilityPublication",
+    method: "GET",
+    path: "/api/v1/public/capability-publication",
+    summary: "The service modes that admit real customers, without authentication",
+    authority: '02 "Capability publication contract"; B11 D-PUB-1',
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "The MODE capabilities in an offered state (AVAILABLE_LIMITED or AVAILABLE), ordered by mode, and the instant they were read. Never cached; never a DESIGN, qualified, suspended or non-mode capability.", contentType: JSON_CONTENT_TYPE, schema: CAPABILITY_PUBLICATION_RESPONSE_SCHEMA }),
+    }),
+  }),
+  Object.freeze({
+    operationId: "createInquiry",
+    method: "POST",
+    path: "/api/v1/public/inquiries",
+    summary: "Submit a fit inquiry; the request's Origin must be exactly the public or the application origin",
+    authority: '02 "Intake and project boundaries"; A3 3.7; B11 D-PUB-2..D-PUB-6',
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: INQUIRY_REQUEST_SCHEMA }),
+    responses: Object.freeze({
+      "201": Object.freeze({ description: "The inquiry was received, or it repeats one received within the last 24 hours and answers the same identity and instant.", contentType: JSON_CONTENT_TYPE, schema: INQUIRY_RECEIVED_RESPONSE_SCHEMA }),
+    }),
+  }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {

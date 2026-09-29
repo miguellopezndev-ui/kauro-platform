@@ -216,7 +216,7 @@ export const ROUTE_OUTCOME_FRAGMENTS = Object.freeze({
   COOKIE_CSRF,
 });
 
-// --- the browser session boundary (B11 W2, design D-AUTH-1..5) ---------------------------------------------------------------
+// --- the operational routes with a closed catalogue (B11: the session boundary W2, the public routes W5b) -----------------------
 
 const TRANSPORT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "TRANSPORT"));
 const PLATFORM_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "PLATFORM"));
@@ -228,8 +228,9 @@ const TOKEN_INVALID = outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", "IDEN
 const NO_BODY = outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the route takes no body and no query parameter", { fieldCodes: ["UNKNOWN_FIELD"] });
 
 /**
- * The closed problem catalogues of the operational routes that have one (the session boundary's; the probes answer any problem
- * the Problem schema admits). The api's send guard refuses any other problem on these routes, like a command's.
+ * The closed problem catalogues of the operational routes that have one (the session boundary's and the public routes'; the
+ * probes answer any problem the Problem schema admits). The api's send guard refuses any other problem on these routes, like a
+ * command's.
  */
 export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   openSession: closedCatalogue("openSession", [
@@ -256,5 +257,16 @@ export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<Problem
     ...PLATFORM_OUTCOMES,
   ]),
   getIdentityConfig: closedCatalogue("getIdentityConfig", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  // the public routes (W5b): no credential, the capability publication and the fit inquiry
+  getCapabilityPublication: closedCatalogue("getCapabilityPublication", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  createInquiry: closedCatalogue("createInquiry", [
+    ...TRANSPORT_OUTCOMES,
+    outcome("ACCESS", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the request's Origin is absent or is not exactly the public or the application origin: decided before the body is read, nothing is stored or counted (D-PUB-2)"),
+    ...BODY_ADMISSION,
+    outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the description looks like a credential, a key or a token: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the description looks like customer records: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client-address hash has 5 accepted inquiries in the trailing hour, or the e-mail hash has 3 in the trailing day; retryAfterSeconds says when the first leaves the window (D-PUB-3)"),
+    ...PLATFORM_OUTCOMES,
+  ]),
 });
 

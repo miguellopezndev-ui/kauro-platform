@@ -108,6 +108,7 @@ test("configuration: every variable is validated and a missing or malformed one 
     bearerTokensFile: null,
     cursorKeyFile: null,
     identity: null,
+    publicApi: null,
   });
 });
 

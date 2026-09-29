@@ -12,13 +12,15 @@ import { ACCEPTED_RESPONSE_SCHEMA_ID, SESSION_ROUTES, operationalRequestSchemaId
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 14 request schemas and the selection manifest document, the 13 COMPLETED envelopes and ACCEPTED, the 3 declared replies of the probes, the 4 reply bodies and 2 request bodies of the session routes (B11 W2), the 14 read replies, the intake reply, the 7 payment request schemas with their 7 command replies and 4 read replies (B09), and Problem, and nothing else", () => {
+test("the validator compiles exactly the 73 contracts, the 14 request schemas and the selection manifest document, the 13 COMPLETED envelopes and ACCEPTED, the 3 declared replies of the probes, the 4 reply bodies and 2 request bodies of the session routes (B11 W2), the 2 reply bodies and 1 request body of the public routes (B11 W5b), the 14 read replies, the intake reply, the 7 payment request schemas with their 7 command replies and 4 read replies (B09), and Problem, and nothing else", () => {
   const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.entries(route.responses).filter(([, r]) => r.schema !== null).map(([status]) => operationalResponseSchemaId(route.operationId, status)));
-  const probeIds = OPERATIONAL_ROUTES.filter((route) => !SESSION_ROUTES.includes(route)).flatMap((route) => Object.keys(route.responses));
+  const probeIds = OPERATIONAL_ROUTES.filter((route) => !route.path.startsWith("/api/v1/")).flatMap((route) => Object.keys(route.responses));
+  const sessionIds = SESSION_ROUTES.flatMap((route) => Object.entries(route.responses).filter(([, r]) => r.schema !== null).map(([status]) => status));
   assert.equal(probeIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
-  assert.equal(operationalIds.length, 7, "and the session routes four reply bodies (their logout answers 204 without one)");
+  assert.equal(sessionIds.length, 4, "the session routes four reply bodies (their logout answers 204 without one)");
+  assert.equal(operationalIds.length, 9, "and the public routes one reply body each (the publication 200, the inquiry 201)");
   const operationalRequestIds = OPERATIONAL_ROUTES.filter((route) => route.request !== undefined).map((route) => operationalRequestSchemaId(route.operationId));
-  assert.deepEqual(operationalRequestIds, [operationalRequestSchemaId("openSession"), operationalRequestSchemaId("createStepUp")], "the identity token of a sign-in and of a step-up");
+  assert.deepEqual(operationalRequestIds, [operationalRequestSchemaId("openSession"), operationalRequestSchemaId("createStepUp"), operationalRequestSchemaId("createInquiry")], "the identity token of a sign-in and of a step-up, and the fit inquiry");
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
   assert.equal(readIds.length, 14, "the five manual-10 reads (N16), the two support reads (B11 W4) and the seven source reads (B07 design §9.1)");
   const completedIds = SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId);
@@ -31,7 +33,7 @@ test("the validator compiles exactly the 73 contracts, the 14 request schemas an
   assert.deepEqual([commerceRequestIds.length, commerceResponseIds.length], [7, 11]);
   const responseIds = [...completedIds, ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...intakeIds, ...commerceResponseIds];
   const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...operationalRequestIds];
-  assert.equal(requestIds.length, 24, "seven B06 and six B07 request schemas, B11's CMD044, the selection manifest document, seven B09 request schemas and the two session bodies");
+  assert.equal(requestIds.length, 25, "seven B06 and six B07 request schemas, B11's CMD044, the selection manifest document, seven B09 request schemas, the two session bodies and the inquiry");
   assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + requestIds.length + responseIds.length + 1);
   for (const id of operationalRequestIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);

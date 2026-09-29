@@ -55,6 +55,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // package B11: numbered 0009 on each mandate's branch and renumbered by the stage-1 integrator (D-INT1-1)
     "0022_web_sessions.sql",
     "0023_support_cases.sql",
+    "0024_inquiries.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

@@ -26,7 +26,7 @@ test("every code of manual 10 is a failure code with a status and a title; platf
   assert.equal(PROBLEM_STATUS.IDEMPOTENCY_CONFLICT, 409);
   assert.equal(PROBLEM_STATUS.CAPABILITY_UNAVAILABLE, 422);
   assert.equal(PROBLEM_STATUS.NOT_FOUND, 404);
-  // B11 CMD044 (D-SUP-2): a summary the detector refuses is a final 422 that points to the secure upload
+  // B11 CMD044 (D-SUP-2) and the public inquiry (W5b, D-PUB-4): a text the detector refuses is a final 422 that points to the secure upload
   assert.equal(PROBLEM_STATUS.CONTENT_REFUSED, 422);
 });
 

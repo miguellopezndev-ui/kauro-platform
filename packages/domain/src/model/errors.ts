@@ -282,6 +282,9 @@ export const FAILURE_REASONS = [
   "SECRET_LIKE_CONTENT",
   "RECORD_LIKE_CONTENT",
   "SUPPORT_CALENDAR_UNAVAILABLE",
+  // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
+  // (W2) and its detector the support reasons above
+  "INQUIRY_RATE_LIMITED",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

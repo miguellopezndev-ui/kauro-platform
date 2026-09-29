@@ -120,3 +120,4 @@ export type {
   CommerceUnitOfWork,
   CommerceUnitOfWorkFactory,
 } from "./commerce.js";
+export type { InquiryStore, InquiryAdmission, InquiryAdmissionRequest, CapabilityPublication, PublishedCapability } from "./inquiries.js";

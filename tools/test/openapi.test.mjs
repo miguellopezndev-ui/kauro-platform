@@ -28,8 +28,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), CMD044 and the two support reads (B11 W4), the two
   // operational probes, every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the five routes of the browser session
-  // boundary (B11 W2)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), the five routes of the browser session
+  // boundary (B11 W2) and the two public routes (B11 W5b)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -41,6 +41,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/projects/{projectId} GetProject",
       "GET /api/v1/projects/{projectId}/support-cases ListSupportCases",
+      "GET /api/v1/public/capability-publication getCapabilityPublication",
       "GET /api/v1/public/identity-config getIdentityConfig",
       "GET /api/v1/quotes/{quoteId} GetQuote",
       "GET /api/v1/refunds/{refundId} GetRefund",
@@ -69,6 +70,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
       "POST /api/v1/projects/{projectId}/support-cases CreateSupportCase",
+      "POST /api/v1/public/inquiries createInquiry",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
       "POST /api/v1/refunds/{refundId}/approve ApproveRefund",
       "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",
@@ -101,9 +103,9 @@ test("the committed document is the generated one, byte for byte, and matches ev
     const problemStatuses = sources.application.outcomesByStatus(sources.application.READ_OUTCOMES[read.operationId]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), ["200", ...problemStatuses].sort());
   }
-  // the probes and the session routes are the operational routes of @kauro/application (R42 connected to R23): documented with
-  // the replies they declare — a probe with the one Problem default, a session route with one Problem per status of its closed
-  // catalogue (like a command's), a body-less 204 without content, a request body where the route takes one
+  // the probes, the session routes and the public routes are the operational routes of @kauro/application (R42 connected to R23):
+  // documented with the replies they declare — a probe with the one Problem default, a session or public route with one Problem per
+  // status of its closed catalogue (like a command's), a body-less 204 without content, a request body where the route takes one
   for (const route of sources.operationalRoutes) {
     const op = expected.paths[route.path][route.method.toLowerCase()];
     assert.equal(op.operationId, route.operationId);
@@ -122,7 +124,15 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/sessions/current/revoke revokeCurrentSession",
     "POST /api/v1/assurance/step-ups createStepUp",
     "GET /api/v1/public/identity-config getIdentityConfig",
+    "GET /api/v1/public/capability-publication getCapabilityPublication",
+    "POST /api/v1/public/inquiries createInquiry",
   ]);
+  // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
+  for (const [path, method] of [["/api/v1/public/capability-publication", "get"], ["/api/v1/public/inquiries", "post"]]) assert.deepEqual(expected.paths[path][method].security, [], path);
+  assert.deepEqual(expected.paths["/api/v1/public/inquiries"].post.parameters, [{ $ref: "#/components/parameters/CorrelationId" }, { $ref: "#/components/parameters/InquiryOrigin" }]);
+  assert.deepEqual(expected.paths["/api/v1/public/capability-publication"].get.parameters, [{ $ref: "#/components/parameters/CorrelationId" }]);
+  assert.equal(expected.paths["/api/v1/public/inquiries"].post.requestBody.content["application/json"].schema.$ref, "#/components/schemas/createInquiryRequest");
+  assert.ok(expected.components.schemas.createInquiryRequest.properties.buyerType.enum.includes("in-house"));
   // the ApprovalView component carries every member of the KAURO_PLAN_APPROVAL_V1 preimage (R29)
   const approval = expected.components.schemas.ApprovalView;
   for (const member of ["approvalId", "actorId", "agencyId", "planHash", "revisionHash", "targetContractHash", "validationReceiptHash", "disclosuresHash", "createdAt"]) {
