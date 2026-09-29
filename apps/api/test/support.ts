@@ -29,12 +29,13 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
 import { ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
   ArtifactRef,
+  AuditUnitOfWork,
   AssuranceProofId,
   CapabilityId,
   CausationId,
@@ -43,7 +44,6 @@ import type {
   CommandJournal,
   CommerceUnitOfWorkFactory,
   ExecutionContext,
-  ExecutionUnitOfWork,
   IdGenerator,
   MembershipId,
   PlanBody,
@@ -208,12 +208,12 @@ export interface UnitOfWorkStats {
 
 /**
  * Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. Both kinds of
- * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07). The factory is the execution one (package
- * B08): its units of work carry the execution store and the commerce repositories (B09) beside B06's, and the decoration keeps them.
+ * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07). The factory is the audit one (package
+ * B08): its units of work carry the audit and execution stores and the commerce repositories (B09) beside B06's, and the decoration keeps them.
  */
 export function instrumentedFactory(inner: RequestUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): RequestUnitOfWorkFactory {
   return {
-    async run<T>(context: ExecutionContext, work: (uow: ExecutionUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    async run<T>(context: ExecutionContext, work: (uow: AuditUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
       stats.runs += 1;
       const out = await inner.run(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
       await holds.pass("after.commit");
@@ -479,6 +479,17 @@ export interface WorldOptions {
    * (test/payment-support.ts paymentWorld({ requestSide: true })).
    */
   readonly payments?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly service: PaymentService; close(): Promise<void> }>;
+  /**
+   * Package B08 (mandate B08-COMMANDS-AUDIT): the cores the api binds (ApiAssembly.cores) — the labelled contract fake of the
+   * Intelligence core's plan compiler (SIMULATED). Absent: none, as a deployment of this edition runs (CORE_SERVICES_UNAVAILABLE).
+   */
+  readonly cores?: CoreServices;
+  /**
+   * The plan services the api itself binds: the decision artifacts of migration 0021, the patch compiler over `cores` and the real
+   * disclosure composer (package B08; edition.ts) — the test's deterministic plan services (`w.plans`) are then not handed to the
+   * assembly. Absent: the test plan services, which every B06 acceptance test binds.
+   */
+  readonly realPlanServices?: boolean;
 }
 
 export interface RawEvent {
@@ -541,7 +552,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     },
     commercialConsequences: commercialConsequencesInspector,
   };
-  const collaborators = options.collaborators ? options.collaborators(base) : base;
+  const configured = options.collaborators ? options.collaborators(base) : base;
+  // the edition's own plan services replace the test's when asked: the three are left out, so the composition binds its defaults
+  const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
+  const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
   const app = assembleApi({
     environment: "LOCAL",
@@ -552,6 +566,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     sources,
     ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
     ...(payments !== null ? { payments: payments.service } : {}),
+    ...(options.cores !== undefined ? { cores: options.cores } : {}),
     validator,
     clock: options.clock ?? processClock,
     ids,

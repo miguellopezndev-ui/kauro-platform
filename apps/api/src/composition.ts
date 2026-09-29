@@ -20,13 +20,13 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, B07Collaborators, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
+import type { B06Collaborators, B07Collaborators, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
 import { createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createExecutionHandlers, createExecutionReadHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
-import type { Clock, Environment, ExecutionContext, ExecutionUnitOfWorkFactory, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
+import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { applyMigrationsAs, classifyError, compareSchema, createExecutionUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { applyMigrationsAs, classifyError, compareSchema, createAuditUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
 import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, externalActionInspector, unavailablePlanServices } from "./edition.js";
@@ -50,11 +50,12 @@ export const READINESS_STATEMENT_TIMEOUT_MS = 2_000;
 
 /**
  * The request handlers' unit-of-work factory: B06's `run`, the source lifecycle's `runSource` (B07), the commerce unit of work of
- * the payments workflow (B09) and the execution unit of work of the job commands (B08: `run` also opens the execution store on the same
- * connection) — one factory on the verified kauro_app pool (@kauro/persistence PgExecutionUnitOfWorkFactory, which extends the commerce
- * factory of B09 and the source-lifecycle factory of B07).
+ * the payments workflow (B09), the execution unit of work of the job commands and the audit unit of work of the audit commands (B08: `run`
+ * also opens the execution store and the audit store on the same connection) — one factory on the verified kauro_app pool
+ * (@kauro/persistence PgAuditUnitOfWorkFactory, which extends the execution factory of B08, the commerce factory of B09 and the
+ * source-lifecycle factory of B07).
  */
-export interface RequestUnitOfWorkFactory extends ExecutionUnitOfWorkFactory {
+export interface RequestUnitOfWorkFactory extends AuditUnitOfWorkFactory {
   runSource<T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T>;
 }
 
@@ -126,7 +127,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   }
   // one factory on the one verified pool: TENANT, IDENTITY, ANONYMOUS and OPERATOR contexts run under kauro_app; the payment
   // service's SERVICE contexts run on its own pool, which this process does not open here (the payment service's composition)
-  const unitOfWork = createExecutionUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
+  const unitOfWork = createAuditUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
   return {
     pool,
     unitOfWork,
@@ -235,6 +236,13 @@ export interface ApiAssembly {
    * request side's CreatePaymentOrder and CapturePayment settle (its units of work and provider adapter; D-INT2-B3).
    */
   readonly payments?: PaymentService;
+  /**
+   * The cores the request side reaches (package B08, D8-PORT-1): the Intelligence core's plan compiler behind CMD022 CreatePlan and
+   * CMD023 RevisePlan. A deployment of this edition binds none and answers INTEGRITY_FAILURE / CORE_SERVICES_UNAVAILABLE for both;
+   * the acceptance tests bind the labelled contract fakes of @kauro/application/testing/cores (SIMULATED) here, and B15 binds the
+   * real thin adapter.
+   */
+  readonly cores?: CoreServices;
 }
 
 /**

@@ -140,3 +140,5 @@ export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds 
 
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
+// B08 audit package (docs/design/B08-audit-approval-jobs.md)
+export * from "./audit/index.js";
