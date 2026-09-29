@@ -38,6 +38,17 @@ Registry verification clauses:
 Counts at design: 13 cases — 0 EXECUTED_LOCAL, 0 SIMULATED, 0 PARTIAL, 13 MISSING (all planned). Target at B11 closure: 4
 EXECUTED_LOCAL (S067, CMD044-OK, CMD044-DENY, CMD044-RACE), 9 PARTIAL (owners B08, B10, B13, B15, B16, B17).
 
+## Stage 1 records
+
+What the stage-1 mandates delivered, per case (the status column above is updated by INT-1).
+
+| case | test file :: exact title | status | commit |
+|---|---|---|---|
+| S069 | `packages/ui/test/safe-text.test.ts` :: "S069: an untrusted label renders as inert text inside a bidi-isolated element — markup, script, formula prefixes and U+202E/U+2066 controls are neither executed nor allowed to reorder the surrounding text" | markup half EXECUTED_LOCAL (W1; Windows; `renderToStaticMarkup`, no DOM library); browser and printed-report half PLANNED (W10) | `cf6e9d1` (test first), green at `f2ffb86` |
+| R2-062 | `packages/ui/test/confirm-dialog.test.ts` :: "R2-062: the confirmation dialog has no default action — no form, every button type=button, initial focus on the heading, approve disabled until each disclosed effect is acknowledged, and each effect's error referenced by that effect's control" | markup half EXECUTED_LOCAL (W1; Windows); keyboard and server-refusal half PLANNED (W8) | `cf6e9d1` (test first), green at `f2ffb86` |
+| R2-065 | `packages/ui/test/count-denominators.test.ts` :: "R2-065: the count panel shows physical rows, billable source units and output rows as three labelled measures with their definitions, never one records figure" | markup half EXECUTED_LOCAL (W1; Windows); the sealed revision's counts through the browser PLANNED (W7) | `cf6e9d1` (test first), green at `f2ffb86` |
+| R2-064 | `packages/ui/test/navigation-guard.test.ts` :: "D-DS-1: the guard asks the browser to confirm leaving the document and, in the capture phase, asks the person before a link inside the application is followed" :: "D-DS-1: when the caller takes over the question, a click that would leave is held and handed over with its destination, and proceed follows it once, as the original click, past the guard" | primitive only, not the case: the guard covers tab close, address change and an in-application link, and hands a held link to the page for Stay, Save draft or Discard (W1; Windows; stubbed environment). The Back button cannot be intercepted by a page (D-W1-9), so the Back clause of the case, the four-status model and the dialog stay PLANNED (W3, W8) | `6335bc7`, `da54519` |
+
 ## Gates
 
 ### G-UX (owner manual 11, package B11; 8 cases)
