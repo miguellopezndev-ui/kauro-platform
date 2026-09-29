@@ -236,9 +236,9 @@ test("R2-044 at the database: an audit commits only with a reservation on an AUT
     await second.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', '', true), set_config('kauro.finance_agency_id', '', true)", [A.agencyId]);
     const pid = await backendPid(second);
     const observed = await settlesOrWaits(env.h.oracle, pid, dispatchIntent(second, A.agencyId, a3.grantId, 50), "the second intent for the last cents");
-    assert.equal(observed.kind, "WAITING", "the second intent waits on the grant's row");
+    if (observed.kind !== "WAITING") assert.fail("the second intent waits on the grant's row");
     await env.control.query("COMMIT");
-    const outcome = observed.kind === "WAITING" ? await observed.pending : observed.outcome;
+    const outcome = await observed.pending;
     assert.equal(outcome.status, "rejected");
     assert.equal(causeState(outcome.status === "rejected" ? outcome.reason : null), "KA083", "the loser finds the last cents reserved");
     await second.query("ROLLBACK");

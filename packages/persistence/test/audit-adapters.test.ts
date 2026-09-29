@@ -8,13 +8,13 @@
 // inside StartAudit's unit of work and the other's lock wait observed in pg_stat_activity, never by a sleep.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import type { Id } from "@kauro/contracts";
 import {
   AUDIT_POLICY,
   isDomainFailure,
   type ArtifactRef,
   type AuditId,
   type AuditStepId,
-  type Id,
   type LeaseOwnerId,
   type MembershipId,
   type ModelTaskId,

@@ -47,7 +47,7 @@ import { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "../eviden
 import { PgInboxIngress } from "../inbox-outbox.js";
 import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
-import { createCommerceUnitOfWorkFactory, createExecutionUnitOfWorkFactory, createUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgExecutionUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { createAuditUnitOfWorkFactory, createCommerceUnitOfWorkFactory, createExecutionUnitOfWorkFactory, createUnitOfWorkFactory, type PgAuditUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgExecutionUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
 import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
 import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
@@ -99,6 +99,11 @@ export interface Harness {
    * — each unit of work with the execution store (execution-fixtures.ts).
    */
   readonly execution: PgExecutionUnitOfWorkFactory;
+  /**
+   * The audit unit-of-work factory of package B08 (AuditUnitOfWorkFactory; mandate B08-PERSISTENCE-AUDIT): the execution factory's
+   * routing, each unit of work with the audit store as well (audit-fixtures.ts).
+   */
+  readonly audit: PgAuditUnitOfWorkFactory;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
@@ -212,6 +217,7 @@ export async function start(): Promise<Harness> {
   const payment = createUnitOfWorkFactory(paymentPool, { clock });
   const commerce = createCommerceUnitOfWorkFactory({ app: appPool, payment: paymentPool }, { clock });
   const execution = createExecutionUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
+  const audit = createAuditUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
   const proofs = new PgAssuranceProofRecorder(assurancePool);
   const receipts = new PgValidationReceiptRecorder(validatorPool);
   const oracle = await pg.connect("postgres");
@@ -275,6 +281,7 @@ export async function start(): Promise<Harness> {
     payment,
     commerce,
     execution,
+    audit,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
