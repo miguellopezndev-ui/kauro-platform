@@ -209,5 +209,5 @@ test("N16: every read answers only the outcomes of its catalogue — each listed
       assert.throws(() => checkReply(w.validator, contract, problem.status, "application/problem+json", problem), (e: unknown) => e instanceof ResponseContractViolation, `${operationId} ${code}`);
     }
   }
-  assert.ok(Object.keys(READ_OUTCOMES).length === 5 && (w.A.agencyId as AgencyId).length > 0);
+  assert.ok(Object.keys(READ_OUTCOMES).length === 7 && (w.A.agencyId as AgencyId).length > 0);
 });
