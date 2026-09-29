@@ -157,12 +157,16 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/plans/:planId/revisions", "RevisePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD023" } }],
       ["POST", "/api/v1/plans/:planId/approve", "ApprovePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD025" } }],
       ["POST", "/api/v1/plans/:planId/withdraw", "WithdrawApproval", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD026" } }],
+      // the support package (B11 W4)
+      ["POST", "/api/v1/projects/:projectId/support-cases", "CreateSupportCase", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD044" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
       ["GET", "/api/v1/agencies/:agencyId/members", "ListMembers", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListMembers" } }],
       ["GET", "/api/v1/agencies/:agencyId/clients", "ListClients", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListClients" } }],
       ["GET", "/api/v1/projects/:projectId", "GetProject", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetProject" } }],
+      ["GET", "/api/v1/projects/:projectId/support-cases", "ListSupportCases", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSupportCases" } }],
+      ["GET", "/api/v1/support-cases/:caseId", "GetSupportCase", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSupportCase" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request

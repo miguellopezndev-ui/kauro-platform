@@ -29,6 +29,9 @@ import { CREATE_SUPPORT_CASE, type CreateSupportCaseBody, type CreateSupportCase
 import { runCommand, type CommandRuntime } from "../runtime.js";
 import { requireMembership } from "./shared.js";
 
+/** The refusal says what was refused and why, never the text itself. */
+const REFUSED_SUMMARY = "the summary looks like a secret or customer records and was not accepted";
+
 /** What the covered-hours calculation reads: the policy window (validated once, when the handler is built) and the holiday calendar. */
 export interface SupportOptions {
   readonly window?: SupportWindow;
@@ -48,9 +51,8 @@ export function createSupportCaseHandler(runtime: CommandRuntime, options: Suppo
         const project = await uow.projects.lock(projectId);
         if (!project || project.agencyId !== membership.agencyId) throw new DomainFailure("NOT_FOUND", "project not visible");
         const finding = detectRefusedContent(envelope.body.summary);
-        if (finding !== null) {
-          throw new DomainFailure("CONTENT_REFUSED", "the summary looks like a secret or customer records and was not accepted", { reason: finding });
-        }
+        if (finding === "SECRET_LIKE_CONTENT") throw new DomainFailure("CONTENT_REFUSED", REFUSED_SUMMARY, { reason: "SECRET_LIKE_CONTENT" });
+        if (finding === "RECORD_LIKE_CONTENT") throw new DomainFailure("CONTENT_REFUSED", REFUSED_SUMMARY, { reason: "RECORD_LIKE_CONTENT" });
         const severity = severityOf(envelope.body.category);
         const reviewAt = nextReviewAt(severity, ctx.now, window, calendar);
         const caseId = uow.ids.next() as SupportCaseId;
