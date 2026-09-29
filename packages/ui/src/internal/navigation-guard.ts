@@ -96,3 +96,8 @@ export function installNavigationGuard(environment: GuardEnvironment, options: G
     environment.document.removeEventListener("click", onClick, true);
   };
 }
+
+/** The effect of NavigationGuard: the guard is installed only while the page holds unsaved work, and removed when it stops. */
+export function guardWhile(dirty: boolean, environment: GuardEnvironment, options: GuardOptions): (() => void) | undefined {
+  return dirty ? installNavigationGuard(environment, options) : undefined;
+}

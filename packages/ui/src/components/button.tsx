@@ -1,5 +1,6 @@
 import type { ComponentPropsWithRef, ReactElement } from "react";
 import { CLASS, cx } from "../internal/class-names.js";
+import { withoutStyling } from "../internal/unstyled.js";
 
 /** The props a primitive never accepts: it is styled only by the generated stylesheet (D-SEC-1, no inline style). */
 type Unstyled = "className" | "style" | "dangerouslySetInnerHTML";
@@ -19,7 +20,7 @@ export interface ButtonProps extends Omit<ComponentPropsWithRef<"button">, Unsty
 }
 
 export function Button({ variant = "secondary", type = "button", ...rest }: ButtonProps): ReactElement {
-  return <button {...rest} type={type} className={cx(CLASS.button, VARIANT_CLASS[variant])} />;
+  return <button {...withoutStyling(rest)} type={type} className={cx(CLASS.button, VARIANT_CLASS[variant])} />;
 }
 
 export interface LinkButtonProps extends Omit<ComponentPropsWithRef<"a">, Unstyled | "href"> {
@@ -38,5 +39,5 @@ export function isSafeHref(href: string): boolean {
 /** A link that looks like a button, for navigation (a button is for actions). */
 export function LinkButton({ href, variant = "secondary", ...rest }: LinkButtonProps): ReactElement {
   if (!isSafeHref(href)) throw new RangeError("a link may not run script or carry data");
-  return <a {...rest} href={href} className={cx(CLASS.button, VARIANT_CLASS[variant])} />;
+  return <a {...withoutStyling(rest)} href={href} className={cx(CLASS.button, VARIANT_CLASS[variant])} />;
 }

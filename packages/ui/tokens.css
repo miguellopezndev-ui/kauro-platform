@@ -377,6 +377,10 @@ h4.kauro-heading {
   align-items: center;
   gap: var(--kauro-space-2);
 }
+.kauro-phase-label {
+  color: var(--kauro-color-text);
+  font-weight: 600;
+}
 .kauro-phase-state {
   padding: 0 var(--kauro-space-2);
   border: var(--kauro-border-width) solid currentColor;

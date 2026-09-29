@@ -1,5 +1,6 @@
 import type { ComponentPropsWithRef, ReactElement } from "react";
 import { CLASS, cx } from "./class-names.js";
+import { withoutStyling } from "./unstyled.js";
 
 export type HeadingLevel = 2 | 3 | 4;
 
@@ -14,5 +15,5 @@ const TAG = { 2: "h2", 3: "h3", 4: "h4" } as const;
 export function Heading({ level, extraClass, ...rest }: HeadingProps): ReactElement {
   if (!Object.hasOwn(TAG, level)) throw new RangeError(`heading level must be 2, 3 or 4: ${String(level)}`);
   const Tag = TAG[level];
-  return <Tag {...rest} className={cx(CLASS.heading, extraClass)} />;
+  return <Tag {...withoutStyling(rest)} className={cx(CLASS.heading, extraClass)} />;
 }

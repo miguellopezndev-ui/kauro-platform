@@ -50,9 +50,13 @@ export function parseMarkup(html: string): ElementNode {
     const attrs = new Map<string, string>();
     ATTRIBUTE.lastIndex = 0;
     const source = m[3] ?? "";
+    // React writes camelCase names (dateTime, colSpan); HTML names are case-insensitive, so they are read in lower case, while
+    // an SVG attribute (viewBox) keeps the case it is written in.
+    const inSvg = m[2] === "svg" || current.tag === "svg" || ancestors(current).some((e) => e.tag === "svg");
     for (let a = ATTRIBUTE.exec(source); a !== null; a = ATTRIBUTE.exec(source)) {
-      if (attrs.has(a[1] as string)) throw new Error(`attribute ${a[1]} repeated on <${m[2]}>`);
-      attrs.set(a[1] as string, decode(a[2] ?? ""));
+      const name = inSvg ? (a[1] as string) : (a[1] as string).toLowerCase();
+      if (attrs.has(name)) throw new Error(`attribute ${name} repeated on <${m[2]}>`);
+      attrs.set(name, decode(a[2] ?? ""));
     }
     const element: ElementNode = { kind: "element", tag: m[2] as string, attrs, children: [], parent: current };
     current.children.push(element);

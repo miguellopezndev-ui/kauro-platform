@@ -56,7 +56,14 @@ export function formatMoney(minor: string, currency: string): string {
   return `${currency} ${negative ? "-" : ""}${whole}${fraction}`;
 }
 
-const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** True when the date and the time of day written in an instant exist: February has no 30th and the day has no 24:00. */
+function fieldsExist(match: RegExpExecArray): boolean {
+  const [year, month, day, hour, minute, second] = [1, 2, 3, 4, 5, 6].map((i) => Number(match[i] ?? "0")) as [number, number, number, number, number, number];
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth && hour <= 23 && minute <= 59 && second <= 59;
+}
 
 export interface FormattedDeadline {
   /** The instant in UTC, for the `datetime` attribute of <time>. */
@@ -67,7 +74,9 @@ export interface FormattedDeadline {
 
 /** An RFC 3339 instant shown to the minute in an IANA time zone, with the zone's name. */
 export function formatDeadline(at: string, timeZone: string): FormattedDeadline {
-  if (!INSTANT.test(at)) throw new RangeError(`not an RFC 3339 instant with an offset: ${JSON.stringify(at)}`);
+  const match = INSTANT.exec(at);
+  if (match === null) throw new RangeError(`not an RFC 3339 instant with an offset: ${JSON.stringify(at)}`);
+  if (!fieldsExist(match)) throw new RangeError(`not a real date and time: ${JSON.stringify(at)}`);
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) throw new RangeError(`not a real instant: ${JSON.stringify(at)}`);
   const parts = new Intl.DateTimeFormat("en-US", {

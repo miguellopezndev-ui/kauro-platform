@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { installNavigationGuard } from "../internal/navigation-guard.js";
+import { guardWhile } from "../internal/navigation-guard.js";
 
 export interface NavigationGuardProps {
   /** True while the page holds work that leaving would lose. The guard is installed only while it is true. */
@@ -18,12 +18,14 @@ export interface NavigationGuardProps {
  * inside the application. The browser's Back button cannot be intercepted by a page and is not.
  */
 export function NavigationGuard({ dirty, message, confirmLeave }: NavigationGuardProps): null {
-  useEffect(() => {
-    if (!dirty) return undefined;
-    return installNavigationGuard(
-      { window, document, currentHref: () => window.location.href },
-      { message, confirmLeave: confirmLeave ?? ((text) => window.confirm(text)) },
-    );
-  }, [dirty, message, confirmLeave]);
+  useEffect(
+    () =>
+      guardWhile(
+        dirty,
+        { window, document, currentHref: () => window.location.href },
+        { message, confirmLeave: confirmLeave ?? ((text) => window.confirm(text)) },
+      ),
+    [dirty, message, confirmLeave],
+  );
   return null;
 }

@@ -205,6 +205,7 @@ export function renderComponentCss(): string {
   add(sel(CLASS.bannerTitle), ["margin: 0 0 var(--kauro-space-1)", "font-weight: 700"]);
   add(sel(CLASS.phaseList), ["display: grid", "gap: var(--kauro-space-3)", "margin: 0", "padding: 0", "list-style: none"]);
   add(sel(CLASS.phase), ["display: flex", "flex-wrap: wrap", "align-items: center", "gap: var(--kauro-space-2)"]);
+  add(sel(CLASS.phaseLabel), [`color: ${color("text")}`, "font-weight: 600"]);
   add(sel(CLASS.phaseState), [
     "padding: 0 var(--kauro-space-2)",
     "border: var(--kauro-border-width) solid currentColor",
