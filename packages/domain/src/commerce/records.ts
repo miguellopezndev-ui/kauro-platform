@@ -596,6 +596,8 @@ export interface ReconciliationCaseRecord {
   readonly orderId?: PaymentOrderId;
   readonly captureId?: CaptureId;
   readonly refundId?: RefundId;
+  /** The provider object the case is about when no local fact holds it (a provider refund no local refund explains; 0019). */
+  readonly providerRef?: string;
   readonly kind: ReconciliationCaseKind;
   readonly version: number;
   readonly state: "OPEN" | "RESOLVED";

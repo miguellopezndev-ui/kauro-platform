@@ -37,7 +37,7 @@
  * 0017 ledger_entries_bank_accounts). Zero lines are never written.
  */
 import { assertMoney } from "./money.js";
-import type { FundsState, LedgerAccount, RefundComponents } from "./records.js";
+import type { CaptureStatus, FundsState, LedgerAccount, RefundComponents } from "./records.js";
 
 export const LEDGER_ACCOUNT_VERSION = "OPS-1";
 export const LEDGER_POLICY_VERSION = "B09-1";
@@ -142,6 +142,28 @@ export function movableBalanceOf(capture: { readonly amountCents: bigint; readon
   assertMoney(capture.returnedCents);
   const left = capture.amountCents - capture.providerFeeCents - capture.returnedCents;
   return left > 0n ? left : 0n;
+}
+
+/**
+ * Every return nets against the capture exactly once, whatever order the provider's facts are observed in (D-LEDGER-B7; B09-R2). A
+ * capture's allocation leaves it through its completed refunds and at most one reversal: a reversal returns the components no
+ * completed refund had returned (capture.reversed.v1 reversed*Cents), so once the capture is REVERSED every component has left it and
+ * a refund that completes afterwards — one in flight when the chargeback came, observed later or in the same provider view —
+ * returns nothing more; before the reversal a refund returns its approved components (the commitment ceiling keeps them within the
+ * allocation, KP003). What a completion returns is what its event carries for the ledger (refund.completed.v1 returned*Cents); its
+ * approved components stay the credit note's and the commissions' basis.
+ */
+export function refundReturnOf(approved: RefundComponents, captureStatus: CaptureStatus): RefundComponents {
+  return captureStatus === "REVERSED" ? { serviceCents: 0n, taxCents: 0n, excessCents: 0n } : approved;
+}
+
+/**
+ * The money a capture has returned so far (the `returnedCents` of movableBalanceOf; D-LEDGER-B7): all of it once it is REVERSED —
+ * the reversal returned what the completed refunds before it had not — else what its completed refunds returned.
+ */
+export function returnedCentsOf(capture: { readonly status: CaptureStatus; readonly amountCents: bigint }, completedRefundsCents: bigint): bigint {
+  assertMoney(completedRefundsCents);
+  return capture.status === "REVERSED" ? capture.amountCents : completedRefundsCents;
 }
 
 /**

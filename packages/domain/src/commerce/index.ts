@@ -78,6 +78,8 @@ export {
   capturePostings,
   providerFeePostings,
   movableBalanceOf,
+  refundReturnOf,
+  returnedCentsOf,
   fundsPostings,
   returnPostings,
   isBalanced,

@@ -41,11 +41,11 @@ import {
   type WebhookVerifierFake,
 } from "@kauro/application/testing";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { AgencyId, CapabilityId, CausationId, CorrelationId, TargetInstanceRef, FiscalIssuerRef, FiscalProfileId, IdempotencyIdentity, JournalEntryId, MembershipId, PaymentAttemptId, PaymentEnvironment, PaymentOrderId, PlanId, ProjectId, RefundId, RevisionId, ServiceIdentity, UserId } from "@kauro/domain";
+import type { AgencyId, CapabilityId, CausationId, CommerceUnitOfWork, CorrelationId, TargetInstanceRef, FiscalIssuerRef, FiscalProfileId, IdempotencyIdentity, JournalEntryId, MembershipId, PaymentAttemptId, PaymentEnvironment, PaymentOrderId, PlanId, ProjectId, RefundId, RevisionId, ServiceIdentity, UserId } from "@kauro/domain";
 import { DomainFailure, NotFoundFailure, deliveryPhaseOf, toUtcInstant } from "@kauro/domain";
 import { ROLES, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
 import { assembleApi, createBearerTokenAuthenticator, createPaymentService, loadContractSchemas, openPaymentPools, storeProviderQuery, type DispatchPass, type PaymentConsumerName, type PaymentHoldCommand, type PaymentHoldPoint, type PaymentPools, type PaymentService } from "../src/index.js";
-import { approveThroughRoute, call, clock, ids, sha, type Call, type PlanFixture, type Reply, type World, world } from "./support.js";
+import { approveThroughRoute, call, clock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, world } from "./support.js";
 
 // --- hold points of the payment service ------------------------------------------------------------------------------------------
 
@@ -106,6 +106,12 @@ export interface PaymentWorld {
   readonly holds: PaymentHolds;
   /** M2's labelled contract fakes (CONTRACT_FAKE, SIMULATED). */
   readonly paypal: PayPalContractFake;
+  /**
+   * The PayPal contract fake's own clock (SIMULATED): the instant of every provider view, provider resource time and dispatch deadline
+   * check of the fake. It only moves forward; a test moves it to take the provider's view after an attempt's dispatch deadline (the
+   * watchdog's absence proof, D-PROTO-B4) without sleeping. Nothing else in the world reads it.
+   */
+  readonly providerClock: MovableClock;
   readonly verifier: WebhookVerifierFake;
   readonly evidence: EvidenceStoreFake;
   readonly services: ServiceAuthenticatorFake;
@@ -129,7 +135,8 @@ export interface PaymentWorld {
 }
 
 export async function paymentWorld(options: { readonly requestSide?: boolean } = {}): Promise<PaymentWorld> {
-  const paypal = createPayPalContractFake({ clock });
+  const providerClock = movableClock();
+  const paypal = createPayPalContractFake({ clock: providerClock });
   const verifier = createWebhookVerifierFake({ clock });
   const evidence = createEvidenceStoreFake({ clock });
   const services = createServiceAuthenticatorFake({ clock });
@@ -190,6 +197,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
     pools,
     holds,
     paypal,
+    providerClock,
     verifier,
     evidence,
     services,
@@ -257,7 +265,9 @@ export async function approvedPlan(pw: PaymentWorld, seed: string, agency: Agenc
     );
   });
   const plan = await w.plan(agency, projectId, { revisionHash: source.revisionHash, targetContractHash, seed, state: "VALIDATED" });
-  await approveThroughRoute(w, plan);
+  // a plan of agency A is approved by A's approver; one of agency B by B's owner (the stranger) under B's own selector
+  if (agency.agencyId === w.A.agencyId) await approveThroughRoute(w, plan);
+  else await approveThroughRoute(w, plan, w.stranger, agency.agencyId);
   return plan;
 }
 
@@ -276,16 +286,40 @@ export async function checkout(pw: PaymentWorld, seed: string): Promise<Checkout
   return { ...order, plan };
 }
 
-/** A purchase paid at the provider by one capture that alone pays it, recorded with its CommercialAuthorization (paidPurchase). */
-export async function paid(pw: PaymentWorld, seed: string, options: { readonly feeCents?: bigint } = {}): Promise<PaidPurchase & { readonly providerCaptureId: string; readonly plan: PlanFixture }> {
-  const plan = await approvedPlan(pw, seed);
+/**
+ * Agency B made a seller as agency A is — ACTIVE, with a reviewed fiscal profile of its own recorded by the corporate owner — once
+ * per world: the foreign tenant whose real purchases, orders and refunds the DENY triads of CMD033 and CMD034 address (B09-R5).
+ */
+const sellingB = new WeakMap<PaymentWorld, Promise<FiscalProfileId>>();
+function sellerProfileOf(pw: PaymentWorld, agency: AgencyFixture): Promise<FiscalProfileId> {
+  if (agency.agencyId === pw.w.A.agencyId) return Promise.resolve(pw.profileId);
+  if (agency.agencyId !== pw.w.B.agencyId) throw new Error("the payment world sells as agency A or agency B");
+  let profile = sellingB.get(pw);
+  if (profile === undefined) {
+    profile = (async () => {
+      await activateAgency(pw.w.h, pw.w.B);
+      return recordReviewedFiscalProfile(pw.w.h, { operatorUserId: pw.kora, agencyId: pw.w.B.agencyId, issuerRef: pw.issuerRef });
+    })();
+    sellingB.set(pw, profile);
+  }
+  return profile;
+}
+
+/**
+ * A purchase paid at the provider by one capture that alone pays it, recorded with its CommercialAuthorization (paidPurchase) — of
+ * agency A, or with `agency` of agency B (its own plan, approved by its own owner, and its own fiscal profile).
+ */
+export async function paid(pw: PaymentWorld, seed: string, options: { readonly feeCents?: bigint; readonly agency?: AgencyFixture } = {}): Promise<PaidPurchase & { readonly providerCaptureId: string; readonly plan: PlanFixture }> {
+  const agency = options.agency ?? pw.w.A;
+  const profileId = await sellerProfileOf(pw, agency);
+  const plan = await approvedPlan(pw, seed, agency);
   let providerCaptureId = "";
   const purchase = await paidPurchase(pw.w.h, {
-    agency: pw.w.A,
+    agency,
     planId: plan.planId as PlanId,
     route: pw.route,
     issuerRef: pw.issuerRef,
-    profileId: pw.profileId,
+    profileId,
     provider: {
       order: (o) => providerOrderOf(pw, o),
       capture: ({ providerOrderId }) => {
@@ -346,16 +380,16 @@ export function dispatch(pw: PaymentWorld, consumer: PaymentConsumerName): Promi
 
 // --- refunds (the request side's writes, through M1's adapters: never M4's routes) ----------------------------------------------
 
-/** A customer refund request of a paid purchase (CMD031's write through the adapter, by the agency's owner). */
-export async function requestedRefund(pw: PaymentWorld, purchase: PaidPurchase, serviceCents: bigint): Promise<RefundId> {
+/** A customer refund request of a paid purchase (CMD031's write through the adapter, by the owner of the agency that bought it). */
+export async function requestedRefund(pw: PaymentWorld, purchase: PaidPurchase, serviceCents: bigint, agency: AgencyFixture = pw.w.A): Promise<RefundId> {
   const { w } = pw;
-  return w.h.commerce.run(w.h.tenant(w.A.agencyId, w.A.ownerUserId), async (uow) => {
+  return w.h.commerce.run(w.h.tenant(agency.agencyId, agency.ownerUserId), async (uow) => {
     const refundId = uow.ids.next() as RefundId;
     const live = await uow.commerce.authorizations.findLiveByCapture(purchase.captureId);
     const now = clock.now();
     await uow.commerce.refunds.request({
       refundId,
-      agencyId: w.A.agencyId,
+      agencyId: agency.agencyId,
       projectId: purchase.projectId as ProjectId,
       orderId: purchase.orderId,
       captureId: purchase.captureId,
@@ -364,18 +398,18 @@ export async function requestedRefund(pw: PaymentWorld, purchase: PaidPurchase, 
       termsHash: purchase.termsHash,
       deliveryPhase: deliveryPhaseOf(live),
       proposed: { serviceCents, taxCents: 0n, excessCents: 0n },
-      requestedByMembershipId: w.A.ownerMembershipId as MembershipId,
-      requestedByUserId: w.A.ownerUserId,
+      requestedByMembershipId: agency.ownerMembershipId as MembershipId,
+      requestedByUserId: agency.ownerUserId,
       requestedAt: now,
     });
-    await uow.scopes.record({ kind: "REFUND", key: refundId, agencyId: w.A.agencyId, orderId: purchase.orderId, refundId }, now);
+    await uow.scopes.record({ kind: "REFUND", key: refundId, agencyId: agency.agencyId, orderId: purchase.orderId, refundId }, now);
     return refundId;
   });
 }
 
 /** A refund requested and approved by the corporate owner in the finance scope it adopts, with a fresh step-up (CMD032's write). */
-export async function approvedRefund(pw: PaymentWorld, purchase: PaidPurchase, serviceCents: bigint): Promise<RefundId> {
-  const refundId = await requestedRefund(pw, purchase, serviceCents);
+export async function approvedRefund(pw: PaymentWorld, purchase: PaidPurchase, serviceCents: bigint, agency: AgencyFixture = pw.w.A): Promise<RefundId> {
+  const refundId = await requestedRefund(pw, purchase, serviceCents, agency);
   const proof = await pw.w.h.recordStepUp(pw.kora);
   await pw.w.h.commerce.run(pw.w.h.operator(pw.kora), async (uow) => {
     if ((await uow.adoptScope("REFUND", refundId)) === null) throw new Error("the corporate owner cannot adopt the refund's finance scope");
@@ -439,6 +473,21 @@ export function captureRun(pw: PaymentWorld, orderId: PaymentOrderId, key: strin
       // the minimal half: the owner's membership is the fixture's; the access decision is M4's CMD029
     },
     ...(hold !== undefined ? { hold } : {}),
+  });
+}
+
+// --- the payment service's scope ------------------------------------------------------------------------------------------------
+
+/**
+ * Work in the payment service's own unit of work — the composition's commerce factory, a SERVICE context under kauro_payment —
+ * adopted through one stored operation exactly as CMD033 and CMD034 adopt it (adoptScope, D-SCOPE-B1): the cross-scope negative
+ * control of a global service role (B09-R5).
+ */
+export function inServiceScope<T>(pw: PaymentWorld, stored: { readonly kind: "REFUND" | "PAYMENT_ORDER"; readonly key: string }, work: (uow: CommerceUnitOfWork, adopted: AgencyId) => Promise<T>): Promise<T> {
+  return pw.pools.commerce.run({ kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId }, async (uow) => {
+    const adopted = await uow.adoptScope(stored.kind, stored.key);
+    if (adopted === null) throw new Error(`the scope index holds no ${stored.kind} ${stored.key}`);
+    return work(uow, adopted);
   });
 }
 
