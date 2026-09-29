@@ -1,0 +1,75 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-24.04
+    env:
+      PGBIN: /usr/lib/postgresql/17/bin
+    steps:
+      # Third-party actions are pinned to immutable commit SHAs.
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.16.1
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      # PostgreSQL 17 from the PGDG apt repository (Ubuntu 24.04 "noble"). Tests start and stop their own
+      # ephemeral clusters as the runner user (packages/persistence/src/testing/temporary-postgres.ts) — this
+      # step only makes the server and client binaries available on PGBIN, it does not run a shared server.
+      - name: Install PostgreSQL 17 (PGDG)
+        run: |
+          set -eu
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+          "$PGBIN/postgres" --version
+
+      - name: Install from the lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify (generate, build, typecheck, test, arch, openapi, matrix, clean-consume)
+        run: |
+          set -o pipefail
+          pnpm run verify 2>&1 | tee verify.log
+
+      - name: Upload evidence / test logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verify-logs
+          path: |
+            verify.log
+            apps/api/openapi.json
+            docs/design/B06-state-command-event-matrix.md
+          if-no-files-found: warn
+          retention-days: 14
