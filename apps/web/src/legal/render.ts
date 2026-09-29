@@ -5,8 +5,8 @@
 //   <document key>-<effective date>-<first 12 hex of sha256 of the rendered text>
 // and the text it hashes is the words of the document as plain text, with the effective date in it and the label not in it: the same
 // words always carry the same label, whatever a fact's citation says, and a new word is a new version (an accepted version never changes).
-import { createHash } from "node:crypto";
 import { gapsOf, textOf, type Gap, type OperatorFacts } from "./facts.ts";
+import { sha256Hex } from "./sha256.ts";
 import { DATA_PROCESSING, PRIVACY, TERMS, type ResolvedFacts, type Section, type Template } from "./templates.ts";
 
 export const LEGAL_KEYS = ["terms", "privacy", "data-processing"] as const;
@@ -53,7 +53,7 @@ export type RenderedLegal = RefusedLegal | PublishedLegal;
 
 /** `<document>-<effective date>-<first 12 hex of sha256 of the text>`. */
 export function versionLabel(key: LegalKey, effectiveDate: string, text: string): string {
-  return `${key}-${effectiveDate}-${createHash("sha256").update(text, "utf8").digest("hex").slice(0, 12)}`;
+  return `${key}-${effectiveDate}-${sha256Hex(text).slice(0, 12)}`;
 }
 
 function resolve(facts: OperatorFacts): ResolvedFacts {
