@@ -92,6 +92,7 @@ export function runtimeSchemas(sources) {
   const responses = application.buildResponseSchemas(bundle, operationalRoutes);
   const byId = { ...responses.roots, Problem: application.PROBLEM_SCHEMA };
   for (const [command, schema] of Object.entries(application.REQUEST_SCHEMAS)) byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  Object.assign(byId, application.operationalRequestSchemas(operationalRoutes));
   const defs = { ...bundle.$defs, ...responses.defs };
   return { byId, defs };
 }
@@ -142,6 +143,14 @@ export function generateOpenApi(sources) {
     description:
       "Opaque correlation id (10 \"Request envelope\"): adopted when it is an id of this shape; any other value is ignored — never refused, never echoed — and the server mints one, as when it is absent (review decision E-CORR-1). Every reply carries the id the request was handled under.",
     schema: { type: "string", pattern: application.REQUEST_LIMITS.correlationIdPattern.source },
+  };
+  components.parameters.InquiryOrigin = {
+    name: "Origin",
+    in: "header",
+    required: true,
+    description:
+      "The exact origin of the public site or of the application as a browser writes it (B11 D-PUB-2, D-AUTH-5): compared as a whole string before the body is read; an absent header or any other origin is NOT_AUTHORIZED ORIGIN_REJECTED. The api never answers with a cross-origin header.",
+    schema: { type: "string", pattern: "^https?://[^/?#\\s]+$" },
   };
   components.headers.CorrelationId = { description: "The correlation id of the request, on every reply.", schema: { type: "string", minLength: 1, maxLength: 128 } };
   components.parameters.PageLimit = {
@@ -268,6 +277,10 @@ export function generateOpenApi(sources) {
     const contract = application.operationalRouteResponses(route.operationId, operationalRoutes);
     const responses = {};
     for (const [status, declared] of Object.entries(contract.declared)) {
+      if (declared.schemaId === null) {
+        responses[status] = { description: route.responses[status].description, headers: REPLY_HEADERS };
+        continue;
+      }
       const name = `${route.operationId}Response${status}`;
       addComponent(name, byId[declared.schemaId], declared.schemaId);
       responses[status] = {
@@ -276,11 +289,22 @@ export function generateOpenApi(sources) {
         content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}${name}` } } },
       };
     }
-    responses.default = problemResponse;
-    paths[route.path] = {
-      ...(paths[route.path] ?? {}),
-      [route.method.toLowerCase()]: { operationId: route.operationId, summary: route.summary, description: `Authority: ${route.authority}`, "x-kauro-operational": true, responses },
-    };
+    // a probe answers the one Problem default; a route with a closed catalogue documents one Problem per status of it
+    if (contract.outcomes === null) responses.default = problemResponse;
+    else Object.assign(responses, problemResponses(contract.outcomes));
+    const operation = { operationId: route.operationId, summary: route.summary, description: `Authority: ${route.authority}`, "x-kauro-operational": true };
+    // the public routes (B11 W5b) take no credential: an explicit empty security requirement, not the document's silence
+    if (route.path.startsWith("/api/v1/public/")) operation.security = [];
+    if (route.path.startsWith("/api/v1/")) {
+      operation.parameters = [{ $ref: "#/components/parameters/CorrelationId" }, ...(route.operationId === "createInquiry" ? [{ $ref: "#/components/parameters/InquiryOrigin" }] : [])];
+    }
+    if (route.request !== undefined) {
+      const requestId = application.operationalRequestSchemaId(route.operationId);
+      addComponent(`${route.operationId}Request`, byId[requestId], requestId);
+      operation.requestBody = { required: true, content: { [route.request.contentType]: { schema: { $ref: `${COMPONENTS}${route.operationId}Request` } } } };
+    }
+    operation.responses = responses;
+    paths[route.path] = { ...(paths[route.path] ?? {}), [route.method.toLowerCase()]: operation };
   }
 
   addComponent("Problem", byId.Problem, "Problem");
@@ -336,7 +360,15 @@ export async function registeredRoutes() {
       codeSchemaVersion: persistence.listMigrations().reduce((max, file) => Math.max(max, file.version), 0),
       readiness: () => Promise.reject(new Error("the route inventory serves no request: readiness must not be read")),
     };
-    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()) });
+    // the public routes (B11 W5b) bound as a deployment binds them, over the same never-connected pool: registering them reads no
+    // capability and stores no inquiry
+    const publicApi = {
+      origins: { public: "https://www.kauro.invalid", app: "https://app.kauro.invalid" },
+      inquiries: new persistence.PgInquiryStore(pool),
+      capabilities: new persistence.PgCapabilityPublication(pool),
+      hashKey: new Uint8Array(32),
+    };
+    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), publicApi });
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();
@@ -473,6 +505,10 @@ export function checkOpenApi({ document, expected, inventory, sources }) {
     }
     for (const [status, declared] of [...Object.entries(contract.declared), ...problemStatuses.map((s) => [s, contract.problem])]) {
       const content = responses[status]?.content;
+      if (declared.schemaId === null) {
+        if (responses[status] === undefined || content !== undefined) failures.push(`response schema mismatch on ${key}: status ${status} is declared without a body and must be documented without content`);
+        continue;
+      }
       const media = content?.[declared.contentType];
       if (!media) {
         failures.push(`response schema mismatch on ${key}: status ${status} is not documented as ${declared.contentType}`);

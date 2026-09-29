@@ -154,9 +154,15 @@ test("R23: every response schema is closed and none declares a forbidden member;
 test("R23: the validator compiles the COMPLETED envelope of every served command, the ACCEPTED envelope and the declared replies of operational routes; operational routes are declared and checked like command routes", () => {
   for (const command of SERVED_COMMAND_IDS) assert.ok(validator.knownSchemaIds.includes(commandResponseSchemaId(command)), command);
   assert.ok(validator.knownSchemaIds.includes(ACCEPTED_RESPONSE_SCHEMA_ID));
-  // the operational routes of this edition are the two probes (14 "Monitoring and service health"); the default validator
-  // compiles exactly their declared replies, and a probe's reply is checked like a command's
-  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [["GET", "/livez", "getLiveness", ["200"]], ["GET", "/readyz", "getReadiness", ["200", "503"]]]);
+  // the operational routes of this edition are the two probes (14 "Monitoring and service health") and the two public routes
+  // (B11 W5b, D-PUB-1..D-PUB-6); the default validator compiles exactly their declared replies, and a probe's or a public route's
+  // reply is checked like a command's
+  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [
+    ["GET", "/livez", "getLiveness", ["200"]],
+    ["GET", "/readyz", "getReadiness", ["200", "503"]],
+    ["GET", "/api/v1/public/capability-publication", "getCapabilityPublication", ["200"]],
+    ["POST", "/api/v1/public/inquiries", "createInquiry", ["201"]],
+  ]);
   for (const route of OPERATIONAL_ROUTES) {
     for (const status of Object.keys(route.responses)) assert.ok(validator.knownSchemaIds.includes(operationalResponseSchemaId(route.operationId, status)), `${route.operationId} ${status}`);
   }

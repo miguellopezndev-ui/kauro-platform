@@ -35,7 +35,7 @@ import { activeAgency, client, id, membership, refused, users } from "./fixtures
 test("every failure code has an HTTP status, a fixed title and a retryability; the manual codes are all present", () => {
   const MANUAL_10 = ["INVALID_REQUEST", "AUTHENTICATION_REQUIRED", "ASSURANCE_REQUIRED", "NOT_AUTHORIZED", "NOT_FOUND", "STALE_VERSION", "IDEMPOTENCY_CONFLICT", "CAPABILITY_UNAVAILABLE", "SOURCE_EXPIRED", "TARGET_STALE", "PLAN_NOT_VALIDATED", "PAYMENT_PENDING", "PAYMENT_UNCERTAIN", "BUDGET_EXHAUSTED", "CAPACITY_UNAVAILABLE", "INTEGRITY_FAILURE", "OPERATION_CANCELLED"];
   for (const c of MANUAL_10) assert.ok(AUTHORITY_FAILURE_CODES.has(c as "NOT_FOUND"), c);
-  assert.deepEqual(FAILURE_CODES.filter((c) => !AUTHORITY_FAILURE_CODES.has(c)), ["PRECONDITION_FAILED", "ADMISSION_LIMITED", "INTERNAL_ERROR"]);
+  assert.deepEqual(FAILURE_CODES.filter((c) => !AUTHORITY_FAILURE_CODES.has(c)), ["PRECONDITION_FAILED", "ADMISSION_LIMITED", "CONTENT_REFUSED", "INTERNAL_ERROR"]);
   for (const c of FAILURE_CODES) {
     const status = FAILURE_HTTP_STATUS[c];
     assert.ok(Number.isInteger(status) && status >= 400 && status <= 599, c);
