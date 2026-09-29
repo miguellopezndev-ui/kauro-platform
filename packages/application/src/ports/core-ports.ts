@@ -311,11 +311,15 @@ export interface ValidateRequest {
   readonly cancellation: CancellationChannel;
 }
 
-/** The registry ValidationReceipt fields this port establishes; receiptId/planId/agencyId/timestamps are persistence's (B08-PERSISTENCE-AUDIT). */
-export type CoreValidationReceipt = Pick<
-  ValidationReceipt,
-  "revisionHash" | "targetContractHash" | "planHash" | "corePackageHash" | "profileEvidenceHash" | "dispositionEvidenceHash" | "artifactEvidenceHash"
->;
+/**
+ * The registry ValidationReceipt fields this port establishes; receiptId/planId/agencyId/timestamps are persistence's
+ * (B08-PERSISTENCE-AUDIT). `targetContractHash` is nullable here for CLEAN_ONLY, where the registry's own `ValidationReceipt`
+ * requires one (D8-PORT-4): persistence supplies the row's canonical "no target" hash when it writes a CLEAN_ONLY receipt.
+ */
+export type CoreValidationReceipt = Omit<
+  Pick<ValidationReceipt, "revisionHash" | "targetContractHash" | "planHash" | "corePackageHash" | "profileEvidenceHash" | "dispositionEvidenceHash" | "artifactEvidenceHash">,
+  "targetContractHash"
+> & { readonly targetContractHash: Sha256Hex | null };
 
 export interface ValidateResult {
   readonly evidenceClass: CoreEvidenceClass;
