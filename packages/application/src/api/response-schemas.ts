@@ -24,19 +24,19 @@ import type { ContractName } from "@kauro/contracts";
 import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
 import { CURSOR_PATTERN } from "./cursor.js";
 import { RESOURCE_ACTIONS } from "./permitted-actions.js";
-import { LABEL_PATTERN } from "./request-schemas.js";
+import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 
 export const RESPONSE_SCHEMA_PREFIX = "urn:kauro:api:v1:response:";
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
-/** The B06 commands this edition serves, by registry id. */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026";
+/** The commands this edition serves, by registry id: the seven of B06 and CMD044 of the support package (B11 W4). */
+export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | "CMD044";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
 /** The manual-10 reads this edition serves (re-check finding N16), by operation id. */
-export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject";
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | "ListSupportCases" | "GetSupportCase";
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
 export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId;
 
@@ -106,6 +106,8 @@ const ref = (name: string): JsonSchema => ({ $ref: `#/$defs/${name}` });
 const NARROW_ID = Object.freeze({ pattern: UUID_PATTERN });
 /** A registry label narrowed by the platform's control-character rule (the request schemas and kauro.is_label; N6). */
 const NARROW_LABEL = Object.freeze({ pattern: LABEL_PATTERN });
+/** A registry summary narrowed to what the request schema and the table keep: 20 characters at least, a visible one, no control character (B11 D-SUP-2). */
+const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
 /** The served commands a caller may issue on a resource, derived server-side (api/permitted-actions; N16). */
 const RESOURCE_ACTIONS_SCHEMA = Object.freeze({ type: "array", maxItems: RESOURCE_ACTIONS.length, items: { type: "string", enum: [...RESOURCE_ACTIONS] } });
 const RESOURCE_ACTIONS_DESCRIPTION =
@@ -421,6 +423,36 @@ export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       completedExternalActions: platform(true, { type: "array", items: ref("CompletedExternalAction") }, "Completed external or customer actions, never promised reversible."),
     },
   },
+  {
+    name: "SupportCaseView",
+    description: "A support case as its agency sees it (owner manual 18: support metadata must not become an unrestricted raw-data channel): the classified case with the covered-hours follow-up. It cites uploads by id only and never the requester's user id (B11 W4).",
+    contract: "SupportCase",
+    withheld: {},
+    members: {
+      caseId: registry(true, NARROW_ID),
+      agencyId: registry(true, NARROW_ID),
+      projectId: registry(true, NARROW_ID),
+      category: registry(true),
+      severity: registry(true),
+      state: registry(true),
+      summary: registry(true, NARROW_SUMMARY),
+      evidenceRefs: registry(true),
+      nextReviewAt: registry(true),
+      createdByMembershipId: platform(true, ID, "The membership that opened the case (an agency-internal identity the caller already sees in team views)."),
+      createdAt: platform(true, UTC, "When the case was opened."),
+      version: platform(true, VERSION, "The case version: 1 when opened, one more for every edit."),
+    },
+  },
+  {
+    name: "SupportCasePage",
+    description: "A page of one project's support cases in (createdAt, caseId) order, oldest first.",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("SupportCaseView") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the project and this list)."),
+    },
+  },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /** The success reply of every served command: status and the view its COMPLETED envelope carries. */
@@ -432,6 +464,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, { readonly stat
   CMD023: { status: 201, view: "RevisePlanView" },
   CMD025: { status: 201, view: "ApprovePlanView" },
   CMD026: { status: 200, view: "WithdrawApprovalView" },
+  CMD044: { status: 201, view: "SupportCaseView" },
 });
 
 export const SERVED_COMMAND_IDS = Object.freeze(Object.keys(COMMAND_RESPONSES) as ServedCommandId[]);
@@ -449,6 +482,8 @@ export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: s
   ListMembers: { view: "TeamPage" },
   ListClients: { view: "ClientPage" },
   GetProject: { view: "ProjectView" },
+  ListSupportCases: { view: "SupportCasePage" },
+  GetSupportCase: { view: "SupportCaseView" },
 });
 
 export const READ_OPERATION_IDS = Object.freeze(Object.keys(READ_RESPONSES) as ReadOperationId[]);

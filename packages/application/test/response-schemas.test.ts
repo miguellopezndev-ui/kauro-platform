@@ -18,6 +18,7 @@ import {
   CREATE_AGENCY,
   CREATE_CLIENT,
   CREATE_PROJECT,
+  CREATE_SUPPORT_CASE,
   FORBIDDEN_RESPONSE_FIELDS,
   LABEL_PATTERN,
   OPERATIONAL_ROUTES,
@@ -34,6 +35,7 @@ import {
   commandRouteResponses,
   createB06Handlers,
   createSchemaValidator,
+  createSupportHandlers,
   declaredMembers,
   openObjects,
   operationalResponseSchemaId,
@@ -238,13 +240,15 @@ function envelopeOf<V>(command: keyof typeof COMMAND_RESPONSES, r: CommandResult
   return { kind: "COMPLETED", version: c.version, replayed: c.replayed, data: c.view };
 }
 
-test("R23 / R29: the COMPLETED reply of each of the seven handlers satisfies its response schema; the approval view recomputes its KAURO_PLAN_APPROVAL_V1 hash from its own members", async () => {
+test("R23 / R29: the COMPLETED reply of each of the eight handlers satisfies its response schema; the approval view recomputes its KAURO_PLAN_APPROVAL_V1 hash from its own members", async () => {
   const w = world();
   const h = createB06Handlers(w.runtime, collaborators(w));
   const replies: Array<[keyof typeof COMMAND_RESPONSES, unknown]> = [];
   replies.push(["CMD001", envelopeOf("CMD001", await h.CMD001.execute(envelope(CREATE_AGENCY, subject("founder"), { key: "response-schema-cmd001", body: { displayName: "Founded" } })))]);
   replies.push(["CMD009", envelopeOf("CMD009", await h.CMD009.execute(envelope(CREATE_CLIENT, w.operator, { key: "response-schema-cmd009", path: { agencyId: w.agencyId }, body: { displayName: "Another", processingAuthorityRef: w.authorityId } })))]);
   replies.push(["CMD011", envelopeOf("CMD011", await h.CMD011.execute(envelope(CREATE_PROJECT, w.operator, { key: "response-schema-cmd011", agencyId: w.agencyId, path: { clientId: w.clientId }, body: { mode: "CLEAN", purpose: "Dedupe" } })))]);
+  const projectId = (replies.at(-1)![1] as { data: { projectId: string } }).data.projectId;
+  replies.push(["CMD044", envelopeOf("CMD044", await createSupportHandlers(w.runtime).CMD044.execute(envelope(CREATE_SUPPORT_CASE, w.operator, { key: "response-schema-cmd044", agencyId: w.agencyId, path: { projectId }, body: { category: "BILLING", summary: "The invoice total of the last import differs from the quote by a few cents." } })))]);
   replies.push(["CMD010", envelopeOf("CMD010", await h.CMD010.execute(envelope(ARCHIVE_CLIENT, w.owner, { key: "response-schema-cmd010", agencyId: w.agencyId, path: { clientId: w.clientId }, body: { expectedVersion: 1 } })))]);
   const planHash = bodyHashOf(w.planBody);
   const approved = envelopeOf("CMD025", await h.CMD025.execute(envelope(APPROVE_PLAN, w.approver, { key: "response-schema-cmd025", agencyId: w.agencyId, path: { planId: w.planId }, body: { expectedVersion: 4, planHash, validationReceiptHash: w.receiptHash, disclosuresHash: sha(`disclosures:${planHash}`), assuranceProofRef: w.proofId } })));

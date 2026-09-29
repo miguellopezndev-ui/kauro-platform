@@ -93,6 +93,11 @@ const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FO
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 const PLAN_SERVICES = outcome("COMMAND", "INTEGRITY_FAILURE", "PLAN_SERVICES_UNAVAILABLE", "the plan services this command needs are not bound in this edition (I-INT-2)");
 const BODY_DIGEST = outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)");
+/** The text a support case would keep looks like a secret or customer records: 422, and the next action is the secure upload (B11 D-SUP-2). */
+const CONTENT_REFUSED: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the summary holds a private key, a cloud or API key, a token or a name-and-value credential; nothing was stored, sent or logged"),
+  outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the summary holds rows of records (three delimited lines) or three e-mail addresses; nothing was stored, sent or logged"),
+]);
 const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTROLLER", "only the approving actor or an OWNER ends an approval's future use (D-AUTHZ-3)");
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
@@ -160,10 +165,15 @@ const COMMAND_SPECIFIC: Readonly<Record<ServedCommandId, ReadonlyArray<ProblemOu
     STALE("plan"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_NOT_APPROVED", "the plan is not APPROVED", { current: "ALWAYS" }),
   ],
+  CMD044: [
+    NOT_VISIBLE("the project"),
+    ...CONTENT_REFUSED,
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "SUPPORT_CALENDAR_UNAVAILABLE", "the versioned holiday calendar does not cover the year of the follow-up, so no next review can be promised; retry with the same key"),
+  ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<ServedCommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
-const HEADER_COMMANDS: ReadonlySet<ServedCommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
+const TENANT_COMMANDS: ReadonlySet<ServedCommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const HEADER_COMMANDS: ReadonlySet<ServedCommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
 
 function catalogueOf(command: ServedCommandId): ReadonlyArray<ProblemOutcome> {
   const entries = [
@@ -190,6 +200,7 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD023: catalogueOf("CMD023"),
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
+  CMD044: catalogueOf("CMD044"),
 });
 
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
@@ -217,6 +228,8 @@ const READ_SPECIFIC: Readonly<Record<ReadOperationId, ReadonlyArray<ProblemOutco
   ListMembers: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   ListClients: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   GetProject: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the project")],
+  ListSupportCases: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the project")],
+  GetSupportCase: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the case")],
 });
 
 function readCatalogueOf(operationId: ReadOperationId): ReadonlyArray<ProblemOutcome> {
@@ -237,6 +250,8 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   ListMembers: readCatalogueOf("ListMembers"),
   ListClients: readCatalogueOf("ListClients"),
   GetProject: readCatalogueOf("GetProject"),
+  ListSupportCases: readCatalogueOf("ListSupportCases"),
+  GetSupportCase: readCatalogueOf("GetSupportCase"),
 });
 
 /** The catalogue entry a problem is an instance of, or null. */
