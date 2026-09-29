@@ -29,16 +29,23 @@
  * the provider held: GENERATION_NOT_LIVE (another generation, or none) or another length is 409 GENERATION_CHANGED; an unanswered
  * placement (or a file the placement did not reach, a release of its object in progress, or a hold the control plane abandoned
  * past its bound) is 503 CAPACITY_UNAVAILABLE / GENERATION_NOT_OBSERVED, retryable under the same key since a refusal leaves no
- * journal row. The seal marks its holds SEALED in its own transaction, after its sealed file set: a sealed subject keeps them until
- * its retention ends (the RETENTION sweeper releases them with the file's admission, D-RET-3). A seal that is refused, fails or is
- * answered by a replay closes its attempt's holds (REFUSED) and releases what nothing else needs; a crash between the hold and the
- * commit leaves them INTENDED, and RETENTION abandons and releases them past their bound (SEAL_HOLD_ATTEMPT_SECONDS). The clauses that
- * rest on the provider honouring the hold are SIMULATED (the labelled storage fake) until B15 binds Cloud Storage. Unbound providers
- * answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
+ * journal row. No hold is intended while a release of the object may still land at the provider (a hold RELEASING, or a release claim
+ * neither answered nor past its in-flight bound — the provider's hold is a flag, and a late release would clear the new one): the file
+ * is then not placed (503 GENERATION_NOT_OBSERVED, retry). The seal marks its holds SEALED in its own transaction, after its sealed
+ * file set, and after its commit re-asserts each of them at the provider and records what it found (D-HOLD-2): a hold missing on the
+ * live generation is placed again, a generation that is not live any more is handed to OBJECT_INVENTORY's revocation. A sealed subject
+ * keeps its holds until its retention ends (the RETENTION sweeper releases them with the file's admission, D-RET-3). A seal that is
+ * refused, fails or is answered by a replay closes its attempt's holds (REFUSED) and releases what nothing else needs, each release
+ * under its own claim (D-HOLD-3); a crash between the hold and the commit leaves them INTENDED, and RETENTION abandons and releases
+ * them past their bound (SEAL_HOLD_ATTEMPT_SECONDS). The clauses that rest on the provider honouring the hold are SIMULATED (the
+ * labelled storage fake) until B15 binds Cloud Storage. Unbound providers answer SOURCE_SERVICES_UNAVAILABLE (D-SAPI-6).
  */
 import type { CommandId, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
   EvaluatedTable,
+  HoldReassertionId,
+  HoldReassertionResult,
+  HoldReleaseId,
   ObjectHoldId,
   ProjectionId,
   RetentionAnchorId,
@@ -56,18 +63,27 @@ import type {
   StoredObjectId,
   UserId,
 } from "@kauro/domain";
-import { DomainFailure, INPUT_ENVELOPE, PROVIDER_CALL_TIMEOUT_MS, RETENTION_POLICY_VERSION, StaleVersionFailure, UPLOAD_LIVE_STATES, projectionHashOf, sealedSubjectHashOf, sourceRevisionManifestHashOf, unpaidSealedDeadlines } from "@kauro/domain";
+import { DomainFailure, INPUT_ENVELOPE, RETENTION_POLICY_VERSION, StaleVersionFailure, UPLOAD_LIVE_STATES, projectionHashOf, sealedSubjectHashOf, sourceRevisionManifestHashOf, unpaidSealedDeadlines } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { applied, checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { contextOf, identityOf } from "../../commands/runtime.js";
 import type { ObjectStoragePort, StorageLocation } from "../../ports/source-providers.js";
+import { boundedProviderCall, claimStillHeld, monotonicMs, reassertHold } from "../provider-holds.js";
 import { SEAL_REVISION, type SealRevisionBody, type SealRevisionHandler, type SealRevisionView } from "../contracts.js";
 import { readRevisionView, retentionView } from "./projections.js";
 import { reachedOnServer, requireProviders, runSourceCommand, versionAt, type B07Collaborators, type SourceRuntime } from "./shared.js";
 
 /** What the provider answered the hold placement on the accepted generation of one included file at seal time (B07-R1, D-HOLD-1). */
 type PlacedHold =
-  | { readonly kind: "HELD"; readonly holdId: ObjectHoldId; readonly objectId: StoredObjectId; readonly generation: string; readonly bytes: number }
+  | {
+      readonly kind: "HELD";
+      readonly holdId: ObjectHoldId;
+      readonly objectId: StoredObjectId;
+      readonly location: StorageLocation;
+      readonly objectName: string;
+      readonly generation: string;
+      readonly bytes: number;
+    }
   | { readonly kind: "GENERATION_NOT_LIVE"; readonly holdId: ObjectHoldId }
   | { readonly kind: "UNOBSERVED" };
 
@@ -317,19 +333,24 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
 }
 
 /**
- * The seal's answer, once its holds are settled (D-HOLD-3): only a seal that committed now marked its holds SEALED; any other end — a
- * refusal, a replay of another execution, a failure — closes and releases the attempt's holds before the answer (or the failure)
- * leaves the handler.
+ * The seal's answer, once its holds are settled (D-HOLD-2, D-HOLD-3): a seal that committed now marked its holds SEALED and re-asserts
+ * them at the provider before it answers; any other end — a refusal, a replay of another execution, a failure — closes and releases
+ * the attempt's holds before the answer (or the failure) leaves the handler.
  */
 async function settleAttempt(runtime: SourceRuntime, collaborators: B07Collaborators, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt, sealing: Promise<CommandResult<SealRevisionView>>): Promise<CommandResult<SealRevisionView>> {
-  let result: CommandResult<SealRevisionView> | undefined;
+  const providers = collaborators.providers;
+  let result: CommandResult<SealRevisionView>;
   try {
     result = await sealing;
-    return result;
-  } finally {
-    const committed = result !== undefined && result.kind === "COMPLETED" && !result.replayed;
-    if (attempt.intended && !committed && collaborators.providers !== null) await releaseAttemptHolds(runtime, collaborators.providers.storage, envelope, attempt);
+  } catch (e) {
+    if (attempt.intended && providers !== null) await releaseAttemptHolds(runtime, providers.storage, envelope, attempt);
+    throw e;
   }
+  const committed = result.kind === "COMPLETED" && !result.replayed;
+  if (providers === null) return result;
+  if (committed) await reassertSealedHolds(runtime, providers.storage, envelope, attempt);
+  else if (attempt.intended) await releaseAttemptHolds(runtime, providers.storage, envelope, attempt);
+  return result;
 }
 
 /** 503 CAPACITY_UNAVAILABLE / GENERATION_NOT_OBSERVED: retryable under the same key (a refusal leaves no journal row). */
@@ -349,9 +370,9 @@ function byId(a: string, b: string): number {
  * record the control plane reconciles; nothing is recorded and no provider is asked when the caller is refused, no provider is
  * bound, or the revision is not the READY_TO_SEAL revision of the body's version and selection (the pipeline then answers its
  * refusal, or replays a journaled seal). A file whose admission no longer stands is left to the seal's own refusal; a file whose
- * object is being released is not placed (UNOBSERVED: retry). A DomainFailure of that unit of work (no connection, a context the
- * pipeline refuses, a hold the database refuses because the file was revoked meanwhile) records nothing: the pipeline meets the same
- * condition and answers it.
+ * object is being released, or whose last release may still land at the provider (D-HOLD-3), is not placed (UNOBSERVED: retry). A
+ * DomainFailure of that unit of work (no connection, a context the pipeline refuses, a hold the database refuses because the file
+ * was revoked meanwhile) records nothing: the pipeline meets the same condition and answers it.
  */
 async function holdIncludedGenerations(runtime: SourceRuntime, collaborators: B07Collaborators, envelope: CommandEnvelope<SealRevisionBody>): Promise<SealAttempt> {
   const attempt: SealAttempt = { attemptId: runtime.ids.next() as SealAttemptId, placed: new Map(), intended: false };
@@ -425,59 +446,76 @@ async function holdIncludedGenerations(runtime: SourceRuntime, collaborators: B0
  * in time is UNOBSERVED (the placement may still have landed: the attempt's release covers it, D-HOLD-3).
  */
 async function place(storage: ObjectStoragePort, intent: { readonly holdId: ObjectHoldId; readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }): Promise<PlacedHold> {
-  const answer = await bounded(storage.placeHold(intent.location, intent.objectName, intent.generation));
-  if (answer === null) return { kind: "UNOBSERVED" };
-  if (answer.outcome === "GENERATION_NOT_LIVE") return { kind: "GENERATION_NOT_LIVE", holdId: intent.holdId };
-  return { kind: "HELD", holdId: intent.holdId, objectId: intent.objectId, generation: answer.observation.generation, bytes: answer.observation.bytes };
-}
-
-/** A provider call bounded by PROVIDER_CALL_TIMEOUT_MS: its answer, or null when it failed or did not answer in time. */
-async function bounded<T>(call: Promise<T>): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), PROVIDER_CALL_TIMEOUT_MS);
-  });
-  try {
-    return await Promise.race([call, timeout]);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const answer = await boundedProviderCall(storage.placeHold(intent.location, intent.objectName, intent.generation));
+  if (!answer.answered) return { kind: "UNOBSERVED" };
+  if (answer.value.outcome === "GENERATION_NOT_LIVE") return { kind: "GENERATION_NOT_LIVE", holdId: intent.holdId };
+  const { observation } = answer.value;
+  return { kind: "HELD", holdId: intent.holdId, objectId: intent.objectId, location: intent.location, objectName: intent.objectName, generation: observation.generation, bytes: observation.bytes };
 }
 
 /**
  * D-HOLD-3: a seal that did not commit — refused, failed, or answered by a replay of another execution — closes the holds its attempt
  * recorded (REFUSED) and releases, at the provider, every object whose hold nothing else needs any more (no other attempt in flight,
- * no seal retaining it), recording the provider's answer. Best effort and never the command's answer: whatever it does not finish
- * (a lost connection, an unanswered release) stays recorded — INTENDED past its bound, or RELEASING — and the RETENTION sweeper
- * abandons and releases it.
+ * no seal retaining it), recording the provider's answer. Each release is this execution's only under the claim the database recorded
+ * for it (its fence token): the provider call is issued only while the claim holds and bounded by PROVIDER_CALL_TIMEOUT_MS, and the
+ * answer is recorded under the same claim (a claim another caller superseded records nothing). Best effort and never the command's
+ * answer: whatever it does not finish (a lost connection, an unanswered release) stays recorded — INTENDED past its bound, or
+ * RELEASING under a claim that lapses — and the RETENTION sweeper abandons, claims again and releases it.
  */
 async function releaseAttemptHolds(runtime: SourceRuntime, storage: ObjectStoragePort, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt): Promise<void> {
   try {
     const context = contextOf(SEAL_REVISION, envelope);
+    const started = monotonicMs();
     const releases = await runtime.unitOfWork.runSource(context, async (uow) => {
       const closed = await uow.sources.holds.closeAttempt(attempt.attemptId);
-      const out: Array<{ readonly objectId: StoredObjectId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }> = [];
+      const out: Array<{ readonly releaseId: HoldReleaseId; readonly location: StorageLocation; readonly objectName: string; readonly generation: string }> = [];
       for (const objectId of [...new Set(closed.map((h) => h.objectId))].sort(byId)) {
-        const decision = await uow.sources.holds.requestRelease(objectId);
+        const decision = await uow.sources.holds.requestRelease(objectId, uow.ids.next() as HoldReleaseId);
         if (decision.kind !== "RELEASE") continue;
         const object = await uow.sources.objects.get(objectId);
-        if (object !== null) out.push({ objectId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName, generation: decision.generation });
+        if (object !== null) out.push({ releaseId: decision.releaseId, location: { provider: object.provider, locationRef: object.locationRef }, objectName: object.objectName, generation: decision.generation });
       }
       return out;
     });
-    const answers: Array<{ readonly objectId: StoredObjectId; readonly result: "RELEASED" | "ABSENT" }> = [];
+    const answers: Array<{ readonly releaseId: HoldReleaseId; readonly result: "RELEASED" | "ABSENT" }> = [];
     for (const r of releases) {
-      const result = await bounded(storage.releaseHold(r.location, r.objectName, r.generation));
-      if (result !== null) answers.push({ objectId: r.objectId, result });
+      // a claim that lapsed before its call is issued is left to the next claimant (D-HOLD-3)
+      if (!claimStillHeld(started)) break;
+      const answer = await boundedProviderCall(storage.releaseHold(r.location, r.objectName, r.generation));
+      if (answer.answered) answers.push({ releaseId: r.releaseId, result: answer.value });
     }
     if (answers.length === 0) return;
     await runtime.unitOfWork.runSource(context, async (uow) => {
-      for (const a of answers) await uow.sources.holds.recordRelease(a.objectId, a.result);
+      for (const a of answers) await uow.sources.holds.recordRelease(a.releaseId, a.result);
     });
   } catch {
     // left recorded for the RETENTION sweeper (D-HOLD-3)
+  }
+}
+
+/**
+ * D-HOLD-2: after its commit the seal re-asserts every hold it sealed — the idempotent placement with the generation precondition,
+ * then a re-observation of the generation and its hold flag; a hold found missing on the live generation is placed again
+ * (`reassertHold`) — and records each finding (HELD, or GENERATION_NOT_LIVE) before it answers. A generation that is not live any
+ * more is never a silent success: its finding is recorded for OBJECT_INVENTORY, which revokes the file's admission
+ * (GENERATION_CHANGED, GENERATION_MISSING — whatever retains it, the sealed revision included). The seal's answer stays the journaled
+ * 200 (the seal committed, and a replay answers the same); whatever is not answered or not recorded (the provider silent, the process
+ * gone) is re-asserted by OBJECT_INVENTORY once the attempt bound passed.
+ */
+async function reassertSealedHolds(runtime: SourceRuntime, storage: ObjectStoragePort, envelope: CommandEnvelope<SealRevisionBody>, attempt: SealAttempt): Promise<void> {
+  try {
+    const held = [...attempt.placed.values()].filter((h): h is Extract<PlacedHold, { kind: "HELD" }> => h.kind === "HELD").sort((a, b) => byId(a.objectId, b.objectId));
+    const findings: Array<{ readonly holdId: ObjectHoldId; readonly result: HoldReassertionResult }> = [];
+    for (const hold of held) {
+      const result = await reassertHold(storage, hold.location, hold.objectName, hold.generation);
+      if (result !== null) findings.push({ holdId: hold.holdId, result });
+    }
+    if (findings.length === 0) return;
+    await runtime.unitOfWork.runSource(contextOf(SEAL_REVISION, envelope), async (uow) => {
+      for (const f of findings) await uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: f.holdId, result: f.result, reassertedBy: "SEAL" });
+    });
+  } catch {
+    // unrecorded: OBJECT_INVENTORY re-asserts the hold once the attempt bound passed (D-HOLD-2)
   }
 }
 

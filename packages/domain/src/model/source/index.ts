@@ -15,6 +15,8 @@ export type {
   RetentionAnchorId,
   ObjectHoldId,
   SealAttemptId,
+  HoldReleaseId,
+  HoldReassertionId,
 } from "./ids.js";
 export {
   INPUT_ENVELOPE,
@@ -27,6 +29,8 @@ export {
   PENDING_RESUME_GRACE_SECONDS,
   PROVIDER_CALL_TIMEOUT_MS,
   SEAL_HOLD_ATTEMPT_SECONDS,
+  HOLD_RELEASE_CLAIM_SECONDS,
+  HOLD_REASSERTION_ROUNDS,
   COMPLETION_REF_MAX_CHARS,
   COMPLETION_POLL_AFTER_SECONDS,
 } from "./policy.js";
@@ -58,6 +62,9 @@ export type {
   ObjectHoldState,
   ObjectHoldCloseReason,
   ObjectHoldRecord,
+  ObjectHoldReleaseRecord,
+  HoldReassertionResult,
+  ObjectHoldReassertionRecord,
   ScanState,
   StructureStatus,
   DetectedFormat,

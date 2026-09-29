@@ -267,7 +267,7 @@ test("the labelled object-storage fake reads and copies only an exact generation
   const bytes = content(5_000, 9);
   const { generation: g1 } = storage.plantObject(quarantine, name, bytes);
   const observed = await storage.stat(quarantine, name);
-  assert.deepEqual(observed, { generation: g1, bytes: 5_000, ...providerChecksumsOf(bytes), observedAt: toUtcInstant(T0) });
+  assert.deepEqual(observed, { generation: g1, bytes: 5_000, ...providerChecksumsOf(bytes), observedAt: toUtcInstant(T0), temporaryHold: false });
   assert.equal(crc32cOf(new TextEncoder().encode("123456789")), 0xe3069283, "the CRC-32C check value");
   // reads and copies name an exact generation
   assert.deepEqual(await drain(storage.read(quarantine, name, g1)), bytes);
@@ -513,6 +513,33 @@ test("the labelled object-storage fake places a temporary hold on exactly the li
   const q = storage.plantObject(quarantine, quarantineName(70), content(4, 6));
   assert.equal((await storage.placeHold(quarantine, quarantineName(70), q.generation)).outcome, "HELD");
   for (const c of storage.calls()) assert.deepEqual([c.provider, c.evidenceClass], [CONTRACT_FAKE_STORAGE_PROVIDER, "SIMULATED"]);
+});
+
+test("the labelled object-storage fake reports a generation's temporary hold as the provider's object resource does — stat and a HELD placement carry temporaryHold — and keeps the hold a flag with no incarnation, exactly the provider's: a release held at the provider (hold point on releaseHold) that lands after a newer placement clears that newer hold, so the platform claims every release and waits out its in-flight bound before it intends a hold (B07-R1 second re-check, D-HOLD-2, D-HOLD-3)", async () => {
+  const t = providerClock();
+  const storage = new ContractFakeObjectStorage({ clock: t.clock });
+  const accepted = storage.location("ACCEPTED");
+  const name = acceptedObjectName(AGENCY, PROJECT, v7(710) as SourceFileId);
+  const planted = storage.plantObject(accepted, name, content(32, 7));
+
+  // the hold is reported: unheld, held (the placement's own observation and a later stat), released
+  assert.equal((await storage.stat(accepted, name))?.temporaryHold, false);
+  const held = await storage.placeHold(accepted, name, planted.generation);
+  assert.equal(held.outcome === "HELD" && held.observation.temporaryHold, true);
+  assert.deepEqual([(await storage.stat(accepted, name))?.generation, (await storage.stat(accepted, name))?.temporaryHold], [planted.generation, true]);
+  assert.equal(storage.calls("stat").at(-1)?.outcome, `PRESENT ${planted.generation} HELD`);
+
+  // a release sent earlier and held at the provider lands after a newer placement: it clears the newer hold (no incarnation)
+  const late = storage.holdNext("releaseHold");
+  const releasing = storage.releaseHold(accepted, name, planted.generation);
+  await late.reached;
+  assert.equal(storage.calls("releaseHold").at(-1)?.outcome, "PENDING");
+  assert.equal((await storage.placeHold(accepted, name, planted.generation)).outcome, "HELD", "the newer placement");
+  late.release();
+  assert.equal(await releasing, "RELEASED");
+  assert.equal((await storage.stat(accepted, name))?.temporaryHold, false, "the late release cleared the newer hold");
+  const replaced = storage.plantObject(accepted, name, content(32, 8), { overwrite: true });
+  assert.deepEqual(storage.generationsOf(accepted, name).map((g) => [g.generation, g.status]), [[planted.generation, "SOFT_DELETED"], [replaced.generation, "LIVE"]]);
 });
 
 test("the labelled session-vault fake seals a session reference with AES-256-GCM under its test key, the binding — agency, upload, requester, attempt — as associated data, and refuses to open it under another binding, another key or a tampered secret, never returning another upload's plaintext; evidence class SIMULATED", async () => {

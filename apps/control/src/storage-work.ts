@@ -9,8 +9,8 @@
  * A provider failure leaves the registry as it was (the deletion stays requested, the cancellation stays pending): the sweepers
  * DELETION_RETRIES and PROVIDER_SESSION_RECONCILIATION pick it up again.
  */
-import type { ObjectStoragePort, ProviderCancellationResult, SessionVaultPort, StorageLocation } from "@kauro/application";
-import type { DeletionResult, SourceUnitOfWorkFactory, StoredObjectId, StoredObjectRecord, UploadId } from "@kauro/domain";
+import { boundedProviderCall, claimStillHeld, monotonicMs, type ObjectStoragePort, type ProviderCancellationResult, type SessionVaultPort, type StorageLocation } from "@kauro/application";
+import type { DeletionResult, HoldReleaseId, SourceUnitOfWorkFactory, StoredObjectId, StoredObjectRecord, UploadId } from "@kauro/domain";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { applied, boundTo, isAfter, publish, type WorkItem } from "./work.js";
 
@@ -67,39 +67,46 @@ export async function executeDeletion(storage: ObjectStoragePort, units: SourceU
 export type HoldReleaseOutcome =
   /** An attempt of the object is in flight, or a seal retains it (its file's admission stands): nothing is released. */
   | { readonly kind: "NEEDED" }
-  /** Another releaser is carrying out a release requested less than the attempt bound ago: left to it. */
+  /** The release is claimed by another caller whose claim has not lapsed: left to its claimant, nothing called, nothing recorded. */
   | { readonly kind: "IN_FLIGHT" }
   /** No hold of the object awaits a release. */
   | { readonly kind: "NONE" }
-  /** The provider answered and its answer is recorded on every releasing hold of the object. */
+  /** The provider answered and its answer is recorded, under this caller's claim, on every releasing hold of the object. */
   | { readonly kind: "RELEASED"; readonly result: "RELEASED" | "ABSENT"; readonly holds: number }
-  /** The provider call or its record failed: the holds stay RELEASING and a later sweep drives the release again past the bound. */
+  /** The provider answered, but this caller's claim was superseded meanwhile (it lapsed and was claimed again): nothing recorded. */
+  | { readonly kind: "SUPERSEDED" }
+  /**
+   * The claim lapsed before its call was issued, or the provider call or its record failed: the holds stay RELEASING and a later
+   * sweep claims the release again once this claim lapsed.
+   */
   | { readonly kind: "PENDING"; readonly cause: string };
 
 /**
- * Releases the provider hold of one accepted object's generation once nothing needs it (D-HOLD-3): the decision is the database's,
- * after the object's hold lock (no attempt of it INTENDED, no seal retaining it — its file's admission ended), every CLOSED or SEALED
- * hold moving to RELEASING in that unit of work, so no new hold is intended while the provider release is carried out; then the
- * provider release of exactly that generation (ifGenerationMatch) outside any transaction; then its answer, recorded at the server's
- * instant. A release requested longer than the attempt bound ago and never recorded is driven again.
+ * Releases the provider hold of one accepted object's generation once nothing needs it (D-HOLD-3). The decision is the database's,
+ * after the object's hold lock (no attempt of it INTENDED, no seal retaining it — its file's admission ended): every CLOSED or SEALED
+ * hold moves to RELEASING in that unit of work, and the release is claimed — one claim, this caller's fence token, bounded by
+ * HOLD_RELEASE_CLAIM_SECONDS; a release claimed by another caller is left to it (IN_FLIGHT), and one whose claim lapsed unanswered is
+ * claimed again. Then, only while the claim holds on this process's monotonic clock, the provider release of exactly that generation
+ * (ifGenerationMatch) outside any transaction, bounded by `timeoutMs`; then its answer, recorded under the same claim at the server's
+ * instant — refused when the claim was superseded. No hold of the object is intended while a claim may still land (until it is
+ * answered, or its bound plus PROVIDER_CALL_TIMEOUT_MS passed).
  */
 export async function releaseObjectHolds(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, objectId: StoredObjectId, timeoutMs: number = PROVIDER_CALL_TIMEOUT_MS): Promise<HoldReleaseOutcome> {
+  const started = monotonicMs();
   const decided = await units.runSource(boundTo(item), async (uow) => {
-    const decision = await uow.sources.holds.requestRelease(objectId);
+    const decision = await uow.sources.holds.requestRelease(objectId, uow.ids.next() as HoldReleaseId);
     return { decision, object: decision.kind === "RELEASE" ? await uow.sources.objects.get(objectId) : null };
   });
   const { decision, object } = decided;
   if (decision.kind !== "RELEASE") return { kind: decision.kind };
   if (object === null) return { kind: "PENDING", cause: "OBJECT_NOT_VISIBLE" };
-  let result: "RELEASED" | "ABSENT";
+  if (!claimStillHeld(started)) return { kind: "PENDING", cause: "CLAIM_LAPSED" };
+  const answer = await boundedProviderCall(storage.releaseHold(locationOf(object), object.objectName, decision.generation), Math.min(timeoutMs, PROVIDER_CALL_TIMEOUT_MS));
+  if (!answer.answered) return { kind: "PENDING", cause: answer.cause };
+  const result = answer.value;
   try {
-    result = await withTimeout(storage.releaseHold(locationOf(object), object.objectName, decision.generation), timeoutMs);
-  } catch (e) {
-    return { kind: "PENDING", cause: e instanceof Error ? e.name : "PROVIDER_FAILURE" };
-  }
-  try {
-    const holds = await units.runSource(boundTo(item), (uow) => uow.sources.holds.recordRelease(objectId, result));
-    return { kind: "RELEASED", result, holds };
+    const recorded = await units.runSource(boundTo(item), (uow) => uow.sources.holds.recordRelease(decision.releaseId, result));
+    return recorded.kind === "RECORDED" ? { kind: "RELEASED", result, holds: recorded.holds } : { kind: "SUPERSEDED" };
   } catch (e) {
     return { kind: "PENDING", cause: e instanceof Error ? e.name : "UNRECORDED" };
   }
@@ -108,8 +115,9 @@ export async function releaseObjectHolds(storage: ObjectStoragePort, units: Sour
 /**
  * Before an accepted generation is deleted: its seal holds are released when nothing needs them (`releaseObjectHolds`), and when no
  * hold record awaits a release the provider is still asked to release that exact generation — a placement whose answer was lost can
- * have landed after its attempt's release, and releasing an unheld generation changes nothing. The deletion's own answer decides
- * the rest (a generation still held fails the delete, recorded DELETION_FAILED and retried).
+ * have landed after its attempt's release, and releasing an unheld generation changes nothing. That call needs no claim: the object is
+ * being deleted, and no hold is ever intended on an object that is not PRESENT or VERIFIED (migration 0020), so it can clear no later
+ * hold. The deletion's own answer decides the rest (a generation still held fails the delete, recorded DELETION_FAILED and retried).
  */
 async function releaseBeforeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, object: StoredObjectRecord): Promise<void> {
   try {

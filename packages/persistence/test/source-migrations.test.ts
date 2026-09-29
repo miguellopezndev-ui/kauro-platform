@@ -436,7 +436,8 @@ function registryEnum(contract: string, field: string): string[] {
 const B07_TABLES = [
   "stored_objects", "storage_location_policies", "revision_quota", "upload_capacity", "upload_sessions", "upload_session_secrets",
   "inspection_receipts", "source_files", "source_tables", "source_table_columns", "selection_manifests", "selection_evaluations", "sealed_manifests",
-  "sealed_revision_files", "retention_anchor_kinds", "retention_anchors", "retention_records", "object_holds",
+  "sealed_revision_files", "retention_anchor_kinds", "retention_anchors", "retention_records", "object_holds", "object_hold_releases",
+  "object_hold_reassertions",
 ];
 
 // ---------------------------------------------------------------------------------------------------------------------------------

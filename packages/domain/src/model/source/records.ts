@@ -11,6 +11,8 @@ import type { PartCoverage, ScanPartKind } from "./scan-coverage.js";
 import type { SelectionManifestDocument } from "./selection.js";
 import type {
   EvaluationId,
+  HoldReassertionId,
+  HoldReleaseId,
   InspectionReceiptId,
   ObjectHoldId,
   ProjectionId,
@@ -203,6 +205,49 @@ export interface ObjectHoldRecord {
   readonly releaseRequestedAt?: UtcInstant;
   readonly releasedAt?: UtcInstant;
   readonly releaseResult?: "RELEASED" | "ABSENT";
+  /** The release claim whose claimant recorded the provider's answer (RELEASED rows only; D-HOLD-3). */
+  readonly releasedBy?: HoldReleaseId;
+}
+
+/**
+ * One release claim of an object's seal holds (B07-R1, second re-check; decision D-HOLD-3; table kauro.object_hold_releases,
+ * migration 0020): the fence token of the one caller that carries a decided release out. The object's claims are numbered in order;
+ * only the latest may be answered, once, by its claimant. A claim may still land at the provider until `inFlightUntil`
+ * (= claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS) unless answered, and no hold of the object is intended before then.
+ */
+export interface ObjectHoldReleaseRecord {
+  readonly releaseId: HoldReleaseId;
+  readonly agencyId: AgencyId;
+  readonly objectId: StoredObjectId;
+  readonly generation: string;
+  /** 1, 2, … per object, in claim order. */
+  readonly sequence: number;
+  readonly claimedAt: UtcInstant;
+  /** claimedAt + HOLD_RELEASE_CLAIM_SECONDS: the claimant issues its provider call before it; another caller may claim after it. */
+  readonly claimExpiresAt: UtcInstant;
+  /** claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS: no call of this claim can land after it. */
+  readonly inFlightUntil: UtcInstant;
+  readonly answeredAt?: UtcInstant;
+  readonly releaseResult?: "RELEASED" | "ABSENT";
+}
+
+/** What a re-assertion of a sealed hold found (D-HOLD-2): the generation live and held, or not the live generation any more. */
+export type HoldReassertionResult = "HELD" | "GENERATION_NOT_LIVE";
+
+/**
+ * One re-assertion of a sealed hold at the provider (B07-R1, second re-check; decision D-HOLD-2; table kauro.object_hold_reassertions,
+ * migration 0020): by the seal after its commit, or by OBJECT_INVENTORY for a hold whose re-assertion was never recorded or found the
+ * generation not live. Append-only evidence; a GENERATION_NOT_LIVE finding is handed to OBJECT_INVENTORY's revocation.
+ */
+export interface ObjectHoldReassertionRecord {
+  readonly reassertionId: HoldReassertionId;
+  readonly holdId: ObjectHoldId;
+  readonly agencyId: AgencyId;
+  readonly objectId: StoredObjectId;
+  readonly generation: string;
+  readonly result: HoldReassertionResult;
+  readonly reassertedBy: "SEAL" | "OBJECT_INVENTORY";
+  readonly observedAt: UtcInstant;
 }
 
 // --- inspection -----------------------------------------------------------------------------------------------------------

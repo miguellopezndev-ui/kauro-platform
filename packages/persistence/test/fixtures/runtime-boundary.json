@@ -28,6 +28,13 @@
           "revoked_at"
         ]
       },
+      "kauro.object_hold_releases": {
+        "UPDATE": [
+          "answered_at",
+          "release_result",
+          "updated_at"
+        ]
+      },
       "kauro.object_holds": {
         "UPDATE": [
           "close_reason",
@@ -35,6 +42,7 @@
           "release_requested_at",
           "release_result",
           "released_at",
+          "released_by",
           "sealed_at",
           "state",
           "updated_at"
@@ -170,6 +178,13 @@
           "version"
         ]
       },
+      "kauro.object_hold_releases": {
+        "UPDATE": [
+          "answered_at",
+          "release_result",
+          "updated_at"
+        ]
+      },
       "kauro.object_holds": {
         "UPDATE": [
           "close_reason",
@@ -177,6 +192,7 @@
           "release_requested_at",
           "release_result",
           "released_at",
+          "released_by",
           "sealed_at",
           "state",
           "updated_at"
@@ -1108,6 +1124,70 @@
       "check": null
     },
     "memberships/memberships_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "object_hold_reassertions/object_hold_reassertions_control_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (reasserted_by = 'OBJECT_INVENTORY'::text))"
+    },
+    "object_hold_reassertions/object_hold_reassertions_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "object_hold_reassertions/object_hold_reassertions_tenant_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (reasserted_by = 'SEAL'::text))"
+    },
+    "object_hold_reassertions/object_hold_reassertions_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "object_hold_releases/object_hold_releases_control_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "object_hold_releases/object_hold_releases_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "object_hold_releases/object_hold_releases_control_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "object_hold_releases/object_hold_releases_tenant": {
       "command": "ALL",
       "roles": [
         "kauro_app"
@@ -2219,6 +2299,14 @@
         "SELECT",
         "UPDATE"
       ],
+      "kauro.object_hold_reassertions": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.object_hold_releases": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.object_holds": [
         "INSERT",
         "SELECT"
@@ -2425,6 +2513,14 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.object_hold_reassertions": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.object_hold_releases": [
+        "INSERT",
+        "SELECT"
       ],
       "kauro.object_holds": [
         "SELECT"

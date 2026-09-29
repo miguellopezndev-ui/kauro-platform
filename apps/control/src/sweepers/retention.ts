@@ -13,8 +13,9 @@
  *    keeps its rejection's reason: a revision's terminal facts are set once (D-PERS-3, re-check residual FINAL-N2).
  * 4. the seal holds (B07-R1; decisions D-HOLD-1..D-HOLD-3): a hold still INTENDED past its attempt bound — a seal that crashed between
  *    its provider hold and its commit — is abandoned (CLOSED, ABANDONED), and every object whose holds nothing needs any more (no
- *    attempt in flight, no seal retaining it: its file's admission ended) is released at the provider and the answer recorded; a
- *    release requested longer than the bound ago and never recorded is driven again. A sealed file's own hold is released in step 2,
+ *    attempt in flight, no seal retaining it: its file's admission ended) is released at the provider under this run's claim and the
+ *    answer recorded under it; a release claimed by another caller is left to it, and one whose claim lapsed unanswered is claimed
+ *    again (D-HOLD-3; an answer under a superseded claim records nothing). A sealed file's own hold is released in step 2,
  *    by the deletion of its accepted generation (the provider refuses to delete a held generation), when its retention ends.
  * Records first, then files, then revisions, then holds, so an expired revision's accepted bytes are already released when its event
  * is handled, and a hold is released in the run that ended what needed it.

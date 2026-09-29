@@ -99,7 +99,19 @@ export async function startControlEnv(options: EnvOptions = {}): Promise<Control
  * those transactions see; `close` ends the pool.
  */
 export async function controlUnitsAhead(env: ControlEnv, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
-  const pool = createPool({ host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user: ROLES.controlLogin, max: 1, applicationName: "kauro-test-control-ahead", idleTimeoutMs: 600_000 });
+  return unitsAhead(env, ROLES.controlLogin, "kauro-test-control-ahead", offsetSeconds);
+}
+
+/**
+ * The request handlers' units of work (kauro_app_test) as they will run `offsetSeconds` from now, like `controlUnitsAhead`: a command
+ * issued once a bound has passed on the database clock (B07-R1: a seal once every earlier release claim's in-flight bound passed).
+ */
+export async function appUnitsAhead(env: ControlEnv, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
+  return unitsAhead(env, ROLES.appLogin, "kauro-test-api-ahead", offsetSeconds);
+}
+
+async function unitsAhead(env: ControlEnv, user: string, applicationName: string, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
+  const pool = createPool({ host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
   const c = await pool.raw.connect();
   try {
     await c.query("SELECT set_config($1, $2, false)", [TEST_CLOCK_OFFSET_SETTING, String(offsetSeconds)]);

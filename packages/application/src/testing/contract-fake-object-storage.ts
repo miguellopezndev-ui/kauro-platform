@@ -34,7 +34,11 @@
  *   ABSENT when it is not the live generation). A held generation refuses every deletion and replacement with OBJECT_HELD, whoever
  *   asks: the port's `delete`, and outside the platform `plantObject(..., { overwrite: true })` and `deleteOutOfBand` — a
  *   finalizing session or a copy to its name is already refused by their no-overwrite precondition. A held generation is therefore
- *   never soft-deleted; its hold is visible in `generationsOf` (`temporaryHold`).
+ *   never soft-deleted; its hold is visible in `generationsOf` (`temporaryHold`), and the provider reports it as Cloud Storage's
+ *   object resource does: `stat` and a HELD placement's observation carry `temporaryHold`. The hold is a flag with no incarnation —
+ *   exactly the provider's: a release that lands late clears a hold placed after it was sent (B07-R1, second re-check), which is why
+ *   the platform fences releases by claim and waits out a claim's in-flight bound before it intends a hold (D-HOLD-3). `releaseHold`
+ *   takes hold points like every call, so a test lands a release exactly when it chooses.
  * - A call log of every provider call (never the bearer session reference: its SHA-256 digest only), hold points that pause a
  *   call until the test releases it (interleavings without sleeps), and scripted faults (UNAVAILABLE before any effect; a TIMEOUT
  *   whose effect was or was not applied — the provider acted and the answer was lost).
@@ -457,8 +461,9 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
         crc32c: live.crc32c,
         md5: live.md5,
         observedAt: this.#clock.now(),
+        temporaryHold: live.temporaryHold,
       });
-      return { value: observation, outcome: `PRESENT ${live.generation}` };
+      return { value: observation, outcome: `PRESENT ${live.generation}${live.temporaryHold ? " HELD" : ""}` };
     });
   }
 
@@ -513,7 +518,7 @@ export class ContractFakeObjectStorage implements ObjectStoragePort {
       // ifGenerationMatch: another live generation is 412, no live object 404 — nothing is held either way
       if (live === undefined || live.generation !== generation) return { value: Object.freeze({ outcome: "GENERATION_NOT_LIVE" }), outcome: "GENERATION_NOT_LIVE" };
       live.temporaryHold = true;
-      const observation: ObjectObservation = Object.freeze({ generation: live.generation, bytes: live.content.length, crc32c: live.crc32c, md5: live.md5, observedAt: this.#clock.now() });
+      const observation: ObjectObservation = Object.freeze({ generation: live.generation, bytes: live.content.length, crc32c: live.crc32c, md5: live.md5, observedAt: this.#clock.now(), temporaryHold: true });
       return { value: Object.freeze({ outcome: "HELD", observation }), outcome: `HELD ${live.generation}` };
     });
   }

@@ -57,6 +57,12 @@ export interface ObjectObservation {
   readonly crc32c?: string;
   readonly md5?: string;
   readonly observedAt: UtcInstant;
+  /**
+   * Whether the generation is under a temporary hold, when the provider reports it (Cloud Storage: the object resource's
+   * `temporaryHold`, on objects.get and objects.patch) — the seal's re-assertion after its commit reads it (B07-R1, D-HOLD-2); absent
+   * means unreported, never "not held".
+   */
+  readonly temporaryHold?: boolean;
 }
 
 /** A resumable session: a bearer credential usable until the provider lifetime unless cancelled (09 "Resumable session security"). */
@@ -114,7 +120,9 @@ export interface ObjectStoragePort {
   /**
    * Releases the temporary hold of exactly `generation` (objects.patch {temporaryHold: false}, ifGenerationMatch): RELEASED when that
    * generation is the name's live generation and is no longer held (also when it was not held); ABSENT when it is not the live
-   * generation (nothing is released, no other generation is touched).
+   * generation (nothing is released, no other generation is touched). The hold is a flag with no incarnation: a release that lands
+   * late clears a hold placed after it was sent, so the platform issues one only under its release claim and intends no hold while
+   * a claim may still land (D-HOLD-3).
    */
   releaseHold(location: StorageLocation, objectName: string, generation: string): Promise<"RELEASED" | "ABSENT">;
   /** Provider inventory of a prefix (09: periodic inventory detects objects missing from the registry). */

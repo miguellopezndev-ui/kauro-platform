@@ -31,3 +31,7 @@ export type RetentionAnchorId = Branded<Id, "RetentionAnchorId">;
 export type ObjectHoldId = Branded<Id, "ObjectHoldId">;
 /** One seal attempt: the holds one execution of SealRevision placed, under one id (D-HOLD-2). */
 export type SealAttemptId = Branded<Id, "SealAttemptId">;
+/** One release claim of an object's seal holds: the fence token of the one caller that carries that provider release out (D-HOLD-3). */
+export type HoldReleaseId = Branded<Id, "HoldReleaseId">;
+/** One recorded re-assertion of a sealed hold at the provider, after its seal's commit (D-HOLD-2). */
+export type HoldReassertionId = Branded<Id, "HoldReassertionId">;

@@ -255,7 +255,8 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   await assertNothingSealed(unobserved, unobservedEvents);
   const sealed = completed<SealRevisionView>(await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key }), 200);
   assert.deepEqual([sealed.replayed, sealed.data.revision.state], [false, "SEALED"]);
-  assert.deepEqual(placementsOf(unobservedObject), ["FAILED UNAVAILABLE", `HELD ${unobserved.file.acceptedGeneration}`]);
+  // the refused attempt's placement, the sealing attempt's placement, and its re-assertion after the commit (D-HOLD-2)
+  assert.deepEqual(placementsOf(unobservedObject), ["FAILED UNAVAILABLE", `HELD ${unobserved.file.acceptedGeneration}`, `HELD ${unobserved.file.acceptedGeneration}`]);
   assert.deepEqual(await holdsOf(unobserved.file.fileId), [["RELEASED", "REFUSED", "RELEASED"], ["SEALED", null, null]]);
   assert.equal(heldAtProvider(unobservedObject), true, "the sealed generation stays held");
   const fileSet = await w.h.oracle.query<{ provider_generation: string }>("SELECT provider_generation FROM kauro.sealed_revision_files WHERE revision_id = $1", [unobserved.revisionId]);
@@ -264,7 +265,7 @@ test("DENY (B07-R1): the provider replaced or lost an included file's accepted g
   const replay = await seal(w, unobserved.revisionId, unobserved.version, unobserved.selectionHash, { key });
   assert.equal(replay.status, 200);
   assert.equal(replay.json<{ replayed: boolean }>().replayed, true);
-  assert.equal(placementsOf(unobservedObject).length, 2, "a replay performs no provider call");
+  assert.equal(placementsOf(unobservedObject).length, 3, "a replay performs no provider call");
   assert.equal(releasesOf(unobservedObject).length, 1);
 });
 
