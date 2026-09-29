@@ -21,5 +21,7 @@ test-only subpath, so no deployment binds a contract fake — the real provider 
 
 Tests (`test/`) run against a real PostgreSQL 17 started per file (`@kauro/persistence/testing`), with the labelled contract fakes of
 `@kauro/application/testing` and `@kauro/data-plane/testing` (evidence class SIMULATED) and the real isolated parsers; interleavings
-are fixed by the fakes' hold points and by lock waits observed in `pg_stat_activity`. `docs/design/B07-case-map.md` names the tests
-of each case.
+are fixed by the fakes' hold points and by lock waits observed in `pg_stat_activity`. `test/end-to-end.test.ts` composes the control
+plane with the application's own handlers of CMD012..CMD017, the source reads and the manifest intake (as `apps/api` binds them, with
+the real Authorizer of `@kauro/authorization`, each answer checked against its route's contract; design D-INT-1). `docs/design/B07-case-map.md`
+names the tests of each case.
