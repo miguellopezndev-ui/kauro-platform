@@ -120,3 +120,19 @@ export {
 } from "./commands/handlers/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
+export type { ContentFinding, DateKey, HolidayCalendar, HolidaySource, SupportWindow, Weekday } from "./support/index.js";
+export {
+  BOGOTA_OFFSET_MS,
+  COLOMBIA_CALENDAR_VERSION,
+  COLOMBIA_HOLIDAYS,
+  COLOMBIA_HOLIDAY_SOURCE,
+  SUPPORT_SEVERITY_BY_CATEGORY,
+  SUPPORT_TIMEZONE,
+  SupportPolicyError,
+  colombianHolidays,
+  detectRefusedContent,
+  easterSundayMs,
+  nextReviewAt,
+  severityOf,
+  supportWindowOf,
+} from "./support/index.js";
