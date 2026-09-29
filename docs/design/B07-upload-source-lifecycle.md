@@ -1022,6 +1022,13 @@ Case map: the six B07-CONTROL rows moved from SPECIFIED to SIMULATED; the end-to
 "Status at `b07/integration`" and checked with no SPECIFIED row left. 23 cases: 13 EXECUTED_LOCAL, 10 PARTIAL (open only in B15, B16,
 B08, B09/B10, B03), 0 MISSING.
 
+`pnpm run verify` at `6484675` after `pnpm install --frozen-lockfile`: **Windows 11** (Node 24.14.1, pnpm 10.16.1,
+`C:\Tools\pgsql17\bin`) exit 0 and **Linux** (WSL Ubuntu 24.04, fresh clone of `b07/integration`, Node 24.21.0,
+`PGBIN=/usr/lib/postgresql/17/bin`) exit 0. Tests: contracts 12, domain 64, application 73, persistence 159, authorization 11,
+data-plane 12, control 15, api 146 (Windows 145 + 1 skipped, B06's Linux-only test), tools 30 — none failed. Architecture gate 8
+packages and 23 edges; OpenAPI 28 served operations, none planned; matrix 18 machines, 13 commands, 12 reads, 1 intake; clean-consume
+13 typed entry points. No PostgreSQL process left on either host; the clone was removed. The next commit adds this paragraph only.
+
 For the B07 + B09 merge (lane B): §17 items 1–15 stand as written; item 16 is done (B07 lands from `b07/integration`). Additions of
 stage 2 it meets: `SourceFileRepository` gained `lockShared` (D-CMD-7), `findRetentionEnded` and `admittedGenerations` (D-CTRL-5),
 additive; item 7 also binds CMD012's `CommercialScopeInspector` in `apps/control/test/support/product.ts` (the edition's "none before
