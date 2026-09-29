@@ -1,0 +1,154 @@
+{
+  "package": "B08",
+  "design": "docs/design/B08-audit-approval-jobs.md",
+  "caseMap": "docs/design/B08-case-map.md",
+  "bases": {
+    "b08/base": "b08/design merged into the verified head of integration/b07-b09 (B09 migrations 0013-0017 present; design D8-BASE-1). The integrator creates it before stage 1; the merge touches documents and tools/test only.",
+    "b08/stage-1": "from b08/base: merge B08-PERSISTENCE-EXECUTION, B08-CORE-PORTS, B08-WORKER-HOST (pnpm-lock.yaml regenerated), then pnpm run verify",
+    "b08/stage-2": "from b08/stage-1: merge B08-COMMANDS-EXECUTION, B08-CONTROL-EXECUTION, B08-PERSISTENCE-AUDIT, then pnpm run verify",
+    "b08/stage-3": "from b08/stage-2: merge B08-COMMANDS-AUDIT, B08-CONTROL-AUDIT, then pnpm run verify",
+    "b08/integration": "from b08/stage-3: the B08-INTEGRATION mandate"
+  },
+  "commonRules": [
+    "Write the case-map tests of the mandate FIRST, under exactly the titles docs/design/B08-case-map.md cites, and see them fail before building.",
+    "Real PostgreSQL 17 for every database claim through the runtime login roles; the superuser only as oracle; never a database fake.",
+    "Interleavings by hold points and lock waits observed in pg_stat_activity; never a sleep.",
+    "Every lifecycle instant is kauro.server_now(); tests stand in the past only through the labelled TEST CLOCK (D8-CLOCK-1).",
+    "A fake has exactly one owner (D8-FAKE-1), reports evidenceClass SIMULATED with contract-fake-* tokens, lives on a test-only testing subpath and is bound by no composition root.",
+    "Keep pnpm run verify green: the matrix owner rows and served inventory of what the mandate adds, runtime-boundary.json re-read and reviewed entry by entry when grants change, OpenAPI regenerated when routes change.",
+    "When the mandate lands, its case-map rows lose PLANNED and gain the commit; the status table follows.",
+    "Commit with the owner's identity and the attribution lines of the session; never push; never write the earlier product name."
+  ],
+  "mandates": [
+    {
+      "key": "B08-PERSISTENCE-EXECUTION",
+      "stage": 1,
+      "starts_from": "b08/base",
+      "depends_on": [],
+      "owns_fakes": [],
+      "migrations": ["0018_execution_jobs_capacity.sql", "0019_staging_verification_packages.sql"],
+      "tests": [
+        "packages/domain/test/execution-model.test.ts",
+        "packages/persistence/test/execution-migrations.test.ts",
+        "packages/persistence/test/execution-adapters.test.ts"
+      ],
+      "estimate": "1.5 agent-days (the critical path; starts first)",
+      "task": "Tests first: write the case-map rows citing packages/domain/test/execution-model.test.ts (R2-046 scheduler order), packages/persistence/test/execution-migrations.test.ts (S055, S056, S061, R2-045, R2-046, CMD036 and CMD037 at the database) and packages/persistence/test/execution-adapters.test.ts (S062 both halves, S075) under their exact titles; see them fail. Then build: @kauro/domain model/execution (ids, records, the ProcessingAttempt and PackageVersion platform machines of design 8.2, policy values heavyActive 1, heavyQueued 3, agency live bound 3, lease 120 s and heartbeat 30 s, at most three attempts, delivery deadline capture + 172,800 s, execution wall 28,800 s, the digests KAURO_JOB_INPUT_BINDING_V1, KAURO_STAGED_MANIFEST_V1 and the KAURO_DELIVERY_MANIFEST_V1 wrapper, the pure fair scheduler of D8-SCHED-1) and ports/execution-store.ts; migrations 0018_execution_jobs_capacity.sql and 0019_staging_verification_packages.sql exactly as design section 9 (tables, composite keys to B09's authorization subject with the UNIQUE it adds, holds and ledgers with the one-snapshot deferred check KA082, attempt fence = JOB_ATTEMPT lease fence, deterministic identity and canonical staging prefix, the consumption and delivery edges of commercial_authorizations bound at COMMIT KA081 with SELECT on commerce_event_bindings and the restrictive outbox subscriber policy for kauro_control, the projects transition lock and kauro.try_await_transition (the non-blocking shared transition lock of D8-LOCK-1), EXECUTION_ADMITTED and PACKAGE_AVAILABLE anchors with the superset retention_anchors_bound, the PAID_ORDINARY record, staged rows and read-backs only from the current attempt KA080, the publication guard KA080/KA081/KA084, cleanup rows bound to one attempt, kauro.execution_control_event_types() refused to request handlers, SQLSTATE KA080-KA084); the pg adapters (execution units of work on the B06 factory with the SYSTEM context bound to an agency, job/attempt/staging/read-back/verification/package/cleanup repositories, capacity ledger, the authorization and capture reads after their transition locks, lease calls with the server instant, B09's DeliveryCapacityPort, the real CommercialConsequenceInspector, ExternalActionInspector and ActiveWorkInspector of B06); sqlstate.ts translation per design 9; @kauro/persistence/testing execution fixtures built on B09's paidPurchase (an ACTIVE authorization), an admitted job, an attempt at a fence, each write by its owning role. Update aggregate-kind, event-type, machine-seed and runtime-boundary expectations additively. Done: the cited titles pass on PostgreSQL 17 with lock waits observed; every B06, B07 and B09 suite unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B08-CORE-PORTS",
+      "stage": 1,
+      "starts_from": "b08/base (b08/design is acceptable while integration/b07-b09 is unverified: no migration or B09 type is touched)",
+      "depends_on": [],
+      "owns_fakes": ["ContractFakeMigrationCore", "ContractFakeIntelligenceCore"],
+      "migrations": [],
+      "tests": ["packages/application/test/core-port-fakes.test.ts"],
+      "estimate": "0.5-1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/application/test/core-port-fakes.test.ts (the Migration-core fake's verification for S061 and the Intelligence-core fake's journal behaviour) under their exact titles; see them fail. Then build @kauro/application ports/core-ports.ts with the signatures of design section 10: ProfilePort, InterpretPort (planCandidates, interpret with a ModelTaskJournalPort, a funded ceiling, the interpretation deadline and a CancellationChannel), PlanCompilerPort (candidate decisions, typed patch with B06's PatchCompilation reasons), ValidatePort (a registry ValidationReceipt document for exact source manifest, plan body, target body and core), ExecutionEnvelopePort.execute(subject, io: HostIo) with the host I/O interfaces SourceReader, ScratchStore, ArtifactWriter, CancellationChannel and ExecutionLimits of manual 04, PackageVerifierPort.verify(candidate, expected: ExpectedAuthority), and the ModelTaskJournalPort interface; every result carries evidenceClass. Then the labelled fakes on @kauro/application/testing, their single owner: ContractFakeMigrationCore (profile, validate, execute only through HostIo with scripted ENOSPC, short write, corrupt intermediate, partial blob and foreign generation, verify only against supplied expected authority, a hold point at every await, a call log, tokens contract-fake-migration-core-*) and ContractFakeIntelligenceCore (a complete candidate manifest, interpret outcomes COMPILED, NEEDS_DECISION, UNSUPPORTED or FAILED as scripted through the journal port, a stored response compiled before any new dispatch, no dispatch without a reservation, patch compilation, tokens contract-fake-intelligence-core-*). No composition root binds them (architecture rule testOnlySubpaths). Done: the cited titles pass; pnpm run verify green."
+    },
+    {
+      "key": "B08-WORKER-HOST",
+      "stage": 1,
+      "starts_from": "the head of B08-CORE-PORTS (branch b08/core-ports), itself from b08/base",
+      "depends_on": ["B08-CORE-PORTS"],
+      "owns_fakes": ["ContractFakeWorkerHost"],
+      "migrations": [],
+      "tests": [
+        "packages/data-plane/test/attempt-scratch.test.ts",
+        "packages/data-plane/test/fenced-artifact-writer.test.ts",
+        "packages/data-plane/test/worker-host-fake.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/data-plane/test/attempt-scratch.test.ts (S035 scratch causes), packages/data-plane/test/fenced-artifact-writer.test.ts (S035 writer) and packages/data-plane/test/worker-host-fake.test.ts (S056 identities, S075 resources) under their exact titles; see them fail. Then build @kauro/application ports/worker-host.ts (WorkerHostPort launch, observe, terminate and resources keyed by the deterministic identity kauro-attempt-<attemptId>, AttemptCapability naming exactly the staging prefix, the manifest name and the sealed ACCEPTED generations, the outcome vocabulary of design section 10) and, in @kauro/data-plane (real, always): AttemptScratchStore (an attempt-owned directory with a byte quota and a SHA-256 per segment; SCRATCH_EXHAUSTED, SHORT_WRITE, CORRUPT_INTERMEDIATE as distinct terminal causes; cleanup of exactly its own directory; D8-STG-2), FencedArtifactWriter (B07's ObjectStoragePort, generation-0 preconditions, close, hash and re-read before an artifact exists, nothing outside the capability's prefix; D8-STG-1) and GenerationSourceReader (the exact ACCEPTED generation with digest and length re-verified). Then the labelled ContractFakeWorkerHost on @kauro/data-plane/testing, its single owner: a local executor that runs an ExecutionEnvelopePort inside the attempt envelope with the real scratch store and writer over the storage fake, create-by-identity (ALREADY_EXISTS), a scripted timeout after creation, NOT_FOUND after its creation horizon, heartbeats, termination of exactly one identity, VM, disk and cost reports, scripted crashes at hold points and an old worker that survives a takeover, evidence class SIMULATED, tokens contract-fake-worker-host-*. It consumes B07's ContractFakeObjectStorage and B08-CORE-PORTS' fakes and copies neither. Done: the cited titles pass on Windows and Linux file systems; pnpm run verify green."
+    },
+    {
+      "key": "B08-COMMANDS-EXECUTION",
+      "stage": 2,
+      "starts_from": "b08/stage-1",
+      "depends_on": ["B08-PERSISTENCE-EXECUTION", "B08-CORE-PORTS", "B08-WORKER-HOST"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/api/test/cmd036-execute-project.test.ts",
+        "apps/api/test/cmd037-cancel-job.test.ts",
+        "apps/api/test/job-reads.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd036-execute-project.test.ts (CMD036-OK, -DENY, -RACE, S055, R2-046), apps/api/test/cmd037-cancel-job.test.ts (CMD037-OK, -DENY, -RACE, S062 through the route) and apps/api/test/job-reads.test.ts (GetJob) under their exact titles; see them fail. Then build in @kauro/application the execution commands on B06's pipeline through runCommandIn/runReadIn: CMD036 ExecuteProject (project row, authorization after its shared transition lock, the existing job answered for a duplicate, the prerequisites of design section 4 in the lock order D8-LOCK-1, the agency bound D8-CAP-2, one QUEUED job with processing_job.queued.v1 to JOB_EXECUTION, 202 ACCEPTED), CMD037 CancelJob (job row lock, expectedVersion, cancel_command with cancel version + 1 and the reason label on the row only, processing_job.cancel_requested.v1 to EXECUTION_CONTROL, 200 JobView with the provider state and published package identified), GetJob (AGENCY_READER); contracts, closed request schemas, JobView, closed outcome catalogues of design section 12, permitted actions. Serve them in apps/api (served inventory, response schemas, OpenAPI under paths, the matrix rows and applicability of CMD036 and CMD037, the Job machine owners, the role matrix), and bind in the composition DeliveryCapacityPort into B09's checkout and the real B06 inspectors. Tests write the control plane's steps between commands through the product's adapters in control-plane units bound to the agency (B07 D-CMD-15) and create authorizations with B09's paidPurchase; the revocation race uses B09's own payment-service write. Done: the cited titles pass through the real routes and composition root; pnpm run verify green."
+    },
+    {
+      "key": "B08-CONTROL-EXECUTION",
+      "stage": 2,
+      "starts_from": "b08/stage-1",
+      "depends_on": ["B08-PERSISTENCE-EXECUTION", "B08-CORE-PORTS", "B08-WORKER-HOST"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/control/test/job-admission.test.ts",
+        "apps/control/test/job-execution.test.ts",
+        "apps/control/test/execution-control.test.ts",
+        "apps/control/test/staging-janitor.test.ts",
+        "apps/control/test/cancellation-boundaries.test.ts"
+      ],
+      "estimate": "1.5 agent-days",
+      "task": "Tests first: write the case-map rows citing apps/control/test/job-admission.test.ts (R2-046, admission consuming the entitlement, authority re-read), apps/control/test/job-execution.test.ts (S035, S056, S061, stale authority at publication, R2-045), apps/control/test/execution-control.test.ts (S055 redelivery, CMD037 continuation, the live old worker, the uncertain termination), apps/control/test/staging-janitor.test.ts (S075) and apps/control/test/cancellation-boundaries.test.ts (every await of design section 6) under their exact titles; see them fail. Then build in apps/control, over B07's dispatcher and B06's leases: JOB_ADMISSION (the fair scheduler under the global ledger, every later lock taken without waiting — rows SKIP LOCKED, kauro.try_await_transition — so a busy job waits for the next round (D8-LOCK-1), authority re-read after the transition locks,QUEUED -> ADMITTED with the authorization consumed, the PAID_ORDINARY record and attempt 1 claimed in one unit), JOB_EXECUTION (launch intent then WorkerHostPort.launch outside any transaction, manifest submission read by the control plane, read-back of every generation, PackageVerifierPort with the authority the platform supplies, VERIFIED_PRIVATE, delivery copies with generation-0 preconditions and read-back, the publication transaction of D8-PUB-2), EXECUTION_CONTROL (authority losses and cancel_requested: cancel version into the lease, terminate by identity, observe until terminal or proved absent, package REVOKED, CANCELLED releasing capacity once), sweepers ATTEMPT_MONITOR (observe, heartbeat under the fence, ambiguous launch reconciled before any create, takeover at fence + 1), JOB_DEADLINES (never early) and STAGING_JANITOR (one attempt, exact prefix, cleanup record); EXECUTION_SWEEPERS in the contracts; runCycle extended. Tests bind B08-CORE-PORTS' and B08-WORKER-HOST's fakes and B07's storage fake with hold points; they own none. Done: the cited titles pass; B07's control tests unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B08-PERSISTENCE-AUDIT",
+      "stage": 2,
+      "starts_from": "b08/stage-1",
+      "depends_on": ["B08-PERSISTENCE-EXECUTION"],
+      "owns_fakes": [],
+      "migrations": ["0020_audits_cost_grants.sql"],
+      "tests": [
+        "packages/persistence/test/audit-migrations.test.ts",
+        "packages/persistence/test/audit-adapters.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/audit-migrations.test.ts (R2-044 at the database) and packages/persistence/test/audit-adapters.test.ts (the pool race for the last cents, step fences, the journal returning a stored response) under their exact titles; see them fail. Then build @kauro/domain model/audit (records, grant arithmetic, audit deadlines, policy values freeAuditCeilingCents 150, interpretationSeconds 1200, auditAbsoluteSeconds 86400, agencyAudits 1) and ports/audit-store.ts; migration 0020_audits_cost_grants.sql exactly as design section 9 (Audit and CostGrant seeded, cost_grants with the ceiling CHECK and the pool reservation, the FK and BEFORE INSERT reservation trigger on B06's request_journal.cost_grant_id KA083, audits one per subject and one live per agency with the DRAFT_READY deferred guard, audit_steps under the current fence KA080, model_tasks, content-idempotent decision_artifacts, plan_validations, the control plane's system-draft insert and validation edges on plans); the pg adapters (audit, grant, step, model task and validation repositories, the ModelTaskJournalPort over model_tasks and request_journal, ArtifactResolver over decision_artifacts); fixtures for a funded pool. Update only the fixtures of B06's packages/persistence/test/journals-leases.test.ts and adapters-journals-outbox.test.ts so every request_journal row names a funded grant, their assertions unchanged. Done: the cited titles pass; every other suite unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B08-COMMANDS-AUDIT",
+      "stage": 3,
+      "starts_from": "b08/stage-2",
+      "depends_on": ["B08-PERSISTENCE-AUDIT", "B08-CORE-PORTS"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/api/test/cmd020-start-audit.test.ts",
+        "apps/api/test/cmd021-cancel-audit.test.ts",
+        "apps/api/test/cmd022-create-plan.test.ts",
+        "apps/api/test/cmd024-validate-plan.test.ts",
+        "apps/api/test/audit-reads.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd020-start-audit.test.ts (R2-044 and CMD020 support), apps/api/test/cmd021-cancel-audit.test.ts, apps/api/test/cmd022-create-plan.test.ts, apps/api/test/cmd024-validate-plan.test.ts and apps/api/test/audit-reads.test.ts under their exact titles; see them fail. Then build in @kauro/application, on B06's pipeline: CMD020 StartAudit (sealed and available revision, confirmed current target, one live audit, the AUDIT grant carved from the pool under its row lock or 429 BUDGET_EXHAUSTED NO_FUNDED_GRANT with nothing written, 202), CMD021 CancelAudit (200), CMD022 CreatePlan (PlanCompilerPort over the audit's candidates and the decision artifact, 201), CMD024 ValidatePlan (validation intent, 202), GetAudit, the content-idempotent decision-artifact intake; bind B06's CMD023 PlanPatchCompiler to PlanCompilerPort and ArtifactResolver to decision_artifacts, and the real DisclosureComposer for CMD025; closed outcome catalogues of design section 12. Serve them in apps/api (inventory, schemas, OpenAPI paths, matrix rows of Audit, CostGrant and the Plan edges B08 performs, role matrix). A deployment without the cores adapter answers INTEGRITY_FAILURE CORE_SERVICES_UNAVAILABLE (D8-PORT-1); tests bind B08-CORE-PORTS' fakes. Done: the cited titles pass through the real routes; B06's CMD023 and CMD025 tests unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B08-CONTROL-AUDIT",
+      "stage": 3,
+      "starts_from": "b08/stage-2",
+      "depends_on": ["B08-PERSISTENCE-AUDIT", "B08-CORE-PORTS", "B08-CONTROL-EXECUTION"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/control/test/audit-orchestration.test.ts",
+        "apps/control/test/plan-validation.test.ts",
+        "apps/control/test/grant-reconciliation.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/control/test/audit-orchestration.test.ts (the three steps, stale steps, cancellation and deadline after every await), apps/control/test/plan-validation.test.ts (only the current intent validates) and apps/control/test/grant-reconciliation.test.ts (unknown usage reserved, never early) under their exact titles; see them fail. Then build in apps/control: AUDIT_ORCHESTRATION (PROFILE, INTERPRET, VALIDATE of design section 3, each claiming fence + 1 and calling its port outside any transaction, the system draft plan, the receipt through a second verified pool whose login is a kauro_validator member, the DRAFT_READY guard), PLAN_VALIDATION, and the sweepers AUDIT_DEADLINES and GRANT_RECONCILIATION added to EXECUTION_SWEEPERS and runCycle; EXECUTION_CONTROL extended to cancel audits on a lost source. Tests bind B08-CORE-PORTS' fakes with hold points; they own none. Done: the cited titles pass; pnpm run verify green."
+    },
+    {
+      "key": "B08-INTEGRATION",
+      "stage": 4,
+      "starts_from": "b08/stage-3",
+      "depends_on": ["B08-COMMANDS-EXECUTION", "B08-CONTROL-EXECUTION", "B08-COMMANDS-AUDIT", "B08-CONTROL-AUDIT"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": ["apps/control/test/b08-end-to-end.test.ts"],
+      "estimate": "0.5 agent-day",
+      "task": "Tests first: write the case-map row citing apps/control/test/b08-end-to-end.test.ts (CMD036-OK end to end) under its exact title; see it fail. Then compose the application's own handlers (as apps/api's assembly binds them, each answer checked with checkReply against its route contract) with apps/control's dispatcher, consumers and sweepers over one cluster and one set of labelled fakes: a sealed revision audited to DRAFT_READY, approved through CMD025, paid through B09's paidPurchase, executed, admitted, run, verified and published, the package AVAILABLE, the job READY and the authorization DELIVERED exactly once, then one whole runCycle that finds nothing to repair. Move every case-map row from PLANNED to its class with its commit, recompute the status table, run pnpm run verify on Windows and on Linux (fresh clone) and record the result in the design's verification section. Done: every cited title exists and passes on both hosts; the case-map check green with no PLANNED row left."
+    }
+  ]
+}
