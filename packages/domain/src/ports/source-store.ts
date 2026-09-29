@@ -138,6 +138,18 @@ export interface UploadSessionRepository {
   findDeadlinePassed(limit: number): Promise<ReadonlyArray<{ readonly uploadId: UploadId; readonly agencyId: AgencyId; readonly revisionId: RevisionId; readonly state: UploadState }>>;
   /** Control-plane discovery: provider cancellations REQUESTED or UNCERTAIN whose provider horizon has not passed on the server clock. */
   findProviderReconciliation(limit: number): Promise<ReadonlyArray<{ readonly uploadId: UploadId; readonly agencyId: AgencyId; readonly revisionId: RevisionId }>>;
+  /**
+   * Control-plane discovery (unbound; B07-R4): the agencies holding a provider cancellation still REQUESTED or UNCERTAIN whose
+   * provider horizon has passed on the server clock. The bearer records are readable only bound to their agency, so which of those
+   * sessions still hold one is asked per agency (`findLapsedSessionSecrets`).
+   */
+  findAgenciesWithLapsedCancellations(limit: number): Promise<ReadonlyArray<AgencyId>>;
+  /**
+   * Bound to one agency (B07-R4): its uploads whose provider cancellation is still REQUESTED or UNCERTAIN past the provider horizon
+   * on the server clock and whose sealed bearer record is still stored — the records PROVIDER_SESSION_RECONCILIATION purges (D-CTRL-7:
+   * once the horizon passed the session is dead, and no answer is invented). Ids only.
+   */
+  findLapsedSessionSecrets(limit: number): Promise<ReadonlyArray<{ readonly uploadId: UploadId; readonly agencyId: AgencyId; readonly revisionId: RevisionId }>>;
 }
 
 export interface SessionSecretRepository {

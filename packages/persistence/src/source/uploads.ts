@@ -378,6 +378,39 @@ export class PgUploadSessionRepository implements UploadSessionRepository {
     );
     return r.rows.map((x) => ({ uploadId: x.upload_id as UploadId, agencyId: x.agency_id as AgencyId, revisionId: x.revision_id as RevisionId }));
   }
+
+  /**
+   * B07-R4, unbound: the agencies with a pending provider cancellation (REQUESTED or UNCERTAIN) past its horizon on the server clock
+   * (the partial index upload_sessions_provider_reconciliation). Whether a bearer record is still held is not visible unbound
+   * (upload_session_secrets is readable by the control plane only in the agency it is bound to), so it is asked per agency.
+   */
+  async findAgenciesWithLapsedCancellations(limit: number): Promise<ReadonlyArray<AgencyId>> {
+    const r = await execute<{ agency_id: string }>(
+      this.db,
+      `SELECT DISTINCT agency_id FROM kauro.upload_sessions
+        WHERE provider_cancellation_state IN ('REQUESTED', 'UNCERTAIN') AND provider_session_expires_at <= kauro.server_now()
+        ORDER BY agency_id LIMIT $1`,
+      [pageLimit(limit, 1000)],
+    );
+    return r.rows.map((x) => x.agency_id as AgencyId);
+  }
+
+  /**
+   * B07-R4, bound to one agency: its pending provider cancellations past the horizon whose sealed bearer record is still stored (the
+   * secret row's policy shows the bound agency's rows only). Ids only; no ciphertext is read.
+   */
+  async findLapsedSessionSecrets(limit: number): Promise<ReadonlyArray<{ readonly uploadId: UploadId; readonly agencyId: AgencyId; readonly revisionId: RevisionId }>> {
+    const r = await execute<{ upload_id: string; agency_id: string; revision_id: string }>(
+      this.db,
+      `SELECT u.upload_id, u.agency_id, u.revision_id FROM kauro.upload_sessions u
+        WHERE u.agency_id = kauro.current_agency_id()
+          AND u.provider_cancellation_state IN ('REQUESTED', 'UNCERTAIN') AND u.provider_session_expires_at <= kauro.server_now()
+          AND EXISTS (SELECT 1 FROM kauro.upload_session_secrets s WHERE s.agency_id = u.agency_id AND s.upload_id = u.upload_id)
+        ORDER BY u.provider_session_expires_at, u.upload_id LIMIT $1`,
+      [pageLimit(limit, 1000)],
+    );
+    return r.rows.map((x) => ({ uploadId: x.upload_id as UploadId, agencyId: x.agency_id as AgencyId, revisionId: x.revision_id as RevisionId }));
+  }
 }
 
 // --- the sealed provider session reference (D-SESSION-1) -------------------------------------------------------------------------
