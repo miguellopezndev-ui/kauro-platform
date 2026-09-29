@@ -483,8 +483,8 @@ export const APPLICABILITY = {
   },
   CMD032: {
     "legitimate state": [["cmd032-approve-refund.test.ts", "OK: a KAURO_OWNER with a fresh step-up approves the remaining service"], ["cmd032-approve-refund.test.ts", "D-REF-B4: a standing policy that covers the refund as it stands authorizes the approval without a step-up"]],
-    "wrong role": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED"]],
-    "wrong agency": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND"]],
+    "wrong role": [["cmd032-approve-refund.test.ts", "DENY: a foreign tenant's real refund is never revealed — outside the grant (agency A's owner, a revoked corporate owner) it is NOT_AUTHORIZED CORPORATE_ROLE_MISSING exactly like an id nobody holds, within the grant agency B's capture is NOT_FOUND like one, and the finance scope adopted through agency A's refund neither sees, approves nor adopts agency B's —, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd032-approve-refund.test.ts", "DENY: a foreign tenant's real refund is never revealed"]],
     "stale version": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION"]],
     "duplicate request": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "changed-body same key": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT"]],
@@ -512,19 +512,19 @@ APPLICABILITY.CMD030 = {
 };
 APPLICABILITY.CMD033 = {
   "legitimate state": [[EXECUTE, "OK: the payment service executes an approved refund once"]],
-  "wrong role": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
-  "wrong agency": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND"]],
-  "stale version": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
+  "wrong role": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach"]],
+  "stale version": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
   "duplicate request": [[EXECUTE, "RACE: an identical retry resumes the one operation"]],
   "changed-body same key": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT"]],
   "invalid schema": [SERVICE_ADMISSION],
   "lost response": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing"]],
-  "external uncertainty": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
+  "external uncertainty": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
 };
 APPLICABILITY.CMD034 = {
   "legitimate state": [[RECONCILE, "OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization"]],
-  "wrong role": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
-  "wrong agency": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND"]],
+  "wrong role": [[RECONCILE, "DENY: a foreign tenant's real order is out of reach — agency B's quote and capture at the order route are NOT_FOUND exactly like an id nobody holds, agency B's stored provider query applied to agency A's order is refused OBSERVATION_SUBJECT_MISMATCH naming nothing of B's, and the payment service's scope adopted through agency A's order neither sees agency B's order nor lets the reconciler apply B's query to it —, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[RECONCILE, "DENY: a foreign tenant's real order is out of reach"]],
   "stale version": "NOT_APPLICABLE: ReconcilePayment carries no expectedVersion (registry fields: observationRef); observations are ordered by provider chronology and applied once per stored artifact and subject",
   "duplicate request": [[RECONCILE, "RACE: an identical retry replays"]],
   "changed-body same key": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT"]],
@@ -705,7 +705,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();

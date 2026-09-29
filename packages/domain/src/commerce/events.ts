@@ -283,10 +283,13 @@ export const COMMERCE_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<CommerceEventType
   "refund.submitting.v1": ["refundId", "agencyId", "attemptId"],
   "refund.uncertain.v1": ["refundId", "agencyId", "attemptId"],
   // fundsState and movableBalanceCents: the balance the refunded money is taken from, and the capture's movable balance before this
-  // refund, read after the completions of the same capture that committed before it (D-LEDGER-B5, D-LEDGER-B6)
+  // refund, read after the completions of the same capture that committed before it (D-LEDGER-B5, D-LEDGER-B6); returned*Cents: what
+  // this completion returns from the capture's unreturned components — its approved components, or nothing when the capture's
+  // reversal already returned them (commerce/ledger refundReturnOf, D-LEDGER-B7; B09-R2). serviceCents, taxCents and excessCents stay
+  // the approved components the credit note and the commissions follow.
   "refund.completed.v1": [
     "refundId", "agencyId", "projectId", "orderId", "captureId", "serviceCents", "taxCents", "excessCents", "serviceBasisAfterCents", "fundsState",
-    "movableBalanceCents", "previousState", "evidenceHash",
+    "movableBalanceCents", "returnedServiceCents", "returnedTaxCents", "returnedExcessCents", "previousState", "evidenceHash",
   ],
   "refund.failed.v1": ["refundId", "agencyId", "failureCode", "previousState"],
   "tax_document.drafted.v1": [

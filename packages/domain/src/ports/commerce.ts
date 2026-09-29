@@ -582,6 +582,11 @@ export interface NewReconciliationCase {
   readonly orderId?: PaymentOrderId;
   readonly captureId?: CaptureId;
   readonly refundId?: RefundId;
+  /**
+   * The provider object the case is about when no local fact holds it (migration 0019): a provider refund no local refund explains
+   * (UNKNOWN_REFUND, B09-R1) is its own case, one per provider refund, beside every other case of its capture.
+   */
+  readonly providerRef?: string;
   readonly kind: ReconciliationCaseKind;
   readonly detailCode: string;
   readonly amountCents?: bigint;

@@ -413,7 +413,7 @@ test("planObservation — a refund's provider completion confirms its attempt an
   w.store().attempts.set(attempt.attemptId, attempt);
   const plan = planObservation(factsOf(w, { ...order, allocatedCents: R2_077.total }, { captures: [capture], authorizations: [live], refunds: [refund] }), {
     origin: { source: "DISPATCH_RESPONSE", attemptId: attempt.attemptId },
-    content: { kind: "DISPATCH_RESULT", result: { kind: "REFUND_OBSERVED", refund: { provider: "paypal", environment: "SANDBOX", providerCaptureId: capture.providerCaptureId, providerRefundId: "PPR1", status: "COMPLETED", amountCents: R2_077.total, currency: "USD", evidenceHash: sha("r") } } },
+    content: { kind: "DISPATCH_RESULT", result: { kind: "REFUND_OBSERVED", refund: { provider: "paypal", environment: "SANDBOX", providerCaptureId: capture.providerCaptureId, providerRefundId: "PPR1", platformRefundRef: refundId, status: "COMPLETED", amountCents: R2_077.total, currency: "USD", evidenceHash: sha("r") } } },
     mint: mint(w),
   });
   assert.deepEqual(ops(plan), ["ATTEMPT_TRANSITION", "AUTHORIZATION_TRANSITION", "REFUND_TRANSITION", "SCOPE", "OBSERVATION"]);
@@ -424,6 +424,72 @@ test("planObservation — a refund's provider completion confirms its attempt an
   assert.equal(completed.change.providerRefundId, "PPR1");
   assert.equal(find(plan, "AUTHORIZATION_TRANSITION")[0]!.change.revocation?.code, "SERVICE_FULLY_REFUNDED");
   assert.equal(find(plan, "SCOPE")[0]!.entry.kind, "PROVIDER_REFUND");
+});
+
+test("planObservation — B09-R1 and B09-R4: a provider refund binds a local refund by identity only — a same-amount refund of the capture naming no platform reference is its own UNKNOWN_REFUND case and leaves the refund in flight; a dispatch response naming another provider refund than the one its refund completed with confirms the attempt and opens that refund's own case, never a silent NO_CHANGE; a fee reported for a DENIED capture is a visible inconsistency, never a fee version", async () => {
+  const w = commerceWorld();
+  const order = await w.seedOrder("CAPTURED");
+  const capture = capturedRecord(w, order, { version: 3 });
+  const refundId = w.ids.next() as RefundId;
+  const inFlight: RefundRecord = {
+    refundId,
+    agencyId: w.agencyId,
+    projectId: w.projectId,
+    orderId: order.orderId,
+    captureId: capture.captureId,
+    version: 3,
+    state: "SUBMITTING",
+    origin: "CUSTOMER_REQUEST",
+    reasonCode: "Cancelled",
+    termsHash: order.termsHash,
+    deliveryPhase: "PRE_EXECUTION",
+    proposed: { serviceCents: 1000n, taxCents: 0n, excessCents: 0n },
+    requestedAt: w.clock.now(),
+    approved: { amounts: { serviceCents: 1000n, taxCents: 0n, excessCents: 0n }, authorizationKind: "OWNER_STEP_UP", authorizationHash: sha("a"), effectsHash: sha("e"), creditNoteRequired: true, approvedByUserId: w.owner.userId, approvedAt: w.clock.now() },
+  };
+  const attempt = { ...w.seedAttempt(order, "CAPTURE", "DISPATCHING"), operation: "REFUND" as const, refundId };
+  w.store().attempts.set(attempt.attemptId, attempt);
+  const refundOf = (providerRefundId: string, platformRefundRef: string | null) => ({ provider: "paypal", environment: "SANDBOX" as const, providerCaptureId: capture.providerCaptureId, providerRefundId, platformRefundRef, status: "COMPLETED" as const, amountCents: 1000n, currency: "USD", evidenceHash: sha(`refund-${providerRefundId}`) });
+
+  // a verified webhook of a same-amount provider refund of the capture that names no platform reference: not the refund in flight
+  const separate = planObservation(factsOf(w, order, { captures: [capture], refunds: [inFlight] }), {
+    origin: { source: "WEBHOOK", inboxId: w.ids.next() as InboxId },
+    content: { kind: "PROVIDER_EVENT", event: { kind: "REFUND_COMPLETED", provider: "paypal", environment: "SANDBOX", externalEventId: "WH-SEPARATE", refund: refundOf("PPRSEPARATE", null), bodyHash: sha("separate") } },
+    mint: mint(w),
+  });
+  assert.deepEqual(ops(separate), ["CASE_OPEN", "OBSERVATION"], "no refund transition, no attempt transition");
+  const unknown = find(separate, "CASE_OPEN")[0]!.entry;
+  assert.deepEqual([unknown.kind, unknown.detailCode, unknown.captureId, unknown.refundId, unknown.providerRef, unknown.amountCents], ["PROVIDER_INCONSISTENCY", "UNKNOWN_REFUND", capture.captureId, undefined, "PPRSEPARATE", 1000n]);
+  assert.deepEqual(separate.effects, [{ about: "REFUND", effect: "NO_CHANGE" }]);
+
+  // the refund completed with PPR1; the attempt's own response then names PPR2: the attempt took effect, PPR2 is its own case
+  const done: RefundRecord = { ...inFlight, version: 4, state: "COMPLETED", providerRefundId: "PPR1", evidenceHash: sha("r1"), completedAt: w.clock.now() };
+  const another = planObservation(factsOf(w, order, { captures: [capture], refunds: [done] }), {
+    origin: { source: "DISPATCH_RESPONSE", attemptId: attempt.attemptId },
+    content: { kind: "DISPATCH_RESULT", result: { kind: "REFUND_OBSERVED", refund: refundOf("PPR2", refundId) } },
+    mint: mint(w),
+  });
+  assert.deepEqual(ops(another), ["ATTEMPT_TRANSITION", "CASE_OPEN", "OBSERVATION"]);
+  assert.equal(find(another, "ATTEMPT_TRANSITION")[0]!.change.state, "CONFIRMED");
+  assert.deepEqual([find(another, "CASE_OPEN")[0]!.entry.detailCode, find(another, "CASE_OPEN")[0]!.entry.providerRef], ["UNKNOWN_REFUND", "PPR2"]);
+  // the provider refund it completed with, observed again, is a duplicate
+  const again = planObservation(factsOf(w, order, { captures: [capture], refunds: [done] }), {
+    origin: { source: "DISPATCH_RESPONSE", attemptId: attempt.attemptId },
+    content: { kind: "DISPATCH_RESULT", result: { kind: "REFUND_OBSERVED", refund: refundOf("PPR1", refundId) } },
+    mint: mint(w),
+  });
+  assert.equal(find(again, "CASE_OPEN").length, 0);
+  assert.deepEqual(again.effects, [{ about: "REFUND", effect: "DUPLICATE" }]);
+
+  // a fee reported for a capture the provider denied: money never captured, so no fee version and no posting — a visible case
+  const pending = capturedRecord(w, order, { status: "PENDING", allocation: { serviceCents: 0n, taxCents: 0n, excessCents: 0n }, providerCaptureId: "PPC0000000000TEST2" });
+  const denied = planObservation(factsOf(w, order, { captures: [pending], refunds: [] }), {
+    origin: { source: "PROVIDER_QUERY", artifactRef: w.ids.next() as EvidenceArtifactRef },
+    content: { kind: "ORDER_OBSERVATION", observation: { providerOrderId: order.providerOrderId ?? null, orderStatus: "APPROVED", captures: [observed(w, order, { providerCaptureId: "PPC0000000000TEST2", status: "DENIED", providerCompletedAt: null, feeCents: 300n })], refunds: [], absenceIsProof: true, observedAt: w.clock.now(), evidenceHash: sha("denied-view") } },
+    mint: mint(w),
+  });
+  assert.equal(find(denied, "CAPTURE_FEE").length, 0);
+  assert.deepEqual(find(denied, "CASE_OPEN").map((c) => [c.entry.detailCode, c.entry.amountCents]), [["FEE_WITHOUT_CAPTURE", 300n]]);
 });
 
 test("planObservation — the protocol's own results: an ambiguous capture makes the attempt UNCERTAIN, the order CAPTURE_UNCERTAIN and a visible UNCERTAIN_EFFECT case; a proved no-effect returns the order to APPROVED (or CREATED when not approved); a created order learns its identity once with an allowlisted approval page", async () => {

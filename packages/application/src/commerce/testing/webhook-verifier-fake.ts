@@ -119,7 +119,8 @@ export function normalizePayPalWebhook(bytes: Uint8Array, environment: PaymentEn
     const captureId = str(up?.["href"])?.split("/").pop() ?? null;
     const status = str(resource["status"]);
     if (id === null || amount === null || captureId === null || (status !== "COMPLETED" && status !== "PENDING" && status !== "FAILED")) return null;
-    const refund: ObservedRefund = { provider: PAYPAL_FAKE_PROVIDER, environment, providerCaptureId: captureId, providerRefundId: id, status, amountCents: amount.cents, currency: amount.currency, evidenceHash: bodyHash };
+    // the refund resource's invoice_id is the platform's refund reference its request carried (none for a refund made elsewhere)
+    const refund: ObservedRefund = { provider: PAYPAL_FAKE_PROVIDER, environment, providerCaptureId: captureId, providerRefundId: id, platformRefundRef: str(resource["invoice_id"]), status, amountCents: amount.cents, currency: amount.currency, evidenceHash: bodyHash };
     return { ...base, kind: status === "COMPLETED" ? "REFUND_COMPLETED" : status === "PENDING" ? "REFUND_PENDING" : "REFUND_FAILED", refund };
   }
   if (eventType === "CUSTOMER.DISPUTE.CREATED" || eventType === "CUSTOMER.DISPUTE.RESOLVED") {

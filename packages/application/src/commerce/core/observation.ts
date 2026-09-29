@@ -91,7 +91,9 @@ import {
   movableBalanceOf,
   proposeRefund,
   providerScopeKey,
+  refundReturnOf,
   refundableBalance,
+  returnedCentsOf,
   revocationPhaseOf,
 } from "@kauro/domain";
 import type { ProviderDispatchResult, ProviderOrderObservation } from "../ports.js";
@@ -410,9 +412,10 @@ class Planner {
     });
   }
 
-  private openCase(kind: ReconciliationCaseKind, subject: { readonly captureId?: CaptureId; readonly refundId?: RefundId }, detailCode: string, evidenceHash: Sha256Hex, amountCents?: bigint): void {
-    // a case that names a capture or a refund always names its order too: one purchase (D-BIND-B2; residual FINAL-N1)
-    const key = `${kind}|${this.order.orderId}|${subject.captureId ?? "-"}|${subject.refundId ?? "-"}`;
+  private openCase(kind: ReconciliationCaseKind, subject: { readonly captureId?: CaptureId; readonly refundId?: RefundId; readonly providerRef?: string }, detailCode: string, evidenceHash: Sha256Hex, amountCents?: bigint): void {
+    // a case that names a capture or a refund always names its order too: one purchase (D-BIND-B2; residual FINAL-N1); a provider
+    // object no local fact holds is part of the subject (a provider refund no local refund explains, B09-R1; migration 0019)
+    const key = `${kind}|${this.order.orderId}|${subject.captureId ?? "-"}|${subject.refundId ?? "-"}|${subject.providerRef ?? "-"}`;
     if (this.casesPlanned.has(key)) return;
     this.casesPlanned.add(key);
     const caseId = this.input.mint() as ReconciliationCaseId;
@@ -423,6 +426,7 @@ class Planner {
       orderId: this.order.orderId,
       ...(subject.captureId !== undefined ? { captureId: subject.captureId } : {}),
       ...(subject.refundId !== undefined ? { refundId: subject.refundId } : {}),
+      ...(subject.providerRef !== undefined ? { providerRef: subject.providerRef } : {}),
       kind,
       detailCode: detail,
       ...(amountCents !== undefined ? { amountCents, currency: this.order.currency } : {}),
@@ -531,6 +535,9 @@ class Planner {
         const completedService = [...this.refunds.values()].filter((r) => r.captureId === refund.captureId && r.state === "COMPLETED" && r.refundId !== refund.refundId).reduce((acc, r) => acc + (r.approved?.amounts.serviceCents ?? 0n), 0n);
         const allocated = capture?.allocation.serviceCents ?? 0n;
         const basisAfter = allocated - completedService - (approved?.amounts.serviceCents ?? 0n);
+        // what this completion returns from the capture: its approved components, or nothing once the capture's reversal returned
+        // every component no completed refund had (D-LEDGER-B7; B09-R2) — each return nets against the capture exactly once
+        const returns = approved === undefined ? undefined : capture === undefined ? approved.amounts : refundReturnOf(approved.amounts, capture.status);
         members = {
           refundId: refund.refundId,
           agencyId: this.agencyId,
@@ -547,7 +554,10 @@ class Planner {
           movableBalanceCents:
             capture === undefined
               ? undefined
-              : movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(this.completedRefundsOf(refund.captureId, refund.refundId)) }),
+              : movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: returnedCentsOf(capture, total(this.completedRefundsOf(refund.captureId, refund.refundId))) }),
+          returnedServiceCents: returns?.serviceCents,
+          returnedTaxCents: returns?.taxCents,
+          returnedExcessCents: returns?.excessCents,
           previousState,
           evidenceHash: extra.evidenceHash,
         };
@@ -818,11 +828,13 @@ class Planner {
       this.provedNoEffect(capturing, "NO_CAPTURE_OBSERVED", observation.evidenceHash, observation.orderStatus);
     }
     for (const refund of observation.refunds) this.refund(refund, null, at);
-    // a refund in flight that the provider's authoritative view does not show was never made: its attempt proves no effect
+    // a refund in flight that the provider's authoritative view does not show was never made: its attempt proves no effect. Absence
+    // is judged per refund, by identity (B09-R3): a provider refund is this refund's trace only when it is bound to it — its provider
+    // refund id, or the platform reference its own request carried — never because it refunds the same capture (another refund of
+    // the capture, completed before, is that refund's trace, not this one's)
     for (const r of [...this.refunds.values()]) {
       if (r.state !== "SUBMITTING" && r.state !== "UNCERTAIN") continue;
-      const providerCaptureId = this.captures.get(r.captureId)?.providerCaptureId;
-      if (observation.refunds.some((x) => x.providerRefundId === r.providerRefundId || x.providerCaptureId === providerCaptureId)) continue;
+      if (observation.refunds.some((x) => (r.providerRefundId !== undefined && x.providerRefundId === r.providerRefundId) || x.platformRefundRef === r.refundId)) continue;
       const a = this.refundAttempt(r.refundId);
       if (a !== null && this.absenceProves(a, observation)) this.provedNoEffect(a, "REFUND_NOT_FOUND", observation.evidenceHash, undefined);
     }
@@ -967,14 +979,20 @@ class Planner {
       this.attemptTo(attempt, "CONFIRMED", { evidenceHash: observed.evidenceHash });
       if (this.order.state === "CAPTURING" || this.order.state === "CAPTURE_UNCERTAIN") this.orderTo("CAPTURED", { captureId: capture.captureId });
     }
-    // later provider facts, one per version (D-EVT-B2): the fee, then the availability of the funds
-    if (capture.status === "COMPLETED") {
+    // later provider facts, one per version (D-EVT-B2): the fee, then the availability of the funds. The fee is a fact of captured
+    // money whenever the provider reports it — with the completion, after it, with the reversal or after it (B09-R4): a reversal
+    // returns the capture's movable balance, and a fee the provider keeps is posted all the same, from the merchant's available
+    // balance (D-LEDGER-B6). A fee reported with a PENDING capture travels with its completion; one reported for a DENIED capture —
+    // money never captured — is a visible inconsistency, never posted and never dropped.
+    if (capture.status === "COMPLETED" || capture.status === "REVERSED") {
       if (observed.feeCents !== null) {
         if (capture.providerFeeCents === undefined) advanced = this.learnFee(capture, observed.feeCents, observed.evidenceHash) || advanced;
         else if (capture.providerFeeCents !== observed.feeCents) this.openCase("PROVIDER_INCONSISTENCY", { captureId: capture.captureId }, "FEE_DIFFERS", observed.evidenceHash, observed.feeCents);
       }
-      if (observed.fundsState !== "UNKNOWN" && observed.fundsState !== capture.fundsState) advanced = this.learnFunds(capture, observed.fundsState, observed.evidenceHash) || advanced;
+    } else if (capture.status === "DENIED" && observed.feeCents !== null && observed.feeCents > 0n) {
+      this.openCase("PROVIDER_INCONSISTENCY", { captureId: capture.captureId }, "FEE_WITHOUT_CAPTURE", observed.evidenceHash, observed.feeCents);
     }
+    if (capture.status === "COMPLETED" && observed.fundsState !== "UNKNOWN" && observed.fundsState !== capture.fundsState) advanced = this.learnFunds(capture, observed.fundsState, observed.evidenceHash) || advanced;
     obs(observed.status, advanced ? "ADVANCED" : "DUPLICATE");
   }
 
@@ -1115,9 +1133,9 @@ class Planner {
         orderId: capture.orderId,
         providerFeeCents: feeCents,
         // the balance the fee is taken from, as the capture's funds stand at this version (D-LEDGER-B5), and the capture's movable
-        // balance before the fee: its amount less the money already returned (D-LEDGER-B6)
+        // balance before the fee: its amount less the money already returned (D-LEDGER-B6) — all of it once reversed (D-LEDGER-B7)
         fundsState: capture.fundsState,
-        movableBalanceCents: movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(this.completedRefundsOf(capture.captureId)) }),
+        movableBalanceCents: movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: returnedCentsOf(capture, total(this.completedRefundsOf(capture.captureId))) }),
         currency: capture.currency,
         evidenceHash,
         source: this.source,
@@ -1131,7 +1149,7 @@ class Planner {
     const version = capture.version + 1;
     const returned = this.completedRefundsOf(capture.captureId);
     // the movable balance: what of the capture's money is still at the provider to move between its balances (D-LEDGER-B5)
-    const movable = movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: total(returned) });
+    const movable = movableBalanceOf({ amountCents: capture.amountCents, providerFeeCents: capture.providerFeeCents ?? 0n, returnedCents: returnedCentsOf(capture, total(returned)) });
     this.steps.push({
       op: "CAPTURE_FUNDS",
       captureId: capture.captureId,
@@ -1289,16 +1307,26 @@ class Planner {
     if (this.isStale("REFUND", ref, providerEventAt)) return obs(observed.status, "STALE_IGNORED");
     const refund = this.refundFor(observed, capture, attempt);
     if (refund === null) {
-      // money returned that no local refund explains (a refund made outside the platform): visible for the owner's review
-      this.openCase("PROVIDER_INCONSISTENCY", { captureId: capture.captureId }, "UNKNOWN_REFUND", observed.evidenceHash, observed.amountCents);
+      // money returned that no local refund explains (a refund made outside the platform): its own incident, keyed by the provider
+      // refund, with its own amount, for the owner's review — 15 "Unexplained differences create a case with amount and age. They do
+      // not enter a generic 'miscellaneous' account without review": its correction is the case's reviewed resolution (D-LEDGER-B4)
+      this.unknownRefund(observed, capture);
+      return obs(observed.status, "NO_CHANGE");
+    }
+    if (refund.providerRefundId !== undefined && refund.providerRefundId !== ref) {
+      // the local refund completed with another provider refund, so this one is not it — whatever reference or request it names —
+      // and is money no local refund explains; the attempt whose own response names it did take effect (B09-R1: never a silent NO_CHANGE)
+      if (attempt !== null && attempt.refundId === refund.refundId && LIVE_ATTEMPT.has(attempt.state)) this.attemptTo(attempt, "CONFIRMED", { evidenceHash: observed.evidenceHash });
+      this.unknownRefund(observed, capture);
       return obs(observed.status, "NO_CHANGE");
     }
     const refundAttempt = attempt ?? this.refundAttempt(refund.refundId);
     switch (observed.status) {
       case "COMPLETED": {
         if (refund.state === "COMPLETED") {
+          // the provider refund this refund completed with, observed again
           if (refundAttempt !== null && LIVE_ATTEMPT.has(refundAttempt.state)) this.attemptTo(refundAttempt, "CONFIRMED", { evidenceHash: observed.evidenceHash });
-          return obs("COMPLETED", refund.providerRefundId === ref ? "DUPLICATE" : "NO_CHANGE");
+          return obs("COMPLETED", "DUPLICATE");
         }
         if (refund.state !== "SUBMITTING" && refund.state !== "UNCERTAIN") {
           this.openCase("PROVIDER_INCONSISTENCY", { captureId: capture.captureId, refundId: refund.refundId }, "REFUND_NOT_SUBMITTED", observed.evidenceHash, observed.amountCents);
@@ -1329,17 +1357,28 @@ class Planner {
     }
   }
 
-  /** The local refund an observed provider refund is: by provider id, by the attempt that dispatched it, or the one in flight that matches. */
+  /**
+   * The local refund an observed provider refund is, bound by identity only (B09-R1): the provider refund id a local refund
+   * completed with; the attempt whose own dispatch response (or resume read by its request identity) reports it; or the platform's
+   * own refund reference the provider's resource names (the refund id the request carried, part of the attempt's exact request).
+   * Never by amount: a same-amount refund on the same capture is not evidence that it is the one in flight.
+   */
   private refundFor(observed: ObservedRefund, capture: Mutable<CaptureFactRecord>, attempt: Mutable<PaymentAttemptRecord> | null): Mutable<RefundRecord> | null {
     for (const r of this.refunds.values()) if (r.providerRefundId === observed.providerRefundId) return r;
     if (attempt !== null && attempt.refundId !== undefined) {
       const r = this.refunds.get(attempt.refundId);
       if (r !== undefined && r.captureId === capture.captureId) return r;
     }
-    const candidates = [...this.refunds.values()].filter(
-      (r) => r.captureId === capture.captureId && (r.state === "SUBMITTING" || r.state === "UNCERTAIN") && r.providerRefundId === undefined && r.approved !== undefined && total(r.approved.amounts) === observed.amountCents,
-    );
-    return candidates.length === 1 ? candidates[0]! : null;
+    if (observed.platformRefundRef !== null) {
+      const r = this.refunds.get(observed.platformRefundRef as RefundId);
+      if (r !== undefined && r.captureId === capture.captureId) return r;
+    }
+    return null;
+  }
+
+  /** A provider refund no local refund explains: its own UNKNOWN_REFUND case (one per provider refund; 0019), with its amount. */
+  private unknownRefund(observed: ObservedRefund, capture: Mutable<CaptureFactRecord>): void {
+    this.openCase("PROVIDER_INCONSISTENCY", { captureId: capture.captureId, providerRef: observed.providerRefundId }, "UNKNOWN_REFUND", observed.evidenceHash, observed.amountCents);
   }
 
   // --- disputes -------------------------------------------------------------------------------------------------------------

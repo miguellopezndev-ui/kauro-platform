@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ApproveRefundView, RefundReviewView, RequestRefundView } from "@kauro/application";
 import type { CaptureId, CommercialAuthorizationId, RefundId, UserId } from "@kauro/domain";
-import { authorizationPreimageMoney, refundAuthorizationHash, refundEffectsHash, toUtcInstant } from "@kauro/domain";
+import { DomainFailure, authorizationPreimageMoney, refundAuthorizationHash, refundEffectsHash, toUtcInstant } from "@kauro/domain";
 import { barrier } from "@kauro/persistence/testing";
 import { paymentRoutes, paymentsWorld, read, readData, subscribersOf, type PaymentsWorld } from "./commerce-support.js";
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, sha, waitForApiLockWait, type Reply } from "./support.js";
@@ -141,7 +141,7 @@ test("OK: a KAURO_OWNER with a fresh step-up approves the remaining service and 
   assert.deepEqual([review.refund.state, review.capture.captureId, review.termsHash], ["APPROVED", sale.captureId, row.terms_hash]);
 });
 
-test("DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED, and one missing prerequisite — a stale step-up, an amount above the remaining capture, a tax split the sale's rule does not release, an uncovering standing policy — is refused; nothing is approved", async () => {
+test("DENY: a foreign tenant's real refund is never revealed — outside the grant (agency A's owner, a revoked corporate owner) it is NOT_AUTHORIZED CORPORATE_ROLE_MISSING exactly like an id nobody holds, within the grant agency B's capture is NOT_FOUND like one, and the finance scope adopted through agency A's refund neither sees, approves nor adopts agency B's —, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED, and one missing prerequisite — a stale step-up, an amount above the remaining capture, a tax split the sale's rule does not release, an uncovering standing policy — is refused; nothing is approved", async () => {
   const { w } = pw;
   const { sale, refundId } = await requested("cmd032-deny");
   const fresh = await w.stepUp(pw.kora);
@@ -157,15 +157,46 @@ test("DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong
   const factsOf = async (actor: string) =>
     (await w.h.oracle.query<{ outcome: string; reason_code: string; agency_id: string | null; requested_agency_id: string | null }>("SELECT outcome, reason_code, agency_id, requested_agency_id FROM kauro.security_events WHERE action = 'CMD032' AND outcome = 'DENY' AND actor_id = $1 ORDER BY occurred_at, security_event_id", [actor])).rows.map((f) => [f.outcome, f.reason_code, f.agency_id, f.requested_agency_id]);
 
-  // outside the grant's reach: a refund no scope index names — unknown, or the id of another resource — is NOT_FOUND alike and adopts nothing
+  // a foreign tenant: agency B's own paid project and its owner's refund request through CMD031 — a real refund of another agency (B09-R5)
+  const foreign = await pw.foreignRefund("cmd032-deny-foreign");
+  const foreignRow = await refundRow(foreign.refundId);
+  assert.deepEqual([foreignRow?.state, foreignRow?.version], ["REQUESTED", "1"]);
+  const sameProblem = (a: Reply, b: Reply, what: string) => assert.deepEqual({ ...asProblem(w, a), correlationId: "" }, { ...asProblem(w, b), correlationId: "" }, what);
+
+  // outside the grant — agency A's own owner (a tenant principal, no corporate grant) and a corporate owner whose grant was revoked —
+  // the refusal comes before the scope index is read: agency B's real refund and an id nobody holds answer alike, nothing is adopted
+  const revoked = await w.person("cmd032-revoked-owner");
+  await w.h.revokeCorporateGrant(await w.h.grantKauroOwner(revoked.userId as UserId));
+  for (const outsider of [w.owner, revoked]) {
+    const proof = await w.stepUp(outsider);
+    const real = await refused(`${outsider.userId}: agency B's refund`, () => approve(foreign.refundId, { ...full, authorizationRef: proof }, { token: outsider.token }), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING");
+    const none = await refused(`${outsider.userId}: an id nobody holds`, () => approve(ids.next(), { ...full, authorizationRef: proof }, { token: outsider.token }), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING");
+    sameProblem(real, none, "outside the grant a foreign refund and an unknown id answer alike");
+    assert.deepEqual(await factsOf(outsider.userId), [["DENY", "CORPORATE_ROLE_MISSING", null, null], ["DENY", "CORPORATE_ROLE_MISSING", null, null]], "the denials name no agency");
+  }
+  // within the grant, a refund no scope index names — an id nobody holds, or agency B's real capture — is NOT_FOUND alike and adopts nothing
   const unknown = await refused("unknown refund", () => approve(ids.next(), full), "404 NOT_FOUND -");
-  const other = await refused("a capture's id is no refund", () => approve(sale.captureId, full), "404 NOT_FOUND -");
-  assert.deepEqual({ ...asProblem(w, unknown), correlationId: "" }, { ...asProblem(w, other), correlationId: "" });
+  const other = await refused("agency B's capture is no refund", () => approve(foreign.sale.captureId, full), "404 NOT_FOUND -");
+  sameProblem(unknown, other, "a foreign resource and an unknown id answer alike");
   assert.deepEqual(await factsOf(pw.kora.userId), [["DENY", "NOT_FOUND", null, null], ["DENY", "NOT_FOUND", null, null]], "the operator's own stream, naming no agency");
+  // the cross-scope negative control of the global operator role: the corporate owner's own unit of work (kauro_app, OPERATOR),
+  // adopted through agency A's refund as CMD032 adopts it, sees nothing of agency B's refund, cannot approve it, adopts no second scope
+  await w.h.commerce.run(w.h.operator(pw.kora.userId as UserId), async (uow) => {
+    assert.equal(await uow.adoptScope("REFUND", refundId), w.A.agencyId);
+    assert.equal(await uow.commerce.refunds.get(foreign.refundId as RefundId), null);
+    await assert.rejects(uow.adoptScope("REFUND", foreign.refundId), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");
+    const now = toUtcInstant(Date.now());
+    await assert.rejects(
+      uow.commerce.refunds.approve(foreign.refundId as RefundId, 1, { amounts: { serviceCents: foreign.sale.serviceCents, taxCents: 0n, excessCents: 0n }, authorizationKind: "OWNER_STEP_UP", authorizationProofRef: full.authorizationRef as never, authorizationHash: sha("cross-scope"), effectsHash: sha("cross-scope-effects"), creditNoteRequired: true, approvedByUserId: pw.kora.userId as UserId, approvedAt: now }, now),
+      (e: unknown) => e instanceof DomainFailure && e.code === "NOT_FOUND",
+    );
+  });
+  const after = await refundRow(foreign.refundId);
+  assert.deepEqual([after?.state, after?.version, after?.approved_service_cents, after?.approved_by_user_id], ["REQUESTED", "1", null, null], "agency B's refund is untouched");
 
   // a wrong role: the agency's own OWNER holds no corporate grant (Private Owner has no automatic bypass; 08)
   await refused("no KAURO_OWNER grant", async () => approve(refundId, { ...full, authorizationRef: await w.stepUp(w.owner) }, { token: w.owner.token }), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING");
-  assert.deepEqual(await factsOf(w.owner.userId), [["DENY", "CORPORATE_ROLE_MISSING", null, null]]);
+  assert.deepEqual(await factsOf(w.owner.userId), [["DENY", "CORPORATE_ROLE_MISSING", null, null], ["DENY", "CORPORATE_ROLE_MISSING", null, null], ["DENY", "CORPORATE_ROLE_MISSING", null, null]], "its own agency's refund is refused like the foreign one and the unknown id");
   // the requester, even holding a grant, never reviews its own request (segregation, D-AUTHZ-B2)
   const grant = await w.h.grantKauroOwner(w.billing.userId as UserId);
   try {

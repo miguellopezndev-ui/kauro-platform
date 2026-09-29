@@ -9,7 +9,8 @@
  *   capture.fee_observed.v1     FEE        providerFeePostings(fee, the funds state and the movable balance the event names)
  *   capture.funds_observed.v1   FUNDS      fundsPostings(previous, next, the movable balance the event carries)
  *   capture.reversed.v1         CHARGEBACK returnPostings(reversed components, the funds state and the movable balance the event names)
- *   refund.completed.v1         REFUND     returnPostings(approved components, the funds state and the movable balance the event names)
+ *   refund.completed.v1         REFUND     returnPostings(returned components — the approved ones, none after the capture's reversal
+ *                                          (D-LEDGER-B7) —, the funds state and the movable balance the event names)
  *   reconciliation_case.resolved.v1  CORRECTION  the reviewed resolution's reversing entries (mirrors) and adjusting lines
  *
  * Any other type posts nothing (NOT_APPLICABLE); a funds change that moves no money (a zero movable balance) posts nothing either.
@@ -114,8 +115,13 @@ export function planPostings(source: PostingSource, correction?: CaseCorrection)
     }
     case "capture.reversed.v1":
       return set(source, "CHARGEBACK", returnPostings(components(source, "reversedServiceCents", "reversedTaxCents", "reversedExcessCents"), funds(source, "fundsState"), money(source, "movableBalanceCents")));
-    case "refund.completed.v1":
-      return set(source, "REFUND", returnPostings(components(source, "serviceCents", "taxCents", "excessCents"), funds(source, "fundsState"), money(source, "movableBalanceCents")));
+    case "refund.completed.v1": {
+      // what the completion returns from the capture's unreturned components (D-LEDGER-B7; B09-R2): nothing when the capture's
+      // reversal had already returned them, so every return nets against the capture exactly once whatever the observation order.
+      // An event recorded before the member existed returned its approved components.
+      const returned = source.payload["returnedServiceCents"] !== undefined ? components(source, "returnedServiceCents", "returnedTaxCents", "returnedExcessCents") : components(source, "serviceCents", "taxCents", "excessCents");
+      return set(source, "REFUND", returnPostings(returned, funds(source, "fundsState"), money(source, "movableBalanceCents")));
+    }
     case "reconciliation_case.resolved.v1": {
       if (correction === undefined) return { kind: "NOT_APPLICABLE", eventType: source.eventType };
       const currencies = new Set(correction.reverse.map((e) => e.currency));

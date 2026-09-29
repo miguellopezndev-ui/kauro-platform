@@ -934,7 +934,7 @@ function commerceUnitOfWork(b06: UnitOfWork, s: InMemoryCommerceStore, clock: Cl
       async open(entry) {
         serviceOnly("a reconciliation case");
         own(entry.agencyId);
-        const open = [...s.cases.values()].find((c) => c.agencyId === entry.agencyId && c.kind === entry.kind && c.state === "OPEN" && c.orderId === entry.orderId && c.captureId === entry.captureId && c.refundId === entry.refundId);
+        const open = [...s.cases.values()].find((c) => c.agencyId === entry.agencyId && c.kind === entry.kind && c.state === "OPEN" && c.orderId === entry.orderId && c.captureId === entry.captureId && c.refundId === entry.refundId && c.providerRef === entry.providerRef);
         if (open !== undefined) return { opened: false, record: open };
         const { openedAt, ...rest } = entry;
         const record: ReconciliationCaseRecord = { ...rest, version: 1, state: "OPEN", openedAt };
