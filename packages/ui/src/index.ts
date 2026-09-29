@@ -59,4 +59,4 @@ export type { BannerProps, StatusBadgeProps, Tone } from "./components/status.js
 export { PhaseList } from "./components/phase-list.js";
 export type { Phase, PhaseListProps, PhaseState } from "./components/phase-list.js";
 export { NavigationGuard } from "./components/navigation-guard.js";
-export type { NavigationGuardProps } from "./components/navigation-guard.js";
+export type { LeaveAttempt, NavigationGuardProps } from "./components/navigation-guard.js";

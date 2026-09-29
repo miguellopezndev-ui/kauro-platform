@@ -49,6 +49,15 @@ Primitives: `SafeText`, `ConfirmDialog` (and its server-renderable `ConfirmDialo
 `DataTable` takes an `onSort` callback only when a column is sortable; a function cannot cross from a server component, so a
 sortable table belongs in a client component.
 
+## NavigationGuard
+
+While `dirty` is true the guard asks before work is lost: the browser's own prompt covers closing the tab, typing another
+address or following an external link, and a capturing click listener covers a link to another page of the application. By
+default the question is `window.confirm(message)`. With `onBlocked` the page asks for itself: the click is held, and the callback
+receives the destination and a `proceed()` that follows it, so a dialog of the page's own can offer Stay, Save draft and Discard
+and call `proceed()` after the person has chosen to go. The browser's Back button cannot be intercepted by a page (`popstate`
+arrives after the page has already changed), so the guard does not cover it; a page that must guard Back builds that itself.
+
 ## Regenerating `tokens.css`
 
 `tokens.css` is a generated file: `test/tokens.test.ts` compares it byte for byte with `renderTokenCss()`. After a change to
