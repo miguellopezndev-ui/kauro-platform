@@ -1,0 +1,187 @@
+{
+  "verdict": "REJECT",
+  "summary": "B07 has a changed-generation sealing gap, loses association counts needed for sealing, and counts excluded hidden-column values. All 23 case-map entries were examined; 175 test citations resolve to existing titles. However, briefs.md and verify.log are absent from this checkout. The vendored registry supplied the case expectations; claimed execution statuses cannot be confirmed.",
+  "verify_observed": "verify.log was not present. Exit code, executed test counts and failures are unknown. No database, build or verification suite was started. Historical verification claims in design documents were not treated as results for this commit.",
+  "cases": [
+    {
+      "id": "S024",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "The real inspector corpus includes hostile archives, bounded expansion and meaningful isolation negative controls. Provider and production egress evidence is explicitly deferred to B15. Passing execution cannot be confirmed without verify.log."
+    },
+    {
+      "id": "S053",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Admission tests compare claims against observed bytes, but the changed-generation sealing test manually revokes admission before sealing. It misses B07-R1. Provider evidence is correctly identified as simulated."
+    },
+    {
+      "id": "S054",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Coverage tests include skipped parts falsely labelled CLEAN, incomplete bytes, stale signatures and a fully covered positive control. Real scanner evidence remains B15-owned. Passing execution is unverified."
+    },
+    {
+      "id": "R2-051",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Deadline, tombstone and late-object cleanup tests exercise product persistence with labelled provider fakes. B15 cancellation and B16 deletion receipts remain named. The unresolved-cancellation horizon transition misses B07-R4; execution is unverified."
+    },
+    {
+      "id": "R2-052",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Database, adapter and route tests use competing reservations and observed lock waits to check the five-billion-byte aggregate limit. Their passing status cannot be confirmed."
+    },
+    {
+      "id": "CMD012-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Tests inspect preserved predecessor facts, new lineage and B09 rebinding against the same paid capture. B10 replacement quoting is explicitly deferred. Execution is unverified."
+    },
+    {
+      "id": "CMD012-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Tests cover foreign predecessors, approval refusal over superseded sources and affected commercial authorizations. B08 execution revocation is explicitly deferred. Execution is unverified."
+    },
+    {
+      "id": "CMD012-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests exercise project serialization, one mutable successor, idempotent replay, conflicting payloads and transaction rollback. Passing execution is unverified."
+    },
+    {
+      "id": "CMD013-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Reservation and deadline facts use real persistence; delivered session behavior uses labelled storage and vault fakes, with B15 explicitly named. Execution is unverified."
+    },
+    {
+      "id": "CMD013-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests inspect requester-only secret access, membership, quota limits and refusals before provider calls. Passing execution is unverified."
+    },
+    {
+      "id": "CMD013-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Persistence tests cover reservation serialization and issuance fences. The route replay, resume and compensation test is explicitly SIMULATED through provider fakes. No execution result is available."
+    },
+    {
+      "id": "CMD014-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Tests follow asynchronous completion through observation, inspection, promotion and admission. Provider-dependent continuations are labelled SIMULATED and deferred to B15. Execution is unverified."
+    },
+    {
+      "id": "CMD014-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Database tests prevent request handlers from fabricating admission evidence; route tests check deadline and authorization refusals. The fake-dependent completion-reference clause is labelled SIMULATED. Execution is unverified."
+    },
+    {
+      "id": "CMD014-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests cover stale inspection attempts, duplicate completion claims and completion versus cancellation with database serialization. Passing execution is unverified."
+    },
+    {
+      "id": "CMD015-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Tests demonstrate tombstoning, quota release and simulated provider cleanup; B15 and B16 are named. Secret cleanup omits the unresolved-cancellation horizon transition in B07-R4. Execution is unverified."
+    },
+    {
+      "id": "CMD015-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests check terminal cancellation, refusal of late admission and single release of reserved capacity, with positive neighboring operations. Passing execution is unverified."
+    },
+    {
+      "id": "CMD015-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests order cancellation against inspection using revision locks and inspect committed state and capacity. Passing execution is unverified."
+    },
+    {
+      "id": "CMD016-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Manifest persistence and evaluator counting are tested separately. Hidden-column exclusion is not honored in projection counting (B07-R3), and association counts are dropped at the control-plane boundary (B07-R2). Execution is unverified."
+    },
+    {
+      "id": "CMD016-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests meaningfully reject missing or changed inventory and unacknowledged hidden worksheets. They do not cover projections referencing excluded hidden columns and the formula-policy bypass in B07-R3. Execution is unverified."
+    },
+    {
+      "id": "CMD016-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Database and route tests observe lock waits and check selection against the post-lock revision state. Passing execution is unverified."
+    },
+    {
+      "id": "CMD017-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Tests inspect atomic manifest, retention and subject facts, with B03's soft deadline explicitly deferred. The integrated path cannot seal multiple associations (B07-R2), and excluded hidden values can affect sealed counts (B07-R3)."
+    },
+    {
+      "id": "CMD017-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Incomplete admission and version-conflict controls are meaningful. Changed-generation detection is prearranged by manually revoking admission, leaving B07-R1 uncovered. Execution is unverified."
+    },
+    {
+      "id": "CMD017-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Tests exercise competing seals, replay, rollback and sealing versus admission revocation with observed lock waits. They do not cover a provider generation change before inventory reconciliation. Passing execution is unverified."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B07-R1",
+      "severity": "BLOCKING",
+      "title": "SealRevision accepts a replaced provider generation until inventory reconciliation runs",
+      "file": "packages/application/src/sources/handlers/seal-revision.ts",
+      "line": 83,
+      "detail": "The seal checks only persisted admission state and compares the evaluation against persisted file generation, digest and length. An out-of-band provider replacement changes neither record, so sealing can succeed before OBJECT_INVENTORY revokes admission. This contradicts CMD017-DENY. The cited test, \"DENY: an included file whose accepted generation changed after the evaluation is refused GENERATION_CHANGED and nothing is sealed\", manually calls revokeAdmission at apps/api/test/cmd017-seal-revision.test.ts:175 after replacing the provider object; it proves refusal of an already-revoked file, not detection of the changed generation.",
+      "reproduction": "Use that test's readyRevision fixture and plantObject(..., { overwrite: true }) replacement. Omit the manual revokeAdmission call and invoke SealRevision before running OBJECT_INVENTORY. The stored file and evaluation still agree, so the handler seals the old, now unavailable generation instead of refusing GENERATION_CHANGED.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B07-R2",
+      "severity": "MAJOR",
+      "title": "Per-association counts are discarded before sealing",
+      "file": "apps/control/src/consumers/selection-evaluation.ts",
+      "line": 109,
+      "detail": "The real evaluator returns association counts separately in outcome.associations, but the persisted evaluation retains only files, tables and projections. Its table entries do not contain association counts. SealRevision's associationEdges helper searches evaluation.tables for those missing counts and throws INTEGRITY_FAILURE whenever more than one association is declared. Consequently, valid multi-association selections reach READY_TO_SEAL but cannot be sealed.",
+      "reproduction": "Take the two-association fixture from packages/data-plane/test/selection-evaluation.test.ts, test \"every selected file and table is counted: physical rows, logical records after projection, billable units, association edges — exact, per table and per projection\". Submit it through SelectInputTables, run the real SELECTION_EVALUATION consumer, then call SealRevision. The helper at packages/application/src/sources/handlers/seal-revision.ts:268 cannot recover either association's split and raises INTEGRITY_FAILURE.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B07-R3",
+      "severity": "MAJOR",
+      "title": "Excluded hidden columns still contribute counts and bypass formula checks",
+      "file": "packages/data-plane/src/evaluator/evaluate-task.ts",
+      "line": 191,
+      "detail": "The counted predicate excludes hidden columns and gates formula-policy validation, but insertion into byColumn ignores that predicate. Projection keys can reference hidden columns because manifest validation checks ordinal range and selectedColumns, not hidden-column exclusion. Their values therefore contribute logical records, billable units and association edges even under hiddenColumns=EXCLUDE. A hidden formula's cached value can also be counted under REJECT_FORMULAS without a failure.",
+      "reproduction": "Create a worksheet with column B hidden, a header row, and two data rows whose B values are a formula with cached value 2 and literal 3. Select hiddenColumns=EXCLUDE and formulas=REJECT_FORMULAS; declare a REFERENCED_ENTITY projection with keyOrdinals=[1] and fieldOrdinals=[1]. The counting path returns two logical records without FORMULAS_REJECTED. A read-only component probe of this path produced logicalRecords=2 and failures=[].",
+      "status": "OPEN"
+    },
+    {
+      "id": "B07-R4",
+      "severity": "MINOR",
+      "title": "Unresolved cancellation secrets miss cleanup after the provider horizon",
+      "file": "packages/persistence/src/source/uploads.ts",
+      "line": 375,
+      "detail": "Reconciliation discovery excludes sessions once provider_session_expires_at passes. However, cancelProviderSession performs horizon-based secret purging only when invoked for such an expired session. If STORAGE_LIFECYCLE already completed with UNCERTAIN and subsequent reconciliation never confirms cancellation, the row stops being discovered and its encrypted session reference remains stored without scheduled cleanup.",
+      "reproduction": "Cancel an issued upload before its provider horizon, script cancellation as UNCERTAIN, and drain STORAGE_LIFECYCLE. Keep reconciliation uncertain until the test clock passes provider_session_expires_at. Run PROVIDER_SESSION_RECONCILIATION again: discovery returns no row, while upload_session_secrets still contains the upload's encrypted reference. Existing coverage resolves uncertainty before the horizon or first processes an already-expired session.",
+      "status": "OPEN"
+    }
+  ]
+}

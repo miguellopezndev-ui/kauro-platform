@@ -1,0 +1,187 @@
+{
+  "verdict": "REJECT",
+  "summary": "B07-R2, B07-R3 and B07-R4 are fixed. B07-R1 is partially fixed: sealing detects replacements before its provider observation, but can still commit after that observation becomes stale. No new findings.",
+  "verify_observed": "verify.log ends with 'verify exit 0'. All 751 tests passed: contracts 12, domain 107, application 126, persistence 218, authorization 11, data-plane 13, control 17, API 206 and tools 41. Zero failures, cancellations or skips. All five B07-R1–R4 regression tests passed. Architecture, OpenAPI, matrix and clean-consumer checks completed successfully. No tests or databases were started during this review.",
+  "cases": [
+    {
+      "id": "S024",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Previously reviewed local evidence now has passing execution evidence; production isolation remains deferred to B15."
+    },
+    {
+      "id": "S053",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Provider observation was added, but the B07 sealing gap remains for replacements after observation and before commit; see B07-R1."
+    },
+    {
+      "id": "S054",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Coverage refusal and positive controls passed; real scanner evidence remains deferred to B15."
+    },
+    {
+      "id": "R2-051",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B07-R4 cleanup regression passed. Provider cancellation and deletion-receipt evidence remain deferred to B15/B16."
+    },
+    {
+      "id": "R2-052",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Verification confirms the previously reviewed reservation and serialization tests passed."
+    },
+    {
+      "id": "CMD012-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Lineage and predecessor-preservation evidence passed; replacement quoting remains B10-owned."
+    },
+    {
+      "id": "CMD012-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Previously reviewed refusal and authority-invalidation evidence passed; execution revocation remains B08-owned."
+    },
+    {
+      "id": "CMD012-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed serialization, replay, conflict and rollback tests passed."
+    },
+    {
+      "id": "CMD013-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Reservation and deadline tests passed; provider session delivery remains simulated pending B15."
+    },
+    {
+      "id": "CMD013-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed requester authorization and quota refusal tests passed."
+    },
+    {
+      "id": "CMD013-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Serialization and issuance-fence tests passed; provider-dependent replay evidence remains explicitly simulated."
+    },
+    {
+      "id": "CMD014-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Asynchronous inspection and admission evidence passed; provider continuations remain simulated pending B15."
+    },
+    {
+      "id": "CMD014-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed admission-evidence, deadline and authorization refusals passed."
+    },
+    {
+      "id": "CMD014-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed stale-attempt, duplicate-completion and cancellation serialization tests passed."
+    },
+    {
+      "id": "CMD015-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Unresolved cancellation secrets are now purged after the horizon. B15/B16 evidence remains explicitly deferred."
+    },
+    {
+      "id": "CMD015-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed terminal cancellation and single quota-release tests passed."
+    },
+    {
+      "id": "CMD015-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed cancellation versus inspection serialization tests passed."
+    },
+    {
+      "id": "CMD016-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "B07-R2 now preserves association counts through the real consumer; B07-R3 prevents excluded hidden values from feeding projections."
+    },
+    {
+      "id": "CMD016-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "The passing B07-R3 regression rejects projections over excluded hidden columns and verifies formula-policy controls."
+    },
+    {
+      "id": "CMD016-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed selection locking and post-lock state checks passed."
+    },
+    {
+      "id": "CMD017-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The multi-association happy path now seals correctly and its regression passed. B03 retention evidence remains deferred; concurrent replacement is addressed under CMD017-DENY/RACE."
+    },
+    {
+      "id": "CMD017-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "The remaining generation gap is in B07 itself, beyond the declared B15 evidence deferral: a replacement after stat can still precede a successful seal commit."
+    },
+    {
+      "id": "CMD017-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "The new race test covers replacement before stat returns, but omits replacement after observation while sealing waits or commits; see B07-R1."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B07-R1",
+      "severity": "BLOCKING",
+      "title": "Generation observation can become stale before the seal commits",
+      "file": "packages/application/src/sources/handlers/seal-revision.ts",
+      "line": 65,
+      "detail": "PARTIALLY_FIXED by static inspection. The handler now observes provider generations before runSourceCommand, correctly rejecting an already replaced or missing object. However, it subsequently acquires the revision lock at line 76 and compares files only with the cached observation at lines 115–120. No provider protection binds that observation through the seal commit. A provider replacement while the command waits therefore leaves persisted admission and evaluation unchanged and still allows sealing the unavailable generation. The comment at line 30 explicitly delegates replacements after observation to inventory reconciliation, preserving this portion of the original gap against CMD017-DENY. The passing regression at apps/api/test/cmd017-seal-revision.test.ts:245 replaces the object before stat returns; it does not cover the reverse ordering.",
+      "reproduction": "Using readyRevision and acceptedOf from apps/api/test/cmd017-seal-revision.test.ts, hold the revision row in an otherwise unchanged transaction. Start SealRevision and wait for its API revision-lock wait, so its provider stat has already returned the accepted generation. Overwrite that accepted object using plantObject(..., { overwrite: true }), then release the revision lock without changing revision or admission facts. The handler consumes the cached observation and reaches the normal seal commit without another provider check. This interleaving was established by code inspection, not executed in the read-only review.",
+      "status": "PARTIALLY_FIXED"
+    },
+    {
+      "id": "B07-R2",
+      "severity": "MAJOR",
+      "title": "Per-association counts are preserved through evaluation and sealing",
+      "file": "apps/control/src/consumers/selection-evaluation.ts",
+      "line": 97,
+      "detail": "FIXED. tablesWithAssociations validates and attaches the evaluator's association counts to their declared tables; line 120 persists those tables and line 144 includes them in the evaluation hash. SealRevision reads the typed counts and checks uniqueness, completeness and their sum at packages/application/src/sources/handlers/seal-revision.ts:368. The integrated regression at apps/control/test/end-to-end.test.ts:199 exercises SelectInputTables, the real consumer and SealRevision; assertions at lines 260–264 compare persisted and sealed counts with independently calculated totals. verify.log:638 records its pass.",
+      "reproduction": "The historical two-association path is now covered end to end: it returns SEALED and preserves the distinct WORKS_AT and OWNED_BY counts instead of raising INTEGRITY_FAILURE.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B07-R3",
+      "severity": "MAJOR",
+      "title": "Excluded hidden columns no longer feed projection counts",
+      "file": "packages/data-plane/src/evaluator/evaluate-task.ts",
+      "line": 195,
+      "detail": "FIXED. Insertion into byColumn now requires the same counted predicate that governs formula validation. Lines 215–217 also reject projection keys or fields referencing excluded hidden columns with PROJECTION_COLUMN_HIDDEN. The regression at packages/data-plane/test/selection-evaluation.test.ts:371 covers the original hidden formula, hidden field references, included-column formula rejection, cached-value counting and a visible-column positive control. verify.log:614 records its pass.",
+      "reproduction": "The original hidden-B projection under EXCLUDE and REJECT_FORMULAS now fails PROJECTION_COLUMN_HIDDEN. Including B applies the formula policy; projecting only the visible column still succeeds.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B07-R4",
+      "severity": "MINOR",
+      "title": "Lapsed unresolved cancellation secrets are discovered and purged",
+      "file": "apps/control/src/sweepers/provider-session-reconciliation.ts",
+      "line": 48,
+      "detail": "FIXED. Reconciliation separately pages agencies with lapsed pending cancellations and discovers their remaining secret rows under agency scope. The queries at packages/persistence/src/source/uploads.ts:388 and :404 include expired horizons. The sweep invokes cancelProviderSession at line 66, whose horizon branch at apps/control/src/storage-work.ts:140 purges the secret without inventing cancellation confirmation. The regression at apps/control/test/storage-lifecycle.test.ts:295 checks UNCERTAIN before and after expiry, secret removal, no additional provider call and pagination past previously cleaned agencies. verify.log:657 records its pass.",
+      "reproduction": "The historical sequence now retains the secret while reconciliation remains uncertain before expiry, then removes it on a post-horizon sweep while preserving UNCERTAIN. A later agency remains discoverable with a sweep limit of one.",
+      "status": "FIXED"
+    }
+  ]
+}
