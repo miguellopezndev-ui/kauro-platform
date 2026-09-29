@@ -186,6 +186,8 @@ map. **W-IDP-LIVE** starts after the owner opens Google Cloud. Binding mandates 
 | same, clean clone as WSL user `miguel`, `PGBIN=/usr/lib/postgresql/17/bin` | Ubuntu 24.04, Node 24.21.0 | `d85e322` | exit 0: same counts, api 118; clone deleted |
 | `pnpm --filter @kauro/web run e2e`, `KAURO_E2E_ENGINES=all` | Windows 11 | `3abde5b` tree | 6/6 (Chromium 153, Firefox 155, WebKit 26.6) |
 | cookie and back/forward probe (scratch, not committed) | Windows, three engines | — | `__Host-` cookie dropped by WebKit over http://localhost, kept over https; `no-store` page re-fetched after logout in all engines |
+| `pnpm run verify` (`.next` deleted first, so the build is fresh) | Windows 11, Node 24.14.1, pnpm 10.16.1, PostgreSQL 17 | W3 tree `3fca904` (+ this row) | exit 0 in 8 m 16 s: ui 5, contracts 12, web 143, domain 54, application 55, persistence 107, authorization 11, api 117 (+1 Linux-only skip), tools 37; gate 8 packages / 15 edges; openapi 14 routes; web-client, matrix, clean-consume |
+| `npx playwright test e2e/fake-routes.spec.ts e2e/harness.spec.ts --project=chromium` | Windows 11 | W3 tree `3fca904` | 6/6 (Chromium): the edge answers a planned session operation from the contract fake, forwards a served route and an unknown path, refuses a malformed request and a refused script |
 
 
 ## 12. Decisions register (stage-1 implementation)
