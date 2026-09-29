@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { screens as registryScreens } from "@kauro/contracts";
-import { AGENCY_NAVIGATION, IMPLEMENTED_SCREENS, matchRoute, navigationFor, originOfPath, parametersOf, pathOf, safeReturnPath, SCREENS, signInHref } from "../src/screens.ts";
+import { AGENCY_NAVIGATION, IMPLEMENTED_SCREENS, matchRoute, navigationFor, originOfPath, parametersOf, pathOf, safeReturnPath, SCREENS, screenById, signInHref } from "../src/screens.ts";
 
 interface RegistryRow {
   readonly id: string;
@@ -173,4 +173,14 @@ test("D-ROUTE-1: navigation offers only agency-level screens that exist, in refe
     return `${screen?.origin}:${screen?.route}`;
   });
   assert.deepEqual(pages.sort(), implementedRoutes.sort(), "an implemented screen has its page in its group, and a page is an implemented screen");
+});
+
+test("D-PRIV-1: a screen is drawn without a session only when it is public, the sign-in or the invitation; every tenant screen and the agency screens need one", () => {
+  const anonymousApp = SCREENS.filter((screen) => screen.origin === "APP" && screen.anonymous).map((screen) => screen.id);
+  assert.deepEqual(anonymousApp, ["UI50", "UI51"]);
+  for (const screen of SCREENS) {
+    if (screen.origin === "PUBLIC") assert.equal(screen.anonymous, true, `${screen.id} is public`);
+    if (screen.tenant) assert.equal(screen.anonymous, false, `${screen.id} is a tenant screen`);
+  }
+  for (const id of ["UI09", "UI10"]) assert.equal(screenById(id).anonymous, false, id);
 });

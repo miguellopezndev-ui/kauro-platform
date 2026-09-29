@@ -31,7 +31,7 @@ if (!existsSync(server)) {
 }
 const next = spawn(process.execPath, [server], {
   stdio: "inherit",
-  env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", NODE_ENV: "production", PORT: String(nextPort), HOSTNAME: "127.0.0.1" },
+  env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", NODE_ENV: "production", KAURO_ENV: process.env.KAURO_ENV ?? "LOCAL", PORT: String(nextPort), HOSTNAME: "127.0.0.1" },
 });
 
 const edge = https.createServer({ key: readFileSync(join(tls, "key.pem")), cert: readFileSync(join(tls, "cert.pem")) }, (req, res) => {

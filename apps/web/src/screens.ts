@@ -17,11 +17,13 @@ export interface Screen {
   readonly route: string;
   /** Lives under /agencies/{agencyId}. */
   readonly tenant: boolean;
+  /** Drawn without a session: the application shell puts nothing private around it and does not hold it back until the session is read. */
+  readonly anonymous: boolean;
 }
 
-const pub = (id: string, route: string): Screen => ({ id, origin: "PUBLIC", route, tenant: false });
-const own = (id: string, route: string): Screen => ({ id, origin: "APP", route, tenant: false });
-const tenant = (id: string, route: string): Screen => ({ id, origin: "APP", route: `/agencies/{agencyId}${route}`, tenant: true });
+const pub = (id: string, route: string): Screen => ({ id, origin: "PUBLIC", route, tenant: false, anonymous: true });
+const own = (id: string, route: string, anonymous = false): Screen => ({ id, origin: "APP", route, tenant: false, anonymous });
+const tenant = (id: string, route: string): Screen => ({ id, origin: "APP", route: `/agencies/{agencyId}${route}`, tenant: true, anonymous: false });
 
 export const SCREENS: readonly Screen[] = [
   pub("UI01", "/"),
@@ -61,8 +63,8 @@ export const SCREENS: readonly Screen[] = [
   pub("UI47", "/legal/data-processing"),
   pub("UI48", "/help"),
   pub("UI49", "/unsubscribe/{token}"),
-  own("UI50", "/login"),
-  own("UI51", "/invitations/{id}"),
+  own("UI50", "/login", true),
+  own("UI51", "/invitations/{id}", true),
   tenant("UI52", "/support"),
 ];
 
