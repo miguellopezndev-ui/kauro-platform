@@ -32,10 +32,18 @@ const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FO
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 const PLAN_SERVICES = outcome("COMMAND", "INTEGRITY_FAILURE", "PLAN_SERVICES_UNAVAILABLE", "the plan services this command needs are not bound in this edition (I-INT-2)");
 const BODY_DIGEST = outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)");
+/** The text a support case would keep looks like a secret or customer records: 422, and the next action is the secure upload (B11 D-SUP-2). */
+const CONTENT_REFUSED: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the summary holds a private key, a cloud or API key, a token or a name-and-value credential; nothing was stored, sent or logged"),
+  outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the summary holds rows of records (three delimited lines) or three e-mail addresses; nothing was stored, sent or logged"),
+]);
 const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTROLLER", "only the approving actor or an OWNER ends an approval's future use (D-AUTHZ-3)");
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
-const COMMAND_SPECIFIC: Readonly<Record<B06CommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+/** The commands this module catalogues itself: B06's seven and B11's CMD044 (B07's come composed from sources/outcomes). */
+type CatalogueCommandId = B06CommandId | "CMD044";
+
+const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: [
     outcome("COMMAND", "ADMISSION_LIMITED", "CREATION_RATE_LIMITED", "the creation limit of the identity or of the client network is reached (08 Abuse controls, R34)"),
     outcome("COMMAND", "ADMISSION_LIMITED", "DRAFT_AGENCY_EXISTS", "the identity already created an agency that is still DRAFT (D-CMD-1)"),
@@ -99,12 +107,17 @@ const COMMAND_SPECIFIC: Readonly<Record<B06CommandId, ReadonlyArray<ProblemOutco
     STALE("plan"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_NOT_APPROVED", "the plan is not APPROVED", { current: "ALWAYS" }),
   ],
+  CMD044: [
+    NOT_VISIBLE("the project"),
+    ...CONTENT_REFUSED,
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "SUPPORT_CALENDAR_UNAVAILABLE", "the versioned holiday calendar does not cover the year of the follow-up, so no next review can be promised; retry with the same key"),
+  ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<B06CommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
-const HEADER_COMMANDS: ReadonlySet<B06CommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
+const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
 
-function catalogueOf(command: B06CommandId): ReadonlyArray<ProblemOutcome> {
+function catalogueOf(command: CatalogueCommandId): ReadonlyArray<ProblemOutcome> {
   const entries = [
     ...EVERY_ROUTE,
     ...COOKIE_CSRF,
@@ -134,11 +147,13 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
+  CMD044: catalogueOf("CMD044"),
 });
 
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
 
-type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject";
+/** The reads this module catalogues itself: B06's five manual-10 reads and B11's two support reads (W4). */
+type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | "ListSupportCases" | "GetSupportCase";
 
 const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   ListAgencies: [...PAGINATED],
@@ -146,6 +161,8 @@ const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOu
   ListMembers: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   ListClients: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   GetProject: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the project")],
+  ListSupportCases: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the project")],
+  GetSupportCase: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the case")],
 });
 
 function readCatalogueOf(operationId: B06ReadOperationId): ReadonlyArray<ProblemOutcome> {
@@ -173,6 +190,8 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetUpload: SOURCE_ROUTE_OUTCOMES.GetUpload,
   GetUploadSession: SOURCE_ROUTE_OUTCOMES.GetUploadSession,
   PreviewTable: SOURCE_ROUTE_OUTCOMES.PreviewTable,
+  ListSupportCases: readCatalogueOf("ListSupportCases"),
+  GetSupportCase: readCatalogueOf("GetSupportCase"),
 });
 
 /** The closed problem catalogue of each served document intake (B07 D-SEL-2). */

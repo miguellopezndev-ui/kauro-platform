@@ -1,11 +1,11 @@
 /**
- * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands and the six B07
- * source-lifecycle commands, registered from the command specs of @kauro/application (method, path, scope), with the admission
- * pipeline of manual 10 (content type, byte size, strict JSON, closed schema, envelope headers, authenticated subject) in front of
- * every handler, typed replies (CompletedResponse / AcceptedResponse / Problem) and the safe problem translation of every failure
- * (opaque INTERNAL_ERROR by correlation id; 07 "Command outcomes"); the manual-10 reads and the source reads; the selection
- * manifest intake (B07 D-SEL-2: a document stored once per content, STORED 201 or 200); plus the liveness and readiness probes
- * outside /api/v1 (health.ts).
+ * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands, the six B07
+ * source-lifecycle commands and the support package's CMD044 (B11 W4), registered from the command specs of @kauro/application
+ * (method, path, scope), with the admission pipeline of manual 10 (content type, byte size, strict JSON, closed schema, envelope
+ * headers, authenticated subject) in front of every handler, typed replies (CompletedResponse / AcceptedResponse / Problem) and the
+ * safe problem translation of every failure (opaque INTERNAL_ERROR by correlation id; 07 "Command outcomes"); the manual-10 reads,
+ * the source reads and the support reads; the selection manifest intake (B07 D-SEL-2: a document stored once per content, STORED
+ * 201 or 200); plus the liveness and readiness probes outside /api/v1 (health.ts).
  *
  * Fastify's built-in JSON parser and Ajv are not used for command bodies: the body reaches the route as raw bytes and goes
  * through the strict UTF-8 decoding, the strict parser and the closed validator of @kauro/application, so an invalid byte, a
@@ -65,6 +65,7 @@ import type {
   SchemaValidator,
   SourceIntakeHandlers,
   SourceReadHandlers,
+  SupportHandlers,
   UnauthenticatedRequest,
 } from "@kauro/application";
 import {
@@ -139,9 +140,9 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  /** The seven B06 commands and the six B07 source-lifecycle commands (B07 design §11). */
-  readonly handlers: B06Handlers & B07Handlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16) and the source reads (B07 design §9.1). */
+  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) and the support package's CMD044 (B11 W4). */
+  readonly handlers: B06Handlers & B07Handlers & SupportHandlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4) and the source reads (B07 design §9.1). */
   readonly reads: ReadHandlers & SourceReadHandlers;
   /** The document intakes: the selection manifest (B07 D-SEL-2). */
   readonly intakes: SourceIntakeHandlers;

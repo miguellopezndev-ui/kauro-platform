@@ -12,7 +12,7 @@ import { ACCEPTED_RESPONSE_SCHEMA_ID, SESSION_ROUTES, operationalRequestSchemaId
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
 
-test("the validator compiles exactly the 73 contracts, the 13 request schemas and the selection manifest document, the 12 COMPLETED envelopes and ACCEPTED, the 3 declared replies of the probes, the 4 reply bodies and 2 request bodies of the session routes (B11 W2), the 12 read replies, the intake reply, the 7 payment request schemas with their 7 command replies and 4 read replies (B09), and Problem, and nothing else", () => {
+test("the validator compiles exactly the 73 contracts, the 14 request schemas and the selection manifest document, the 13 COMPLETED envelopes and ACCEPTED, the 3 declared replies of the probes, the 4 reply bodies and 2 request bodies of the session routes (B11 W2), the 14 read replies, the intake reply, the 7 payment request schemas with their 7 command replies and 4 read replies (B09), and Problem, and nothing else", () => {
   const operationalIds = OPERATIONAL_ROUTES.flatMap((route) => Object.entries(route.responses).filter(([, r]) => r.schema !== null).map(([status]) => operationalResponseSchemaId(route.operationId, status)));
   const probeIds = OPERATIONAL_ROUTES.filter((route) => !SESSION_ROUTES.includes(route)).flatMap((route) => Object.keys(route.responses));
   assert.equal(probeIds.length, 3, "the probes declare three replies: /livez 200, /readyz 200 and 503");
@@ -20,9 +20,9 @@ test("the validator compiles exactly the 73 contracts, the 13 request schemas an
   const operationalRequestIds = OPERATIONAL_ROUTES.filter((route) => route.request !== undefined).map((route) => operationalRequestSchemaId(route.operationId));
   assert.deepEqual(operationalRequestIds, [operationalRequestSchemaId("openSession"), operationalRequestSchemaId("createStepUp")], "the identity token of a sign-in and of a step-up");
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
-  assert.equal(readIds.length, 12, "the five manual-10 reads (N16) and the seven source reads (B07 design §9.1)");
+  assert.equal(readIds.length, 14, "the five manual-10 reads (N16), the two support reads (B11 W4) and the seven source reads (B07 design §9.1)");
   const completedIds = SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId);
-  assert.equal(completedIds.length, 12, "every served command but CMD014, answered ACCEPTED (B07 D-RUN-1)");
+  assert.equal(completedIds.length, 13, "every served command but CMD014, answered ACCEPTED (B07 D-RUN-1); CMD044 of B11 W4 among them");
   const intakeIds = INTAKE_OPERATION_IDS.map(intakeResponseSchemaId);
   assert.equal(intakeIds.length, 1, "the selection manifest intake (B07 D-SEL-2)");
   // package B09 (D-REQ-B7): the payment catalogue's closed request schemas and the envelopes of its replies and reads
@@ -31,7 +31,7 @@ test("the validator compiles exactly the 73 contracts, the 13 request schemas an
   assert.deepEqual([commerceRequestIds.length, commerceResponseIds.length], [7, 11]);
   const responseIds = [...completedIds, ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...intakeIds, ...commerceResponseIds];
   const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...operationalRequestIds];
-  assert.equal(requestIds.length, 23, "seven B06 and six B07 request schemas, the selection manifest document, seven B09 request schemas and the two session bodies");
+  assert.equal(requestIds.length, 24, "seven B06 and six B07 request schemas, B11's CMD044, the selection manifest document, seven B09 request schemas and the two session bodies");
   assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + requestIds.length + responseIds.length + 1);
   for (const id of operationalRequestIds) assert.ok(validator.knownSchemaIds.includes(id), id);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);

@@ -50,6 +50,7 @@ import type {
   NewMembership,
   NewPlanRevision,
   NewProject,
+  NewSupportCase,
   OutboxDispatchStore,
   OutboxId,
   PlanBody,
@@ -60,6 +61,8 @@ import type {
   ProjectId,
   ProjectRecord,
   ProjectState,
+  SupportCaseId,
+  SupportCaseRecord,
   PublishedEvent,
   RequestJournal,
   ReservationOutcome,
@@ -93,6 +96,7 @@ export interface InMemoryStore {
   processingAuthorities: Map<string, ProcessingAuthorityRecord>;
   endClients: Map<string, EndClientRecord>;
   projects: Map<string, ProjectRecord>;
+  supportCases: Map<string, SupportCaseRecord>;
   revisions: Map<string, DatasetRevisionRecord>;
   targetContracts: Map<string, TargetContractRecord>;
   plans: Map<string, PlanRecord>;
@@ -115,6 +119,7 @@ export function emptyStore(): InMemoryStore {
     processingAuthorities: new Map(),
     endClients: new Map(),
     projects: new Map(),
+    supportCases: new Map(),
     revisions: new Map(),
     targetContracts: new Map(),
     plans: new Map(),
@@ -496,6 +501,43 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         const w = cas(visible(s.projects.get(projectId)), expectedVersion, (r) => ({ ...r, state: change.state, version: r.version + 1, updatedAt: now }));
         if (w.kind === "APPLIED") s.projects.set(projectId, w.record);
         return w;
+      },
+    },
+    supportCases: {
+      async get(caseId: SupportCaseId) {
+        return visible(s.supportCases.get(caseId));
+      },
+      async insert(c: NewSupportCase) {
+        checkWrite(c.agencyId);
+        const project = s.projects.get(c.projectId);
+        if (!project || project.agencyId !== c.agencyId) throw new DomainFailure("INVALID_REQUEST", "composite foreign key refused the project reference", { reason: "UNKNOWN_REFERENCE" });
+        const record: SupportCaseRecord = {
+          caseId: c.caseId,
+          agencyId: c.agencyId,
+          projectId: c.projectId,
+          category: c.category,
+          severity: c.severity,
+          state: "OPEN",
+          summary: c.summary,
+          evidenceRefs: [...c.evidenceRefs],
+          createdByUserId: c.createdByUserId,
+          createdByMembershipId: c.createdByMembershipId,
+          nextReviewAt: c.nextReviewAt,
+          version: 1,
+          createdAt: c.createdAt,
+          updatedAt: c.createdAt,
+        };
+        s.supportCases.set(c.caseId, record);
+        return record;
+      },
+      async listByProject(agencyId, projectId, page) {
+        if (tenantId() !== agencyId) return [];
+        const after = page.after;
+        return [...s.supportCases.values()]
+          .filter((c) => c.agencyId === agencyId && c.projectId === projectId)
+          .sort((a, b) => (a.createdAt === b.createdAt ? (a.caseId < b.caseId ? -1 : 1) : a.createdAt < b.createdAt ? -1 : 1))
+          .filter((c) => after === undefined || c.createdAt > after.createdAt || (c.createdAt === after.createdAt && c.caseId > after.id))
+          .slice(0, page.limit);
       },
     },
     revisions: {

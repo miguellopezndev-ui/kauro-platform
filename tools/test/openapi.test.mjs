@@ -26,7 +26,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(generateOpenApi(sources), expected, "generation is deterministic");
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
-  // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, every payment route of
+  // (N16), the seven source reads and the selection manifest intake (B07), CMD044 and the two support reads (B11 W4), the two
+  // operational probes, every payment route of
   // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the five routes of the browser session
   // boundary (B11 W2)
   assert.deepEqual(
@@ -39,6 +40,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/projects/{projectId} GetProject",
+      "GET /api/v1/projects/{projectId}/support-cases ListSupportCases",
       "GET /api/v1/public/identity-config getIdentityConfig",
       "GET /api/v1/quotes/{quoteId} GetQuote",
       "GET /api/v1/refunds/{refundId} GetRefund",
@@ -48,6 +50,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview PreviewTable",
       "GET /api/v1/revisions/{revisionId}/uploads ListUploads",
       "GET /api/v1/sessions/current getCurrentSession",
+      "GET /api/v1/support-cases/{caseId} GetSupportCase",
       "GET /api/v1/uploads/{uploadId} GetUpload",
       "GET /api/v1/uploads/{uploadId}/session GetUploadSession",
       "GET /livez getLiveness",
@@ -65,6 +68,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
+      "POST /api/v1/projects/{projectId}/support-cases CreateSupportCase",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
       "POST /api/v1/refunds/{refundId}/approve ApproveRefund",
       "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",

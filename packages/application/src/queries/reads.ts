@@ -19,16 +19,16 @@
  * their own members.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AgencyId, ClientId, CorrelationId, IdentityContext, MembershipId, ProjectId, ResolvedMembership, TenantContext, UnitOfWork } from "@kauro/domain";
+import type { AgencyId, ClientId, CorrelationId, IdentityContext, MembershipId, ProjectId, ResolvedMembership, SupportCaseId, TenantContext, UnitOfWork } from "@kauro/domain";
 import { DomainFailure, capabilitiesOf, isUuid } from "@kauro/domain";
 import type { RequestHead } from "../api/admission.js";
 import { CURSOR_PATTERN, openCursor, sealCursor, type CursorBinding, type CursorPosition } from "../api/cursor.js";
 import { HEADERS, SINGLE_VALUED_HEADERS, type AuthenticatedSubject } from "../api/envelope.js";
 import { clientActions, projectActions } from "../api/permitted-actions.js";
 import { problemOf, type Problem } from "../api/problems.js";
-import { agencyMembershipView, agencyView, endClientView, projectView, readinessBlockersOf, teamMemberView } from "../api/projections.js";
+import { agencyMembershipView, agencyView, endClientView, projectView, readinessBlockersOf, supportCaseView, teamMemberView } from "../api/projections.js";
 import type { ReadOperationId } from "../api/response-schemas.js";
-import type { AgencyMembershipView, AgencyView, EndClientView, Page, ProjectView, TeamMemberView } from "../api/views.js";
+import type { AgencyMembershipView, AgencyView, EndClientView, Page, ProjectView, SupportCaseView, TeamMemberView } from "../api/views.js";
 import { REQUEST_LIMITS } from "../api/envelope.js";
 import { recordDenialFact, type CommandRuntime } from "../commands/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION, type AuthorizationDecision } from "../ports/authorizer.js";
@@ -54,7 +54,7 @@ function readSpec(s: ReadSpec): ReadSpec {
   return Object.freeze(s);
 }
 
-/** The five manual-10 reads of B06 and the seven reads of the source lifecycle (B07, sources/read-specs), in route order. */
+/** The five manual-10 reads of B06, the seven reads of the source lifecycle (B07, sources/read-specs) and the two reads of the support package (B11 W4), in route order. */
 export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.freeze({
   ListAgencies: readSpec({
     operationId: "ListAgencies",
@@ -107,6 +107,26 @@ export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.f
     authority: '10 "Client and project routes": "GET /projects/{projectId} returns the current revision summary, commercial state, retention deadlines, safe progress and permitted actions"',
   }),
   ...SOURCE_READ_ROUTES,
+  ListSupportCases: readSpec({
+    operationId: "ListSupportCases",
+    method: "GET",
+    path: "/api/v1/projects/{projectId}/support-cases",
+    action: "LIST_SUPPORT_CASES",
+    scope: "AGENCY_HEADER",
+    paginated: true,
+    summary: "One project's support cases, oldest first",
+    authority: "design section 5, W4 row: \"keyset list per project\"; owner manual 18",
+  }),
+  GetSupportCase: readSpec({
+    operationId: "GetSupportCase",
+    method: "GET",
+    path: "/api/v1/support-cases/{caseId}",
+    action: "GET_SUPPORT_CASE",
+    scope: "AGENCY_HEADER",
+    paginated: false,
+    summary: "One support case with its severity, state and next review",
+    authority: "design section 5, W4 row: \"one case\"; owner manual 18",
+  }),
 });
 
 // --- the query (a closed schema too) ------------------------------------------------------------------------------------------
@@ -303,6 +323,8 @@ export interface ReadHandlers {
   readonly ListMembers: ReadHandler<Page<TeamMemberView>>;
   readonly ListClients: ReadHandler<Page<EndClientView>>;
   readonly GetProject: ReadHandler<ProjectView>;
+  readonly ListSupportCases: ReadHandler<Page<SupportCaseView>>;
+  readonly GetSupportCase: ReadHandler<SupportCaseView>;
 }
 
 export function createReadHandlers(runtime: ReadRuntime): ReadHandlers {
@@ -382,5 +404,43 @@ export function createReadHandlers(runtime: ReadRuntime): ReadHandlers {
       }),
   };
 
-  return Object.freeze({ ListAgencies: listAgencies, GetAgency: getAgency, ListMembers: listMembers, ListClients: listClients, GetProject: getProject });
+  const listSupportCases: ReadHandler<Page<SupportCaseView>> = {
+    spec: READ_ROUTES.ListSupportCases,
+    execute: (request) =>
+      runRead(READ_ROUTES.ListSupportCases, runtime, request, async (uow, ctx) => {
+        const membership = member(ctx);
+        const projectId = request.path["projectId"] as ProjectId;
+        // the cursor is bound to the project, so a cursor of one project's list opens no other list
+        const binding: CursorBinding = { operation: "ListSupportCases", userId: membership.userId, agencyId: membership.agencyId, filter: projectId };
+        const after = positionOf(runtime, binding, request.query.cursor);
+        const project = await uow.projects.get(projectId);
+        if (!project || project.agencyId !== membership.agencyId) throw new DomainFailure("NOT_FOUND", "project not visible");
+        const rows = await uow.supportCases.listByProject(membership.agencyId, projectId, {
+          limit: request.query.limit,
+          ...(after !== undefined ? { after: { createdAt: after.createdAt as UtcInstant, id: after.id as SupportCaseId } } : {}),
+        });
+        return pageOf(runtime, binding, rows, request.query.limit, supportCaseView, (c) => ({ createdAt: c.createdAt, id: c.caseId }));
+      }),
+  };
+
+  const getSupportCase: ReadHandler<SupportCaseView> = {
+    spec: READ_ROUTES.GetSupportCase,
+    execute: (request) =>
+      runRead(READ_ROUTES.GetSupportCase, runtime, request, async (uow, ctx) => {
+        const membership = member(ctx);
+        const found = await uow.supportCases.get(request.path["caseId"] as SupportCaseId);
+        if (!found || found.agencyId !== membership.agencyId) throw new DomainFailure("NOT_FOUND", "case not visible");
+        return supportCaseView(found);
+      }),
+  };
+
+  return Object.freeze({
+    ListAgencies: listAgencies,
+    GetAgency: getAgency,
+    ListMembers: listMembers,
+    ListClients: listClients,
+    GetProject: getProject,
+    ListSupportCases: listSupportCases,
+    GetSupportCase: getSupportCase,
+  });
 }

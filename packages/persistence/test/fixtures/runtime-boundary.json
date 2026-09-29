@@ -1932,6 +1932,14 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
+    "support_cases/support_cases_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
     "target_contracts/target_contracts_payment_read": {
       "command": "SELECT",
       "roles": [
@@ -2308,6 +2316,10 @@
         "SELECT"
       ],
       "kauro.stored_objects": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.support_cases": [
         "INSERT",
         "SELECT"
       ],

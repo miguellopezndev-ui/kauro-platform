@@ -8,13 +8,13 @@ export * from "./ports/index.js";
 export type { Problem, NextAction } from "./api/problems.js";
 export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, problemOf, internalProblem, isFailureCode } from "./api/problems.js";
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
-export { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
+export { LABEL_PATTERN, TEXT_PATTERN, REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
 export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
 export { HEADERS, PRIVATE_CACHE_POLICY, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
-export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, Page } from "./api/views.js";
+export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, Page } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
 export type { ReadinessFacts } from "./api/projections.js";
-export { agencyView, membershipView, endClientView, projectView, planView, approvalView, readinessBlockersOf, agencyMembershipView, teamMemberView } from "./api/projections.js";
+export { agencyView, membershipView, endClientView, projectView, planView, approvalView, readinessBlockersOf, agencyMembershipView, teamMemberView, supportCaseView } from "./api/projections.js";
 export type { ResourceAction } from "./api/permitted-actions.js";
 export { RESOURCE_ACTIONS, clientActions, projectActions, planActions, approvalActions, controlsApproval } from "./api/permitted-actions.js";
 export type { CursorBinding, CursorPosition } from "./api/cursor.js";
@@ -125,8 +125,11 @@ export type {
   WithdrawApprovalView,
   WithdrawApprovalHandler,
   B06CommandId,
+  CreateSupportCaseBody,
+  CreateSupportCaseHandler,
+  SupportCommandId,
 } from "./commands/contracts.js";
-export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS } from "./commands/contracts.js";
+export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS, CREATE_SUPPORT_CASE, SUPPORT_COMMANDS } from "./commands/contracts.js";
 export type { CommandRuntime, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
 export { runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
 export type { PresentedCredential } from "./sessions/protocol.js";
@@ -150,9 +153,11 @@ export {
 } from "./sessions/protocol.js";
 export type { SessionView, StepUpProofView, SessionService, SessionServiceDependencies, SessionOutcome, ResumedSession } from "./sessions/service.js";
 export { createSessionService, SESSION_POLICY_VERSION, SESSION_ACTIONS, SESSION_ALLOW_REASONS, LOGOUT_REASON, REPLACED_REASON } from "./sessions/service.js";
-export type { B06Collaborators, B06Handlers, ApprovalPreimage } from "./commands/handlers/index.js";
+export type { B06Collaborators, B06Handlers, SupportHandlers, SupportOptions, ApprovalPreimage } from "./commands/handlers/index.js";
 export {
   createB06Handlers,
+  createSupportHandlers,
+  createSupportCaseHandler,
   createAgencyHandler,
   createClientHandler,
   archiveClientHandler,
@@ -170,3 +175,21 @@ export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds 
 
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
+
+// support cases (package B11 W4): the severity table, the covered-hours calendar and the bounded content detector
+export type { ContentFinding, DateKey, HolidayCalendar, HolidaySource, SupportWindow, Weekday } from "./support/index.js";
+export {
+  BOGOTA_OFFSET_MS,
+  COLOMBIA_CALENDAR_VERSION,
+  COLOMBIA_HOLIDAYS,
+  COLOMBIA_HOLIDAY_SOURCE,
+  SUPPORT_SEVERITY_BY_CATEGORY,
+  SUPPORT_TIMEZONE,
+  SupportPolicyError,
+  colombianHolidays,
+  detectRefusedContent,
+  easterSundayMs,
+  nextReviewAt,
+  severityOf,
+  supportWindowOf,
+} from "./support/index.js";

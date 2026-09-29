@@ -3,8 +3,8 @@
  * authorizer consume. Behaviour (reads, locks, preconditions in order, writes, events, OK/DENY/RACE) is specified in
  * docs/design/B06-domain-db-authz.md §7; handlers implementing these contracts belong to the B06 implementation mandate.
  */
-import type { ServiceMode } from "@kauro/domain";
-import type { AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView } from "../api/views.js";
+import type { ServiceMode, SupportCategory } from "@kauro/domain";
+import type { AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, SupportCaseView } from "../api/views.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { ActiveWorkSummary, CompletedExternalAction } from "../ports/work-inspectors.js";
 
@@ -187,6 +187,35 @@ export const WITHDRAW_APPROVAL: CommandSpec<WithdrawApprovalBody> = spec<Withdra
   fields: ["expectedVersion", "reasonCode"],
 });
 export type WithdrawApprovalHandler = CommandHandler<WithdrawApprovalBody, WithdrawApprovalView>;
+
+// --- CMD044 CreateSupportCase (B11 W4) -------------------------------------------------------------------------------------
+
+export interface CreateSupportCaseBody {
+  readonly category: SupportCategory;
+  readonly summary: string;
+  /** Upload ids the case cites: an empty list until the upload package serves them (D-SUP-2). */
+  readonly evidenceRefs?: ReadonlyArray<string>;
+}
+export const CREATE_SUPPORT_CASE: CommandSpec<CreateSupportCaseBody> = spec<CreateSupportCaseBody>({
+  id: "CMD044",
+  name: "CreateSupportCase",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/support-cases",
+  role: "AGENCY_MEMBER",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "projectId",
+  expectedVersionRequired: false,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["category", "summary", "evidenceRefs"],
+});
+export type CreateSupportCaseHandler = CommandHandler<CreateSupportCaseBody, SupportCaseView>;
+
+/** The commands of the support package: separate from the seven of B06, which stay a closed set. */
+export const SUPPORT_COMMANDS = Object.freeze({
+  CMD044: CREATE_SUPPORT_CASE,
+} as const);
+export type SupportCommandId = keyof typeof SUPPORT_COMMANDS;
 
 export const B06_COMMANDS = Object.freeze({
   CMD001: CREATE_AGENCY,

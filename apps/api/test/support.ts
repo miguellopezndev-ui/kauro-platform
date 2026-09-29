@@ -78,6 +78,7 @@ import {
   noExternalActionsInThisEdition,
   openDatabase,
   subjectOf,
+  type ApiLogger,
   type DatabaseHandle,
   type PaymentService,
   type RequestUnitOfWorkFactory,
@@ -554,6 +555,8 @@ export interface WorldOptions {
   readonly payments?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly service: PaymentService; close(): Promise<void> }>;
   /** Binds the browser session boundary (B11 W2) with the contract-fake identity issuer on the api's clock. */
   readonly sessions?: boolean;
+  /** The api's logger (silent by default): a test that inspects what the api logs passes a sink here. */
+  readonly logger?: ApiLogger;
 }
 
 export interface RawEvent {
@@ -646,6 +649,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
     ...(sessionAssembly !== undefined ? { sessions: sessionAssembly } : {}),
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
   await app.ready();
 
@@ -1102,6 +1106,7 @@ export const EFFECT_TABLES = [
   "plans",
   "validation_receipts",
   "approvals",
+  "support_cases",
   "capabilities",
   "domain_events",
   "outbox_records",
@@ -1142,7 +1147,7 @@ export async function approveThroughRoute(w: World, plan: PlanFixture, approver:
   return completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(plan.planId), token: approver.token, agency: agencyId, key: freshKey("approve"), body: approvalBodyOf(plan, proof) }), 201);
 }
 
-/** The routes of the seven commands. */
+/** The routes of the seven commands, and of the support cases (CMD044 and its two reads). */
 export const routes = {
   createAgency: () => "/api/v1/agencies",
   createClient: (agencyId: string) => `/api/v1/agencies/${agencyId}/clients`,
@@ -1151,4 +1156,7 @@ export const routes = {
   revisePlan: (planId: string) => `/api/v1/plans/${planId}/revisions`,
   approvePlan: (planId: string) => `/api/v1/plans/${planId}/approve`,
   withdrawApproval: (planId: string) => `/api/v1/plans/${planId}/withdraw`,
+  createSupportCase: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
+  listSupportCases: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
+  getSupportCase: (caseId: string) => `/api/v1/support-cases/${caseId}`,
 };

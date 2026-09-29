@@ -1000,6 +1000,7 @@ function commerceUnitOfWork(b06: UnitOfWork, s: InMemoryCommerceStore, clock: Cl
     processingAuthorities: b06.processingAuthorities,
     endClients: b06.endClients,
     projects: b06.projects,
+    supportCases: b06.supportCases,
     revisions: b06.revisions,
     targetContracts: b06.targetContracts,
     plans: b06.plans,

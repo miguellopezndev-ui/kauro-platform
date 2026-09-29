@@ -222,6 +222,22 @@ export async function project(app: Client, ag: AgencyFixture, clientId: string, 
   return { projectId, revisionId };
 }
 
+/** One OPEN support case of `projectId`, opened by the agency owner under kauro_app with its opened event (B11 CMD044's writes, one event per version). */
+export async function supportCase(app: Client, ag: AgencyFixture, projectId: string, extra: { readonly severity?: string; readonly category?: string; readonly summary?: string } = {}): Promise<{ caseId: string }> {
+  const caseId = ids.next();
+  const severity = extra.severity ?? "S3";
+  const category = extra.category ?? "PRODUCT_DEFECT";
+  await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    await c.query(
+      `INSERT INTO kauro.support_cases (case_id, agency_id, project_id, category, severity, summary, created_by_user_id, created_by_membership_id, next_review_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now() + interval '1 day', now(), now())`,
+      [caseId, ag.agencyId, projectId, category, severity, extra.summary ?? "The import preview shows the wrong column for the second sheet.", ag.ownerUserId, ag.ownerMembershipId],
+    );
+    await event(c, { aggregateKind: "support_case", aggregateId: caseId, aggregateVersion: 1, agencyId: ag.agencyId, eventType: "support_case.opened.v1", actorUserId: ag.ownerUserId, payload: { caseId, projectId, category, severity } });
+  });
+  return { caseId };
+}
+
 export interface PlanFixture {
   readonly planId: string;
   readonly bodyHash: string;

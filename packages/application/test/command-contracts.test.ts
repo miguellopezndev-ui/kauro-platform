@@ -4,9 +4,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
-import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, requestSchemaId } from "../src/index.js";
+import { SUPPORT_CATEGORIES } from "@kauro/domain";
+import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SUPPORT_COMMANDS, requestSchemaId } from "../src/index.js";
 
 const IN_SCOPE = ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"] as const;
+/** The B06 commands and CMD044 of the support package (B11 W4), whose request schema is checked against the catalogue too. */
+const WITH_SUPPORT = [...IN_SCOPE, "CMD044"] as const;
 
 test("every in-scope spec matches the catalogue entry: method, path, role, fields in order", () => {
   for (const id of IN_SCOPE) {
@@ -26,8 +29,8 @@ test("every in-scope spec matches the catalogue entry: method, path, role, field
 });
 
 test("request schemas are closed 2020-12 objects whose properties are exactly the catalogue fields, typed by the field vocabulary", () => {
-  const typeOf: Record<string, string> = { label: "string", id: "string", version: "integer", hash: "string" };
-  for (const id of IN_SCOPE) {
+  const typeOf: Record<string, string> = { label: "string", id: "string", version: "integer", hash: "string", text: "string", listText: "array" };
+  for (const id of WITH_SUPPORT) {
     const catalogue = COMMANDS.find((c) => c.id === id)!;
     const s = REQUEST_SCHEMAS[id];
     assert.equal(s.$schema, "https://json-schema.org/draft/2020-12/schema");
@@ -53,7 +56,31 @@ test("request schemas are closed 2020-12 objects whose properties are exactly th
   // CMD011: targetInstanceRef is the only optional member (required by the handler for CRM modes, D-CMD-4)
   assert.deepEqual([...REQUEST_SCHEMAS.CMD011.required], ["mode", "purpose"]);
   assert.deepEqual(REQUEST_SCHEMAS.CMD011.properties["mode"]!["enum"], ["CLEAN", "HUBSPOT", "SALESFORCE"]);
-  assert.equal(REQUEST_SCHEMA_IDS.length, IN_SCOPE.length);
+  assert.equal(REQUEST_SCHEMA_IDS.length, WITH_SUPPORT.length);
+});
+
+test("CMD044 CreateSupportCase matches the catalogue entry and its schema names the closed category set and a bounded summary (B11 W4)", () => {
+  const catalogue = COMMANDS.find((c) => c.id === "CMD044")!;
+  const spec = SUPPORT_COMMANDS.CMD044;
+  assert.equal(spec.id, catalogue.id);
+  assert.equal(spec.name, catalogue.name);
+  assert.equal(spec.method, catalogue.method);
+  assert.equal(spec.path, catalogue.path);
+  assert.equal(spec.role, catalogue.role);
+  assert.equal(spec.role, "AGENCY_MEMBER");
+  assert.deepEqual([...spec.fields], catalogue.fields.map((f) => f.name));
+  assert.equal(catalogue.idempotency, "REQUIRED");
+  assert.equal(catalogue.gate, "G-UX");
+  assert.deepEqual([...(catalogue.testIds ?? [])], ["CMD044-OK", "CMD044-DENY", "CMD044-RACE"]);
+  assert.equal(spec.expectedVersionRequired, false);
+  assert.equal(spec.stepUpRequired, false);
+  const schema = REQUEST_SCHEMAS.CMD044;
+  assert.deepEqual([...schema.required], ["category", "summary"], "evidenceRefs is optional: an empty list until B07 serves upload ids");
+  assert.deepEqual(schema.properties["category"]!["enum"], [...SUPPORT_CATEGORIES], "the request's categories are the domain's, in order");
+  const summary = schema.properties["summary"]!;
+  assert.equal(summary["minLength"], 20);
+  assert.equal(summary["maxLength"], 4000);
+  assert.equal(schema.properties["evidenceRefs"]!["maxItems"], 0, "no upload id can be cited before B07's uploads are on main (D-SUP-2)");
 });
 
 test("no request schema exposes a server-owned member (verified, agencyOwner, state, agencyId, version, hashes of bytes)", () => {
@@ -64,7 +91,7 @@ test("no request schema exposes a server-owned member (verified, agencyOwner, st
 });
 
 test("scope resolution: only CreateAgency runs without a tenant; agency-path routes carry agencyId; the rest use the header", () => {
-  for (const spec of Object.values(B06_COMMANDS)) {
+  for (const spec of [...Object.values(B06_COMMANDS), ...Object.values(SUPPORT_COMMANDS)]) {
     if (spec.path.includes("{agencyId}")) assert.equal(spec.scope, "AGENCY_PATH", spec.id);
     else if (spec.id === "CMD001") assert.equal(spec.scope, "NONE");
     else assert.equal(spec.scope, "AGENCY_HEADER", spec.id);

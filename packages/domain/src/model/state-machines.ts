@@ -6,7 +6,7 @@
  * current state of the aggregate lists that edge. The database additionally checks the state vocabulary of each column against
  * the same registry (persistence tests use the registry as the oracle).
  *
- * Two aggregates of B06 have no registry machine: EndClient (the contract has a state but no machine; decision D-AGG-2 fixes
+ * Two aggregates of B06 have no registry machine (and SupportCase, B11 D-SUP-6): EndClient (the contract has a state but no machine; decision D-AGG-2 fixes
  * the single edge ACTIVE -> ARCHIVED, CMD010) and Project (no registry contract; decision D-AGG-1 fixes OPEN, CLOSED,
  * DELETION_REQUESTED, DELETED). They are declared here in the registry's own shape with the registry's unlisted-transition
  * policy so the same guard applies; the persistence migrations seed the same edges (migration 0003).
@@ -33,15 +33,15 @@ export type RegistryMachineName =
 /**
  * EndClient and Project are B06's (D-AGG-1, D-AGG-2); UploadSession, StoredObject, SourceFile and RetentionRecord are B07's
  * (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2; @kauro/domain SOURCE_LIFECYCLE_STATE_MACHINES); the commerce machines are package B09's
- * (commerce/machines.ts).
+ * (commerce/machines.ts); SupportCase is package B11's (W4, D-SUP-6).
  */
-export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord" | CommercePlatformMachineName;
+export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord" | CommercePlatformMachineName | "SupportCase";
 
 export type MachineName = RegistryMachineName | PlatformMachineName;
 
 export const UNLISTED_TRANSITION_POLICY = "REJECT_UNLESS_A_NEW_VERSIONED_CONTRACT_IS_ACCEPTED";
 
-/** Machines the platform declares because the registry has no entry (D-AGG-1, D-AGG-2). */
+/** Machines the platform declares because the registry has no entry (D-AGG-1, D-AGG-2, D-SUP-6). */
 export const PLATFORM_STATE_MACHINES: ReadonlyArray<StateMachine> = Object.freeze([
   {
     contract: "EndClient",
@@ -71,6 +71,15 @@ export const PLATFORM_STATE_MACHINES: ReadonlyArray<StateMachine> = Object.freez
     unlistedTransition: UNLISTED_TRANSITION_POLICY,
   },
   ...COMMERCE_PLATFORM_MACHINES,
+  // D-SUP-6: the registry contract SupportCase has a state enum and no machine. A case is born OPEN (CMD044); the triage edges belong
+  // to the package that triages cases, so this edition lists none and an unlisted edge is rejected.
+  {
+    contract: "SupportCase",
+    initial: "OPEN",
+    terminal: ["CLOSED"],
+    transitions: [],
+    unlistedTransition: UNLISTED_TRANSITION_POLICY,
+  },
 ]);
 
 export function machine(name: MachineName): StateMachine {

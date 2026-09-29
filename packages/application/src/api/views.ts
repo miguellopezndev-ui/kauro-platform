@@ -7,7 +7,7 @@
  * which every reply is validated against before it is sent (10 "TypeScript types alone are insufficient runtime validation").
  */
 import type { Agency, Approval, EndClient, Membership, Plan, UtcInstant } from "@kauro/contracts";
-import type { AgencyCapability, ProjectState, ServiceMode } from "@kauro/domain";
+import type { AgencyCapability, ProjectState, ServiceMode, SupportCaseState, SupportCategory, SupportSeverity } from "@kauro/domain";
 import type { ResourceAction } from "./permitted-actions.js";
 
 export interface AgencyView {
@@ -153,6 +153,27 @@ export interface TeamMemberView {
   readonly self: boolean;
   readonly createdAt?: UtcInstant;
   readonly acceptedAt?: UtcInstant;
+}
+
+/**
+ * A support case (B11 CMD044): the registry SupportCase members plus who opened it, when, and the version. It carries the
+ * minimized summary the requester wrote (the detector refused secrets and record sets before it was stored) and no reply, no
+ * assignee and no internal note: this edition has no action on a case.
+ */
+export interface SupportCaseView {
+  readonly caseId: string;
+  readonly agencyId: string;
+  readonly projectId: string;
+  readonly category: SupportCategory;
+  readonly severity: SupportSeverity;
+  readonly state: SupportCaseState;
+  readonly summary: string;
+  readonly evidenceRefs: ReadonlyArray<string>;
+  /** The covered-hours instant the case is due its first review (D-SUP-4). */
+  readonly nextReviewAt: UtcInstant;
+  readonly createdByMembershipId: string;
+  readonly createdAt: UtcInstant;
+  readonly version: number;
 }
 
 /** A page of a list read: at most the page size, and the cursor of the next page when there may be one. */

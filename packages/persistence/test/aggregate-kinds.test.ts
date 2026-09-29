@@ -14,7 +14,7 @@ import type { Client } from "pg";
 import { AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
-import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, tx, type PlanFixture } from "./support.js";
+import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, supportCase, tx, type PlanFixture } from "./support.js";
 
 let h: Harness;
 let app: Client;
@@ -62,6 +62,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   refund: ["refunds", "refund_id"],
   tax_document: ["tax_documents", "document_id"],
   reconciliation_case: ["reconciliation_cases", "case_id"],
+  support_case: ["support_cases", "case_id"],
 });
 
 // every runtime login of this branch: B06 five and package B09 payment service
@@ -145,6 +146,7 @@ before(async () => {
     upload_session: source.uploadId,
     source_file: source.fileId,
     retention_record: source.retentionId,
+    support_case: (await supportCase(app, A, projectId)).caseId,
   };
   for (const kind of WALKED_KINDS) {
     const [table, column] = TABLE_OF[kind];

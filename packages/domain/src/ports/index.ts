@@ -21,6 +21,8 @@ export type {
   EndClientRepository,
   NewProject,
   ProjectRepository,
+  NewSupportCase,
+  SupportCaseRepository,
   DatasetRevisionRepository,
   TargetContractRepository,
   NewPlanRevision,

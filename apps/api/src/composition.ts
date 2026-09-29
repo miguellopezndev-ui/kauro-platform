@@ -31,6 +31,7 @@ import {
   createSessionService,
   createSourceIntakeHandlers,
   createSourceReadHandlers,
+  createSupportHandlers,
   isCursorKey,
   refuseAnonymously,
   refuseUnauthenticated,
@@ -347,7 +348,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...paymentService, ...assembly.commerce });
   return createApiServer({
     environment: assembly.environment,
-    handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
+    handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources), ...createSupportHandlers(runtime) },
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
     intakes: createSourceIntakeHandlers(readRuntime),
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },

@@ -25,6 +25,7 @@ import { SOURCE_ROUTES } from "../sources/contracts.js";
 import type { B07CommandId } from "../sources/contracts.js";
 import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
+import { TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
@@ -55,17 +56,23 @@ const { ID, VERSION, HASH, UTC, LABEL, COUNT } = RESPONSE_FIELD_VOCABULARY;
 const { registry, platform, ref, NARROW_ID, NARROW_LABEL, CURSOR, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION } = VIEW_MEMBER_KIT;
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
+/** A registry summary narrowed to what the request schema and the table keep: 20 characters at least, a visible one, no control character (B11 D-SUP-2). */
+const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
 
 /**
- * The commands this edition serves, by registry id: the seven of B06 and, since mandate B07-COMMANDS, the six of the source
- * lifecycle (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths).
+ * The commands this edition serves, by registry id: the seven of B06, since mandate B07-COMMANDS the six of the source lifecycle
+ * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
+ * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId;
+export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | "CMD044";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
-/** The manual-10 reads this edition serves (re-check finding N16) and the reads of the source lifecycle (B07), by operation id. */
-export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId;
+/**
+ * The manual-10 reads this edition serves (re-check finding N16), the reads of the source lifecycle (B07) and the two support
+ * reads (B11 W4), by operation id.
+ */
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId | "ListSupportCases" | "GetSupportCase";
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
 /** The document intakes this edition serves (B07 D-SEL-2: the selection manifest), by operation id. */
 export type IntakeOperationId = SourceIntakeId;
@@ -73,8 +80,9 @@ export type IntakeResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}intake:${I
 export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId | IntakeResponseSchemaId;
 
 /**
- * Every DTO definition of the B06 routes. Order is the order of the OpenAPI components. A view is closed: a member not
- * listed here can never reach the wire, whatever a record or a collaborator carries.
+ * Every DTO definition of the B06 routes (and, since B11 W4, the support case views). Order is the order of the OpenAPI
+ * components. A view is closed: a member not listed here can never reach the wire, whatever a record or a collaborator
+ * carries.
  */
 const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
   {
@@ -380,6 +388,36 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       completedExternalActions: platform(true, { type: "array", items: ref("CompletedExternalAction") }, "Completed external or customer actions, never promised reversible."),
     },
   },
+  {
+    name: "SupportCaseView",
+    description: "A support case as its agency sees it (owner manual 18: support metadata must not become an unrestricted raw-data channel): the classified case with the covered-hours follow-up. It cites uploads by id only and never the requester's user id (B11 W4).",
+    contract: "SupportCase",
+    withheld: {},
+    members: {
+      caseId: registry(true, NARROW_ID),
+      agencyId: registry(true, NARROW_ID),
+      projectId: registry(true, NARROW_ID),
+      category: registry(true),
+      severity: registry(true),
+      state: registry(true),
+      summary: registry(true, NARROW_SUMMARY),
+      evidenceRefs: registry(true),
+      nextReviewAt: registry(true),
+      createdByMembershipId: platform(true, ID, "The membership that opened the case (an agency-internal identity the caller already sees in team views)."),
+      createdAt: platform(true, UTC, "When the case was opened."),
+      version: platform(true, VERSION, "The case version: 1 when opened, one more for every edit."),
+    },
+  },
+  {
+    name: "SupportCasePage",
+    description: "A page of one project's support cases in (createdAt, caseId) order, oldest first.",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("SupportCaseView") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the project and this list)."),
+    },
+  },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /**
@@ -404,6 +442,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD025: { status: 201, view: "ApprovePlanView" },
   CMD026: { status: 200, view: "WithdrawApprovalView" },
   ...SOURCE_COMMAND_RESPONSES,
+  CMD044: { status: 201, view: "SupportCaseView" },
 });
 
 export const SERVED_COMMAND_IDS = Object.freeze(Object.keys(COMMAND_RESPONSES) as ServedCommandId[]);
@@ -429,6 +468,8 @@ export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: s
   GetUpload: { view: SOURCE_ROUTES.GetUpload.view },
   GetUploadSession: { view: SOURCE_ROUTES.GetUploadSession.view },
   PreviewTable: { view: SOURCE_ROUTES.PreviewTable.view },
+  ListSupportCases: { view: "SupportCasePage" },
+  GetSupportCase: { view: "SupportCaseView" },
 });
 
 export const READ_OPERATION_IDS = Object.freeze(Object.keys(READ_RESPONSES) as ReadOperationId[]);
