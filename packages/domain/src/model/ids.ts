@@ -32,6 +32,7 @@ export type ApprovalId = Branded<Id, "ApprovalId">;
 export type AssuranceProofId = Branded<Id, "AssuranceProofId">;
 export type CapabilityId = Branded<Id, "CapabilityId">;
 export type EventId = Branded<Id, "EventId">;
+export type InquiryId = Branded<Id, "InquiryId">;
 export type OutboxId = Branded<Id, "OutboxId">;
 export type InboxId = Branded<Id, "InboxId">;
 export type CorrelationId = Branded<Id, "CorrelationId">;

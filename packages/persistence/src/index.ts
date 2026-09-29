@@ -33,6 +33,8 @@ export { PgEventPublisher } from "./event-publisher.js";
 export { PgCommandJournal } from "./command-journal.js";
 export { PgLeaseStore } from "./lease-store.js";
 export { PgRequestJournal } from "./request-journal.js";
+export { PgInquiryStore } from "./inquiries.js";
+export { PgCapabilityPublication } from "./capability-publication.js";
 export { PgInboxIngress, PgInboxConsumerStore, PgOutboxDispatchStore } from "./inbox-outbox.js";
 export { PgIdentityRepository, PgAgencyRepository, PgMembershipRepository, PgInvitationRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 export { PgProcessingAuthorityRepository, PgEndClientRepository, PgProjectRepository, PgDatasetRevisionRepository, PgTargetContractRepository, PgCapabilityRepository } from "./repositories/workspace.js";

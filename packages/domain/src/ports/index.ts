@@ -46,3 +46,4 @@ export type {
   OutboxSettlement,
   OutboxDispatchStore,
 } from "./inbox-outbox.js";
+export type { InquiryStore, InquiryAdmission, InquiryAdmissionRequest, CapabilityPublication, PublishedCapability } from "./inquiries.js";
