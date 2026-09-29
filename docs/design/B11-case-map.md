@@ -40,7 +40,8 @@ EXECUTED_LOCAL (S067, CMD044-OK, CMD044-DENY, CMD044-RACE), 9 PARTIAL (owners B0
 
 ## Stage 1 records
 
-What the stage-1 mandates delivered, per case (the status column above is updated by INT-1).
+What the stage-1 mandates delivered, per case (the status column above is updated by INT-1); a record is evidence of one half of
+a case, never of the case. Deviations of the implementation from the design are in design §12.
 
 | case | test file :: exact title | status | commit |
 |---|---|---|---|
@@ -50,6 +51,11 @@ What the stage-1 mandates delivered, per case (the status column above is update
 | R2-062 | `packages/ui/test/confirm-dialog.test.ts` :: "R2-062: the confirmation dialog has no default action — no form, every button type=button, initial focus on the heading, approve disabled until each disclosed effect is acknowledged, and each effect's error referenced by that effect's control" | markup half EXECUTED_LOCAL (W1; Windows); keyboard and server-refusal half PLANNED (W8) | `cf6e9d1` (test first), green at `f2ffb86` |
 | R2-065 | `packages/ui/test/count-denominators.test.ts` :: "R2-065: the count panel shows physical rows, billable source units and output rows as three labelled measures with their definitions, never one records figure" | markup half EXECUTED_LOCAL (W1; Windows); the sealed revision's counts through the browser PLANNED (W7) | `cf6e9d1` (test first), green at `f2ffb86` |
 | R2-064 | `packages/ui/test/navigation-guard.test.ts` :: "D-DS-1: the guard asks the browser to confirm leaving the document and, in the capture phase, asks the person before a link inside the application is followed" :: "D-DS-1: when the caller takes over the question, a click that would leave is held and handed over with its destination, and proceed follows it once, as the original click, past the guard" | primitive only, not the case: the guard covers tab close, address change and an in-application link, and hands a held link to the page for Stay, Save draft or Discard (W1; Windows; stubbed environment). The Back button cannot be intercepted by a page (D-W1-9), so the Back clause of the case, the four-status model and the dialog stay PLANNED (W3, W8) | `6335bc7`, `da54519` |
+| S066 | `apps/web/test/operation-runner.test.ts` :: "S066: one logical intent keeps one idempotency key — a double activation, a lost response and a reload of CreatePaymentOrder and CapturePayment reuse the key derived from the quote version and the order, and never mint another" | EXECUTED_LOCAL — unit half (runner and api client against a scripted transport); the browser half is planned for W9 | 082564c test first, ebb06d1 code |
+| R2-064 | `apps/web/test/navigation-guard.test.ts` :: "R2-064: local edits, saved draft, validated and approved are four separate statuses; leaving with local edits needs Stay, Save draft or Discard, and no status is derived from local edits" | EXECUTED_LOCAL — unit half (the guard and its four statuses); the browser half is planned for W8 | 082564c test first, ebb06d1 code |
+
+W3 also holds the harness tests of the ContractFakeAgencyApi (`apps/web/test/fake-routes.test.ts`, `apps/web/e2e/fake-routes.spec.ts`, design
+D-E2E-2): no case of B11 is demonstrated by them.
 
 ## Gates
 

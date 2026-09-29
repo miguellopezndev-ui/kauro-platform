@@ -1,4 +1,5 @@
 import "@kauro/ui/tokens.css";
+import "../shell/shell.css";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
