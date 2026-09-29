@@ -17585,7 +17585,9 @@
               "EXECUTION_QUEUE_FULL",
               "PUBLICATION_EVIDENCE_MISSING",
               "NO_FUNDED_GRANT",
-              "GRANT_CEILING"
+              "GRANT_CEILING",
+              "AUDIT_EXISTS",
+              "AUDIT_CONCURRENCY_LIMITED"
             ]
           },
           "correlationId": {
