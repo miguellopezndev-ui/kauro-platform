@@ -31,7 +31,6 @@ export const EN = {
   "nav.billing.label": "Billing",
   "nav.settings.label": "Settings",
   "nav.support.label": "Support",
-  "nav.help.label": "Help",
   // unsaved edits (R2-064): four separate facts and the three ways out
   "guard.title": "You have unsaved edits",
   "guard.body": "Your edits are only on this page. Leaving now would lose them.",
