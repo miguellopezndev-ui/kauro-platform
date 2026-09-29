@@ -100,3 +100,39 @@ test("B09-N8: the implementation mandates are staged and self-contained — stag
   // after the stage-2 integration every cited api test is on the branch: no planned citation is left (INT-2, design §14)
   assert.equal(planned, 0);
 });
+
+// The section headings of the authority manuals 15 and 19 (authority_r2, read-only outside this repository): a decision may cite
+// only a section that exists.
+const MANUAL_SECTIONS = {
+  15: ["Initial payment decision", "Money vocabulary", "Exact representation and rounding", "PaymentOrder and intent", "Capture and authority", "Webhooks and reconciliation", "Payment state transitions", "Price and source expiry races", "Refund policy and calculation", "Disputes and chargebacks", "Settlement and withdrawal", "Fee reference and example", "Accounting integration decision", "FiscalProfile", "TaxDocument state machine", "Operational ledger", "Commission integration", "Corporate and owner money", "Acceptance", "Cross-system worked examples"],
+  19: ["Operator decision and sequence", "Name, trademark and domain", "BusinessProfile and legal facts", "Setup action chain", "Customer instrument hierarchy", "Service terms: required operative content", "Data processing agreement", "Data categories and excluded use", "Subprocessor register", "Rights requests and privacy complaints", "Incident and breach obligations", "People and engagement administration", "Intellectual property and repository ownership", "Fiscal and corporate calendar", "Business readiness gate", "Specific unresolved application questions", "Acceptance"],
+};
+
+/** The cells of the one table row of the design whose first cell is `id`. */
+function row(id) {
+  const lines = design.split(/\r?\n/).filter((l) => l.startsWith(`| ${id} |`));
+  assert.equal(lines.length, 1, `one row ${id}`);
+  return lines[0].split(" | ").map((c) => c.replace(/^\| |\s\|$/g, ""));
+}
+
+test("FINAL-N2 (D-PAY-B6): the decisions register fixes the tax point of a capture observed REVERSED without its completion instant — the provider's completion instant alone, never the reversal's instant, the webhook's receipt, the observation's instant or the local clock — citing existing sections of manuals 15 and 19, and the critique row names the tests that prove it", () => {
+  const [, decision, authority] = row("D-PAY-B6");
+  assert.match(decision, /REVERSED/);
+  assert.match(decision, /tax point/);
+  for (const never of ["the reversal's instant", "the webhook's receipt", "the observation's instant", "the local clock"]) {
+    assert.ok(decision.includes(never), `D-PAY-B6 names ${never} as never the tax point`);
+  }
+  for (const manual of [15, 19]) {
+    const cited = [...authority.matchAll(new RegExp(`\\b${manual} "([^"]+)"`, "g"))].map((m) => m[1]);
+    assert.ok(cited.length > 0, `D-PAY-B6 cites manual ${manual}`);
+    for (const section of cited) assert.ok(MANUAL_SECTIONS[manual].includes(section), `manual ${manual} has no section "${section}"`);
+  }
+  // the critique row cites each test by file and title prefix, and each title exists in its file
+  const evidence = row("FINAL-N2 (re-check of `3f4af4a`) a REVERSED observation without a completion instant has no rule")[3];
+  const citations = [...evidence.matchAll(/`((?:apps|packages)\/[a-z0-9/-]+\.test\.ts)` "([^"…]+)…"/g)];
+  assert.ok(citations.some(([, file]) => file === "apps/api/test/b09-payment-service.test.ts"), "the route test on PostgreSQL 17 is cited");
+  for (const [, file, prefix] of citations) {
+    const source = readFileSync(join(root, file), "utf8");
+    assert.ok(source.includes(`test("${prefix}`), `${file} has a test titled "${prefix}…"`);
+  }
+});

@@ -48,6 +48,12 @@ async function paidProject(clientId: ClientId, seed: string) {
 
 test("FINAL-N3 (D-INSP-B1) CMD023 DENY: revising an APPROVED plan on which a paid purchase rests — its accepted quote and its live CommercialAuthorization, as the bound inspector names them — is 409 PRECONDITION_FAILED CONSEQUENCES_UNRECONCILED for the approval's controller and commits nothing; an approved plan of another project with no commercial fact is revised", async () => {
   const { plan, purchase } = await paidProject(w.clientA, "inspector-cmd023");
+
+  // the route first: the paid plan is not superseded
+  const body = () => ({ expectedVersion: 5, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "SCOPE_CHANGED" }) });
+  const before = await effectCounts(w);
+  const denied = await call(w, { url: routes.revisePlan(plan.planId), token: w.owner.token, key: freshKey("cmd023-paid"), body: body() });
+  assert.equal(outcome(w, denied), "409 PRECONDITION_FAILED CONSEQUENCES_UNRECONCILED");
   // what the composition's inspector reads in the command's own unit of work, under the tenant's policies
   const named = await w.h.app.run(w.h.tenant(w.A.agencyId, w.A.ownerUserId), (uow) => commercialConsequencesInspector.unreconciledForPlan(uow, plan.planId as PlanId));
   assert.deepEqual(
@@ -57,11 +63,6 @@ test("FINAL-N3 (D-INSP-B1) CMD023 DENY: revising an APPROVED plan on which a pai
       ["QUOTE", purchase.quoteId],
     ],
   );
-
-  const body = () => ({ expectedVersion: 5, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "SCOPE_CHANGED" }) });
-  const before = await effectCounts(w);
-  const denied = await call(w, { url: routes.revisePlan(plan.planId), token: w.owner.token, key: freshKey("cmd023-paid"), body: body() });
-  assert.equal(outcome(w, denied), "409 PRECONDITION_FAILED CONSEQUENCES_UNRECONCILED");
   assert.deepEqual(asProblem(w, denied).current, { version: 5, state: "APPROVED" });
   // nothing committed: no plan, approval, event, outbox or journal row (the refusal's durable fact aside)
   assert.deepEqual({ ...(await effectCounts(w)), security_events: 0 }, { ...before, security_events: 0 });
