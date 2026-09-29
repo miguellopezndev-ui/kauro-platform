@@ -281,6 +281,8 @@ export class JobPipeline {
       if (attempt.state === "CLAIMED") return this.launch(jobId, agencyId, service);
       if (attempt.state === "ABANDONED" || attempt.state === "FAILED") return this.takeOver(job, attempt.attemptId);
       if (attempt.state !== "STARTING" && attempt.state !== "RUNNING") return waiting("NOT_MONITORED");
+      // a refusal recorded without its failure (the recording unit did not complete): the host created nothing to observe
+      if (attempt.launchState === "REFUSED") return this.failFor(job.jobId, attempt.attemptId, "HOST_REFUSED", service);
 
       let observation: WorkerObservation;
       try {

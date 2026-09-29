@@ -113,6 +113,9 @@ export class JobAdmission implements ExecutionSweeper {
     if (keys.targetContractId !== null) shared.push({ kind: "TARGET_CONTRACT", key: keys.targetContractId });
     shared.push({ kind: "CAPABILITY", key: job.mode }, { kind: "AGENCY", key: job.agencyId });
     if (!(await x.tryAwaitTransition(shared[0] as TransitionSubject))) return { kind: "DEFERRED", jobId: job.jobId };
+    // an ACTIVE entitlement's row, then its exclusive transition half (the consumption is its transition), neither waited for; a
+    // row no longer ACTIVE is not moved here (the facts below cancel the job), and one that changes meanwhile defers it
+    if (keys.authorizationState === "ACTIVE" && !(await x.tryLockAuthorization(job.authorizationId))) return { kind: "DEFERRED", jobId: job.jobId };
     if (!(await x.tryTransitionExclusive({ kind: "AUTHORIZATION", key: job.authorizationId }))) return { kind: "DEFERRED", jobId: job.jobId };
     for (const subject of shared.slice(1)) if (!(await x.tryAwaitTransition(subject))) return { kind: "DEFERRED", jobId: job.jobId };
 

@@ -319,3 +319,30 @@ test("R2-045: a reversal revokes the consumed authorization while the worker is 
   assert.deepEqual(await w.objectsUnder("DELIVERY", `delivery/${p.agency.agencyId}/`), []);
   await w.quiesce();
 });
+
+test("JOB_DEADLINES expires a launched job at its execution deadline on the server clock and never early: the exact provider job terminated first, the attempt abandoned, the job EXPIRED with its reason and its slots released", async () => {
+  const A = await w.agency("deadline");
+  const p = await w.paid(A, "deadline");
+  const { jobId, identity } = await admitted(w, p);
+  const beforeManifest = w.host.holdNext("manifest", identity);
+  await launched(w, jobId);
+  await beforeManifest.reached;
+  await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
+  assert.equal((await w.job(jobId)).state, "RUNNING");
+  // before its execution deadline nothing is due
+  const early = await w.x.sweepers.jobDeadlines.sweep(w.units, 20);
+  assert.deepEqual([early.examined, early.acted], [0, 0], "never early");
+  assert.equal((await w.job(jobId)).state, "RUNNING");
+  // the control plane's TEST CLOCK (and the host's) past launch + 28,800 s: the deadline is reached on the server clock
+  w.advance(28_800 + 60);
+  const due = await w.x.sweepers.jobDeadlines.sweep(w.units, 20);
+  assert.deepEqual([due.examined, due.acted, due.failed], [1, 1, []]);
+  assert.deepEqual(w.host.calls("terminate").filter((c) => c.identity === identity).map((c) => c.outcome), ["TERMINATED"], "the exact provider job, terminated first");
+  const job = await w.job(jobId);
+  assert.deepEqual([job.state, job.terminal_reason, job.holds], ["EXPIRED", "EXECUTION_DEADLINE_REACHED", "NONE"]);
+  assert.deepEqual([(await w.attempt(jobId)).state, (await w.attempt(jobId)).terminal_cause], ["ABANDONED", "EXECUTION_DEADLINE_REACHED"]);
+  assert.deepEqual(await w.capacity(A.agencyId), { active: 0, waiting: 0, live: 0 });
+  assert.equal((await w.authorization(p.authorizationId)).state, "CONSUMED", "an expiry is never a delivery");
+  await w.host.settled(identity);
+  await w.quiesce();
+});

@@ -263,6 +263,11 @@ export class PgExecutionStore implements ExecutionStore {
     return r.rows[0]?.ok === true;
   }
 
+  async tryLockAuthorization(authorizationId: CommercialAuthorizationId): Promise<boolean> {
+    const r = await execute<{ authorization_id: string }>(this.db, "SELECT authorization_id FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR UPDATE SKIP LOCKED", [authorizationId]);
+    return r.rows.length === 1;
+  }
+
   async lockGlobalLedger(): Promise<void> {
     await execute(this.db, "SELECT ledger_id FROM kauro.execution_capacity WHERE ledger_id = 1 FOR UPDATE");
   }

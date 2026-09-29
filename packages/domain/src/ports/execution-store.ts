@@ -225,6 +225,13 @@ export interface ExecutionStore {
   tryAwaitTransition(subject: TransitionSubject): Promise<boolean>;
   /** The exclusive transition lock without waiting: admission's consumption of the authorization never waits under the ledger. */
   tryTransitionExclusive(subject: TransitionSubject): Promise<boolean>;
+  /**
+   * The entitlement's row lock without waiting (FOR UPDATE SKIP LOCKED): false when another transaction holds it (a revocation in
+   * flight) — or when the row is not one the control plane may move (only ACTIVE or CONSUMED rows are, 0019's update policy).
+   * JOB_ADMISSION takes it on an ACTIVE entitlement before its exclusive transition lock, so it never waits under the ledger for a
+   * row whose holder waits for that lock (D8-LOCK-1; mandate B08-CONTROL-EXECUTION).
+   */
+  tryLockAuthorization(authorizationId: CommercialAuthorizationId): Promise<boolean>;
   /** The global ledger row under its lock (JOB_ADMISSION takes it first, D8-SCHED-1). */
   lockGlobalLedger(): Promise<void>;
   /** The facts a job relies on, read in this statement's snapshot (call after the transition locks). */
