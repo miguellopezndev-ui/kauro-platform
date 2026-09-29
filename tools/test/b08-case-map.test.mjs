@@ -91,7 +91,7 @@ test("B08 mandates: every mandate's test file is cited, each test file and each 
   assert.equal(new Set(fakes).size, fakes.length, "one owner per fake");
   assert.equal(new Set(migrations).size, migrations.length, "one mandate per migration");
   const numbers = migrations.map((f) => Number(/^(\d{4})_[a-z0-9_]+\.sql$/.exec(f)?.[1])).sort((a, b) => a - b);
-  assert.deepEqual(numbers, numbers.map((_, i) => 18 + i), "the B08 migrations are 0018 upward without a gap");
+  assert.deepEqual(numbers, numbers.map((_, i) => 19 + i), "the B08 migrations are 0019 upward without a gap");
 });
 
 /** The lines of a case's section: a scenario's `### <id> ` heading, or a command family's `- **<id>**` item. */

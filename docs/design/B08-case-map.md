@@ -2,7 +2,8 @@
 
 Every case of package B08 (`node tools/package-brief.mjs B08`: 15 cases, gate G-JOB, owner 07) mapped to the tests that will
 demonstrate its expected outcome, their evidence class, what the check observes, and the later package and case of any clause B08
-cannot demonstrate. Design: `docs/design/B08-audit-approval-jobs.md` (decisions `D8-*`). Mandates: `docs/design/B08-mandates.json`.
+cannot demonstrate. Design: `docs/design/B08-audit-approval-jobs.md` (decisions `D8-*`). Mandates: `docs/design/B08-mandates.json`. `b08/base` already carries the landed rows of B08-CORE-PORTS and B08-WORKER-HOST (D8-BASE-3);
+the planned migrations are 0019–0021 (D8-BASE-1, D8-XPKG-1).
 
 Every test is cited as `` `file` :: "exact test title" ``. `tools/test/b08-case-map.test.mjs` reads this file: a cited file that
 exists must contain a test with exactly that title; a cited file that does not exist yet must be listed in the `tests` of exactly one
