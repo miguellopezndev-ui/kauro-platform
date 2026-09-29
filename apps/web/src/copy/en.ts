@@ -5,8 +5,10 @@
 // Id convention (the lint reads the last segment): `.title`, `.heading`, `.label`, `.cta`, `.offer`, `.subject` and `.name` are surfaces
 // where AI never appears (A3 3.1); `.body` and `.hint` are running text.
 import type { NextStep, SharedState } from "../client/states.ts";
+import { PUBLIC_COPY } from "./public.ts";
 
-export const EN = {
+/** The application's own entries: the shell, the shared states, their next steps, the guard (W3). */
+export const APPLICATION_COPY = {
   // the application shell
   "shell.brand.name": "Kauro",
   "shell.skip-link.label": "Skip to main content",
@@ -92,11 +94,14 @@ export const EN = {
   "next.RETRY_LATER.label": "Try again later",
   "next.CONTACT_SUPPORT.label": "Contact support",
   "next.SECURE_UPLOAD.label": "Use the secure upload",
-  // names and sentences A3 fixes word for word
-  "health-check.title": "Free data health check",
-  "public.cta.request-health-check.cta": "Request a free data health check",
-  "pricing.in-house.body": "In-house CRM and data teams can use Kauro too.",
 } as const satisfies Readonly<Record<string, string>>;
+
+/**
+ * The one catalogue of the web application (D-COPY-1; B11 stage-1 integration, D-W5a-2): the application's own entries and the public
+ * site's (copy/public.ts, the names and sentences A3 fixes word for word among them), merged by key prefix: no id is defined by both,
+ * so the A3 rules that count a sentence count it once over everything a person can read.
+ */
+export const EN = { ...APPLICATION_COPY, ...PUBLIC_COPY } as const;
 
 export type MessageId = keyof typeof EN;
 export type MessageParams = Readonly<Record<string, string | number>>;

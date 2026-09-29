@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { R2_DOMAIN_ALIASES } from "@kauro/contracts";
-import { EN, message, nextStepLabel, placeholdersOf, stateCopy } from "../src/copy/en.ts";
+import { APPLICATION_COPY, EN, message, nextStepLabel, placeholdersOf, stateCopy } from "../src/copy/en.ts";
+import { PUBLIC_COPY } from "../src/copy/public.ts";
 import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, IN_HOUSE_SENTENCE, lintCatalogue, lintText, PERMITTED_AI_SENTENCE, withoutComments } from "../src/copy/lint.ts";
 import { SHARED_STATES, type NextStep } from "../src/client/states.ts";
 
@@ -24,6 +25,18 @@ const withEntry = (id: string, text: string): Readonly<Record<string, string>> =
 test("D-COPY-1: the copy catalogue passes every A3 rule, and the brand list the lint refuses is not empty", () => {
   assert.ok(brands.length > 0, "the earlier brand names come from the alias table");
   assert.deepEqual(lintCatalogue(EN, options), []);
+});
+
+test("B11 INT-1 seam, one copy catalogue (D-COPY-1, D-W5a-2): EN is the application's entries and the public site's, merged by key prefix with no id defined by both, so the A3 sentences stand once over everything a person reads", () => {
+  const application = Object.keys(APPLICATION_COPY);
+  const site = Object.keys(PUBLIC_COPY);
+  assert.deepEqual(application.filter((id) => Object.hasOwn(PUBLIC_COPY, id)), [], "no id is defined by both catalogues");
+  assert.deepEqual(Object.keys(EN).sort(), [...application, ...site].sort());
+  for (const [id, text] of Object.entries(PUBLIC_COPY)) assert.equal((EN as Readonly<Record<string, string>>)[id], text, id);
+  // the names and sentences A3 fixes word for word are the public site's, and each stands once over both catalogues
+  for (const sentence of [HEALTH_CHECK_CTA, IN_HOUSE_SENTENCE]) {
+    assert.equal([...Object.values(APPLICATION_COPY), ...Object.values(PUBLIC_COPY)].filter((text) => text === sentence).length, 1, sentence);
+  }
 });
 
 test("D-COPY-1: the required names are exact — the free step is the Free data health check, its call to action, and the in-house sentence once on Pricing", () => {

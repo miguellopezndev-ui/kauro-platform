@@ -163,7 +163,8 @@ test("D-ROUTE-1: navigation offers only agency-level screens that exist, in refe
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) walk(path, group, `${prefix}/${entry.name.replace(/^\[(.+)\]$/, "{$1}")}`);
-      else if (entry.name === "page.tsx") pages.push(`${group}:${prefix === "" ? "/" : prefix}`);
+      // a page, or a route handler that answers a whole document (the legal documents, D-LEGAL-1)
+      else if (entry.name === "page.tsx" || entry.name === "route.ts") pages.push(`${group}:${prefix === "" ? "/" : prefix}`);
     }
   };
   walk(join(webRoot, "src", "app", "(public)"), "PUBLIC", "");

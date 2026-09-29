@@ -1,8 +1,18 @@
+import "./public.css";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { PublicFrame } from "../../shell/landmarks.tsx";
+import { SiteFrame } from "../../public/frame.tsx";
+import { signInAddress } from "../../server/config/site-origins.ts";
+import { MainNav } from "./main-nav.tsx";
 
-// The PUBLIC group (design D-ROUTE-1, D-TOPO-2): the screens of the public host, none of which reads a session. The frame is the skip
-// link and the landmark; the public site's own header and footer belong to the screens that draw them.
+// The frame of every page of the public origin (D-TOPO-1). The document itself (html, body, the nonce) is the root layout's; the legal pages
+// are route handlers with their own document and do not pass through here. Nothing here reads a cookie, a header or a session.
+export const metadata: Metadata = { title: { template: "%s | Kauro", default: "Kauro" } };
+
 export default function PublicLayout({ children }: { readonly children: ReactNode }) {
-  return <PublicFrame>{children}</PublicFrame>;
+  return (
+    <SiteFrame signInHref={signInAddress()} nav={<MainNav />}>
+      {children}
+    </SiteFrame>
+  );
 }

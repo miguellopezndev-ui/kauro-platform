@@ -71,9 +71,10 @@ export const SCREENS: readonly Screen[] = [
 /**
  * The screens whose page exists in this build. A navigation entry appears only for one of these (11 "Every navigation link resolves to
  * real content or an explicitly unavailable feature"); the mandate that lands a screen adds its id here, and a test refuses an id
- * without its page file and a page file without its id.
+ * without its page file and a page file without its id. The public screens are W5a's: UI01-UI08, UI48 and UI49 are pages, and the
+ * legal documents UI45-UI47 are route handlers that answer the whole document (D-LEGAL-1).
  */
-export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>();
+export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(["UI01", "UI02", "UI03", "UI04", "UI05", "UI06", "UI07", "UI08", "UI45", "UI46", "UI47", "UI48", "UI49"]);
 
 export interface NavigationEntry {
   readonly screen: string;
