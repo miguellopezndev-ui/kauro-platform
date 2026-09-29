@@ -27,7 +27,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; D8-API-1)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -35,6 +35,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId} GetAgency",
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/jobs/{jobId} GetJob",
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/projects/{projectId} GetProject",
@@ -53,12 +54,14 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
+      "POST /api/v1/jobs/{jobId}/cancel CancelJob",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/execute ExecuteProject",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",

@@ -226,8 +226,11 @@ export interface ExecutionStore {
   tryTransitionExclusive(subject: TransitionSubject): Promise<boolean>;
   /** The global ledger row under its lock (JOB_ADMISSION takes it first, D8-SCHED-1). */
   lockGlobalLedger(): Promise<void>;
-  /** The facts a job relies on, read in this statement's snapshot (call after the transition locks). */
-  readAuthority(job: ProcessingJobRecord): Promise<ExecutionAuthorityFacts>;
+  /**
+   * The facts a job relies on, read in this statement's snapshot (call after the transition locks). It takes the execution subject, not
+   * the job row: ExecuteProject (CMD036) reads them before any job exists (D8-CMD-1); a ProcessingJobRecord is one.
+   */
+  readAuthority(subject: JobExecutionSubject): Promise<ExecutionAuthorityFacts>;
 
   // --- request handlers (CMD036, CMD037) -------------------------------------------------------------------------------------------
   /** CMD036: the job born QUEUED with processing_job.queued.v1 and its JOB_EXECUTION outbox record; the database stamps its instants. */
@@ -283,6 +286,12 @@ export interface ExecutionStore {
 /** A unit of work of processing authority: the commerce unit of work with the execution store on the same connection. */
 export interface ExecutionUnitOfWork extends CommerceUnitOfWork {
   readonly execution: ExecutionStore;
+  /**
+   * The database's transaction time, kauro.server_now(), as an exact ISO-8601 instant with microseconds (D8-CLOCK-1): the clock a
+   * request handler compares a deadline against (CMD036's source deadline), never the process clock. The same reading as
+   * SourceUnitOfWork.serverInstant on the same connection.
+   */
+  serverInstant(): Promise<string>;
 }
 
 export interface ExecutionUnitOfWorkFactory extends CommerceUnitOfWorkFactory {

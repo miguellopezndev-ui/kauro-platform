@@ -164,6 +164,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/uploads/:uploadId/cancel", "CancelUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD015" } }],
       ["POST", "/api/v1/revisions/:revisionId/selection", "SelectInputTables", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD016" } }],
       ["POST", "/api/v1/revisions/:revisionId/seal", "SealRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD017" } }],
+      // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job
+      ["POST", "/api/v1/projects/:projectId/execute", "ExecuteProject", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/jobs/:jobId/cancel", "CancelJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD037" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
@@ -178,6 +181,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/uploads/:uploadId", "GetUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetUpload" } }],
       ["GET", "/api/v1/uploads/:uploadId/session", "GetUploadSession", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetUploadSession" } }],
       ["GET", "/api/v1/revisions/:revisionId/tables/:tableId/preview", "PreviewTable", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTable" } }],
+      // GetJob (B08 design §12)
+      ["GET", "/api/v1/jobs/:jobId", "GetJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetJob" } }],
       // the selection manifest intake: 201 stored, 200 the same document again (B07 D-SEL-2)
       ["POST", "/api/v1/revisions/:revisionId/selection-manifests", "SubmitSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" } }],
       // package B09's request side (M4, D-REQ-B7): a provider command declares its 202 accepted observation beside its success

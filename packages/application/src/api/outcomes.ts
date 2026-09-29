@@ -18,6 +18,7 @@
  * it with RESPONSE_CONTRACT_VIOLATION and the sink receives the violation under the correlation id.
  */
 import type { B06CommandId } from "../commands/contracts.js";
+import { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "../execution/outcomes.js";
 import { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "../sources/outcomes.js";
 import { OUTCOME_BLOCKS, problemOutcome as outcome, type ProblemOutcome } from "./outcome-kit.js";
 import type { IntakeOperationId, ReadOperationId, ServedCommandId } from "./response-schemas.js";
@@ -133,6 +134,7 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
+  ...EXECUTION_COMMAND_OUTCOMES,
 });
 
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
@@ -172,6 +174,7 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetUpload: SOURCE_ROUTE_OUTCOMES.GetUpload,
   GetUploadSession: SOURCE_ROUTE_OUTCOMES.GetUploadSession,
   PreviewTable: SOURCE_ROUTE_OUTCOMES.PreviewTable,
+  GetJob: EXECUTION_ROUTE_OUTCOMES.GetJob,
 });
 
 /** The closed problem catalogue of each served document intake (B07 D-SEL-2). */

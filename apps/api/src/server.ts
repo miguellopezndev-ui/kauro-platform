@@ -52,6 +52,8 @@ import type {
   CommerceCommandHandler,
   CommerceReadHandler,
   CompletedResponse,
+  ExecutionHandlers,
+  ExecutionReadHandlers,
   IntakeHandler,
   IntakeResult,
   Problem,
@@ -137,10 +139,10 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  /** The seven B06 commands and the six B07 source-lifecycle commands (B07 design §11). */
-  readonly handlers: B06Handlers & B07Handlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16) and the source reads (B07 design §9.1). */
-  readonly reads: ReadHandlers & SourceReadHandlers;
+  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) and the two B08 execution commands (B08 design §12). */
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16), the source reads (B07 design §9.1) and GetJob (B08 design §12). */
+  readonly reads: ReadHandlers & SourceReadHandlers & ExecutionReadHandlers;
   /** The document intakes: the selection manifest (B07 D-SEL-2). */
   readonly intakes: SourceIntakeHandlers;
   /**
