@@ -3,13 +3,13 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { SafeText, isFormulaLike, truncateGraphemes } from "../src/index.js";
 import type { SafeTextCopy } from "../src/index.js";
-import { BIDI_CONTROLS, byClass, elementsOf, findAll, findOne, render, textOf } from "./support/markup.js";
+import { BIDI_CONTROLS, byClass, byId, elementsOf, findAll, findOne, render, textOf } from "./support/markup.js";
 import type { ElementNode, Node } from "./support/markup.js";
 
 const copy: SafeTextCopy = { formulaMarker: "Formula", showFullValue: "Show full value" };
 
 /** A sentence around the value, so a value that escapes its element would visibly disturb the surrounding text. */
-const sentence = (value: string, maxChars?: number) =>
+const sentence = (value: string, maxChars?: number | null) =>
   render(createElement("p", null, "Client ", createElement(SafeText, { value, copy, maxChars }), " was removed"));
 
 /** Every text node of the tree that is not inside a <bdi>. */
@@ -85,20 +85,26 @@ test("S069: an untrusted label renders as inert text inside a bidi-isolated elem
   }
 });
 
-test("a long value is cut on grapheme boundaries and keeps its full text in an accessible disclosure that a screen reader can reach", () => {
-  const value = `${"A".repeat(100)}\u{202E}${"B".repeat(100)}`;
+test("a long value is cut on grapheme boundaries and keeps its full text behind a disclosure button a screen reader can reach; a null limit never cuts", () => {
+  const value = `${"A".repeat(100)}${String.fromCodePoint(0x202e)}${"B".repeat(100)}`;
   const { root, html } = sentence(value, 40);
   const [visible, full] = findAll(root, "bdi");
   assert.equal(textOf(visible as ElementNode), `${"A".repeat(40)}…`);
-  const details = findOne(root, "details");
-  assert.equal(textOf(findOne(root, "summary")), copy.showFullValue);
-  assert.equal(details.children.length, 2, "summary and the full value");
+  const button = findOne(root, "button");
+  assert.equal(button.attrs.get("type"), "button");
+  assert.equal(button.attrs.get("aria-expanded"), "false");
+  assert.equal(textOf(button), copy.showFullValue);
+  const region = byId(root, button.attrs.get("aria-controls") as string);
+  assert.equal(region.attrs.has("hidden"), true, "the full value stays hidden until the button is used");
+  assert.equal(region.children.length, 1);
   assert.equal(textOf(full as ElementNode), value, "the full value is available verbatim");
-  assert.ok((full as ElementNode).parent === details);
+  assert.ok((full as ElementNode).parent === region);
   assert.doesNotMatch(html.replace(/<bdi\b[^>]*>[\s\S]*?<\/bdi>/g, ""), BIDI_CONTROLS, "still contained");
 
-  assert.equal(findAll(sentence("short", 40).root, "details").length, 0, "a short value has no disclosure");
-  assert.equal(findAll(sentence("A".repeat(40), 40).root, "details").length, 0, "exactly the limit is not cut");
+  assert.equal(findAll(sentence("short", 40).root, "button").length, 0, "a short value has no disclosure");
+  assert.equal(findAll(sentence("A".repeat(40), 40).root, "button").length, 0, "exactly the limit is not cut");
+  assert.equal(findAll(sentence("A".repeat(5000), null).root, "button").length, 0, "a null limit never cuts (a value inside a link cannot hold a button)");
+  assert.equal(textOf(findOne(sentence("A".repeat(5000), null).root, "bdi")), "A".repeat(5000));
 
   assert.equal(truncateGraphemes("e\u{301}".repeat(30), 30), null, "30 graphemes of two code points each fit in 30");
   assert.equal(truncateGraphemes("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".repeat(5), 3), "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", "a ZWJ family is never split");

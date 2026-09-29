@@ -11,7 +11,12 @@
  * Focus (B11 design D-DS-2): #005FCC is 1.16:1 against the primary action colour, so the focus ring is always drawn as an
  * outline offset by FOCUS.offsetPx from the control, over the surface it sits on — never adjacent to a primary fill. The
  * contrast checks bind the focus colour against every surface, not against the primary fill.
+ *
+ * The rules of the primitives (styles.ts) are rendered after the base rules, into the same file: components emit class names only,
+ * never a style attribute (B11 D-SEC-1), and every value a rule reads is one of the properties above.
  */
+
+import { renderComponentCss } from "./styles.js";
 
 export const COLOR = Object.freeze({
   text: "#17212B",
@@ -51,6 +56,12 @@ export const FOCUS = Object.freeze({ widthPx: 2, offsetPx: 2 });
 
 export const RADIUS_PX = 4;
 
+/** The smallest pointer target of a control (WCAG 2.2 SC 2.5.8 asks 24px; the primitives use the 44px of the interface contract). */
+export const TARGET_SIZE_PX = 44;
+
+/** The width of the border of a control, a table rule and a card. */
+export const BORDER_WIDTH_PX = 1;
+
 /** Text colours and the surfaces they are drawn on: each pair must reach 4.5:1 (WCAG 2.2 SC 1.4.3, normal text). */
 export const TEXT_PAIRS: ReadonlyArray<readonly [ColorToken, ColorToken]> = Object.freeze([
   ["text", "background"],
@@ -60,6 +71,7 @@ export const TEXT_PAIRS: ReadonlyArray<readonly [ColorToken, ColorToken]> = Obje
   ["onPrimary", "primary"],
   ["onPrimary", "primaryHover"],
   ["primary", "background"],
+  ["primary", "surface"],
   ["dangerText", "background"],
   ["dangerText", "dangerSurface"],
   ["warningText", "background"],
@@ -108,7 +120,7 @@ export function contrastRatio(a: string, b: string): number {
 
 const kebab = (name: string): string => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
-/** The stylesheet the web surfaces load (@kauro/ui/tokens.css): custom properties plus the base rules they bind. */
+/** The stylesheet the web surfaces load (@kauro/ui/tokens.css): custom properties, the base rules they bind and the component rules. */
 export function renderTokenCss(): string {
   const lines: string[] = [
     "/* Generated from packages/ui/src/tokens.ts (renderTokenCss); packages/ui/test/tokens.test.ts checks it. Do not edit by hand. */",
@@ -125,6 +137,8 @@ export function renderTokenCss(): string {
   lines.push(`  --kauro-focus-width: ${FOCUS.widthPx}px;`);
   lines.push(`  --kauro-focus-offset: ${FOCUS.offsetPx}px;`);
   lines.push(`  --kauro-radius: ${RADIUS_PX}px;`);
+  lines.push(`  --kauro-target-size: ${TARGET_SIZE_PX}px;`);
+  lines.push(`  --kauro-border-width: ${BORDER_WIDTH_PX}px;`);
   lines.push("}");
   lines.push("html {");
   lines.push("  color: var(--kauro-color-text);");
@@ -145,5 +159,6 @@ export function renderTokenCss(): string {
   lines.push("@media (forced-colors: active) {");
   lines.push("  :focus-visible { outline-color: Highlight; }");
   lines.push("}");
+  lines.push(renderComponentCss());
   return `${lines.join("\n")}\n`;
 }

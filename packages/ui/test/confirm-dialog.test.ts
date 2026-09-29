@@ -12,7 +12,6 @@ const copy: ConfirmDialogCopy = {
   approve: "Approve clear",
   cancel: "Cancel",
   errorSummaryTitle: "This confirmation could not be approved",
-  safeText: { formulaMarker: "Formula", showFullValue: "Show full value" },
 };
 
 const effects: readonly ConfirmEffect[] = [
