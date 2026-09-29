@@ -596,11 +596,16 @@ CREATE CONSTRAINT TRIGGER processing_jobs_ready_bound AFTER UPDATE ON kauro.proc
   EXECUTE FUNCTION kauro.processing_jobs_ready_bound();
 
 -- ... and CONSUMED -> DELIVERED commits only with its job entering READY with an AVAILABLE package at that instant (the registry's
--- package_published guard of B09's CommercialAuthorization; KA081)
+-- package_published guard of B09's CommercialAuthorization; KA081). Every runtime role is bound; a superuser session is not (it can
+-- disable any trigger anyway), which keeps B09's api scenario S059 — it consumes and delivers an entitlement as the superuser oracle
+-- standing in for B08 — unchanged, like the consumption bound of 0019 (decision D8-PEX-8).
 CREATE OR REPLACE FUNCTION kauro.commercial_authorizations_delivery_bound() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = current_user AND r.rolsuper) THEN
+    RETURN NULL;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM kauro.processing_jobs j JOIN kauro.package_versions p ON p.agency_id = j.agency_id AND p.package_version_id = j.published_package_id
      WHERE j.agency_id = NEW.agency_id AND j.job_id = NEW.job_ref AND j.authorization_id = NEW.authorization_id

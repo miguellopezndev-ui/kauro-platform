@@ -739,3 +739,49 @@ test("B08 seeds: the Job edges and initial state equal the registry and the Proc
     ],
   );
 });
+
+test("D8-PEX-8: the control plane consumes an entitlement only with its job's admission and delivers it only with the job's publication (KA081); only a superuser session, B09's stand-in for B08, is exempt", async () => {
+  const { A } = env;
+  const control = { kind: "SERVICE", id: "control-plane" } as const;
+  const p = await purchase(env, A, "pex-8");
+  const job = await queueJob(env.h, A, p.authorizationId);
+  // a consumption naming the QUEUED job, without its admission, never commits
+  await refusedTransaction(
+    env.control,
+    service(A.agencyId),
+    async (c) => {
+      await c.query("UPDATE kauro.commercial_authorizations SET version = 2, state = 'CONSUMED', job_ref = $2, consumed_at = kauro.server_now() WHERE authorization_id = $1", [p.authorizationId, job.jobId]);
+      await commerceEvent(c, "commercial_authorization", p.authorizationId, 2, A.agencyId, "commercial_authorization.consumed.v1", control);
+    },
+    "KA081",
+    "a consumption without the admission",
+  );
+  // admitted (the entitlement CONSUMED by its job), a delivery without the publication never commits either
+  await admitJob(env.h, A, job.jobId);
+  const consumed = await oracle<{ version: number }>(env, "SELECT version::int AS version FROM kauro.commercial_authorizations WHERE authorization_id = $1", [p.authorizationId]);
+  const version = consumed[0]!.version + 1;
+  await refusedTransaction(
+    env.control,
+    service(A.agencyId),
+    async (c) => {
+      await c.query("UPDATE kauro.commercial_authorizations SET version = $2, state = 'DELIVERED', delivered_at = kauro.server_now() WHERE authorization_id = $1", [p.authorizationId, version]);
+      await commerceEvent(c, "commercial_authorization", p.authorizationId, version, A.agencyId, "commercial_authorization.delivered.v1", control);
+    },
+    "KA081",
+    "a delivery without the publication",
+  );
+  assert.deepEqual(await oracle(env, "SELECT state, job_ref FROM kauro.commercial_authorizations WHERE authorization_id = $1", [p.authorizationId]), [{ state: "CONSUMED", job_ref: job.jobId }]);
+  await endJob(env.h, A, job.jobId);
+  // the superuser oracle, standing in for B08 in B09's suites (B09-F2, the api scenario S059), is not bound by the two edges
+  const standIn = await purchase(env, A, "pex-8-stand-in");
+  await env.h.oracle.query("BEGIN");
+  try {
+    await env.h.oracle.query("UPDATE kauro.commercial_authorizations SET version = 2, state = 'CONSUMED', job_ref = $2, consumed_at = now() WHERE authorization_id = $1", [standIn.authorizationId, ids.next()]);
+    await commerceEvent(env.h.oracle, "commercial_authorization", standIn.authorizationId, 2, A.agencyId, "commercial_authorization.consumed.v1", control);
+    await env.h.oracle.query("COMMIT");
+  } catch (e) {
+    await env.h.oracle.query("ROLLBACK");
+    throw e;
+  }
+  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [standIn.authorizationId]), [{ state: "CONSUMED" }]);
+});
