@@ -1038,7 +1038,8 @@ B09", as `apps/api` `edition.ts`); item 13's matrix now serves 13 commands, 12 r
 ## 17. Integration obligations (B07 and B09 on main)
 
 B07 and B09 were designed in parallel on the same base (`ac44af6`). Neither references the other's tables; they touch through
-ports, shared B06 tables and shared files. When both land, the integrator:
+ports, shared B06 tables and shared files. When both land, the integrator (done on `integration/b07-b09`; the record, its seam tests and
+its one migration of its own, 0018, are `docs/design/B07-B09-merge.md`):
 
 1. **Migrations.** Keeps B07's `0009..0012` and renumbers B09's files after them (or the reverse, whichever merges second),
    contiguous from 0001 (the runner refuses gaps); re-applies from empty; both packages' tests are the proof. B09's own
