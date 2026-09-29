@@ -1178,3 +1178,8 @@ has a test under the title below that failed on `0f15636` and passes with its fi
 | B07-R2 | MAJOR | FIXED | `apps/control/test/end-to-end.test.ts` :: "B07-R2 end to end: …" (two associations through CMD016, the real SELECTION_EVALUATION consumer and CMD017) | `9fa857e` |
 | B07-R3 | MAJOR | FIXED | `packages/data-plane/test/selection-evaluation.test.ts` :: "B07-R3: …" (the reviewer's hidden formula column under REJECT_FORMULAS) | `ac1a382` |
 | B07-R4 | MINOR | FIXED | `apps/control/test/storage-lifecycle.test.ts` :: "B07-R4: …" (UNCERTAIN until the horizon; the sweep on transactions whose TEST CLOCK stands past it; a later agency not hidden) | `077cc3e`, `5a39967` |
+
+`pnpm run verify` at `70cc3cf` on Windows 11 (Node 24.14.1, pnpm 10.16.1, `C:\Tools\pgsql17\bin`): VERIFY_EXIT 0 — contracts 12,
+domain 107, application 125, persistence 218, authorization 11, data-plane 13, control 17, api 201 + 1 skipped (B06's Linux-only
+test), tools 41; 0 failed; architecture gate, OpenAPI (39 operations), matrix and clean-consume green. The next commit adds this
+paragraph only.
