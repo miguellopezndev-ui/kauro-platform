@@ -748,7 +748,8 @@ FIXED; none is DEFERRED or NOT_A_DEFECT. What stays open is listed in §12d.4.
 Independent re-checkers then examined the integrated branch at `e05d47a`: fifteen resolutions were not confirmed and twenty new
 findings (N1–N20) were reported. Their record — each item's outcome, decision, authority, regression tests and revert proof —
 is §12d.5. An independent residual re-check of `055d317` reported one new minor finding in the N2 guard and did not confirm the
-N20-skip revert proof; both are resolved in §12d.6.
+N20-skip revert proof; both are resolved in §12d.6. The package-close review of `main` at `a7203f0` reported B06-R1–B06-R3;
+they are resolved in §12d.7.
 
 ### 12d.1 Findings
 
@@ -1036,6 +1037,49 @@ killed runs of the `055d317` test were stopped with `pg_ctl stop -m immediate` a
 | N2-race-delivery | the conflicting delivery takes no shared lock | `packages/persistence/migrations/0005_events_outbox_inbox.sql` | 1/4 failed: the same message | 4/4 passed |
 | N2-race-isolation | no READ COMMITTED requirement on the move to APPLIED | `packages/persistence/migrations/0005_events_outbox_inbox.sql` | 1/4 failed: "a REPEATABLE READ settlement was not refused: the record ends APPLIED with 1 body conflict(s)" | 4/4 passed |
 | N20-skip | the dispatcher claim locks `FOR UPDATE` without SKIP LOCKED | `packages/persistence/src/inbox-outbox.ts` | with the test of `055d317`: the file never finished — the first test passed, the second never reported, and the run was killed at an external 60 s bound (exit 124); with the new test: 1/4 failed in 110 ms, "the second dispatcher waited on the records the first one holds instead of skipping them: a concurrent claim must lock FOR UPDATE SKIP LOCKED", the other three passed and the file finished in 6 s | 4/4 passed |
+
+### 12d.7 Package-close review record — `main` at `a7203f0`
+
+The independent reviewer's package-close review of `main` at `a7203f0` (all 29 cases; verdict REJECT, with that commit's
+`pnpm run verify` green) agreed with 24 case statuses and disagreed with five — S090, CMD025-DENY, CMD023-RACE, CMD025-RACE and
+CMD026-RACE — through three findings. They were resolved on `fix/b06-review`, branched from `a7203f0`. Each defect was first
+shown by a test under a precise title that fails on `a7203f0` (a clean checkout of `a7203f0` with only the new or changed tests
+applied; every persistence and api test on its own PostgreSQL 17 cluster, instants as the lease functions' clock parameter or
+the labelled TEST CLOCK, no sleep), then fixed, and the same test passes on the fix. Migration 0006 is corrected in place, not
+by a new migration number: nothing is deployed anywhere (D-LEASE-3). Decisions: D-LEASE-3 and D-SRC-1 (§1). Outcome: 3 FIXED,
+0 DEFERRED, 0 NOT_A_DEFECT.
+
+**Review findings**
+
+| id | severity | status | test | commit |
+|---|---|---|---|---|
+| B06-R1 | BLOCKING | FIXED — D-LEASE-3: the expiry decides a claim before the owner; an expired lease is resumed, by anyone, only under the next fence with exactly the stored checkpoint; a MODEL_TASK or JOB_ATTEMPT that expired without one is not resumed; `leases_guard` holds the rule for every writer | `packages/persistence/test/adapters-leases.test.ts` :: "B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — …" and :: "B06-R1: an expired owner re-claiming its own lease is a resume, not a renewal — …"; `packages/persistence/test/journals-leases.test.ts` :: "B06-R1 (database): the guard beneath claim_lease refuses the control plane's own UPDATE …" | `34edc13` |
+| B06-R2 | BLOCKING | FIXED — D-SRC-1: CMD025 requires, after the revision's transition lock, a governing retention record ACTIVE with its effective deadline ahead of `kauro.server_now()`, else SOURCE_EXPIRED | `apps/api/test/cmd025-approve-plan.test.ts` :: "B06-R2 DENY: a source still SEALED whose governing retention deadline has passed on the server clock — …"; the OK test :: "OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; …" now asserts through the oracle that its source's retention lies ahead | `706403d` |
+| B06-R3 | MAJOR | FIXED — CMD023-RACE, CMD025-RACE and CMD026-RACE are PARTIAL exactly like their OK rows (SIMULATED ports and owning packages named); every row quotes its registry outcome verbatim; no product change | `tools/test/case-map.test.mjs` :: "B06-R3: every case row quotes its registry expected outcome verbatim, and a RACE row claims no more than its command's OK row — …" and :: "N12: one PARTIAL criterion — …" | `80eb30b` |
+
+What the tests observed on `a7203f0`, and on the fix:
+
+- **B06-R1** — 3 of the 11 tests of the two lease files failed. Another owner's takeover of an expired JOB_ATTEMPT that never
+  checkpointed, with no checkpoint, returned CLAIMED under fence 2 ("JOB_ATTEMPT without a checkpoint"); the original owner's
+  claim after expiry, without the checkpoint it had stored, returned CLAIMED keeping fence 1 ("expired re-claim without the
+  checkpoint"); the control plane's raw takeover UPDATE of that JOB_ATTEMPT committed ("Missing expected rejection: another
+  owner's takeover without a checkpoint"). On the fix 11/11 pass. The live holder's re-claim now names the stored checkpoint
+  too (a re-claim without it is a restart). The two OUTBOX_DISPATCH dispatchers of `main` (`apps/control`, the payments
+  dispatcher of `apps/api`) claim with no checkpoint and read the fence from the claim: an OUTBOX_DISPATCH lease spends
+  nothing, so they are unaffected, except that a dispatcher's own re-claim after expiry now advances the fence.
+- **B06-R2** — 2 of the 12 tests of `cmd025-approve-plan` failed. The SEALED source whose UNPAID retention had lapsed a day
+  earlier (sealed fifteen days ago on the TEST CLOCK, no sweeper run) was approved: "… was answered 201" with the plan
+  APPROVED; and with the fixture of `a7203f0` the OK test's own source had its retention behind ("the approved source's
+  retention lies ahead"). On the fix 12/12 pass; the fixtures seal a SEALED source an hour ago, and the sweeper racing an
+  approval stands on the TEST CLOCK fifteen days ahead.
+- **B06-R3** — 2 of the 4 tests of `case-map.test.mjs` failed on the case map of `a7203f0`: N12's reviewed PARTIAL set lacked
+  CMD023-RACE, CMD025-RACE and CMD026-RACE, and B06-R3 listed 28 violations — each of the three RACE rows claimed
+  EXECUTED_LOCAL while its OK row is PARTIAL and named neither the OK row's SIMULATED clause nor its owners (B03 and B08, B08,
+  B08 and B17); 13 rows did not quote their registry outcome; the RACE rows of CMD001, CMD009, CMD010 and CMD011 cited no test
+  of the effect their race commits. On the fix 4/4 pass; the case map counts 18 EXECUTED_LOCAL and 11 PARTIAL cases.
+
+The durable evidence bundles (D-EVIDENCE-1) were not regenerated in this round: `docs/evidence/b06/` still holds those of
+`0cce2f02f8b0`, which predate these tests.
 
 ## 13. Verification performed on `b06/integration`
 
