@@ -182,6 +182,13 @@ test("the attempt scratch cannot be steered outside its own directory: a non-can
     failsWith(() => keyed.manifest("../../outside-every-attempt"), "CORRUPT_INTERMEDIATE", "SEGMENT_NOT_PRESENT");
     keyed.dispose();
 
+    // a name the store is about to create that something else already took is never written through
+    const occupied = new AttemptScratchStore({ root, attemptId: attemptFixture(5).attemptId, quotaBytes: 1024 });
+    writeFileSync(join(occupied.directory, "records-000001.part"), "planted");
+    failsWith(() => occupied.createSegment(RECORDS), "CORRUPT_INTERMEDIATE", "PATH_OCCUPIED");
+    assert.equal(readFileSync(join(occupied.directory, "records-000001.part"), "utf8"), "planted");
+    occupied.dispose();
+
     // a link planted where an attempt's directory belongs is refused, and removing it removes the link, never its target
     const victimRoot = join(root, "victim");
     mkdirSync(victimRoot);

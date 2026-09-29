@@ -633,7 +633,17 @@ export class AttemptScratchStore implements ScratchStore {
   }
 
   #openFile(path: string, flags: "wx" | "r"): number {
-    const fd = openSync(path, flags);
+    let fd: number;
+    try {
+      fd = openSync(path, flags);
+    } catch (error) {
+      const code = codeOf(error);
+      if (code === "ENOSPC" || code === "EDQUOT") this.#fail("SCRATCH_EXHAUSTED", "DEVICE_FULL", "the scratch device is full");
+      // a name the store is about to create already exists: something else wrote into the attempt's directory
+      if (code === "EEXIST") this.#fail("CORRUPT_INTERMEDIATE", "PATH_OCCUPIED", "a scratch file name was already taken");
+      if (code === "ENOENT") this.#fail("CORRUPT_INTERMEDIATE", "MISSING", "a scratch file or the attempt's directory is gone");
+      throw error;
+    }
     this.#fds.add(fd);
     return fd;
   }
