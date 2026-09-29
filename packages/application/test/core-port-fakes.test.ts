@@ -31,7 +31,7 @@ import {
   CONTRACT_FAKE_MIGRATION_CORE_TOKEN,
   ContractFakeIntelligenceCore,
   ContractFakeMigrationCore,
-} from "../src/testing/index.js";
+} from "../src/testing/cores.js";
 
 function sha(value: string): Sha256Hex {
   return createHash("sha256").update(value).digest("hex");
