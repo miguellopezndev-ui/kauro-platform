@@ -22,7 +22,7 @@ Registry: commands.json `6fa1a124821609a5ac911779304e8876df1a6954c530e895604da10
 
 `Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the
 edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;
-**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019–0020 of B08) stores the aggregate and seeds the edge in
+**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019–0021 of B08) stores the aggregate and seeds the edge in
 `kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and
 checked; **—** — the aggregate is not stored yet.
 
@@ -87,25 +87,25 @@ registry machine; initial QUEUED; terminal DRAFT_READY, NEEDS_DECISION, UNSUPPOR
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial QUEUED) | QUEUED | CMD020 StartAudit (B03) | — (no event type registered: the owning package registers it with the edge) | — |
-| QUEUED | profile_worker_claims | PROFILING | B08: durable profile/interpret/validate orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| PROFILING | profile_and_candidates_complete | INTERPRETING | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | compiled_decisions_ready | VALIDATING | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | unresolved_material_choice | NEEDS_DECISION | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | capability_not_supported | UNSUPPORTED | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATING | complete_valid_receipt_and_current_authority | DRAFT_READY | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATING | validatable_issue_needs_agency_choice | NEEDS_DECISION | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | — (no event type registered: the owning package registers it with the edge) | — |
-| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | — (no event type registered: the owning package registers it with the edge) | — |
-| QUEUED | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | — (no event type registered: the owning package registers it with the edge) | — |
-| PROFILING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | — (no event type registered: the owning package registers it with the edge) | — |
-| PROFILING | fatal_integrity_error | FAILED | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| INTERPRETING | fatal_contract_or_provider_error | FAILED | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
-| VALIDATING | fatal_contract_error | FAILED | B08: durable orchestration | — (no event type registered: the owning package registers it with the edge) | — |
+| — | (initial QUEUED) | QUEUED | CMD020 StartAudit (B03) | audit.queued.v1 | database |
+| QUEUED | profile_worker_claims | PROFILING | B08: durable profile/interpret/validate orchestration | audit.profiling.v1 | database |
+| PROFILING | profile_and_candidates_complete | INTERPRETING | B08: durable orchestration | audit.interpreting.v1 | database |
+| INTERPRETING | compiled_decisions_ready | VALIDATING | B08: durable orchestration | audit.validating.v1 | database |
+| INTERPRETING | unresolved_material_choice | NEEDS_DECISION | B08: durable orchestration | audit.needs_decision.v1 | database |
+| INTERPRETING | capability_not_supported | UNSUPPORTED | B08: durable orchestration | audit.unsupported.v1 | database |
+| VALIDATING | complete_valid_receipt_and_current_authority | DRAFT_READY | B08: durable orchestration | audit.draft_ready.v1 | database |
+| VALIDATING | validatable_issue_needs_agency_choice | NEEDS_DECISION | B08: durable orchestration | audit.needs_decision.v1 | database |
+| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
+| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
+| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
+| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
+| QUEUED | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
+| PROFILING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
+| INTERPRETING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
+| VALIDATING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
+| PROFILING | fatal_integrity_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
+| INTERPRETING | fatal_contract_or_provider_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
+| VALIDATING | fatal_contract_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
 
 ### Plan
 
@@ -213,14 +213,14 @@ registry machine; initial PREPARED; terminal CLOSED, EXPIRED; unlisted edges: RE
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial PREPARED) | PREPARED | B03: the durable audit request reserves a grant (CMD020 StartAudit) | — (no event type registered: the owning package registers it with the edge) | — |
-| PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9) | — (no event type registered: the owning package registers it with the edge) | — |
-| AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B03: bounded reservations | — (no event type registered: the owning package registers it with the edge) | — |
-| EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B03: reconciled reservations | — (no event type registered: the owning package registers it with the edge) | — |
-| AUTHORIZED | expiry_reached | EXPIRED | B03: the grant's expiry | — (no event type registered: the owning package registers it with the edge) | — |
-| EXHAUSTED | expiry_reached | EXPIRED | B03: the grant's expiry | — (no event type registered: the owning package registers it with the edge) | — |
-| AUTHORIZED | all_effects_reconciled_and_scope_closed | CLOSED | B03: grant closure | — (no event type registered: the owning package registers it with the edge) | — |
-| EXPIRED | all_effects_reconciled | CLOSED | B03: grant closure | — (no event type registered: the owning package registers it with the edge) | — |
+| — | (initial PREPARED) | PREPARED | B03: the durable audit request reserves a grant (CMD020 StartAudit) | cost_grant.prepared.v1 | database |
+| PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9) | cost_grant.authorized.v1 | database |
+| AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B03: bounded reservations | cost_grant.exhausted.v1 | database |
+| EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B03: reconciled reservations | cost_grant.authorized.v1 | database |
+| AUTHORIZED | expiry_reached | EXPIRED | B03: the grant's expiry | cost_grant.expired.v1 | database |
+| EXHAUSTED | expiry_reached | EXPIRED | B03: the grant's expiry | cost_grant.expired.v1 | database |
+| AUTHORIZED | all_effects_reconciled_and_scope_closed | CLOSED | B03: grant closure | cost_grant.closed.v1 | database |
+| EXPIRED | all_effects_reconciled | CLOSED | B03: grant closure | cost_grant.closed.v1 | database |
 
 ### TaxDocument
 

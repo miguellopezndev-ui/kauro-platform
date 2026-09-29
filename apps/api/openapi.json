@@ -19011,7 +19011,9 @@
               "GRANT_CEILING",
               "AUTHORIZATION_REVOKED",
               "JOB_TERMINAL",
-              "JOB_ALREADY_READY"
+              "JOB_ALREADY_READY",
+              "AUDIT_EXISTS",
+              "AUDIT_CONCURRENCY_LIMITED"
             ]
           },
           "correlationId": {

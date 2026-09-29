@@ -15,6 +15,7 @@
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
+import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -268,6 +269,8 @@ export const FAILURE_REASONS = [
   ...COMMERCE_FAILURE_REASONS,
   // processing authority (package B08; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1)
   ...EXECUTION_FAILURE_REASONS,
+  // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; the audit keys of migration 0021)
+  ...AUDIT_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

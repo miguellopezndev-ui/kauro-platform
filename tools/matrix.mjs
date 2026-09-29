@@ -112,19 +112,19 @@ export const EDGE_OWNERS = {
     cleanup_verified_with_residuals: { owner: "B16", why: "verified managed deletion with recorded provider residuals", event: null },
   },
   Audit: {
-    "(initial QUEUED)": { command: "CMD020", event: null },
-    profile_worker_claims: { owner: "B08", why: "durable profile/interpret/validate orchestration", event: null },
-    profile_and_candidates_complete: { owner: "B08", why: "durable orchestration", event: null },
-    compiled_decisions_ready: { owner: "B08", why: "durable orchestration", event: null },
-    unresolved_material_choice: { owner: "B08", why: "durable orchestration", event: null },
-    capability_not_supported: { owner: "B08", why: "durable orchestration", event: null },
-    complete_valid_receipt_and_current_authority: { owner: "B08", why: "durable orchestration", event: null },
-    validatable_issue_needs_agency_choice: { owner: "B08", why: "durable orchestration", event: null },
-    cancellation_wins: { command: "CMD021", event: null },
-    absolute_deadline: { owner: "B08", why: "the audit's absolute deadline", event: null },
-    fatal_integrity_error: { owner: "B08", why: "durable orchestration", event: null },
-    fatal_contract_or_provider_error: { owner: "B08", why: "durable orchestration", event: null },
-    fatal_contract_error: { owner: "B08", why: "durable orchestration", event: null },
+    "(initial QUEUED)": { command: "CMD020", event: "audit.queued.v1" },
+    profile_worker_claims: { owner: "B08", why: "durable profile/interpret/validate orchestration", event: "audit.profiling.v1" },
+    profile_and_candidates_complete: { owner: "B08", why: "durable orchestration", event: "audit.interpreting.v1" },
+    compiled_decisions_ready: { owner: "B08", why: "durable orchestration", event: "audit.validating.v1" },
+    unresolved_material_choice: { owner: "B08", why: "durable orchestration", event: "audit.needs_decision.v1" },
+    capability_not_supported: { owner: "B08", why: "durable orchestration", event: "audit.unsupported.v1" },
+    complete_valid_receipt_and_current_authority: { owner: "B08", why: "durable orchestration", event: "audit.draft_ready.v1" },
+    validatable_issue_needs_agency_choice: { owner: "B08", why: "durable orchestration", event: "audit.needs_decision.v1" },
+    cancellation_wins: { command: "CMD021", event: "audit.cancelled.v1" },
+    absolute_deadline: { owner: "B08", why: "the audit's absolute deadline", event: "audit.expired.v1" },
+    fatal_integrity_error: { owner: "B08", why: "durable orchestration", event: "audit.failed.v1" },
+    fatal_contract_or_provider_error: { owner: "B08", why: "durable orchestration", event: "audit.failed.v1" },
+    fatal_contract_error: { owner: "B08", why: "durable orchestration", event: "audit.failed.v1" },
   },
   Plan: {
     "(initial DRAFT)": { command: "CMD022", event: "plan.created.v1", note: "CMD023 RevisePlan (B06) creates the successor DRAFT of a revision" },
@@ -187,14 +187,14 @@ export const EDGE_OWNERS = {
     material_counterexample: { command: "CMD059", event: null },
   },
   CostGrant: {
-    "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: null },
+    "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: "cost_grant.prepared.v1" },
     // B09 funds no cost grant: the grant's own package records the owner's funding evidence (B09 open question Q-B09-9; B09-F17)
-    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: null },
-    remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: null },
-    reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: null },
-    expiry_reached: { owner: "B03", why: "the grant's expiry", event: null },
-    all_effects_reconciled_and_scope_closed: { owner: "B03", why: "grant closure", event: null },
-    all_effects_reconciled: { owner: "B03", why: "grant closure", event: null },
+    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: "cost_grant.authorized.v1" },
+    remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: "cost_grant.exhausted.v1" },
+    reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: "cost_grant.authorized.v1" },
+    expiry_reached: { owner: "B03", why: "the grant's expiry", event: "cost_grant.expired.v1" },
+    all_effects_reconciled_and_scope_closed: { owner: "B03", why: "grant closure", event: "cost_grant.closed.v1" },
+    all_effects_reconciled: { owner: "B03", why: "grant closure", event: "cost_grant.closed.v1" },
   },
   TaxDocument: {
     "(initial DRAFT)": { owner: "B09", why: "the fiscal consumer drafts the invoice of a completed capture and the credit note of a completed refund, blocked when the treatment is not reviewed (D-FISC-B1)", event: "tax_document.drafted.v1" },
@@ -745,7 +745,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019–0020 of B08) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019–0021 of B08) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();

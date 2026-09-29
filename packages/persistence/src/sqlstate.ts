@@ -161,6 +161,20 @@ export const EXECUTION_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly s
 });
 
 /**
+ * Audit authority's keys and grant checks (package B08, mandate B08-PERSISTENCE-AUDIT; D8-AUD-1, D8-GRANT-1, D8-SQL-1; migration
+ * 0021): a grant's reservations past its ceiling or an AUDIT grant above the free-audit policy are BUDGET_EXHAUSTED / GRANT_CEILING, a
+ * second audit of one (revision, target) is PRECONDITION_FAILED / AUDIT_EXISTS, and a second live audit of the agency is
+ * ADMISSION_LIMITED / AUDIT_CONCURRENCY_LIMITED, retryable once the first ends. Keyed by the constraint (or unique index) name the
+ * error carries, for its SQLSTATE.
+ */
+export const AUDIT_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason: FailureReason; readonly retryable?: boolean }>> = Object.freeze({
+  cost_grants_within_ceiling: { sqlState: "23514", code: "BUDGET_EXHAUSTED", reason: "GRANT_CEILING" },
+  cost_grants_audit_ceiling: { sqlState: "23514", code: "BUDGET_EXHAUSTED", reason: "GRANT_CEILING" },
+  audits_one_per_subject: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "AUDIT_EXISTS" },
+  audits_one_live_per_agency: { sqlState: "23505", code: "ADMISSION_LIMITED", reason: "AUDIT_CONCURRENCY_LIMITED", retryable: true },
+});
+
+/**
  * Commerce unique indexes a racing request can meet, decided by their name (package B09, design §7): a second open checkout of a
  * project is PAYMENT_PENDING (retry with the same key once the open order settles), a second open request of a capture and origin
  * is REFUND_REQUEST_OPEN, and a second capture.completed.v1 of one capture is an integrity failure (a reconciler that follows
@@ -221,7 +235,7 @@ export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
  */
 export function failureOfSqlState(sqlState: string | undefined, constraint?: string): DomainFailure | null {
   if (!sqlState) return null;
-  const source = constraint === undefined ? undefined : (SOURCE_CONSTRAINT_FAILURES[constraint] ?? EXECUTION_CONSTRAINT_FAILURES[constraint]);
+  const source = constraint === undefined ? undefined : (SOURCE_CONSTRAINT_FAILURES[constraint] ?? EXECUTION_CONSTRAINT_FAILURES[constraint] ?? AUDIT_CONSTRAINT_FAILURES[constraint]);
   if (source !== undefined && source.sqlState === sqlState) {
     return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
   }

@@ -142,3 +142,28 @@ export type {
 } from "./execution-store.js";
 // the control plane's discovery of execution work (package B08, mandate B08-CONTROL-EXECUTION)
 export type { ExecutionJobRef, ExecutionAttemptRef, ExecutionFact, ExecutionSourceGeneration, ExecutionInput, ExecutionDiscovery } from "./execution-discovery.js";
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §10)
+export type {
+  NewAudit,
+  StartedAudit,
+  AuditCancellation,
+  StepClaim,
+  StepResult,
+  AuditEdge,
+  SystemDraft,
+  SystemDraftRecord,
+  ValidationRequest,
+  ValidationSettlement,
+  ValidationSettled,
+  NewModelTask,
+  DispatchIntent,
+  DispatchOutcome,
+  JournalAppend,
+  JournalAppendOutcome,
+  NewDecisionArtifact,
+  StoredDecisionArtifact,
+  GrantEdge,
+  AuditStore,
+  AuditUnitOfWork,
+  AuditUnitOfWorkFactory,
+} from "./audit-store.js";
