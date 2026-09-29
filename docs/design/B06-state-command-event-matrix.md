@@ -133,22 +133,22 @@ registry machine; initial QUEUED; terminal READY, FAILED, CANCELLED, EXPIRED; un
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
 | — | (initial QUEUED) | QUEUED | CMD036 ExecuteProject (B08) | processing_job.queued.v1 | route |
-| QUEUED | capacity_reserved | ADMITTED | B08: job admission | processing_job.admitted.v1 | database |
-| ADMITTED | provider_start_observed | RUNNING | B08: fenced execution | processing_job.running.v1 | database |
-| RUNNING | complete_staging_submitted | VERIFYING | B08: fenced staging | processing_job.verifying.v1 | database |
-| VERIFYING | atomic_publication_accepted | READY | B08: verification and publication | processing_job.ready.v1 | database |
-| QUEUED | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08) | processing_job.cancel_requested.v1 | route |
-| ADMITTED | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08) | processing_job.cancel_requested.v1 | route |
-| RUNNING | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08) | processing_job.cancel_requested.v1 | route |
-| VERIFYING | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08) | processing_job.cancel_requested.v1 | route |
-| CANCEL_REQUESTED | provider_and_artifacts_reconciled | CANCELLED | B08: cancellation reconciliation | processing_job.cancelled.v1 | database |
-| QUEUED | deadline_reached | EXPIRED | B08: the job's deadline | processing_job.expired.v1 | database |
-| ADMITTED | deadline_reached | EXPIRED | B08: the job's deadline | processing_job.expired.v1 | database |
-| RUNNING | deadline_reached | EXPIRED | B08: the job's deadline | processing_job.expired.v1 | database |
-| VERIFYING | deadline_reached | EXPIRED | B08: the job's deadline | processing_job.expired.v1 | database |
-| ADMITTED | unrecoverable_start_error | FAILED | B08: fenced execution | processing_job.failed.v1 | database |
-| RUNNING | fatal_resource_or_integrity_error | FAILED | B08: fenced execution | processing_job.failed.v1 | database |
-| VERIFYING | verification_failure | FAILED | B08: verification | processing_job.failed.v1 | database |
+| QUEUED | capacity_reserved | ADMITTED | B08: JOB_ADMISSION (control plane): the fair round under the global ledger admits the next QUEUED job and consumes its authorization in the same unit (D8-SCHED-1, D8-AUTH-1), run by JOB_EXECUTION on processing_job.queued.v1 and by the JOB_ADMISSION sweeper | processing_job.admitted.v1 | database |
+| ADMITTED | provider_start_observed | RUNNING | B08: the ATTEMPT_MONITOR sweeper (control plane) observes the attempt's provider job by its deterministic identity (D8-ATT-2) | processing_job.running.v1 | database |
+| RUNNING | complete_staging_submitted | VERIFYING | B08: the ATTEMPT_MONITOR sweeper (control plane) reads the finished attempt's manifest from its staging prefix itself and records it under the attempt's fence (D8-STG-3) | processing_job.verifying.v1 | database |
+| VERIFYING | atomic_publication_accepted | READY | B08: the JOB_EXECUTION consumer (control plane) on package_version.verified_private.v1: the authority re-read after its locks, the delivery copies read back, then the publication transaction (D8-PUB-1, D8-PUB-2, D8-CEX-5) | processing_job.ready.v1 | database |
+| QUEUED | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08); the control plane requests it too, with a SERVICE actor and its reason, when a fact the job relies on is lost (JOB_ADMISSION at its re-read, EXECUTION_CONTROL on the loss event, JOB_EXECUTION at the publication's re-read; D8-CEX-5, D8-CEX-6) | processing_job.cancel_requested.v1 | route |
+| ADMITTED | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08); the control plane requests it too, with a SERVICE actor and its reason, when a fact the job relies on is lost (JOB_ADMISSION at its re-read, EXECUTION_CONTROL on the loss event, JOB_EXECUTION at the publication's re-read; D8-CEX-5, D8-CEX-6) | processing_job.cancel_requested.v1 | route |
+| RUNNING | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08); the control plane requests it too, with a SERVICE actor and its reason, when a fact the job relies on is lost (JOB_ADMISSION at its re-read, EXECUTION_CONTROL on the loss event, JOB_EXECUTION at the publication's re-read; D8-CEX-5, D8-CEX-6) | processing_job.cancel_requested.v1 | route |
+| VERIFYING | cancel_command | CANCEL_REQUESTED | CMD037 CancelJob (B08); the control plane requests it too, with a SERVICE actor and its reason, when a fact the job relies on is lost (JOB_ADMISSION at its re-read, EXECUTION_CONTROL on the loss event, JOB_EXECUTION at the publication's re-read; D8-CEX-5, D8-CEX-6) | processing_job.cancel_requested.v1 | route |
+| CANCEL_REQUESTED | provider_and_artifacts_reconciled | CANCELLED | B08: the EXECUTION_CONTROL consumer (control plane) terminates the attempt's provider job by identity, observes it terminal, revokes the private package and releases the job's slots once (D8-CANCEL-1, D8-CEX-6) | processing_job.cancelled.v1 | database |
+| QUEUED | deadline_reached | EXPIRED | B08: the JOB_DEADLINES sweeper (control plane) on the server clock, never early, after the exact provider job is terminated (D8-DL-1) | processing_job.expired.v1 | database |
+| ADMITTED | deadline_reached | EXPIRED | B08: the JOB_DEADLINES sweeper (control plane) on the server clock, never early, after the exact provider job is terminated (D8-DL-1) | processing_job.expired.v1 | database |
+| RUNNING | deadline_reached | EXPIRED | B08: the JOB_DEADLINES sweeper (control plane) on the server clock, never early, after the exact provider job is terminated (D8-DL-1) | processing_job.expired.v1 | database |
+| VERIFYING | deadline_reached | EXPIRED | B08: the JOB_DEADLINES sweeper (control plane) on the server clock, never early, after the exact provider job is terminated (D8-DL-1) | processing_job.expired.v1 | database |
+| ADMITTED | unrecoverable_start_error | FAILED | B08: the control plane's launch (ATTEMPT_MONITOR, or JOB_EXECUTION handing on the ACTIVE slot) records the host's refusal, or ATTEMPT_MONITOR finds the attempts exhausted (D8-CEX-8) | processing_job.failed.v1 | database |
+| RUNNING | fatal_resource_or_integrity_error | FAILED | B08: the ATTEMPT_MONITOR sweeper (control plane) ends the job with the worker's classified cause (S035) or with its attempts exhausted (D8-CEX-8) | processing_job.failed.v1 | database |
+| VERIFYING | verification_failure | FAILED | B08: the JOB_EXECUTION consumer (control plane) on processing_job.verifying.v1: a read-back that differs or an INVALID verifier verdict (D8-CEX-4) | processing_job.failed.v1 | database |
 
 ### PaymentAttempt
 

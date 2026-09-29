@@ -8,8 +8,9 @@ the planned migrations are 0019–0021 (D8-BASE-1, D8-XPKG-1). B08-PERSISTENCE-E
 B08-COMMANDS-EXECUTION landed its twelve rows at `c40fe42` on `b08/commands-execution`; its deviations are D8-CMD-1 to D8-CMD-7.
 B08-CONTROL-EXECUTION landed its fourteen rows at `7f8ee1d` on `b08/control-execution` (the tests first at `e704e55`); its deviations
 are D8-CEX-1 to D8-CEX-10. B08-PERSISTENCE-AUDIT landed its two rows and migration 0021 at `990967d` on `b08/persistence-audit`; its
-deviations are D8-PAU-1 to D8-PAU-10. B08-STAGE-2 merged the three on `b08/stage-2` (deviations D8-ST2-*); a row keeps the commit of
-the mandate that landed it.
+deviations are D8-PAU-1 to D8-PAU-10. B08-STAGE-2 merged the three on `b08/stage-2` with no deviation of its own (the Job machine's owner
+rows of `tools/matrix.mjs` now name the control-plane consumer or sweeper performing each edge); a row keeps the commit of the
+mandate that landed it.
 
 Every test is cited as `` `file` :: "exact test title" ``. `tools/test/b08-case-map.test.mjs` reads this file: a cited file that
 exists must contain a test with exactly that title; a cited file that does not exist yet must be listed in the `tests` of exactly one
