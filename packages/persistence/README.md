@@ -11,7 +11,9 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   lifecycle (`docs/design/B07-upload-source-lifecycle.md`): upload sessions and quota ledgers, the object registry, inspection
   receipts and admitted files with their frozen inventory, selections, evaluations and the sealed manifest and subject, retention
   anchors and records; every lifecycle instant is the server's (`kauro.server_now()`, which the test harness replaces by a
-  labelled TEST CLOCK in its temporary clusters only). Every tenant table has row-level security enabled and
+  labelled TEST CLOCK in its temporary clusters only). `migrations/0013..0017_*.sql` — the B09 payments and fiscal workflow
+  (`docs/design/B09-payments-fiscal.md`; numbered 0009..0013 on its branch), and `0018` — the B07 + B09 merge's payment-service read
+  of retention records (`docs/design/B07-B09-merge.md`). Every tenant table has row-level security enabled and
   forced; every tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
   (an event of its own agency, bound to an aggregate of that agency at or below its version); every aggregate is born in its
   machine's initial state (`kauro.state_machines`, seeded from the registry) and changes state only along a listed edge.
