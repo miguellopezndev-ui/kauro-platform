@@ -13,6 +13,15 @@ bounded parsers of `@kauro/data-plane`.
 | `AuthorityJournal` | AUTHORITY_JOURNAL (§12.4): appends the restore tombstone of every terminal authority fact, only for a subject in the tombstone's terminal state (D-RESTORE-1, D-CTRL-8) |
 | sweepers | `UploadDeadlines`, `ProviderSessionReconciliation`, `RetentionSweeper`, `ObjectInventory`, `DeletionRetries`, `LocationPolicy` — exactly `SOURCE_SWEEPERS` (§12.5), each on the server clock, never early |
 | `assembleControlPlane`, `openControlDatabase`, `platformParsers` | the composition root: a verified `kauro_control` pool, the real parsers, and the provider ports the caller hands in |
+| `JobAdmission` | JOB_ADMISSION (package B08, `docs/design/B08-audit-approval-jobs.md` §4.2): the fair round under the global ledger (D8-SCHED-1), every later lock taken without waiting (D8-LOCK-1), the authority re-read after them (a lost fact cancels the QUEUED job with its reason), then QUEUED -> ADMITTED with the entitlement consumed, the PAID_ORDINARY record and attempt 1 claimed at fence 1 in one unit |
+| `JobPipeline` | JOB_EXECUTION's steps and ATTEMPT_MONITOR's observation: the launch by deterministic identity, observe before any other create, heartbeat under the fence, a lapsed lease terminated and taken over at fence + 1, the manifest read by the control plane, read-back and verification against the platform's authority, the delivery copies and the publication with the authority re-read after its locks (§4.3, §5) |
+| `CancellationReconciler` | EXECUTION_CONTROL's continuation of a cancellation (CMD037 or a lost authority): the lease's cancellation version, the identity terminated and observed until terminal, the package revoked, CANCELLED releasing the slots once (§6) |
+| `JobExecutionConsumer`, `ExecutionControlConsumer` | the consumers JOB_EXECUTION and EXECUTION_CONTROL over the same dispatcher (§11) |
+| `AttemptMonitor`, `JobDeadlines`, `StagingJanitor` | with JobAdmission, exactly `EXECUTION_SWEEPERS`: the monitor's pass over the ACTIVE job, deadlines never early, one ended attempt's exact prefix, scratch and cleanup record (D8-JAN-1) |
+
+The execution pipelines (package B08) are assembled only when the caller hands in the execution units of work, the worker host (B14's)
+and the verifier (the cores adapter of `b05/cores`); a deployment of this edition binds neither, so its control plane has none
+(D8-PORT-1), and the tests bind the labelled contract fakes of their owners.
 
 Every unit of work is a SYSTEM context bound to the agency of its work item (D-CTRL-1), takes the revision row before any upload or
 file of it (D-LOCK-2), records only the database's instants (D-CLOCK-1) and appends only the events of the edges the control plane
@@ -24,4 +33,6 @@ Tests (`test/`) run against a real PostgreSQL 17 started per file (`@kauro/persi
 are fixed by the fakes' hold points and by lock waits observed in `pg_stat_activity`. `test/end-to-end.test.ts` composes the control
 plane with the application's own handlers of CMD012..CMD017, the source reads and the manifest intake (as `apps/api` binds them, with
 the real Authorizer of `@kauro/authorization`, each answer checked against its route's contract; design D-INT-1). `docs/design/B07-case-map.md`
-names the tests of each case.
+names the tests of each case. The execution tests (`job-admission`, `job-execution`, `execution-control`, `staging-janitor`,
+`cancellation-boundaries`) share `test/support/execution-world.ts`: B09's paid purchases, the labelled worker-host, Migration-core and
+object-storage fakes, and the labelled TEST CLOCK of the control plane's units; `docs/design/B08-case-map.md` names their cases.
