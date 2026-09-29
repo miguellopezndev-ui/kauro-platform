@@ -1,0 +1,605 @@
+# B10 — Agency recurrence and commission domain: design
+
+Branch `b10/design` from `integration/b07-b09` (`0f15636`: B06, the foundation, B07 and B09 merged; migrations 0001–0018; verify
+green on Windows and Linux, `docs/design/B07-B09-merge.md`). Package B10 (22: "Implement agency-level first/repeat counts,
+discounts, founding slots, attribution, twelve-month residuals, refund adjustments, statements and payout intents"; "Test
+simultaneous first purchases, another end client, claim conflicts, splits, termination tail, full refund to zero and post-window
+organic purchase"). Gate G-COMMERCIAL (owner 17). Manuals 12, 15, 16, 17, 18 as amended by A3 (founding slots open to admitted
+in-house tenants, buyer type recorded, prospects agency-only, D58); `reference/COMMERCIAL_LEDGER_WORKED_EXAMPLES.md` is the oracle,
+HASHING, the field and command catalogues and ACCEPTANCE_SCENARIOS are active source. 64 cases (`node tools/package-brief.mjs B10`).
+Brand Kauro (A2): the registry's owner role is written KAURO_OWNER. Acceptance per A4 (case map, verify green on Windows, Linux and
+CI, independent Codex review of the exact commit, on main).
+
+This branch delivers documents and their check only: this design, `docs/design/B10-case-map.md`, `docs/design/B10-mandates.json`
+and `tools/test/b10-case-map.test.mjs`. B10 **extends** and never forks: B06's pipeline (D-PIPE-1), journal (D-IDEM-1..3), facts
+(D-FACT-1), transition locks (D-TX-2), closed views and outcome catalogues (D-RESP-1, D-OUT-1) and inspectors; the foundation's kind
+registry (D-AGGK-1..5); B07's server clock and source readers (D-MERGE-2); B09's quote and snapshot model (D-QUOTE-B1..B7), re-binder
+(D-QUOTE-B6, D-M3-B6), principals (D-CTX-B1, D-CTX-B2, D-AUTHZ-B3, D-CORP-B1), event bindings (D-EVT-B3), money primitive
+(D-MONEY-B1), hour-exact durations (D-TIME-B1), the refund basis `serviceBasisAfterCents` (R2-081), labelled fakes (D-FAKE-B1) and its
+integration obligation §15 item 12. Every rule is quoted authority or a decision of §16 (`D10-*`).
+
+## 1. Base, stages and what B10 owns
+
+B10 numbers 0025–0028 on a contiguous runner that refuses a gap; B08 (0019–0021) and B11 (0022–0024) are not on the base, so the
+first schema mandate adds six reservation files (D10-BASE-1). Fourteen mandates (`B10-mandates.json`, about one agent-day each) run in
+four stages, at most five at once (A4 "lanes of at most five concurrent agents"); each lane owns its files, so no stage waits on a
+parallel lane (D10-STAGE-1):
+
+| stage | mandates (branch `b10/<key without B10- in lower case>`) | merged into |
+|---|---|---|
+| 1 | B10-MODEL ∥ B10-PORTS-FAKES ∥ B10-SCHEMA-RECURRENCE, then B10-SCHEMA-COMMISSION from the head of B10-SCHEMA-RECURRENCE (the runner is contiguous) | `b10/stage-1` (from `b10/design`) |
+| 2 | B10-ADAPTERS-RECURRENCE ∥ B10-ADAPTERS-SALES ∥ B10-ADAPTERS-LEDGER ∥ B10-AGENCY-LIFECYCLE (CMD002, CMD043: they need only 0025 and stage 1) | `b10/stage-2` (the integrator binds the agency, sales and ledger repositories into the commercial unit of work of B10-ADAPTERS-RECURRENCE) |
+| 3 | B10-COMMANDS-QUOTE ∥ B10-COMMANDS-PROSPECTS ∥ B10-COMMANDS-SELLERS ∥ B10-COMMISSION-SERVICE ∥ B10-STATEMENTS-PAYOUTS | `b10/stage-3` |
+| 4 | B10-INTEGRATION (the cross-lane races, the worked examples end to end through the public commands, the PERIODS sweep in the commission service's cycle, case-map statuses, verify on Windows and Linux) | `b10/integration` |
+
+B10 owns: the qualifying-purchase history and first designation, the founding cohort, CMD027's issuance, the agency's activation and
+closure request, sellers and their agreements, payout destinations, prospects and suppression, attribution claims and allocations,
+entitlements, assignments, assistance agreements, termination tails, the commission ledger (pools, lines, adjustments, holds,
+completions), periods, statements and payout intents. It serves CMD002, CMD027, CMD043, CMD045–CMD053 and GetCommissionStatement,
+and performs the Agency, Quote and CommissionLine edges of §8. Not B10's: outreach drafts, sends and sales activity (CMD061–CMD064,
+B12), the seller and owner screens and the prospect-stage edges (B12), recording the buyer type (B11 W6), execution and delivery facts
+(B08), staged import stages (B13), transfers, bank evidence, the verified banking calendar and FX (B15), the CLOSED edge and managed
+deletion (B16), and engaging a real seller (owner action: a signed, reviewed arrangement only when a real person is engaged).
+
+## 2. Principals and runtime roles
+
+| principal | context, runtime group | commands |
+|---|---|---|
+| agency member | TENANT on `kauro_app` (B06) | CMD002, CMD043 (OWNER); CMD027 (AGENCY_BILLING = OWNER or BILLING) |
+| corporate owner | OPERATOR on `kauro_app`, ACTIVE `KAURO_OWNER` grant (B09 D-CORP-B1), no finance scope needed | CMD045, CMD047, CMD048, CMD049, CMD050, CMD052 |
+| seller | OPERATOR on `kauro_app`: the seller's corporate identity; the database finds its seller row (D10-CTX-2) | CMD045, CMD046; GetCommissionStatement (own) |
+| commission service | SERVICE `commission-service` → COMMISSION_SERVICE on the new group `kauro_commission` (D10-CTX-1) | CMD051; the COMMISSIONS consumer; the sweeps of §14 |
+| finance service | SERVICE `finance-service` → FINANCE_SERVICE on `kauro_commission` | CMD053 |
+| payment service | SERVICE on `kauro_payment` (B09) | the designation trigger of §3.1 runs inside its reconciler's transaction |
+
+Sales and commission tables are corporate records (D10-CTX-3): the owner reads all, a seller its own, `kauro_commission` all; no
+tenant policy exists on them. Agency-scoped B10 rows (recurrence, reservations, acceptances, closures) carry the agency in every key
+and have tenant policies. Every decision writes a B06 security fact: agency commands to the agency stream, corporate ones to the
+person's identity stream with `requested_agency_id`, service ones with actor SERVICE (B09 D-FACT-B1).
+
+## 3. Recurrence, founding cohort and quotes
+
+### 3.1 Qualifying purchases and the first designation (D10-FIRST-1, D10-FIRST-2)
+
+A qualifying purchase is an original CommercialAuthorization (`rebinding_id` NULL): its capture alone paid the whole obligation and
+the subject still bound (B09 KP004). An excess, partial or unbound capture, a retry and a re-binding never create one (17 "A quote,
+free audit, failed payment, technical retry, replacement package or receipt-bound continuation is not a first paid project"; R2-140).
+B10's AFTER INSERT trigger on `commercial_authorizations` runs in the payment service's reconciler transaction — "the persisted first
+designation and financial inbox transaction are the authority" (worked example 9) — and: takes the agency recurrence lock's exclusive
+half; upserts `agency_recurrence` (one row per agency, the row lock serializing designations) for the next confirmation sequence;
+inserts `qualifying_purchases` (agency, project, quote, order, capture, authorization, `confirmation_seq`, `confirmed_at` = the
+authorization's server instant, `provider_completed_at` = the capture's, `order_created_at`, allocated service, founding reservation
+and `founding_basis` NONE, RESERVED_SLOT or UNBACKED); consumes the quote's founding reservation (§3.3). Sequence 1 is the sticky
+first designation; nothing rewrites a row (KC001). The COMMISSIONS consumer later mirrors it into B06's
+`agencies.first_qualifying_capture_id` (registry Agency.firstQualifyingCaptureId) once, agency row first, with
+`agency.first_purchase_designated.v1` (D10-FIRST-2).
+
+### 3.2 The eligibility set (D10-REC-1..3)
+
+A prior project counts at a quote's `as_of` when a qualifying purchase of it was confirmed in [as_of − 8760 h, as_of), it is another
+project of the agency, and its remaining service basis — allocated service less COMPLETED service refunds, zero once the capture is
+REVERSED — is positive (16 "Recurrence decision"; R2-089: a fully refunded purchase leaves the set, its designation stays). The one
+definition is the SQL function `kauro.qualifying_projects_at(agency, as_of, project)`; the domain mirrors it for units. The set is a
+transition subject `kauro.agency_recurrence` (agency): designation, refund completion and capture reversal take its exclusive half
+by trigger, CMD027 its shared half before the snapshot's `INSERT … SELECT` of the function, so an issuance sees a concurrent change
+wholly or not at all. Tiers 0/500/1000/1500 bps by 0/1–9/10–24/25+ (policy repeatTiers); the issued quote keeps its snapshot
+whatever happens later (R2-088; worked example 4). The database does not re-check snapshots on B09's table (D10-REC-3);
+`kauro.eligibility_findings()` reports any quote whose snapshot differs from the function or whose founding rate has no reservation.
+
+### 3.3 The founding cohort (D10-FOUND-1..4)
+
+`founding_slots`: one row per slot of a price policy (R2-INITIAL: 1..3 = pricing.foundingAgencyCount), with `held` and
+`live_reservation_id`. `founding_slot_reservations` (machine FoundingReservation): agency, quote, slot, `ends_at` = the quote's
+`expires_at`; UNIQUE (policy_version, agency_id) — one founding reservation per agency per cohort, ever (no revival, §16 of the
+examples; A3 3.7: agencies and admitted in-house tenants alike, total three); the reservation names its quote and that quote's
+snapshot names the reservation (deferred check from the reservation side); a live reservation is its slot's `live_reservation_id`.
+**The Nth-slot race**: CMD027 takes a slot with `UPDATE founding_slots SET held, live_reservation_id … WHERE slot_no = $n AND NOT
+held` in ascending slot order; a contender for the same row waits for the first transaction (the wait is visible in
+`pg_stat_activity`), re-checks `NOT held` and moves to the next slot or to none — its quote is issued at its own tier ("the
+unsuccessful contender sees its actual alternative price", example 17). A fourth live reservation is impossible: three rows. A slot
+is consumed by the qualifying purchase (RESERVED or RECONCILIATION_HOLD → CONSUMED) and never freed again, not even by a full refund
+(R2-096). At the quote's expiry the commission service's QUOTE_EXPIRY sweep expires the quote (B09's release guard refuses while a
+payment is in flight) and releases the slot; a quote that cannot expire because a capture is in flight or uncertain puts its
+reservation in RECONCILIATION_HOLD (visible), which the capture's completion consumes or a proved no-capture releases (R2-127).
+Previews and refused commands reserve nothing; a superseding or replacement quote never inherits or extends a reservation.
+
+### 3.4 CreateQuote (D10-QUOTE-1..2)
+
+`POST /api/v1/projects/{projectId}/quotes`, body `{ planId, billingProfileRef }`. Access (B06, AGENCY_BILLING) → journal → shared
+halves of agency, capability, approval, source revision, target contract, fiscal profile → the project's live quote `FOR UPDATE` →
+agency recurrence (shared) → snapshot → price → founding slot → quote. Preconditions, first failure answers: project visible
+(NOT_FOUND); plan of the project APPROVED with its live approval; agency ACTIVE with its accepted terms version; billable units > 0
+(PRECONDITION_FAILED NO_BILLABLE_UNITS: no minimum-price sale); units within the offered envelope, pricing band ≤
+capacity.launchSourceUnits (CAPABILITY_UNAVAILABLE ENVELOPE_NOT_OFFERED for 500 001–1 000 000); mode offered; buyer type recorded
+(PRECONDITION_FAILED BUYER_TYPE_UNSET, A3 3.7, read through BuyerTypeReader); source SEALED and available (B07
+SourceAvailabilityReader: SOURCE_EXPIRED); billingProfileRef the agency's current profile (BILLING_PROFILE_MISMATCH) with a reviewed
+treatment (FISCAL_TREATMENT_UNREVIEWED, R2-082). Writes: the snapshot (set, count, tier, founding rate and reservation, applied =
+max, 8760-hour lookback, `as_of` = issuance), the quote DRAFT → ISSUED (base band, discount rounded once, service, reviewed tax,
+total, 336-hour expiry, `source_available_until` = min(expiry, B07's effective deadline), terms hash KAURO_QUOTE_TERMS_V1 over the
+accepted terms version), the previous unpaid quote SUPERSEDED with its reservation released, `quote_issuances` (journal entry →
+quote, reservation), `quote.drafted.v1`, `quote.issued.v1`, `quote.superseded.v1`. A paid previous quote is superseded only by the
+replacement path (§3.5). 201 `CreateQuoteView { quote, eligibility { qualifyingProjectCount, repeatDiscountBps, foundingOffer
+RESERVED, NOT_ELIGIBLE or NONE_AVAILABLE, appliedDiscountBps, lookbackStartsAt }, supersededQuoteId? , replacement? }`.
+
+### 3.5 The included replacement (D10-QUOTE-3, D10-QUOTE-4)
+
+On a project whose quote is paid and whose entitlement is ACTIVE (execution not started), CMD027 with a new approved plan of the same
+project, mode, target and band (equal base) while the allowance (`price_policies.pre_execution_replacements_included` = 1) is unspent
+issues a replacement quote carrying the paid terms (B09 `quotes_replacement_terms_fk`; its snapshot copies the replaced facts and
+names the consumed reservation) and calls B09's `PurchaseRebinder` in a SERVICE unit of work adopted to the paid order (D-M3-B6):
+intent (tenant, replacement ISSUED, `quote_issuances`) → settle (payment service, re-binding) → complete (tenant, journal); a crash
+between resumes by the journal entry; a refused re-binding withdraws the replacement (`withdraw_quote`) and answers its reason. No
+order, no new fee, the old entitlement REVOKED SOURCE_REPLACED, the new approval required (R2-092). Another band, mode or target
+answers PRECONDITION_FAILED REPLACEMENT_SCOPE_CHANGED with the price comparison, a spent allowance REPLACEMENT_ALLOWANCE_SPENT, a
+CONSUMED entitlement EXECUTION_STARTED, writing nothing: a larger scope is charged only after the paid purchase is refunded and a new
+quote is explicitly accepted by CreatePaymentOrder (R2-093; 16 "Scope changes and credits"; example 18).
+
+## 4. Agency lifecycle (D10-AGY-1..3)
+
+**CMD002 ActivateAgency** `POST /api/v1/agencies/{agencyId}/activate` `{ expectedVersion, termsVersion, privacyAgreementVersion,
+billingProfileRef }`: the agency's ACTIVE OWNER acting as itself (B06 `agencies_authority`), agency DRAFT, CAS; both versions equal
+the PUBLISHED rows of `service_agreement_versions` (PRECONDITION_FAILED AGREEMENT_VERSION_NOT_PUBLISHED — no default, no implicit
+signature); billingProfileRef the agency's current reviewed fiscal profile (BILLING_PROFILE_MISMATCH). Writes an append-only
+`agency_agreement_acceptances` row (versions, document hashes, membership, instant) and the agency ACTIVE with versions and
+`legal_profile_ref` (`agency.activated.v1`); answers the capabilities currently offered, writing none.
+
+**CMD043 CloseAgency** `POST /api/v1/agencies/{agencyId}/closure-requests` `{ expectedVersion, assuranceProofRef }`: the OWNER with a
+fresh step-up (Agency guard "Step-up and current owner authority"); a payment order or refund in flight or uncertain is
+PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED; otherwise an `agency_closures` row with the obligations inventory (open quotes
+withdrawn, live authorizations, open refunds, non-terminal tax documents, active work through B06's ActiveWorkInspector, the
+managed-deletion schedule) and the agency ACTIVE, RESTRICTED or DRAFT → CLOSING (`agency.closing.v1`); new work stops because B06 and
+B09 require ACTIVE. `agencies_closure_residuals` refuses CLOSING → CLOSED (KC006) while any payment, refund, live authorization or tax
+document of the agency is non-terminal; commission, fiscal and ledger rows are never deleted (no DELETE grant, FK RESTRICT) and a
+closing agency's commission lines keep their path to payment. The CLOSED edge's performer is B16 (verified managed deletion).
+
+**Rename and consolidation (R2-141)**: every recurrence, founding, attribution and ledger fact keys on `agency_id`; a display-name
+change touches none; `agency_relationship_decisions` records a reviewed consolidation decision (agencies, evidence, effective
+instant, enumerated treatment) and merges no dataset, membership, designation or attribution.
+
+## 5. Sales: sellers, prospects, claims, attribution, assignment, termination
+
+**Sellers (D10-SELL-1, D10-SELL-2).** `sellers` (machine Seller) bound to one identity; `seller_agreements` (registry SellerAgreement
+plus `offset_terms` NONE or SIGNED_FUTURE_OFFSET, `retainer_cents_per_month`, compensation policy version); `seller_legal_reviews`
+(the classification's substance, reviewer, evidence); `seller_payout_destinations` (versions, masked label, destination digest,
+currency; VERIFIED only with the seller's own step-up proof at the change and an owner verification ≥ 172 800 s later — an
+unauthenticated change can never verify; R2-103); tax documentation and assessment evidence records. **CMD049 ActivateSeller**
+`{ agreementId, assessmentEvidenceRef, assuranceProofRef }` (owner, fresh step-up): CANDIDATE → ACTIVE only with the agreement signed,
+a legal review confirming its classification, assessment evidence, confidentiality acceptance, a VERIFIED destination, tax
+documentation and a verified identity with MFA; the database repeats it (KC005). Least privilege: a seller sees its prospects,
+claims, entitlements and statements, never a package, schema, source, owner balance or another seller's ledger.
+
+**Prospects (D10-PROS-1).** Agencies only (18 "Prospect qualification"; A3 3.7). **CMD045 RegisterProspect** `{ organizationLabel,
+businessContactRef, sourceEvidenceHash, jurisdiction }` (ACTIVE seller or owner): `sourceEvidenceHash` names the caller's
+`prospect_source_evidence` (source URL digest, observation date, lawful basis, segment AGENCY — the only segment the table admits)
+and `businessContactRef` a `prospect_contacts` row; `organization_key` (KAURO_PROSPECT_ORGANIZATION_V1 over the normalized business
+domain: lower case, IDNA ASCII, no `www.`, no trailing dot) is unique among live prospects (PROSPECT_EXISTS); `prospect_suppressions`
+by organization and contact key refuse re-registration however the label is spelled (PROSPECT_SUPPRESSED, KC016). Born RESEARCHED,
+minimized, owned by the registering seller; no claim, no attribution, no customer data.
+
+**Claims (D10-CLAIM-1).** **CMD046 ClaimProspect** `{ evidenceHash, agreementVersion }` (ACTIVE seller, its active agreement version,
+a prospect it owns or is assigned): `claim_evidence` of substantive work (first meaningful contact, qualified need, activity kinds; a
+list import or tracking link alone is CLAIM_EVIDENCE_INSUFFICIENT); born SUBMITTED with a review deadline of 2160 h; an accepted live
+claim on the organization key, another seller's live claim, or a prospect linked to an agency with an order or purchase moves it
+DISPUTED in the same transaction (conflict review). One live claim per seller and prospect (CLAIM_EXISTS). Submission owns nothing.
+
+**Attribution (D10-ATTR-1, D10-ATTR-2).** **CMD047 AcceptAttribution** `{ expectedVersion, shareAllocationRef }` (owner, CAS on the
+claim) freezes an owner-prepared `attribution_allocations` row: the agency the prospect is (identity evidence), the claims it rules
+on and the reason (never timestamps alone, 17), shares summing exactly 10 000 bps (deferred KC003), pool terms equal to each
+beneficiary's signed agreement. One frozen allocation per agency (ATTRIBUTION_EXISTS: "the pool does not become 10% for each
+seller"); an IN_HOUSE agency is IN_HOUSE_NOT_ATTRIBUTABLE and an agency whose buyer type is unset BUYER_TYPE_UNSET (A3 7.1, D58:
+the type is set once, so an acceptance before it could bind an in-house tenant); a claim submitted after the agency's first payment
+order is CLAIM_AFTER_FIRST_ORDER. Claims ACCEPTED with `expires_at` = acceptance + 2160 h, competing ones REJECTED. The commission service
+converts: at the agency's first qualifying purchase confirmed before the claim's end (or its termination tail's end) it creates one
+`commission_entitlements` row per beneficiary (ACQUISITION; `first_capture_id`, `window_starts_at` = the first purchase's
+`confirmed_at`, `window_ends_at` = twelve calendar months later at the same America/Bogota wall time, day clamped — checked by the
+database; share; agreement), the claims CONVERTED. First capture, window, share and agreement are immutable.
+
+**Assignment (D10-ASSIGN-1).** `sales_accounts` (one per agency, versioned) and `account_assignments` (append-only, one current).
+**CMD048 AssignAccount** `{ expectedVersion, sellerId, serviceAssignmentRef }` (owner): an ACTIVE seller and a prepared
+`service_assignments` row stating the compensation for new work (none, or an assistance agreement); only the current operational
+owner changes; allocations, entitlements and the designation have no path from it (R2-095).
+
+**Assistance (D10-ASSIST-1).** `assistance_agreements` (seller, agency, project or next purchase, rate — 400 bps by default, 1000 bps
+for an inbound buyer's complete closing effort, A3 7.1 — signed instant) create an ASSISTANCE entitlement whose pool applies only to a
+purchase whose order was created after the signing; separate from the acquisition pool, never reducing it (R2-099).
+
+**Termination (D10-TERM-1).** **CMD050 TerminateSeller** `{ expectedVersion, terminationTermsRef, activeOpportunityManifestRef }`
+(owner, CAS on the seller): TERMINATED at the effective instant, current assignments ended, the seller's prospects unassigned,
+entitlements → TERMINATED_WITH_RESIDUAL, unlisted open claims EXPIRED; each manifest entry must be an ACCEPTED, unexpired claim of the
+seller whose agency has no qualifying purchase (KC011 TAIL_NOT_ENUMERATED); `termination_tail_entries` end 2160 h after the effective
+instant. Nothing of the ledger is deleted or forfeited (R2-100; 17 "Termination and tail").
+
+## 6. Commission ledger (D10-POOL-1, D10-RATE-1, D10-ADJ-1, D10-ELIG-1, D10-HOLD-1, D10-NEG-1)
+
+**Pools.** One `commission_pools` row per (qualifying purchase, source): ACQUISITION (the agency's allocation) and each applicable
+ASSISTANCE entitlement. Basis = the capture's allocated service — never tax, excess or the PSP fee — less completed service refunds,
+zero once reversed (17 "Commission basis"; examples 1, 19, 20). Pool = `round_half_up_bps(basis, rate)` once; beneficiary
+allocations by largest remainder over shares, ties by beneficiary seller id ascending (policy splitRemainder); the database checks
+pool = round(basis × rate) and Σ allocations = pool at COMMIT (KC002; R2-097).
+
+**Rate.** Sequence 1 under an ACQUISITION pool → first bps (1000); sequence > 1 → repeat bps (400) iff `provider_completed_at` <
+`window_ends_at` — the verified provider completion, never the quote, confirmation or notification instant (R2-137, R2-138, R2-094);
+later → no acquisition line (R2-098). A provider completion after its confirmation or before its order's creation is implausible:
+the line is born HELD PROVIDER_TIME_UNVERIFIED, never guessed (example 10).
+
+**Lines** (registry CommissionLine, one per pool and beneficiary): `rate_bps`, `net_service_basis_cents`, `cumulative_entitlement_cents`,
+`previous_posted_cents` (the first posting), `paid_cents`, state, `eligible_at`, policy version. **Adjustments**: every basis change
+(`refund.completed.v1` `serviceBasisAfterCents`, `capture.reversed.v1`) recomputes each pool and allocation cumulatively and appends
+one `commission_adjustments` row per changed line (REFUND or REVERSAL, direction, |new − previous|, new cumulative, source event id;
+KC015), UNIQUE (line, source event) so a replay adds nothing. Basis zero → VOID from ACCRUED_PENDING, HELD or ELIGIBLE; after PAID →
+ADJUSTED (and ADJUSTED → ADJUSTED); a PAYABLE line keeps its state and the adjustment goes to the next statement. The designation,
+window and consumed slot never change (R2-080, R2-096).
+
+**Completion and eligibility.** `purchase_completions` (STAGE or FINAL, instant, evidence, source) from PreparationCompletionSource;
+`eligible_at` = FINAL + 720 h, checked against a FINAL row; ACCRUED_PENDING → ELIGIBLE when due, the capture's funds AVAILABLE
+(`capture.funds_observed.v1`, subscribed for COMMISSIONS by B10) and no hold covers the line; funds HELD → HELD FUNDS_HELD with a
+review date; a STAGE completion starts nothing (R2-101; examples 14, 15).
+
+**Holds.** `commission_holds` (line, amount ≤ unpaid, reason token, review date; OPEN → RELEASED or UPHELD): a hold covering the whole
+unpaid amount moves the line HELD; a partial hold — a seller's dispute of part of a line — leaves the line on its path and the
+statement withholds exactly the held cents with reason and review date; UPHELD posts an AGREED_ERROR_CORRECTION adjustment (R2-102).
+A DISPUTED entitlement holds only its own lines. **Negative balance**: an adjustment after PAID shows original accrual, payout,
+adjustment and balance; it offsets future eligible amounts only under SIGNED_FUTURE_OFFSET terms (KC017), otherwise the statement
+carries a REPAYMENT_REVIEW, WRITE_OFF or DISPUTE item for the owner; no port can debit a seller (R2-104; example 7).
+
+## 7. Periods, statements and payouts (D10-CAL-1, D10-STMT-1, D10-GUARD-1, D10-PAY-1, D10-PAY-2)
+
+`banking_calendars` (jurisdiction CO, source VERIFIED_FEED or TEST_FIXTURE, nonbanking dates, evidence) from BankingCalendarSource;
+`commission_periods` (one calendar month in America/Bogota, [start, end), close due on the 5th and pay due on the 10th banking day
+after month-end — weekends and listed days excluded; the fixture of example 21 gives 2026-10-07 and 2026-10-15; R2-139). A period
+closed on a TEST_FIXTURE calendar is labelled SIMULATED; no composition binds the fixture.
+
+**CMD051 CloseCommissionPeriod** `POST /api/v1/sales/commission-periods/{periodId}/close` `{ ledgerCutoffHash }` (commission service):
+the period OPEN and due; no COMMISSIONS outbox record with `occurred_at` < cutoff undelivered (PRECONDITION_FAILED
+INPUTS_UNRECONCILED); the recomputed KAURO_COMMISSION_CUTOFF_V1 over the included lines, adjustments and holds equals the request
+(STALE_VERSION LEDGER_CHANGED). Writes one immutable statement per seller (DRAFT → ISSUED; items: agency and project reference,
+first or repeat, basis, rate, share, cumulative, previously paid, adjustment, hold with reason and review date, payable; the calendar
+version; the pay date), ELIGIBLE lines → PAYABLE, lines awaiting final completion or funds as reasoned hold items — never payable —,
+negative balances and offsets per D10-NEG-1, and the owner's compensation-guard review: (retainer + commission accrued) /
+attributable net service, EXCEEDS_PLANNING_GUARD above 1500 bps, labelled a business planning guard, not a legal ceiling; nothing is
+refused by it (R2-105). The period CLOSED.
+
+**CMD052 ApproveCommissionPayout** `{ expectedVersion, payeeRef, authorizationRef }` (owner, fresh step-up, CAS on an ISSUED
+statement): payeeRef the seller's current VERIFIED destination (PAYEE_UNVERIFIED); payable > 0 (NOTHING_PAYABLE — the only floor,
+minimumPayoutCents 0); bank-available cash of the latest settlement with bank evidence (B09 `settlements`) covers it and every
+unsettled authorized intent (FUNDS_UNAVAILABLE). Writes one AUTHORIZED `payout_intents` row (amount = payable exactly, fee bearer
+KAURO, destination version and digest, stable reference `kauro-payout-<intentId>`), the statement APPROVED; no transfer (B15). One
+live intent per statement; an intent keeps its destination whatever changes later (R2-103; example 22).
+
+**CMD053 ReconcileCommissionPayout** `{ providerPayoutEvidenceRef }` (finance service): evidence from PayoutEvidenceVerifier must
+match the intent's reference, destination digest, amount and currency (PAYOUT_EVIDENCE_MISMATCH, nothing changes); SUBMITTED-only
+evidence is PAYOUT_NOT_SETTLED ("Submitting a transfer is not proof"); SETTLED → intent SETTLED, statement PAID with
+`payout_evidence_hash`, lines PAYABLE → PAID; FAILED or RETURNED → the intent kept FAILED or RETURNED, the statement APPROVED →
+ISSUED, lines PAYABLE → HELD PAYOUT_FAILED with a review date.
+
+## 8. State machines and guards
+
+### 8.1 Registry machines (edges B10 performs)
+
+| machine | from | event | to | performer | enforcement |
+|---|---|---|---|---|---|
+| Agency | DRAFT | agreements_and_profile_accepted | ACTIVE | CMD002 | B06 `agencies_activation_requires_agreements`, `agencies_authority`; published versions and the current reviewed profile read after their locks |
+| Agency | ACTIVE | owner_requests_closure | CLOSING | CMD043 | owner as itself (B06), fresh step-up, nothing in flight; the closure record |
+| Agency | RESTRICTED | owner_requests_closure | CLOSING | CMD043 | same guard |
+| Agency | DRAFT | owner_abandons_setup | CLOSING | CMD043 | same guard; no charge exists |
+| Agency | CLOSING | closure_obligations_completed | CLOSED | B16 (re-assigned, D10-AGY-2) | B10 `agencies_closure_residuals` (KC006) |
+| CommissionLine | ACCRUED_PENDING | eligibility_conditions_met | ELIGIBLE | commission service ELIGIBILITY sweep | `eligible_at` = FINAL + 720 h reached, funds AVAILABLE, no covering hold (KC007) |
+| CommissionLine | ACCRUED_PENDING | justified_dispute_or_funds_hold | HELD | COMMISSIONS consumer; hold writers | an OPEN hold of the whole unpaid amount with reason and review date |
+| CommissionLine | HELD | hold_resolved_and_eligible | ELIGIBLE | ELIGIBILITY sweep | holds RELEASED, eligibility conditions met |
+| CommissionLine | ELIGIBLE | statement_closed | PAYABLE | CMD051 | an ISSUED statement item names the line |
+| CommissionLine | PAYABLE | settled_payout_evidence | PAID | CMD053 | the intent SETTLED with matching evidence (KC010) |
+| CommissionLine | PAYABLE | payout_blocked | HELD | CMD053 | FAILED or RETURNED evidence; hold PAYOUT_FAILED |
+| CommissionLine | PAID | reconciled_refund_adjustment | ADJUSTED | COMMISSIONS consumer | an adjustment row with the cumulative difference (KC015) |
+| CommissionLine | ACCRUED_PENDING | full_service_reversal | VOID | COMMISSIONS consumer | basis zero, cumulative zero |
+| CommissionLine | HELD | full_service_reversal | VOID | COMMISSIONS consumer | basis zero, cumulative zero |
+| CommissionLine | ELIGIBLE | full_service_reversal | VOID | COMMISSIONS consumer | basis zero before payout; the next statement corrects |
+| CommissionLine | ADJUSTED | further_reconciled_adjustment | ADJUSTED | COMMISSIONS consumer | another adjustment row |
+
+CommissionLine is born ACCRUED_PENDING by the COMMISSIONS consumer (or HELD PROVIDER_TIME_UNVERIFIED: the birth then walks
+ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs `issue_quote` and `superseding_quote_issued` (CMD027),
+`price_expiry_reached` (QUOTE_EXPIRY sweep) and `withdraw_quote` (a replacement whose re-binding was refused; CMD043's open quotes).
+
+### 8.2 Platform machines (declared in `@kauro/domain`, seeded identically; unlisted edges rejected)
+
+- **FoundingReservation** — initial RESERVED; terminal CONSUMED, RELEASED; states RESERVED, RECONCILIATION_HOLD, CONSUMED, RELEASED (16 "Founding incentive"; D10-FOUND-1).
+- **Seller** — initial CANDIDATE; terminal TERMINATED; states CANDIDATE, ACTIVE, SUSPENDED, TERMINATED (12 "Seller onboarding and access lifecycle"; D10-SELL-1).
+- **Prospect** — initial RESEARCHED; terminal SUPPRESSED; states RESEARCHED, QUALIFIED, CONTACTED, ENGAGED, OPPORTUNITY, WON, LOST, SUPPRESSED (registry Prospect; D10-PROS-1).
+- **AttributionClaim** — initial SUBMITTED; terminal REJECTED, EXPIRED, CONVERTED; states SUBMITTED, ACCEPTED, DISPUTED, REJECTED, EXPIRED, CONVERTED (registry AttributionClaim; D10-CLAIM-1).
+- **CommissionEntitlement** — initial ACTIVE; terminal EXPIRED; states ACTIVE, EXPIRED, DISPUTED, TERMINATED_WITH_RESIDUAL (registry CommissionEntitlement; D10-ATTR-2).
+- **CommissionStatement** — initial DRAFT; terminal PAID, CORRECTED; states DRAFT, ISSUED, DISPUTED, APPROVED, PAID, CORRECTED (registry CommissionStatement; D10-STMT-1).
+- **PayoutIntent** — initial AUTHORIZED; terminal SETTLED, FAILED, RETURNED; states AUTHORIZED, SUBMITTED, UNCERTAIN, SETTLED, FAILED, RETURNED (15 "Commission integration"; D10-PAY-1).
+- **PayoutDestination** — initial PENDING_VERIFICATION; terminal REJECTED, SUPERSEDED; states PENDING_VERIFICATION, VERIFIED, REJECTED, SUPERSEDED (12 "Finance and cost controls"; D10-SELL-2).
+- **CommissionHold** — initial OPEN; terminal RELEASED, UPHELD; states OPEN, RELEASED, UPHELD (17 "Claim validity and conflicts"; D10-HOLD-1).
+- **CommissionPeriod** — initial OPEN; terminal CLOSED; states OPEN, CLOSED (17 "Business-day calendar"; D10-STMT-1).
+
+| machine | from | event | to | performer | enforcement |
+|---|---|---|---|---|---|
+| FoundingReservation | RESERVED | slot_consumed | CONSUMED | payment service (B10 trigger on the authorization) | the purchase's quote is the reservation's |
+| FoundingReservation | RESERVED | reservation_released | RELEASED | CMD027 (supersession); CMD043 (withdrawal at closure); QUOTE_EXPIRY sweep | the quote EXPIRED, SUPERSEDED or WITHDRAWN (B09 release guard); slot freed (KC014) |
+| FoundingReservation | RESERVED | end_with_payment_in_flight | RECONCILIATION_HOLD | QUOTE_EXPIRY sweep | `ends_at` passed, the quote still ACCEPTED_FOR_CHECKOUT with a payment in flight |
+| FoundingReservation | RECONCILIATION_HOLD | slot_consumed | CONSUMED | payment service (B10 trigger) | same as from RESERVED |
+| FoundingReservation | RECONCILIATION_HOLD | reservation_released | RELEASED | QUOTE_EXPIRY sweep | the quote expired after a proved no-capture |
+| Seller | CANDIDATE | seller_activated | ACTIVE | CMD049 | signed agreement, legal review, verified payment facts (KC005) |
+| Seller | ACTIVE | seller_suspended | SUSPENDED | B12 | owner decision |
+| Seller | SUSPENDED | seller_reinstated | ACTIVE | B12 | owner decision; the KC005 facts still hold |
+| Seller | ACTIVE | seller_terminated | TERMINATED | CMD050 | termination terms; tail entries enumerated (KC011) |
+| Seller | SUSPENDED | seller_terminated | TERMINATED | CMD050 | same |
+| Seller | CANDIDATE | candidate_not_engaged | TERMINATED | B12 | no agreement signed |
+| Prospect | RESEARCHED | qualification_recorded | QUALIFIED | B12 (CMD064) | evidence of need, mode, timing and contact |
+| Prospect | QUALIFIED | contact_recorded | CONTACTED | B12 (CMD063, CMD064) | an observed send |
+| Prospect | CONTACTED | engagement_recorded | ENGAGED | B12 (CMD064) | an observed reply |
+| Prospect | ENGAGED | opportunity_recorded | OPPORTUNITY | B12 (CMD064) | an issued quote or audit invitation |
+| Prospect | OPPORTUNITY | won_recorded | WON | B12 (CMD064) | the agency's qualifying purchase |
+| Prospect | RESEARCHED | lost_recorded | LOST | B12 (CMD064) | a structured lost reason |
+| Prospect | QUALIFIED | lost_recorded | LOST | B12 (CMD064) | same |
+| Prospect | CONTACTED | lost_recorded | LOST | B12 (CMD064) | same |
+| Prospect | ENGAGED | lost_recorded | LOST | B12 (CMD064) | same |
+| Prospect | OPPORTUNITY | lost_recorded | LOST | B12 (CMD064) | same |
+| Prospect | LOST | new_signal_recorded | RESEARCHED | B12 (CMD064) | a legitimate new business signal (16 "Agency lifecycle") |
+| Prospect | RESEARCHED | suppression_recorded | SUPPRESSED | B12 (CMD064) | a suppression row by organization or contact key |
+| Prospect | QUALIFIED | suppression_recorded | SUPPRESSED | B12 (CMD064) | same |
+| Prospect | CONTACTED | suppression_recorded | SUPPRESSED | B12 (CMD064) | same |
+| Prospect | ENGAGED | suppression_recorded | SUPPRESSED | B12 (CMD064) | same |
+| Prospect | OPPORTUNITY | suppression_recorded | SUPPRESSED | B12 (CMD064) | same |
+| Prospect | LOST | suppression_recorded | SUPPRESSED | B12 (CMD064) | same |
+| Prospect | WON | suppression_recorded | SUPPRESSED | B12 (CMD064) | same; transactional notices stay separate |
+| AttributionClaim | SUBMITTED | claim_conflict_found | DISPUTED | CMD046 | a live accepted or competing claim, or customer history, in the same transaction |
+| AttributionClaim | SUBMITTED | claim_accepted | ACCEPTED | CMD047 | a frozen allocation naming the claim (KC003) |
+| AttributionClaim | DISPUTED | claim_accepted | ACCEPTED | CMD047 | the allocation's decision reason resolves the conflict |
+| AttributionClaim | SUBMITTED | claim_rejected | REJECTED | CMD047 | a competing claim's allocation rules against it |
+| AttributionClaim | DISPUTED | claim_rejected | REJECTED | CMD047 | same |
+| AttributionClaim | SUBMITTED | claim_lapsed | EXPIRED | CLAIM_WINDOWS sweep; CMD050 | review deadline passed, or its seller terminated |
+| AttributionClaim | DISPUTED | claim_lapsed | EXPIRED | CLAIM_WINDOWS sweep; CMD050 | same |
+| AttributionClaim | ACCEPTED | claim_lapsed | EXPIRED | CLAIM_WINDOWS sweep; CMD050 | `expires_at` (or its tail end) passed with no first purchase; unlisted at termination |
+| AttributionClaim | ACCEPTED | first_purchase_confirmed | CONVERTED | COMMISSIONS consumer | the agency's first purchase confirmed before the claim's (or tail's) end, claim before the first order |
+| CommissionEntitlement | ACTIVE | window_ended | EXPIRED | ENTITLEMENT_WINDOWS sweep | `window_ends_at` passed; earned lines unaffected |
+| CommissionEntitlement | ACTIVE | seller_terminated | TERMINATED_WITH_RESIDUAL | CMD050 | lines keep accruing inside the window |
+| CommissionEntitlement | ACTIVE | attribution_disputed | DISPUTED | B12 | a seller or owner dispute of the attribution; only its lines held |
+| CommissionEntitlement | DISPUTED | dispute_resolved | ACTIVE | B12 | reviewed resolution |
+| CommissionEntitlement | DISPUTED | seller_terminated | TERMINATED_WITH_RESIDUAL | CMD050 | same as from ACTIVE |
+| CommissionEntitlement | DISPUTED | window_ended | EXPIRED | ENTITLEMENT_WINDOWS sweep | same as from ACTIVE |
+| CommissionEntitlement | TERMINATED_WITH_RESIDUAL | window_ended | EXPIRED | ENTITLEMENT_WINDOWS sweep | same |
+| CommissionStatement | DRAFT | statement_issued | ISSUED | CMD051 | same transaction as its items |
+| CommissionStatement | ISSUED | payout_approved | APPROVED | CMD052 | one live intent (KC009 payee) |
+| CommissionStatement | APPROVED | payout_settled | PAID | CMD053 | settled evidence of its intent (KC010) |
+| CommissionStatement | APPROVED | payout_not_settled | ISSUED | CMD053 | the intent FAILED or RETURNED |
+| CommissionStatement | ISSUED | statement_disputed | DISPUTED | B12 | the seller's dispute of the whole statement |
+| CommissionStatement | DISPUTED | dispute_scoped | ISSUED | B12 | the dispute became line holds |
+| CommissionStatement | DISPUTED | correction_issued | CORRECTED | CMD051 | a correcting statement supersedes it |
+| CommissionStatement | ISSUED | correction_issued | CORRECTED | CMD051 | same |
+| PayoutIntent | AUTHORIZED | transfer_submitted | SUBMITTED | B15 | the payout adapter's durable submission |
+| PayoutIntent | SUBMITTED | transfer_ambiguous | UNCERTAIN | B15 | a lost response |
+| PayoutIntent | AUTHORIZED | settled_evidence | SETTLED | CMD053 | matching SETTLED evidence |
+| PayoutIntent | SUBMITTED | settled_evidence | SETTLED | CMD053 | same |
+| PayoutIntent | UNCERTAIN | settled_evidence | SETTLED | CMD053 | same |
+| PayoutIntent | AUTHORIZED | failed_evidence | FAILED | CMD053 | matching FAILED evidence |
+| PayoutIntent | SUBMITTED | failed_evidence | FAILED | CMD053 | same |
+| PayoutIntent | UNCERTAIN | failed_evidence | FAILED | CMD053 | same |
+| PayoutIntent | AUTHORIZED | returned_evidence | RETURNED | CMD053 | matching RETURNED evidence |
+| PayoutIntent | SUBMITTED | returned_evidence | RETURNED | CMD053 | same |
+| PayoutIntent | UNCERTAIN | returned_evidence | RETURNED | CMD053 | same |
+| PayoutDestination | PENDING_VERIFICATION | destination_verified | VERIFIED | B12 | the seller's own step-up at the change, owner verification ≥ 172 800 s later |
+| PayoutDestination | PENDING_VERIFICATION | destination_rejected | REJECTED | B12 | owner decision |
+| PayoutDestination | VERIFIED | destination_superseded | SUPERSEDED | B12 | a later version VERIFIED |
+| CommissionHold | OPEN | hold_released | RELEASED | ELIGIBILITY sweep; B12 | funds AVAILABLE, or the dispute resolved for the seller |
+| CommissionHold | OPEN | hold_upheld | UPHELD | B12 | reviewed decision; an AGREED_ERROR_CORRECTION adjustment |
+| CommissionPeriod | OPEN | period_closed | CLOSED | CMD051 | inputs reconciled; cutoff hash equal |
+
+## 9. Migrations 0019–0028
+
+| file | content | mandate |
+|---|---|---|
+| 0019_reserved_b08.sql | reservation of B08's number: a header and `SELECT 1;` (D10-BASE-1) | B10-SCHEMA-RECURRENCE |
+| 0020_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
+| 0021_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
+| 0022_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0023_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0024_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0025_recurrence_founding_agency.sql | group `kauro_commission`; `agency_recurrence`, `qualifying_purchases`, the designation trigger on `commercial_authorizations`, the recurrence-lock triggers on `refunds` and `capture_facts`, `kauro.qualifying_projects_at`, `kauro.eligibility_findings`; `founding_slots` (seeded 1..3 for R2-INITIAL), `founding_slot_reservations`, `quote_issuances`; `service_agreement_versions`, `agency_agreement_acceptances`, `agency_closures`, `agency_relationship_decisions`, `agencies_closure_residuals`, the set-once first designation on `agencies`; `agency.first_purchase_designated.v1`; subscriptions `capture.funds_observed.v1` and `commercial_authorization.delivered.v1` → COMMISSIONS; quote expiry grants for `kauro_commission`; machine FoundingReservation; `commercial_transitions` history | B10-SCHEMA-RECURRENCE |
+| 0026_sales_attribution.sql | `sellers`, `seller_agreements`, `seller_legal_reviews`, `seller_payout_destinations`, seller tax and assessment records, `prospect_source_evidence`, `prospect_contacts`, `prospects`, `prospect_suppressions`, `claim_evidence`, `attribution_claims`, `attribution_allocations`, `allocation_shares`, `commission_entitlements`, `sales_accounts`, `service_assignments`, `account_assignments`, `assistance_agreements`, `termination_manifests`, `seller_terminations`, `termination_tail_entries`; `kauro.current_seller_id()`; machines Seller, Prospect, AttributionClaim, CommissionEntitlement, PayoutDestination | B10-SCHEMA-COMMISSION |
+| 0027_commission_ledger.sql | `purchase_completions`, `commission_pools`, `commission_lines` (registry machine CommissionLine), `commission_adjustments`, `commission_holds` (machine CommissionHold), `capture_funds_observations` | B10-SCHEMA-COMMISSION |
+| 0028_statements_payouts.sql | `banking_calendars`, `commission_periods`, `commission_statements`, `statement_items`, `payout_intents`, `payout_reconciliations`, `compensation_guard_reviews`; machines CommissionPeriod, CommissionStatement, PayoutIntent | B10-SCHEMA-COMMISSION |
+
+Conventions (07 "Database representation", B09 §4): UUIDv7 ids, BIGINT cents within `kauro.is_money`, `timestamptz` instants,
+durations in exact hours (336, 720, 2160, 8760), calendar months only through `AT TIME ZONE 'America/Bogota'` plus `interval '12
+months'` (PostgreSQL clamps the day), versions bumped by one, `updated_at` by trigger, immutable columns by
+`kauro.forbid_column_change`, FORCE RLS everywhere, composite keys with the agency where a row is agency-scoped, append-only tables
+by `kauro.forbid_change`, no DELETE grant on any B10 table, `_of` guard variants where the state column is not `state`. The runtime
+boundary matrix (`runtime-boundary.json`), the machine seeds, aggregate kinds, event types and subscriptions tests are updated
+additively and reviewed entry by entry.
+
+## 10. Transaction discipline (D10-TX-1)
+
+READ COMMITTED; one global order, B09's extended: identity → membership → corporate grant → seller → agency → capability → approval →
+source revision → target contract → payment route / fiscal issuer / fiscal profile → quote → payment order → attempt → capture →
+commercial authorization → refund → **agency recurrence → qualifying purchase → founding slot → founding reservation** → tax document
+→ ledger; the corporate ledger after it: **prospect → claim → allocation → sales account → entitlement → commission period →
+statement → payout intent → commission line → hold**. New transition subjects: `kauro.agency_recurrence` (agency), `kauro.sellers`
+(seller), `kauro.attribution_claims` (prospect: claims of one prospect serialize), `kauro.commission_entitlements` (entitlement).
+Readers take shared halves, writers the row lock and, through the subject's trigger, the exclusive half (B06 D-TX-2). The concurrency
+cases fix interleavings with hold points and observe waits in `pg_stat_activity`, never a sleep: the last founding slot (R2-090),
+simultaneous first captures (R2-137, both orders), a snapshot against a designation (CMD027-RACE), claims of two sellers
+(CMD046-RACE), two acceptances for one agency (CMD047-RACE), a termination against an acceptance (CMD050-RACE, end to end in
+B10-INTEGRATION because the two commands are built in parallel lanes), a close against an adjustment (CMD051-RACE), a closure against
+a payment order (CMD043-RACE: B09's CreatePaymentOrder takes the agency's shared half, CloseAgency its row and exclusive half).
+
+## 11. Ports, fakes and implementers
+
+| port (package) | purpose | real implementer | shipped binding until then (D10-BIND-1) | test double |
+|---|---|---|---|---|
+| BuyerTypeReader (`@kauro/application` commercial/ports.ts) | the agency's recorded buyer type AGENCY or IN_HOUSE (B11 stores `agency` / `in-house`; the adapter maps), read in the caller's unit of work (A3 3.7) | B11 W6 `agency_buyer_types`, bound at integration | `UnrecordedBuyerTypeReader`: always unset, so the shipped edition refuses every quote BUYER_TYPE_UNSET | ContractFakeBuyerTypeReader (B10-PORTS-FAKES) |
+| PreparationCompletionSource | STAGE and FINAL completion of a qualifying purchase | B13 (stages of a staged purchase) | `AuthorizationDeliveryCompletionSource` (B10-ADAPTERS-LEDGER): FINAL at B09's `commercial_authorization.delivered.v1` of a single-stage purchase (performed by B08) | ContractFakePreparationCompletion (B10-PORTS-FAKES) |
+| BankingCalendarSource | the verified Colombian banking calendar version | B15 (a verified feed), owner-reviewed | `RecordedBankingCalendarSource` (B10-ADAPTERS-LEDGER): the latest VERIFIED_FEED version recorded in `banking_calendars`; none → CMD051 PRECONDITION_FAILED CALENDAR_UNAVAILABLE | ContractFakeBankingCalendar (B10-PORTS-FAKES) |
+| PayoutEvidenceVerifier | authenticated bank or provider payout evidence (SUBMITTED, SETTLED, FAILED, RETURNED) | B15 | `UnavailablePayoutEvidenceVerifier`: CMD053 PRECONDITION_FAILED PAYOUT_EVIDENCE_UNAVAILABLE | ContractFakePayoutEvidence (B10-PORTS-FAKES) |
+| CommercialPrincipalReader | a seller row or corporate grant after its transition lock | B10-ADAPTERS-SALES | — | — |
+| FoundingOfferReader | reservable slots of the current cohort (no agency data) | B10-ADAPTERS-RECURRENCE; consumed by B11's pricing page | — | — |
+| SourceAvailabilityReader, SourceLineageReader, PurchaseRebinder, PurchasedSubjectReader | B09 ports bound to B07 and B09 (PLATFORM) | existing | — |
+| ServiceAuthenticator, PaymentProviderAdapter, DeliveryCapacityPort | B09 ports; their fakes stay B09 M2's, reused never copied | B15, B08 | B09's labelled fakes |
+| ActiveWorkInspector | B06 port, bound in the api edition | existing | — |
+
+Domain repository ports (`@kauro/domain` ports/commercial.ts): RecurrenceRepository, FoundingRepository, AgencyLifecycleRepository,
+SalesRepository, AttributionRepository, CommissionLedgerRepository, StatementRepository; `CommercialUnitOfWork extends
+CommerceUnitOfWork` adds them and `adoptAgency(agencyId)` (SERVICE only, from a durable work item: the event's agency, a
+reservation's; never a request). B10-MODEL declares them; B10-ADAPTERS-RECURRENCE implements the recurrence and founding repositories
+and the commercial unit of work, B10-AGENCY-LIFECYCLE the agency lifecycle repository, B10-ADAPTERS-SALES the sales and attribution
+ones, B10-ADAPTERS-LEDGER the ledger and statement ones and the two recorded bindings of D10-BIND-1. The domain's machine table
+(`commercial/machines.ts`) and B10's event type and subscriptions (`commercial/events.ts`) belong to B10-SCHEMA-RECURRENCE, which seeds
+them, so seed and declaration change in one commit (the B09 seed tests compare them). Application: `CommercialAuthorizer` (`authorizeSeller`, `authorizeCorporateOwner`,
+`authorizeCommercialService`), the handlers, the COMMISSIONS planners. Every fake (D10-FAKE-1) declares `integrationClass`
+CONTRACT_FAKE and evidence class SIMULATED, keeps a call log, lives on `@kauro/application/testing`, is bound by no composition root.
+Arithmetic reuses B09's money kernel (`@kauro/domain` commerce/money.ts: `roundHalfUpBps`, `allocateLargestRemainder`,
+`cumulativeEntitlement`, `entitlementAdjustment`; D-MONEY-B1) and never forks it.
+
+## 12. Error contract
+
+SQLSTATE class KC (`packages/persistence/src/sqlstate.ts`): KC001 DESIGNATION_REWRITE, KC002 COMMISSION_POOL_MISMATCH, KC007
+ELIGIBILITY_WITHOUT_FINAL_COMPLETION, KC015 ADJUSTMENT_NOT_CUMULATIVE → INTEGRITY_FAILURE; KC003 SHARES_NOT_WHOLE, KC005
+SELLER_NOT_ACTIVATABLE, KC006 CLOSURE_RESIDUALS_OPEN, KC009 PAYEE_UNVERIFIED, KC010 PAYOUT_NOT_SETTLED, KC011 TAIL_NOT_ENUMERATED,
+KC014 RESERVATION_RELEASE_REFUSED, KC016 PROSPECT_SUPPRESSED, KC017 OFFSET_NOT_AUTHORIZED → PRECONDITION_FAILED. Unique indexes decided
+by name: `quotes_one_live_per_project` → STALE_VERSION with the live quote; `prospects_one_live_per_organization` → PROSPECT_EXISTS;
+`attribution_claims_one_live_per_seller` → CLAIM_EXISTS; `attribution_allocations_one_per_agency` → ATTRIBUTION_EXISTS;
+`payout_intents_one_live_per_statement` and `commission_statements_one_per_period_seller` → the replayed row. New reasons
+(`COMMERCIAL_FAILURE_REASONS`, appended to FAILURE_REASONS): BUYER_TYPE_UNSET, NO_BILLABLE_UNITS, ENVELOPE_NOT_OFFERED,
+BILLING_PROFILE_MISMATCH, AGREEMENT_VERSION_NOT_PUBLISHED, AGENCY_NOT_DRAFT, CLOSURE_OBLIGATIONS_UNRECONCILED, CLOSURE_RESIDUALS_OPEN,
+REPLACEMENT_SCOPE_CHANGED, REPLACEMENT_ALLOWANCE_SPENT, EXECUTION_STARTED, SELLER_NOT_ACTIVE, SELLER_NOT_ACTIVATABLE,
+AGREEMENT_VERSION_MISMATCH, PROSPECT_EXISTS, PROSPECT_SUPPRESSED, SOURCE_EVIDENCE_INVALID, CLAIM_EVIDENCE_INSUFFICIENT, CLAIM_EXISTS,
+CLAIM_NOT_REVIEWABLE, CLAIM_AFTER_FIRST_ORDER, ATTRIBUTION_EXISTS, SHARES_NOT_WHOLE, IN_HOUSE_NOT_ATTRIBUTABLE,
+SERVICE_ASSIGNMENT_UNPREPARED, TAIL_NOT_ENUMERATED, TERMINATION_TERMS_UNPREPARED, INPUTS_UNRECONCILED, LEDGER_CHANGED, PERIOD_NOT_DUE,
+PAYEE_UNVERIFIED, NOTHING_PAYABLE, FUNDS_UNAVAILABLE, PAYOUT_EVIDENCE_MISMATCH, PAYOUT_NOT_SETTLED, OFFSET_NOT_AUTHORIZED,
+CALENDAR_UNAVAILABLE, PAYOUT_EVIDENCE_UNAVAILABLE. B06's
+codes and statuses are unchanged (PRECONDITION_FAILED 409, CAPABILITY_UNAVAILABLE 422, ASSURANCE_REQUIRED 403). The schema mandates
+raise the KC codes and their tests assert the raw SQLSTATE; the translation into these reasons is added to `sqlstate.ts` by the stage-2
+mandate whose adapter surfaces the code (ADAPTERS-RECURRENCE KC001, KC014; AGENCY-LIFECYCLE KC006; ADAPTERS-SALES KC003, KC005, KC011,
+KC016; ADAPTERS-LEDGER KC002, KC007, KC009, KC010, KC015, KC017), because the reasons exist only after B10-MODEL is merged.
+
+## 13. Commands and reads
+
+| command | route | principal | scope | answer |
+|---|---|---|---|---|
+| CMD002 ActivateAgency | POST /api/v1/agencies/{agencyId}/activate | agency OWNER | AGENCY_PATH | 200 AgencyActivationView |
+| CMD027 CreateQuote | POST /api/v1/projects/{projectId}/quotes | AGENCY_BILLING | AGENCY_HEADER | 201 CreateQuoteView |
+| CMD043 CloseAgency | POST /api/v1/agencies/{agencyId}/closure-requests | agency OWNER, step-up | AGENCY_PATH | 200 AgencyClosureView |
+| CMD045 RegisterProspect | POST /api/v1/sales/prospects | ACTIVE seller or owner | CORPORATE | 201 ProspectView |
+| CMD046 ClaimProspect | POST /api/v1/sales/prospects/{prospectId}/claims | ACTIVE seller | CORPORATE | 201 AttributionClaimView |
+| CMD047 AcceptAttribution | POST /api/v1/sales/claims/{claimId}/accept | KAURO_OWNER | CORPORATE | 200 AttributionView |
+| CMD048 AssignAccount | POST /api/v1/sales/agencies/{agencyId}/assignment | KAURO_OWNER | CORPORATE | 200 SalesAccountView |
+| CMD049 ActivateSeller | POST /api/v1/sales/sellers/{sellerId}/activate | KAURO_OWNER, step-up | CORPORATE | 200 SellerView |
+| CMD050 TerminateSeller | POST /api/v1/sales/sellers/{sellerId}/terminate | KAURO_OWNER | CORPORATE | 200 SellerTerminationView |
+| CMD051 CloseCommissionPeriod | POST /api/v1/sales/commission-periods/{periodId}/close | COMMISSION_SERVICE | STORED_OPERATION | 200 PeriodCloseView |
+| CMD052 ApproveCommissionPayout | POST /api/v1/sales/statements/{statementId}/approve-payout | KAURO_OWNER, step-up | CORPORATE | 200 PayoutIntentView |
+| CMD053 ReconcileCommissionPayout | POST /api/v1/sales/statements/{statementId}/reconcile-payout | FINANCE_SERVICE | STORED_OPERATION | 200 PayoutReconciliationView |
+| GetCommissionStatement | GET /api/v1/sales/statements/{statementId} | the statement's seller or KAURO_OWNER | CORPORATE | 200 CommissionStatementView |
+
+Every command: the B06 envelope (Idempotency-Key, correlation id), closed request schemas with the registry's field names exactly,
+money as MoneyMinorUnits strings, closed response views by `viewSchemaOf` withholding contact details, destination digests and
+another seller's rows (D10-API-1), outcome catalogues composed from B06's fragments and B09's operator and service access fragments,
+OpenAPI under `paths` once served, the matrix owner rows and applicability of each command. DENY titles state "foreign tenant or
+scope, wrong role, then one missing material prerequisite"; RACE titles "identical retry, conflicting same-key request, crash at the
+intent/commit boundary" (D10-CASEMAP-1).
+
+## 14. Consumer, sweeps and events (D10-CONS-1)
+
+The commission service runs `apps/api/src/commissions/`: the `kauro_commission` pool, outbox claims through B06's
+`PgOutboxDispatchStore` under `kauro_control` with one lease for COMMISSIONS (B09 D-M3-B8), each effect in its own SERVICE unit of
+work, idempotent by durable identity (a pool per purchase and source, an adjustment per line and source event, a completion per
+purchase and kind). **COMMISSIONS** on `capture.completed.v1` (the purchase's pools and lines; the first-designation mirror),
+`refund.completed.v1` and `capture.reversed.v1` (adjustments), `capture.funds_observed.v1` (funds facts, holds), and
+`commercial_authorization.delivered.v1` (ask PreparationCompletionSource). **Sweeps**: QUOTE_EXPIRY (price_expiry_reached,
+reservation release or hold), CLAIM_WINDOWS, ENTITLEMENT_WINDOWS, ACCRUAL_RECONCILIATION (a purchase lacking the lines of an
+applicable entitlement, e.g. an acceptance after the first purchase), ELIGIBILITY, PERIODS (open the month; close a due period
+through CMD051 under journal key `period-close-<periodId>`; built by B10-STATEMENTS-PAYOUTS beside CMD051, entered into the cycle by
+B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v1`,
+`quote.drafted.v1`, `quote.issued.v1`, `quote.superseded.v1`, `quote.expired.v1`, `quote.withdrawn.v1` and the new
+`agency.first_purchase_designated.v1`; its corporate aggregates publish none (D10-EVT-1) and keep `commercial_transitions`.
+
+## 15. Integration obligations
+
+1. **B08**: perform the DELIVERED edge that `AuthorizationDeliveryCompletionSource` reads as the FINAL completion of a single-stage
+   purchase (0025 routes `commercial_authorization.delivered.v1` to COMMISSIONS); renumber nothing (B08 owns 0019–0021): the integrator deletes `0019_reserved_b08.sql` …
+   `0021_reserved_b08.sql` when B08's files land (the runner's "duplicate migration version" makes a miss loud).
+2. **B11**: bind BuyerTypeReader to W6's `agency_buyer_types` (CMD027 refuses a quote while it is unset; CMD047 refuses an unset or IN_HOUSE agency);
+   bind FoundingOfferReader to the pricing page's founding line; delete `0022_reserved_b11.sql` … `0024_reserved_b11.sql`.
+3. **B12**: the prospect-stage, seller suspension, destination, dispute and hold edges of §8 marked B12; the seller and owner screens
+   read B10's views; outreach (CMD061–CMD064) respects `prospect_suppressions`.
+4. **B13**: the FINAL completion of a staged purchase through PreparationCompletionSource.
+5. **B15**: BankingCalendarSource (verified feed), PayoutEvidenceVerifier and the payout adapter's SUBMITTED and UNCERTAIN edges; FX of
+   a COP payout with its recorded source.
+6. **B16**: the CLOSED edge and managed deletion, never touching B10's ledger rows.
+7. **B09 fixtures**: `issueQuote`, `paidPurchase` and `commerce-support.ts` keep their fabricated founding references (D10-REC-3); a
+   later change that routes them through CMD027's core lets 0029+ add the snapshot guards (Q10-1).
+
+## 16. Decisions register
+
+| id | decision | authority / rationale |
+|---|---|---|
+| D10-BASE-1 | B10 numbers 0025–0028; its branches carry six reservation files 0019–0024 (a header and `SELECT 1;`, nothing created) so the contiguous runner applies the real numbers before B08 and B11 land; the cross-package integrator deletes each reservation when its owner's file arrives. No persistent database applies them (every suite builds a fresh cluster; no environment is deployed), so the checksum ledger never sees the swap | the task's numbering rule; `runner.ts` "migration versions must be contiguous from 0001" and "duplicate migration version"; `migrations.test.ts` lists every file |
+| D10-STAGE-1 | Four stages of fourteen mandates of about one agent-day, at most five at once; one owner per test file, migration and fake; no test of a lane needs a parallel lane's code (the agency lifecycle runs in stage 2 beside the adapters, CMD050 against CMD047 and the PERIODS sweep's registration wait for B10-INTEGRATION); stage 2's integrator binds the agency, sales and ledger repositories into the commercial unit of work | A4 "lanes of at most five concurrent agents"; B08 D8 staging; B09 D-STAGE-B1 |
+| D10-CTX-1 | One new runtime group `kauro_commission` (NOSUPERUSER, NOBYPASSRLS, one login per group) serves the service identities commission-service → COMMISSION_SERVICE and finance-service → FINANCE_SERVICE (SERVICE_ROLE_TABLE); a SERVICE unit of work adopts an agency only from a durable work item | 08 "a service account has only its technical role"; 10 "Internal command authentication"; B09 D-CTX-B1, D-AUTHZ-B3; B07 D-CTRL-1 |
+| D10-CTX-2 | Sellers act in B09's OPERATOR context as their individually managed corporate identity; the database finds the seller through `kauro.current_seller_id()` and admits seller writes only while its row is ACTIVE; the owner is `kauro.holds_corporate_role('KAURO_OWNER')` | 08 "Corporate operators and sellers use individually managed corporate identities"; 12 "Seller onboarding and access lifecycle"; B09 D-CTX-B2 |
+| D10-CTX-3 | Sales and commission tables are corporate records with owner, own-seller and `kauro_commission` policies and no tenant policy; an agency never reads attribution, seller or compensation rows | Agency invariant "the seller does not gain CRM access"; 17 "Currency, fees and tax documentation" (limited finance access); 12 "Commission statement"; example 25 |
+| D10-EVT-1 | Corporate B10 aggregates publish no domain event (the foundation binding reads `agency_id`, and a statement spans agencies); their history is `commercial_transitions` plus security facts; CommissionLine owner rows keep `event: null` | FOUNDATION D-AGGK-1..5 (`domain_events_bind_aggregate`); `tools/matrix.mjs` CommissionLine rows; B09 CorporateGrant precedent |
+| D10-FIRST-1 | A qualifying purchase is an original CommercialAuthorization; B10's trigger on its insert, in the reconciler's transaction, serializes on the agency recurrence lock and row, assigns the confirmation sequence, records the purchase and consumes its founding reservation; sequence 1 is the sticky first designation | 17 "First qualifying project"; example 9 "The persisted first designation and financial inbox transaction are the authority"; R2-140; B09 D-QUOTE-B6 |
+| D10-FIRST-2 | `agencies.first_qualifying_capture_id` is written once by the COMMISSIONS consumer (agency row first, version bump, `agency.first_purchase_designated.v1`, equal to `agency_recurrence`), never in the reconciler, whose agency row lock after its shared half would deadlock with CMD043 | registry Agency.firstQualifyingCaptureId; B06 D-TX-2; example 24 |
+| D10-REC-1 | A prior project counts when a qualifying purchase of it was confirmed in [as_of − 8760 h, as_of), it is another project of the agency and its remaining service basis is positive; `kauro.qualifying_projects_at` is the one definition | 16 "Recurrence decision"; policy repeatLookbackDays; B09 D-TIME-B1; example 5; R2-089 |
+| D10-REC-2 | The eligibility set is the transition subject `kauro.agency_recurrence`: designation, refund completion and reversal take the exclusive half by trigger, CMD027 the shared half before its snapshot's `INSERT … SELECT` | 16 "evaluated at quote issuance using a server timestamp and a stored qualifying-project set"; B06 D-TX-2 |
+| D10-REC-3 | No guard is added to B09's snapshot table: B09's fixtures fabricate founding references and sets for one agency many times per database; CMD027 is the only product writer, `kauro.eligibility_findings()` reports divergence and an unbacked founding rate is recorded UNBACKED, never counted as a slot (Q10-1) | "never damage existing work"; B07+B09 merge record ("only the fixtures move"); 07 "Application checks improve messages but cannot be the sole protection" (hence the findings function) |
+| D10-FOUND-1 | Three seeded slot rows per cohort; one founding reservation per agency per cohort, ever — stricter than policy pendingFoundingReservationsPerAgency 1 (at most one pending), because a released reservation re-taken under a new quote id would renew it ("quote IDs do not renew it"); the reservation binds its quote and the quote's snapshot names it; a live reservation is its slot's `live_reservation_id` | 16 "Founding incentive"; policy foundingAgencyCount, pendingFoundingReservationsPerAgency; example 16 "Do not revive a founding reservation"; example 17; R2-090, R2-127; A3 3.7 |
+| D10-FOUND-2 | The last-slot race is decided on the slot row: `UPDATE … WHERE NOT held` in ascending slot order; a contender waits, re-checks and takes the next slot or none, and its quote is issued at its own tier | example 17 ("atomic", "the unsuccessful contender sees its actual alternative price"); R2-090 |
+| D10-FOUND-3 | A reservation belongs to one quote and ends at that quote's 336-hour expiry; superseding and replacement quotes never inherit or extend it; previews and refused commands reserve nothing; eligibility needs no qualifying purchase, no reservation in the cohort and a recorded buyer type of either value | 16 "Founding incentive"; R2-127; example 16 "Do not revive a founding reservation"; A3 3.7 |
+| D10-FOUND-4 | QUOTE_EXPIRY expires a quote past its price expiry and releases its slot; a quote that cannot expire because a payment is in flight puts the reservation in RECONCILIATION_HOLD, consumed by the capture or released after a proved no-capture; a consumed slot is never freed | 16 "An expired or explicitly withdrawn unpaid quote releases it only after proving that no capture is in flight or uncertain"; B09 D-QUOTE-B4; R2-096; example 17 |
+| D10-QUOTE-1 | CMD027's lock order and writes are those of §3.4; the terms hash covers the accepted terms version; the previous unpaid quote is superseded and its reservation released in the same transaction | 16 "Quote calculation"; B09 D-QUOTE-B1..B7, D-TX-B1 |
+| D10-QUOTE-2 | Saleable scope: units > 0, band within capacity.launchSourceUnits, mode offered, buyer type recorded, current reviewed billing profile, agency ACTIVE with accepted terms | 16 "Price schedule" (zero units, disabled band); CMD027 precondition and failure; A3 3.7 ("before its first quote"); R2-082 |
+| D10-QUOTE-3 | The included replacement re-binds a paid, unexecuted purchase to a same-band replacement quote through B09's PurchaseRebinder within the allowance; any other scope is refused with the comparison and charged only after refund and a new accepted quote | 16 "Scope changes and credits"; example 18; B09 D-QUOTE-B6, §15 item 12; R2-092, R2-093 |
+| D10-QUOTE-4 | The replacement path is intent (tenant), settle (payment service), complete (tenant) with `quote_issuances` naming the journal entry; a refused re-binding withdraws the replacement | B09 D-PROTO-B1, D-PROTO-B2, D-M3-B6; B06 D-IDEM-1 |
+| D10-AGY-1 | CMD002 accepts only the published agreement versions and the agency's current reviewed billing profile, records an append-only acceptance and activates without writing capabilities | registry Agency machine guard; CMD002; 16 "Offer and buyer fit"; B06 `agencies_activation_requires_agreements` |
+| D10-AGY-2 | CMD043 refuses while payments are in flight, records the obligations inventory and moves to CLOSING; CLOSED is refused while payments, refunds, live authorizations or tax documents are open (KC006); ledger rows are never deleted; the CLOSED performer is re-assigned to B16 | registry Agency (owner_requests_closure, closure_obligations_completed); CMD043; 16 "Agency lifecycle"; B06 `agencies_authority` admits only the owner |
+| D10-AGY-3 | Rename changes no commercial fact; consolidation is a recorded, reviewed decision with no data effect | 16 "A new legal agency under the same holding company is not automatically merged"; example 24; R2-141 |
+| D10-SELL-1 | Activation requires a signed agreement, a legal review of the classification's substance, assessment, confidentiality, verified payment and tax facts, verified identity with MFA and the owner's step-up, repeated by the database (KC005) | 17 "Activation prerequisites"; 12 "Seller onboarding and access lifecycle"; CMD049 failure |
+| D10-SELL-2 | A payout destination verifies only with the seller's own step-up at the change and an owner verification 172 800 s later; an intent binds the version and digest it was approved with | 12 "Changing a payout destination requires step-up and a cooling/verification procedure"; example 22; R2-103; Q10-5 |
+| D10-PROS-1 | Prospects are agencies from lawful, dated, agency-segment evidence; one live prospect per normalized organization key; suppression by organization and contact key survives spelling and re-import | 18 "Prospect qualification" (A3); 12 "Prospect record"; CMD045 failure; A3 3.7 |
+| D10-CLAIM-1 | A claim needs its seller's active agreement and substantive evidence; conflicts (an accepted or competing claim, customer history) make it DISPUTED in the same transaction; submission owns nothing | 17 "Attribution subject", "Claim validity and conflicts"; 12 "Attribution and assignment views"; CMD046 |
+| D10-ATTR-1 | Acceptance freezes one allocation per agency with shares of exactly 10 000 bps and the owner's reason; refused for an in-house agency or one whose buyer type is unset, and for a claim after the first order | 17 "The default is one attribution owner", "A claim must be submitted before the first paid order"; A3 7.1 ("no seller attribution claim can arise from prospecting an in-house team"), A3 3.7 (answered once, "before its first quote"), D58; CMD047 |
+| D10-ATTR-2 | Entitlements are created by the commission service at conversion, one per beneficiary, with the window from the first purchase's confirmation to twelve calendar months later in America/Bogota with the day clamped; immutable | 17 "Recurring entitlement"; policy windowAnchor, calendarMonthRollover; example 11 |
+| D10-ASSIGN-1 | Assignment changes only the current operational owner; new work is compensated only by a prepared service assignment | 17 "Assignment changes"; example 12; R2-095 |
+| D10-ASSIST-1 | Assistance agreements are prospective, per project, signed before the purchase's order, with their own pool beside the acquisition pool | 17 "Recurring entitlement", "Attribution subject"; example 3; A3 7.1; R2-099 |
+| D10-TERM-1 | Termination ends access, keeps residuals, expires unlisted claims and records a 2160-hour tail only for enumerated accepted opportunities (KC011); nothing of the ledger is deleted | 17 "Termination and tail"; 12 "Termination revokes operational access and preserves accrued contractual rights"; example 13; R2-100 |
+| D10-POOL-1 | One pool per purchase and source on the allocated service net of refunds, rounded once; largest-remainder shares with ties by beneficiary id; database-checked | 17 "Commission basis", "Claim validity and conflicts"; policy splitRemainder; examples 1, 8, 19, 20 |
+| D10-RATE-1 | First 1000 bps for sequence 1; 400 bps for a later purchase whose verified provider completion precedes the exclusive window end; implausible provider times are held, never guessed | 17 "First qualifying project", "Recurring entitlement"; policy subsequentCutoff; examples 9, 10, 11 |
+| D10-ADJ-1 | Every basis change recomputes cumulatively and appends one adjustment per changed line, idempotent by source event; VOID at zero before payout, ADJUSTED after | 17 "For a full refund, cumulative commission after all adjustments must be exactly zero"; registry CommissionLine, CommissionAdjustment; examples 5, 6 |
+| D10-ELIG-1 | Eligibility is 720 hours after a FINAL completion with funds AVAILABLE and no covering hold; a STAGE completion starts nothing | 17 "Accrual, eligibility and payout"; policy eligibilityDaysAfterFinalCompletion; examples 14, 15 |
+| D10-HOLD-1 | Holds are amounts with reason and review date; only a hold of the whole unpaid amount makes a line HELD; the statement withholds exactly the held cents | 17 "An unresolved claim dispute holds only the contested compensation allocation"; 12 "Seller dispute flow"; example 21 |
+| D10-NEG-1 | A negative position after payout is shown and offset only under signed offset terms (KC017), otherwise carried as an owner recovery item; nothing debits a seller | 17 "Refunds after payout and negative balances"; example 7 |
+| D10-GUARD-1 | The compensation guard is computed per seller and period for the owner and refuses nothing | 17 "Performance and compensation evolution"; example 23 |
+| D10-CAL-1 | Statement and pay dates are the 5th and 10th banking days after month-end from a recorded calendar version; a TEST_FIXTURE calendar makes the close SIMULATED | 17 "Business-day calendar"; example 21 |
+| D10-STMT-1 | CMD051 closes only with reconciled inputs and an equal cutoff hash, issuing one immutable itemized statement per seller | CMD051; 12 "Commission statement"; example 25 |
+| D10-PAY-1 | CMD052 authorizes one intent of exactly the payable to a verified destination with fee bearer KAURO and covered bank-available cash; no minimum beyond zero; no transfer | CMD052; 15 "Commission integration"; policy minimumPayoutCents, feeBearer |
+| D10-PAY-2 | CMD053 accepts only authenticated evidence matching the intent; submission is not settlement; failed or returned transfers stay recorded and hold the lines | CMD053; registry CommissionLine; example 22; 15 "Payout receipts reconcile to bank/provider evidence" |
+| D10-TX-1 | The global lock order of §10 and the new transition subjects | B06 D-TX-2; B09 D-TX-B1 |
+| D10-CONS-1 | The COMMISSIONS consumer and sweeps run in the commission service, each effect idempotent by its durable identity; accrual reconciliation covers late acceptances | 07 "Consumers deduplicate by their own durable inbox identity"; B09 D-CONS-B1, D-M3-B8 |
+| D10-FAKE-1 | The four B10 fakes are labelled CONTRACT_FAKE and SIMULATED, owned by B10-PORTS-FAKES, on the testing subpath, bound by no composition root; B09's fakes are reused, never copied | 21 "Evidence classes"; B09 D-FAKE-B1 |
+| D10-API-1 | B10 routes follow B06 and B09 conventions: closed schemas with registry field names, views withholding contact details, destination digests and other sellers' rows | 10 "Read endpoints return safe projections"; B06 D-RESP-1; B09 D-RESP-B1 |
+| D10-CASEMAP-1 | Every DENY and RACE title states its registry scenario; a row is SIMULATED only when a fake decides its asserted clause | cases.json scenarios; B09 D-CASEMAP-B1; 21 "Evidence classes" |
+| D10-BIND-1 | No composition root binds a fake: until its real implementer lands, a B10 port is bound to an honest platform implementation — the buyer type unset (every quote refused), completion from B09's delivered authorization, the latest recorded VERIFIED_FEED calendar (none: the close is refused), payout evidence unavailable (reconciliation refused) — and the tests inject the labelled fakes | B09 D-FAKE-B1 and D-MERGE-2; A3 3.7 ("before its first quote"); 17 "Business-day calendar" ("from the current verified calendar"); CMD053 precondition |
+| D10-CLOCK-1 | Every instant is `kauro.server_now()`; durations are exact hours; calendar months through America/Bogota; tests stand at another instant only through the labelled TEST CLOCK | B07 D-CLOCK-1; B09 D-TIME-B1; policy commission.operationalTimezone |
+
+## 17. Open questions for the authority
+
+| id | question | interim |
+|---|---|---|
+| Q10-1 | Should B09's fixtures move to CMD027's issuance core so the snapshot's founding reference and qualifying set become database guards? | findings function; UNBACKED purchases reported (D10-REC-3) |
+| Q10-2 | May a scope-correcting superseding quote keep a founding reservation with its original end? It needs checkout to honor the reservation end | no; the owner's recorded goodwill exception |
+| Q10-3 | How does an approved consolidation group future quote eligibility across agencies? | recorded decision only, no grouping (D10-AGY-3) |
+| Q10-4 | B06's authority trigger has no service path for closure_obligations_completed | re-assigned to B16 with the verified deletion |
+| Q10-5 | The destination-change cooling period has no policy value | 172 800 s, a policy value to add |
+| Q10-6 | A transfer returned after SETTLED evidence has no edge | owner recovery through a reviewed correction |
+| Q10-7 | "Fraud/abuse review for artificial nominal balances" of partly refunded projects has no rule | counted while the basis is positive; reported by the findings function |
+| Q10-8 | Which purchases are staged is B08's and B13's fact | PreparationCompletionSource reports STAGE or FINAL |
+| Q10-9 | Commission tax withholding and support documents depend on the seller's reviewed profile | recorded requirement; no computation (17) |
+
+## 18. Handoff and verification
+
+`docs/design/B10-mandates.json` carries the fourteen mandates with their start, dependencies, fakes, migrations and test files; the case
+map names every case's tests under exact titles. `tools/test/b10-case-map.test.mjs` checks both documents against this design, the
+registry and each other: citations, mandate ownership, the status table, the machine edges, the decisions and the migrations.
+Verification of this branch: the focused design test only (`node --test tools/test/b10-case-map.test.mjs`); the first full
+`pnpm run verify` runs with the first mandate that changes code.
