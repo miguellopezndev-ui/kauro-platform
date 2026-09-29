@@ -23,6 +23,7 @@
     "allowJs": false,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "incremental": false,
     "types": [
       "node"

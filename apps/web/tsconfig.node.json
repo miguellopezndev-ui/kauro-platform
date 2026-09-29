@@ -4,7 +4,17 @@
     "rootDir": ".",
     "outDir": "dist",
     "declaration": false,
-    "declarationMap": false
+    "declarationMap": false,
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/server/**/*.ts", "test/**/*.ts", "e2e/**/*.ts", "playwright.config.ts"]
+  "include": [
+    "src/api/**/*.ts",
+    "src/client/**/*.ts",
+    "src/copy/**/*.ts",
+    "src/server/**/*.ts",
+    "src/screens.ts",
+    "test/**/*.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
+  ]
 }
