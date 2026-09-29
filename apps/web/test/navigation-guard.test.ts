@@ -114,15 +114,10 @@ test("R2-064: closing the tab with local edits raises the browser's own leave wa
   const guard = guardWith(neverSaves);
   const target = new EventTarget();
   const disarm = armTabClose(guard, target);
-  // the event of a browser carries a writable returnValue; the one of the test runner carries an own data property in its place
-  class UnloadEvent extends Event {
-    returnValue: unknown = undefined;
-    constructor() {
-      super("beforeunload", { cancelable: true });
-    }
-  }
+  // the event of a browser carries a writable returnValue; the one of the test runner has a read-only accessor, so the test gives it an own one
   const closing = () => {
-    const event = new UnloadEvent();
+    const event = new Event("beforeunload", { cancelable: true });
+    Object.defineProperty(event, "returnValue", { value: undefined, writable: true, configurable: true });
     target.dispatchEvent(event);
     return event;
   };
@@ -130,7 +125,7 @@ test("R2-064: closing the tab with local edits raises the browser's own leave wa
   guard.edit({ field: "enumMap.status.OPEN", value: "Open", baseline: "New" });
   const warned = closing();
   assert.equal(warned.defaultPrevented, true);
-  assert.equal(warned.returnValue, "", "the legacy flag some engines still read");
+  assert.equal((warned as { returnValue?: unknown }).returnValue, "", "the legacy flag some engines still read");
   guard.edit({ field: "enumMap.status.OPEN", value: "New", baseline: "New" });
   assert.equal(closing().defaultPrevented, false, "the edit was put back");
   guard.edit({ field: "enumMap.status.OPEN", value: "Open", baseline: "New" });
