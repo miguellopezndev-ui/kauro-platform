@@ -1505,3 +1505,23 @@ expected rejection"), 0012 restored `9941fcaa…`; FINAL-N2 — the D-PAY-B6 gua
 "planObservation — D-PAY-B5 (B09-N3): …" and "CommerceReconciler — D-PAY-B6 (residual FINAL-N2): …" (`providerQueryRequired`
 false), restored `846b3bf9…`; FINAL-N3 — `edition.ts` back to the zero stubs fails both "FINAL-N3 (D-INSP-B1) …" route tests
 (CMD023 answers 201 and supersedes the paid plan; CMD010 reports 0 live authorizations), restored `09e39317…`.
+
+## 17. Review findings
+
+The independent package-close review (amendment A4) of `integration/b07-b09` @ `0f15636` rejected B09 with five findings. Each
+test below fails on `0f15636` on exactly the reviewed defect — B09-R5, an evidence finding, with tenant isolation broken by a
+permissive row policy on refunds, orders and captures: every route check still passes and each test fails at its cross-scope
+assertion — and passes at its commit. An unmatched provider refund is a case, never an automatic posting: 15 "Operational ledger"
+keeps an unexplained difference a case with amount and age until its reviewed resolution posts the correction (D-LEDGER-B4).
+
+| id | severity | status | test | commit |
+|---|---|---|---|---|
+| B09-R1 | BLOCKING | FIXED (D-REF-B8, migration 0019) | `apps/api/test/b09-review.test.ts` "B09-R1: …"; `packages/application/test/commerce-planners.test.ts` "planObservation — B09-R1 and B09-R4: …" | `ccd2085` |
+| B09-R2 | BLOCKING | FIXED (D-LEDGER-B7) | `apps/api/test/b09-review.test.ts` "B09-R2: …" (three observation orders with and without a kept fee; every delivery order of each scenario's events) | `ccd2085` |
+| B09-R3 | MAJOR | FIXED (D-REF-B8) | `apps/api/test/b09-review.test.ts` "B09-R3: …" | `ccd2085` |
+| B09-R4 | BLOCKING | FIXED (D-LEDGER-B7) | `apps/api/test/b09-review.test.ts` "B09-R4: …"; `packages/application/test/commerce-planners.test.ts` "planObservation — B09-R1 and B09-R4: …" | `ccd2085` |
+| B09-R5 | MAJOR | FIXED (evidence) | `apps/api/test/cmd032-approve-refund.test.ts`, `cmd033-execute-refund.test.ts`, `cmd034-reconcile-payment.test.ts` "DENY: a foreign tenant's real …" | `ca116b2` |
+
+The case map rows the review disagreed with and these changes answer cite the tests above (S059, R2-078, CMD030-OK, CMD030-RACE,
+CMD032-DENY, CMD033-OK, CMD033-DENY, CMD033-RACE, CMD034-OK, CMD034-DENY, CMD034-RACE); the rows it questioned only because the
+verify log was absent from its workspace are unchanged.
