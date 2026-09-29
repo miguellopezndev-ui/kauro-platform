@@ -748,4 +748,10 @@ test("W2 session view: sign-in answers 201 with the closed SessionView and the _
   // sign-in is a durable fact of the person's own stream
   const fact = await w.h.oracle.query<{ outcome: string; reason_code: string; actor_id: string }>("SELECT outcome, reason_code, actor_id FROM kauro.security_events WHERE action = 'SESSION_OPEN' AND correlation_id = $1", [String(reply.headers["x-correlation-id"])]);
   assert.deepEqual(fact.rows, [{ outcome: "ALLOW", reason_code: "SESSION_OPENED", actor_id: w.billing.userId }]);
+  // the session probe refuses a cookie beside a bearer token like every route, and records no fact (the page's probe)
+  const ambiguous = await browser(session, { method: "GET", url: sessionPaths.current, headers: { authorization: `Bearer ${w.billing.token}` } });
+  assert.equal(outcome(w, ambiguous), "400 INVALID_REQUEST AMBIGUOUS_CREDENTIALS");
+  assert.equal(await w.count("security_events", "correlation_id = $1", [String(ambiguous.headers["x-correlation-id"])]), 0);
+  // a query or a body is not part of the probe's closed request
+  assert.equal(outcome(w, await browser(session, { method: "GET", url: `${sessionPaths.current}?refresh=1` })), "400 INVALID_REQUEST SCHEMA_VIOLATION");
 });

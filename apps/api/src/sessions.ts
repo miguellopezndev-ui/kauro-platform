@@ -193,7 +193,8 @@ export function registerSessionRoutes(app: FastifyInstance, options: SessionRout
         credential = presentedCredential({ method: request.method, headers: head.headers }, options.appOrigins);
       } catch (e) {
         if (!(e instanceof DomainFailure)) throw e;
-        return sendProblem(reply, await options.refuseCredentials(SESSION_ACTIONS.open, { correlationId: head.correlationId, agencyId: null }, e).catch((error: unknown) => failed(head.correlationId, error)));
+        // the session probe records no fact, a refused credential included
+        return sendProblem(reply, problemOf(e, head.correlationId));
       }
       if (credential.kind !== "SESSION" || credential.secret === null) return sendProblem(reply, unauthenticatedProblem(head.correlationId));
       const secret = credential.secret;
