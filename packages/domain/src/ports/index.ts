@@ -140,3 +140,5 @@ export type {
   ExecutionUnitOfWork,
   ExecutionUnitOfWorkFactory,
 } from "./execution-store.js";
+// the control plane's discovery of execution work (package B08, mandate B08-CONTROL-EXECUTION)
+export type { ExecutionJobRef, ExecutionAttemptRef, ExecutionFact, ExecutionSourceGeneration, ExecutionInput, ExecutionDiscovery } from "./execution-discovery.js";

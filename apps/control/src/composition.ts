@@ -16,6 +16,13 @@
  * `runCycle` is one pass of the control plane over the source lifecycle: the location read-back first (a deletion cannot be recorded
  * at a location never read back, D-OBJ-2), the deadline, reconciliation and retention sweeps, then every consumer's due outbox
  * records, then the inventory and the deletion retries. Each piece is also usable alone (the tests drive them one by one).
+ *
+ * Processing authority (package B08, mandate B08-CONTROL-EXECUTION; docs/design/B08-audit-approval-jobs.md §11): when the caller hands
+ * in the execution providers — the worker host (B14's), the verifier (the cores adapter of `b05/cores`) and the execution units of
+ * work — the plane also assembles the consumers JOB_EXECUTION and EXECUTION_CONTROL and the sweepers of EXECUTION_SWEEPERS
+ * (`execution`), and `runCycle` extends its pass with them: JOB_DEADLINES and ATTEMPT_MONITOR after the source sweeps, both consumers
+ * with the others, then JOB_ADMISSION and STAGING_JANITOR. A deployment of this edition binds no worker host or cores adapter, so its
+ * control plane has no execution pipelines (`execution` is null; D8-PORT-1).
  */
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -32,7 +39,7 @@ import type {
   SourceSweeper,
   SourceSweeperName,
 } from "@kauro/application";
-import { SOURCE_SWEEPERS } from "@kauro/application";
+import { SOURCE_SWEEPERS, type ExecutionSweeperName } from "@kauro/application";
 import { createIdGenerator, toUtcInstant, type Clock, type IdGenerator, type LeaseOwnerId, type SourceUnitOfWorkFactory } from "@kauro/domain";
 import { IsolatedContainerInspector, IsolatedSelectionEvaluator } from "@kauro/data-plane";
 import { createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
@@ -41,6 +48,7 @@ import { SelectionEvaluation } from "./consumers/selection-evaluation.js";
 import { StorageLifecycle } from "./consumers/storage-lifecycle.js";
 import { UploadInspection } from "./consumers/upload-inspection.js";
 import { PgOutboxDispatcher, type DispatchCounts, type DispatcherOptions } from "./dispatcher.js";
+import { assembleExecutionPlane, type ControlExecutionOptions, type ExecutionPlane } from "./execution/plane.js";
 import { DeletionRetries } from "./sweepers/deletion-retries.js";
 import { LocationPolicy } from "./sweepers/location-policy.js";
 import { ObjectInventory } from "./sweepers/object-inventory.js";
@@ -87,6 +95,8 @@ export interface ControlPlaneOptions {
   readonly dispatcher?: Pick<DispatcherOptions, "claimSeconds" | "maxAttempts" | "leaseWindowSeconds" | "onFailure">;
   /** When a consumer's transient failure is retried (seconds). */
   readonly retryAfterSeconds?: number;
+  /** The execution providers (package B08): bound, the plane assembles its execution pipelines; absent, it has none. */
+  readonly execution?: ControlExecutionOptions;
 }
 
 export interface ControlConsumers {
@@ -106,7 +116,7 @@ export interface ControlSweepers {
 }
 
 export interface ControlCycleReport {
-  readonly sweeps: Readonly<Partial<Record<SourceSweeperName, SweepResult>>>;
+  readonly sweeps: Readonly<Partial<Record<SourceSweeperName | ExecutionSweeperName, SweepResult>>>;
   readonly dispatched: Readonly<Record<string, DispatchCounts>>;
 }
 
@@ -117,6 +127,8 @@ export interface ControlPlane {
   readonly sweepers: ControlSweepers;
   /** The sweepers by their SOURCE_SWEEPERS name (design §12.5): exactly one for each. */
   readonly sweeperByName: Readonly<Record<SourceSweeperName, SourceSweeper>>;
+  /** The execution pipelines of processing authority (package B08), or null when no execution providers were bound. */
+  readonly execution: ExecutionPlane | null;
   /** Dispatches the due records of one consumer until a batch claims nothing (at most `rounds` batches). */
   drain(consumer: OutboxConsumer, now: UtcInstant, limit?: number, rounds?: number): Promise<DispatchCounts>;
   /** One pass of the control plane over the source lifecycle (header). */
@@ -144,6 +156,7 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
   };
   const sweeperByName = Object.fromEntries(Object.values(sweepers).map((s: SourceSweeper) => [s.name, s])) as Record<SourceSweeperName, SourceSweeper>;
   for (const name of SOURCE_SWEEPERS) if (sweeperByName[name] === undefined) throw new Error(`the control plane has no ${name} sweeper`);
+  const execution = options.execution === undefined ? null : assembleExecutionPlane(options.execution, providers.storage, ids);
 
   const drain = async (consumer: OutboxConsumer, now: UtcInstant, limit = 50, rounds = 20): Promise<DispatchCounts> => {
     let delivered = 0;
@@ -165,13 +178,18 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
     consumers,
     sweepers,
     sweeperByName,
+    execution,
     drain,
     async runCycle(now, limit = 100) {
-      const sweeps: Partial<Record<SourceSweeperName, SweepResult>> = {};
+      const sweeps: Partial<Record<SourceSweeperName | ExecutionSweeperName, SweepResult>> = {};
       for (const sweeper of [sweepers.locationPolicy, sweepers.uploadDeadlines, sweepers.providerSessionReconciliation, sweepers.retention]) sweeps[sweeper.name] = await sweeper.sweep(units, limit);
+      // processing authority: the deadlines first (never early), then what the monitor observes of the live attempts
+      if (execution !== null) for (const sweeper of [execution.sweepers.jobDeadlines, execution.sweepers.attemptMonitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
       const dispatched: Record<string, DispatchCounts> = {};
       for (const consumer of [consumers.uploadInspection, consumers.selectionEvaluation, consumers.storageLifecycle, consumers.authorityJournal]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
+      if (execution !== null) for (const consumer of [execution.consumers.jobExecution, execution.consumers.executionControl]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
       for (const sweeper of [sweepers.objectInventory, sweepers.deletionRetries]) sweeps[sweeper.name] = await sweeper.sweep(units, limit);
+      if (execution !== null) for (const sweeper of [execution.sweepers.jobAdmission, execution.sweepers.stagingJanitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
       return { sweeps, dispatched };
     },
   };

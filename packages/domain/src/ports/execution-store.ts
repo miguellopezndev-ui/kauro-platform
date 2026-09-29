@@ -42,6 +42,7 @@ import type {
 } from "../model/execution/records.js";
 import type { AdmissionCandidate } from "../model/execution/scheduler.js";
 import type { CommerceUnitOfWork, CommerceUnitOfWorkFactory } from "./commerce.js";
+import type { ExecutionDiscovery } from "./execution-discovery.js";
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
 import type { UnitOfWorkOptions } from "./unit-of-work.js";
@@ -224,6 +225,13 @@ export interface ExecutionStore {
   tryAwaitTransition(subject: TransitionSubject): Promise<boolean>;
   /** The exclusive transition lock without waiting: admission's consumption of the authorization never waits under the ledger. */
   tryTransitionExclusive(subject: TransitionSubject): Promise<boolean>;
+  /**
+   * The entitlement's row lock without waiting (FOR UPDATE SKIP LOCKED): false when another transaction holds it (a revocation in
+   * flight) — or when the row is not one the control plane may move (only ACTIVE or CONSUMED rows are, 0019's update policy).
+   * JOB_ADMISSION takes it on an ACTIVE entitlement before its exclusive transition lock, so it never waits under the ledger for a
+   * row whose holder waits for that lock (D8-LOCK-1; mandate B08-CONTROL-EXECUTION).
+   */
+  tryLockAuthorization(authorizationId: CommercialAuthorizationId): Promise<boolean>;
   /** The global ledger row under its lock (JOB_ADMISSION takes it first, D8-SCHED-1). */
   lockGlobalLedger(): Promise<void>;
   /**
@@ -283,9 +291,13 @@ export interface ExecutionStore {
   recordCleanup(cleanup: CleanupInput): Promise<AttemptCleanupRecord>;
 }
 
-/** A unit of work of processing authority: the commerce unit of work with the execution store on the same connection. */
+/**
+ * A unit of work of processing authority: the commerce unit of work with the execution store on the same connection, and the control
+ * plane's discovery reads of execution work (ports/execution-discovery.ts; mandate B08-CONTROL-EXECUTION, D8-CEX-1).
+ */
 export interface ExecutionUnitOfWork extends CommerceUnitOfWork {
   readonly execution: ExecutionStore;
+  readonly executionDiscovery: ExecutionDiscovery;
   /**
    * The database's transaction time, kauro.server_now(), as an exact ISO-8601 instant with microseconds (D8-CLOCK-1): the clock a
    * request handler compares a deadline against (CMD036's source deadline), never the process clock. The same reading as

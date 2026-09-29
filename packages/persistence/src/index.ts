@@ -29,7 +29,7 @@ export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidenc
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf } from "./unit-of-work.js";
 // processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
 export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecutionUnitOfWork, executionReadsOf } from "./unit-of-work.js";
-export { PgExecutionStore, PgExecutionReads, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
+export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
 export type { ExecutionWriteContext, CheckoutCapacity } from "./execution/index.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";

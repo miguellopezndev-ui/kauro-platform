@@ -6,6 +6,11 @@
  * its work item (D-CTRL-1), takes the revision row before any upload or file of it (D-LOCK-2), records only the server's instants
  * (D-CLOCK-1) and appends only the events of the edges the control plane owns (D-CTRL-2). External providers are reached only
  * through the ports of @kauro/application; the platform's own parsers (@kauro/data-plane) are always real.
+ *
+ * Processing authority (docs/design/B08-audit-approval-jobs.md §4..§7, §11, mandate B08-CONTROL-EXECUTION): where the execution units
+ * of work, the worker host and the verifier are handed in, the consumers JOB_EXECUTION and EXECUTION_CONTROL and the sweepers of
+ * EXECUTION_SWEEPERS (JOB_ADMISSION, ATTEMPT_MONITOR, JOB_DEADLINES, STAGING_JANITOR) over the same dispatcher, each unit bound to the
+ * job's agency, every provider call outside any transaction and every answer recorded only under the job's row lock (§6).
  */
 export { PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
 export type { DispatcherOptions, DispatchCounts } from "./dispatcher.js";
@@ -36,3 +41,21 @@ export { boundTo, discovery, publish, applied, lostTheSubject, SettledElsewhere,
 export type { WorkItem } from "./work.js";
 export { assembleControlPlane, platformParsers, openControlDatabase, CONTROL_APPLICATION_NAME, controlClock } from "./composition.js";
 export type { ControlPlane, ControlPlaneOptions, ControlProviders, ControlParsers, ControlConsumers, ControlSweepers, ControlCycleReport, ControlDatabase, ControlDatabaseConfig } from "./composition.js";
+// processing authority (package B08, mandate B08-CONTROL-EXECUTION; docs/design/B08-audit-approval-jobs.md §4..§7, §11)
+export { assembleExecutionPlane } from "./execution/plane.js";
+export type { ControlExecutionOptions, ExecutionPlane, ExecutionConsumers, ExecutionSweepers } from "./execution/plane.js";
+export type { ExecutionUnits } from "@kauro/application";
+export { JobAdmission } from "./execution/admission.js";
+export type { AdmissionRound, JobAdmissionDependencies } from "./execution/admission.js";
+export { JobPipeline, readbackProblem } from "./execution/pipeline.js";
+export type { PipelineDependencies } from "./execution/pipeline.js";
+export { CancellationReconciler } from "./execution/cancellation.js";
+export { JobExecutionConsumer, ExecutionControlConsumer } from "./execution/consumers.js";
+export { AttemptMonitor } from "./execution/monitor.js";
+export { JobDeadlines } from "./execution/deadlines.js";
+export { StagingJanitor, ATTEMPT_CLEANUP } from "./execution/janitor.js";
+export { lostAuthority, LOST_AUTHORITY_REASONS } from "./execution/authority.js";
+export type { LostAuthorityReason } from "./execution/authority.js";
+export { deliveryObjectNameOf, expectedAuthorityHashOf, DELIVERY_OBJECT_NAME_DOMAIN, EXPECTED_AUTHORITY_DOMAIN } from "./execution/names.js";
+export { EXECUTION_SERVICES } from "./execution/work.js";
+export type { ExecutionStep } from "./execution/work.js";
