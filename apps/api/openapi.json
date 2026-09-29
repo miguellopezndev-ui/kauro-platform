@@ -17578,7 +17578,14 @@
               "AUTHORITY_OUTLIVES_REVERSAL",
               "FINANCE_SCOPE_MISSING",
               "COMMITMENT_ISOLATION",
-              "FISCAL_VALIDATION_REFUSED"
+              "FISCAL_VALIDATION_REFUSED",
+              "EXECUTION_FENCED",
+              "EXECUTION_AUTHORITY_LOST",
+              "CAPACITY_LEDGER",
+              "EXECUTION_QUEUE_FULL",
+              "PUBLICATION_EVIDENCE_MISSING",
+              "NO_FUNDED_GRANT",
+              "GRANT_CEILING"
             ]
           },
           "correlationId": {

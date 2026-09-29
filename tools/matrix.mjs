@@ -137,17 +137,17 @@ export const EDGE_OWNERS = {
     withdraw_plan: { owner: "B08", why: "an authorized project actor withdraws a VALIDATED plan (typed plan editing and exact approval); no registry command names it", event: "plan.withdrawn.v1" },
   },
   Job: {
-    "(initial QUEUED)": { command: "CMD036", event: null },
-    capacity_reserved: { owner: "B08", why: "job admission", event: null },
-    provider_start_observed: { owner: "B08", why: "fenced execution", event: null },
-    complete_staging_submitted: { owner: "B08", why: "fenced staging", event: null },
-    atomic_publication_accepted: { owner: "B08", why: "verification and publication", event: null },
-    cancel_command: { command: "CMD037", event: null },
-    provider_and_artifacts_reconciled: { owner: "B08", why: "cancellation reconciliation", event: null },
-    deadline_reached: { owner: "B08", why: "the job's deadline", event: null },
-    unrecoverable_start_error: { owner: "B08", why: "fenced execution", event: null },
-    fatal_resource_or_integrity_error: { owner: "B08", why: "fenced execution", event: null },
-    verification_failure: { owner: "B08", why: "verification", event: null },
+    "(initial QUEUED)": { command: "CMD036", event: "processing_job.queued.v1" },
+    capacity_reserved: { owner: "B08", why: "job admission", event: "processing_job.admitted.v1" },
+    provider_start_observed: { owner: "B08", why: "fenced execution", event: "processing_job.running.v1" },
+    complete_staging_submitted: { owner: "B08", why: "fenced staging", event: "processing_job.verifying.v1" },
+    atomic_publication_accepted: { owner: "B08", why: "verification and publication", event: "processing_job.ready.v1" },
+    cancel_command: { command: "CMD037", event: "processing_job.cancel_requested.v1" },
+    provider_and_artifacts_reconciled: { owner: "B08", why: "cancellation reconciliation", event: "processing_job.cancelled.v1" },
+    deadline_reached: { owner: "B08", why: "the job's deadline", event: "processing_job.expired.v1" },
+    unrecoverable_start_error: { owner: "B08", why: "fenced execution", event: "processing_job.failed.v1" },
+    fatal_resource_or_integrity_error: { owner: "B08", why: "fenced execution", event: "processing_job.failed.v1" },
+    verification_failure: { owner: "B08", why: "verification", event: "processing_job.failed.v1" },
   },
   // package B09 (docs/design/B09-payments-fiscal.md §4): the provider-effect protocol of CMD028 (CREATE_ORDER), CMD029 (CAPTURE)
   // and CMD033 (REFUND) — intent, dispatch, settle — and the reconciliation of CMD030/CMD034
@@ -705,7 +705,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019–0020 of B08) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();
