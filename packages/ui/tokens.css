@@ -1,0 +1,58 @@
+/* Generated from packages/ui/src/tokens.ts (renderTokenCss); packages/ui/test/tokens.test.ts checks it. Do not edit by hand. */
+:root {
+  --kauro-color-text: #17212B;
+  --kauro-color-text-muted: #4A5561;
+  --kauro-color-background: #FFFFFF;
+  --kauro-color-surface: #F5F7F9;
+  --kauro-color-border: #C3CAD2;
+  --kauro-color-control-border: #6B7682;
+  --kauro-color-primary: #0B6463;
+  --kauro-color-primary-hover: #084F4E;
+  --kauro-color-on-primary: #FFFFFF;
+  --kauro-color-focus: #005FCC;
+  --kauro-color-danger-text: #A4262C;
+  --kauro-color-danger-surface: #FDECEC;
+  --kauro-color-warning-text: #7A4B00;
+  --kauro-color-warning-surface: #FFF4E0;
+  --kauro-color-success-text: #1E6B35;
+  --kauro-color-success-surface: #E8F5EC;
+  --kauro-color-info-text: #0B4F8A;
+  --kauro-color-info-surface: #E7F0FA;
+  --kauro-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --kauro-mono-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --kauro-font-size-body: 16px;
+  --kauro-font-size-dense: 14px;
+  --kauro-line-height-body: 1.5;
+  --kauro-line-height-heading: 1.25;
+  --kauro-space-0: 0px;
+  --kauro-space-1: 4px;
+  --kauro-space-2: 8px;
+  --kauro-space-3: 12px;
+  --kauro-space-4: 16px;
+  --kauro-space-5: 24px;
+  --kauro-space-6: 32px;
+  --kauro-space-7: 48px;
+  --kauro-space-8: 64px;
+  --kauro-focus-width: 2px;
+  --kauro-focus-offset: 2px;
+  --kauro-radius: 4px;
+}
+html {
+  color: var(--kauro-color-text);
+  background: var(--kauro-color-background);
+  font-family: var(--kauro-font-family);
+  font-size: var(--kauro-font-size-body);
+  line-height: var(--kauro-line-height-body);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+:focus-visible {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  :focus-visible { outline-color: Highlight; }
+}
