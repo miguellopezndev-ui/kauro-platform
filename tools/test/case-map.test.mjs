@@ -30,8 +30,9 @@ function section(title) {
 const OTHER_PACKAGE = /\bB(0[0-57-9]|1\d|2[0-2])\b/;
 
 // The reviewed classification (design D-GATE-1): a case is PARTIAL when a clause of its expected outcome is shown only through
-// a test-bound port (SIMULATED) or belongs to another package's command or aggregate (not demonstrated in B06).
-const PARTIAL = ["S089", "S093", "R2-043", "CMD023-OK", "CMD023-DENY", "CMD025-OK", "CMD025-DENY", "CMD026-OK"];
+// a test-bound port (SIMULATED) or belongs to another package's command or aggregate (not demonstrated in B06). The RACE rows of
+// CMD023, CMD025 and CMD026 commit the successful effect of their PARTIAL OK rows (package-close review, finding B06-R3).
+const PARTIAL = ["S089", "S093", "R2-043", "CMD023-OK", "CMD023-DENY", "CMD023-RACE", "CMD025-OK", "CMD025-DENY", "CMD025-RACE", "CMD026-OK", "CMD026-RACE"];
 
 test("N12: one PARTIAL criterion — exactly the reviewed cases are PARTIAL, each naming its demonstrated half, what B06 does not demonstrate and the package that owns it; no EXECUTED_LOCAL row rests on a SIMULATED clause; an edition constant a row relies on is NOT_APPLICABLE with its reason", () => {
   const partial = rows.filter((r) => r.status.startsWith("PARTIAL"));
@@ -81,6 +82,37 @@ test("N18: every closure gate of B06 has its record — its owner and package, e
       }
     }
   }
+});
+
+test("B06-R3: every case row quotes its registry expected outcome verbatim, and a RACE row claims no more than its command's OK row — a RACE whose OK row is PARTIAL is PARTIAL, names a SIMULATED clause when the OK row does and names every package that owns the OK row's undemonstrated half; an EXECUTED_LOCAL RACE row cites its OK row's test for the successful effect", () => {
+  // Review finding B06-R3: CMD023-RACE, CMD025-RACE and CMD026-RACE had replaced the registry outcome ("<the command's effect>.
+  // Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority.") by a
+  // retry/conflict/crash description and claimed EXECUTED_LOCAL although their successful effect rests on the same SIMULATED
+  // port or later package as their OK row. Every violation is collected, so a failure names each row at once.
+  const cases = [...registry("cases.json"), ...registry("additional_scenarios.json")];
+  const violations = [];
+  for (const row of rows) {
+    const registered = cases.find((c) => c.id === row.caseId);
+    if (registered === undefined) violations.push(`${row.caseId}: not a registry case`);
+    else if (row.expected !== registered.expected) violations.push(`${row.caseId}: the expected column is not the registry's outcome verbatim`);
+  }
+  const packagesOf = (observes) => new Set([...observes.matchAll(/\bB(0[0-57-9]|1\d|2[0-2])\b/g)].map((m) => m[0]));
+  const simulated = (row) => /\*\*SIMULATED\*\*/.test(row.observes);
+  for (const race of rows.filter((r) => r.caseId.endsWith("-RACE"))) {
+    const ok = rows.find((r) => r.caseId === race.caseId.replace(/-RACE$/, "-OK"));
+    if (ok === undefined) {
+      violations.push(`${race.caseId}: no OK row`);
+    } else if (ok.status.startsWith("PARTIAL")) {
+      if (!race.status.startsWith("PARTIAL")) violations.push(`${race.caseId} claims ${race.status} while its successful effect (${ok.caseId}) is PARTIAL`);
+      if (simulated(ok) && !simulated(race)) violations.push(`${race.caseId}: ${ok.caseId} names a SIMULATED clause, which the RACE row does not`);
+      const named = packagesOf(race.observes);
+      for (const pkg of packagesOf(ok.observes)) if (!named.has(pkg)) violations.push(`${race.caseId}: ${ok.caseId} routes a clause to ${pkg}, which the RACE row does not name`);
+    } else {
+      const cited = new Set(race.citations.map((c) => `${c.file} :: ${c.title}`));
+      if (!ok.citations.some((c) => cited.has(`${c.file} :: ${c.title}`))) violations.push(`${race.caseId}: EXECUTED_LOCAL without the test of its successful effect (${ok.caseId})`);
+    }
+  }
+  assert.deepEqual(violations, []);
 });
 
 test("N18: every registry verification clause of B06's command cases is quoted and answered — NOT_APPLICABLE with the package whose domain it is, or the evidence that answers it", () => {
