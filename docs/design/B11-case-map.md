@@ -44,8 +44,8 @@ What the stage-1 mandates delivered, per case (the status column above is update
 
 | case | test file :: exact title | status | commit |
 |---|---|---|---|
-| S067 | `apps/api/test/b11-sessions.test.ts` :: "S067: a revoked or expired session reads nothing — every read with its cookie answers 401, the revoke answer clears the cookie and the site data, is idempotent, and no reply is cacheable" | api half EXECUTED_LOCAL (W2; Windows); browser half PLANNED (W6) | `596765e` |
-| R2-134 | `apps/api/test/b11-sessions.test.ts` :: "R2-134: a session opened after expiry carries no invitation or acceptance state, and sign-in answers the same for an unknown, a disabled and an existing identity" | api half EXECUTED_LOCAL (W2; Windows; identity provider SIMULATED); browser half PLANNED (W6) | `596765e` |
+| S067 | `apps/api/test/b11-sessions.test.ts` :: "S067: a revoked or expired session reads nothing — every read with its cookie answers 401, the revoke answer clears the cookie and the site data, is idempotent, and no reply is cacheable" | api half EXECUTED_LOCAL (W2; Windows); browser half PLANNED (W6) | `0470497` |
+| R2-134 | `apps/api/test/b11-sessions.test.ts` :: "R2-134: a session opened after expiry carries no invitation or acceptance state, and sign-in answers the same for an unknown, a disabled and an existing identity" | api half EXECUTED_LOCAL (W2; Windows; identity provider SIMULATED); browser half PLANNED (W6) | `0470497` |
 
 ## Gates
 
