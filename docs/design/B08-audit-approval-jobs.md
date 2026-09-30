@@ -465,3 +465,30 @@ unreachable platform state, a dangling or duplicated decision and a migration no
 PostgreSQL 17, never a database fake; interleavings by hold points and lock waits in `pg_stat_activity`, never sleeps; tests first;
 `pnpm run verify` green before a mandate reports; the matrix owner rows and served inventory of what a mandate adds; no fake bound by
 a composition root.
+
+## 16. Verification (B08-INTEGRATION)
+
+`b08/integration` from `b08/stage-2` (`2e438b6`; D8-INT-2): `e850128` merges `b08/commands-audit` (`6e9e0d3`), `143e805` renumbers its
+deviations D8-CMA-1..10 (D8-INT-1), `80a4fd3` merges `b08/control-audit` (`c4db743`), `a235af9` adds the end-to-end tests, `2d477e2`
+lands the case-map rows. Conflicts: the decisions register and the case-map header (both kept); the Intelligence-core fake's compiler
+digest (both mandates had adopted KAURO_PLAN_BODY_V1); `tools/matrix.mjs`, where Plan `valid_receipt` and `invalid_receipt_result`
+stay owned by B08 and name both performers (PLAN_VALIDATION for a command's intent, AUDIT_ORCHESTRATION for a system draft; CMD024 is
+served and publishes only `plan.validating.v1`) and CostGrant keeps CMD020's initial PREPARED with the control plane's five
+reconciliation rows. The matrix document was regenerated; OpenAPI, migrations, SQLSTATE, routes and harness exports needed nothing.
+
+`apps/control/test/b08-end-to-end.test.ts` runs both halves over one cluster and one set of labelled fakes: a revision sealed through
+B07's handlers and this control plane, StartAudit to DRAFT_READY, CMD025, B09's `paidPurchase`, CMD036, admission, run, verification
+and publication (package AVAILABLE, job READY, authorization DELIVERED once), then a whole `runCycle` acting on nothing; and the agency's
+decisions (intake, CMD022, CMD024, PLAN_VALIDATION) with CMD021. Its first run failed on the fixture-sealed source (D8-INT-3); no
+product seam failed, so no product code changed.
+
+`pnpm install --frozen-lockfile` then `pnpm run verify` at `2d477e2`:
+
+| host | result | tests (pass / skip) |
+|---|---|---|
+| Windows 11, Node 24.14.1, pnpm 10.16.1, `C:\Tools\pgsql17\bin` | VERIFY_EXIT 0 | contracts 12, domain 117, application 128, persistence 232, authorization 11, data-plane 20, control 35, api 222 + 1 skipped (B06's Linux-only N7), tools 51; 0 failed; 0 postgres processes left |
+| WSL Ubuntu 24.04, fresh clone, Node 24.21.0, `PGBIN=/usr/lib/postgresql/17/bin` | VERIFY_EXIT 0 | the same, api 223; 0 failed; clone removed, 0 postgres processes left |
+
+Both: architecture gate 8 packages, 23 edges, no violation; OpenAPI 48 operations, 0 planned; matrix 28 machines, 252 edges and
+initial states owned, 26 commands, 18 reads, 2 intakes; clean-consume green. The next commit adds this section only. Open for A4: CI,
+the independent review of the exact commit and main.
