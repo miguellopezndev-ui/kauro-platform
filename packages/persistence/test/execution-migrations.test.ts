@@ -23,6 +23,7 @@ import {
   fixtureArtifacts,
   fixtureGeneration,
   launchJob,
+  publishJob,
   queueJob,
   stageJob,
   verifyJob,
@@ -791,4 +792,84 @@ test("D8-PEX-8: the control plane consumes an entitlement only with its job's ad
     throw e;
   }
   assert.deepEqual(await oracle(env, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [standIn.authorizationId]), [{ state: "CONSUMED" }]);
+});
+
+/**
+ * B08-R1 (Codex package-close review of B08): OBJECT_INVENTORY's revokeAdmission of an INCLUDED sealed file of the job's revision
+ * (GENERATION_CHANGED, with its source_file.admission_revoked.v1) as the control plane — the revision itself stays SEALED.
+ */
+async function revokeIncludedFile(c: Client, agencyId: string, projectId: string): Promise<string> {
+  const [f] = (
+    await c.query<{ file_id: string; version: number }>(
+      `SELECT s.file_id, f.version FROM kauro.sealed_revision_files s JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
+         JOIN kauro.dataset_revisions r ON r.agency_id = s.agency_id AND r.revision_id = s.revision_id
+        WHERE r.project_id = $1 AND r.state = 'SEALED' AND s.disposition = 'INCLUDED' ORDER BY s.ordinal LIMIT 1`,
+      [projectId],
+    )
+  ).rows;
+  assert.ok(f, "the revision seals an included file");
+  await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.source_files', $1::uuid::text))", [f.file_id]);
+  const r = await c.query<{ version: number }>(
+    `UPDATE kauro.source_files SET state = 'ADMISSION_REVOKED', admitted = false, revoked_at = kauro.server_now(), revocation_reason = 'GENERATION_CHANGED', version = $2 + 1
+      WHERE file_id = $1 AND version = $2 RETURNING version`,
+    [f.file_id, f.version],
+  );
+  assert.equal(r.rowCount, 1, "the admission is revoked");
+  await commerceEvent(c, "source_file", f.file_id, Number(r.rows[0]!.version), agencyId, "source_file.admission_revoked.v1", { kind: "SERVICE", id: "object-inventory" });
+  return f.file_id;
+}
+
+test("B08-R1 at the database: a package cannot become AVAILABLE once an INCLUDED sealed file of its job's revision lost its admission (GENERATION_CHANGED) although the revision stays SEALED and EXECUTION_CONTROL has not run — the publication waits on the file's transition lock behind the uncommitted revocation and is refused KA081 at COMMIT, a later publication is refused KA081 too, the package stays VERIFIED_PRIVATE, and a neighbour whose files are admitted publishes", async () => {
+  const { A } = env;
+  const verifiedJob = async (seed: string) => {
+    const p = await purchase(env, A, seed);
+    const job = await queueJob(env.h, A, p.authorizationId);
+    await admitJob(env.h, A, job.jobId);
+    await launchJob(env.h, A, job.jobId);
+    await stageJob(env.h, A, job.jobId);
+    const pkg = await verifyJob(env.h, A, job.jobId);
+    return { p, job, pkg };
+  };
+  const publishRaw = (c: Client, v: Awaited<ReturnType<typeof verifiedJob>>, seed: string) =>
+    rawStore(c).publish({ jobId: v.job.jobId, packageVersionId: v.pkg.packageVersionId, deliveryManifestHash: sha(seed), anchorId: ids.next() });
+
+  // --- interleaving: the revocation holds the file's exclusive transition lock; the publication waits for it, then is refused ---------
+  const one = await verifiedJob("b08-r1-revocation-first");
+  const revoker = await env.h.pg.connect("kauro_control_test");
+  let revoked = false;
+  try {
+    await revoker.query("BEGIN");
+    await revoker.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', '', true)", [A.agencyId]);
+    await revokeIncludedFile(revoker, A.agencyId, one.p.projectId);
+    await env.control.query("BEGIN");
+    try {
+      await env.control.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', '', true)", [A.agencyId]);
+      const pid = await backendPid(env.control);
+      const publication = publishRaw(env.control, one, "b08-r1-one");
+      const seen = await settlesOrWaits(env.h.oracle, pid, publication, "the publication behind the uncommitted revocation of an included file");
+      await revoker.query("COMMIT");
+      revoked = true;
+      if (seen.kind === "WAITING") assert.equal((await seen.pending).status, "fulfilled", "the publication writes its edges; the database decides at COMMIT");
+      await assert.rejects(env.control.query("COMMIT"), (e: unknown) => sqlState(e) === "KA081", "no package becomes AVAILABLE once an included file's admission is revoked");
+      assert.equal(seen.kind, "WAITING", "the publication waited for the revocation on the file's transition lock");
+    } catch (e) {
+      await env.control.query("ROLLBACK").catch(() => undefined);
+      throw e;
+    }
+  } finally {
+    if (!revoked) await revoker.query("ROLLBACK").catch(() => undefined);
+    await revoker.end();
+  }
+  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.dataset_revisions r JOIN kauro.projects p ON p.current_revision_id = r.revision_id WHERE p.project_id = $1", [one.p.projectId]), [{ state: "SEALED" }], "the revision itself is still SEALED");
+  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [one.pkg.packageVersionId]), [{ state: "VERIFIED_PRIVATE" }]);
+  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [one.p.authorizationId]), [{ state: "CONSUMED" }], "never DELIVERED");
+
+  // --- after the revocation committed: refused again (the EXECUTION_CONTROL event is still undelivered) -------------------------------
+  await refusedTransaction(env.control, service(A.agencyId), (c) => publishRaw(c, one, "b08-r1-again"), "KA081", "a publication after the committed revocation");
+  await endJob(env.h, A, one.job.jobId, "SOURCE_ADMISSION_REVOKED");
+
+  // the neighbour: its revision's files admitted, the same publication commits
+  const neighbour = await verifiedJob("b08-r1-neighbour");
+  assert.equal((await publishJob(env.h, A, neighbour.job.jobId)).kind, "PUBLISHED");
+  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [neighbour.pkg.packageVersionId]), [{ state: "AVAILABLE" }]);
 });

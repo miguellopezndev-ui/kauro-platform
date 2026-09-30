@@ -7,10 +7,14 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { after, before, test } from "node:test";
-import { attemptScratchDirectoryOf } from "@kauro/data-plane";
+import { attemptScratchDirectoryOf, removeAttemptScratch } from "@kauro/data-plane";
+import type { AgencyId, ProcessingAttemptId } from "@kauro/domain";
+import { StagingJanitor } from "../src/index.js";
 import { admitted, ids, launched, startExecutionWorld, type ExecutionWorld } from "./support/execution-world.js";
 
 let w: ExecutionWorld;
+/** The first retry of a PARTIAL cleanup is due this long after it (later retries back off, doubling). */
+const CLEANUP_RETRY_SECONDS = 300;
 
 before(async () => {
   w = await startExecutionWorld("janitor");
@@ -122,5 +126,117 @@ test("S075: the worker dies and its lease lapses; STAGING_JANITOR terminates exa
   await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
   await w.drain(w.x.consumers.jobExecution);
   assert.deepEqual([(await w.job(jobId)).state, (await w.job(jobId)).fence], ["READY", "2"]);
+  await w.quiesce();
+});
+
+/** The S075 setup: an agent dies before its manifest and its lease lapses — attempt 1 ABANDONED with its artifact and scratch left behind. */
+async function abandonedAttempt(label: string) {
+  await w.quiesce(); // the platform's one ACTIVE slot free, whatever an earlier case left
+  const A = await w.agency(label);
+  const p = await w.paid(A, label);
+  const { jobId, identity } = await admitted(w, p);
+  w.host.crashAt("manifest", identity, "RUNNING");
+  await launched(w, jobId);
+  await w.host.settled(identity);
+  await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
+  w.advance(150);
+  await w.x.sweepers.attemptMonitor.sweep(w.units, 20);
+  const lost = await w.attempt(jobId, 1);
+  assert.equal(lost.state, "ABANDONED");
+  assert.ok(existsSync(attemptScratchDirectoryOf(w.scratchRoot, lost.attempt_id)), "its scratch is left behind");
+  return { agencyId: A.agencyId as AgencyId, jobId, identity, attemptId: lost.attempt_id as ProcessingAttemptId, prefix: lost.staging_prefix };
+}
+
+/** A janitor of the same control plane whose scratch removal fails with a file-system error while `failing()` says so. */
+function janitorWithScratchFailure(failing: () => boolean): StagingJanitor {
+  return new StagingJanitor({
+    ids,
+    units: w.units,
+    pipeline: w.x.pipeline,
+    host: w.host,
+    storage: w.storage,
+    workerScratchRoot: w.scratchRoot,
+    retryAfterSeconds: 30,
+    removeScratch: (root, attemptId) => {
+      if (failing()) throw Object.assign(new Error(`EIO: i/o error, rmdir '${attemptId}'`), { code: "EIO" });
+      return removeAttemptScratch(root, attemptId);
+    },
+  });
+}
+
+async function cleanupsOf(attemptId: string) {
+  return (
+    await w.h.oracle.query<{ result: string; scratch_deleted: boolean; machine_type: string | null; cost_micros: string | null; runtime_ms: string | null; currency: string | null }>(
+      "SELECT result, scratch_deleted, machine_type, cost_micros, runtime_ms, currency FROM kauro.attempt_cleanups WHERE attempt_id = $1 ORDER BY recorded_at, cleanup_id",
+      [attemptId],
+    )
+  ).rows;
+}
+
+test("B08-R2 (S035, S075): a transient file-system failure of the scratch removal records a PARTIAL cleanup and the attempt stays discoverable — a later STAGING_JANITOR sweep removes its scratch and records CLEANED; after that nothing is cleaned twice", async () => {
+  const lost = await abandonedAttempt("b08r2-retry");
+  let failures = 1;
+  const flaky = janitorWithScratchFailure(() => failures-- > 0);
+  assert.deepEqual(await flaky.clean(lost.attemptId, lost.agencyId), { kind: "APPLIED", what: "PARTIAL" });
+  assert.deepEqual((await cleanupsOf(lost.attemptId)).map((c) => [c.result, c.scratch_deleted]), [["PARTIAL", false]]);
+  assert.ok(existsSync(attemptScratchDirectoryOf(w.scratchRoot, lost.attemptId)), "the scratch survived the failed removal");
+  assert.deepEqual(await w.objectsUnder("STAGING", lost.prefix), [], "the objects were deleted in the first pass");
+
+  // the file system recovers; the platform's own janitor finds the attempt again once its retry is due
+  w.advance(CLEANUP_RETRY_SECONDS);
+  await w.x.sweepers.stagingJanitor.sweep(w.units, 50);
+  assert.equal(existsSync(attemptScratchDirectoryOf(w.scratchRoot, lost.attemptId)), false, "its scratch is removed by the retry");
+  assert.deepEqual((await cleanupsOf(lost.attemptId)).map((c) => [c.result, c.scratch_deleted]), [["PARTIAL", false], ["CLEANED", true]]);
+
+  // CLEANED is final: neither a sweep nor a direct call cleans it again
+  w.advance(CLEANUP_RETRY_SECONDS * 16);
+  await w.x.sweepers.stagingJanitor.sweep(w.units, 50);
+  assert.deepEqual(await w.x.sweepers.stagingJanitor.clean(lost.attemptId, lost.agencyId), { kind: "REFUSED", reason: "NOT_TO_CLEAN" });
+  assert.equal((await cleanupsOf(lost.attemptId)).length, 2);
+  await w.quiesce();
+});
+
+test("B08-R2 bound: a scratch removal that keeps failing is retried a bounded number of times — five PARTIAL records, never a sixth; the attempt then leaves discovery and a direct call refuses it", async () => {
+  const lost = await abandonedAttempt("b08r2-bound");
+  const broken = janitorWithScratchFailure(() => true);
+  for (let pass = 1; pass <= 5; pass += 1) {
+    assert.deepEqual(await broken.clean(lost.attemptId, lost.agencyId), { kind: "APPLIED", what: "PARTIAL" }, `pass ${pass}`);
+    w.advance(CLEANUP_RETRY_SECONDS * 16);
+  }
+  assert.deepEqual(await broken.clean(lost.attemptId, lost.agencyId), { kind: "REFUSED", reason: "NOT_TO_CLEAN" });
+  await w.x.sweepers.stagingJanitor.sweep(w.units, 50);
+  assert.deepEqual((await cleanupsOf(lost.attemptId)).map((c) => c.result), ["PARTIAL", "PARTIAL", "PARTIAL", "PARTIAL", "PARTIAL"], "bounded: the sweep did not select it again");
+  assert.ok(existsSync(attemptScratchDirectoryOf(w.scratchRoot, lost.attemptId)), "left for an operator, recorded PARTIAL");
+  await w.quiesce();
+});
+
+test("B08-R4 (S075): a transient timeout of the host's resource report does not finalize the cleanup without its cost — the pass stays open (not CLEANED) with the report pending, and once the host answers again the next sweep records CLEANED with the VM, disk, runtime and cost it reports", async () => {
+  const lost = await abandonedAttempt("b08r4");
+  const host = w.host as { resources: typeof w.host.resources };
+  const original = host.resources;
+  host.resources = async () => {
+    throw Object.assign(new Error("ETIMEDOUT: the host's usage report timed out"), { code: "ETIMEDOUT" });
+  };
+  try {
+    await w.x.sweepers.stagingJanitor.clean(lost.attemptId, lost.agencyId);
+  } finally {
+    host.resources = original;
+  }
+  const first = await cleanupsOf(lost.attemptId);
+  assert.equal(first.length, 1);
+  assert.deepEqual([first[0]!.scratch_deleted, first[0]!.machine_type], [true, null], "deleted, but no report yet");
+  assert.notEqual(first[0]!.result, "CLEANED", "never final without the host's report");
+
+  w.advance(CLEANUP_RETRY_SECONDS);
+  await w.x.sweepers.stagingJanitor.sweep(w.units, 50);
+  const report = await w.host.resources(lost.identity);
+  assert.ok(report.outcome === "REPORTED");
+  const all = await cleanupsOf(lost.attemptId);
+  const last = all[all.length - 1]!;
+  assert.deepEqual(
+    [last.result, last.machine_type, Number(last.runtime_ms), Number(last.cost_micros), last.currency],
+    ["CLEANED", report.resources.machineType, report.resources.runtimeMs, report.resources.costMicros, report.resources.currency],
+    "the cost evidence the host reported once it answered",
+  );
   await w.quiesce();
 });

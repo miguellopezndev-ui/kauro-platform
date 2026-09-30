@@ -74,6 +74,7 @@ import {
   type ProcessingJobRecord,
   type ProjectId,
   type RevisionId,
+  type SourceFileId,
   type SourceUnitOfWork,
   type UnitOfWorkOptions,
   type UserId,
@@ -92,7 +93,7 @@ import {
   type Harness,
   type QualifiedRoute,
 } from "@kauro/persistence/testing";
-import { assembleControlPlane, platformParsers, type AuditUnits, type ControlPlane, type DispatchCounts, type ExecutionPlane, type ValidationReceipts } from "../../src/index.js";
+import { assembleControlPlane, boundTo, platformParsers, publish, type AuditUnits, type ControlPlane, type DispatchCounts, type ExecutionPlane, type ValidationReceipts } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -341,6 +342,12 @@ export interface ExecutionWorld {
   withdrawApproval(p: Purchase): Promise<void>;
   /** CMD012's write: a successor revision supersedes the purchase's sealed source, with its events. */
   supersedeSource(p: Purchase): Promise<void>;
+  /**
+   * OBJECT_INVENTORY's revokeAdmission of the first INCLUDED sealed file of the purchase's revision (GENERATION_MISSING or
+   * GENERATION_CHANGED) with its source_file.admission_revoked.v1, as the control plane writes it; the revision stays SEALED and
+   * EXECUTION_CONTROL has not read the event until a test drains it (B08-R1).
+   */
+  revokeIncludedFile(p: Purchase, reason: "GENERATION_MISSING" | "GENERATION_CHANGED"): Promise<string>;
   /** The retention sweeper's retention_expires of the purchase's source (the harness, fifteen days ahead on the TEST CLOCK). */
   expireSource(p: Purchase): Promise<void>;
   /** A newer observation supersedes the purchase's target contract (the request handlers' write). */
@@ -847,6 +854,36 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         const moved = applied(await uow.sources.projects.switchCurrentRevision(p.projectId, project.version, successorId, clock.now()), "the current revision");
         await publish("project", p.projectId, moved.version, "project.current_revision_changed.v1", { projectId: p.projectId, agencyId: p.agency.agencyId, currentRevisionId: successorId, previousRevisionId: p.revisionId, changedByMembershipId: p.agency.ownerMembershipId });
       });
+    },
+
+    async revokeIncludedFile(p, reason) {
+      const [row] = (
+        await h.oracle.query<{ file_id: string }>(
+          "SELECT file_id FROM kauro.sealed_revision_files WHERE revision_id = $1 AND disposition = 'INCLUDED' ORDER BY ordinal LIMIT 1",
+          [p.revisionId],
+        )
+      ).rows;
+      assert.ok(row, "the revision seals an included file");
+      const fileId = row.file_id as SourceFileId;
+      const item = { serviceId: "object-inventory", agencyId: p.agency.agencyId, correlationId: ids.next() as CorrelationId, causationId: ids.next() as CausationId };
+      await units.runSource(boundTo(item), async (uow) => {
+        const found = await uow.sources.files.get(fileId);
+        assert.ok(found && found.state === "ADMITTED", "the file is admitted");
+        // the revision row first, then the file (B07 D-LOCK-2), as OBJECT_INVENTORY takes them
+        assert.ok(await uow.sources.revisions.lock(found.originRevisionId));
+        const selectedBy = await uow.sources.files.selectedBy(fileId);
+        const sealedBy = await uow.sources.files.sealedBy(fileId);
+        const record = applied(await uow.sources.files.revokeAdmission(fileId, found.version, reason), "admission revocation");
+        await publish(uow, item, "source_file", fileId, record.version, "source_file.admission_revoked.v1", {
+          fileId,
+          agencyId: p.agency.agencyId,
+          projectId: found.projectId,
+          revocationReason: reason,
+          selectedByRevisionIds: [...selectedBy],
+          sealedByRevisionIds: [...sealedBy],
+        });
+      });
+      return fileId;
     },
 
     async expireSource(p) {

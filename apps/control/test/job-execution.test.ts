@@ -11,7 +11,9 @@ import { existsSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { readStagedManifest } from "@kauro/application";
 import { attemptScratchDirectoryOf } from "@kauro/data-plane";
-import type { ProcessingAttemptId, ProcessingJobId } from "@kauro/domain";
+import type { AuditUnitOfWork, ExecutionContext, ProcessingAttemptId, ProcessingJobId, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
+import type { AuditUnits } from "../src/index.js";
+import { deliveryObjectNameOf } from "../src/execution/names.js";
 import { admitted, launched, observedDone, startExecutionWorld, verifiedPrivate, type ExecutionWorld, type Purchase } from "./support/execution-world.js";
 
 let w: ExecutionWorld;
@@ -276,6 +278,36 @@ test("stale authority at publication: a source revision superseded or expired, a
   await w.quiesce();
 });
 
+test("B08-R1: an INCLUDED sealed file whose admission OBJECT_INVENTORY revoked (GENERATION_CHANGED) after verification — the revision still SEALED, the event not yet read by EXECUTION_CONTROL — refuses JOB_EXECUTION's publication with SOURCE_ADMISSION_REVOKED, the package REVOKED and never AVAILABLE, and the delayed event then finds nothing to repair; revoked (GENERATION_MISSING) before admission, JOB_ADMISSION cancels the QUEUED job with that reason and consumes nothing", async () => {
+  const A = await w.agency("b08r1");
+  const p = await w.paid(A, "b08r1-publication");
+  const { jobId } = await verifiedPrivate(w, p);
+  await w.revokeIncludedFile(p, "GENERATION_CHANGED");
+  assert.equal((await w.h.oracle.query<{ state: string }>("SELECT state FROM kauro.dataset_revisions WHERE revision_id = $1", [p.revisionId])).rows[0]?.state, "SEALED", "the revision itself is unchanged");
+  const step = await w.x.pipeline.publish(jobId as ProcessingJobId);
+  assert.deepEqual(step, { kind: "REFUSED", reason: "SOURCE_ADMISSION_REVOKED" });
+  const cancelling = await w.job(jobId);
+  assert.deepEqual([cancelling.state, cancelling.cancel_reason_code], ["CANCEL_REQUESTED", "SOURCE_ADMISSION_REVOKED"]);
+  const [pkg] = await w.packages(jobId);
+  assert.deepEqual([pkg?.state, pkg?.revocation_reason], ["REVOKED", "SOURCE_ADMISSION_REVOKED"]);
+  // the delayed event reaches EXECUTION_CONTROL afterwards: the job ends CANCELLED, never READY, the entitlement never DELIVERED
+  await w.drain(w.x.consumers.executionControl);
+  await w.x.cancellations.reconcile(jobId as ProcessingJobId);
+  assert.equal((await w.job(jobId)).state, "CANCELLED");
+  assert.ok(!(await w.events(pkg!.package_version_id)).some((e) => e.event_type === "package_version.available.v1"), "never AVAILABLE");
+  assert.equal((await w.authorization(p.authorizationId)).state, "CONSUMED");
+
+  // revoked before admission (the event still undelivered): the admission's authority read refuses it
+  const q = await w.paid(A, "b08r1-admission");
+  const queued = await w.queue(q);
+  await w.revokeIncludedFile(q, "GENERATION_MISSING");
+  await w.x.sweepers.jobAdmission.admitRound();
+  const row = await w.job(queued.jobId);
+  assert.deepEqual([row.state, row.cancel_reason_code], ["CANCELLED", "SOURCE_ADMISSION_REVOKED"]);
+  assert.notEqual((await w.authorization(q.authorizationId)).state, "CONSUMED", "nothing consumed");
+  await w.quiesce();
+});
+
 test("R2-045: a reversal revokes the consumed authorization while the worker is still producing a valid package — EXECUTION_CONTROL requests the job's cancellation, the package is verified but never AVAILABLE, it ends REVOKED with its evidence retained privately, and the authorization is never DELIVERED", async () => {
   const p = await w.paid(await w.agency("r2045"), "r2045");
   const { jobId, identity } = await admitted(w, p);
@@ -344,5 +376,84 @@ test("JOB_DEADLINES expires a launched job at its execution deadline on the serv
   assert.deepEqual(await w.capacity(A.agencyId), { active: 0, waiting: 0, live: 0 });
   assert.equal((await w.authorization(p.authorizationId)).state, "CONSUMED", "an expiry is never a delivery");
   await w.host.settled(identity);
+  await w.quiesce();
+});
+
+/**
+ * The control plane's units of work with a process crash: once `recordReadback` has run in a unit of work (and that unit committed),
+ * the next `lockJob` throws — the process died after the delivery copies and their read-backs committed, before failFor (B08-R3).
+ */
+function crashAfterReadbacks(inner: AuditUnits): AuditUnits {
+  let readBack = false;
+  let crashed = false;
+  const instrument = <U extends object>(uow: U): U =>
+    new Proxy(uow, {
+      get(target, prop) {
+        const value = Reflect.get(target, prop, target) as unknown;
+        if (prop !== "execution") return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+        const store = value as Record<string | symbol, unknown>;
+        return new Proxy(store, {
+          get(s, p) {
+            const fn = Reflect.get(s, p, s) as unknown;
+            if (typeof fn !== "function") return fn;
+            const bound = (fn as (...args: unknown[]) => unknown).bind(s);
+            if (p === "recordReadback") {
+              return async (...args: unknown[]) => {
+                const out = await bound(...args);
+                readBack = true;
+                return out;
+              };
+            }
+            if (p === "lockJob") {
+              return async (...args: unknown[]) => {
+                if (readBack && !crashed) {
+                  crashed = true;
+                  throw new Error("SIMULATED CRASH: the process died after the delivery read-backs committed");
+                }
+                return bound(...args);
+              };
+            }
+            return bound;
+          },
+        });
+      },
+    });
+  return new Proxy(inner, {
+    get(target, prop) {
+      if (prop === "run") return <T>(context: ExecutionContext, work: (uow: AuditUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions) => target.run(context, (uow) => work(instrument(uow)), options);
+      if (prop === "runSource") return <T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions) => target.runSource(context, (uow) => work(instrument(uow)), options);
+      const value = Reflect.get(target, prop, target) as unknown;
+      return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+}
+
+test("B08-R3 (S061): a delivery read-back that returns a partial blob, the process crashing after the copy and its negative read-back committed and before the job failed — the replayed package_version.verified_private.v1 re-derives DELIVERY_READBACK_PARTIAL_BLOB from the recorded read-back, fails the job, revokes the private package and releases the ACTIVE slot, never AVAILABLE", async () => {
+  await w.quiesce();
+  const p = await w.paid(await w.agency("b08r3"), "b08r3");
+  const { jobId } = await verifiedPrivate(w, p);
+  const [pkg] = await w.packages(jobId);
+  const attemptId = pkg!.attempt_id;
+  // one delivery copy's destination already holds a partial blob: the copy's precondition fails, the existing object is read back
+  const prefix = (await w.h.oracle.query<{ delivery_prefix: string }>("SELECT delivery_prefix FROM kauro.package_versions WHERE package_version_id = $1", [pkg!.package_version_id])).rows[0]!.delivery_prefix;
+  const staged = (await w.h.oracle.query<{ object_name: string }>("SELECT object_name FROM kauro.staged_artifacts WHERE attempt_id = $1 ORDER BY object_name LIMIT 1", [attemptId])).rows[0]!.object_name;
+  w.storage.plantObject(w.storage.location("DELIVERY"), deliveryObjectNameOf(prefix, staged), Buffer.from("partial"));
+
+  // the crashed process: the copies and their read-backs commit, then it dies before failFor
+  const crashed = w.planeWith({ units: crashAfterReadbacks(w.units) }).execution!;
+  await crashed.pipeline.publish(jobId as ProcessingJobId).catch(() => undefined);
+  const recorded = (await w.h.oracle.query<{ result: string }>("SELECT result FROM kauro.artifact_readbacks WHERE attempt_id = $1 AND kind = 'DELIVERY'", [attemptId])).rows.map((r) => r.result);
+  assert.ok(recorded.includes("MISMATCH"), "the negative delivery read-back committed");
+  assert.equal((await w.job(jobId)).state, "VERIFYING", "the crash came before the job failed");
+
+  // the storage is restored (nothing to repair there: the recorded copy stands) and the event is replayed
+  const event = await w.eventOf(pkg!.package_version_id, "package_version.verified_private.v1");
+  await w.redeliver(w.x.consumers.jobExecution, event);
+  const job = await w.job(jobId);
+  assert.deepEqual([job.state, job.terminal_reason], ["FAILED", "DELIVERY_READBACK_PARTIAL_BLOB"], "the classified failure is re-derived from the recorded read-back");
+  const [after] = await w.packages(jobId);
+  assert.equal(after?.state, "REVOKED", "the private package is revoked");
+  assert.deepEqual([job.holds, (await w.capacity()).active], ["NONE", 0], "the ACTIVE slot is released");
+  assert.ok(!(await w.events(pkg!.package_version_id)).some((e) => e.event_type === "package_version.available.v1"), "never AVAILABLE");
   await w.quiesce();
 });

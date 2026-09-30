@@ -36,6 +36,8 @@ export interface StagingJanitorDependencies {
   /** Where the worker host keeps the attempts' scratch (the host's disk; B14 binds the Batch VM's). */
   readonly workerScratchRoot: string;
   readonly retryAfterSeconds: number;
+  /** Removes exactly one attempt's scratch (@kauro/data-plane removeAttemptScratch; a test injects a file-system failure here). */
+  readonly removeScratch?: (root: string, attemptId: ProcessingAttemptId) => unknown;
 }
 
 export class StagingJanitor implements ExecutionSweeper {
@@ -142,7 +144,7 @@ export class StagingJanitor implements ExecutionSweeper {
     // 3. exactly its scratch
     let scratchDeleted = false;
     try {
-      removeAttemptScratch(this.deps.workerScratchRoot, attempt.attemptId);
+      (this.deps.removeScratch ?? removeAttemptScratch)(this.deps.workerScratchRoot, attempt.attemptId);
       scratchDeleted = true;
     } catch {
       scratchDeleted = false;
