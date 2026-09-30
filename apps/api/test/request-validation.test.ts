@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, B07_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, EXECUTION_COMMANDS, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, SOURCE_INTAKE_ROUTES, SOURCE_REQUEST_SCHEMA_IDS, requestSchemaId } from "@kauro/application";
+import { AUDIT_COMMANDS, AUDIT_REQUEST_SCHEMA_IDS, B06_COMMANDS, B07_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, EXECUTION_COMMANDS, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, INTAKE_ROUTES, SOURCE_REQUEST_SCHEMA_IDS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -229,8 +229,8 @@ test("the correlation id is echoed when supplied, generated otherwise, and prese
 
 test("exactly the thirteen catalogue routes and the selection manifest intake are registered as POST and the twelve reads as GET, under /api/v1", async () => {
   const reads = new Set(Object.values(READ_ROUTES).map((r) => r.path));
-  const commands = [...Object.values(B06_COMMANDS), ...Object.values(B07_COMMANDS), ...Object.values(EXECUTION_COMMANDS)];
-  const intakes = Object.values(SOURCE_INTAKE_ROUTES).map((r) => r.path);
+  const commands = [...Object.values(B06_COMMANDS), ...Object.values(B07_COMMANDS), ...Object.values(EXECUTION_COMMANDS), ...Object.values(AUDIT_COMMANDS)];
+  const intakes = Object.values(INTAKE_ROUTES).map((r) => r.path);
   for (const spec of commands) {
     assert.ok(w.app.hasRoute({ method: "POST", url: fastifyPath(spec.path) }), spec.path);
     // a command path is readable only where manual 10 names the read on the same path (GET /agencies, GET .../clients)
@@ -251,18 +251,20 @@ test("exactly the thirteen catalogue routes and the selection manifest intake ar
   for (const path of commercePosts) assert.ok(w.app.hasRoute({ method: "POST", url: path }) && path.startsWith("/api/v1/"), path);
   for (const path of commerceGets) assert.ok(w.app.hasRoute({ method: "GET", url: path }) && path.startsWith("/api/v1/"), path);
   const inventory = routeInventoryOf(w.app);
-  // B06's seven commands, B07's six (design §11), B08's two (design §12) and the selection manifest intake (D-SEL-2); beside them every served route of
+  // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12) and the selection manifest and
+  // decision artifact intakes (D-SEL-2, D8-CAU-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url)).length, 16);
-  // the five manual-10 reads, the seven source reads (B07 design §9.1) and GetJob (B08 design §12)
-  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url)).length, 13);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url)).length, 21);
+  // the five manual-10 reads, the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12)
+  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url)).length, 14);
   assert.deepEqual(inventory.filter((r) => commercePosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercePosts].sort());
   assert.deepEqual(inventory.filter((r) => commerceGets.has(r.url) && r.method === "GET").map((r) => r.url).sort(), [...commerceGets].sort());
   // each route validates its body against its own closed request schema
   for (const id of Object.keys(B06_COMMANDS) as Array<keyof typeof B06_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
   for (const id of SOURCE_REQUEST_SCHEMA_IDS) assert.ok(w.validator.knownSchemaIds.includes(id), id);
-  for (const route of Object.values(SOURCE_INTAKE_ROUTES)) assert.ok(w.validator.knownSchemaIds.includes(route.schemaId), route.schemaId);
+  for (const id of AUDIT_REQUEST_SCHEMA_IDS) assert.ok(w.validator.knownSchemaIds.includes(id), id);
+  for (const route of Object.values(INTAKE_ROUTES)) assert.ok(w.validator.knownSchemaIds.includes(route.schemaId), route.schemaId);
   for (const id of COMMERCE_SERVED_COMMAND_IDS) assert.ok((w.validator.knownSchemaIds as ReadonlyArray<string>).includes(`${REQUEST_SCHEMA_PREFIX}${id}`), id);
 });
 

@@ -109,6 +109,7 @@ const NEXT_ACTIONS: Readonly<Record<FailureCode, ReadonlyArray<NextAction>>> = O
  */
 const REASON_NEXT_ACTIONS: Readonly<Record<string, ReadonlyArray<NextAction>>> = Object.freeze({
   JOB_TERMINAL: [],
+  AUDIT_TERMINAL: [],
   JOB_ALREADY_READY: [],
 });
 

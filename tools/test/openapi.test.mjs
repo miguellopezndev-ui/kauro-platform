@@ -27,7 +27,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; D8-API-1)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CAU-7)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -35,6 +35,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId} GetAgency",
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
@@ -52,6 +53,9 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
+      "POST /api/v1/audits/{auditId}/cancel CancelAudit",
+      "POST /api/v1/audits/{auditId}/decision-artifacts SubmitDecisionArtifact",
+      "POST /api/v1/audits/{auditId}/plans CreatePlan",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
       "POST /api/v1/jobs/{jobId}/cancel CancelJob",
@@ -60,6 +64,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
+      "POST /api/v1/plans/{planId}/validate ValidatePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
       "POST /api/v1/projects/{projectId}/execute ExecuteProject",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
@@ -67,6 +72,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
       "POST /api/v1/refunds/{refundId}/approve ApproveRefund",
       "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",
+      "POST /api/v1/revisions/{revisionId}/audits StartAudit",
       "POST /api/v1/revisions/{revisionId}/seal SealRevision",
       "POST /api/v1/revisions/{revisionId}/selection SelectInputTables",
       "POST /api/v1/revisions/{revisionId}/selection-manifests SubmitSelectionManifest",
@@ -297,4 +303,29 @@ test("B09: the payment routes are documented from their contracts — a served o
   const leaks = check({ document: leaking });
   assert.ok(leaks.some((f) => f.startsWith("DTO exposes a forbidden field: POST /api/v1/projects/{projectId}/refund-requests 201")), leaks.join("\n"));
   assert.ok(leaks.some((f) => f.startsWith("DTO exposes a forbidden field: planned POST /api/v1/refunds/{refundId}/approve-again 200")), leaks.join("\n"));
+});
+
+test("B08-COMMANDS-AUDIT: the audit routes are documented from their contracts — the four commands with the registry's paths, StartAudit and ValidatePlan as ACCEPTED, GetAudit as a read and the decision artifact intake with its closed envelope, 201 stored and 200 the same document again", () => {
+  const audits = committed.paths["/api/v1/revisions/{revisionId}/audits"].post;
+  assert.equal(audits.operationId, "StartAudit");
+  assert.deepEqual(Object.keys(audits.responses).filter((status) => status.startsWith("2")), ["202"]);
+  assert.deepEqual(audits.responses["202"].content["application/json"].schema, { $ref: "#/components/schemas/AcceptedResponse" });
+  assert.match(audits.responses["202"].description, /GetAudit/);
+  const validate = committed.paths["/api/v1/plans/{planId}/validate"].post;
+  assert.equal(validate.operationId, "ValidatePlan");
+  assert.deepEqual(validate.responses["202"].content["application/json"].schema, { $ref: "#/components/schemas/AcceptedResponse" });
+  const cancel = committed.paths["/api/v1/audits/{auditId}/cancel"].post;
+  assert.deepEqual(Object.keys(cancel.responses).filter((status) => status.startsWith("2")), ["200"]);
+  const plans = committed.paths["/api/v1/audits/{auditId}/plans"].post;
+  assert.deepEqual(Object.keys(plans.responses).filter((status) => status.startsWith("2")), ["201"]);
+  const read = committed.paths["/api/v1/audits/{auditId}"].get;
+  assert.equal(read["x-kauro-read"], true);
+  const intake = committed.paths["/api/v1/audits/{auditId}/decision-artifacts"].post;
+  assert.equal(intake["x-kauro-intake"], true);
+  assert.ok(!intake.parameters.some((p) => p.$ref === "#/components/parameters/IdempotencyKey"));
+  assert.deepEqual(intake.requestBody.content["application/json"].schema, { $ref: "#/components/schemas/DecisionArtifactDocument" });
+  for (const status of ["200", "201"]) assert.deepEqual(intake.responses[status].content["application/json"].schema, { $ref: "#/components/schemas/SubmitDecisionArtifactReply" });
+  const envelope = committed.components.schemas.DecisionArtifactDocument;
+  assert.equal(envelope.additionalProperties, false, "the envelope is closed");
+  assert.deepEqual([...envelope.required].sort(), ["document", "kind"]);
 });

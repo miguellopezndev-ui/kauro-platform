@@ -1,0 +1,79 @@
+/**
+ * Closed response views of the audit package (B08; docs/design/B08-audit-approval-jobs.md §12, D8-API-1), declared exactly as B06, B07 and
+ * the execution package declare their own (api/response-schemas, decision D-RESP-1 of B06): a view that projects a registry contract
+ * (Audit) takes every selected member from the generated registry bundle, may only narrow it by adding a keyword, keeps what the registry
+ * requires required, and lists every registry member it does not select as withheld with the reason. Every object is closed.
+ *
+ * The AuditView is the safe progress of an audit (10 "Responses and safe errors": never a provider identity, a prompt or a customer
+ * value): the sealed source and the target are named by id only, the grant by its classification and state, the pending decisions and the
+ * unsupported capabilities by stable finding codes.
+ */
+import { RESPONSE_FIELD_VOCABULARY, VIEW_MEMBER_KIT, type ViewDefinition } from "../api/view-kit.js";
+import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS } from "./views.js";
+import { COST_GRANT_STATES, DECISION_ARTIFACT_KINDS } from "@kauro/domain";
+
+const { ID, HASH, UTC } = RESPONSE_FIELD_VOCABULARY;
+const { registry, platform, NARROW_ID } = VIEW_MEMBER_KIT;
+
+/** A finding or reason code: a token the database's kauro.is_token admits (^[A-Z][A-Z0-9_]{2,63}$). */
+const TOKEN = Object.freeze({ type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" });
+/** A finding list: the database bounds it at 64 entries (audits_finding_codes_bounded). */
+const FINDINGS = Object.freeze({ type: "array", maxItems: 64, items: TOKEN });
+
+const AUDIT_ACTIONS_SCHEMA = Object.freeze({ type: "array", maxItems: AUDIT_RESOURCE_ACTIONS.length, items: { type: "string", enum: [...AUDIT_RESOURCE_ACTIONS] } });
+const AUDIT_ACTIONS_DESCRIPTION =
+  "The audit commands the caller may issue on this audit, derived server-side from the caller's role and the audit's state (CancelAudit while it is live, CreatePlan once it needs a decision); informative, never authority (B06 D-PERM-1).";
+
+/** The success reply of each audit command: CMD020 and CMD024 answer B06's ACCEPTED envelope; CMD021 the audit; CMD022 the plan it created. */
+export const AUDIT_COMMAND_RESPONSES = Object.freeze({
+  CMD020: { status: 202, view: null },
+  CMD021: { status: 200, view: "AuditView" },
+  CMD022: { status: 201, view: "PlanView" },
+  CMD024: { status: 202, view: null },
+} as const);
+
+export const AUDIT_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
+  {
+    name: "AuditView",
+    description:
+      "An audit's safe progress (10 \"Long work returns 202 with operationId, current state, status URL and allowed polling guidance\"; design B08 §12): its durable phase, deadlines, grant classification and state, pending decisions or unsupported capabilities and its draft plan — never a provider identity, a prompt, the sealed source's or the target's hash or a customer value.",
+    contract: "Audit",
+    withheld: {
+      interpretationDeadline:
+        "Served as the optional interpretationDeadlineAt: the registry requires the deadline, but an audit that has not reached INTERPRETING has none yet (it is stamped once, by the database, at the first INTERPRETING).",
+    },
+    members: {
+      auditId: registry(true, NARROW_ID),
+      revisionId: registry(true, NARROW_ID),
+      targetContractId: registry(true, NARROW_ID),
+      state: registry(true),
+      version: registry(true),
+      startedAt: registry(true),
+      interpretationDeadlineAt: platform(false, UTC, "No new semantic dispatch after this instant (the first INTERPRETING plus the interpretation window); absent until the audit reaches INTERPRETING and kept afterwards."),
+      absoluteDeadline: registry(true),
+      grantId: registry(true, NARROW_ID),
+      grantClass: platform(true, { type: "string", enum: [...AUDIT_GRANT_CLASSES] }, "How the audit's grant is classified: FREE_AUDIT, carved from the platform's funded pool (D8-GRANT-1); never the pool's identity or the funding authorization."),
+      grantState: platform(true, { type: "string", enum: [...COST_GRANT_STATES] }, "The audit grant's state (PREPARED, AUTHORIZED, EXHAUSTED, EXPIRED or CLOSED)."),
+      candidateManifestHash: registry(false),
+      cancelVersion: registry(true),
+      pendingDecisions: platform(false, FINDINGS, "The decisions the customer owes, as stable finding codes (NEEDS_DECISION only); never a column name or a cell value."),
+      unsupportedCapabilities: platform(false, FINDINGS, "The capabilities the audit could not plan, as stable finding codes (UNSUPPORTED only)."),
+      terminalReason: platform(false, TOKEN, "The classified cause of a FAILED, EXPIRED or CANCELLED audit."),
+      draftPlanId: platform(false, ID, "The system draft plan a DRAFT_READY audit published."),
+      permittedActions: platform(true, AUDIT_ACTIONS_SCHEMA, AUDIT_ACTIONS_DESCRIPTION),
+    },
+  },
+  {
+    name: "DecisionArtifactIntakeView",
+    description: "The decision-artifact intake (D8-PLAN-1): stored once per audit, kind and document; the same document again answers the stored artifact with created false.",
+    contract: null,
+    withheld: {},
+    members: {
+      artifactRef: platform(true, ID, "The artifact reference CMD022 and CMD023 name (candidateDecisionArtifactRef, decisionPatchArtifactRef)."),
+      auditId: platform(true, ID, "The audit it decides on."),
+      kind: platform(true, { type: "string", enum: [...DECISION_ARTIFACT_KINDS] }, "CANDIDATE_DECISIONS (CMD022) or DECISION_PATCH (CMD023)."),
+      contentHash: platform(true, HASH, "KAURO_DECISION_ARTIFACT_V1 digest of the kind and the document: the artifact's content identity."),
+      created: platform(true, { type: "boolean" }, "False when the same document was already stored for this audit."),
+    },
+  },
+] satisfies ReadonlyArray<ViewDefinition>);

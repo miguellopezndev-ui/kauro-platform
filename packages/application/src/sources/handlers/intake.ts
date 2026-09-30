@@ -16,6 +16,7 @@ import { DomainFailure, REVISION_SELECTABLE_STATES, roleSatisfies, selectionHash
 import type { AuthenticatedSubject } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { IntakeOperationId } from "../../api/response-schemas.js";
+import type { SourceIntakeId } from "../outcomes.js";
 import type { KnownSchemaId } from "../../ports/schema-validator.js";
 import { runReadIn, type AccessSpec } from "../../queries/reads.js";
 import type { CorrelationId } from "@kauro/domain";
@@ -35,7 +36,7 @@ export interface IntakeSpec extends AccessSpec {
   readonly authority: string;
 }
 
-export const SOURCE_INTAKE_ROUTES: Readonly<Record<IntakeOperationId, IntakeSpec>> = Object.freeze({
+export const SOURCE_INTAKE_ROUTES: Readonly<Record<SourceIntakeId, IntakeSpec>> = Object.freeze({
   SubmitSelectionManifest: Object.freeze({
     operationId: "SubmitSelectionManifest",
     method: "POST",

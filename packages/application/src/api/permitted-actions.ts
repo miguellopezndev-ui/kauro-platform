@@ -13,9 +13,10 @@
  */
 import type { AgencyRecord, ApprovalRecord, EndClientRecord, MembershipRole, PlanRecord, ResolvedMembership } from "@kauro/domain";
 import { AGENCY_OPEN_STATES, findTransition, roleSatisfies } from "@kauro/domain";
+import { VALIDATE_PLAN } from "../audit/contracts.js";
 import { B06_COMMANDS, type B06CommandId } from "../commands/contracts.js";
 
-export const RESOURCE_ACTIONS = ["ArchiveClient", "CreateProject", "RevisePlan", "ApprovePlan", "WithdrawApproval"] as const;
+export const RESOURCE_ACTIONS = ["ArchiveClient", "CreateProject", "RevisePlan", "ValidatePlan", "ApprovePlan", "WithdrawApproval"] as const;
 export type ResourceAction = (typeof RESOURCE_ACTIONS)[number];
 
 function admits(command: B06CommandId, role: MembershipRole): boolean {
@@ -46,11 +47,13 @@ export function projectActions(): ReadonlyArray<ResourceAction> {
 
 /**
  * A plan revision: RevisePlan (CMD023, a state that lists new_plan_revision; an APPROVED plan only for its approval's
- * controller), ApprovePlan (CMD025, VALIDATED), WithdrawApproval (CMD026, APPROVED, the approval's controller).
+ * controller), ValidatePlan (CMD024, VALIDATION_REQUIRED, B08), ApprovePlan (CMD025, VALIDATED), WithdrawApproval (CMD026, APPROVED,
+ * the approval's controller).
  */
 export function planActions(role: MembershipRole, plan: Pick<PlanRecord, "state">, controlsLiveApproval: boolean): ReadonlyArray<ResourceAction> {
   const out: ResourceAction[] = [];
   if (admits("CMD023", role) && findTransition("Plan", plan.state, "new_plan_revision") !== null && (plan.state !== "APPROVED" || controlsLiveApproval)) out.push("RevisePlan");
+  if (roleSatisfies(VALIDATE_PLAN.role, role) && plan.state === "VALIDATION_REQUIRED") out.push("ValidatePlan");
   if (admits("CMD025", role) && plan.state === "VALIDATED") out.push("ApprovePlan");
   if (admits("CMD026", role) && plan.state === "APPROVED" && controlsLiveApproval) out.push("WithdrawApproval");
   return out;

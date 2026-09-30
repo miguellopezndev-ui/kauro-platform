@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import type { Sha256Hex } from "@kauro/contracts";
+
 /**
  * The audit policy values of package B08 (docs/design/B08-audit-approval-jobs.md D8-AUD-1, D8-GRANT-1, D8-AUD-3), each tied to the
  * vendored registry policy it comes from. Migration 0021 carries the same numbers in its CHECK constraints and guards; the domain
@@ -19,3 +22,9 @@ export const AUDIT_POLICY = Object.freeze({
 } as const);
 
 export type AuditPolicy = typeof AUDIT_POLICY;
+
+/**
+ * The dated price profile a free AUDIT grant is sized under (CostGrant.priceProfileHash; D8-GRANT-1): the SHA-256 of the profile's
+ * identity, the one the platform's pool is funded under. A changed profile is a new dated identity, never an edit of this one.
+ */
+export const AUDIT_PRICE_PROFILE_HASH: Sha256Hex = createHash("sha256").update("price-profile-r2").digest("hex");

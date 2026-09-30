@@ -15,13 +15,13 @@
  *   happens without a reservation preceding it in the journal) and then commits the scripted outcome — COMPILED,
  *   NEEDS_DECISION, UNSUPPORTED or FAILED, queued in call order by `scriptInterpretOutcomes` — as the response.
  * - `compile` (`PlanCompilerPort`) turns a candidate decision already shaped as `{ body: PlanBody }` into B06's
- *   `PatchCompilation` (`COMPILED` with the body and its hash, or `REJECTED MALFORMED_PATCH`), so CMD022 and CMD023
+ *   `PatchCompilation` (`COMPILED` with the body and its PLAN_BODY digest, or `REJECTED MALFORMED_PATCH`), so CMD022 and CMD023
  *   answer with one compiler-reason vocabulary.
  * - A call log of every port call, and a hold point before each awaited step (`planCandidates`'s plan, `interpret`'s
  *   journal read, reservation and commit, `compile`'s own step) so a test can interleave without a sleep.
  */
 import { createHash } from "node:crypto";
-import type { Sha256Hex } from "@kauro/contracts";
+import { DOMAINS, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { PlanBody } from "@kauro/domain";
 import type { PatchCompilation } from "../ports/plan-services.js";
 import type {
@@ -200,7 +200,8 @@ export class ContractFakeIntelligenceCore implements InterpretPort, PlanCompiler
         return { kind: "REJECTED", reason: "MALFORMED_PATCH" } as const;
       }
       const body = decisions.body;
-      return { kind: "COMPILED", body, bodyHash: digestOf({ token: CONTRACT_FAKE_INTELLIGENCE_CORE_TOKEN, body }) } as const;
+      // the digest B06 rechecks in its handlers ("a collaborator's claim is never taken on trust"): the plan body's own structured digest
+      return { kind: "COMPILED", body, bodyHash: structuredDigest(DOMAINS.PLAN_BODY, 1, body) } as const;
     });
   }
 }

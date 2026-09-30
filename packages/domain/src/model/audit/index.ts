@@ -6,7 +6,7 @@
  * @kauro/persistence's over migration 0021.
  */
 export type { AuditId, CostGrantId, AuditStepId, ModelTaskId, PlanValidationId } from "./ids.js";
-export { AUDIT_POLICY } from "./policy.js";
+export { AUDIT_POLICY, AUDIT_PRICE_PROFILE_HASH } from "./policy.js";
 export type { AuditPolicy } from "./policy.js";
 export { AUDIT_FAILURE_REASONS } from "./failure-reasons.js";
 export type { AuditFailureReason } from "./failure-reasons.js";

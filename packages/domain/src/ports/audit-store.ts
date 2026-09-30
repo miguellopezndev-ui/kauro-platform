@@ -35,6 +35,7 @@ import type { ExecutionUnitOfWork, ExecutionUnitOfWorkFactory } from "./executio
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
 import type { RequestJournalRecord } from "./request-journal.js";
+import type { SourceUnitOfWork } from "./source-store.js";
 import type { UnitOfWorkOptions } from "./unit-of-work.js";
 
 /** StartAudit's writes (CMD020; D8-GRANT-1): the audit of a sealed revision and a confirmed target, funded by a free AUDIT grant. */
@@ -235,8 +236,12 @@ export interface AuditStore {
   reconcileRequest(requestId: RequestId, actualCents: bigint): Promise<CostGrantRecord>;
 }
 
-/** A unit of work of audit authority: the execution unit of work with the audit store on the same connection. */
-export interface AuditUnitOfWork extends ExecutionUnitOfWork {
+/**
+ * A unit of work of audit authority: the execution unit of work with the audit store on the same connection. It also exposes the
+ * source store (the class of every unit of work of this package carries it, B07): CMD020 reads the availability of the revision it
+ * audits through it (D8-CAU-9).
+ */
+export interface AuditUnitOfWork extends ExecutionUnitOfWork, Pick<SourceUnitOfWork, "sources"> {
   readonly audits: AuditStore;
 }
 
