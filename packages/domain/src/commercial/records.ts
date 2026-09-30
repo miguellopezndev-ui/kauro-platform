@@ -24,6 +24,7 @@ import type {
   PriceEligibilitySnapshotRecord,
 } from "../commerce/records.js";
 import type { AgencyId, AssuranceProofId, Branded, EventId, JournalEntryId, MembershipId, ProjectId, UserId } from "../model/ids.js";
+import { COMMERCIAL_VOCABULARY as V } from "./vocabulary.js";
 
 // --- ids ----------------------------------------------------------------------------------------------------------------------
 
@@ -72,66 +73,68 @@ export type ShareAllocationRef = AttributionAllocationId;
 
 // --- vocabularies ---------------------------------------------------------------------------------------------------------------
 
+type Token<K extends keyof typeof V> = (typeof V)[K][number];
+
 /** The agency's recorded buyer type (A3 3.7; B11 W6 stores `agency` / `in-house`, the BuyerTypeReader maps). */
-export type BuyerType = "AGENCY" | "IN_HOUSE";
+export type BuyerType = Token<"buyerTypes">;
 /** How a qualifying purchase's founding rate is backed: no founding rate, a consumed slot, or a fixture's unbacked rate (D10-REC-3). */
-export type FoundingBasis = "NONE" | "RESERVED_SLOT" | "UNBACKED";
+export type FoundingBasis = Token<"foundingBases">;
 /** The founding outcome a quote's eligibility view states (§3.4 CreateQuoteView.eligibility.foundingOffer). */
-export type FoundingOffer = "RESERVED" | "NOT_ELIGIBLE" | "NONE_AVAILABLE";
-export type FoundingReservationState = "RESERVED" | "RECONCILIATION_HOLD" | "CONSUMED" | "RELEASED";
+export type FoundingOffer = Token<"foundingOffers">;
+export type FoundingReservationState = Token<"foundingReservationStates">;
 /** A published agreement document an agency accepts at activation (CMD002 termsVersion, privacyAgreementVersion). */
-export type ServiceAgreementKind = "TERMS" | "PRIVACY";
-export type ServiceAgreementState = "DRAFT" | "PUBLISHED" | "RETIRED";
+export type ServiceAgreementKind = Token<"serviceAgreementKinds">;
+export type ServiceAgreementState = Token<"serviceAgreementStates">;
 /**
  * A reviewed relationship between two agencies (R2-141; example 24): kept separate although related, a commercial consolidation
  * approved, or confirmed duplicate accounts. Each is a recorded decision with no data effect (D10-AGY-3; Q10-3).
  */
-export type RelationshipKind = "RELATED_KEPT_SEPARATE" | "COMMERCIAL_CONSOLIDATION" | "DUPLICATE_ACCOUNTS";
-export type SellerState = "CANDIDATE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+export type RelationshipKind = Token<"relationshipKinds">;
+export type SellerState = Token<"sellerStates">;
 /** registry SellerAgreement.classification: the actual reviewed relationship. */
-export type SellerClassification = "INDEPENDENT_COLLABORATION" | "EMPLOYMENT" | "OTHER_REVIEWED";
+export type SellerClassification = Token<"sellerClassifications">;
 /** Whether a negative balance may be offset against future eligible amounts (D10-NEG-1; KC017). */
-export type OffsetTerms = "NONE" | "SIGNED_FUTURE_OFFSET";
-export type LegalReviewOutcome = "CONFIRMED" | "REJECTED";
-export type PayoutDestinationState = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "SUPERSEDED";
-export type ProspectState = "RESEARCHED" | "QUALIFIED" | "CONTACTED" | "ENGAGED" | "OPPORTUNITY" | "WON" | "LOST" | "SUPPRESSED";
+export type OffsetTerms = Token<"offsetTerms">;
+export type LegalReviewOutcome = Token<"legalReviewOutcomes">;
+export type PayoutDestinationState = Token<"payoutDestinationStates">;
+export type ProspectState = Token<"prospectStates">;
 /** Prospects are agencies only (18 "Prospect qualification" as amended by A3; D58): the only segment the evidence table admits. */
-export type ProspectSegment = "AGENCY";
-export type AttributionClaimState = "SUBMITTED" | "ACCEPTED" | "DISPUTED" | "REJECTED" | "EXPIRED" | "CONVERTED";
+export type ProspectSegment = Token<"prospectSegments">;
+export type AttributionClaimState = Token<"attributionClaimStates">;
 /** Substantive acquisition activity; a list import or a tracking link alone is not a claim (17 "Attribution subject"). */
-export type ClaimActivityKind = "FIRST_MEANINGFUL_CONTACT" | "QUALIFIED_NEED" | "DISCOVERY_MEETING" | "PROPOSAL" | "CLOSING_SUPPORT" | "LIST_IMPORT" | "TRACKING_LINK";
-export type CommissionEntitlementState = "ACTIVE" | "EXPIRED" | "DISPUTED" | "TERMINATED_WITH_RESIDUAL";
+export type ClaimActivityKind = Token<"claimActivityKinds">;
+export type CommissionEntitlementState = Token<"entitlementStates">;
 /** A pool's and an entitlement's source: the agency's frozen acquisition allocation, or a prospective assistance agreement (D10-ASSIST-1). */
-export type CommissionSource = "ACQUISITION" | "ASSISTANCE";
+export type CommissionSource = Token<"commissionSources">;
 /** What a prepared service assignment compensates for new work (R2-095; D10-ASSIGN-1). */
-export type ServiceCompensation = "NONE" | "ASSISTANCE_AGREEMENT";
+export type ServiceCompensation = Token<"serviceCompensations">;
 /** An assistance agreement covers one named project or the agency's next purchase (§5 Assistance). */
-export type AssistanceScope = "PROJECT" | "NEXT_PURCHASE";
-export type CompletionKind = "STAGE" | "FINAL";
-export type CommissionLineState = "ACCRUED_PENDING" | "ELIGIBLE" | "HELD" | "PAYABLE" | "PAID" | "ADJUSTED" | "VOID";
-export type AdjustmentReason = "REFUND" | "REVERSAL" | "SPLIT_CORRECTION" | "AGREED_ERROR_CORRECTION";
-export type AdjustmentDirection = "INCREASE" | "DECREASE";
-export type CommissionHoldState = "OPEN" | "RELEASED" | "UPHELD";
+export type AssistanceScope = Token<"assistanceScopes">;
+export type CompletionKind = Token<"completionKinds">;
+export type CommissionLineState = Token<"lineStates">;
+export type AdjustmentReason = Token<"adjustmentReasons">;
+export type AdjustmentDirection = Token<"adjustmentDirections">;
+export type CommissionHoldState = Token<"holdStates">;
 /**
  * Why cents are held (D10-HOLD-1; 8.1): an unverifiable provider instant (example 10), funds the provider holds (example 14), a
  * failed or returned payout, the seller's dispute of part of a line (R2-102), a disputed attribution (its entitlement's lines only).
  */
-export const HOLD_REASONS = ["PROVIDER_TIME_UNVERIFIED", "FUNDS_HELD", "PAYOUT_FAILED", "SELLER_DISPUTE", "ATTRIBUTION_DISPUTED"] as const;
+export const HOLD_REASONS = V.holdReasons;
 export type HoldReason = (typeof HOLD_REASONS)[number];
 /** The banking calendar's origin: a verified feed (B15) or the labelled test fixture, which makes a close SIMULATED (D10-CAL-1). */
-export type CalendarSource = "VERIFIED_FEED" | "TEST_FIXTURE";
-export type CommissionPeriodState = "OPEN" | "CLOSED";
-export type CommissionStatementState = "DRAFT" | "ISSUED" | "DISPUTED" | "APPROVED" | "PAID" | "CORRECTED";
+export type CalendarSource = Token<"calendarSources">;
+export type CommissionPeriodState = Token<"periodStates">;
+export type CommissionStatementState = Token<"statementStates">;
 /** What a statement item reports (§7 CMD051 items; example 21 "separate totals"). */
-export type StatementItemKind = "PAYABLE_LINE" | "HELD_LINE" | "PENDING_LINE" | "ADJUSTMENT" | "OFFSET" | "NEGATIVE_BALANCE";
+export type StatementItemKind = Token<"statementItemKinds">;
 /** The owner's resolution of a negative balance without signed offset terms (D10-NEG-1; example 7). */
-export type RecoveryAction = "REPAYMENT_REVIEW" | "WRITE_OFF" | "DISPUTE";
-export type PayoutIntentState = "AUTHORIZED" | "SUBMITTED" | "UNCERTAIN" | "SETTLED" | "FAILED" | "RETURNED";
+export type RecoveryAction = Token<"recoveryActions">;
+export type PayoutIntentState = Token<"payoutIntentStates">;
 /** What authenticated payout evidence reports (PayoutEvidenceVerifier; "Submitting a transfer is not proof"). */
-export type PayoutEvidenceStatus = "SUBMITTED" | "SETTLED" | "FAILED" | "RETURNED";
+export type PayoutEvidenceStatus = Token<"payoutEvidenceStatuses">;
 /** Who bears the transfer fee of a payout (policy commission.feeBearer, brand-mapped by amendment A2): the company, never the seller. */
-export type PayoutFeeBearer = "KAURO";
-export type GuardResult = "WITHIN_PLANNING_GUARD" | "EXCEEDS_PLANNING_GUARD";
+export type PayoutFeeBearer = Token<"payoutFeeBearers">;
+export type GuardResult = Token<"guardResults">;
 
 // --- recurrence and the founding cohort (§3; migration 0028) -----------------------------------------------------------------
 
@@ -234,7 +237,7 @@ export interface QuoteIssuance {
 export interface EligibilityFinding {
   readonly quoteId: QuoteId;
   readonly agencyId: AgencyId;
-  readonly finding: "SET_DIFFERS_FROM_FUNCTION" | "FOUNDING_RATE_WITHOUT_RESERVATION" | "UNBACKED_FOUNDING_PURCHASE";
+  readonly finding: Token<"eligibilityFindings">;
 }
 
 // --- agency lifecycle (§4; migration 0028) -------------------------------------------------------------------------------------

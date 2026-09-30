@@ -7,6 +7,9 @@
 export type { CommercialFailureReason } from "./failure-reasons.js";
 export { COMMERCIAL_FAILURE_REASONS } from "./failure-reasons.js";
 
+export type { CommercialVocabulary } from "./vocabulary.js";
+export { COMMERCIAL_VOCABULARY } from "./vocabulary.js";
+
 export type * from "./records.js";
 export { HOLD_REASONS } from "./records.js";
 
