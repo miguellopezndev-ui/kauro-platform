@@ -113,7 +113,7 @@ const CASE_ID = /\b(?:S\d{3}|R2-\d{3}|CMD\d{3}-(?:OK|DENY|RACE)|MC-\d{2}|IC-\d{2
 
 test("B08 case map: every case of the package has its section and one status row whose counts are its section's rows, a PARTIAL case names its later package and registry case, and the totals follow", () => {
   assert.equal(b08.caseIds.length, 15);
-  const start = text.indexOf("\n## Status at `b08/design`\n");
+  const start = text.indexOf("\n## Status at `b08/integration`\n");
   assert.ok(start >= 0, "the case map has its status section");
   const end = text.indexOf("\n## ", start + 1);
   const section = text.slice(start, end < 0 ? undefined : end).split("\n");
@@ -147,4 +147,17 @@ test("B08 case map: every case of the package has its section and one status row
   const totals = /Totals: (\d+) cases — (\d+) EXECUTED_LOCAL, (\d+) PARTIAL\./.exec(text);
   assert.ok(totals !== null, "the status section states its totals");
   assert.deepEqual(totals.slice(1).map(Number), [b08.caseIds.length, tally.EXECUTED_LOCAL, tally.PARTIAL]);
+});
+
+test("B08 case map after B08-INTEGRATION: no row is PLANNED, and every row a B08 mandate landed names that mandate first and its landing commit last", () => {
+  const rows = text.split("\n").map((l) => ROW.exec(l)).filter((m) => m !== null);
+  assert.ok(rows.length >= 45, `${rows.length} rows`);
+  assert.deepEqual(rows.filter((m) => m[1] === "PLANNED ").map((m) => m[3]), [], "no PLANNED row is left");
+  const keys = new Set(mandates.map((m) => m.key));
+  for (const m of rows) {
+    const parts = m[3].split(";").map((p) => p.trim());
+    if (parts[0].startsWith("existing")) continue;
+    assert.ok(keys.has(parts[0]), `a landed row names its mandate first: ${m[3]}`);
+    assert.match(parts[parts.length - 1], /^[0-9a-f]{7,40}$/, `a landed row names its commit last: ${m[3]}`);
+  }
 });

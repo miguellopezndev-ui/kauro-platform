@@ -1,9 +1,11 @@
 # B08 — case map
 
-Every case of package B08 (`node tools/package-brief.mjs B08`: 15 cases, gate G-JOB, owner 07) mapped to the tests that will
+Every case of package B08 (`node tools/package-brief.mjs B08`: 15 cases, gate G-JOB, owner 07) mapped to the tests that
 demonstrate its expected outcome, their evidence class, what the check observes, and the later package and case of any clause B08
-cannot demonstrate. Design: `docs/design/B08-audit-approval-jobs.md` (decisions `D8-*`). Mandates: `docs/design/B08-mandates.json`. `b08/base` already carries the landed rows of B08-CORE-PORTS and B08-WORKER-HOST (D8-BASE-3);
-the planned migrations are 0019–0021 (D8-BASE-1, D8-XPKG-1). B08-PERSISTENCE-EXECUTION landed its eleven rows and migrations
+cannot demonstrate. Design: `docs/design/B08-audit-approval-jobs.md` (decisions `D8-*`). Mandates: `docs/design/B08-mandates.json`.
+`b08/base` already carries the landed rows of B08-CORE-PORTS (at `fbb0410` on `b08/core-ports`) and B08-WORKER-HOST (at `57d6bee` on
+`b08/worker-host`, the tests first at `b126d93`) (D8-BASE-3);
+the migrations are 0019–0021 (D8-BASE-1, D8-XPKG-1). B08-PERSISTENCE-EXECUTION landed its eleven rows and migrations
 0019–0020 at `7936e2b` on `b08/persistence-execution`; its deviations are D8-PEX-1 to D8-PEX-12.
 B08-COMMANDS-EXECUTION landed its twelve rows at `c40fe42` on `b08/commands-execution`; its deviations are D8-CMD-1 to D8-CMD-7.
 B08-CONTROL-EXECUTION landed its fourteen rows at `7f8ee1d` on `b08/control-execution` (the tests first at `e704e55`); its deviations
@@ -12,8 +14,10 @@ deviations are D8-PAU-1 to D8-PAU-10. B08-STAGE-2 merged the three on `b08/stage
 rows of `tools/matrix.mjs` now name the control-plane consumer or sweeper performing each edge). B08-COMMANDS-AUDIT landed its seven
 rows at `7b5d50b` on `b08/commands-audit` (the tests first at `4803c7f`); its deviations are D8-CMA-1 to D8-CMA-10, renumbered from
 its branch's D8-CAU ids when B08-INTEGRATION merged it, because B08-CONTROL-AUDIT registered the same ids. B08-CONTROL-AUDIT landed its
-three rows at `2dc17fa` on `b08/control-audit` (the tests first at `784e402`); its deviations are D8-CAU-1 to D8-CAU-11. A row keeps
-the commit of the mandate that landed it.
+three rows at `2dc17fa` on `b08/control-audit` (the tests first at `784e402`); its deviations are D8-CAU-1 to D8-CAU-11.
+B08-INTEGRATION merged both on `b08/integration` and landed the end-to-end row and one supporting row at `a235af9`, with no product
+change; its deviations are D8-INT-1 to D8-INT-3 and its record is the design's §16. A row keeps the commit of the mandate that landed it; no row is
+PLANNED any more.
 
 Every test is cited as `` `file` :: "exact test title" ``. `tools/test/b08-case-map.test.mjs` reads this file: a cited file that
 exists must contain a test with exactly that title; a cited file that does not exist yet must be listed in the `tests` of exactly one
@@ -21,23 +25,24 @@ mandate of `B08-mandates.json` and cited on a `- PLANNED` row naming that mandat
 
 Row classes (21 "Evidence classes"; A4 records: case | test file :: exact title | status | commit):
 
-- **PLANNED EXECUTED_LOCAL** — the mandate writes this test first; it will run the real handlers, control plane and PostgreSQL 17
-  through the runtime login roles, no provider or core fake deciding the clause.
-- **PLANNED SIMULATED** — the clause passes through a labelled contract fake (core, worker host, object storage) and is never
-  EXECUTED_PROVIDER.
+- **EXECUTED_LOCAL** (mandate; commit) — the test runs the real handlers, control plane and PostgreSQL 17 through the runtime login
+  roles, no provider or core fake deciding the clause; the mandate wrote it first on a **PLANNED EXECUTED_LOCAL** row.
+- **SIMULATED** (mandate; commit) — the clause passes through a labelled contract fake (core, worker host, object storage) and is never
+  EXECUTED_PROVIDER; the mandate wrote it first on a **PLANNED SIMULATED** row.
 - **EXECUTED_LOCAL (existing)** — a test already on the base that demonstrates a half of the case.
 
 When a mandate lands, its rows lose the word PLANNED and gain the commit; nothing is PASS by being listed.
 
-## Status at `b08/design`
+## Status at `b08/integration`
 
-The planned status of each case once every mandate has landed: **EXECUTED_LOCAL** when no clause needs a later package; **PARTIAL**
-when one does, named with its package and registry case (or "no registry case" with the gate). The check keeps the counts equal to the
-section's rows and the status consistent with the later column.
+The status of each case with every mandate landed: **EXECUTED_LOCAL** when no clause needs a later package; **PARTIAL** when one does,
+named with its package and registry case (or "no registry case" with the gate). The check keeps the counts equal to the section's rows
+and the status consistent with the later column. Recomputed by B08-INTEGRATION: every row stands, so every status is the one the design
+planned.
 
 Totals: 15 cases — 7 EXECUTED_LOCAL, 8 PARTIAL.
 
-| case | planned status | rows | later package and case |
+| case | status | rows | later package and case |
 |---|---|---|---|
 | S035 | PARTIAL | 1 EXECUTED_LOCAL, 2 SIMULATED — the scratch store's exact causes; the fenced writer; the job FAILED end to end with its staging cleaned | B01 — the Migration core's own ENOSPC, short-write and corrupt-read causes (G-MC-SEMANTICS, no registry case); B14 — the 64 GiB Batch scratch (G-CLOUD, no registry case) |
 | S055 | EXECUTED_LOCAL | 3 EXECUTED_LOCAL, 0 SIMULATED — job, event and outbox atomically; the lost answer replayed; the undelivered record admitted once | none (B14 repeats the dispatch on Cloud Tasks under G-CLOUD) |
@@ -61,8 +66,8 @@ Totals: 15 cases — 7 EXECUTED_LOCAL, 8 PARTIAL.
 
 Expected (registry): no valid package publication; exact failure and bounded cleanup/recovery.
 
-- EXECUTED_LOCAL (B08-WORKER-HOST) `packages/data-plane/test/attempt-scratch.test.ts` :: "S035: the attempt scratch refuses a segment beyond its byte quota as SCRATCH_EXHAUSTED, a short write as SHORT_WRITE and a segment whose bytes no longer match their checksum as CORRUPT_INTERMEDIATE, never a completed segment, and its cleanup removes exactly the attempt's own directory" — observes: real files, the quota counter, the segment checksums, a sibling attempt's directory unchanged.
-- SIMULATED (B08-WORKER-HOST) `packages/data-plane/test/fenced-artifact-writer.test.ts` :: "S035: the fenced artifact writer never turns a failed close, a short write or a read-back mismatch into a staged artifact, and writes nothing outside the attempt's staging prefix" — observes: the storage fake's generations and call log; no artifact record for a failed write.
+- EXECUTED_LOCAL (B08-WORKER-HOST; 57d6bee) `packages/data-plane/test/attempt-scratch.test.ts` :: "S035: the attempt scratch refuses a segment beyond its byte quota as SCRATCH_EXHAUSTED, a short write as SHORT_WRITE and a segment whose bytes no longer match their checksum as CORRUPT_INTERMEDIATE, never a completed segment, and its cleanup removes exactly the attempt's own directory" — observes: real files, the quota counter, the segment checksums, a sibling attempt's directory unchanged.
+- SIMULATED (B08-WORKER-HOST; 57d6bee) `packages/data-plane/test/fenced-artifact-writer.test.ts` :: "S035: the fenced artifact writer never turns a failed close, a short write or a read-back mismatch into a staged artifact, and writes nothing outside the attempt's staging prefix" — observes: the storage fake's generations and call log; no artifact record for a failed write.
 - SIMULATED (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/job-execution.test.ts` :: "S035 end to end: an attempt whose scratch fills, whose artifact write is short or whose intermediate bytes are corrupted ends its job FAILED with that exact cause, no package version leaves STAGED, and STAGING_JANITOR deletes exactly that attempt's staging objects and scratch" — observes: job terminal cause token, package state, registry rows DELETED by generation, the cleanup record.
 
 ### S055 — The service crashes after database commit but before queue send
@@ -79,7 +84,7 @@ Expected (registry): only current authority publishes; reconcile provider identi
 
 - EXECUTED_LOCAL (existing, B06; the fence mechanism every attempt reuses, D8-ATT-1) `packages/persistence/test/adapters-leases.test.ts` :: "S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes (no or another checkpoint, reset deadline, another subject, another cost authority), a valid takeover that keeps subject, clock, cost and checkpoint identity, advances the fence and fences the old owner out" — observes: the lease fence and the old owner fenced out.
 - EXECUTED_LOCAL (B08-PERSISTENCE-EXECUTION; 7936e2b) `packages/persistence/test/execution-migrations.test.ts` :: "S056 at the database: a staged manifest, a verification or a publication of an attempt whose fence is not its job lease's current fence is refused KA080, and an attempt's provider job identity is its own deterministic identity, learned once" — observes: KA080, the identity CHECK, KA004 on a second provider job id.
-- SIMULATED (B08-WORKER-HOST) `packages/data-plane/test/worker-host-fake.test.ts` :: "the labelled worker-host fake keys every provider job by the attempt's deterministic identity — a second create answers ALREADY_EXISTS, a scripted timeout after creation leaves a job that observe finds, termination acts on that identity only — and every record carries evidence class SIMULATED" — observes: the fake's call log and identities.
+- SIMULATED (B08-WORKER-HOST; 57d6bee) `packages/data-plane/test/worker-host-fake.test.ts` :: "the labelled worker-host fake keys every provider job by the attempt's deterministic identity — a second create answers ALREADY_EXISTS, a scripted timeout after creation leaves a job that observe finds, termination acts on that identity only — and every record carries evidence class SIMULATED" — observes: the fake's call log and identities.
 - SIMULATED (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/job-execution.test.ts` :: "S056: a duplicated admission delivery launches nothing twice; an ambiguous launch is reconciled by observing the attempt's identity before any other create; the old attempt that survives a takeover finishes a valid package that is never submitted, verified or published" — observes: one create per identity, observe before create, the old attempt's objects left private for the janitor.
 
 ### S061 — Worker finalization references a partial blob or foreign generation
@@ -87,7 +92,7 @@ Expected (registry): only current authority publishes; reconcile provider identi
 Expected (registry): read-back and attestation fail; no READY publication.
 
 - EXECUTED_LOCAL (B08-PERSISTENCE-EXECUTION; 7936e2b) `packages/persistence/test/execution-migrations.test.ts` :: "S061 at the database: a package version becomes AVAILABLE only when every artifact of its staged manifest was read back at exactly its generation, sha256 and length from the attempt's own staging prefix, every delivery copy likewise, and the verification is VALID; a partial or foreign read-back is refused KA084" — observes: KA084 at COMMIT for each missing or unequal read-back.
-- SIMULATED (B08-CORE-PORTS) `packages/application/test/core-port-fakes.test.ts` :: "the labelled Migration-core fake verifies a package only against the expected authority its caller supplies and rejects a missing, duplicated, extra or foreign artifact and a false summary; every record carries evidence class SIMULATED" — observes: the fake's verdicts against supplied expectations.
+- SIMULATED (B08-CORE-PORTS; fbb0410) `packages/application/test/core-port-fakes.test.ts` :: "the labelled Migration-core fake verifies a package only against the expected authority its caller supplies and rejects a missing, duplicated, extra or foreign artifact and a false summary; every record carries evidence class SIMULATED" — observes: the fake's verdicts against supplied expectations.
 - SIMULATED (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/job-execution.test.ts` :: "S061: a staged manifest naming a partial blob, another attempt's object or an overwritten generation fails read-back, the job ends FAILED by verification_failure with the exact problem and its package is REVOKED with the evidence kept; the complete neighbour publishes" — observes: read-back rows, the verification problem tokens, package and job states.
 
 ### S062 — Cancellation/deletion races package promotion
@@ -104,7 +109,7 @@ Expected (registry): one transactional winner; stale promotion cannot undo revok
 Expected (registry): an external janitor cleans only exact owned resources and records cost/result.
 
 - EXECUTED_LOCAL (B08-PERSISTENCE-EXECUTION; 7936e2b) `packages/persistence/test/execution-adapters.test.ts` :: "S075 at the database: an attempt cleanup records exactly one attempt with its provider identity, staging prefix, deleted generations and the host-reported cost and result, and only objects under that attempt's prefix can be recorded as its cleanup" — observes: the cleanup row and the refusal of a foreign object.
-- SIMULATED (B08-WORKER-HOST) `packages/data-plane/test/worker-host-fake.test.ts` :: "the labelled worker-host fake reports the VM, disk and cost of each provider job it created, terminates only the identity it is given and answers NOT_FOUND for any other" — observes: the fake's resources and termination log.
+- SIMULATED (B08-WORKER-HOST; 57d6bee) `packages/data-plane/test/worker-host-fake.test.ts` :: "the labelled worker-host fake reports the VM, disk and cost of each provider job it created, terminates only the identity it is given and answers NOT_FOUND for any other" — observes: the fake's resources and termination log.
 - SIMULATED (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/staging-janitor.test.ts` :: "S075: the worker dies and its lease lapses; STAGING_JANITOR terminates exactly that provider job, deletes by generation exactly the objects under that attempt's staging prefix and its scratch — a sibling attempt's and another agency's objects untouched — and records the VM, disk, cost and result the host reported" — observes: registry rows, storage listing, cleanup record.
 
 ### R2-044 — Sealing without audit funding
@@ -136,7 +141,7 @@ Expected (registry): enforce global active/waiting limits and the documented fai
 - **CMD036-OK** (ExecuteProject; atomically create one logical job and outbox command)
   - EXECUTED_LOCAL (B08-COMMANDS-EXECUTION; c40fe42) `apps/api/test/cmd036-execute-project.test.ts` :: "OK: ExecuteProject with a live commercial authorization whose source, plan, approval, target, capture, retention and capability bind consistently answers 202 with one QUEUED job, one processing_job.queued.v1 event and one outbox record to JOB_EXECUTION, the job bound exactly to the authorization's subject" — observes: the answer, the job's key columns, event and outbox rows.
   - EXECUTED_LOCAL (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/job-admission.test.ts` :: "admission consumes the entitlement: QUEUED -> ADMITTED with the authorization ACTIVE -> CONSUMED naming the job, attempt 1 CLAIMED at lease fence 1 and the PAID_ORDINARY record anchored on the capture, in one unit of work" — observes: the four rows and their events in one transaction.
-  - PLANNED SIMULATED (B08-INTEGRATION) `apps/control/test/b08-end-to-end.test.ts` :: "b08 end to end: a sealed revision is audited to DRAFT_READY, approved, paid, executed, admitted, run, verified and published — the package is AVAILABLE, the job READY and the authorization DELIVERED exactly once, every answer within its route's contract" — observes: every answer checked against its route contract, final rows.
+  - SIMULATED (B08-INTEGRATION; a235af9) `apps/control/test/b08-end-to-end.test.ts` :: "b08 end to end: a sealed revision is audited to DRAFT_READY, approved, paid, executed, admitted, run, verified and published — the package is AVAILABLE, the job READY and the authorization DELIVERED exactly once, every answer within its route's contract" — observes: the revision sealed through B07's handlers and control plane, every request admitted and every answer checked against its route contract, the rows each step leaves, then one whole runCycle that acts on nothing.
 - **CMD036-DENY** (duplicate requests reuse the job; revoked authority or full queue cannot silently start a second execution)
   - EXECUTED_LOCAL (B08-COMMANDS-EXECUTION; c40fe42) `apps/api/test/cmd036-execute-project.test.ts` :: "DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency's project 404; then one missing prerequisite at a time — a revoked authorization, a withdrawn approval, an expired source, a superseded target, a suspended capability, an agency not ACTIVE — is refused with its reason, nothing written and no outbox record" — observes: each answer, unchanged rows, the DENY facts.
   - EXECUTED_LOCAL (B08-COMMANDS-EXECUTION; c40fe42) `apps/api/test/cmd036-execute-project.test.ts` :: "DENY: ExecuteProject for an authorization that already has a job answers that same job, even after the job was cancelled, and never creates a second one" — observes: one job row per authorization.
@@ -170,10 +175,11 @@ B01's (CMD024, G-MC-SEMANTICS); these tests support them and are not counted abo
 - EXECUTED_LOCAL (B08-COMMANDS-AUDIT; CMD024; 7b5d50b) `apps/api/test/cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING with one validation intent and answers 202; a stale planHash is 409 STALE_VERSION, a VIEWER 403, and two requests on one version yield one intent"
 - EXECUTED_LOCAL (B08-COMMANDS-AUDIT; 7b5d50b) `apps/api/test/audit-reads.test.ts` :: "GetAudit answers the durable phase, deadlines, grant classification and pending decisions to live members only, never a provider identity, a prompt or a customer value"
 - EXECUTED_LOCAL (B08-PERSISTENCE-AUDIT; B03 S041; 990967d) `packages/persistence/test/audit-adapters.test.ts` :: "the audit store through every repository method as the owning roles: two StartAudit reservations for the last cents of the pool serialize on its row with the loser BUDGET_EXHAUSTED, steps record only under the current fence, and the model-task journal returns a stored response before any new dispatch intent"
-- SIMULATED (B08-CORE-PORTS; B03 IC-01) `packages/application/test/core-port-fakes.test.ts` :: "the labelled Intelligence-core fake plans a complete candidate manifest, answers COMPILED, NEEDS_DECISION, UNSUPPORTED or FAILED as scripted through the journal port, compiles a stored response before any new dispatch and never dispatches without a reservation; evidence class SIMULATED"
+- SIMULATED (B08-CORE-PORTS; B03 IC-01; fbb0410) `packages/application/test/core-port-fakes.test.ts` :: "the labelled Intelligence-core fake plans a complete candidate manifest, answers COMPILED, NEEDS_DECISION, UNSUPPORTED or FAILED as scripted through the journal port, compiles a stored response before any new dispatch and never dispatches without a reservation; evidence class SIMULATED"
 - SIMULATED (B08-CONTROL-AUDIT; B03 IC-02, R2-035; 2dc17fa) `apps/control/test/audit-orchestration.test.ts` :: "the audit runs PROFILE, INTERPRET and VALIDATE under its fence to DRAFT_READY with a VALIDATED system draft; a stale step's result is refused, and a cancellation or the absolute deadline after every await of the three steps leaves no draft"
 - SIMULATED (B08-CONTROL-AUDIT; B01 CMD024, B03 IC-03; 2dc17fa) `apps/control/test/plan-validation.test.ts` :: "PLAN_VALIDATION validates only the current intent: a receipt for another body, source, target or core, a null or incomplete receipt and a receipt after the plan was revised never make it VALIDATED"
 - EXECUTED_LOCAL (B08-CONTROL-AUDIT; B03 IC-12; 2dc17fa) `apps/control/test/grant-reconciliation.test.ts` :: "GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a proven unused amount, exhausts and expires grants on the server clock never early, and closes a grant only when no uncertain usage remains"
+- SIMULATED (B08-INTEGRATION; B03 IC-03, B01 CMD024; a235af9) `apps/control/test/b08-end-to-end.test.ts` :: "b08 end to end: the agency's own decisions and a cancellation compose with the control plane — an audit that needs a decision takes the agency's candidate decisions through the intake, CreatePlan and ValidatePlan through their handlers, PLAN_VALIDATION validates exactly that intent through the validator's pool; CancelAudit through its handler stops a queued audit before AUDIT_ORCHESTRATION claims a step, and both grants close" — observes: the request side's writes read by AUDIT_ORCHESTRATION and PLAN_VALIDATION, the receipt of exactly the intent's subjects, the grants CLOSED, a whole cycle that acts on nothing.
 
 ## Gate G-JOB
 
