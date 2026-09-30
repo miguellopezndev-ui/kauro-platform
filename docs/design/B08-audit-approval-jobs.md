@@ -519,3 +519,14 @@ What main gained since `0f15636`, against B08:
 
 Case map: every row stands on the merged tree; S056 gains the two B06-R1 seam rows; totals unchanged, 15 cases — 7 EXECUTED_LOCAL,
 8 PARTIAL.
+
+`pnpm install --frozen-lockfile` then `pnpm run verify` at `f7446fe` (the lockfile is main's; the merge changed none):
+
+| host | result | tests (pass / skip) |
+|---|---|---|
+| Windows 11, Node 24.14.1, pnpm 10.16.1, `C:\Tools\pgsql17\bin` | VERIFY_EXIT 0 | contracts 12, domain 119, application 131, persistence 240, authorization 11, data-plane 21, control 43, api 230 + 1 skipped (B06's Linux-only N7), tools 52; 0 failed; 0 postgres processes left |
+| WSL Ubuntu 24.04, fresh clone, Node 24.21.0, `PGBIN=/usr/lib/postgresql/17/bin` | VERIFY_EXIT 0 | the same, api 231; 0 failed; clone removed, 0 postgres processes left |
+
+Both: architecture gate 8 packages, 23 edges, no violation; OpenAPI 48 operations, 0 planned; matrix 28 machines, 252 edges and
+initial states owned, 26 commands, 18 reads, 2 intakes; clean-consume green. The next commit adds this record only. Open for A4: CI,
+the independent review of the exact commit, and main.
