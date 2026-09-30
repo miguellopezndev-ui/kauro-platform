@@ -132,8 +132,8 @@ export const EDGE_OWNERS = {
     "(initial DRAFT)": { command: "CMD022", event: "plan.created.v1", note: "CMD023 RevisePlan (B06) creates the successor DRAFT of a revision" },
     compiled_or_edited: { command: "CMD023", event: "plan.validation_required.v1", note: "the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it" },
     validation_admitted: { command: "CMD024", event: "plan.validating.v1" },
-    valid_receipt: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-10); CMD024 records the intent and answers 202", event: "plan.validated.v1" },
-    invalid_receipt_result: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CAU-10)", event: "plan.validation_required.v1" },
+    valid_receipt: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CMA-10); CMD024 records the intent and answers 202", event: "plan.validated.v1" },
+    invalid_receipt_result: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CMA-10)", event: "plan.validation_required.v1" },
     agency_approval: { command: "CMD025", event: "plan.approved.v1" },
     new_plan_revision: { command: "CMD023", event: "plan.superseded.v1" },
     withdraw_approval: { command: "CMD026", event: "plan.withdrawn.v1" },
@@ -953,7 +953,7 @@ export function generateMatrix(s) {
     }
     line();
   }
-  line("## 5a. The document intakes (B07 D-SEL-2; B08 D8-CAU-7)");
+  line("## 5a. The document intakes (B07 D-SEL-2; B08 D8-CMA-7)");
   line();
   line("A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was");
   line("already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live");

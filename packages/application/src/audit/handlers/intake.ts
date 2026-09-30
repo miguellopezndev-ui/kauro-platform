@@ -1,6 +1,6 @@
 /**
  * The decision-artifact intake — POST /api/v1/audits/{auditId}/decision-artifacts — AGENCY_OPERATOR (design B08 §8, §12; D8-PLAN-1,
- * D8-AUD-3, D8-CAU-7). Not a catalogue command: the artifact is evidence the agency hands the platform (its candidate decisions for
+ * D8-AUD-3, D8-CMA-7). Not a catalogue command: the artifact is evidence the agency hands the platform (its candidate decisions for
  * CMD022, a typed decision patch for CMD023), not an aggregate change, so it takes no command journal entry and no version; it is
  * content-idempotent instead — the same (kind, document) again answers the stored artifact with created false (200), whatever
  * reference the first request minted (B07's selection manifest intake is its template).

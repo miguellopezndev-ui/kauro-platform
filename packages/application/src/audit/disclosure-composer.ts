@@ -1,5 +1,5 @@
 /**
- * The DisclosureComposer of this edition (package B08, mandate B08-COMMANDS-AUDIT; docs/design/B08-audit-approval-jobs.md §7, D8-CAU-6;
+ * The DisclosureComposer of this edition (package B08, mandate B08-COMMANDS-AUDIT; docs/design/B08-audit-approval-jobs.md §7, D8-CMA-6;
  * owner manual 11/07): the server-side truth CMD025 ApprovePlan compares the caller's acknowledged disclosures against. It is computed
  * from records alone — the plan's mapping effects and the validation receipt's counts — so it is deterministic, calls no core and reads
  * no customer value:

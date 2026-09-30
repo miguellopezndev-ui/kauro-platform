@@ -1,6 +1,6 @@
 /**
- * CMD024 ValidatePlan — POST /api/v1/plans/{planId}/validate — AGENCY_OPERATOR (design B08 §7, §12; D8-PLAN-2, D8-LOCK-1, D8-CAU-3,
- * D8-CAU-4; Plan machine edge `validation_requested` VALIDATION_REQUIRED → VALIDATING; catalogue "Request validation of a frozen plan
+ * CMD024 ValidatePlan — POST /api/v1/plans/{planId}/validate — AGENCY_OPERATOR (design B08 §7, §12; D8-PLAN-2, D8-LOCK-1, D8-CMA-3,
+ * D8-CMA-4; Plan machine edge `validation_requested` VALIDATION_REQUIRED → VALIDATING; catalogue "Request validation of a frozen plan
  * body; the receipt binds the plan hash").
  *
  * Order: authorize → reserve → the plan row under its lock (NOT_FOUND; a foreign and a nonexistent plan answer alike) → the caller's

@@ -27,7 +27,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CAU-7)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CMA-7)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [

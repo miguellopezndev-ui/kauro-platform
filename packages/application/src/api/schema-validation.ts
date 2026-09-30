@@ -110,7 +110,7 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);
     roots[id] = schema;
   }
-  // package B08: the audit commands' closed request schemas and the envelope of the decision-artifact intake (design §12, D8-CAU-7)
+  // package B08: the audit commands' closed request schemas and the envelope of the decision-artifact intake (design §12, D8-CMA-7)
   for (const [command, schema] of Object.entries(AUDIT_REQUEST_SCHEMAS)) {
     const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
     if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);

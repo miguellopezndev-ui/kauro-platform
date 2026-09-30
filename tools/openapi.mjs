@@ -16,7 +16,7 @@
 // registry commands.json (path, method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their
 // request schemas, the response views (derived from the registry contract bundle), the envelopes, the Problem document, the reads
 // (READ_ROUTES: the manual-10 reads of re-check finding N16, B07's source reads and B08's GetJob and GetAudit), the selection manifest
-// and the decision artifact intake (INTAKE_ROUTES: B07 D-SEL-2, B08 D8-CAU-7) and the operational routes come from @kauro/application — the very objects the api's
+// and the decision artifact intake (INTAKE_ROUTES: B07 D-SEL-2, B08 D8-CMA-7) and the operational routes come from @kauro/application — the very objects the api's
 // validator compiles and its send guard validates with. The routes
 // are the ones the composition root actually registers: tools/openapi.mjs builds the api with `assembleApi` over the real pg
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
@@ -247,7 +247,7 @@ export function generateOpenApi(sources) {
         const accepted = {
           CMD036: "ACCEPTED: the job was queued and runs asynchronously — the operation (the processing job), its state, the status path of GetJob and the polling guidance (package B08 D8-API-1)",
           CMD020: "ACCEPTED: the audit was queued and runs asynchronously — the operation (the audit), its state, the status path of GetAudit and the polling guidance (package B08 D8-API-1)",
-          CMD024: "ACCEPTED: the plan's validation was requested and runs asynchronously — the operation (the plan), its state VALIDATING, the plan's status path and the polling guidance (package B08 D8-API-1, D8-CAU-4)",
+          CMD024: "ACCEPTED: the plan's validation was requested and runs asynchronously — the operation (the plan), its state VALIDATING, the plan's status path and the polling guidance (package B08 D8-API-1, D8-CMA-4)",
         };
         responses[status] = {
           description: accepted[command.id] ?? "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
@@ -325,7 +325,7 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // the document intakes (B07 D-SEL-2, B08 D8-CAU-7): the selection manifest and the decision artifact, each stored once per content —
+  // the document intakes (B07 D-SEL-2, B08 D8-CMA-7): the selection manifest and the decision artifact, each stored once per content —
   // 201 stored, 200 the same document again
   addComponent("SelectionManifestDocument", byId[application.SELECTION_MANIFEST_SCHEMA_ID], application.SELECTION_MANIFEST_SCHEMA_ID);
   addComponent("DecisionArtifactDocument", byId[application.DECISION_ARTIFACT_SCHEMA_ID], application.DECISION_ARTIFACT_SCHEMA_ID);
@@ -352,7 +352,7 @@ export function generateOpenApi(sources) {
         ],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${documentComponent}` } } } },
         responses: {
-          200: reply("STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CAU-7)"),
+          200: reply("STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CMA-7)"),
           201: reply("STORED: the document is stored (created true)"),
           ...problemResponses(contract.outcomes),
         },

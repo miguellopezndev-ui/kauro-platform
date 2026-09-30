@@ -203,7 +203,7 @@ test("OK, DENY and RACE: CreatePlan compiles the agency's candidate decision art
   assert.equal((await storeDecisionArtifact(w, auditId, { kind: "CANDIDATE_DECISIONS", document: {}, extra: true })).status, 400);
 
   // --- RACE ---
-  // two CreatePlan calls on one audit (an audit may yield several plans, D8-CAU): the first held before its journal commit with the audit row
+  // two CreatePlan calls on one audit (an audit may yield several plans, D8-CMA-2): the first held before its journal commit with the audit row
   // locked, the second observed waiting on that row; after the release both are 201, with two plans that have nothing to do with each other
   await endLiveAudits(w);
   const raced = await deciding();

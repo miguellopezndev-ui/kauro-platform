@@ -2,7 +2,7 @@
  * The four B08 audit request commands (CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan), the GetAudit
  * read and the decision-artifact intake: input body (exactly the registry fields), result view and the spec the transport and the
  * authorizer consume. Behaviour — locks in the order of D8-LOCK-1, preconditions in order, writes, events, OK/DENY/RACE — is
- * specified in docs/design/B08-audit-approval-jobs.md §3, §12 (D8-API-1) and §13 (D8-CAU-n); the handlers are audit/handlers.
+ * specified in docs/design/B08-audit-approval-jobs.md §3, §12 (D8-API-1) and §13 (D8-CMA-n); the handlers are audit/handlers.
  *
  * The commands are served through B06's pipeline in an audit unit of work (`runCommandIn`/`runReadIn`, B07 D-CMD-10): the same
  * access decision, journal reservation, assurance and denial facts as every other command.
@@ -102,7 +102,7 @@ export interface ValidatePlanBody {
 }
 /**
  * ValidatePlan answers 202 with B06's ACCEPTED envelope: the operation is the plan's validation — operationId = the plan id, state =
- * VALIDATING, statusPath = /api/v1/plans/{planId}, pollAfterSeconds = AUDIT_POLL_AFTER_SECONDS (D8-CAU-4).
+ * VALIDATING, statusPath = /api/v1/plans/{planId}, pollAfterSeconds = AUDIT_POLL_AFTER_SECONDS (D8-CMA-4).
  */
 export type ValidatePlanAccepted = Omit<Extract<CommandResult<never>, { readonly kind: "ACCEPTED" }>, "kind" | "status"> & { readonly state: "VALIDATING" };
 export const VALIDATE_PLAN: CommandSpec<ValidatePlanBody> = spec<ValidatePlanBody>({

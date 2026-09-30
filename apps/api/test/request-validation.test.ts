@@ -252,7 +252,7 @@ test("exactly the thirteen catalogue routes and the selection manifest intake ar
   for (const path of commerceGets) assert.ok(w.app.hasRoute({ method: "GET", url: path }) && path.startsWith("/api/v1/"), path);
   const inventory = routeInventoryOf(w.app);
   // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12) and the selection manifest and
-  // decision artifact intakes (D-SEL-2, D8-CAU-7); beside them every served route of
+  // decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue
   assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url)).length, 21);

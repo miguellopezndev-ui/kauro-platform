@@ -12,7 +12,7 @@ deviations are D8-PAU-1 to D8-PAU-10. B08-STAGE-2 merged the three on `b08/stage
 rows of `tools/matrix.mjs` now name the control-plane consumer or sweeper performing each edge); a row keeps the commit of the
 mandate that landed it.
 B08-COMMANDS-AUDIT landed its seven rows at `7b5d50b` on `b08/commands-audit` (the tests first at `4803c7f`); its deviations
-are D8-CAU-1 to D8-CAU-10.
+are D8-CMA-1 to D8-CMA-10.
 
 Every test is cited as `` `file` :: "exact test title" ``. `tools/test/b08-case-map.test.mjs` reads this file: a cited file that
 exists must contain a test with exactly that title; a cited file that does not exist yet must be listed in the `tests` of exactly one

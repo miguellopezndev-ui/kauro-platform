@@ -2717,7 +2717,7 @@
         },
         "responses": {
           "200": {
-            "description": "STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CAU-7)",
+            "description": "STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CMA-7)",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -8044,7 +8044,7 @@
         },
         "responses": {
           "202": {
-            "description": "ACCEPTED: the plan's validation was requested and runs asynchronously — the operation (the plan), its state VALIDATING, the plan's status path and the polling guidance (package B08 D8-API-1, D8-CAU-4)",
+            "description": "ACCEPTED: the plan's validation was requested and runs asynchronously — the operation (the plan), its state VALIDATING, the plan's status path and the polling guidance (package B08 D8-API-1, D8-CMA-4)",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -14723,7 +14723,7 @@
         },
         "responses": {
           "200": {
-            "description": "STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CAU-7)",
+            "description": "STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CMA-7)",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"

@@ -2,7 +2,7 @@
  * The audit package of the application layer (B08; docs/design/B08-audit-approval-jobs.md §4 items 2..4, §12): CMD020 StartAudit,
  * CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, the GetAudit read and the decision-artifact intake — their contracts,
  * closed request schemas, closed outcome catalogues, safe views and handlers on B06's pipeline in an audit unit of work — with the
- * core services the request side reaches (D8-PORT-1) and the real disclosure composer CMD025 compares against (D8-CAU-6).
+ * core services the request side reaches (D8-PORT-1) and the real disclosure composer CMD025 compares against (D8-CMA-6).
  */
 export type {
   StartAuditBody,

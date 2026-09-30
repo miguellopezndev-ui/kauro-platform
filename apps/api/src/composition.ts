@@ -193,7 +193,7 @@ export interface ApiAssembly {
   /**
    * Collaborators that replace the edition defaults (edition.ts planServices). The acceptance tests of B06 bind deterministic plan
    * services here; a deployment of this edition binds nothing: the decision artifacts, the patch compiler over `cores` and the real
-   * disclosure composer are its own (I-INT-2, D8-CAU-5).
+   * disclosure composer are its own (I-INT-2, D8-CMA-5).
    */
   readonly collaborators?: Partial<B06Collaborators>;
   /**

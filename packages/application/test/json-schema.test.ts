@@ -20,7 +20,7 @@ test("the validator compiles exactly the 73 contracts, the 15 request schemas an
   const completedIds = SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId);
   assert.equal(completedIds.length, 15, "every served command but CMD014, CMD036, CMD020 and CMD024, answered ACCEPTED (B07 D-RUN-1, B08 D8-API-1)");
   const intakeIds = INTAKE_OPERATION_IDS.map(intakeResponseSchemaId);
-  assert.equal(intakeIds.length, 2, "the selection manifest intake (B07 D-SEL-2) and the decision artifact intake (B08 D8-CAU-7)");
+  assert.equal(intakeIds.length, 2, "the selection manifest intake (B07 D-SEL-2) and the decision artifact intake (B08 D8-CMA-7)");
   // package B09 (D-REQ-B7): the payment catalogue's closed request schemas and the envelopes of its replies and reads
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const commerceResponseIds = [...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId), ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId)];

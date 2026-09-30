@@ -116,8 +116,8 @@ registry machine; initial DRAFT; terminal SUPERSEDED, WITHDRAWN; unlisted edges:
 | — | (initial DRAFT) | DRAFT | CMD022 CreatePlan (B03); CMD023 RevisePlan (B06) creates the successor DRAFT of a revision | plan.created.v1 | route |
 | DRAFT | compiled_or_edited | VALIDATION_REQUIRED | CMD023 RevisePlan (B06); the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it | plan.validation_required.v1 | route |
 | VALIDATION_REQUIRED | validation_admitted | VALIDATING | CMD024 ValidatePlan (B01) | plan.validating.v1 | route |
-| VALIDATING | valid_receipt | VALIDATED | B08: the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-10); CMD024 records the intent and answers 202 | plan.validated.v1 | database |
-| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | B08: the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CAU-10) | plan.validation_required.v1 | database |
+| VALIDATING | valid_receipt | VALIDATED | B08: the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CMA-10); CMD024 records the intent and answers 202 | plan.validated.v1 | database |
+| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | B08: the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CMA-10) | plan.validation_required.v1 | database |
 | VALIDATED | agency_approval | APPROVED | CMD025 ApprovePlan (B06) | plan.approved.v1 | route |
 | DRAFT | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
 | VALIDATION_REQUIRED | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
@@ -2367,7 +2367,7 @@ same rules (the view: phase, deadlines, grant classification and pending decisio
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
-## 5a. The document intakes (B07 D-SEL-2; B08 D8-CAU-7)
+## 5a. The document intakes (B07 D-SEL-2; B08 D8-CMA-7)
 
 A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was
 already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live

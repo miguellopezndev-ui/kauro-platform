@@ -192,7 +192,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/audits/:auditId", "GetAudit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAudit" } }],
       // the selection manifest intake: 201 stored, 200 the same document again (B07 D-SEL-2)
       ["POST", "/api/v1/revisions/:revisionId/selection-manifests", "SubmitSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" } }],
-      // the decision artifact intake: 201 stored, 200 the same document again (B08 D8-CAU-7)
+      // the decision artifact intake: 201 stored, 200 the same document again (B08 D8-CMA-7)
       ["POST", "/api/v1/audits/:auditId/decision-artifacts", "SubmitDecisionArtifact", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitDecisionArtifact" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitDecisionArtifact" } }],
       // package B09's request side (M4, D-REQ-B7): a provider command declares its 202 accepted observation beside its success
       ["POST", "/api/v1/quotes/:quoteId/payment-orders", "CreatePaymentOrder", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD028" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],

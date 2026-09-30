@@ -239,7 +239,7 @@ export interface AuditStore {
 /**
  * A unit of work of audit authority: the execution unit of work with the audit store on the same connection. It also exposes the
  * source store (the class of every unit of work of this package carries it, B07): CMD020 reads the availability of the revision it
- * audits through it (D8-CAU-9).
+ * audits through it (D8-CMA-9).
  */
 export interface AuditUnitOfWork extends ExecutionUnitOfWork, Pick<SourceUnitOfWork, "sources"> {
   readonly audits: AuditStore;

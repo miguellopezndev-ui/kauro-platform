@@ -45,14 +45,14 @@ export const AUDIT_REQUEST_SCHEMA_IDS: ReadonlyArray<AuditRequestSchemaId> = Obj
   (k) => `${REQUEST_SCHEMA_PREFIX}${k as AuditRequestSchemaCommand}` as const,
 );
 
-/** Document schema id of the decision-artifact intake (auxiliary route, decision D8-CAU-7). */
+/** Document schema id of the decision-artifact intake (auxiliary route, decision D8-CMA-7). */
 export const DECISION_ARTIFACT_SCHEMA_ID = "urn:kauro:api:v1:document:DecisionArtifact" as const;
 
 /**
  * The closed envelope of a decision artifact: which of the two kinds it is (a CANDIDATE_DECISIONS document CMD022 compiles, a
  * DECISION_PATCH document CMD023 applies) and the document itself. The document's own shape belongs to the Intelligence core's
  * compiler, which the platform reaches only through its port (PlanCompilerPort); the envelope therefore states only that it is one
- * JSON object, and the compiler rejects anything else with its closed reasons (D8-CAU-7). The bound of the stored document is the
+ * JSON object, and the compiler rejects anything else with its closed reasons (D8-CMA-7). The bound of the stored document is the
  * database's (256 KiB) and is checked by the handler before it is stored (BODY_TOO_LARGE).
  */
 export const DECISION_ARTIFACT_SCHEMA = Object.freeze({

@@ -1,12 +1,12 @@
 /**
  * CMD020 StartAudit — POST /api/v1/revisions/{revisionId}/audits — AGENCY_OPERATOR (design B08 §3, §12; D8-GRANT-1, D8-AUD-1,
- * D8-LOCK-1, D8-STALE-1, D8-CAU-9; R2-044; catalogue "Verify the sealed, available revision and the confirmed, current target; queue
+ * D8-LOCK-1, D8-STALE-1, D8-CMA-9; R2-044; catalogue "Verify the sealed, available revision and the confirmed, current target; queue
  * the audit on a free grant").
  *
  * Order: authorize → reserve → the revision (NOT_FOUND; a foreign and a nonexistent revision answer alike) and its shared transition
  * lock (D-TX-2: a retention expiry or a supersession issued meanwhile waits, one committed first is what is read) → the revision
  * SEALED (EXPIRED and DELETED are SOURCE_EXPIRED; any other state is REVISION_NOT_SEALED naming where it stands) and still available
- * on the database's clock (a retention that ended is SOURCE_EXPIRED, D8-STALE-1, D8-CAU-9) → the target contract after its shared
+ * on the database's clock (a retention that ended is SOURCE_EXPIRED, D8-STALE-1, D8-CMA-9) → the target contract after its shared
  * transition lock (D8-LOCK-1: source before target), confirmed, current and of this revision's project (TARGET_STALE) → the store's
  * StartAudit: the agency's one live audit and the subject's one audit (its constraints answer AUDIT_CONCURRENCY_LIMITED and
  * AUDIT_EXISTS), the AUDIT grant carved from the platform's pool under the pool's row lock — or BUDGET_EXHAUSTED NO_FUNDED_GRANT with

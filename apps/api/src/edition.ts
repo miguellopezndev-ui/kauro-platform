@@ -19,12 +19,12 @@
  *   plan's live jobs are named through the same port, after B09's facts (`executionReadsOf(uow).unreconciledJobsForPlan`, D8-XPKG-3).
  * - `planServices`: CMD023 and CMD025 need the typed patch compiler and the disclosure composer, and CMD023 the artifact resolver. Since
  *   package B08 the edition binds all three: the decision artifacts of migration 0021 (@kauro/persistence decisionArtifactResolver), the
- *   patch compiler over the Intelligence core's plan compiler (`patchCompilerOver`) and the real disclosure composer (D8-CAU-6). A
+ *   patch compiler over the Intelligence core's plan compiler (`patchCompilerOver`) and the real disclosure composer (D8-CMA-6). A
  *   deployment that binds no adapter of the core (ApiAssembly.cores absent) answers INTEGRITY_FAILURE / CORE_SERVICES_UNAVAILABLE for
  *   CMD022 and CMD023 inside the unit of work (rolled back, no journal row, no effect): 07 "Command outcomes and error taxonomy" -
  *   integrity failure is a distinct, nonretryable outcome "until the subject or implementation changes"; 07 "Acceptance obligations" -
  *   "a downstream team must not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" - a local
- *   result is never presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md, refined by D8-CAU-5.
+ *   result is never presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md, refined by D8-CMA-5.
  * - `commercialScopeInspector` (B07 port, bound by the B07 + B09 merge): CMD012's impact map names the live commercial
  *   authorizations bound to the revision it replaces (docs/design/B07-upload-source-lifecycle.md §17 item 7; B09 design §15 item 6):
  *   the replaced revision's manifest hash read in CMD012's own source unit of work (B07's source store), then package B09's
@@ -106,7 +106,7 @@ export interface PlanServices {
 }
 
 /**
- * The plan services of this edition over the cores it is composed with (D8-CAU-5, D8-CAU-6): the artifacts are the platform's own decision
+ * The plan services of this edition over the cores it is composed with (D8-CMA-5, D8-CMA-6): the artifacts are the platform's own decision
  * artifacts, the patch compiler is the core's plan compiler (an unbound core refuses inside the unit of work, D8-PORT-1) and the
  * disclosure composer is computed from records alone.
  */
