@@ -729,8 +729,8 @@ export async function approvePayout(w: World, statement: Statement, seller: { re
     await c.query(
       `INSERT INTO kauro.payout_intents (intent_id, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, reference,
          authorized_by_user_id, authorization_proof_ref, authorized_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'USD', 'KAURO', $5, $6, $7, 'kauro-payout-' || $1::text, $8, $9, kauro.server_now(), now(), now())`,
-      [intentId, statement.statementId, seller.sellerId, options.amountCents ?? statement.payableCents, destination.destinationId, destination.destinationVersion ?? 1, destination.destinationDigest, w.kora, proof],
+       VALUES ($1, $2, $3, $4, 'USD', 'KAURO', $5, $6, $7, $8, $9, $10, kauro.server_now(), now(), now())`,
+      [intentId, statement.statementId, seller.sellerId, options.amountCents ?? statement.payableCents, destination.destinationId, destination.destinationVersion ?? 1, destination.destinationDigest, `kauro-payout-${intentId}`, w.kora, proof],
     );
     await c.query(
       "UPDATE kauro.commission_statements SET state = 'APPROVED', approved_by_user_id = $2, approved_at = kauro.server_now(), approval_proof_ref = $3, version = version + 1 WHERE statement_id = $1",

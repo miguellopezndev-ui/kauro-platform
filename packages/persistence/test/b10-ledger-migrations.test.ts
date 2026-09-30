@@ -146,7 +146,7 @@ test("R2-097 at the database: a pool's cents equal round(basis x rate) and its l
   await assert.rejects(accrue(w, ag, first, allocationId, pool(9713), lines(5828, 3885)), refusedWith("23505", "commission_pools_one_per_purchase_source"));
   // a pool's basis, rate and cents rewritten out of step with its lines are refused at COMMIT (KC002), and a basis never rises (KC015)
   await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_pools SET pool_cents = 9714, version = version + 1 WHERE pool_id = $1", [accrued.poolId])), refusedWith("KC002"));
-  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_pools SET basis_cents = 97126, version = version + 1 WHERE pool_id = $1", [accrued.poolId])), (e: unknown) => refusedWith("KC015")(e) || refusedWith("23514", "commission_pools_basis_falls")(e));
+  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_pools SET basis_cents = 97126, version = version + 1 WHERE pool_id = $1", [accrued.poolId])), refusedWith("KC015"));
   // only the commission service writes the ledger: the owner, a seller and the agency are refused (42501)
   for (const [ctx, who] of [[ownerOf(w), "owner"], [personOf(a.userId), "seller"]] as const) {
     await assert.rejects(within(w.app, ctx, (c) => c.query("UPDATE kauro.commission_lines SET cumulative_entitlement_cents = 0 WHERE pool_id = $1", [accrued.poolId])), refusedWith("42501"), who);
@@ -322,7 +322,7 @@ test("R2-104 at the database: an offset against a later line is refused without 
         [ids.next(), s.sellerId, repeat.lineOf.get(s.sellerId)!, firstPool.lineOf.get(s.sellerId)!, t.agreementId],
       ),
     ),
-    (e: unknown) => refusedWith("KC017")(e) || refusedWith("23503", "commission_offsets_agreement_fk")(e),
+    refusedWith("KC017"),
   );
 
   // the paid cents and the payout rows never change: the commission service's rewrite of paid cents is refused (KA004), nobody holds
@@ -367,9 +367,10 @@ test("R2-139 at the database: a period's close and pay dates are stored with the
   // the dates, once stored with their calendar, never change
   await assert.rejects(
     within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_periods SET pay_due_on = '2026-10-14', version = version + 1 WHERE period_id = $1", [periodId])),
-    (e: unknown) => refusedWith("23514", "commission_periods_banking_days")(e) || refusedWith("KA004")(e),
+    refusedWith("23514", "commission_periods_banking_days"),
   );
-  await oracleProbe(w, "UPDATE kauro.commission_periods SET calendar_id = $2, version = version + 1 WHERE period_id = $1", [periodId, noHoliday], refusedWith("KA004"), "the period keeps its calendar");
+  await oracleProbe(w, "UPDATE kauro.commission_periods SET calendar_id = $2, version = version + 1 WHERE period_id = $1", [periodId, noHoliday], refusedWith("23514", "commission_periods_banking_days"), "the period keeps its calendar's dates");
+  await oracleProbe(w, "UPDATE kauro.commission_periods SET calendar_id = $2, pay_due_on = '2026-10-14', version = version + 1 WHERE period_id = $1", [periodId, noHoliday], refusedWith("KA004"), "even with the other calendar's own dates");
 
   // a statement closed on this TEST_FIXTURE calendar is labelled SIMULATED, with its period's dates and calendar
   const s = await activeSeller(w, "r139-s");
@@ -389,7 +390,8 @@ test("R2-139 at the database: a period's close and pay dates are stored with the
   assert.deepEqual(closed.rows, [{ state: "ISSUED", label: "SIMULATED", statement_date: "2026-10-07", pay_date: "2026-10-15", calendar_id: holiday, calendar_source: "TEST_FIXTURE" }]);
   // the period closes on its calendar with the cutoff hash it closed on, at the server's instant, once
   await within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_periods SET state = 'CLOSED', cutoff_hash = $2, closed_at = kauro.server_now(), version = version + 1 WHERE period_id = $1", [periodId, sha("cutoff")]));
-  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_periods SET state = 'OPEN', closed_at = NULL, version = version + 1 WHERE period_id = $1", [periodId])), (e: unknown) => refusedWith("KA008")(e) || refusedWith("KA004")(e));
+  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_periods SET state = 'OPEN', version = version + 1 WHERE period_id = $1", [periodId])), refusedWith("KA008"));
+  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_periods SET closed_at = NULL, version = version + 1 WHERE period_id = $1", [periodId])), refusedWith("KA004"));
   // calendars are append-only records
   await oracleProbe(w, "UPDATE kauro.banking_calendars SET nonbanking_dates = '{}' WHERE calendar_id = $1", [holiday], refusedWith("KA004"), "calendars are append-only");
 });
@@ -556,12 +558,12 @@ test("CMD052 at the database: an intent's amount equals its statement's payable,
       const second = ids.next();
       await c.query(
         `INSERT INTO kauro.payout_intents (intent_id, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, reference, authorized_by_user_id, authorization_proof_ref, authorized_at, created_at, updated_at)
-         SELECT $1, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, 'kauro-payout-' || $1::text, authorized_by_user_id, authorization_proof_ref, kauro.server_now(), now(), now()
+         SELECT $1, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, $3, authorized_by_user_id, authorization_proof_ref, kauro.server_now(), now(), now()
            FROM kauro.payout_intents WHERE intent_id = $2`,
-        [second, intentId],
+        [second, intentId, `kauro-payout-${second}`],
       );
     }),
-    (e: unknown) => refusedWith("23505", "payout_intents_one_live_per_statement")(e) || refusedWith("23514", "payout_intents_authorization")(e),
+    refusedWith("23505", "payout_intents_one_live_per_statement"),
   );
   // the transfer failed: the FAILED intent is kept with its evidence, the statement back to ISSUED, the line held for the failure ...
   await within(w.commission, corporate, async (c) => {
@@ -580,11 +582,12 @@ test("CMD052 at the database: an intent's amount equals its statement's payable,
   // nobody but the owner authorizes an intent — the seller's own attempt is refused as an authorization in another's name (23514) or by
   // its session's policies (42501), the commission service holds no INSERT (42501) — and an intent's payee never changes
   for (const [client, ctx] of [[w.app, personOf(s.userId)], [w.commission, corporate]] as const) {
+    const attempted = ids.next();
     await assert.rejects(
       within(client, ctx, (c) =>
         c.query(
-          "INSERT INTO kauro.payout_intents (intent_id, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, reference, authorized_by_user_id, authorization_proof_ref, authorized_at, created_at, updated_at) SELECT $1, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, 'kauro-payout-' || $1::text, authorized_by_user_id, authorization_proof_ref, kauro.server_now(), now(), now() FROM kauro.payout_intents WHERE intent_id = $2",
-          [ids.next(), again],
+          "INSERT INTO kauro.payout_intents (intent_id, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, reference, authorized_by_user_id, authorization_proof_ref, authorized_at, created_at, updated_at) SELECT $1, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, $3, authorized_by_user_id, authorization_proof_ref, kauro.server_now(), now(), now() FROM kauro.payout_intents WHERE intent_id = $2",
+          [attempted, again, `kauro-payout-${attempted}`],
         ),
       ),
       (e: unknown) => refusedWith("42501")(e) || refusedWith("23514", "payout_intents_authorization")(e),
@@ -668,7 +671,7 @@ test("CMD053 at the database: a line becomes PAID only when its statement's inte
   ]);
   assert.deepEqual(await lineRow(tLine), { state: "HELD", cumulative: String(t === lo ? 4857 : 4856), paid: null, basis: "97125" });
   // a statement goes back to ISSUED only when its intents failed or were returned, never with one live or settled
-  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_statements SET state = 'ISSUED', version = version + 1 WHERE statement_id = $1", [sStatement.statementId])), (e: unknown) => refusedWith("KA008")(e) || refusedWith("23514", "commission_statements_edge")(e));
+  await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.commission_statements SET state = 'ISSUED', version = version + 1 WHERE statement_id = $1", [sStatement.statementId])), refusedWith("KA008"));
   // the kept intents and their evidence never change and are never deleted
   for (const intentId of [tFirst, tSecond]) {
     await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.payout_intents SET evidence_hash = $2, version = version + 1 WHERE intent_id = $1", [intentId, sha("rewritten")])), refusedWith("KA004"));

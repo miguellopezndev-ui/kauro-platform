@@ -109,7 +109,7 @@ CREATE TABLE kauro.commission_periods (
   CONSTRAINT commission_periods_closed_record CHECK ((state = 'CLOSED') = (closed_at IS NOT NULL) AND (state <> 'CLOSED' OR (calendar_id IS NOT NULL AND cutoff_hash IS NOT NULL)))
 );
 
--- --- statements (platform machine CommissionStatement; D10-STMT-1, D10-STMT-2, R2-102, R2-139) --------------------------------------------
+-- --- statements (platform machine CommissionStatement; D10-STMT-1, D10-STMT-2, R2-102, R2-139) -------------------------------------------
 -- One immutable statement per period and seller (a correction is its own statement naming the one it corrects): its dates are its
 -- period's with the calendar version and source they came from, labelled SIMULATED when that calendar is the TEST_FIXTURE; its totals
 -- are separate (accrued pending, held, payable, paid to date, negative balance) and its payable and held totals are the sums of its
@@ -217,7 +217,7 @@ CREATE TABLE kauro.statement_items (
 );
 CREATE UNIQUE INDEX statement_items_one_line_item ON kauro.statement_items (statement_id, line_id) WHERE item_kind = 'LINE';
 
--- --- payout intents and their reconciliation (platform machine PayoutIntent; D10-PAY-1, D10-PAY-2, R2-103) ---------------------------------
+-- --- payout intents and their reconciliation (platform machine PayoutIntent; D10-PAY-1, D10-PAY-2, R2-103) -------------------------------
 -- The owner's authorization of exactly the statement's payable (minimumPayoutCents 0: any positive amount) to a VERIFIED destination
 -- version of the statement's seller, which it keeps whatever changes later (KC009); fee bearer Kauro; the stable reference
 -- kauro-payout-<intentId>. One live intent per statement: a FAILED or RETURNED one is kept with its evidence beside the next.

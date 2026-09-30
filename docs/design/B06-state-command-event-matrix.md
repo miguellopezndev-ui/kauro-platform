@@ -245,18 +245,18 @@ registry machine; initial ACCRUED_PENDING; terminal VOID; unlisted edges: REJECT
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial ACCRUED_PENDING) | ACCRUED_PENDING | B10: commission accrual | — (no event type registered: the owning package registers it with the edge) | — |
-| ACCRUED_PENDING | eligibility_conditions_met | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | — |
-| ACCRUED_PENDING | justified_dispute_or_funds_hold | HELD | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | — |
-| HELD | hold_resolved_and_eligible | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | — |
-| ELIGIBLE | statement_closed | PAYABLE | CMD051 CloseCommissionPeriod (B10) | — (no event type registered: the owning package registers it with the edge) | — |
-| PAYABLE | settled_payout_evidence | PAID | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | — |
-| PAYABLE | payout_blocked | HELD | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | — |
-| PAID | reconciled_refund_adjustment | ADJUSTED | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | — |
-| ACCRUED_PENDING | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | — |
-| HELD | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | — |
-| ELIGIBLE | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | — |
-| ADJUSTED | further_reconciled_adjustment | ADJUSTED | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | — |
+| — | (initial ACCRUED_PENDING) | ACCRUED_PENDING | B10: commission accrual | — (no event type registered: the owning package registers it with the edge) | database |
+| ACCRUED_PENDING | eligibility_conditions_met | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
+| ACCRUED_PENDING | justified_dispute_or_funds_hold | HELD | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
+| HELD | hold_resolved_and_eligible | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
+| ELIGIBLE | statement_closed | PAYABLE | CMD051 CloseCommissionPeriod (B10) | — (no event type registered: the owning package registers it with the edge) | database |
+| PAYABLE | settled_payout_evidence | PAID | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | database |
+| PAYABLE | payout_blocked | HELD | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | database |
+| PAID | reconciled_refund_adjustment | ADJUSTED | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
+| ACCRUED_PENDING | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
+| HELD | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
+| ELIGIBLE | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
+| ADJUSTED | further_reconciled_adjustment | ADJUSTED | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
 
 ### EndClient
 

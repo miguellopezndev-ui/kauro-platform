@@ -10,9 +10,10 @@
 -- AttributionClaim, CommissionEntitlement; policy commission (acceptedClaimDays 90, terminationOpportunityTailDays 90,
 -- recurrenceCalendarMonths 12, operationalTimezone America/Bogota, calendarMonthRollover CLAMP_DAY_TO_LAST_DAY_OF_DESTINATION_MONTH,
 -- windowAnchor FIRST_DURABLE_CAPTURE_CONFIRMATION); COMMERCIAL_LEDGER_WORKED_EXAMPLES 8, 11, 12, 13, 22. Design:
--- docs/design/B10-commercial-domain.md §2, §5, §8.2, §9, §10 (D10-CTX-2, D10-CTX-3, D10-SELL-1..3, D10-PROS-1, D10-CLAIM-1,
--- D10-ATTR-1, D10-ATTR-2, D10-ASSIGN-1, D10-ASSIGN-2, D10-ASSIST-1, D10-TERM-1, D10-TX-1, D10-EVT-1). This file adds tables,
--- triggers, policies and grants; it edits no B06 or B09 rule. On 0028's tables it adds two keys (binding targets) and read policies.
+-- docs/design/B10-commercial-domain.md §2, §5, §8.2, §9, §10 (D10-CTX-2, D10-CTX-3, D10-SELL-1..4, D10-PROS-1, D10-CLAIM-1,
+-- D10-ATTR-1, D10-ATTR-2, D10-ASSIGN-1, D10-ASSIGN-2, D10-ASSIST-1, D10-ASSIST-2, D10-TERM-1, D10-TX-1, D10-EVT-1, D10-EVT-2). This
+-- file adds tables, triggers, policies and grants; it edits no B06 or B09 rule. On 0028's tables it adds a key (a binding target) and
+-- read and record policies, and on B06's identities the owner's read of sellers' identities (D10-SELL-3).
 --
 -- Principals (D10-CTX-1..3): the corporate owner and the sellers act on kauro_app in an OPERATOR session (their person bound, no
 -- agency); the commission service on kauro_commission. These are corporate records: the owner reads all, a seller its own rows, the
@@ -50,7 +51,7 @@ BEGIN
 END
 $$;
 
--- --- the history of B10's corporate machines (D10-EVT-1, D10-CTX-3) ------------------------------------------------------------------
+-- --- the history of B10's corporate machines (D10-EVT-1, D10-EVT-2, D10-CTX-3) -----------------------------------------------------------
 -- The sales and commission aggregates publish no domain event: their history is kauro.commercial_transitions (0028), recorded by
 -- this writer's half with no agency — a corporate record's history is never readable by a tenant session, even when the row names
 -- the agency it concerns. AFTER INSERT OR UPDATE OF state; TG_ARGV[0] the machine, [1] the id column, [2] the state column.
@@ -265,7 +266,7 @@ CREATE TABLE kauro.seller_tax_documents (
 ALTER TABLE kauro.sellers ADD CONSTRAINT sellers_agreement_fk FOREIGN KEY (seller_id, agreement_id) REFERENCES kauro.seller_agreements (seller_id, agreement_id);
 ALTER TABLE kauro.sellers ADD CONSTRAINT sellers_assessment_fk FOREIGN KEY (seller_id, activation_assessment_id) REFERENCES kauro.seller_assessments (seller_id, assessment_id);
 
--- --- payout destinations (platform machine PayoutDestination; D10-SELL-2, R2-103) ------------------------------------------------------
+-- --- payout destinations (platform machine PayoutDestination; D10-SELL-2, D10-SELL-4, R2-103) --------------------------------------------
 -- A version of the seller's destination: the masked label and the digest of the account details (the details themselves are the
 -- payout adapter's, B15). Written by the seller itself — the change is the seller's own fact, recorded before activation and kept
 -- after termination — and VERIFIED only when the change carried the seller's own fresh step-up and an owner verifies it at least
@@ -526,8 +527,8 @@ CREATE TABLE kauro.assistance_agreements (
 -- agency's first qualifying purchase; its window starts at that purchase's confirmation (policy windowAnchor
 -- FIRST_DURABLE_CAPTURE_CONFIRMATION: the agency's sticky first designation) and ends exclusively twelve calendar months later at
 -- the same America/Bogota wall time with the day clamped (PostgreSQL's month arithmetic clamps it). ASSISTANCE: the one entitlement
--- of an assistance agreement, whose pool the commission service opens. First capture, window, share and agreement are immutable.
--- The transition subject kauro.commission_entitlements (entitlement) (D10-TX-1).
+-- of an assistance agreement, whose pool the commission service opens (D10-ASSIST-2). First capture, window, share and agreement are
+-- immutable. The transition subject kauro.commission_entitlements (entitlement) (D10-TX-1).
 CREATE TABLE kauro.commission_entitlements (
   entitlement_id           uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(entitlement_id)),
   agency_id                uuid NOT NULL REFERENCES kauro.agencies (agency_id),

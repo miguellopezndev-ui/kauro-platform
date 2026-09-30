@@ -301,7 +301,7 @@ test("R2-103 at the database: a payout destination becomes VERIFIED only with th
   assert.equal(await stateOf(third.destinationId), "PENDING_VERIFICATION");
   // a destination's identity, digest and change record never change
   for (const column of ["destination_digest", "changed_at", "change_proof_ref"]) {
-    await oracleProbe(w, `UPDATE kauro.seller_payout_destinations SET ${column} = NULL WHERE destination_id = $1`, [second.destinationId], (e) => refusedWith("KA004")(e) || refusedWith("23502")(e), column);
+    await oracleProbe(w, `UPDATE kauro.seller_payout_destinations SET ${column} = NULL WHERE destination_id = $1`, [second.destinationId], refusedWith("KA004"), column);
   }
 });
 
