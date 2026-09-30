@@ -323,6 +323,26 @@ test("RACE: ExecuteProject racing the payment service's revocation of the author
 });
 
 // the last case of the file: it suspends the platform's CLEAN capability, which no later case can undo
+// before the DENY case below, which suspends the capability every later purchase would need
+test("B08-R1 (CMD036-DENY): an INCLUDED sealed file of the authorization's revision whose admission OBJECT_INVENTORY revoked (GENERATION_CHANGED) — the revision itself still SEALED and the event not yet read by EXECUTION_CONTROL — refuses ExecuteProject 422 SOURCE_EXPIRED with nothing written, while a neighbour purchase whose files are admitted executes", async () => {
+  const { w } = pw;
+  const sale = await pw.paidProject("cmd036-b08r1");
+  const revisionId = await revisionIdOf(pw, sale);
+  const [file] = (await w.h.oracle.query<{ file_id: string }>("SELECT file_id FROM kauro.sealed_revision_files WHERE revision_id = $1 AND disposition = 'INCLUDED' ORDER BY ordinal LIMIT 1", [revisionId])).rows;
+  assert.ok(file, "the revision seals an included file");
+  await revokeAdmission(w, w.A.agencyId, file.file_id, "GENERATION_CHANGED");
+  assert.equal((await w.h.oracle.query<{ state: string }>("SELECT state FROM kauro.dataset_revisions WHERE revision_id = $1", [revisionId])).rows[0]?.state, "SEALED");
+  const before = await footprint(pw);
+  const reply = await execute(pw, sale);
+  assert.equal(outcome(w, reply), "422 SOURCE_EXPIRED -");
+  assert.deepEqual(await footprint(pw), before, "nothing written");
+  assert.deepEqual(await jobsOfAuthorization(pw, sale.authorizationId), [], "no job");
+  assert.equal((await authorizationRow(pw, sale.authorizationId)).state, "ACTIVE", "the authorization is untouched");
+
+  const neighbour = await pw.paidProject("cmd036-b08r1-neighbour");
+  assert.equal(accepted(await execute(pw, neighbour)).state, "QUEUED", "the refusal was the revoked file alone");
+});
+
 test("DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency's project 404; then one missing prerequisite at a time — a revoked authorization, a withdrawn approval, an expired source, a superseded target, a suspended capability, an agency not ACTIVE — is refused with its reason, nothing written and no outbox record", async () => {
   const { w } = pw;
   const sale = await pw.paidProject("cmd036-deny");
@@ -390,23 +410,4 @@ test("DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency'
   const suspended = await pw.paidProject("cmd036-deny-suspended");
   await suspendCapability(pw);
   await refused("a suspended capability", suspended, {}, "422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED");
-});
-
-test("B08-R1 (CMD036-DENY): an INCLUDED sealed file of the authorization's revision whose admission OBJECT_INVENTORY revoked (GENERATION_CHANGED) — the revision itself still SEALED and the event not yet read by EXECUTION_CONTROL — refuses ExecuteProject 422 SOURCE_EXPIRED with nothing written, while a neighbour purchase whose files are admitted executes", async () => {
-  const { w } = pw;
-  const sale = await pw.paidProject("cmd036-b08r1");
-  const revisionId = await revisionIdOf(pw, sale);
-  const [file] = (await w.h.oracle.query<{ file_id: string }>("SELECT file_id FROM kauro.sealed_revision_files WHERE revision_id = $1 AND disposition = 'INCLUDED' ORDER BY ordinal LIMIT 1", [revisionId])).rows;
-  assert.ok(file, "the revision seals an included file");
-  await revokeAdmission(w, w.A.agencyId, file.file_id, "GENERATION_CHANGED");
-  assert.equal((await w.h.oracle.query<{ state: string }>("SELECT state FROM kauro.dataset_revisions WHERE revision_id = $1", [revisionId])).rows[0]?.state, "SEALED");
-  const before = await footprint(pw);
-  const reply = await execute(pw, sale);
-  assert.equal(outcome(w, reply), "422 SOURCE_EXPIRED -");
-  assert.deepEqual(await footprint(pw), before, "nothing written");
-  assert.deepEqual(await jobsOfAuthorization(pw, sale.authorizationId), [], "no job");
-  assert.equal((await authorizationRow(pw, sale.authorizationId)).state, "ACTIVE", "the authorization is untouched");
-
-  const neighbour = await pw.paidProject("cmd036-b08r1-neighbour");
-  assert.equal(accepted(await execute(pw, neighbour)).state, "QUEUED", "the refusal was the revoked file alone");
 });
