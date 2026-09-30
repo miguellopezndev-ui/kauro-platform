@@ -10,6 +10,7 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { AgencyId, ExecutionAttemptRef, ExecutionDiscovery, ExecutionFact, ExecutionInput, ExecutionJobRef, ProcessingAttemptId, ProcessingJobId, ProcessingJobRecord } from "@kauro/domain";
+import { EXECUTION_POLICY } from "@kauro/domain";
 import { execute, int, type Queryable } from "../sql.js";
 import { one, pageLimit, serverInstantOf, str } from "../source/rows.js";
 
@@ -68,10 +69,12 @@ export class PgExecutionDiscovery implements ExecutionDiscovery {
       this.db,
       `SELECT t.attempt_id, t.job_id, t.agency_id FROM kauro.processing_attempts t
         WHERE t.state IN ('COMMITTED', 'ABANDONED', 'FAILED')
-          AND NOT EXISTS (SELECT 1 FROM kauro.attempt_cleanups c WHERE c.attempt_id = t.attempt_id)
+          AND NOT EXISTS (SELECT 1 FROM kauro.attempt_cleanups c WHERE c.attempt_id = t.attempt_id AND (c.result = 'CLEANED' OR c.pass >= $2))
+          AND NOT EXISTS (SELECT 1 FROM kauro.attempt_cleanups c WHERE c.attempt_id = t.attempt_id
+                             AND c.recorded_at + make_interval(secs => $3::double precision * 2 ^ (c.pass - 1)) > kauro.server_now())
           AND NOT EXISTS (SELECT 1 FROM kauro.package_versions p WHERE p.attempt_id = t.attempt_id AND p.state IN ('STAGED', 'VERIFIED_PRIVATE', 'REVOKED'))
         ORDER BY t.ended_at, t.attempt_id LIMIT $1`,
-      [pageLimit(limit, 1000)],
+      [pageLimit(limit, 1000), EXECUTION_POLICY.cleanupPasses, EXECUTION_POLICY.cleanupRetrySeconds],
     );
     return r.rows.map((x) => ({ attemptId: str<ProcessingAttemptId>(x.attempt_id), jobId: str<ProcessingJobId>(x.job_id), agencyId: str<AgencyId>(x.agency_id) }));
   }

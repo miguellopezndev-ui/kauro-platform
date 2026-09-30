@@ -10,12 +10,15 @@
  *      registered RESIDUAL at its generation first, D-OBJ-1), and the registered objects of the prefix the listing no longer shows
  *      closed by their absence; the location's retention read back first when it never was (D-OBJ-2, B07's LocationPolicy);
  *   3. exactly its scratch directory removed (@kauro/data-plane removeAttemptScratch, a link unlinked and never followed);
- *   4. one attempt_cleanups row: its identity and prefix, the generations deleted, the termination's answer, the scratch, the host's
- *      report, CLEANED or PARTIAL, and SIMULATED unless both the host and the storage are real providers.
+ *   4. one attempt_cleanups row per pass: its identity and prefix, the generations deleted, the termination's answer, the scratch, the
+ *      host's report, CLEANED or PARTIAL, and SIMULATED unless both the host and the storage are real providers. A PARTIAL pass — an
+ *      object or the scratch left, or the host's resource report unavailable — is retried by a later pass, at most
+ *      EXECUTION_POLICY.cleanupPasses in all; CLEANED is final (B08-R2, B08-R4, D8-REV-3, D8-REV-4; migration 0024).
  * Nothing outside the prefix is listed, touched or recorded: the database refuses a cleanup naming another attempt's object (KA080).
  */
 import type { ExecutionSweeper, ExecutionUnits, ObjectStoragePort, WorkerHostPort, WorkerResources } from "@kauro/application";
 import { removeAttemptScratch } from "@kauro/data-plane";
+import { EXECUTION_POLICY } from "@kauro/domain";
 import type { AgencyId, AttemptCleanupId, CausationId, CorrelationId, IdGenerator, ProcessingAttemptId, ProjectId, RevisionId, StoredObjectId, StoredObjectRecord } from "@kauro/domain";
 import { requestAndDelete } from "../storage-work.js";
 import { LocationPolicy } from "../sweepers/location-policy.js";
@@ -65,7 +68,10 @@ export class StagingJanitor implements ExecutionSweeper {
     const seen = await p.bound(service, agencyId, async (uow) => {
       const x = uow.execution;
       const attempt = await x.getAttempt(attemptId);
-      if (attempt === null || !["COMMITTED", "ABANDONED", "FAILED"].includes(attempt.state) || (await x.cleanupOf(attemptId)) !== null) return null;
+      if (attempt === null || !["COMMITTED", "ABANDONED", "FAILED"].includes(attempt.state)) return null;
+      // a CLEANED pass is final; a PARTIAL one is retried until the passes are used (the database numbers and bounds them, KA080)
+      const last = await x.cleanupOf(attemptId);
+      if (last !== null && (last.result === "CLEANED" || last.pass >= EXECUTION_POLICY.cleanupPasses)) return null;
       const pkg = await x.packageOfAttempt(attemptId);
       if (pkg !== null && pkg.state !== "AVAILABLE" && pkg.state !== "RETIRED" && pkg.state !== "DELETED") return null;
       const job = await x.getJob(attempt.jobId);
@@ -83,7 +89,12 @@ export class StagingJanitor implements ExecutionSweeper {
       return retry("HOST_UNAVAILABLE", this.deps.retryAfterSeconds);
     }
     if (termination.outcome === "UNCERTAIN") return waiting("TERMINATION_UNCERTAIN");
-    const report = await this.deps.host.resources(attempt.identity).catch(() => null);
+    // an unanswered report is not "no report": the pass stays PARTIAL and a later one asks the host again (B08-R4)
+    let reportUnavailable = false;
+    const report = await this.deps.host.resources(attempt.identity).catch(() => {
+      reportUnavailable = true;
+      return null;
+    });
     const resources: WorkerResources | null = report !== null && report.outcome === "REPORTED" ? report.resources : null;
 
     // 2. exactly its prefix, every generation deleted through the registry
@@ -150,7 +161,8 @@ export class StagingJanitor implements ExecutionSweeper {
       scratchDeleted = false;
     }
 
-    // 4. one cleanup record of exactly this attempt
+    // 4. one cleanup record of exactly this attempt: this pass
+    const cleaned = allDeleted && scratchDeleted && !reportUnavailable;
     const evidenceClass = this.deps.host.evidenceClass === "EXECUTED_PROVIDER" && this.deps.storage.evidenceClass === "EXECUTED_PROVIDER" ? "EXECUTED_PROVIDER" : "SIMULATED";
     await p.bound(service, agencyId, async (uow) => {
       await uow.execution.recordCleanup({
@@ -160,10 +172,11 @@ export class StagingJanitor implements ExecutionSweeper {
         terminationResult: termination.outcome,
         scratchDeleted,
         resources,
-        result: allDeleted && scratchDeleted ? "CLEANED" : "PARTIAL",
+        ...(reportUnavailable ? { resourceReport: "UNAVAILABLE" as const } : {}),
+        result: cleaned ? "CLEANED" : "PARTIAL",
         evidenceClass,
       });
     });
-    return applied(allDeleted && scratchDeleted ? "CLEANED" : "PARTIAL");
+    return applied(cleaned ? "CLEANED" : "PARTIAL");
   }
 }

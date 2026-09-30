@@ -56,6 +56,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0021_execution_jobs_capacity.sql",
     "0022_staging_verification_packages.sql",
     "0023_audits_cost_grants.sql",
+    "0024_execution_review_fixes.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

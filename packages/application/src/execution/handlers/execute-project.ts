@@ -120,7 +120,8 @@ export function executeProjectHandler(runtime: ExecutionRuntime): ExecuteProject
           }
           // the source stays executable while it is SEALED and its retention has not ended, judged on the database's clock (D8-STALE-1, D8-CLOCK-1)
           const sourceEnded = facts.retentionEffectiveDeadline !== null && reachedOnServer(facts.retentionEffectiveDeadline, await uow.serverInstant());
-          if (facts.revisionState !== "SEALED" || sourceEnded) throw new DomainFailure("SOURCE_EXPIRED", "the authorization's source revision is no longer available");
+          // B08-R1: an INCLUDED sealed file whose admission was revoked (the revision itself stays SEALED) ends the source as well
+          if (facts.revisionState !== "SEALED" || sourceEnded || !facts.sourceFilesAdmitted) throw new DomainFailure("SOURCE_EXPIRED", "the authorization's source revision is no longer available");
           if (!facts.targetCurrent) throw new DomainFailure("TARGET_STALE", "the authorization's target contract is no longer confirmed and current");
           if (!facts.capabilityOffered) throw new DomainFailure("CAPABILITY_UNAVAILABLE", "the authorization's mode is no longer offered", { reason: "MODE_NOT_OFFERED" });
 

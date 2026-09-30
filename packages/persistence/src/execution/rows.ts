@@ -11,6 +11,7 @@ import type {
   ArtifactReadbackRecord,
   AttemptCleanupId,
   AttemptCleanupRecord,
+  CleanupResourceReport,
   AttemptState,
   CapabilityId,
   CaptureId,
@@ -357,7 +358,7 @@ export function deliveryRecord(r: Row): DeliveryArtifactRecord {
 
 export const CLEANUP_COLUMNS = `cleanup_id, agency_id, job_id, attempt_id, provider_identity, staging_prefix, deleted_objects, termination_result, scratch_deleted, machine_type, vcpus,
   memory_bytes::text AS memory_bytes, disk_bytes::text AS disk_bytes, peak_scratch_bytes::text AS peak_scratch_bytes, runtime_ms::text AS runtime_ms,
-  cost_micros::text AS cost_micros, currency, result, evidence_class, ${exact("recorded_at")}`;
+  cost_micros::text AS cost_micros, currency, resource_report, pass, result, evidence_class, ${exact("recorded_at")}`;
 
 export function cleanupRecord(r: Row): AttemptCleanupRecord {
   const machineType = optionalString(r["machine_type"]);
@@ -386,6 +387,8 @@ export function cleanupRecord(r: Row): AttemptCleanupRecord {
             currency: str(r["currency"]),
           },
     ),
+    resourceReport: str<CleanupResourceReport>(r["resource_report"]),
+    pass: int(r["pass"]),
     result: str<"CLEANED" | "PARTIAL">(r["result"]),
     evidenceClass: str<"EXECUTED_PROVIDER" | "SIMULATED">(r["evidence_class"]),
     recordedAt: instantText(r["recorded_at"]),

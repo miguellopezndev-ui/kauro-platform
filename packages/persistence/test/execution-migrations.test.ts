@@ -860,7 +860,7 @@ test("B08-R1 at the database: a package cannot become AVAILABLE once an INCLUDED
     if (!revoked) await revoker.query("ROLLBACK").catch(() => undefined);
     await revoker.end();
   }
-  assert.deepEqual(await oracle(env, "SELECT state FROM kauro.dataset_revisions r JOIN kauro.projects p ON p.current_revision_id = r.revision_id WHERE p.project_id = $1", [one.p.projectId]), [{ state: "SEALED" }], "the revision itself is still SEALED");
+  assert.deepEqual(await oracle(env, "SELECT r.state FROM kauro.dataset_revisions r JOIN kauro.projects p ON p.current_revision_id = r.revision_id WHERE p.project_id = $1", [one.p.projectId]), [{ state: "SEALED" }], "the revision itself is still SEALED");
   assert.deepEqual(await oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [one.pkg.packageVersionId]), [{ state: "VERIFIED_PRIVATE" }]);
   assert.deepEqual(await oracle(env, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [one.p.authorizationId]), [{ state: "CONSUMED" }], "never DELIVERED");
 

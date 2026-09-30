@@ -256,6 +256,12 @@ export interface CleanupResources {
   readonly currency: string;
 }
 
+/**
+ * What the host answered for the attempt's resources in a cleanup pass (B08-R4, D8-REV-4): REPORTED with its figures, NOT_FOUND (the
+ * host knows nothing of the identity), or UNAVAILABLE (no answer: the pass stays PARTIAL and a later one asks again).
+ */
+export type CleanupResourceReport = "REPORTED" | "NOT_FOUND" | "UNAVAILABLE";
+
 export interface AttemptCleanupRecord {
   readonly cleanupId: AttemptCleanupId;
   readonly agencyId: AgencyId;
@@ -268,6 +274,9 @@ export interface AttemptCleanupRecord {
   readonly terminationResult: TerminationResult;
   readonly scratchDeleted: boolean;
   readonly resources?: CleanupResources;
+  readonly resourceReport: CleanupResourceReport;
+  /** 1 for the first pass; a PARTIAL pass n is followed by pass n + 1, at most EXECUTION_POLICY.cleanupPasses (D8-REV-3). */
+  readonly pass: number;
   readonly result: "CLEANED" | "PARTIAL";
   readonly evidenceClass: "EXECUTED_PROVIDER" | "SIMULATED";
   readonly recordedAt: UtcInstant;

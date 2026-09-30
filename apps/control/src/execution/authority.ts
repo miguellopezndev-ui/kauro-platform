@@ -39,6 +39,8 @@ export function lostAuthority(job: ProcessingJobRecord, facts: ExecutionAuthorit
   if (!facts.approvalLive) return "APPROVAL_WITHDRAWN";
   if (facts.planState !== "APPROVED") return facts.planState === "WITHDRAWN" ? "PLAN_WITHDRAWN" : facts.planState === "SUPERSEDED" ? "PLAN_SUPERSEDED" : "PLAN_NOT_APPROVED";
   if (facts.revisionState !== "SEALED") return facts.revisionState === "SUPERSEDED" ? "SOURCE_SUPERSEDED" : "SOURCE_EXPIRED";
+  // B08-R1: the revision stays SEALED when an included file's admission is revoked; the job's source is lost all the same
+  if (!facts.sourceFilesAdmitted) return "SOURCE_ADMISSION_REVOKED";
   // D8-XPKG-8: once the revision has a PAID_ORDINARY record, the governing record ahead is read against the job's delivery deadline
   if (facts.paidOrdinaryRetentionId !== null && (facts.retentionEffectiveDeadline === null || microsOfInstant(facts.retentionEffectiveDeadline) < microsOfInstant(job.deliveryDeadlineAt))) {
     return "SOURCE_EXPIRED";

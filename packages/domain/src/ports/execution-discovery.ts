@@ -62,8 +62,10 @@ export interface ExecutionDiscovery {
   /** JOB_DEADLINES: live, uncancelled jobs whose delivery deadline — or execution deadline once launched — is at or before the server clock. */
   jobsPastDeadline(limit: number): Promise<ReadonlyArray<ExecutionJobRef>>;
   /**
-   * STAGING_JANITOR's work (D8-JAN-1): ended attempts without a cleanup record whose staging no package still needs — none, or one
-   * AVAILABLE, RETIRED or DELETED (its delivery copies are the package); a REVOKED package's staging is private evidence, kept.
+   * STAGING_JANITOR's work (D8-JAN-1): ended attempts without a CLEANED cleanup record whose staging no package still needs — none,
+   * or one AVAILABLE, RETIRED or DELETED (its delivery copies are the package); a REVOKED package's staging is private evidence, kept.
+   * An attempt whose last pass was PARTIAL is due again cleanupRetrySeconds × 2^(pass − 1) after it, until its cleanupPasses are
+   * used (B08-R2, D8-REV-3).
    */
   attemptsToClean(limit: number): Promise<ReadonlyArray<ExecutionAttemptRef>>;
   /** EXECUTION_CONTROL (D8-CANCEL-2): the agency's live, uncancelled jobs that rely on the fact. */

@@ -15,7 +15,7 @@ import { clockAt } from "../src/testing/source-lifecycle.js";
 import { backendPid, barrier, settlesOrWaits, waitForLockWait } from "../src/testing/harness.js";
 import { admitJob, controlOf, endJob, launchJob, queueJob, stageJob, verifyJob } from "../src/testing/execution-fixtures.js";
 import { tenant, within } from "./commerce-support.js";
-import { asControl, causeState, closeExecutionEnv, openExecutionEnv, oracle, purchase, refused, type ExecutionEnv } from "./execution-support.js";
+import { asControl, causeConstraint, causeState, closeExecutionEnv, openExecutionEnv, oracle, purchase, refused, type ExecutionEnv } from "./execution-support.js";
 import { clock, event, ids, sha, sqlState } from "./support.js";
 
 let env: ExecutionEnv;
@@ -272,16 +272,16 @@ test("S075 at the database: an attempt cleanup records exactly one attempt with 
     },
   );
   assert.deepEqual(await env.h.execution.run(controlOf(A.agencyId), (uow) => uow.execution.cleanupOf(attempt.attemptId)), record);
-  // exactly one cleanup per attempt
-  await assert.rejects(cleaned(deleted), (e: unknown) => causeState(e) === "23505", "a second cleanup of the attempt");
+  // CLEANED is final: no pass after it (B08-R2, migration 0024; KA080)
+  await assert.rejects(cleaned(deleted), (e: unknown) => causeState(e) === "KA080", "a second cleanup of a CLEANED attempt");
   // a cleanup row cannot claim another attempt's identity and prefix: they are the attempt's own by key
   await asControl(env, A, async (c) => {
     await refused(
       c,
       () =>
         c.query(
-          `INSERT INTO kauro.attempt_cleanups (cleanup_id, agency_id, job_id, attempt_id, provider_identity, staging_prefix, deleted_objects, termination_result, scratch_deleted, result, evidence_class)
-           VALUES ($1, $2, $3, $4, $5, $6, '[]'::jsonb, 'NOT_FOUND', true, 'CLEANED', 'SIMULATED')`,
+          `INSERT INTO kauro.attempt_cleanups (cleanup_id, agency_id, job_id, attempt_id, provider_identity, staging_prefix, deleted_objects, termination_result, scratch_deleted, result, evidence_class, resource_report)
+           VALUES ($1, $2, $3, $4, $5, $6, '[]'::jsonb, 'NOT_FOUND', true, 'PARTIAL', 'SIMULATED', 'NOT_FOUND')`,
           [ids.next(), A.agencyId, q2.jobId, siblingStaging.attempt.attemptId, attempt.identity, attempt.stagingPrefix],
         ),
       "23503",
@@ -289,9 +289,31 @@ test("S075 at the database: an attempt cleanup records exactly one attempt with 
       "attempt_cleanups_attempt_identity_fk",
     );
   });
+  // B08-R2, B08-R4 (migration 0024): the sibling's PARTIAL passes are numbered by the database, at most five; CLEANED never claims an
+  // unanswered resource report
+  const siblingPass = (input: Omit<CleanupInput, "cleanupId" | "attemptId">) =>
+    env.h.execution.run(controlOf(A.agencyId), (uow) => uow.execution.recordCleanup({ ...input, cleanupId: uow.ids.next() as AttemptCleanupId, attemptId: siblingStaging.attempt.attemptId }));
+  await assert.rejects(
+    siblingPass({ deletedObjects: [], terminationResult: "NOT_FOUND", scratchDeleted: true, resources: null, resourceReport: "UNAVAILABLE", result: "CLEANED", evidenceClass: "SIMULATED" }),
+    (e: unknown) => causeState(e) === "23514" && causeConstraint(e) === "attempt_cleanups_cleaned",
+    "CLEANED without the host's resource report",
+  );
+  const passes: number[] = [];
+  for (let n = 1; n <= 5; n += 1) {
+    const pass = await siblingPass({ deletedObjects: [], terminationResult: "NOT_FOUND", scratchDeleted: false, resources: null, resourceReport: "UNAVAILABLE", result: "PARTIAL", evidenceClass: "SIMULATED" });
+    assert.equal(pass.resourceReport, "UNAVAILABLE");
+    passes.push(pass.pass);
+  }
+  assert.deepEqual(passes, [1, 2, 3, 4, 5]);
+  await assert.rejects(
+    siblingPass({ deletedObjects: [], terminationResult: "NOT_FOUND", scratchDeleted: true, resources, result: "CLEANED", evidenceClass: "SIMULATED" }),
+    (e: unknown) => causeState(e) === "KA080",
+    "a sixth pass",
+  );
+  assert.equal((await env.h.execution.run(controlOf(A.agencyId), (uow) => uow.execution.cleanupOf(siblingStaging.attempt.attemptId)))?.pass, 5, "cleanupOf reads the latest pass");
   assert.deepEqual(
     await oracle(env, "SELECT count(*)::int AS n FROM kauro.attempt_cleanups WHERE attempt_id = ANY($1::uuid[])", [[attempt.attemptId, siblingStaging.attempt.attemptId, foreignStaging.attempt.attemptId]]),
-    [{ n: 1 }],
+    [{ n: 6 }],
   );
 });
 

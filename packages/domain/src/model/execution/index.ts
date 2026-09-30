@@ -56,6 +56,7 @@ export type {
   PackageVersionRecord,
   DeliveryArtifactRecord,
   TerminationResult,
+  CleanupResourceReport,
   CleanupResources,
   AttemptCleanupRecord,
   ExecutionCapacitySnapshot,

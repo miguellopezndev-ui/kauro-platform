@@ -109,6 +109,9 @@ const TRANSITION_KINDS: Readonly<Record<TransitionSubject["kind"], string>> = Ob
   AGENCY: "kauro.agencies",
 });
 
+/** The INCLUDED files of the sealed revision $1 (B08-R1: the revision's source authority is also their admission). */
+const INCLUDED_FILES = "kauro.sealed_revision_files s WHERE s.revision_id = $1::uuid AND s.disposition = 'INCLUDED'";
+
 /** The retention policy label of the records execution writes (the registry's pricing and retention schedule of this edition). */
 const RETENTION_POLICY_VERSION = "R2-INITIAL";
 
@@ -207,7 +210,7 @@ export class PgExecutionStore implements ExecutionStore {
   }
 
   async cleanupOf(attemptId: ProcessingAttemptId): Promise<AttemptCleanupRecord | null> {
-    const r = await execute<Row>(this.db, `SELECT ${CLEANUP_COLUMNS} FROM kauro.attempt_cleanups WHERE attempt_id = $1`, [attemptId]);
+    const r = await execute<Row>(this.db, `SELECT ${CLEANUP_COLUMNS} FROM kauro.attempt_cleanups WHERE attempt_id = $1 ORDER BY pass DESC LIMIT 1`, [attemptId]);
     return r.rows[0] ? cleanupRecord(r.rows[0]) : null;
   }
 
@@ -257,11 +260,21 @@ export class PgExecutionStore implements ExecutionStore {
 
   async awaitTransition(subject: TransitionSubject): Promise<void> {
     await execute(this.db, "SELECT kauro.await_transition($1, $2)", [TRANSITION_KINDS[subject.kind], subject.key]);
+    // a revision's source is also its INCLUDED sealed files' admission (B08-R1): their shared transition halves, in file order, so
+    // an admission revocation in flight (OBJECT_INVENTORY, RETENTION) commits before the authority is read, or waits for this one
+    if (subject.kind === "REVISION") await execute(this.db, `SELECT kauro.await_transition('kauro.source_files', s.file_id::text) FROM ${INCLUDED_FILES} ORDER BY s.file_id`, [subject.key]);
   }
 
   async tryAwaitTransition(subject: TransitionSubject): Promise<boolean> {
     const r = await execute<{ ok: boolean }>(this.db, "SELECT kauro.try_await_transition($1, $2) AS ok", [TRANSITION_KINDS[subject.kind], subject.key]);
-    return r.rows[0]?.ok === true;
+    if (r.rows[0]?.ok !== true) return false;
+    if (subject.kind !== "REVISION") return true;
+    const files = await execute<{ ok: boolean | null }>(
+      this.db,
+      `SELECT bool_and(t.ok) AS ok FROM (SELECT kauro.try_await_transition('kauro.source_files', s.file_id::text) AS ok FROM ${INCLUDED_FILES} ORDER BY s.file_id) t`,
+      [subject.key],
+    );
+    return files.rows[0]?.ok !== false;
   }
 
   async tryTransitionExclusive(subject: TransitionSubject): Promise<boolean> {
@@ -292,6 +305,10 @@ export class PgExecutionStore implements ExecutionStore {
               (SELECT r.state FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $6) AS revision_state,
               (SELECT t.contract_id FROM kauro.target_contracts t WHERE t.agency_id = $1 AND t.project_id = $2 AND t.body_hash = $7) AS target_contract_id,
               EXISTS (SELECT 1 FROM kauro.target_contracts t WHERE t.agency_id = $1 AND t.project_id = $2 AND t.body_hash = $7 AND t.confirmed_at IS NOT NULL AND t.superseded_at IS NULL) AS target_current,
+              NOT EXISTS (SELECT 1 FROM kauro.dataset_revisions r
+                            JOIN kauro.sealed_revision_files s ON s.agency_id = r.agency_id AND s.revision_id = r.revision_id AND s.disposition = 'INCLUDED'
+                            JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
+                           WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $6 AND f.state <> 'ADMITTED') AS source_files_admitted,
               EXISTS (SELECT 1 FROM kauro.capabilities k WHERE k.capability_id = $8 AND k.state IN ('AVAILABLE_LIMITED', 'AVAILABLE')) AS capability_offered,
               (SELECT ${exact("c.provider_completed_at", "at")} FROM kauro.capture_facts c WHERE c.agency_id = $1 AND c.capture_id = $9) AS capture_completed_at,
               (SELECT to_char(max(rr.effective_deadline) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
@@ -314,6 +331,7 @@ export class PgExecutionStore implements ExecutionStore {
       revisionState: optionalString(x["revision_state"]) ?? null,
       targetContractId: optionalString(x["target_contract_id"]) ?? null,
       targetCurrent: x["target_current"] === true,
+      sourceFilesAdmitted: x["source_files_admitted"] === true,
       capabilityOffered: x["capability_offered"] === true,
       captureCompletedAt: optionalString(x["capture_completed_at"]) ?? null,
       retentionEffectiveDeadline: optionalString(x["retention_effective_deadline"]) ?? null,
@@ -1000,8 +1018,8 @@ export class PgExecutionStore implements ExecutionStore {
     const r = await execute<Row>(
       this.db,
       `INSERT INTO kauro.attempt_cleanups (cleanup_id, agency_id, job_id, attempt_id, provider_identity, staging_prefix, deleted_objects, termination_result, scratch_deleted,
-          machine_type, vcpus, memory_bytes, disk_bytes, peak_scratch_bytes, runtime_ms, cost_micros, currency, result, evidence_class)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING ${CLEANUP_COLUMNS}`,
+          machine_type, vcpus, memory_bytes, disk_bytes, peak_scratch_bytes, runtime_ms, cost_micros, currency, result, evidence_class, resource_report)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING ${CLEANUP_COLUMNS}`,
       [
         cleanup.cleanupId,
         attempt.agencyId,
@@ -1022,6 +1040,7 @@ export class PgExecutionStore implements ExecutionStore {
         res?.currency ?? null,
         cleanup.result,
         cleanup.evidenceClass,
+        res !== null ? "REPORTED" : (cleanup.resourceReport ?? "NOT_FOUND"),
       ],
     );
     return cleanupRecord(one(r.rows, "attempt cleanup"));

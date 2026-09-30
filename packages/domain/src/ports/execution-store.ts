@@ -75,6 +75,8 @@ export interface ExecutionAuthorityFacts {
   readonly revisionState: string | null;
   readonly targetContractId: string | null;
   readonly targetCurrent: boolean;
+  /** No INCLUDED sealed file of the revision has lost its admission (B08-R1: GENERATION_MISSING, GENERATION_CHANGED, ...). */
+  readonly sourceFilesAdmitted: boolean;
   readonly capabilityOffered: boolean;
   /** capture_facts.provider_completed_at (D8-XPKG-5): the anchor of the delivery and retention deadlines. */
   readonly captureCompletedAt: string | null;
@@ -186,6 +188,8 @@ export interface CleanupInput {
   readonly terminationResult: TerminationResult;
   readonly scratchDeleted: boolean;
   readonly resources: CleanupResources | null;
+  /** REPORTED when `resources` is given; otherwise NOT_FOUND unless the report could not be obtained (UNAVAILABLE, B08-R4). */
+  readonly resourceReport?: "NOT_FOUND" | "UNAVAILABLE";
   readonly result: "CLEANED" | "PARTIAL";
   readonly evidenceClass: "EXECUTED_PROVIDER" | "SIMULATED";
 }
@@ -210,6 +214,7 @@ export interface ExecutionStore {
   readbacksOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<ArtifactReadbackRecord>>;
   deliveryArtifactsOf(packageVersionId: PackageVersionId): Promise<ReadonlyArray<DeliveryArtifactRecord>>;
   verificationsOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<PackageVerificationRecord>>;
+  /** The attempt's latest cleanup pass (the highest pass number), or null. */
   cleanupOf(attemptId: ProcessingAttemptId): Promise<AttemptCleanupRecord | null>;
   /** The job's JOB_ATTEMPT lease (resource = the job id). */
   jobLease(jobId: ProcessingJobId): Promise<LeaseRecord | null>;

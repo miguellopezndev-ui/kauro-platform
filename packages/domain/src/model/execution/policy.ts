@@ -24,6 +24,10 @@ export const EXECUTION_POLICY = Object.freeze({
   paidOrdinaryHardSeconds: 1_209_600,
   /** retention.paidDaysFromFirstPackage (7 days): the PAID_ORDINARY soft deadline from the first package (D8-RET-1). */
   paidOrdinarySoftSeconds: 604_800,
+  /** Cleanup passes of one ended attempt: a PARTIAL pass is retried, at most this many in all (B08-R2, D8-REV-3; migration 0024). */
+  cleanupPasses: 5,
+  /** The first retry of a PARTIAL cleanup pass is due this long after it, each later one twice as long (D8-REV-3). */
+  cleanupRetrySeconds: 300,
 } as const);
 
 export type ExecutionPolicy = typeof EXECUTION_POLICY;

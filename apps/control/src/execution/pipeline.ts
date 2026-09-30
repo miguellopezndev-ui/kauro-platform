@@ -51,6 +51,7 @@ import {
   deliveryManifestHashOf,
   type AgencyId,
   type ArtifactReadbackId,
+  type ArtifactReadbackRecord,
   type ExecutionInput,
   type ExecutionUnitOfWork,
   type IdGenerator,
@@ -113,6 +114,12 @@ async function collect(stream: AsyncIterable<Uint8Array>): Promise<Buffer> {
 }
 
 /** The problem of one read-back, exact (S061): nothing under the name, a shorter blob, other bytes, or another generation of them. */
+/** A recorded read-back's observation as `readbackProblem` reads it: nothing found (or no generation, digest or length) is null. */
+function observedOf(o: ArtifactReadbackRecord["observed"]): Observed | null {
+  if (o === undefined || o.generation === null || o.sha256 === null || o.byteLength === null) return null;
+  return { generation: o.generation, sha256: o.sha256, byteLength: o.byteLength };
+}
+
 export function readbackProblem(expected: Observed, observed: Observed | null): string | null {
   if (observed === null) return "READBACK_MISSING";
   if (observed.byteLength < expected.byteLength) return "READBACK_PARTIAL_BLOB";
@@ -734,10 +741,21 @@ export class JobPipeline {
         const facts = await this.authorityAfterLocks(uow, checked.job);
         const lost = lostAuthority(checked.job, facts, "CONSUMED");
         if (lost !== null) return { stale: await this.cancelForStaleAuthority(uow, checked.job, checked.pkg, lost) };
-        return { stale: null, ...checked, staged: await x.stagedArtifactsOf(checked.attempt.attemptId), copies: await x.deliveryArtifactsOf(checked.pkg.packageVersionId) };
+        return {
+          stale: null,
+          ...checked,
+          staged: await x.stagedArtifactsOf(checked.attempt.attemptId),
+          copies: await x.deliveryArtifactsOf(checked.pkg.packageVersionId),
+          readbacks: await x.readbacksOf(checked.attempt.attemptId),
+        };
       });
       if (ready.stale !== null) return refused(ready.stale);
-      const { job, attempt, pkg, staged, copies } = ready;
+      const { job, attempt, pkg, staged, copies, readbacks } = ready;
+      // B08-R3: a delivery read-back an earlier run recorded negative (it crashed before failing the job) is the same failure now
+      const recordedProblem = readbacks
+        .filter((r) => r.kind === "DELIVERY" && r.packageVersionId === pkg.packageVersionId && r.result !== "EQUAL")
+        .map((r) => readbackProblem(r.expected, observedOf(r.observed)) ?? "READBACK_FOREIGN_CONTENT")[0];
+      if (recordedProblem !== undefined) return this.failFor(job.jobId, attempt.attemptId, `DELIVERY_${recordedProblem}`, service);
 
       // the delivery copies, generation-0 preconditions, each read back (outside any transaction)
       const copied = new Set(copies.map((c) => c.sourceObjectName));
