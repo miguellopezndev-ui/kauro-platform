@@ -114,13 +114,16 @@ export function eligibilityDecision(terms: Pick<CommissionPolicy, "eligibilityHo
   return { state: "ELIGIBLE", eligibleAt };
 }
 
-/** A commission period: one calendar month of the operational zone, [start, end), with its close and pay dates (D10-CAL-1). */
+/**
+ * A commission period: one calendar month of the operational zone, [start, end), with its close and pay dates (D10-CAL-1) — both
+ * null when the calendar does not cover the pay date, for a period is dated with both or neither (commission_periods_dates_record).
+ */
 export interface CommissionPeriodDates {
   readonly month: string;
   readonly startsAt: UtcInstant;
   readonly endsAt: UtcInstant;
-  readonly closeDueOn: string;
-  readonly payDueOn: string;
+  readonly closeDueOn: string | null;
+  readonly payDueOn: string | null;
 }
 
 /**
@@ -128,11 +131,14 @@ export interface CommissionPeriodDates {
  * Bogota and ends at the next month's; its statement is due on the 5th and its payout on the 10th banking day after month-end.
  */
 export function commissionPeriodOf(month: string, terms: Pick<CommissionPolicy, "operationalTimeZone" | "statementBankingDay" | "payBankingDay">, calendar: BankingDays): CommissionPeriodDates {
+  const closeDueOn = bankingDayAfterMonthEnd(month, terms.statementBankingDay, calendar);
+  const payDueOn = bankingDayAfterMonthEnd(month, terms.payBankingDay, calendar);
+  const dated = closeDueOn !== null && payDueOn !== null;
   return {
     month,
     startsAt: monthStartsAt(month, terms.operationalTimeZone),
     endsAt: monthStartsAt(nextMonth(month), terms.operationalTimeZone),
-    closeDueOn: bankingDayAfterMonthEnd(month, terms.statementBankingDay, calendar),
-    payDueOn: bankingDayAfterMonthEnd(month, terms.payBankingDay, calendar),
+    closeDueOn: dated ? closeDueOn : null,
+    payDueOn: dated ? payDueOn : null,
   };
 }

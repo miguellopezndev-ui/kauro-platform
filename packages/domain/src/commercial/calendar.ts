@@ -110,10 +110,18 @@ export function addHours(instant: UtcInstant, hours: number): UtcInstant {
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-/** The explicit calendar a count runs over: the non-banking dates besides weekends (a recorded BankingCalendar version's). */
+/**
+ * The explicit calendar a count runs over (a recorded BankingCalendar version's): the non-banking dates besides weekends and the
+ * dates the version covers. A day outside [coversFrom, coversTo] is unknown to the version, so it is never counted as a banking day.
+ */
 export interface BankingDays {
   readonly nonbankingDates: ReadonlyArray<string>;
+  readonly coversFrom: string;
+  readonly coversTo: string;
 }
+
+/** How far a count looks after month-end, as kauro.banking_day_after does (62 days). */
+const BANKING_DAY_HORIZON_DAYS = 62;
 
 function parseMonth(month: string): { readonly year: number; readonly month: number } {
   const m = MONTH.exec(month);
@@ -135,25 +143,33 @@ function assertCalendarDate(value: string): void {
 /**
  * The `ordinal`-th banking day after the end of `month` (YYYY-MM): counting from the first day of the next month, skipping Saturdays,
  * Sundays and the listed non-banking dates (example 21: with 2026-10-12 listed, the 5th after September 2026 is 2026-10-07 and the
- * 10th 2026-10-15). A weekday of a calendar date is the same in every zone.
+ * 10th 2026-10-15). A weekday of a calendar date is the same in every zone. Null when the calendar does not cover the count — its
+ * coverage starts after the first day counted, or ends before the ordinal-th banking day — exactly where the database's
+ * kauro.banking_day_after answers NULL (0031), so a period is never dated beyond what a recorded version knows.
  */
-export function bankingDayAfterMonthEnd(month: string, ordinal: number, calendar: BankingDays): string {
+export function bankingDayAfterMonthEnd(month: string, ordinal: number, calendar: BankingDays): string | null {
   const { year, month: m } = parseMonth(month);
   if (!Number.isSafeInteger(ordinal) || ordinal < 1 || ordinal > 31) throw new RangeError("the ordinal is a banking day 1..31");
   for (const d of calendar.nonbankingDates) assertCalendarDate(d);
+  assertCalendarDate(calendar.coversFrom);
+  assertCalendarDate(calendar.coversTo);
+  if (calendar.coversTo < calendar.coversFrom) throw new RangeError("a calendar covers a range of dates");
   const listed = new Set(calendar.nonbankingDates);
-  let cursor = Date.UTC(year, m, 1);
+  const first = Date.UTC(year, m, 1);
+  const start = new Date(first);
+  if (isoDate(start.getUTCFullYear(), start.getUTCMonth() + 1, 1) < calendar.coversFrom) return null;
   let counted = 0;
-  for (;;) {
-    const day = new Date(cursor);
+  for (let offset = 0; offset < BANKING_DAY_HORIZON_DAYS; offset += 1) {
+    const day = new Date(first + offset * 86_400_000);
     const weekday = day.getUTCDay();
     const date = isoDate(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate());
+    if (date > calendar.coversTo) return null;
     if (weekday !== 0 && weekday !== 6 && !listed.has(date)) {
       counted += 1;
       if (counted === ordinal) return date;
     }
-    cursor += 86_400_000;
   }
+  return null;
 }
 
 /** The instant a calendar month (YYYY-MM) starts at in `zone`: its first day at 00:00 local time. */

@@ -6,20 +6,24 @@
  * `binding: CONTRACT_FAKE`, evidence class SIMULATED, a call log and a hold point; reachable only from the testing subpath.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AgencyId, CaptureId, Clock, UnitOfWork } from "@kauro/domain";
+import { COMMERCIAL_VOCABULARY, type AgencyId, type CaptureId, type Clock, type CompletionSource, type UnitOfWork } from "@kauro/domain";
 import { CONTRACT_FAKE, FAKE_EVIDENCE_CLASS, sha256Hex, type FakeCall } from "../../commerce/testing/labels.js";
 import type { PreparationCompletion, PreparationCompletionKind, PreparationCompletionSource } from "../ports.js";
 import { HoldPoints, type CommercialFakeHold } from "./holds.js";
 
 export const PREPARATION_COMPLETION_FAKE_PROVIDER = "contract-fake-preparation-completion" as const;
 
-/** What a test records: one completion of one purchase (an agency's capture) of one kind. */
+/**
+ * What a test records: one completion of one purchase (an agency's capture) — a STAGE names the stage it completes, a FINAL names
+ * none — reported by a registered source, so it is a completion purchase_completions can record.
+ */
 export interface RecordedCompletion {
   readonly agencyId: AgencyId;
   readonly captureId: CaptureId;
   readonly kind: PreparationCompletionKind;
+  readonly stageRef?: string;
   readonly completedAt: UtcInstant;
-  readonly source: string;
+  readonly source: CompletionSource;
 }
 
 const KIND_ORDER: Readonly<Record<PreparationCompletionKind, number>> = { STAGE: 0, FINAL: 1 };
@@ -42,16 +46,27 @@ export class ContractFakePreparationCompletion implements PreparationCompletionS
     return Object.freeze([...this.log]);
   }
 
-  /** Records one completion. One completion per purchase and kind: a second is refused, as the platform's own fact is written once. */
+  /**
+   * Records one completion, as the platform's own fact is written once: one FINAL per purchase and one STAGE per purchase and stage —
+   * a second is refused — a STAGE only with its stage reference and a FINAL without one, from a registered source only.
+   */
   record(completion: RecordedCompletion): void {
     const key = `${completion.agencyId}/${completion.captureId}`;
+    if (!(COMMERCIAL_VOCABULARY.completionSources as ReadonlyArray<string>).includes(completion.source)) {
+      throw new Error(`"${String(completion.source)}" is not a registered completion source (contract fake)`);
+    }
+    const stageRef = completion.stageRef;
+    if ((completion.kind === "STAGE") !== (stageRef !== undefined)) throw new Error(`a ${completion.kind} completion ${completion.kind === "STAGE" ? "names its stage" : "names no stage"} (contract fake)`);
     const held = this.recorded.get(key) ?? [];
-    if (held.some((c) => c.kind === completion.kind)) throw new Error(`a ${completion.kind} completion is already recorded for ${key} (contract fake)`);
+    if (held.some((c) => c.kind === completion.kind && c.stageRef === stageRef)) {
+      throw new Error(`a ${completion.kind}${stageRef === undefined ? "" : ` ${stageRef}`} completion is already recorded for ${key} (contract fake)`);
+    }
     held.push(
       Object.freeze({
         kind: completion.kind,
+        ...(stageRef === undefined ? {} : { stageRef }),
         completedAt: completion.completedAt,
-        evidenceHash: sha256Hex(["preparation-completion", completion.agencyId, completion.captureId, completion.kind, completion.completedAt, completion.source].join("|")),
+        evidenceHash: sha256Hex(["preparation-completion", completion.agencyId, completion.captureId, completion.kind, stageRef ?? "", completion.completedAt, completion.source].join("|")),
         source: completion.source,
       }),
     );

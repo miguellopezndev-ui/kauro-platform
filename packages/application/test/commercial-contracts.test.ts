@@ -213,7 +213,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   ok(commercialCommandResponseSchemaId("CMD046"), completed(claim, 1));
   ok(commercialCommandResponseSchemaId("CMD047"), completed({ claim: { ...claim, state: "ACCEPTED", acceptedAt: AT, version: 2 }, allocationId: ID(140), agencyId: ID(2), decisionReason: "FIRST_CLAIM_WINS", beneficiaryCount: 1, rejectedClaimCount: 2 }, 2));
   ok(commercialCommandResponseSchemaId("CMD048"), completed({ agencyId: ID(2), version: 4, sellerId: ID(103), assignedAt: AT, newWorkCompensation: "NONE" }, 4));
-  ok(commercialCommandResponseSchemaId("CMD048"), completed({ agencyId: ID(2), version: 5, sellerId: ID(103), assignedAt: AT, newWorkCompensation: "ASSISTANCE", assistanceAgreementId: ID(141) }, 5));
+  ok(commercialCommandResponseSchemaId("CMD048"), completed({ agencyId: ID(2), version: 5, sellerId: ID(103), assignedAt: AT, newWorkCompensation: "ASSISTANCE_AGREEMENT", assistanceAgreementId: ID(141) }, 5));
   ok(commercialCommandResponseSchemaId("CMD049"), completed({ sellerId: ID(103), version: 2, state: "ACTIVE", agreementId: ID(16), classification: "INDEPENDENT_COLLABORATION", activatedAt: AT, payoutDestinationVerified: false }, 2));
   ok(commercialCommandResponseSchemaId("CMD050"), completed({ sellerId: ID(103), version: 3, state: "TERMINATED", effectiveAt: AT, tailEndsAt: "2027-01-05T12:00:00.000Z", tailEntries: 2, entitlementsResidual: 2, claimsExpired: 1, prospectsUnassigned: 3, assignmentsEnded: 2 }, 3));
   ok(commercialCommandResponseSchemaId("CMD051"), completed({ period, ledgerCutoffHash: H("c"), statementCount: 3, payableTotalCents: "43704", heldTotalCents: "2000", guardReviewCount: 1 }, 2));

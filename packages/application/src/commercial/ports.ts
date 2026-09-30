@@ -5,21 +5,39 @@
  * these interfaces; the shipped binding of each is either an adapter over B10's own tables or a binding that answers the refusal
  * the design names (bindings.ts), and tests bind the labelled contract fakes of the ./testing subpath (commercial/testing).
  *
- * The ports are self-contained on purpose: they import no module of the B10 domain model (B10-MODEL is built beside this lane), so a
- * port never depends on an enumeration another lane may still change. Their vocabularies are the design's, spelled here once.
+ * B10-PORTS-FAKES first spelled their vocabularies here, beside B10-MODEL; since stage 1 every shape a port answers is the domain's own
+ * record or vocabulary (commercial/records.ts, COMMERCIAL_VOCABULARY; D10-STAGE-2), so what a port reports is what the database
+ * records — a calendar version with the dates it covers, a completion with a registered source and its stage, payout evidence with
+ * its observation instant — and no adapter or handler converts a token.
  *
  * No port that reaches a provider is called inside a database transaction (07 "No database transaction remains open across ...
  * calls"): PayoutEvidenceVerifier therefore takes no unit of work. The three ports that read platform state (buyer type,
  * completions, calendar) run in the caller's unit of work, so what they answer is read at the caller's snapshot.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { AgencyId, CaptureId, CommerceUnitOfWork, IntegrationClass, UnitOfWork, UserId } from "@kauro/domain";
+import type {
+  AgencyId,
+  BankingCalendarRecord,
+  BuyerType as DomainBuyerType,
+  CalendarSource,
+  CaptureId,
+  CommerceUnitOfWork,
+  CompletionKind,
+  CompletionSource,
+  FoundingOfferView,
+  IntegrationClass,
+  PayoutEvidenceFacts,
+  PayoutEvidenceStatus as DomainPayoutEvidenceStatus,
+  SellerState,
+  UnitOfWork,
+  UserId,
+} from "@kauro/domain";
 import type { PlatformBinding } from "../commerce/ports.js";
 
 // --- BuyerTypeReader (A3 3.7; design §3.4 CMD027 precondition BUYER_TYPE_UNSET) --------------------------------------------------
 
 /** The agency's recorded buyer type (B11 stores `agency` / `in-house`; the adapter maps). Only an AGENCY buyer earns a commission (A3 3.7). */
-export type BuyerType = "AGENCY" | "IN_HOUSE";
+export type BuyerType = DomainBuyerType;
 
 /**
  * The agency's recorded buyer type, or null while none is recorded — which CMD027 refuses BUYER_TYPE_UNSET and CMD047 refuses as an
@@ -33,14 +51,19 @@ export interface BuyerTypeReader {
 // --- PreparationCompletionSource (design §7 "Completion and eligibility"; Q10-8) -----------------------------------------------
 
 /** STAGE: one stage of a staged purchase was completed; FINAL: the purchase's preparation is complete (B08 and B13 own the fact). */
-export type PreparationCompletionKind = "STAGE" | "FINAL";
+export type PreparationCompletionKind = CompletionKind;
 
-/** One completion of a qualifying purchase: its instant, the evidence that establishes it and the source that reported it. */
+/**
+ * One completion of a qualifying purchase as purchase_completions records it: its kind — a STAGE names the stage it completes, a
+ * FINAL names none — its instant, the evidence that establishes it and the binding that reported it (AUTHORIZATION_DELIVERY for
+ * B09's delivered authorization of a single-stage purchase, STAGED_PREPARATION for the stages of a staged one).
+ */
 export interface PreparationCompletion {
   readonly kind: PreparationCompletionKind;
+  readonly stageRef?: string;
   readonly completedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
-  readonly source: string;
+  readonly source: CompletionSource;
 }
 
 /** The completions of one purchase, in instant order with a STAGE before a FINAL of the same instant; empty while nothing is complete. */
@@ -55,20 +78,15 @@ export interface PreparationCompletionSource {
  * Where a calendar version came from: a verified feed (B15, owner-reviewed) or the controlled fixture of a test. A fixture is never
  * presented as a feed: the source travels with the version into the commission period, which records it and whether it is SIMULATED.
  */
-export type BankingCalendarSourceKind = "VERIFIED_FEED" | "TEST_FIXTURE";
+export type BankingCalendarSourceKind = CalendarSource;
 
 /**
- * One version of a jurisdiction's banking calendar. Weekends are nonbanking by rule; `nonbankingDates` lists the other nonbanking
- * days only (YYYY-MM-DD, the jurisdiction's calendar dates). The evidence hash is the digest of the version as recorded.
+ * One version of a jurisdiction's banking calendar, as banking_calendars records it before it has a row id. Weekends are nonbanking
+ * by rule; `nonbankingDates` lists the other nonbanking days only (YYYY-MM-DD, the jurisdiction's calendar dates), all inside
+ * [coversFrom, coversTo], the dates the version knows: a day outside them is never counted as a banking day (commercial
+ * bankingDayAfterMonthEnd, kauro.banking_day_after). The evidence hash is the digest of the version as recorded.
  */
-export interface BankingCalendarVersion {
-  readonly calendarVersion: string;
-  readonly jurisdiction: "CO";
-  readonly source: BankingCalendarSourceKind;
-  readonly nonbankingDates: ReadonlyArray<string>;
-  readonly evidenceHash: Sha256Hex;
-  readonly recordedAt: UtcInstant;
-}
+export type BankingCalendarVersion = Omit<BankingCalendarRecord, "calendarVersionId">;
 
 /** The calendar version in force at `at` for the jurisdiction, or null when none is recorded (CMD051 then refuses CALENDAR_UNAVAILABLE). */
 export interface BankingCalendarSource {
@@ -79,22 +97,14 @@ export interface BankingCalendarSource {
 // --- PayoutEvidenceVerifier (design §9, D10-PAY-1, D10-PAY-2) -------------------------------------------------------------------
 
 /** What the bank or payout provider says happened to one payout (B15's adapter; a fake in tests). */
-export type PayoutEvidenceStatus = "SUBMITTED" | "SETTLED" | "FAILED" | "RETURNED";
+export type PayoutEvidenceStatus = DomainPayoutEvidenceStatus;
 
 /**
- * Authenticated payout evidence. The verifier states what the provider reported — the payout's reference, the digest of the
- * destination it paid and the amount in integer minor units — and CMD053 compares each with the stored intent: evidence that names
- * another reference, destination or amount reconciles nothing (D10-PAY-1).
+ * Authenticated payout evidence, as payout_reconciliations records it. The verifier states what the provider reported — the payout's
+ * reference, the digest of the destination it paid and the amount in integer minor units — and CMD053 compares each with the stored
+ * intent: evidence that names another reference, destination or amount reconciles nothing (D10-PAY-1).
  */
-export interface PayoutEvidence {
-  readonly status: PayoutEvidenceStatus;
-  readonly reference: string;
-  readonly destinationDigest: Sha256Hex;
-  readonly amountCents: bigint;
-  readonly currency: string;
-  readonly observedAt: UtcInstant;
-  readonly evidenceHash: Sha256Hex;
-}
+export type PayoutEvidence = PayoutEvidenceFacts;
 
 /** The refusal reason of a verifier that has no evidence to give (CMD053 PRECONDITION_FAILED PAYOUT_EVIDENCE_UNAVAILABLE). */
 export type PayoutEvidenceAnswer =
@@ -110,7 +120,7 @@ export interface PayoutEvidenceVerifier {
 // --- CommercialPrincipalReader (design §2, D10-CTX-1, D10-CTX-2) ---------------------------------------------------------------
 
 /** A seller's lifecycle state (design §4: CANDIDATE, ACTIVE, SUSPENDED, TERMINATED). Only ACTIVE may act. */
-export type SellerPrincipalState = "CANDIDATE" | "ACTIVE" | "SUSPENDED" | "TERMINATED";
+export type SellerPrincipalState = SellerState;
 
 /** The seller row of an identity, as the database finds it in the caller's own unit of work. */
 export interface SellerPrincipal {
@@ -139,11 +149,12 @@ export interface CommercialPrincipalReader {
 
 // --- FoundingOfferReader (design §3.3; consumed by B11's pricing page) ------------------------------------------------------------
 
-/** The reservable slots of the current founding cohort. Deliberately carries no agency, quote or seller data: the pricing page is public. */
-export interface FoundingOffer {
-  readonly policyVersion: string;
-  readonly cohortSize: number;
-  readonly reservableSlots: number;
+/**
+ * The reservable slots of the current founding cohort (FoundingRepository.offer's view at an instant): its policy version, the cohort's
+ * slots, how many are reservable and the founding discount. Deliberately carries no agency, quote or seller data: the pricing page is
+ * public.
+ */
+export interface FoundingOffer extends FoundingOfferView {
   readonly asOf: UtcInstant;
 }
 

@@ -29,6 +29,10 @@ import type {
   AgencyClosureId,
   AgencyClosureRecord,
   AgencyRecurrenceRecord,
+  ClosureFromState,
+  CommissionOffsetRecord,
+  CommissionRateKind,
+  CompletionSource,
   AgreementAcceptanceId,
   AgreementAcceptanceRecord,
   AssistanceAgreementId,
@@ -73,7 +77,6 @@ import type {
   HoldReason,
   PayoutDestinationId,
   PayoutDestinationRecord,
-  PayoutEvidenceStatus,
   PayoutIntentId,
   PayoutIntentRecord,
   PayoutIntentState,
@@ -106,7 +109,6 @@ import type {
   TerminationManifestRecord,
   TerminationManifestRef,
   TerminationTailEntryRecord,
-  TerminationTermsRecord,
   TerminationTermsRef,
 } from "../commercial/records.js";
 
@@ -227,6 +229,8 @@ export interface NewAgencyClosure {
   readonly agencyId: AgencyId;
   readonly membershipId: MembershipId;
   readonly assuranceProofId: AssuranceProofId;
+  /** The state the agency leaves for CLOSING (read after its row lock). */
+  readonly fromState: ClosureFromState;
   readonly obligations: ClosureObligations;
   readonly withdrawnQuoteIds: ReadonlyArray<QuoteId>;
   readonly deletionScheduledAt: UtcInstant;
@@ -268,17 +272,23 @@ export interface NewProspect {
   readonly createdAt: UtcInstant;
 }
 
+/** An ASSIGNED link appended to the agency's assignment chain (D10-ASSIGN-2): the seller under its prepared service assignment. */
 export interface NewAccountAssignment {
   readonly assignmentId: AccountAssignmentId;
   readonly agencyId: AgencyId;
   readonly sellerId: SellerId;
   readonly serviceAssignmentRef: ServiceAssignmentRef;
-  readonly startsAt: UtcInstant;
+  readonly effectiveAt: UtcInstant;
 }
 
+/** CMD050's completion of the prepared termination (seller_terminations, CAS on its version) with its tail entries. */
 export interface NewSellerTermination {
-  readonly termination: SellerTerminationRecord;
-  /** One entry per listed accepted, unexpired claim whose agency has no qualifying purchase (KC011). */
+  /** The prepared terms (CMD050 terminationTermsRef). */
+  readonly terminationId: TerminationTermsRef;
+  readonly expectedVersion: number;
+  readonly manifestRef: TerminationManifestRef;
+  readonly effectiveAt: UtcInstant;
+  /** One entry per listed accepted, unexpired claim whose agency has no qualifying purchase (KC011), ending effectiveAt + 2160 h. */
   readonly tailEntries: ReadonlyArray<TerminationTailEntryRecord>;
 }
 
@@ -315,22 +325,27 @@ export interface SalesRepository {
   unassignProspects(sellerId: SellerId, now: UtcInstant): Promise<number>;
 
   getSalesAccount(agencyId: AgencyId): Promise<SalesAccountRecord | null>;
-  /** The sales account FOR UPDATE (CMD048), created at version 1 when the agency has none. */
-  lockSalesAccount(agencyId: AgencyId, now: UtcInstant): Promise<SalesAccountRecord>;
+  /** The sales account FOR UPDATE (CMD048), or null while the agency has none: its first assignment opens it (D10-ASSIGN-2). */
+  lockSalesAccount(agencyId: AgencyId): Promise<SalesAccountRecord | null>;
   getServiceAssignment(ref: ServiceAssignmentRef): Promise<ServiceAssignmentRecord | null>;
+  /** The last link of the agency's assignment chain (the one its sales account names), or null. */
   currentAssignment(agencyId: AgencyId): Promise<AccountAssignmentRecord | null>;
-  /** Ends the current assignment and appends the new one as current, bumping the account's version (CAS; D10-ASSIGN-1). */
-  assignAccount(assignment: NewAccountAssignment, expectedVersion: number, now: UtcInstant): Promise<VersionedWrite<SalesAccountRecord>>;
-  /** CMD050: ends every current assignment of the seller; returns the ended ones. */
+  /**
+   * Appends an ASSIGNED link superseding the current one and moves the sales account to it, bumping its version (CAS; D10-ASSIGN-1,
+   * D10-ASSIGN-2); `expectedVersion` null opens the account with the agency's first link.
+   */
+  assignAccount(assignment: NewAccountAssignment, expectedVersion: number | null, now: UtcInstant): Promise<VersionedWrite<SalesAccountRecord>>;
+  /** CMD050: appends a SELLER_TERMINATED link after each current link naming the seller and moves those accounts to it; returns the new links. */
   endAssignmentsOf(sellerId: SellerId, now: UtcInstant): Promise<ReadonlyArray<AccountAssignmentRecord>>;
   getAssistanceAgreement(id: AssistanceAgreementId): Promise<AssistanceAgreementRecord | null>;
   /** The assistance agreements of the agency signed before `orderCreatedAt` that cover `projectId` or its next purchase (R2-099). */
   assistanceAgreementsFor(agencyId: AgencyId, projectId: ProjectId, orderCreatedAt: UtcInstant): Promise<ReadonlyArray<AssistanceAgreementRecord>>;
 
-  getTerminationTerms(ref: TerminationTermsRef): Promise<TerminationTermsRecord | null>;
+  /** The prepared termination terms (a seller_terminations row, effective or not), or null. */
+  getTerminationTerms(ref: TerminationTermsRef): Promise<SellerTerminationRecord | null>;
   getTerminationManifest(ref: TerminationManifestRef): Promise<TerminationManifestRecord | null>;
-  /** Records the termination and its tail entries (the database refuses an unenumerable entry, KC011). */
-  recordTermination(termination: NewSellerTermination): Promise<SellerTerminationRecord>;
+  /** Makes the prepared termination effective and records its tail entries (the database refuses an unenumerable entry, KC011). */
+  recordTermination(termination: NewSellerTermination): Promise<VersionedWrite<SellerTerminationRecord>>;
   tailEntriesOf(sellerId: SellerId): Promise<ReadonlyArray<TerminationTailEntryRecord>>;
   /** The tail entry of a claim, if its seller was terminated with it listed. */
   tailEntryOfClaim(claimId: AttributionClaimId): Promise<TerminationTailEntryRecord | null>;
@@ -342,10 +357,14 @@ export interface NewAttributionClaim {
   readonly claimId: AttributionClaimId;
   readonly prospectId: ProspectId;
   readonly sellerId: SellerId;
+  /** The seller's agreement in force, whose version the claim cites. */
+  readonly agreementId: SellerAgreementId;
   readonly agreementVersion: string;
   readonly evidenceHash: Sha256Hex;
   /** SUBMITTED, or DISPUTED when a conflict was found in the same transaction (D10-CLAIM-1). */
   readonly state: "SUBMITTED" | "DISPUTED";
+  /** The conflict a DISPUTED claim was born with (a token). */
+  readonly conflictReason?: string;
   readonly submittedAt: UtcInstant;
   /** submittedAt + 2160 h. */
   readonly reviewDeadlineAt: UtcInstant;
@@ -361,21 +380,29 @@ export interface ClaimConflicts {
 
 export interface ClaimChange {
   readonly state: AttributionClaimState;
+  /** The ruling of an acceptance or rejection (CMD047): the agency the prospect is and the allocation that decided it. */
+  readonly agencyId?: AgencyId;
+  readonly allocationId?: AttributionAllocationId;
   readonly acceptedAt?: UtcInstant;
   readonly expiresAt?: UtcInstant;
 }
 
+/**
+ * An entitlement to create (D10-ATTR-2, D10-ASSIST-2): ACQUISITION with its allocation, claim, first capture and window; ASSISTANCE
+ * with its assistance agreement only, at 10 000 bps.
+ */
 export interface NewCommissionEntitlement {
   readonly entitlementId: CommissionEntitlementId;
   readonly agencyId: AgencyId;
   readonly sellerId: SellerId;
   readonly source: CommissionSource;
   readonly allocationId?: AttributionAllocationId;
+  readonly claimId?: AttributionClaimId;
   readonly assistanceAgreementId?: AssistanceAgreementId;
-  readonly firstCaptureId: CaptureId;
-  readonly windowStartsAt: UtcInstant;
+  readonly firstCaptureId?: CaptureId;
+  readonly windowStartsAt?: UtcInstant;
   /** Twelve calendar months later at the same America/Bogota wall time (commercial recurrenceWindowEndsAt); the database checks it. */
-  readonly windowEndsAt: UtcInstant;
+  readonly windowEndsAt?: UtcInstant;
   readonly agreementId: SellerAgreementId;
   readonly agreementVersion: string;
   readonly shareBps: number;
@@ -419,10 +446,13 @@ export interface AttributionRepository {
 export interface NewPurchaseCompletion {
   readonly completionId: PurchaseCompletionRecord["completionId"];
   readonly purchaseId: QualifyingPurchaseId;
+  readonly agencyId: AgencyId;
   readonly kind: CompletionKind;
+  /** The stage a STAGE completion completes (required for STAGE, absent for FINAL; purchase_completions_stage). */
+  readonly stageRef?: string;
   readonly completedAt: UtcInstant;
   readonly evidenceHash: Sha256Hex;
-  readonly source: string;
+  readonly source: CompletionSource;
   readonly recordedAt: UtcInstant;
 }
 
@@ -444,6 +474,8 @@ export interface NewCommissionPool {
   readonly agencyId: AgencyId;
   readonly captureId: CaptureId;
   readonly source: CommissionSource;
+  /** FIRST for the sticky first designation, REPEAT inside the window, ASSISTANCE for an assistance pool (commercial acquisitionRate). */
+  readonly rateKind: CommissionRateKind;
   readonly allocationId?: AttributionAllocationId;
   readonly assistanceAgreementId?: AssistanceAgreementId;
   readonly basisCents: bigint;
@@ -485,10 +517,10 @@ export interface NewCommissionHold {
 }
 
 export interface CommissionLedgerRepository {
-  /** Records a completion once per purchase and kind; `recorded` is false for the existing one. */
+  /** Records a completion once — one FINAL per purchase, one STAGE per purchase and stage; `recorded` is false for the existing one. */
   recordCompletion(completion: NewPurchaseCompletion): Promise<{ readonly recorded: boolean; readonly record: PurchaseCompletionRecord }>;
   completionsOf(purchaseId: QualifyingPurchaseId): Promise<ReadonlyArray<PurchaseCompletionRecord>>;
-  /** Records a funds observation of a capture (capture.funds_observed.v1), once per source event. */
+  /** Records a funds observation of a capture (capture.funds_observed.v1), once per source event and capture version. */
   recordFundsObservation(observation: CaptureFundsObservationRecord): Promise<{ readonly recorded: boolean; readonly record: CaptureFundsObservationRecord }>;
   /** The capture's latest observed funds state (UNKNOWN when none). */
   fundsStateOf(captureId: CaptureId): Promise<FundsState>;
@@ -516,6 +548,12 @@ export interface CommissionLedgerRepository {
   linesDueForEligibility(now: UtcInstant, limit: number): Promise<ReadonlyArray<CommissionLineRecord>>;
   /** The ACCRUAL_RECONCILIATION sweep's work: purchases lacking the pool of an applicable entitlement. */
   purchasesLackingPools(limit: number): Promise<ReadonlyArray<QualifyingPurchaseRecord>>;
+  /**
+   * Offsets a negative position against a later unpaid line of the same seller (commission_offsets; D10-NEG-2): refused KC017 without
+   * the SIGNED_FUTURE_OFFSET terms of the negative line's agreement, and never beyond either amount.
+   */
+  recordOffset(offset: CommissionOffsetRecord): Promise<CommissionOffsetRecord>;
+  offsetsOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionOffsetRecord>>;
 }
 
 // --- periods, statements and payouts (§7; B10-ADAPTERS-LEDGER) --------------------------------------------------------------------
@@ -558,10 +596,16 @@ export interface StatementRepository {
   /** The period FOR UPDATE (CMD051: a close and an adjustment serialize on it). */
   lockPeriod(periodId: CommissionPeriodId): Promise<CommissionPeriodRecord | null>;
   periodOfMonth(month: string): Promise<CommissionPeriodRecord | null>;
-  /** Opens a month's period once (the PERIODS sweep); `created` is false for the existing one. */
-  openPeriod(period: Omit<CommissionPeriodRecord, "state" | "version" | "closedAt">): Promise<{ readonly created: boolean; readonly record: CommissionPeriodRecord }>;
+  /** Opens a month's period once (the PERIODS sweep), dated or not; `created` is false for the existing one. */
+  openPeriod(period: Omit<CommissionPeriodRecord, "state" | "version" | "cutoffHash" | "closedAt">): Promise<{ readonly created: boolean; readonly record: CommissionPeriodRecord }>;
+  /**
+   * Dates an undated period once with a recorded calendar version and the close and pay dates it gives (commercial
+   * commissionPeriodOf; the database checks them against kauro.banking_day_after over the version's coverage).
+   */
+  datePeriod(periodId: CommissionPeriodId, expectedVersion: number, dates: { readonly calendarVersionId: BankingCalendarVersionId; readonly calendarSource: CalendarSource; readonly closeDueOn: string; readonly payDueOn: string }, now: UtcInstant): Promise<VersionedWrite<CommissionPeriodRecord>>;
   periodInputs(periodId: CommissionPeriodId, cutoffAt: UtcInstant): Promise<PeriodInputs>;
-  closePeriod(periodId: CommissionPeriodId, expectedVersion: number, now: UtcInstant): Promise<VersionedWrite<CommissionPeriodRecord>>;
+  /** OPEN → CLOSED with the ledger cutoff hash it closed on (CMD051; the period must be dated). */
+  closePeriod(periodId: CommissionPeriodId, expectedVersion: number, cutoffHash: Sha256Hex, now: UtcInstant): Promise<VersionedWrite<CommissionPeriodRecord>>;
   /** Issues a statement with its items, DRAFT → ISSUED in one transaction; one per period and seller (the replayed row otherwise). */
   issueStatement(statement: NewCommissionStatement): Promise<{ readonly issued: boolean; readonly record: CommissionStatementRecord }>;
   getStatement(statementId: CommissionStatementId): Promise<CommissionStatementRecord | null>;
@@ -580,16 +624,6 @@ export interface StatementRepository {
   reconciliationsOf(intentId: PayoutIntentId): Promise<ReadonlyArray<PayoutReconciliationRecord>>;
   recordGuardReview(review: CompensationGuardReviewRecord): Promise<CompensationGuardReviewRecord>;
   guardReviewsOf(periodId: CommissionPeriodId): Promise<ReadonlyArray<CompensationGuardReviewRecord>>;
-}
-
-/** The payout evidence CMD053 matches against an intent (PayoutEvidenceVerifier's answer; D10-PAY-2). */
-export interface PayoutEvidenceFacts {
-  readonly status: PayoutEvidenceStatus;
-  readonly reference: string;
-  readonly destinationDigest: Sha256Hex;
-  readonly amountCents: bigint;
-  readonly currency: string;
-  readonly evidenceHash: Sha256Hex;
 }
 
 // --- the commercial unit of work ---------------------------------------------------------------------------------------------

@@ -1,40 +1,42 @@
 /**
  * The enumerations the commercial views answer (docs/design/B10-commercial-domain.md §4 states, §6 statements and adjustments, §8
- * commission periods, §9 payout intents), spelled once for the closed response schemas and the TypeScript DTOs of this package.
+ * commission periods, §9 payout intents), for the closed response schemas and the TypeScript DTOs of this package.
  *
- * They are declared here, not imported from the B10 domain model, on purpose: B10-MODEL is built beside this lane, so a view never
- * depends on a vocabulary another lane may still be changing. The model lane's own enumerations are the same design tables; the
- * command lanes that serve these views convert nothing, so a token that drifts fails the send guard's schema check at once.
+ * Each is the domain's stored vocabulary (COMMERCIAL_VOCABULARY; D10-STAGE-2), never a second spelling: B10-PORTS-FAKES first declared
+ * them here beside B10-MODEL, and the stage-1 integration found two that had drifted from what the database stores (a sales account's
+ * new-work compensation, a statement line's rate kind), so a view built from a stored row would have been refused by its own schema.
+ * The command lanes that serve these views convert nothing (application test/commercial-stage-one.test.ts keeps them equal).
  */
+import { COMMERCIAL_VOCABULARY as V } from "@kauro/domain";
 
 export const COMMERCIAL_VIEW_VOCABULARY = Object.freeze({
   /** Prospect stages (registry Prospect.state; design §4). */
-  prospectStates: ["RESEARCHED", "QUALIFIED", "CONTACTED", "ENGAGED", "OPPORTUNITY", "WON", "LOST", "SUPPRESSED"],
+  prospectStates: V.prospectStates,
   /** Attribution claim states (registry AttributionClaim.state). */
-  claimStates: ["SUBMITTED", "ACCEPTED", "DISPUTED", "REJECTED", "EXPIRED", "CONVERTED"],
+  claimStates: V.attributionClaimStates,
   /** Seller lifecycle (design §4): only ACTIVE may act. */
-  sellerStates: ["CANDIDATE", "ACTIVE", "SUSPENDED", "TERMINATED"],
+  sellerStates: V.sellerStates,
   /** The reviewed classification of a seller agreement (design §4; a classification of EMPLOYMENT is never activated as a collaboration). */
-  sellerClassifications: ["INDEPENDENT_COLLABORATION", "EMPLOYMENT", "OTHER_REVIEWED"],
+  sellerClassifications: V.sellerClassifications,
   /** Commission statement lifecycle (registry CommissionStatement.state). */
-  statementStates: ["DRAFT", "ISSUED", "DISPUTED", "APPROVED", "PAID", "CORRECTED"],
+  statementStates: V.statementStates,
   /** Payout intent lifecycle (design §9): AUTHORIZED by the owner, then the provider's word decides. */
-  payoutIntentStates: ["AUTHORIZED", "SUBMITTED", "UNCERTAIN", "SETTLED", "FAILED", "RETURNED"],
+  payoutIntentStates: V.payoutIntentStates,
   /** What the founding offer did for a quote (design §3.3): reserved a slot, the agency was not eligible, or the cohort was full. */
-  foundingOffers: ["RESERVED", "NOT_ELIGIBLE", "NONE_AVAILABLE"],
-  /** Whether a purchase is the agency's first qualifying one or a repeat (design §7). */
-  commissionSequences: ["FIRST", "REPEAT"],
+  foundingOffers: V.foundingOffers,
+  /** A statement line's rate: the agency's first qualifying purchase, a repeat, or a prospective assistance agreement's pool (§6; D10-ASSIST-2). */
+  commissionSequences: V.rateKinds,
   /** The direction of a statement adjustment. */
-  adjustmentDirections: ["INCREASE", "DECREASE"],
+  adjustmentDirections: V.adjustmentDirections,
   /** Commission period lifecycle (design §8). */
-  periodStates: ["OPEN", "CLOSED"],
+  periodStates: V.periodStates,
   /** Where the calendar a period was closed against came from (D10-CAL-1). */
-  calendarSources: ["VERIFIED_FEED", "TEST_FIXTURE"],
-  /** Whether a reassigned account earns its new seller anything for new work (design §5). */
-  newWorkCompensation: ["NONE", "ASSISTANCE"],
-  /** What an unrecovered balance of a statement is waiting on (design §6). */
-  balanceItemKinds: ["OFFSET", "REPAYMENT_REVIEW", "WRITE_OFF", "DISPUTE"],
-} as const);
+  calendarSources: V.calendarSources,
+  /** Whether a reassigned account earns its new seller anything for new work: its service assignment's compensation (design §5). */
+  newWorkCompensation: V.serviceCompensations,
+  /** What an unrecovered balance of a statement is waiting on: an OFFSET item or a RECOVERY item's action (design §6; D10-STMT-2). */
+  balanceItemKinds: ["OFFSET", ...V.recoveryActions] as const,
+});
 
 type Vocabulary = typeof COMMERCIAL_VIEW_VOCABULARY;
 

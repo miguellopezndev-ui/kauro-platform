@@ -88,7 +88,9 @@ test("the banking-calendar fake serves the controlled fixture with 2026-10-12 no
   // only the controlled source may be served: a feed label is refused at the fake, so a test can never pass a fixture off as one
   assert.throws(() => calendar.serve({ ...served, source: "VERIFIED_FEED" as never }), /TEST_FIXTURE/);
   assert.throws(() => calendar.serve({ ...served, nonbankingDates: ["12-10-2026"] }), /date/);
-  calendar.serve({ ...served, calendarVersion: "test-fixture-variant", nonbankingDates: ["2026-10-12", "2026-11-02"] });
+  // a served version covers its listed days (banking_calendars; D10-STAGE-2): the variant extends the fixture's October to November
+  assert.throws(() => calendar.serve({ ...served, calendarVersion: "test-fixture-variant", nonbankingDates: ["2026-10-12", "2026-11-02"] }), /outside the covered dates/);
+  calendar.serve({ ...served, calendarVersion: "test-fixture-variant", nonbankingDates: ["2026-10-12", "2026-11-02"], coversTo: "2026-11-30" });
   const variant = await w.ports.unitOfWork.run(w.tenant(), (uow) => calendar.currentCalendar(uow, { jurisdiction: "CO", at }));
   assert.deepEqual([variant?.calendarVersion, variant?.source, [...(variant?.nonbankingDates ?? [])]], ["test-fixture-variant", "TEST_FIXTURE", ["2026-10-12", "2026-11-02"]]);
   assert.equal(calendar.isNonbanking("2026-11-02"), true);
@@ -164,17 +166,17 @@ test("the buyer-type, preparation-completion and payout-evidence fakes answer on
   const stageAt = w.clock.now();
   w.clock.advance(3_600_000);
   const finalAt = w.clock.now();
-  completions.record({ agencyId: w.agencyId, captureId, kind: "FINAL", completedAt: finalAt, source: "contract-fake-final-source" });
-  completions.record({ agencyId: w.agencyId, captureId, kind: "STAGE", completedAt: stageAt, source: "contract-fake-stage-source" });
+  completions.record({ agencyId: w.agencyId, captureId, kind: "FINAL", completedAt: finalAt, source: "STAGED_PREPARATION" });
+  completions.record({ agencyId: w.agencyId, captureId, kind: "STAGE", stageRef: "parent-stage", completedAt: stageAt, source: "STAGED_PREPARATION" });
   const recorded = await completionsOf(w.agencyId, captureId);
-  assert.deepEqual(recorded.map((c) => [c.kind, c.completedAt, c.source]), [["STAGE", stageAt, "contract-fake-stage-source"], ["FINAL", finalAt, "contract-fake-final-source"]]);
+  assert.deepEqual(recorded.map((c) => [c.kind, c.stageRef ?? null, c.completedAt, c.source]), [["STAGE", "parent-stage", stageAt, "STAGED_PREPARATION"], ["FINAL", null, finalAt, "STAGED_PREPARATION"]]);
   for (const c of recorded) assert.match(c.evidenceHash, /^[0-9a-f]{64}$/);
   assert.notEqual(recorded[0]!.evidenceHash, recorded[1]!.evidenceHash);
   assert.deepEqual((await completionsOf(w.agencyId, captureId)).map((c) => c.evidenceHash), recorded.map((c) => c.evidenceHash), "the evidence is a function of what was recorded");
   assert.deepEqual(await completionsOf(other, captureId), [], "another agency's completions are not this agency's");
   assert.deepEqual(await completionsOf(w.agencyId, secondCapture), [], "another capture's neither");
-  assert.throws(() => completions.record({ agencyId: w.agencyId, captureId, kind: "FINAL", completedAt: finalAt, source: "again" }), /already recorded/, "one completion per purchase and kind");
-  completions.record({ agencyId: w.agencyId, captureId: secondCapture, kind: "STAGE", completedAt: stageAt, source: "contract-fake-stage-source" });
+  assert.throws(() => completions.record({ agencyId: w.agencyId, captureId, kind: "FINAL", completedAt: finalAt, source: "AUTHORIZATION_DELIVERY" }), /already recorded/, "one completion per purchase and kind");
+  completions.record({ agencyId: w.agencyId, captureId: secondCapture, kind: "STAGE", stageRef: "parent-stage", completedAt: stageAt, source: "STAGED_PREPARATION" });
   assert.deepEqual((await completionsOf(w.agencyId, secondCapture)).map((c) => c.kind), ["STAGE"], "a purchase with only a STAGE completion has no FINAL to answer");
   assert.deepEqual(completions.calls.map((c) => [c.port, c.operation, c.identity]), [
     ["PreparationCompletionSource", "COMPLETIONS_OF SERVICE", `${w.agencyId}/${captureId}`],

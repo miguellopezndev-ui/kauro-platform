@@ -10,6 +10,12 @@ export { HoldPoints } from "./holds.js";
 export { BUYER_TYPE_FAKE_PROVIDER, ContractFakeBuyerTypeReader } from "./buyer-type.js";
 export type { RecordedCompletion } from "./preparation-completion.js";
 export { PREPARATION_COMPLETION_FAKE_PROVIDER, ContractFakePreparationCompletion } from "./preparation-completion.js";
-export { BANKING_CALENDAR_FAKE_PROVIDER, BANKING_CALENDAR_FIXTURE_NONBANKING, BANKING_CALENDAR_FIXTURE_VERSION, ContractFakeBankingCalendar } from "./banking-calendar.js";
+export {
+  BANKING_CALENDAR_FAKE_PROVIDER,
+  BANKING_CALENDAR_FIXTURE_COVERAGE,
+  BANKING_CALENDAR_FIXTURE_NONBANKING,
+  BANKING_CALENDAR_FIXTURE_VERSION,
+  ContractFakeBankingCalendar,
+} from "./banking-calendar.js";
 export type { PayoutIntentFacts, PayoutMismatch } from "./payout-evidence.js";
 export { PAYOUT_EVIDENCE_FAKE_PROVIDER, ContractFakePayoutEvidence } from "./payout-evidence.js";

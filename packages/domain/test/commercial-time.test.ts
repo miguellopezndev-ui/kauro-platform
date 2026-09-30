@@ -90,19 +90,21 @@ test("R2-138 (example 11): the subsequent rate is 400 bps iff the verified provi
 test("R2-139 (example 21): with weekends and 2026-10-12 excluded, the fifth banking day after September 2026 is 2026-10-07 and the tenth 2026-10-15; the same calendar without that holiday gives 2026-10-07 and 2026-10-14", () => {
   const terms = registryCommissionPolicy();
   assert.deepEqual([terms.statementBankingDay, terms.payBankingDay], [5, 10]);
-  const fixture = { nonbankingDates: ["2026-10-12"] };
+  // a recorded version covers a range of dates (0031 banking_calendars; D10-STAGE-2); this one covers every day each count reaches
+  const covering = { coversFrom: "2026-09-01", coversTo: "2027-01-31" };
+  const fixture = { nonbankingDates: ["2026-10-12"], ...covering };
   assert.equal(bankingDayAfterMonthEnd("2026-09", 5, fixture), "2026-10-07");
   assert.equal(bankingDayAfterMonthEnd("2026-09", 10, fixture), "2026-10-15");
-  const plain = { nonbankingDates: [] };
+  const plain = { nonbankingDates: [], ...covering };
   assert.equal(bankingDayAfterMonthEnd("2026-09", 5, plain), "2026-10-07");
   assert.equal(bankingDayAfterMonthEnd("2026-09", 10, plain), "2026-10-14");
   // the first banking day after month-end is the next month's first weekday (Thursday 1 October 2026), never the month's last day
   assert.equal(bankingDayAfterMonthEnd("2026-09", 1, fixture), "2026-10-01");
   // a month ending on a weekend and a listed first of the year: January 2027 starts on Friday 1 January, listed, so the 1st is Monday the 4th
-  assert.equal(bankingDayAfterMonthEnd("2026-12", 1, { nonbankingDates: ["2027-01-01"] }), "2027-01-04");
+  assert.equal(bankingDayAfterMonthEnd("2026-12", 1, { nonbankingDates: ["2027-01-01"], ...covering }), "2027-01-04");
   assert.equal(bankingDayAfterMonthEnd("2026-12", 1, plain), "2027-01-01");
   // a listed weekend day changes nothing: weekends are already excluded
-  assert.equal(bankingDayAfterMonthEnd("2026-09", 10, { nonbankingDates: ["2026-10-03", "2026-10-12"] }), "2026-10-15");
+  assert.equal(bankingDayAfterMonthEnd("2026-09", 10, { nonbankingDates: ["2026-10-03", "2026-10-12"], ...covering }), "2026-10-15");
   // the period: one calendar month in America/Bogota, [start, end), with its close and pay dates from the explicit calendar
   assert.deepEqual(commissionPeriodOf("2026-09", terms, fixture), {
     month: "2026-09",
@@ -113,7 +115,7 @@ test("R2-139 (example 21): with weekends and 2026-10-12 excluded, the fifth bank
   });
   assert.deepEqual(commissionPeriodOf("2026-12", terms, plain).endsAt, "2027-01-01T05:00:00.000Z");
   // malformed inputs are programming errors, never a guessed date
-  for (const bad of [() => bankingDayAfterMonthEnd("2026-09", 0, plain), () => bankingDayAfterMonthEnd("2026-13", 5, plain), () => bankingDayAfterMonthEnd("2026-9", 5, plain), () => bankingDayAfterMonthEnd("2026-09", 5, { nonbankingDates: ["12/10/2026"] })]) {
+  for (const bad of [() => bankingDayAfterMonthEnd("2026-09", 0, plain), () => bankingDayAfterMonthEnd("2026-13", 5, plain), () => bankingDayAfterMonthEnd("2026-9", 5, plain), () => bankingDayAfterMonthEnd("2026-09", 5, { nonbankingDates: ["12/10/2026"], ...covering })]) {
     assert.throws(bad, RangeError);
   }
 });

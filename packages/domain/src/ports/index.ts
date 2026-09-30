@@ -157,7 +157,6 @@ export type {
   NewPayoutIntent,
   PayoutCash,
   StatementRepository,
-  PayoutEvidenceFacts,
   CommercialRepositories,
   CommercialUnitOfWork,
   CommercialUnitOfWorkFactory,
