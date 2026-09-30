@@ -14,6 +14,7 @@
  * not inferred solely from status code" — the status is a projection of the code, never the other way round.
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
+import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -266,6 +267,8 @@ export const FAILURE_REASONS = [
   "SOURCE_SERVICES_UNAVAILABLE",
   // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
   ...COMMERCE_FAILURE_REASONS,
+  // agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md §12)
+  ...COMMERCIAL_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

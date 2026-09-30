@@ -23,6 +23,7 @@ import {
   roundHalfUpBps,
   DomainFailure,
   type CommissionPoolState,
+  type ProjectId,
   type RefundComponents,
 } from "../src/index.js";
 
@@ -213,7 +214,7 @@ test("R2-136 (example 4): a synthetic 1002-cent basis at a 2500-bps discount rou
   // the founding rate reserved for the quote is the applied rate (MAX_NOT_STACKED over the tier of two prior projects)
   const eligibility = quoteEligibility(prices, {
     asOf: "2026-10-01T15:00:00.000Z",
-    qualifyingProjectIds: ["0192a000-0000-7000-8000-0000000000d1", "0192a000-0000-7000-8000-0000000000d2"],
+    qualifyingProjectIds: ["0192a000-0000-7000-8000-0000000000d1" as ProjectId, "0192a000-0000-7000-8000-0000000000d2" as ProjectId],
     founding: { eligible: true, slotReserved: true },
   });
   assert.equal(eligibility.appliedDiscountBps, 2500);
