@@ -93,6 +93,12 @@ export interface Harness {
    * pool, SERVICE contexts on the payment-service pool, each unit of work with the commerce repositories and scope adoption.
    */
   readonly commerce: PgCommerceUnitOfWorkFactory;
+  /**
+   * Commission-service pool (login role in kauro_commission; package B10, D10-CTX-1): the verified group of the COMMISSIONS consumer,
+   * the sweeps and CMD051/CMD053, which acts on one adopted agency per transaction or on corporate records. Its unit of work is the
+   * commercial unit-of-work factory of the stage-2 lanes; the schema tests use the pool's login directly.
+   */
+  readonly commissionPool: KauroPool;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
@@ -200,6 +206,7 @@ export async function start(): Promise<Harness> {
   const validatorPool = createPool({ ...base, max: 2, user: ROLES.validatorLogin, applicationName: "kauro-test-validator" });
   const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
   const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
+  const commissionPool = createPool({ ...base, max: 2, user: ROLES.commissionLogin, applicationName: "kauro-test-commission" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
@@ -267,6 +274,7 @@ export async function start(): Promise<Harness> {
     paymentPool,
     payment,
     commerce,
+    commissionPool,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
@@ -442,6 +450,7 @@ export async function start(): Promise<Harness> {
       await validatorPool.end();
       await ingressPool.end();
       await paymentPool.end();
+      await commissionPool.end();
       await pg.stop();
     },
   };

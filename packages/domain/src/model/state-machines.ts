@@ -13,6 +13,7 @@
  */
 import { STATE_MACHINES, type StateMachine, type StateTransition } from "@kauro/contracts";
 import { COMMERCE_PLATFORM_MACHINES, type CommercePlatformMachineName } from "../commerce/machines.js";
+import { COMMERCIAL_PLATFORM_MACHINES, type CommercialPlatformMachineName } from "../commercial/machines.js";
 import { PreconditionFailure } from "./errors.js";
 import { SOURCE_LIFECYCLE_STATE_MACHINES } from "./source/machines.js";
 
@@ -33,9 +34,10 @@ export type RegistryMachineName =
 /**
  * EndClient and Project are B06's (D-AGG-1, D-AGG-2); UploadSession, StoredObject, SourceFile and RetentionRecord are B07's
  * (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2; @kauro/domain SOURCE_LIFECYCLE_STATE_MACHINES); the commerce machines are package B09's
- * (commerce/machines.ts).
+ * (commerce/machines.ts); the commercial machines are package B10's (commercial/machines.ts, kept apart from this list as B07's are,
+ * so neither package rewrites the other's).
  */
-export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord" | CommercePlatformMachineName;
+export type PlatformMachineName = "EndClient" | "Project" | "UploadSession" | "StoredObject" | "SourceFile" | "RetentionRecord" | CommercePlatformMachineName | CommercialPlatformMachineName;
 
 export type MachineName = RegistryMachineName | PlatformMachineName;
 
@@ -77,7 +79,8 @@ export function machine(name: MachineName): StateMachine {
   const m =
     STATE_MACHINES.find((x) => x.contract === name) ??
     PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ??
-    SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name);
+    SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name) ??
+    COMMERCIAL_PLATFORM_MACHINES.find((x) => x.contract === name);
   if (!m) throw new TypeError(`state machine ${name} is not in the registry`);
   return m;
 }

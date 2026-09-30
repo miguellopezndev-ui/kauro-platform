@@ -740,7 +740,9 @@ test("R2-141 at the database: agency_relationship_decisions are append-only revi
     [[...B10_AGENCY_TABLES]],
   )).rows.map((r) => r.table_name);
   for (const t of ["agency_recurrence", "qualifying_purchases", "founding_slot_reservations", "quote_issuances", "agency_agreement_acceptances", "agency_closures", "agency_relationship_decisions"]) assert.ok(present.includes(t), `${t} carries its agency`);
-  const rowsOf = () => digest(present.map((t) => `SELECT '${t}' AS t, row_to_json(x)::text AS r FROM kauro.${t} x WHERE x.agency_id IN ($1, $2)`).join(" UNION ALL "), [R.agencyId, S.agencyId]);
+  // every B10 row keyed by either agency, but the decisions themselves (the one row a decision adds)
+  const keyed = present.filter((t) => t !== "agency_relationship_decisions");
+  const rowsOf = () => digest(keyed.map((t) => `SELECT '${t}' AS t, row_to_json(x)::text AS r FROM kauro.${t} x WHERE x.agency_id IN ($1, $2)`).join(" UNION ALL "), [R.agencyId, S.agencyId]);
   const state = async () => [await setAt(R, null, "now"), await setAt(S, null, "now"), await rowsOf()];
   const before_ = await state();
 
