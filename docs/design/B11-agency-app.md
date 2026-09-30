@@ -304,6 +304,7 @@ commands), the web client (46 browser operations) and the runtime-boundary fixtu
 | D-INT1-10 | The public screens W5a built are implemented screens (UI01–UI08, UI48, UI49 pages; UI45–UI47 document route handlers), and the page walk counts a document route handler. The `(public)` layout is W5a's SiteFrame; W3's PublicFrame stays the landmark primitive. | D-W3-12, D-W3-17, D-LEGAL-1 |
 | D-INT1-11 | OpenAPI documents a person's route (B07's intake, B09's person commands and reads) with `bearerAuth` or `sessionCookie` and the CSRF parameter on unsafe cookie routes; the public routes (identity-config among them) an empty security requirement. | D-AUTH-5, D-PUB-1 |
 | D-INT1-12 | The evidence tool runs the `ui` and `web` suites the design added; the test world's identity issuer and verifier share the movable process clock of the B07+B09 world. | 21 "Evidence classes"; D-RUN-2 |
+| D-INT1-13 | *Deviation from D-W5a-9's variable.* The local stack names no host (W3's host policy LOCAL serves both groups on one origin), so the browser suite names where the public pages read their publication with `KAURO_LOCAL_PUBLICATION_ORIGIN`, honoured in LOCAL only, instead of `KAURO_PUBLIC_ORIGIN`, which W3 reads as the public host (one host named in LOCAL is ONE_ORIGIN_ONLY, every screen 503). | D-TOPO-2, D-W3-10, D-W5a-9 |
 
 ### Seams (each test fails without its fix)
 
@@ -317,10 +318,21 @@ commands), the web client (46 browser operations) and the runtime-boundary fixtu
 | W3 × W5a | `apps/web/test/copy-lint.test.ts` :: "B11 INT-1 seam, one copy catalogue (D-COPY-1, D-W5a-2): EN is the application's entries and the public site's, merged by key prefix with no id defined by both, so the A3 sentences stand once over everything a person reads" | D-INT1-9 | `26c39af` |
 | W3 × W5a | `apps/web/test/screens.test.ts` :: "D-ROUTE-1: navigation offers only agency-level screens that exist, in reference order, and each link resolves to a page file" | D-INT1-10 | `26c39af` |
 | W4 × B09 | the build: B09's in-memory commerce unit of work lacked the new `supportCases` repository | `supportCases: b06.supportCases` | `c7301c9` |
+| W3 × W5a | `apps/web/test/browser-environment.test.ts` :: "B11 INT-1 seam, the browser suite's environment (D-TOPO-2, D-W5a-9, D-INT1-13): the server the suite starts serves both groups on its one local origin and reads the public pages' publication from the suite's fake" | D-INT1-13 | this commit |
 | design × evidence | `tools/test/evidence.test.mjs` :: "the suites the tool runs are the packages' own test scripts, one for every workspace package that has one, and canonical JSON is key-order independent" | D-INT1-12 | `c7301c9` |
 
 `apps/web/test/public-contract.test.ts` holds W5a's form and publication reader equal to W5b's served contract (a guard; it passed
 at the merge).
+
+Revert proofs (on the final tree: the fix taken out, the seam test fails; the file restored, SHA-256 equal to before):
+
+| fix taken out | the seam test's first failure | restored SHA-256 |
+|---|---|---|
+| `apps/api/src/server.ts`: the intake authenticates with `authenticate(headers)` | intake, another origin: 404 NOT_FOUND instead of 403 ORIGIN_REJECTED | `b93ed77b…` |
+| `packages/application/src/commerce/outcomes.ts`: no COOKIE_CSRF in `tenantCommand` | CMD028, another origin: 422 RESPONSE_CONTRACT_VIOLATION | `e85ef540…` |
+| `packages/application/src/sources/outcomes.ts`: no COOKIE_CSRF in `commandCatalogue` | CMD012, another origin: 422 RESPONSE_CONTRACT_VIOLATION | `853829e5…` |
+| `apps/api/test/support/fake-identity-server.ts`: the protocol routes not dispatched | sign-in: PROTOCOL_ERROR instead of TOTP_REQUIRED | `9f989ca1…` |
+| `apps/web/playwright.config.ts`: the fake named as `KAURO_PUBLIC_ORIGIN` | host policy ONE_ORIGIN_ONLY instead of LOCAL | `dad4b4f0…` |
 
 ### Open for stage 2
 
@@ -329,3 +341,5 @@ at the merge).
   a process with `--origin` the edge's origin, and the edge route `/__kauro-identity/*` to it; W5a's public specs keep their
   in-worker publication fake (D-W5a-9) until then.
 - D-W5a-1 (swapping the public markup for `@kauro/ui`) is left to the screen mandates.
+- CMD044's `evidenceRefs` stays closed (`maxItems` 0) although B07 serves uploads on this base: binding refs of the same project
+  (design §5 W4 row) comes with the support screen (W10).

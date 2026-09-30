@@ -6,7 +6,7 @@ import { publicationUrl, signInUrl } from "../public-origins.ts";
 
 /** The address of the capability publication, or null when the deployment names no usable public origin. */
 export function publicationAddress(): string | null {
-  return publicationUrl({ KAURO_ENV: process.env["KAURO_ENV"], KAURO_PUBLIC_ORIGIN: process.env["KAURO_PUBLIC_ORIGIN"] });
+  return publicationUrl({ KAURO_ENV: process.env["KAURO_ENV"], KAURO_PUBLIC_ORIGIN: process.env["KAURO_PUBLIC_ORIGIN"], KAURO_LOCAL_PUBLICATION_ORIGIN: process.env["KAURO_LOCAL_PUBLICATION_ORIGIN"] });
 }
 
 /** Where the visitor signs in: the application origin's /login, or the local path (see signInUrl). */

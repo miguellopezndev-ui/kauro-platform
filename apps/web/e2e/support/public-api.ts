@@ -1,6 +1,6 @@
 // CONTRACT_FAKE: the api's public capability publication (W5b: GET /api/v1/public/capability-publication) on a fixed local port, for the browser
 // suite of the public pages. The built server reads it on every request (D-TOPO-2: server-side, uncached), and playwright.config.ts points
-// the server's KAURO_PUBLIC_ORIGIN at this port, so a test chooses what the public site is told by calling `publish`. No provider and no database
+// the server's KAURO_LOCAL_PUBLICATION_ORIGIN at this port, so a test chooses what the public site is told by calling `publish`. No provider and no database
 // is involved; the reply has exactly the shape the api's response schema declares. The inquiry POST is answered by the test itself at the browser
 // network boundary (page.route), because the browser, not the server, sends it.
 import { createServer, type Server } from "node:http";

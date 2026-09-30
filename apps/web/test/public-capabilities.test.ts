@@ -119,6 +119,9 @@ test("the publication address comes from the public origin only: a local stack t
   assert.equal(publicationUrl({ KAURO_ENV: "LOCAL", KAURO_PUBLIC_ORIGIN: undefined }), null);
   assert.equal(publicationUrl({ KAURO_ENV: "LOCAL", KAURO_PUBLIC_ORIGIN: "" }), null);
   assert.equal(publicationUrl({ KAURO_ENV: undefined, KAURO_PUBLIC_ORIGIN: undefined }), null);
+  // the local stack names no public host, so it names its publication on its own; nowhere else is that name honoured (D-INT1-13)
+  assert.equal(publicationUrl({ KAURO_ENV: "LOCAL", KAURO_PUBLIC_ORIGIN: undefined, KAURO_LOCAL_PUBLICATION_ORIGIN: "http://127.0.0.1:44302" }), `http://127.0.0.1:44302${PUBLICATION_PATH}`);
+  assert.equal(publicationUrl({ KAURO_ENV: "PRODUCTION", KAURO_PUBLIC_ORIGIN: "https://kauro.example", KAURO_LOCAL_PUBLICATION_ORIGIN: "https://evil.example" }), `https://kauro.example${PUBLICATION_PATH}`);
   const refused = [
     { KAURO_ENV: "PRODUCTION", KAURO_PUBLIC_ORIGIN: "http://kauro.example" },
     { KAURO_ENV: undefined, KAURO_PUBLIC_ORIGIN: "http://localhost:3000" },

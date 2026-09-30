@@ -31,12 +31,13 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     reuseExistingServer: false,
     timeout: 120_000,
-    // KAURO_ENV and KAURO_PUBLIC_ORIGIN name the CONTRACT_FAKE publication of e2e/support/public-api.ts (the edge's port plus two) unless the
-    // caller names its own; the public pages read it server-side, so the browser suite sees every reading of the capability publication.
+    // KAURO_ENV and KAURO_LOCAL_PUBLICATION_ORIGIN name the CONTRACT_FAKE publication of e2e/support/public-api.ts (the edge's port plus two)
+    // unless the caller names its own; the public pages read it server-side, so the browser suite sees every reading of the capability
+    // publication. The local stack names no host (KAURO_PUBLIC_ORIGIN, KAURO_APP_ORIGIN): one origin serves both groups (D-TOPO-2, D-INT1-13).
     env: {
       KAURO_E2E_PORT: String(port),
       KAURO_ENV: process.env["KAURO_ENV"] ?? "LOCAL",
-      KAURO_PUBLIC_ORIGIN: process.env["KAURO_PUBLIC_ORIGIN"] ?? `http://127.0.0.1:${port + 2}`,
+      KAURO_LOCAL_PUBLICATION_ORIGIN: process.env["KAURO_LOCAL_PUBLICATION_ORIGIN"] ?? `http://127.0.0.1:${port + 2}`,
     },
   },
 });

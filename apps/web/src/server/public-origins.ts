@@ -2,8 +2,10 @@
 // read, and where a visitor signs in. This module is pure: it is handed the environment values and reads no environment, so node:test
 // exercises it; the one file that reads them is config/site-origins.ts, which starts with `import "server-only"`.
 //
-// The public site reads the publication from its own origin (the deployment routes /api/v1 to the api on both hosts). A local stack that
-// names no origin has nothing to read, and the pages then say the publication cannot be read: they never guess an address.
+// The public site reads the publication from its own origin (the deployment routes /api/v1 to the api on both hosts). The local stack
+// names no hosts (W3's host policy LOCAL serves both groups on one origin), so it names where its publication is read on its own,
+// KAURO_LOCAL_PUBLICATION_ORIGIN, honoured in LOCAL only (B11 stage-1 integration, D-INT1-13); a stack that names neither has nothing to
+// read, and the pages then say the publication cannot be read: they never guess an address.
 //
 // Sign-in is an application route, and in a split deployment the public host does not serve application routes (W3's host routing answers
 // 404), so the link from the public site must name the application origin. When the deployment does not name a distinct one, the link is
@@ -13,6 +15,8 @@ import { PUBLICATION_PATH } from "../public/capabilities.ts";
 export interface PublicOriginEnvironment {
   readonly KAURO_ENV: string | undefined;
   readonly KAURO_PUBLIC_ORIGIN: string | undefined;
+  /** LOCAL only: where the local stack reads its publication, since it names no public host (D-INT1-13). */
+  readonly KAURO_LOCAL_PUBLICATION_ORIGIN?: string | undefined;
 }
 
 /** `https://host[:port]` exactly as the URL parser prints an origin; plain http only for the local stack. */
@@ -30,7 +34,8 @@ function originOf(value: string, local: boolean): string | null {
 
 /** The publication URL, or null when no usable public origin is named. */
 export function publicationUrl(environment: PublicOriginEnvironment): string | null {
-  const value = environment.KAURO_PUBLIC_ORIGIN;
+  const local = environment.KAURO_LOCAL_PUBLICATION_ORIGIN;
+  const value = environment.KAURO_ENV === "LOCAL" && local !== undefined && local !== "" ? local : environment.KAURO_PUBLIC_ORIGIN;
   if (value === undefined || value === "") return null;
   const origin = originOf(value, environment.KAURO_ENV === "LOCAL");
   return origin === null ? null : `${origin}${PUBLICATION_PATH}`;
