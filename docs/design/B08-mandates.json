@@ -27,7 +27,7 @@
       "starts_from": "b08/base",
       "depends_on": [],
       "owns_fakes": [],
-      "migrations": ["0021_execution_jobs_capacity.sql", "0022_staging_verification_packages.sql"],
+      "migrations": ["0021_execution_jobs_capacity.sql", "0022_staging_verification_packages.sql", "0024_execution_review_fixes.sql"],
       "tests": [
         "packages/domain/test/execution-model.test.ts",
         "packages/persistence/test/execution-migrations.test.ts",

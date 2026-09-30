@@ -827,7 +827,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review, 0020 of B07's, 0021–0023 of B08) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review, 0020 of B07's, 0021–0024 of B08) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();
