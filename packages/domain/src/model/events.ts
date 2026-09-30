@@ -11,6 +11,7 @@
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
+import { COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_TYPES } from "../commercial/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
 import type { ActorRef } from "./tenant.js";
@@ -86,6 +87,8 @@ export const EVENT_TYPES = [
   "source_file.admission_revoked.v1",
   // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0013)
   ...COMMERCE_EVENT_TYPES,
+  // Agency recurrence and commission domain (package B10, commercial/events.ts; migration 0028)
+  ...COMMERCIAL_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -163,6 +166,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
   // payments and fiscal workflow (package B09, commerce/events.ts)
   ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
+  // agency recurrence and commission domain (package B10, commercial/events.ts): ids only
+  ...COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -217,6 +222,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.expired.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
   ...COMMERCE_EVENT_SUBSCRIPTIONS,
+  // B10 (commercial/events.ts): COMMISSIONS learns the funds' availability and the authorization's delivery
+  ...COMMERCIAL_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {
