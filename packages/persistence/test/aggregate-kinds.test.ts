@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
+import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
 import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, tx, type PlanFixture } from "./support.js";
@@ -35,8 +35,13 @@ let carolInA: string;
  * oracle). The kinds package B09 registers bind through the same unchanged function and are exercised by that package: every B09
  * schema test appends their events (b09-migrations.test.ts, b09-critique.test.ts).
  */
-type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number]>;
-const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter((k): k is WalkedKind => !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k));
+// package B08's kinds (processing_job, package_version; audit, cost_grant) bind through the same unchanged function and are walked by
+// its own schema tests (execution-migrations.test.ts, execution-adapters.test.ts; audit-migrations.test.ts, audit-adapters.test.ts)
+type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number]>;
+const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter(
+  (k): k is WalkedKind =>
+    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
+);
 const ofA = new Map<WalkedKind, { readonly id: string; readonly version: number }>();
 
 /**
@@ -62,6 +67,12 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   refund: ["refunds", "refund_id"],
   tax_document: ["tax_documents", "document_id"],
   reconciliation_case: ["reconciliation_cases", "case_id"],
+  // package B08 (0021, 0022)
+  processing_job: ["processing_jobs", "job_id"],
+  package_version: ["package_versions", "package_version_id"],
+  // package B08 (0023)
+  audit: ["audits", "audit_id"],
+  cost_grant: ["cost_grants", "grant_id"],
 });
 
 // every runtime login of this branch: B06 five and package B09 payment service

@@ -10,6 +10,10 @@
  *
  * Each runs its parse in an isolated child under the Node permission model with network hooks (decision D-ISO-1, runIsolated),
  * reporting InspectionIsolation evidence. The labelled scanner fake is the test-only subpath @kauro/data-plane/testing.
+ *
+ * The attempt envelope of a processing attempt (B08; docs/design/B08-audit-approval-jobs.md D8-STG-1..5, mandate B08-WORKER-HOST),
+ * real in tests too: AttemptScratchStore (ScratchStore), FencedArtifactWriter (ArtifactWriter) and GenerationSourceReader
+ * (SourceReader). The labelled worker-host fake is the test-only subpath @kauro/data-plane/testing/worker-host.
  */
 export { ARCHIVE_BOUNDS, DATA_PLANE_VERSION, EVALUATOR_VERSION, INSPECTOR_VERSION, PREVIEW_BOUNDS, PREVIEW_READER_VERSION, SHEET_GRID, evaluationLimits, inspectionLimits } from "./limits.js";
 export { IsolatedContainerInspector, InspectorFailure, type ContainerInspectorOptions } from "./inspector/container-inspector.js";
@@ -19,3 +23,17 @@ export { rejectionClassOfInspection, rejectionClassOfScan } from "./scan/classif
 export { parserProfileHashOfInspection, storedTableFacts, type StoredTableFacts } from "./inventory.js";
 export { partDigestOf } from "./archive/zip.js";
 export { SANDBOX_CODE_ROOT, runIsolated, sandboxFlags, type SandboxRequest, type SandboxResult } from "./sandbox/runner.js";
+export { AttemptEnvelopeFailure, terminalCauseOf, type AttemptFailureCause } from "./attempt/failure.js";
+export {
+  ARTIFACT_SPOOL_FAMILY,
+  ATTEMPT_SCRATCH_DIRECTORY_PREFIX,
+  AttemptScratchStore,
+  SCRATCH_STORE_CONTRACT_VERSION,
+  attemptScratchDirectoryOf,
+  removeAttemptScratch,
+  type AttemptScratchOptions,
+  type ScratchDevice,
+  type ScratchSpool,
+} from "./attempt/scratch-store.js";
+export { FencedArtifactWriter, type FencedArtifactWriterOptions, type StagedManifestRequest } from "./attempt/artifact-writer.js";
+export { GenerationSourceReader, type GenerationSourceReaderOptions } from "./attempt/source-reader.js";

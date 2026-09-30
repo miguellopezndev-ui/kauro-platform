@@ -25,6 +25,7 @@ export type { StrictJsonOptions, StrictJsonReason } from "./api/strict-json.js";
 export { parseStrictJson, StrictJsonError } from "./api/strict-json.js";
 export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js";
 export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_KEYWORDS, ANNOTATION_KEYWORDS } from "./api/json-schema.js";
+export { INTAKE_ROUTES } from "./api/intake-routes.js";
 export type { ContractSchemaBundle } from "./api/schema-validation.js";
 export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
 export type {
@@ -133,8 +134,12 @@ export {
 } from "./commands/handlers/index.js";
 // B07 source lifecycle (docs/design/B07-upload-source-lifecycle.md)
 export * from "./sources/index.js";
+// B08 execution package (docs/design/B08-audit-approval-jobs.md)
+export * from "./execution/index.js";
 export type { InMemoryStore, InMemoryPorts, OutboxRow } from "./testing/in-memory-ports.js";
 export { createInMemoryPorts, emptyStore, journalKey, fixedClock, sequentialIds } from "./testing/in-memory-ports.js";
 
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
+// B08 audit package (docs/design/B08-audit-approval-jobs.md)
+export * from "./audit/index.js";

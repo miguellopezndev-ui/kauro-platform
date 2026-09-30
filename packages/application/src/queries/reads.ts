@@ -32,6 +32,8 @@ import type { AgencyMembershipView, AgencyView, EndClientView, Page, ProjectView
 import { REQUEST_LIMITS } from "../api/envelope.js";
 import { recordDenialFact, type CommandRuntime } from "../commands/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION, type AuthorizationDecision } from "../ports/authorizer.js";
+import { AUDIT_READ_ROUTES } from "../audit/read-specs.js";
+import { EXECUTION_READ_ROUTES } from "../execution/read-specs.js";
 import { SOURCE_READ_ROUTES } from "../sources/read-specs.js";
 
 export interface ReadSpec<Id extends string = ReadOperationId> {
@@ -107,6 +109,8 @@ export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.f
     authority: '10 "Client and project routes": "GET /projects/{projectId} returns the current revision summary, commercial state, retention deadlines, safe progress and permitted actions"',
   }),
   ...SOURCE_READ_ROUTES,
+  ...EXECUTION_READ_ROUTES,
+  ...AUDIT_READ_ROUTES,
 });
 
 // --- the query (a closed schema too) ------------------------------------------------------------------------------------------

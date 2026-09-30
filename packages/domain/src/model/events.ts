@@ -11,6 +11,8 @@
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
+import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD_ALLOWLIST, EXECUTION_EVENT_SUBSCRIPTIONS, EXECUTION_EVENT_TYPES } from "./execution/events.js";
+import { AUDIT_AGGREGATE_KINDS, AUDIT_AUTHORITY_EVENT_TYPES, AUDIT_CONSUMERS, AUDIT_EVENT_PAYLOAD_ALLOWLIST, AUDIT_EVENT_SUBSCRIPTIONS } from "./audit/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
 import type { ActorRef } from "./tenant.js";
@@ -86,6 +88,10 @@ export const EVENT_TYPES = [
   "source_file.admission_revoked.v1",
   // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0013)
   ...COMMERCE_EVENT_TYPES,
+  // Processing authority (package B08, model/execution/events.ts; migrations 0021 and 0022)
+  ...EXECUTION_EVENT_TYPES,
+  // Audit authority (package B08, model/audit/events.ts; migration 0023)
+  ...AUDIT_AUTHORITY_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -94,9 +100,10 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * every package: docs/design/FOUNDATION-aggregate-kinds.md) holds the same kinds, each bound to its table and uuid primary-key
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here (B07: upload_session, source_file, retention_record, registered by migrations 0009, 0010 and
- * 0012; B09: the commerce kinds, registered by migrations 0013..0017).
+ * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
+ * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -163,6 +170,10 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
   // payments and fiscal workflow (package B09, commerce/events.ts)
   ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
+  // processing authority (package B08, model/execution/events.ts)
+  ...EXECUTION_EVENT_PAYLOAD_ALLOWLIST,
+  // audit authority (package B08, model/audit/events.ts)
+  ...AUDIT_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -171,9 +182,11 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
  * hashes, inspects, scans and promotes a reported completion; SELECTION_EVALUATION counts a bound selection; STORAGE_LIFECYCLE
  * cancels provider sessions and deletes quarantined, late and unsealed objects under generation preconditions; AUTHORITY_JOURNAL
  * appends the tombstones that must survive a database restore (14 "Minimal durable facts outside the primary restore boundary").
- * The commerce consumers are package B09's (commerce/events.ts COMMERCE_CONSUMERS).
+ * The commerce consumers are package B09's (commerce/events.ts COMMERCE_CONSUMERS); JOB_EXECUTION is package B08's (admission,
+ * launch, staging, verification and publication of a job; model/execution/events.ts, D8-XPKG-7), and so are AUDIT_ORCHESTRATION
+ * (an audit's PROFILE, INTERPRET and VALIDATE steps) and PLAN_VALIDATION (a plan's validation intent; model/audit/events.ts).
  */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", ...COMMERCE_CONSUMERS] as const;
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", ...COMMERCE_CONSUMERS, ...EXECUTION_CONSUMERS, ...AUDIT_CONSUMERS] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -217,6 +230,12 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.expired.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
   ...COMMERCE_EVENT_SUBSCRIPTIONS,
+  // processing authority (package B08 §11): admission, launch and verification to JOB_EXECUTION, a cancellation to EXECUTION_CONTROL,
+  // every terminal outcome and a package's availability to the agency
+  ...EXECUTION_EVENT_SUBSCRIPTIONS,
+  // audit authority (package B08 §11): the audit's live phases to AUDIT_ORCHESTRATION, its outcomes to the agency, a plan's validation
+  // intent to PLAN_VALIDATION
+  ...AUDIT_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

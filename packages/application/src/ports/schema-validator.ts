@@ -16,6 +16,8 @@ import type { RequestSchemaId } from "../api/request-schemas.js";
 import type { ResponseSchemaId } from "../api/response-schemas.js";
 import type { CommerceRequestSchemaCommand } from "../commerce/request-schemas.js";
 import type { CommerceReadOperationId, CommerceServedCommandId } from "../commerce/response-schemas.js";
+import type { AuditRequestSchemaId, DECISION_ARTIFACT_SCHEMA_ID } from "../audit/request-schemas.js";
+import type { ExecutionRequestSchemaId } from "../execution/request-schemas.js";
 import type { SELECTION_MANIFEST_SCHEMA_ID, SourceRequestSchemaId } from "../sources/request-schemas.js";
 
 /**
@@ -37,6 +39,9 @@ export type KnownSchemaId =
   | RequestSchemaId
   | ResponseSchemaId
   | SourceRequestSchemaId
+  | ExecutionRequestSchemaId
+  | AuditRequestSchemaId
+  | typeof DECISION_ARTIFACT_SCHEMA_ID
   | typeof SELECTION_MANIFEST_SCHEMA_ID
   | CommerceSchemaId
   | "Problem";

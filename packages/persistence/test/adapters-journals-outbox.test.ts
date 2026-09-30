@@ -12,6 +12,7 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { DomainFailure, commandRequestDigest, isDomainFailure, type ApprovalId, type AssuranceProofId, type CausationId, type ClientId, type IdempotencyIdentity, type PlanId, type ProcessingAuthorityId, type ProjectId, type RequestId, type RevisionId, type TaskId, type UserId } from "@kauro/domain";
 import { barrier, clock, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { fundPlatformPool } from "../src/testing/audit-fixtures.js";
 import { plan as planFixture } from "./support.js";
 
 let h: Harness;
@@ -209,7 +210,8 @@ test("CreateAgency reservations (no tenant) are visible to the identity that res
 test("S089 (structural): the request journal refuses a short hash, a zero ceiling and an absent grant; fence-scoped updates; response before consume; terminal states final", async () => {
   const mint = async (): Promise<string> => h.control.run(h.system(), async (uow) => uow.ids.next());
   const task = (await mint()) as TaskId;
-  const grant = await mint();
+  // the platform's funded model pool the intents reserve on (migration 0023, D8-GRANT-2: a request names a funded grant)
+  const grant = await fundPlatformPool(rawControl, { ceilingCents: 100_000n });
   const reserve = (requestId: RequestId, fence: number, requestHash: string, reservedCents: string) =>
     h.control.run(h.system(), (uow) => uow.requestJournal.reserve({ requestId, taskId: task, agencyId: A.agencyId, requestHash, fence, reservedCents, costGrantId: grant, upstreamRequestIds: [], reservedAt: clock.now() }));
   await assert.rejects(reserve((await mint()) as RequestId, 1, "abc1234", "150"), (e: unknown) => failure(e).code === "INVALID_REQUEST", "short SHA");
@@ -283,12 +285,14 @@ test("S089 failed upstream through the adapter: a dispatch intent naming an upst
   // dependencies and grants are resolved". The runnable materialization is the RESERVED dispatch intent of the control plane
   // (design §10); its dependencies are the upstream attempts whose consumed responses it builds on.
   const now = () => clock.now();
+  // the platform's funded model pool the intents reserve on (migration 0023, D8-GRANT-2: a request names a funded grant)
+  const grant = await fundPlatformPool(rawControl, { ceilingCents: 100_000n });
   type UpstreamState = "RESERVED" | "RESPONSE_STORED" | "CONSUMED" | "FAILED" | "CANCELLED" | "UNCERTAIN";
   /** An upstream attempt of its own task, walked to `state` through the adapter's fenced transitions. */
   const upstream = (state: UpstreamState, agencyId: AgencyFixture["agencyId"] = A.agencyId): Promise<RequestId> =>
     h.control.run(h.system(), async (uow) => {
       const requestId = uow.ids.next() as RequestId;
-      await uow.requestJournal.reserve({ requestId, taskId: uow.ids.next() as TaskId, agencyId, requestHash: sha(`upstream-${requestId}`), fence: 1, reservedCents: "40", costGrantId: uow.ids.next(), upstreamRequestIds: [], reservedAt: now() });
+      await uow.requestJournal.reserve({ requestId, taskId: uow.ids.next() as TaskId, agencyId, requestHash: sha(`upstream-${requestId}`), fence: 1, reservedCents: "40", costGrantId: grant, upstreamRequestIds: [], reservedAt: now() });
       if (state === "RESERVED") return requestId;
       if (state === "FAILED") return (await uow.requestJournal.markFailed(requestId, 1, now()))?.state === "FAILED" ? requestId : Promise.reject(new Error("FAILED fixture"));
       if (state === "CANCELLED") return (await uow.requestJournal.markCancelled(requestId, 1, now()))?.state === "CANCELLED" ? requestId : Promise.reject(new Error("CANCELLED fixture"));
@@ -304,7 +308,7 @@ test("S089 failed upstream through the adapter: a dispatch intent naming an upst
     h.control.run(h.system(), (uow) => {
       const taskId = uow.ids.next() as TaskId;
       attemptedTasks.push(taskId);
-      return uow.requestJournal.reserve({ requestId: uow.ids.next() as RequestId, taskId, agencyId: A.agencyId, requestHash: sha(`dependent-${taskId}`), fence: 1, reservedCents: "90", costGrantId: uow.ids.next(), upstreamRequestIds, reservedAt: now() });
+      return uow.requestJournal.reserve({ requestId: uow.ids.next() as RequestId, taskId, agencyId: A.agencyId, requestHash: sha(`dependent-${taskId}`), fence: 1, reservedCents: "90", costGrantId: grant, upstreamRequestIds, reservedAt: now() });
     });
   const unresolved = (e: unknown) => failure(e).code === "PRECONDITION_FAILED" && failure(e).reason === "UPSTREAM_UNRESOLVED";
 

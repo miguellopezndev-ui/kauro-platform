@@ -20,16 +20,16 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, B07Collaborators, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
-import { createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import type { AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
+import { createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createExecutionHandlers, createExecutionReadHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated, unavailableCoreServices } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
-import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
+import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { applyMigrationsAs, classifyError, compareSchema, createAuditUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
+import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, externalActionInspector, planServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
@@ -49,11 +49,13 @@ export const API_APPLICATION_NAME = "kauro-api";
 export const READINESS_STATEMENT_TIMEOUT_MS = 2_000;
 
 /**
- * The request handlers' unit-of-work factory: B06's `run`, the source lifecycle's `runSource` (B07) and the commerce unit of work of
- * the payments workflow (B09) — one factory on the verified kauro_app pool (@kauro/persistence PgCommerceUnitOfWorkFactory, which
- * extends the source-lifecycle factory of B07).
+ * The request handlers' unit-of-work factory: B06's `run`, the source lifecycle's `runSource` (B07), the commerce unit of work of
+ * the payments workflow (B09), the execution unit of work of the job commands and the audit unit of work of the audit commands (B08: `run`
+ * also opens the execution store and the audit store on the same connection) — one factory on the verified kauro_app pool
+ * (@kauro/persistence PgAuditUnitOfWorkFactory, which extends the execution factory of B08, the commerce factory of B09 and the
+ * source-lifecycle factory of B07).
  */
-export interface RequestUnitOfWorkFactory extends CommerceUnitOfWorkFactory {
+export interface RequestUnitOfWorkFactory extends AuditUnitOfWorkFactory {
   runSource<T>(context: ExecutionContext, work: (uow: SourceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T>;
 }
 
@@ -125,7 +127,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   }
   // one factory on the one verified pool: TENANT, IDENTITY, ANONYMOUS and OPERATOR contexts run under kauro_app; the payment
   // service's SERVICE contexts run on its own pool, which this process does not open here (the payment service's composition)
-  const unitOfWork = createCommerceUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
+  const unitOfWork = createAuditUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
   return {
     pool,
     unitOfWork,
@@ -189,8 +191,9 @@ export interface ApiAssembly {
   /** The database side of readiness and the build's schema version (the DatabaseHandle). */
   readonly database: Pick<DatabaseHandle, "readiness" | "codeSchemaVersion">;
   /**
-   * Collaborators that replace the edition defaults (edition.ts). The acceptance tests bind deterministic plan services here;
-   * a deployment of this edition binds nothing and answers PLAN_SERVICES_UNAVAILABLE for CMD023/CMD025 (I-INT-2).
+   * Collaborators that replace the edition defaults (edition.ts planServices). The acceptance tests of B06 bind deterministic plan
+   * services here; a deployment of this edition binds nothing: the decision artifacts, the patch compiler over `cores` and the real
+   * disclosure composer are its own (I-INT-2, D8-CMA-5).
    */
   readonly collaborators?: Partial<B06Collaborators>;
   /**
@@ -234,10 +237,17 @@ export interface ApiAssembly {
    * request side's CreatePaymentOrder and CapturePayment settle (its units of work and provider adapter; D-INT2-B3).
    */
   readonly payments?: PaymentService;
+  /**
+   * The cores the request side reaches (package B08, D8-PORT-1): the Intelligence core's plan compiler behind CMD022 CreatePlan and
+   * CMD023 RevisePlan. A deployment of this edition binds none and answers INTEGRITY_FAILURE / CORE_SERVICES_UNAVAILABLE for both;
+   * the acceptance tests bind the labelled contract fakes of @kauro/application/testing/cores (SIMULATED) here, and B15 binds the
+   * real thin adapter.
+   */
+  readonly cores?: CoreServices;
 }
 
 /**
- * Binds the authorizer, the thirteen command handlers (B06's seven, B07's six), the twelve reads, the selection manifest intake,
+ * Binds the authorizer, the nineteen command handlers (B06's seven, B07's six, B08's two job commands and four audit commands), the fourteen reads, the selection manifest and decision artifact intakes,
  * the request side of the payments workflow (CMD028, CMD029, CMD031, CMD032 and the four B09 reads), the payment service's routes
  * (CMD030, CMD033, CMD034) and the HTTP server over an open unit-of-work factory.
  */
@@ -251,12 +261,13 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     clock,
     ids,
   };
+  const cores = assembly.cores ?? unavailableCoreServices();
   const collaborators: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
     activeWork: activeWorkInspector,
-    externalActions: noExternalActionsInThisEdition,
+    externalActions: externalActionInspector,
     commercialConsequences: commercialConsequencesInspector,
-    ...unavailablePlanServices(),
+    ...planServices(cores),
     ...assembly.collaborators,
   };
   const sources: B07Collaborators = {
@@ -267,7 +278,11 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const cursorKey = assembly.cursorKey ?? systemRandom(32);
   if (!isCursorKey(cursorKey)) throw new RangeError("the cursor key has at least 32 bytes");
-  const readRuntime: SourceReadRuntime = { unitOfWork: runtime.unitOfWork, authorizer: runtime.authorizer, clock, cursorKey };
+  const readRuntime: SourceReadRuntime & ExecutionReadRuntime & AuditReadRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, cursorKey };
+  // package B08: the job commands run B06's pipeline in an execution unit of work of the same factory (design §12)
+  const executionRuntime: ExecutionRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, ids };
+  // package B08: the audit commands on the same pipeline in an audit unit of work of the same factory (design §12)
+  const auditRuntime: AuditRuntime = { unitOfWork, authorizer: runtime.authorizer, clock, ids };
   const validator = assembly.validator ?? loadContractSchemas();
   // package B09: the request side of the payments workflow over the same units of work and authorizer, with the corporate owner's
   // authorizer and the payment collaborators of the edition, replaced by the assembly's (D-REQ-B1). A bound payment service is the
@@ -286,9 +301,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...paymentService, ...assembly.commerce });
   return createApiServer({
     environment: assembly.environment,
-    handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
-    reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
-    intakes: createSourceIntakeHandlers(readRuntime),
+    handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources), ...createExecutionHandlers(executionRuntime), ...createAuditHandlers(auditRuntime, cores) },
+    reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources), ...createExecutionReadHandlers(readRuntime), ...createAuditReadHandlers(readRuntime) },
+    intakes: { ...createSourceIntakeHandlers(readRuntime), ...createAuditIntakeHandlers(readRuntime) },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
