@@ -343,3 +343,14 @@ Revert proofs (on the final tree: the fix taken out, the seam test fails; the fi
 - D-W5a-1 (swapping the public markup for `@kauro/ui`) is left to the screen mandates.
 - CMD044's `evidenceRefs` stays closed (`maxItems` 0) although B07 serves uploads on this base: binding refs of the same project
   (design §5 W4 row) comes with the support screen (W10).
+
+### Verification of the stage-1 head
+
+| check | platform | subject | result |
+|---|---|---|---|
+| `pnpm install --frozen-lockfile && pnpm run verify` (`.next` deleted first) | Windows 11, Node 24.14.1, pnpm 10.16.1, PostgreSQL 17 | `eea8c2c` | exit 0 in 13 m 20 s: contracts 12, ui 58, domain 112, web 244, application 156, persistence 226, authorization 11, data-plane 12, control 15, api 245 (one Linux-only skip of B06), tools 56; gate 10 packages / 25 edges; openapi 49 operations; web-client; matrix 29 machines / 21 commands; clean-consume |
+| same, fresh clone as WSL user `miguel`, `PGBIN=/usr/lib/postgresql/17/bin` | Ubuntu 24.04 (WSL2), Node 24.21.0, pnpm 10.16.1 | `eea8c2c` | exit 0 in 10 m 26 s: the same counts, api 245 passed; clone deleted, no cluster left |
+| `npx playwright test --project=chromium` (after the Windows verify's build) | Windows 11, Playwright 1.63.0 | `eea8c2c` | 48/48: harness 2, contract-fake harness 4, public pages 42 |
+
+The case map's EXECUTED_LOCAL and PARTIAL cells (`B11-case-map.md`, counts at stage 1) rest on these runs. Firefox and WebKit are not
+installed on this host; the three-engine suites of S067, S068 and R2-062 are stage 2's (W6, W8) and INT-2's.
