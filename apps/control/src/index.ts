@@ -10,7 +10,10 @@
  * Processing authority (docs/design/B08-audit-approval-jobs.md §4..§7, §11, mandate B08-CONTROL-EXECUTION): where the execution units
  * of work, the worker host and the verifier are handed in, the consumers JOB_EXECUTION and EXECUTION_CONTROL and the sweepers of
  * EXECUTION_SWEEPERS (JOB_ADMISSION, ATTEMPT_MONITOR, JOB_DEADLINES, STAGING_JANITOR) over the same dispatcher, each unit bound to the
- * job's agency, every provider call outside any transaction and every answer recorded only under the job's row lock (§6).
+ * job's agency, every provider call outside any transaction and every answer recorded only under the job's row lock (§6). Audit
+ * authority (§3, mandate B08-CONTROL-AUDIT): with the cores' ports and the validator's write path, the consumers AUDIT_ORCHESTRATION
+ * (PROFILE, INTERPRET and VALIDATE under the audit's fence) and PLAN_VALIDATION (only the current intent), and the sweepers
+ * AUDIT_DEADLINES and GRANT_RECONCILIATION; EXECUTION_CONTROL also cancels the audits of a lost source.
  */
 export { PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
 export type { DispatcherOptions, DispatchCounts } from "./dispatcher.js";
@@ -59,3 +62,14 @@ export type { LostAuthorityReason } from "./execution/authority.js";
 export { deliveryObjectNameOf, expectedAuthorityHashOf, DELIVERY_OBJECT_NAME_DOMAIN, EXPECTED_AUTHORITY_DOMAIN } from "./execution/names.js";
 export { EXECUTION_SERVICES } from "./execution/work.js";
 export type { ExecutionStep } from "./execution/work.js";
+// audit authority (package B08, mandate B08-CONTROL-AUDIT; docs/design/B08-audit-approval-jobs.md §3, §6, §8.1, §11)
+export type { AuditUnits } from "@kauro/application";
+export { AuditOrchestration, AGENCY_DECISION_REQUIRED, CAPABILITY_NOT_SUPPORTED } from "./audit/orchestration.js";
+export type { AuditOrchestrationDependencies } from "./audit/orchestration.js";
+export { PlanValidation } from "./audit/plan-validation.js";
+export type { PlanValidationDependencies } from "./audit/plan-validation.js";
+export { AuditDeadlines, ABSOLUTE_DEADLINE_REACHED } from "./audit/deadlines.js";
+export { GrantReconciliation } from "./audit/grants.js";
+export { AuditCancellations } from "./audit/cancellation.js";
+export { PlanValidator, judgeReceipt, openValidatorReceipts, planBodyHashOf, validationReceiptHashOf, VALIDATION_RECEIPT_DOMAIN } from "./audit/receipts.js";
+export type { ValidationReceipts, ReceiptJudgement, ValidatedSubject, ValidationRun, ValidatorDatabaseConfig } from "./audit/receipts.js";

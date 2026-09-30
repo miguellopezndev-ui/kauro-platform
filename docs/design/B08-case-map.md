@@ -9,10 +9,11 @@ B08-COMMANDS-EXECUTION landed its twelve rows at `c40fe42` on `b08/commands-exec
 B08-CONTROL-EXECUTION landed its fourteen rows at `7f8ee1d` on `b08/control-execution` (the tests first at `e704e55`); its deviations
 are D8-CEX-1 to D8-CEX-10. B08-PERSISTENCE-AUDIT landed its two rows and migration 0021 at `990967d` on `b08/persistence-audit`; its
 deviations are D8-PAU-1 to D8-PAU-10. B08-STAGE-2 merged the three on `b08/stage-2` with no deviation of its own (the Job machine's owner
-rows of `tools/matrix.mjs` now name the control-plane consumer or sweeper performing each edge); a row keeps the commit of the
-mandate that landed it.
-B08-COMMANDS-AUDIT landed its seven rows at `7b5d50b` on `b08/commands-audit` (the tests first at `4803c7f`); its deviations
-are D8-CMA-1 to D8-CMA-10.
+rows of `tools/matrix.mjs` now name the control-plane consumer or sweeper performing each edge). B08-COMMANDS-AUDIT landed its seven
+rows at `7b5d50b` on `b08/commands-audit` (the tests first at `4803c7f`); its deviations are D8-CMA-1 to D8-CMA-10, renumbered from
+its branch's D8-CAU ids when B08-INTEGRATION merged it, because B08-CONTROL-AUDIT registered the same ids. B08-CONTROL-AUDIT landed its
+three rows at `2dc17fa` on `b08/control-audit` (the tests first at `784e402`); its deviations are D8-CAU-1 to D8-CAU-11. A row keeps
+the commit of the mandate that landed it.
 
 Every test is cited as `` `file` :: "exact test title" ``. `tools/test/b08-case-map.test.mjs` reads this file: a cited file that
 exists must contain a test with exactly that title; a cited file that does not exist yet must be listed in the `tests` of exactly one
@@ -170,9 +171,9 @@ B01's (CMD024, G-MC-SEMANTICS); these tests support them and are not counted abo
 - EXECUTED_LOCAL (B08-COMMANDS-AUDIT; 7b5d50b) `apps/api/test/audit-reads.test.ts` :: "GetAudit answers the durable phase, deadlines, grant classification and pending decisions to live members only, never a provider identity, a prompt or a customer value"
 - EXECUTED_LOCAL (B08-PERSISTENCE-AUDIT; B03 S041; 990967d) `packages/persistence/test/audit-adapters.test.ts` :: "the audit store through every repository method as the owning roles: two StartAudit reservations for the last cents of the pool serialize on its row with the loser BUDGET_EXHAUSTED, steps record only under the current fence, and the model-task journal returns a stored response before any new dispatch intent"
 - SIMULATED (B08-CORE-PORTS; B03 IC-01) `packages/application/test/core-port-fakes.test.ts` :: "the labelled Intelligence-core fake plans a complete candidate manifest, answers COMPILED, NEEDS_DECISION, UNSUPPORTED or FAILED as scripted through the journal port, compiles a stored response before any new dispatch and never dispatches without a reservation; evidence class SIMULATED"
-- PLANNED SIMULATED (B08-CONTROL-AUDIT; B03 IC-02, R2-035) `apps/control/test/audit-orchestration.test.ts` :: "the audit runs PROFILE, INTERPRET and VALIDATE under its fence to DRAFT_READY with a VALIDATED system draft; a stale step's result is refused, and a cancellation or the absolute deadline after every await of the three steps leaves no draft"
-- PLANNED SIMULATED (B08-CONTROL-AUDIT; B01 CMD024, B03 IC-03) `apps/control/test/plan-validation.test.ts` :: "PLAN_VALIDATION validates only the current intent: a receipt for another body, source, target or core, a null or incomplete receipt and a receipt after the plan was revised never make it VALIDATED"
-- PLANNED EXECUTED_LOCAL (B08-CONTROL-AUDIT; B03 IC-12) `apps/control/test/grant-reconciliation.test.ts` :: "GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a proven unused amount, exhausts and expires grants on the server clock never early, and closes a grant only when no uncertain usage remains"
+- SIMULATED (B08-CONTROL-AUDIT; B03 IC-02, R2-035; 2dc17fa) `apps/control/test/audit-orchestration.test.ts` :: "the audit runs PROFILE, INTERPRET and VALIDATE under its fence to DRAFT_READY with a VALIDATED system draft; a stale step's result is refused, and a cancellation or the absolute deadline after every await of the three steps leaves no draft"
+- SIMULATED (B08-CONTROL-AUDIT; B01 CMD024, B03 IC-03; 2dc17fa) `apps/control/test/plan-validation.test.ts` :: "PLAN_VALIDATION validates only the current intent: a receipt for another body, source, target or core, a null or incomplete receipt and a receipt after the plan was revised never make it VALIDATED"
+- EXECUTED_LOCAL (B08-CONTROL-AUDIT; B03 IC-12; 2dc17fa) `apps/control/test/grant-reconciliation.test.ts` :: "GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a proven unused amount, exhausts and expires grants on the server clock never early, and closes a grant only when no uncertain usage remains"
 
 ## Gate G-JOB
 

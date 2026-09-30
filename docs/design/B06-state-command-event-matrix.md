@@ -88,24 +88,24 @@ registry machine; initial QUEUED; terminal DRAFT_READY, NEEDS_DECISION, UNSUPPOR
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
 | — | (initial QUEUED) | QUEUED | CMD020 StartAudit (B03) | audit.queued.v1 | route |
-| QUEUED | profile_worker_claims | PROFILING | B08: durable profile/interpret/validate orchestration | audit.profiling.v1 | database |
-| PROFILING | profile_and_candidates_complete | INTERPRETING | B08: durable orchestration | audit.interpreting.v1 | database |
-| INTERPRETING | compiled_decisions_ready | VALIDATING | B08: durable orchestration | audit.validating.v1 | database |
-| INTERPRETING | unresolved_material_choice | NEEDS_DECISION | B08: durable orchestration | audit.needs_decision.v1 | database |
-| INTERPRETING | capability_not_supported | UNSUPPORTED | B08: durable orchestration | audit.unsupported.v1 | database |
-| VALIDATING | complete_valid_receipt_and_current_authority | DRAFT_READY | B08: durable orchestration | audit.draft_ready.v1 | database |
-| VALIDATING | validatable_issue_needs_agency_choice | NEEDS_DECISION | B08: durable orchestration | audit.needs_decision.v1 | database |
-| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
-| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
-| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
-| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
-| QUEUED | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
-| PROFILING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
-| INTERPRETING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
-| VALIDATING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
-| PROFILING | fatal_integrity_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
-| INTERPRETING | fatal_contract_or_provider_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
-| VALIDATING | fatal_contract_error | FAILED | B08: durable orchestration | audit.failed.v1 | database |
+| QUEUED | profile_worker_claims | PROFILING | B08: the AUDIT_ORCHESTRATION consumer (control plane) on audit.queued.v1: the PROFILE step claims the audit's fence + 1 over a SEALED source and an AUTHORIZED grant (D8-AUD-2) | audit.profiling.v1 | database |
+| PROFILING | profile_and_candidates_complete | INTERPRETING | B08: the AUDIT_ORCHESTRATION consumer (control plane): the PROFILE step records the profile evidence and the complete candidate manifest under its fence (D8-AUD-2, D8-CAU-9) | audit.interpreting.v1 | database |
+| INTERPRETING | compiled_decisions_ready | VALIDATING | B08: the AUDIT_ORCHESTRATION consumer (control plane) on audit.interpreting.v1: the INTERPRET step's compiled decisions, the system draft plan VALIDATING in the same unit (D8-AUD-3, D8-CAU-4, D8-CAU-5) | audit.validating.v1 | database |
+| INTERPRETING | unresolved_material_choice | NEEDS_DECISION | B08: the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's NEEDS_DECISION answer, no plan (D8-CAU-11) | audit.needs_decision.v1 | database |
+| INTERPRETING | capability_not_supported | UNSUPPORTED | B08: the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's UNSUPPORTED answer; GRANT_RECONCILIATION closes the unused grant (D8-CAU-10, D8-CAU-11) | audit.unsupported.v1 | database |
+| VALIDATING | complete_valid_receipt_and_current_authority | DRAFT_READY | B08: the AUDIT_ORCHESTRATION consumer (control plane) on audit.validating.v1: the VALIDATE step's VALID receipt under the fence and cancel version before the absolute deadline, the system draft VALIDATED (deferred guard, D8-AUD-4) | audit.draft_ready.v1 | database |
+| VALIDATING | validatable_issue_needs_agency_choice | NEEDS_DECISION | B08: the AUDIT_ORCHESTRATION consumer (control plane): the VALIDATE step's INVALID receipt, its blocking issues the findings (D8-CAU-11) | audit.needs_decision.v1 | database |
+| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03); EXECUTION_CONTROL (control plane) cancels too, as a SERVICE actor with its reason, the live audits of a superseded or expired revision or of a revoked source admission (D8-CANCEL-2) | audit.cancelled.v1 | route |
+| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03); EXECUTION_CONTROL (control plane) cancels too, as a SERVICE actor with its reason, the live audits of a superseded or expired revision or of a revoked source admission (D8-CANCEL-2) | audit.cancelled.v1 | route |
+| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03); EXECUTION_CONTROL (control plane) cancels too, as a SERVICE actor with its reason, the live audits of a superseded or expired revision or of a revoked source admission (D8-CANCEL-2) | audit.cancelled.v1 | route |
+| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03); EXECUTION_CONTROL (control plane) cancels too, as a SERVICE actor with its reason, the live audits of a superseded or expired revision or of a revoked source admission (D8-CANCEL-2) | audit.cancelled.v1 | route |
+| QUEUED | absolute_deadline | EXPIRED | B08: the AUDIT_DEADLINES sweeper (control plane) on the server clock, never early, settling the system draft's open intent CANCELLED (D8-DL-1, D8-CAU-8) | audit.expired.v1 | database |
+| PROFILING | absolute_deadline | EXPIRED | B08: the AUDIT_DEADLINES sweeper (control plane) on the server clock, never early, settling the system draft's open intent CANCELLED (D8-DL-1, D8-CAU-8) | audit.expired.v1 | database |
+| INTERPRETING | absolute_deadline | EXPIRED | B08: the AUDIT_DEADLINES sweeper (control plane) on the server clock, never early, settling the system draft's open intent CANCELLED (D8-DL-1, D8-CAU-8) | audit.expired.v1 | database |
+| VALIDATING | absolute_deadline | EXPIRED | B08: the AUDIT_DEADLINES sweeper (control plane) on the server clock, never early, settling the system draft's open intent CANCELLED (D8-DL-1, D8-CAU-8) | audit.expired.v1 | database |
+| PROFILING | fatal_integrity_error | FAILED | B08: the AUDIT_ORCHESTRATION consumer (control plane): the PROFILE step meets a sealed generation that fails its integrity or a rejected profile (D8-CAU-9) | audit.failed.v1 | database |
+| INTERPRETING | fatal_contract_or_provider_error | FAILED | B08: the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's FAILED answer, a compiler refusal or a candidate manifest that changed (D8-CAU-4, D8-CAU-5) | audit.failed.v1 | database |
+| VALIDATING | fatal_contract_error | FAILED | B08: the AUDIT_ORCHESTRATION consumer (control plane): the VALIDATE step's null, incomplete or foreign receipt (D8-CAU-7) | audit.failed.v1 | database |
 
 ### Plan
 
@@ -114,10 +114,10 @@ registry machine; initial DRAFT; terminal SUPERSEDED, WITHDRAWN; unlisted edges:
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
 | — | (initial DRAFT) | DRAFT | CMD022 CreatePlan (B03); CMD023 RevisePlan (B06) creates the successor DRAFT of a revision | plan.created.v1 | route |
-| DRAFT | compiled_or_edited | VALIDATION_REQUIRED | CMD023 RevisePlan (B06); the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it | plan.validation_required.v1 | route |
-| VALIDATION_REQUIRED | validation_admitted | VALIDATING | CMD024 ValidatePlan (B01) | plan.validating.v1 | route |
-| VALIDATING | valid_receipt | VALIDATED | B08: the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CMA-10); CMD024 records the intent and answers 202 | plan.validated.v1 | database |
-| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | B08: the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CMA-10) | plan.validation_required.v1 | database |
+| DRAFT | compiled_or_edited | VALIDATION_REQUIRED | CMD023 RevisePlan (B06); the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it, and AUDIT_ORCHESTRATION (control plane) so takes the system draft it inserts (D8-CAU-4) | plan.validation_required.v1 | route |
+| VALIDATION_REQUIRED | validation_admitted | VALIDATING | CMD024 ValidatePlan (B01); AUDIT_ORCHESTRATION (control plane) admits a system draft's first validation intent with the INTERPRET step's VALIDATING edge (D8-AUD-4) | plan.validating.v1 | route |
+| VALIDATING | valid_receipt | VALIDATED | B08: the PLAN_VALIDATION consumer (control plane) on plan.validating.v1 for CMD024's current intent, and AUDIT_ORCHESTRATION's VALIDATE step for a system draft: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-7, D8-CMA-10); CMD024 records the intent and answers 202 | plan.validated.v1 | database |
+| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | B08: the PLAN_VALIDATION consumer (control plane) or AUDIT_ORCHESTRATION's VALIDATE step: an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED; also when an audit's cancellation or deadline settles its draft's open intent CANCELLED (D8-PLAN-2, D8-CAU-8, D8-CMA-10) | plan.validation_required.v1 | database |
 | VALIDATED | agency_approval | APPROVED | CMD025 ApprovePlan (B06) | plan.approved.v1 | route |
 | DRAFT | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
 | VALIDATION_REQUIRED | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
@@ -215,12 +215,12 @@ registry machine; initial PREPARED; terminal CLOSED, EXPIRED; unlisted edges: RE
 | --- | --- | --- | --- | --- | --- |
 | — | (initial PREPARED) | PREPARED | CMD020 StartAudit (B03); the AUDIT grant is born PREPARED and authorized from its funded pool in the same unit of work (cost_grant.authorized.v1, D8-GRANT-1) | cost_grant.prepared.v1 | route |
 | PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9); an AUDIT grant is authorized by CMD020 from its pool (D8-GRANT-1) | cost_grant.authorized.v1 | database |
-| AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B03: bounded reservations | cost_grant.exhausted.v1 | database |
-| EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B03: reconciled reservations | cost_grant.authorized.v1 | database |
-| AUTHORIZED | expiry_reached | EXPIRED | B03: the grant's expiry | cost_grant.expired.v1 | database |
-| EXHAUSTED | expiry_reached | EXPIRED | B03: the grant's expiry | cost_grant.expired.v1 | database |
-| AUTHORIZED | all_effects_reconciled_and_scope_closed | CLOSED | B03: grant closure | cost_grant.closed.v1 | database |
-| EXPIRED | all_effects_reconciled | CLOSED | B03: grant closure | cost_grant.closed.v1 | database |
+| AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B08: the GRANT_RECONCILIATION sweeper (control plane) once known spend plus reserved reaches the ceiling (D8-GRANT-2, D8-CAU-10) | cost_grant.exhausted.v1 | database |
+| EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B08: the GRANT_RECONCILIATION sweeper (control plane) once a dispatch intent the database can no longer send is released unused and the grant is unexpired (D8-CAU-10) | cost_grant.authorized.v1 | database |
+| AUTHORIZED | expiry_reached | EXPIRED | B08: the GRANT_RECONCILIATION sweeper (control plane) at the grant's expiry on the server clock, never early, its uncertain usage still reserved (D8-DL-1, D8-CAU-10) | cost_grant.expired.v1 | database |
+| EXHAUSTED | expiry_reached | EXPIRED | B08: the GRANT_RECONCILIATION sweeper (control plane) at the grant's expiry on the server clock, never early, its uncertain usage still reserved (D8-DL-1, D8-CAU-10) | cost_grant.expired.v1 | database |
+| AUTHORIZED | all_effects_reconciled_and_scope_closed | CLOSED | B08: the GRANT_RECONCILIATION sweeper (control plane) once the grant's audit ended and no usage is uncertain; an AUDIT grant's close releases its pool's hold (D8-PAU-4, D8-CAU-10) | cost_grant.closed.v1 | database |
+| EXPIRED | all_effects_reconciled | CLOSED | B08: the GRANT_RECONCILIATION sweeper (control plane) once an expired grant has no uncertain usage and no live carve left (D8-CAU-10) | cost_grant.closed.v1 | database |
 
 ### TaxDocument
 

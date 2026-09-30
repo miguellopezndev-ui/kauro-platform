@@ -23,6 +23,12 @@
  * (`execution`), and `runCycle` extends its pass with them: JOB_DEADLINES and ATTEMPT_MONITOR after the source sweeps, both consumers
  * with the others, then JOB_ADMISSION and STAGING_JANITOR. A deployment of this edition binds no worker host or cores adapter, so its
  * control plane has no execution pipelines (`execution` is null; D8-PORT-1).
+ *
+ * Audit authority (mandate B08-CONTROL-AUDIT; §3, §11): the same `execution` providers carry the cores' ports (profile, interpret,
+ * compile, validate), the validator's write path — a second verified pool whose login is a member of kauro_validator
+ * (`openValidatorReceipts`, D8-ROLE-1) — and the core package hash the platform expects, and the plane assembles AUDIT_ORCHESTRATION,
+ * PLAN_VALIDATION, AUDIT_DEADLINES and GRANT_RECONCILIATION over the audit units of work; `runCycle` expires audits with the jobs'
+ * deadlines, drains both consumers with the others, and reconciles the grants last, after every dispatch of the pass is recorded.
  */
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -156,7 +162,7 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
   };
   const sweeperByName = Object.fromEntries(Object.values(sweepers).map((s: SourceSweeper) => [s.name, s])) as Record<SourceSweeperName, SourceSweeper>;
   for (const name of SOURCE_SWEEPERS) if (sweeperByName[name] === undefined) throw new Error(`the control plane has no ${name} sweeper`);
-  const execution = options.execution === undefined ? null : assembleExecutionPlane(options.execution, providers.storage, ids);
+  const execution = options.execution === undefined ? null : assembleExecutionPlane(options.execution, providers.storage, ids, options.scratchRoot);
 
   const drain = async (consumer: OutboxConsumer, now: UtcInstant, limit = 50, rounds = 20): Promise<DispatchCounts> => {
     let delivered = 0;
@@ -184,12 +190,19 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
       const sweeps: Partial<Record<SourceSweeperName | ExecutionSweeperName, SweepResult>> = {};
       for (const sweeper of [sweepers.locationPolicy, sweepers.uploadDeadlines, sweepers.providerSessionReconciliation, sweepers.retention]) sweeps[sweeper.name] = await sweeper.sweep(units, limit);
       // processing authority: the deadlines first (never early), then what the monitor observes of the live attempts
-      if (execution !== null) for (const sweeper of [execution.sweepers.jobDeadlines, execution.sweepers.attemptMonitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
+      if (execution !== null) {
+        for (const sweeper of [execution.sweepers.jobDeadlines, execution.sweepers.auditDeadlines, execution.sweepers.attemptMonitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
+      }
       const dispatched: Record<string, DispatchCounts> = {};
       for (const consumer of [consumers.uploadInspection, consumers.selectionEvaluation, consumers.storageLifecycle, consumers.authorityJournal]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
-      if (execution !== null) for (const consumer of [execution.consumers.jobExecution, execution.consumers.executionControl]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
+      if (execution !== null) {
+        const { jobExecution, executionControl, auditOrchestration, planValidation } = execution.consumers;
+        for (const consumer of [jobExecution, executionControl, auditOrchestration, planValidation]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
+      }
       for (const sweeper of [sweepers.objectInventory, sweepers.deletionRetries]) sweeps[sweeper.name] = await sweeper.sweep(units, limit);
-      if (execution !== null) for (const sweeper of [execution.sweepers.jobAdmission, execution.sweepers.stagingJanitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
+      if (execution !== null) {
+        for (const sweeper of [execution.sweepers.jobAdmission, execution.sweepers.stagingJanitor, execution.sweepers.grantReconciliation]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
+      }
       return { sweeps, dispatched };
     },
   };

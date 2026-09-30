@@ -71,6 +71,7 @@ import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
+import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgAuditStore } from "./audit/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
@@ -734,10 +735,13 @@ export const decisionArtifactResolver = Object.freeze({
  */
 export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUnitOfWork {
   readonly audits: PgAuditStore;
+  /** The control plane's discovery reads of audit work (mandate B08-CONTROL-AUDIT, D8-CAU-1). */
+  readonly auditDiscovery: PgAuditDiscovery;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
     this.audits = new PgAuditStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
+    this.auditDiscovery = new PgAuditDiscovery(client);
   }
 }
 

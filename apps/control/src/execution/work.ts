@@ -4,8 +4,9 @@
  *
  * - Every write runs in a SYSTEM unit of work bound to the job's agency, as the control-plane service whose edge it is (the actor of
  *   its events; B07 D-CTRL-2): JOB_ADMISSION admits, JOB_EXECUTION launches, submits, verifies and publishes, ATTEMPT_MONITOR
- *   observes and takes over, EXECUTION_CONTROL cancels, JOB_DEADLINES expires, STAGING_JANITOR cleans. Discovery across agencies runs
- *   unbound and reads ids and states only.
+ *   observes and takes over, EXECUTION_CONTROL cancels, JOB_DEADLINES expires, STAGING_JANITOR cleans — and, for audit authority
+ *   (../audit), AUDIT_ORCHESTRATION runs an audit's steps, PLAN_VALIDATION validates a plan's intent, AUDIT_DEADLINES expires audits
+ *   and GRANT_RECONCILIATION settles the cost grants. Discovery across agencies runs unbound and reads ids and states only.
  * - No transaction spans a provider or core call (07): a unit records an intent, the call runs outside, the next unit re-reads the
  *   job under its row lock and records the answer only if nothing moved — the check after every await (D8-CANCEL-1, §6).
  * - A step the database refuses because its subject moved (a spent fence, KA080; a lost authority or a cancellation, KA081; an
@@ -22,6 +23,11 @@ export const EXECUTION_SERVICES = Object.freeze({
   ATTEMPT_MONITOR: "attempt-monitor",
   JOB_DEADLINES: "job-deadlines",
   STAGING_JANITOR: "staging-janitor",
+  // audit authority (mandate B08-CONTROL-AUDIT): the audit's steps, a plan's validation, the audits' deadline and the grants
+  AUDIT_ORCHESTRATION: "audit-orchestration",
+  PLAN_VALIDATION: "plan-validation",
+  AUDIT_DEADLINES: "audit-deadlines",
+  GRANT_RECONCILIATION: "grant-reconciliation",
 } as const);
 
 /**

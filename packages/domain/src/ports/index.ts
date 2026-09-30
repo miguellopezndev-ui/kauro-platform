@@ -167,3 +167,5 @@ export type {
   AuditUnitOfWork,
   AuditUnitOfWorkFactory,
 } from "./audit-store.js";
+// the control plane's discovery of audit work (package B08, mandate B08-CONTROL-AUDIT)
+export type { AuditRef, GrantRef, AuditSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";

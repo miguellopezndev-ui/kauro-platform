@@ -11,6 +11,8 @@
  * `evidenceClass: "SIMULATED"` and names a `contract-fake-*` token in every record it produces (21 "Evidence classes").
  */
 export {
+  CONTRACT_FAKE_MIGRATION_CORE_COUNTS,
+  CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH,
   CONTRACT_FAKE_MIGRATION_CORE_TOKEN,
   CONTRACT_FAKE_MIGRATION_CORE_VERSION,
   ContractFakeMigrationCore,
