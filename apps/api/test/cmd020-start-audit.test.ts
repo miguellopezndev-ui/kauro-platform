@@ -183,7 +183,9 @@ test("DENY and RACE: a VIEWER is 403, another agency's revision 404, an unsealed
   const expiredTarget = await w.targetContract(w.A, expiredProject.projectId);
   await refused("expired revision", expiredRevision.revisionId, { targetContractId: expiredTarget.contractId }, {}, "422 SOURCE_EXPIRED -");
   const oldProject = await w.project(w.A, w.clientA);
-  const oldRevision = await w.revision(w.A, oldProject.projectId, "SEALED");
+  // sealed fifteen days ago, its UNPAID retention behind: since main's B06-R2 fixture change a SEALED revision is current by
+  // default, so the lapsed one is asked for explicitly
+  const oldRevision = await w.revision(w.A, oldProject.projectId, "SEALED", { recent: false });
   const oldTarget = await w.targetContract(w.A, oldProject.projectId);
   await refused("a revision sealed past its retention", oldRevision.revisionId, { targetContractId: oldTarget.contractId }, {}, "422 SOURCE_EXPIRED -");
 

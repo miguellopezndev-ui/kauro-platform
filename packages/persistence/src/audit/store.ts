@@ -16,6 +16,7 @@ import {
   DomainFailure,
   NotFoundFailure,
   decisionArtifactHashOf,
+  modelTaskCheckpointOf,
   modelTaskJournalEventHashOf,
   auditEventTypeOf,
   costGrantEventTypeOf,
@@ -474,14 +475,18 @@ export class PgAuditStore implements AuditStore {
     return existing;
   }
 
-  /** The MODEL_TASK lease claimed on the server clock (its deadline the interpretation deadline, its cost the audit's grant). */
+  /**
+   * The MODEL_TASK lease claimed on the server clock (its deadline the interpretation deadline, its cost the audit's grant) with the
+   * task's checkpoint (B06-R1, D-LEASE-3; D8-LAND-2): the first claim stores it, and every later claim — the live holder's renewal or
+   * a new owner's resume of a lapsed lease under fence + 1 — names it again, recomputed from the planned task.
+   */
   private async claimTaskLease(task: ModelTaskRecord, ownerId: string): Promise<LeaseRecord> {
     await execute(this.db, "SAVEPOINT kauro_model_task_lease");
     try {
       await execute(
         this.db,
-        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease('MODEL_TASK', $1, $2, $3, $4::timestamptz, $5, $6, NULL, kauro.server_now())`,
-        [task.modelTaskId, ownerId, AUDIT_POLICY.modelTaskLeaseSeconds, task.interpretationDeadlineAt, task.taskKey, task.grantId],
+        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease('MODEL_TASK', $1, $2, $3, $4::timestamptz, $5, $6, $7, kauro.server_now())`,
+        [task.modelTaskId, ownerId, AUDIT_POLICY.modelTaskLeaseSeconds, task.interpretationDeadlineAt, task.taskKey, task.grantId, modelTaskCheckpointOf(task)],
       );
       await execute(this.db, "RELEASE SAVEPOINT kauro_model_task_lease");
     } catch (e) {

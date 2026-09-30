@@ -14,6 +14,7 @@ import {
   DomainFailure,
   EXECUTION_POLICY,
   NotFoundFailure,
+  jobAttemptCheckpointOf,
   jobAttemptIdentityOf,
   jobAttemptStagingPrefixOf,
   packageDeliveryPrefixOf,
@@ -423,13 +424,18 @@ export class PgExecutionStore implements ExecutionStore {
     return { anchorId: row.anchor_id, evidenceHash: row.evidence_hash, created: false };
   }
 
+  /**
+   * The job's JOB_ATTEMPT lease claimed on the server clock with the job's checkpoint (B06-R1, D-LEASE-3; D8-LAND-2): the admission's
+   * first claim stores it, and a takeover of the lapsed lease names it again, recomputed from the job's admitted input, which the
+   * lease guard finds equal to the stored one — an expired lease is resumed only from its stored checkpoint, under fence + 1.
+   */
   private async claimLease(job: ProcessingJobRecord, ownerId: ProcessingAttemptId): Promise<{ readonly kind: "CLAIMED" | "HELD"; readonly lease: LeaseRecord }> {
     await execute(this.db, "SAVEPOINT kauro_job_lease");
     try {
       const r = await execute<Row>(
         this.db,
-        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, $3, $4::timestamptz, $5, $6, NULL, kauro.server_now())`,
-        [job.jobId, ownerId, EXECUTION_POLICY.leaseSeconds, job.deliveryDeadlineAt, job.inputBindingHash, job.authorizationId],
+        `SELECT ${LEASE_COLUMNS} FROM kauro.claim_lease('JOB_ATTEMPT', $1, $2, $3, $4::timestamptz, $5, $6, $7, kauro.server_now())`,
+        [job.jobId, ownerId, EXECUTION_POLICY.leaseSeconds, job.deliveryDeadlineAt, job.inputBindingHash, job.authorizationId, jobAttemptCheckpointOf(job)],
       );
       await execute(this.db, "RELEASE SAVEPOINT kauro_job_lease");
       const lease = await this.jobLease(job.jobId);
