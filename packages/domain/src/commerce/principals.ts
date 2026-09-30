@@ -7,18 +7,18 @@
  *
  * B06 left these roles denied by default (design §6.2: "Corporate and service roles of the catalogue (KAURO_OWNER,
  * PAYMENT_SERVICE, ...) are not memberships; roleSatisfies denies them by default and their authorizers arrive with their
- * packages"). B09 brings the two its commands name:
+ * packages"). B09 brings the two its commands name (B10 adds the commission and finance services below):
  *  - KAURO_OWNER (CMD032 ApproveRefund): a corporate grant of a person's identity, stored in kauro.corporate_roles and read by the
  *    database itself (kauro.holds_corporate_role) — never a claim of a token (D-CORP-B1);
  *  - PAYMENT_SERVICE (CMD033 ExecuteRefund, CMD034 ReconcilePayment) and AUTHENTICATED_PROVIDER (CMD030, the provider ingress):
  *    verified service identities, mapped to their one technical role by this code-owned table (D-AUTHZ-B3).
  */
 
-export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE";
+export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
 
 /** A service identity the service authenticator verified (issuer, audience, expected identity, environment; 10). */
 export interface ServiceIdentity {
-  /** The verified service identity, a lowercase token (payment-service, provider-ingress, fiscal-service). */
+  /** The verified service identity, a lowercase token (payment-service, provider-ingress, fiscal-service, commission-service, finance-service). */
   readonly serviceId: string;
   readonly audience: string;
   /** The deployment environment the identity was issued for (LOCAL, SANDBOX, LIVE). */
@@ -28,12 +28,16 @@ export interface ServiceIdentity {
 /**
  * Code-owned service role table (D-AUTHZ-B3): each service identity holds exactly the technical role of its boundary. The
  * fiscal service's role is named for the fiscal integration package (CMD035 IssueTaxDocument, B15); B09 serves none of its
- * commands.
+ * commands. B10 adds the two services of the commission ledger (D10-CTX-1): the commission service closes a commission period
+ * (CMD051) and the finance service reconciles a commission payout against the provider evidence (CMD053); both run on the
+ * kauro_commission runtime role and neither holds the other's role.
  */
 export const SERVICE_ROLE_TABLE: Readonly<Record<string, ServiceRole>> = Object.freeze({
   "payment-service": "PAYMENT_SERVICE",
   "provider-ingress": "AUTHENTICATED_PROVIDER",
   "fiscal-service": "FISCAL_SERVICE",
+  "commission-service": "COMMISSION_SERVICE",
+  "finance-service": "FINANCE_SERVICE",
 });
 
 export function serviceHoldsRole(serviceId: string, role: ServiceRole): boolean {

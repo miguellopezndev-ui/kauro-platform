@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
-import type { AgencyId, CorrelationId } from "@kauro/domain";
+import type { AgencyId, CaptureId, CorrelationId } from "@kauro/domain";
 import {
   PAYOUT_EVIDENCE_UNAVAILABLE,
   UnavailablePayoutEvidenceVerifier,
@@ -157,9 +157,9 @@ test("the buyer-type, preparation-completion and payout-evidence fakes answer on
   ]);
 
   // preparation completions: only what was recorded, for that agency and capture, in instant order; a STAGE completion is a STAGE
-  const captureId = w.ids.next();
-  const secondCapture = w.ids.next();
-  const completionsOf = (agencyId: AgencyId, capture: string) => w.ports.unitOfWork.run(w.service(), (uow) => completions.completionsOf(uow, { agencyId, captureId: capture }));
+  const captureId = w.ids.next() as CaptureId;
+  const secondCapture = w.ids.next() as CaptureId;
+  const completionsOf = (agencyId: AgencyId, capture: CaptureId) => w.ports.unitOfWork.run(w.service(), (uow) => completions.completionsOf(uow, { agencyId, captureId: capture }));
   assert.deepEqual(await completionsOf(w.agencyId, captureId), [], "nothing recorded is nothing completed");
   const stageAt = w.clock.now();
   w.clock.advance(3_600_000);
