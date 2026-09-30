@@ -300,6 +300,8 @@ export interface ExecutionWorld {
   readonly plane: ControlPlane;
   readonly x: ExecutionPlane;
   readonly storage: ContractFakeObjectStorage;
+  /** B07's session vault fake the control plane's STORAGE_LIFECYCLE opens sealed session references with (the request side seals them). */
+  readonly vault: ContractFakeSessionVault;
   readonly core: ContractFakeMigrationCore;
   /** The labelled Intelligence-core fake an audit's INTERPRET step and the plan compiler are bound to (B08-CORE-PORTS). */
   readonly intelligence: ContractFakeIntelligenceCore;
@@ -314,10 +316,21 @@ export interface ExecutionWorld {
   readonly B: AgencyFixture;
   readonly capabilityId: string;
   agency(label: string): Promise<AgencyFixture>;
+  /** The end client every project of the agency is created for (made with the agency). */
+  clientOf(agency: AgencyFixture): ClientId;
+  /** The agency's upload session limit, set by the control plane's capacity row (what CMD013 reserves against). */
+  allowUploads(agency: AgencyFixture, limit: number): Promise<void>;
+  /** A confirmed, current target contract of the project (observation and confirmation leave it; the request handlers' write). */
+  confirmTarget(agency: AgencyFixture, projectId: ProjectId, label: string, mode?: "HUBSPOT" | "SALESFORCE"): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }>;
   /** A fresh project of the agency (HUBSPOT, or SALESFORCE), its revision sealed recently through B07's lifecycle and its target confirmed. */
   subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<AuditSubject>;
   /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
   paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<Purchase>;
+  /**
+   * B09's paidPurchase of a plan the agency already APPROVED through CMD025 (the end-to-end run): the quote, the order and the completed
+   * capture over the world's qualified route, fiscal issuer and the agency's reviewed profile — an ACTIVE CommercialAuthorization.
+   */
+  purchase(agency: AgencyFixture, planId: PlanId): Promise<{ readonly authorizationId: CommercialAuthorizationId; readonly orderId: string; readonly captureId: string }>;
   /** CMD036's write (the request handlers' TENANT unit of work through the execution store): one QUEUED job with its outbox record. */
   queue(p: Purchase): Promise<ProcessingJobRecord>;
   /** CMD037's write (the request handlers' TENANT unit of work): cancel_command at the job's version, as the agency's owner. */
@@ -606,7 +619,13 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     });
     // B07: the source sealed recently through the lifecycle fixture (a quote promises no more source than its seal left)
     const source = await h.sealedRevision(ag, projectId, "SEALED", { base: new Date(Date.now() - RECENT_SEAL_MS) });
-    // a confirmed, current target contract (observation and confirmation leave it; plans_target_fk)
+    const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode);
+    return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
+  }
+
+  /** A confirmed, current target contract of the project (observation and confirmation leave it; plans_target_fk). */
+  async function confirmedTarget(ag: AgencyFixture, projectId: ProjectId, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }> {
+    const capabilityVersion = (await oracle.query<{ version: string }>("SELECT version FROM kauro.capabilities WHERE capability_id = $1", [await capabilityOf(mode)])).rows[0]?.version ?? "R2-INITIAL";
     const contractId = ids.next();
     const targetContractHash = sha(`target-${label}-${contractId}`);
     await asTenant(ag, (c) =>
@@ -616,7 +635,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
         [contractId, ag.agencyId, projectId, mode, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
       ),
     );
-    return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
+    return { contractId, targetContractHash };
   }
 
   async function approved(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<Omit<Purchase, "authorizationId" | "orderId" | "captureId">> {
@@ -717,6 +736,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     plane,
     x,
     storage,
+    vault,
     core,
     intelligence,
     receipts,
@@ -728,6 +748,34 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     capabilityId,
     agency,
 
+    clientOf(ag) {
+      const clientId = clients.get(ag.agencyId);
+      assert.ok(clientId !== undefined, `the agency ${ag.agencyId} was made by this world`);
+      return clientId;
+    },
+
+    async allowUploads(ag, limit) {
+      const c: RawClient = await connectTo(h.controlPool);
+      try {
+        await c.query("BEGIN");
+        await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', '', true)", [ag.agencyId]);
+        await c.query(
+          "INSERT INTO kauro.upload_capacity (agency_id, active_sessions, session_limit, updated_at) VALUES ($1, 0, $2, now()) ON CONFLICT (agency_id) DO UPDATE SET session_limit = EXCLUDED.session_limit, updated_at = now()",
+          [ag.agencyId, limit],
+        );
+        await c.query("COMMIT");
+      } catch (e) {
+        await c.query("ROLLBACK");
+        throw e;
+      } finally {
+        c.release();
+      }
+    },
+
+    confirmTarget(ag, projectId, label, mode = "HUBSPOT") {
+      return confirmedTarget(ag, projectId, label, mode);
+    },
+
     subject(ag, label, options = {}) {
       return subjectOf(ag, label, options.mode ?? "HUBSPOT");
     },
@@ -736,6 +784,11 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
       const subject = await approved(ag, label, options.mode ?? "HUBSPOT");
       const paid = await paidPurchase(h, { agency: ag, planId: subject.planId, issuerRef, profileId: profiles.get(ag.agencyId) as FiscalProfileId, treatment: "EXEMPT_EXPORT", route });
       return { ...subject, authorizationId: paid.authorizationId, orderId: paid.orderId, captureId: paid.captureId };
+    },
+
+    async purchase(ag, planId) {
+      const paid = await paidPurchase(h, { agency: ag, planId, issuerRef, profileId: profiles.get(ag.agencyId) as FiscalProfileId, treatment: "EXEMPT_EXPORT", route });
+      return { authorizationId: paid.authorizationId, orderId: paid.orderId, captureId: paid.captureId };
     },
 
     queue(p) {
