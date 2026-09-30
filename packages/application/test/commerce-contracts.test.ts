@@ -76,7 +76,7 @@ test("principal, runtime role, scope and idempotency store follow the catalogue 
   assert.equal(serviceHoldsRole("payment-service", "AUTHENTICATED_PROVIDER"), false);
   assert.equal(serviceHoldsRole("provider-ingress", "PAYMENT_SERVICE"), false);
   assert.equal(serviceHoldsRole("constructor", "PAYMENT_SERVICE"), false, "an inherited object key is not a service identity");
-  assert.equal(Object.keys(SERVICE_ROLE_TABLE).length, 3);
+  assert.equal(Object.keys(SERVICE_ROLE_TABLE).length, 5);
 });
 
 test("request schemas are closed 2020-12 objects whose properties are exactly the catalogue fields, typed by the field vocabulary", () => {
