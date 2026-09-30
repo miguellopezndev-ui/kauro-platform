@@ -63,12 +63,13 @@ export type {
 export {
   EXECUTION_DIGEST_DOMAINS,
   jobInputBindingHashOf,
+  jobAttemptCheckpointOf,
   stagedManifestHashOf,
   deliveryManifestHashOf,
   jobAttemptIdentityOf,
   jobAttemptStagingPrefixOf,
   packageDeliveryPrefixOf,
 } from "./digests.js";
-export type { StagedManifestArtifact, StagedManifestDocument, DeliveryManifestArtifact, DeliveryPackageManifest } from "./digests.js";
+export type { AdmittedJobInput, StagedManifestArtifact, StagedManifestDocument, DeliveryManifestArtifact, DeliveryPackageManifest } from "./digests.js";
 export { compareAdmissionCandidates, fairAdmissionOrder } from "./scheduler.js";
 export type { AdmissionCandidate } from "./scheduler.js";

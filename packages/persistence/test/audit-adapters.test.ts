@@ -8,6 +8,7 @@
 // inside StartAudit's unit of work and the other's lock wait observed in pg_stat_activity, never by a sleep.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import type { Client } from "pg";
 import type { Id } from "@kauro/contracts";
 import {
   AUDIT_POLICY,
@@ -25,13 +26,19 @@ import {
   type AgencyId,
   type AuditStepOutcome,
   type UserId,
+  type EventProvenance,
+  modelTaskCheckpointOf,
 } from "@kauro/domain";
 import { decisionArtifactResolver, modelTaskJournalOf } from "../src/index.js";
+import { PgAuditStore } from "../src/audit/store.js";
+import { PgEventPublisher } from "../src/event-publisher.js";
+import { clockAt } from "../src/testing/source-lifecycle.js";
+import { service, within } from "./commerce-support.js";
 import { barrier, waitForLockWait } from "../src/testing/harness.js";
 import { fundPlatformPool } from "../src/testing/audit-fixtures.js";
 import { controlOf } from "../src/testing/execution-fixtures.js";
 import { auditSubject, closeAuditEnv, failureOf, newAudit, openAuditEnv, type AuditEnv } from "./audit-support.js";
-import { clock, ids, plan, planBody, sha, validationReceipt } from "./support.js";
+import { clock, ids, plan, planBody, sha, sqlState, validationReceipt } from "./support.js";
 
 let env: AuditEnv;
 
@@ -263,4 +270,97 @@ test("the audit store through every repository method as the owning roles: two S
     (await h.oracle.query("SELECT event_type FROM kauro.domain_events WHERE aggregate_id = $1 ORDER BY aggregate_version", [inputA.grantId])).rows.map((r) => r.event_type),
     ["cost_grant.prepared.v1", "cost_grant.authorized.v1", "cost_grant.closed.v1"],
   );
+});
+
+/** PgAuditStore on the control plane's raw transaction bound to the agency: a dispatch owner's unit on the TEST CLOCK. */
+function controlAuditStore(c: Client): PgAuditStore {
+  const provenance = (): EventProvenance => ({ actor: { kind: "SERVICE", serviceId: "control-plane" }, causationId: ids.next() as EventProvenance["causationId"], correlationId: ids.next() as EventProvenance["correlationId"] });
+  return new PgAuditStore({ db: c, ids, events: new PgEventPublisher(c, ids, clock), provenance });
+}
+
+/** A raw claim of the task's MODEL_TASK lease by a new owner naming `checkpoint`, as a savepoint probe: the refusal's label, if any. */
+async function taskClaimProbe(c: Client, modelTaskId: string, checkpoint: string | null): Promise<string> {
+  await c.query("SAVEPOINT lease_probe");
+  try {
+    await c.query(
+      `SELECT kauro.claim_lease('MODEL_TASK', m.model_task_id, $2, 120, a.interpretation_deadline_at, m.task_key, m.grant_id, $3, kauro.server_now())
+         FROM kauro.model_tasks m JOIN kauro.audits a ON a.audit_id = m.audit_id WHERE m.model_task_id = $1`,
+      [modelTaskId, ids.next(), checkpoint],
+    );
+    return "CLAIMED";
+  } catch (e) {
+    assert.equal(sqlState(e), "KA005", String(e));
+    return (e as Error).message.split(":")[0] ?? "";
+  } finally {
+    await c.query("ROLLBACK TO SAVEPOINT lease_probe");
+  }
+}
+
+test("B06-R1 seam (b08/land): the MODEL_TASK lease is born with the model task's checkpoint — KAURO_MODEL_TASK_CHECKPOINT_V1 over its planned request — so once its dispatch owner's lease lapsed another owner's beginDispatch resumes it under fence 2 naming exactly that checkpoint and reserves its own intent at that fence; while the lease is live the other owner is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing", async () => {
+  const { h, B } = env;
+  await fundPlatformPool(env.control, { ceilingCents: 5_000n });
+  const subject = await auditSubject(env, B, "b06-r1-model-task");
+  const input = newAudit(B, subject);
+  await h.audit.run(h.tenant(B.agencyId as AgencyId, B.ownerUserId as UserId), (uow) => uow.audits.startAudit(input));
+  const profile = await h.audit.run(controlOf(B.agencyId), (uow) => uow.audits.claimStep(input.auditId, "PROFILE", ids.next() as AuditStepId));
+  await h.audit.run(controlOf(B.agencyId), (uow) => uow.audits.recordStep(profile.step.stepId, { outcome: "COMPLETED", evidenceHash: sha("b06-r1-profile"), evidenceClass: "SIMULATED" }));
+  const candidateManifestHash = sha("b06-r1-candidates");
+  const interpreting = await h.audit.run(controlOf(B.agencyId), (uow) =>
+    uow.audits.advanceAudit(input.auditId, 2, { to: "INTERPRETING", profileEvidenceHash: sha("b06-r1-profile-evidence"), candidateManifestHash }),
+  );
+  assert.equal(interpreting.kind, "APPLIED");
+  const interpret = await h.audit.run(controlOf(B.agencyId), (uow) => uow.audits.claimStep(input.auditId, "INTERPRET", ids.next() as AuditStepId));
+  const task = await h.audit.run(controlOf(B.agencyId), (uow) =>
+    uow.audits.createModelTask({
+      modelTaskId: ids.next() as ModelTaskId,
+      auditId: input.auditId,
+      stepFence: interpret.step.fence,
+      taskKey: sha("b06-r1-task"),
+      candidateManifestHash,
+      policyHash: sha("b06-r1-policy"),
+      minimizedRequestHash: sha("b06-r1-minimized-request"),
+      providerProfileId: ids.next() as Id,
+      maximumCostCents: 40n,
+    }),
+  );
+  const checkpoint = modelTaskCheckpointOf(task);
+  const lease = async () =>
+    (await h.oracle.query<{ owner_id: string; fence: number; checkpoint_hash: string | null }>(
+      "SELECT owner_id, fence::int AS fence, checkpoint_hash FROM kauro.leases WHERE resource_kind = 'MODEL_TASK' AND resource_id = $1",
+      [task.modelTaskId],
+    )).rows[0];
+  // the first dispatch owner's claim stores the task's checkpoint with the lease and reserves its intent at fence 1
+  const owner1 = ids.next() as LeaseOwnerId;
+  const first = await h.audit.run(controlOf(B.agencyId), (uow) =>
+    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner1, requestHash: sha("b06-r1-request-1"), reservedCents: 25n }),
+  );
+  assert.deepEqual(first.kind === "RESERVED" ? [first.request.fence, first.lease.fence, first.lease.ownerId, first.lease.checkpointHash] : [first.kind], [1, 1, owner1, checkpoint]);
+  // while owner 1's lease is live another owner is HELD and reserves nothing
+  const owner2 = ids.next() as LeaseOwnerId;
+  const held = await h.audit.run(controlOf(B.agencyId), (uow) =>
+    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n }),
+  );
+  assert.equal(held.kind, "HELD");
+  assert.deepEqual(await lease(), { owner_id: owner1, fence: 1, checkpoint_hash: checkpoint });
+  // past its time to live on the TEST CLOCK (inside the interpretation deadline): a resume naming no checkpoint, or another one, is
+  // refused by the guard; nothing changes
+  const lapsed = new Date(Date.now() + (AUDIT_POLICY.modelTaskLeaseSeconds + 60) * 1000);
+  await within(env.control, service(B.agencyId), async (c) => {
+    await clockAt(c, lapsed);
+    assert.equal(await taskClaimProbe(c, task.modelTaskId, null), "RESUME_WITHOUT_CHECKPOINT");
+    assert.equal(await taskClaimProbe(c, task.modelTaskId, sha("another checkpoint")), "CHECKPOINT_MISMATCH");
+  });
+  assert.deepEqual(await lease(), { owner_id: owner1, fence: 1, checkpoint_hash: checkpoint });
+  // owner 2 resumes the task through beginDispatch: fence 2 from the stored checkpoint, its own intent reserved at fence 2
+  const r2 = ids.next() as RequestId;
+  const resumed = await within(env.control, service(B.agencyId), async (c) => {
+    await clockAt(c, lapsed);
+    return controlAuditStore(c).beginDispatch(task.modelTaskId, { requestId: r2, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n });
+  });
+  assert.deepEqual(
+    resumed.kind === "RESERVED" ? [resumed.request.requestId, resumed.request.fence, resumed.lease.fence, resumed.lease.ownerId, resumed.lease.checkpointHash] : [resumed.kind],
+    [r2, 2, 2, owner2, checkpoint],
+  );
+  assert.deepEqual(await lease(), { owner_id: owner2, fence: 2, checkpoint_hash: checkpoint });
+  assert.deepEqual(await heldOn(input.grantId), { reserved: 50, spent: 0, state: "AUTHORIZED" }, "each fence's intent reserves on the audit's grant");
 });

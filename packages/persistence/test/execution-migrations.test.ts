@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { STATE_MACHINES } from "@kauro/contracts";
-import { EXECUTION_AGGREGATE_KINDS, EXECUTION_EVENT_TYPES, EXECUTION_PLATFORM_MACHINES, EXECUTION_POLICY, JOB_EVENT_TYPES, PACKAGE_EVENT_TYPES, fairAdmissionOrder, isDomainFailure, jobInputBindingHashOf, type CommerceUnitOfWork, type EventProvenance, type ProcessingJobId } from "@kauro/domain";
+import { EXECUTION_AGGREGATE_KINDS, EXECUTION_EVENT_TYPES, EXECUTION_PLATFORM_MACHINES, EXECUTION_POLICY, JOB_EVENT_TYPES, PACKAGE_EVENT_TYPES, fairAdmissionOrder, isDomainFailure, jobAttemptCheckpointOf, jobInputBindingHashOf, type CommerceUnitOfWork, type EventProvenance, type ProcessingJobId } from "@kauro/domain";
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { PgExecutionStore } from "../src/execution/store.js";
 import { executionReadsOf } from "../src/unit-of-work.js";
@@ -136,12 +136,19 @@ function rawStore(c: Client, serviceId = "control-plane"): PgExecutionStore {
 async function takeOverLease(c: Client, jobId: string): Promise<string> {
   await clockAt(c, new Date(Date.now() + (EXECUTION_POLICY.leaseSeconds + 60) * 1000));
   const newOwner = ids.next();
-  // the lease's subject, deadline and cost authority exactly as stored (a takeover names them again; they never change)
+  // the lease's subject, deadline and cost authority exactly as stored (a takeover names them again; they never change), and the
+  // job's checkpoint the admission stored with it (B06-R1, D8-LAND-2: an expired JOB_ATTEMPT lease resumes only from it)
+  const [job] = (await c.query<{ agency_id: string; project_id: string; authorization_id: string; input_binding_hash: string }>(
+    "SELECT agency_id, project_id, authorization_id, input_binding_hash FROM kauro.processing_jobs WHERE job_id = $1",
+    [jobId],
+  )).rows;
+  assert.ok(job);
+  const checkpoint = jobAttemptCheckpointOf({ jobId, agencyId: job.agency_id, projectId: job.project_id, authorizationId: job.authorization_id, inputBindingHash: job.input_binding_hash });
   const claimed = await c.query<{ owner_id: string; fence: string }>(
     `SELECT l.owner_id, l.fence FROM kauro.processing_jobs j,
-            LATERAL kauro.claim_lease('JOB_ATTEMPT', j.job_id, $2, 120, j.delivery_deadline_at, j.input_binding_hash, j.authorization_id, NULL, kauro.server_now()) l
+            LATERAL kauro.claim_lease('JOB_ATTEMPT', j.job_id, $2, 120, j.delivery_deadline_at, j.input_binding_hash, j.authorization_id, $3, kauro.server_now()) l
       WHERE j.job_id = $1`,
-    [jobId, newOwner],
+    [jobId, newOwner, checkpoint],
   );
   assert.equal(claimed.rows[0]?.owner_id, newOwner, "the lapsed lease is taken over");
   return newOwner;

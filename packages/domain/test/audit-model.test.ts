@@ -4,7 +4,7 @@
 // mandate (its case rows are the persistence suites').
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { STATE_MACHINES, registryJson } from "@kauro/contracts";
+import { STATE_MACHINES, canonicalBytes, rawDigest, registryJson } from "@kauro/contracts";
 import {
   AGGREGATE_KINDS,
   AUDIT_AGGREGATE_KINDS,
@@ -28,6 +28,7 @@ import {
   grantAvailableCents,
   grantFunds,
   interpretationDeadlineOf,
+  modelTaskCheckpointOf,
   modelTaskJournalEventHashOf,
   poolFundsAudit,
   type CostGrantRecord,
@@ -109,4 +110,42 @@ test("the audit events: one registered `<kind>.<state>.v1` for every Audit and C
   // every step outcome names the edge it records (design §8.1)
   assert.deepEqual(AUDIT_STEP_OUTCOMES.INTERPRET, ["COMPILED", "NEEDS_DECISION", "UNSUPPORTED", "FAILED"]);
   assert.deepEqual(AUDIT_STEP_OUTCOMES.VALIDATE, ["VALID", "NEEDS_DECISION", "FAILED"]);
+});
+
+test("B06-R1 seam (b08/land): a model task's MODEL_TASK checkpoint is KAURO_MODEL_TASK_CHECKPOINT_V1 over the task, its audit, its grant and its planned request — every member binds, and it is hashed apart from the task's key and its journal events", () => {
+  const planned = {
+    modelTaskId: "01980000-0000-7000-8000-000000000001",
+    agencyId: "01910000-0000-7000-8000-000000000001",
+    auditId: "01990000-0000-7000-8000-000000000001",
+    grantId: "019a0000-0000-7000-8000-000000000001",
+    taskKey: "1".repeat(64),
+    candidateManifestHash: "2".repeat(64),
+    policyHash: "3".repeat(64),
+    minimizedRequestHash: "4".repeat(64),
+    providerProfileId: "019b0000-0000-7000-8000-000000000001",
+    maximumCostCents: 40n,
+  };
+  const checkpoint = modelTaskCheckpointOf(planned);
+  // the canonical wrapper of the platform domain; the cents as their exact decimal (no float), the restart rule in the payload: a
+  // new dispatch owner resumes the planned request (a stored response is compiled before any new dispatch, D8-AUD-3)
+  assert.equal(
+    checkpoint,
+    rawDigest(canonicalBytes({ domain: "KAURO_MODEL_TASK_CHECKPOINT_V1", version: 1, payload: { ...planned, maximumCostCents: "40", resumesFrom: "PLANNED_REQUEST" } })),
+  );
+  for (const [member, other] of [
+    ["modelTaskId", "01980000-0000-7000-8000-000000000002"],
+    ["agencyId", "01910000-0000-7000-8000-000000000002"],
+    ["auditId", "01990000-0000-7000-8000-000000000002"],
+    ["grantId", "019a0000-0000-7000-8000-000000000002"],
+    ["taskKey", "5".repeat(64)],
+    ["candidateManifestHash", "6".repeat(64)],
+    ["policyHash", "7".repeat(64)],
+    ["minimizedRequestHash", "8".repeat(64)],
+    ["providerProfileId", "019b0000-0000-7000-8000-000000000002"],
+    ["maximumCostCents", 41n],
+  ] as const) {
+    assert.notEqual(modelTaskCheckpointOf({ ...planned, [member]: other }), checkpoint, `${member} binds the checkpoint`);
+  }
+  assert.notEqual(checkpoint, planned.taskKey);
+  assert.notEqual(checkpoint, modelTaskJournalEventHashOf({ ...planned, maximumCostCents: "40", resumesFrom: "PLANNED_REQUEST" }), "another domain");
 });

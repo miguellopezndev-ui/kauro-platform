@@ -1,7 +1,7 @@
 /**
  * Digests and names of processing authority (package B08; reference/HASHING_AND_ACCOUNTING_RULES "Hash domain separation": every
  * structured digest is SHA-256 over the canonical {domain, version, payload} wrapper; docs/design/B08-audit-approval-jobs.md
- * D8-JOB-2, D8-STG-5, D8-PUB-2, D8-HOST-1, D8-STG-1, D8-PUB-1).
+ * D8-JOB-2, D8-STG-5, D8-PUB-2, D8-HOST-1, D8-STG-1, D8-PUB-1, D8-LAND-2).
  *
  * KAURO_JOB_INPUT_BINDING_V1 and KAURO_STAGED_MANIFEST_V1 are platform domains (the authority names the Job.inputBindingHash and a
  * staged manifest but no domain for them), in the same wrapper shape as B07's source digests; KAURO_DELIVERY_MANIFEST_V1 is the
@@ -17,7 +17,36 @@ import type { JobExecutionSubject } from "./records.js";
 export const EXECUTION_DIGEST_DOMAINS = Object.freeze({
   JOB_INPUT_BINDING: "KAURO_JOB_INPUT_BINDING_V1",
   STAGED_MANIFEST: "KAURO_STAGED_MANIFEST_V1",
+  JOB_ATTEMPT_CHECKPOINT: "KAURO_JOB_ATTEMPT_CHECKPOINT_V1",
 } as const);
+
+/** What a job's JOB_ATTEMPT checkpoint is taken over: the admitted job, its scope, its entitlement and its input binding. */
+export interface AdmittedJobInput {
+  readonly jobId: string;
+  readonly agencyId: string;
+  readonly projectId: string;
+  readonly authorizationId: string;
+  readonly inputBindingHash: Sha256Hex;
+}
+
+/**
+ * The checkpoint identity of a job's JOB_ATTEMPT lease (B06 review finding B06-R1, decision D-LEASE-3; D8-LAND-2): the one durable
+ * point every attempt of the job starts from — the admitted input (the input binding: sealed source, approved plan, target, receipt
+ * and core package) under the entitlement the admission consumed — and nothing an earlier attempt left in scratch or staging (R2-076:
+ * rerun under the same authorized job; no ephemeral intermediate recovery). The admission's first claim stores it with the lease and
+ * every takeover names it again, recomputed from the job, so an expired lease is resumed only from its stored checkpoint.
+ */
+export function jobAttemptCheckpointOf(job: AdmittedJobInput): Sha256Hex {
+  const payload = {
+    jobId: job.jobId,
+    agencyId: job.agencyId,
+    projectId: job.projectId,
+    authorizationId: job.authorizationId,
+    inputBindingHash: job.inputBindingHash,
+    resumesFrom: "ADMITTED_INPUT",
+  };
+  return rawDigest(canonicalBytes({ domain: EXECUTION_DIGEST_DOMAINS.JOB_ATTEMPT_CHECKPOINT, version: 1, payload }));
+}
 
 /**
  * Job.inputBindingHash ("Source, plan, target, core and policy bundle"): KAURO_JOB_INPUT_BINDING_V1 over the authorization's

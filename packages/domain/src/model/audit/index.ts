@@ -40,7 +40,8 @@ export type {
   PlanValidationRecord,
 } from "./records.js";
 export { grantAvailableCents, grantFunds, poolFundsAudit, auditAbsoluteDeadlineOf, interpretationDeadlineOf } from "./grants.js";
-export { AUDIT_DIGEST_DOMAINS, decisionArtifactHashOf, modelTaskJournalEventHashOf } from "./digests.js";
+export { AUDIT_DIGEST_DOMAINS, decisionArtifactHashOf, modelTaskCheckpointOf, modelTaskJournalEventHashOf } from "./digests.js";
+export type { PlannedModelTask } from "./digests.js";
 export {
   AUDIT_EVENT_TYPES,
   COST_GRANT_EVENT_TYPES,

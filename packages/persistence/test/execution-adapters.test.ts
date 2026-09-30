@@ -8,12 +8,15 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { isDomainFailure, type AttemptCleanupId, type CleanupInput, type PublicationOutcome, type StoredObjectId } from "@kauro/domain";
+import { EXECUTION_POLICY, isDomainFailure, jobAttemptCheckpointOf, type AttemptCleanupId, type CleanupInput, type EventProvenance, type ProcessingAttemptId, type PublicationOutcome, type StoredObjectId } from "@kauro/domain";
+import { PgEventPublisher } from "../src/event-publisher.js";
+import { PgExecutionStore } from "../src/execution/store.js";
+import { clockAt } from "../src/testing/source-lifecycle.js";
 import { backendPid, barrier, settlesOrWaits, waitForLockWait } from "../src/testing/harness.js";
 import { admitJob, controlOf, endJob, launchJob, queueJob, stageJob, verifyJob } from "../src/testing/execution-fixtures.js";
 import { tenant, within } from "./commerce-support.js";
 import { asControl, causeState, closeExecutionEnv, openExecutionEnv, oracle, purchase, refused, type ExecutionEnv } from "./execution-support.js";
-import { event, ids, sha } from "./support.js";
+import { clock, event, ids, sha, sqlState } from "./support.js";
 
 let env: ExecutionEnv;
 
@@ -290,4 +293,71 @@ test("S075 at the database: an attempt cleanup records exactly one attempt with 
     await oracle(env, "SELECT count(*)::int AS n FROM kauro.attempt_cleanups WHERE attempt_id = ANY($1::uuid[])", [[attempt.attemptId, siblingStaging.attempt.attemptId, foreignStaging.attempt.attemptId]]),
     [{ n: 1 }],
   );
+});
+
+/** PgExecutionStore on the control plane's raw transaction: the adapter ATTEMPT_MONITOR takes a lapse through, on the TEST CLOCK. */
+function controlStore(c: Client): PgExecutionStore {
+  const provenance = (): EventProvenance => ({ actor: { kind: "SERVICE", serviceId: "control-plane" }, causationId: ids.next() as EventProvenance["causationId"], correlationId: ids.next() as EventProvenance["correlationId"] });
+  return new PgExecutionStore({ db: c, ids, events: new PgEventPublisher(c, ids, clock), provenance });
+}
+
+/** A raw claim of the job's JOB_ATTEMPT lease by a new owner naming `checkpoint`, as a savepoint probe: the refusal's label, if any. */
+async function claimProbe(c: Client, jobId: string, checkpoint: string | null): Promise<string> {
+  await c.query("SAVEPOINT lease_probe");
+  try {
+    await c.query(
+      `SELECT kauro.claim_lease('JOB_ATTEMPT', j.job_id, $2, 120, j.delivery_deadline_at, j.input_binding_hash, j.authorization_id, $3, kauro.server_now())
+         FROM kauro.processing_jobs j WHERE j.job_id = $1`,
+      [jobId, ids.next(), checkpoint],
+    );
+    return "CLAIMED";
+  } catch (e) {
+    assert.equal(sqlState(e), "KA005", String(e));
+    return (e as Error).message.split(":")[0] ?? "";
+  } finally {
+    await c.query("ROLLBACK TO SAVEPOINT lease_probe");
+  }
+}
+
+test("B06-R1 seam (b08/land): the JOB_ATTEMPT lease is born at admission with the job's checkpoint — KAURO_JOB_ATTEMPT_CHECKPOINT_V1 over its admitted input — so once the lease lapsed the control plane abandons attempt 1 and PgExecutionStore.takeOver resumes the lease under fence 2 naming exactly that checkpoint; while the lease is live the takeover is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing", async () => {
+  const { A } = env;
+  const p = await purchase(env, A, "b06-r1-job-lease");
+  const queued = await queueJob(env.h, A, p.authorizationId);
+  const jobId = queued.jobId;
+  const admitted = await admitJob(env.h, A, jobId);
+  const a1 = admitted.attempt.attemptId;
+  const checkpoint = jobAttemptCheckpointOf(admitted.job);
+  const lease = async () =>
+    (await oracle<{ owner_id: string; fence: number; checkpoint_hash: string | null }>(env, "SELECT owner_id, fence::int AS fence, checkpoint_hash FROM kauro.leases WHERE resource_kind = 'JOB_ATTEMPT' AND resource_id = $1", [jobId]))[0];
+  // the admission's first claim stores the job's checkpoint with the lease: owner attempt 1, fence 1
+  assert.deepEqual([admitted.lease.fence, admitted.lease.ownerId, admitted.lease.checkpointHash], [1, a1, checkpoint]);
+  assert.deepEqual(await lease(), { owner_id: a1, fence: 1, checkpoint_hash: checkpoint });
+  // while attempt 1's lease is live a takeover is HELD and writes nothing
+  const held = await asControl(env, A, (c) => controlStore(c).takeOver(jobId, ids.next() as ProcessingAttemptId));
+  assert.equal(held.kind, "HELD");
+  assert.deepEqual(await lease(), { owner_id: a1, fence: 1, checkpoint_hash: checkpoint });
+  // past its time to live on the TEST CLOCK: a resume naming no checkpoint, or another one, is refused by the guard; nothing changes
+  const lapsed = new Date(Date.now() + (EXECUTION_POLICY.leaseSeconds + 60) * 1000);
+  await asControl(env, A, async (c) => {
+    await clockAt(c, lapsed);
+    assert.equal(await claimProbe(c, jobId, null), "RESUME_WITHOUT_CHECKPOINT");
+    assert.equal(await claimProbe(c, jobId, sha("another checkpoint")), "CHECKPOINT_MISMATCH");
+  });
+  assert.deepEqual(await lease(), { owner_id: a1, fence: 1, checkpoint_hash: checkpoint });
+  // the lapse as ATTEMPT_MONITOR takes it, in one unit: attempt 1 ABANDONED, the lease resumed by attempt 2 at fence 2 from the
+  // stored checkpoint (the takeover recomputes it from the job's admitted input and the guard finds it equal)
+  const a2 = ids.next() as ProcessingAttemptId;
+  const taken = await asControl(env, A, async (c) => {
+    await clockAt(c, lapsed);
+    const x = controlStore(c);
+    await x.abandonAttempt(a1, "LEASE_LAPSED");
+    return x.takeOver(jobId, a2);
+  });
+  assert.deepEqual(
+    taken.kind === "CLAIMED" ? [taken.attempt.attemptId, taken.attempt.ordinal, taken.attempt.state, taken.attempt.fence, taken.lease.fence, taken.lease.ownerId, taken.lease.checkpointHash] : [taken.kind],
+    [a2, 2, "CLAIMED", 2, 2, a2, checkpoint],
+  );
+  assert.deepEqual(await lease(), { owner_id: a2, fence: 2, checkpoint_hash: checkpoint });
+  assert.deepEqual(await oracle(env, "SELECT state, terminal_cause FROM kauro.processing_attempts WHERE attempt_id = $1", [a1]), [{ state: "ABANDONED", terminal_cause: "LEASE_LAPSED" }]);
+  await endJob(env.h, A, jobId);
 });

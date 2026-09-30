@@ -23,6 +23,7 @@ import {
   consumersOf,
   deliveryManifestHashOf,
   fairAdmissionOrder,
+  jobAttemptCheckpointOf,
   jobAttemptIdentityOf,
   jobAttemptStagingPrefixOf,
   jobEventTypeOf,
@@ -208,4 +209,29 @@ test("the execution events are registered with allowlists and routed as design s
   assert.throws(() => assertAllowlistedPayload("package_version.available.v1", { packageVersionId: job(1), objectName: "delivery/x" } as never), TypeError);
   assert.throws(() => assertAllowlistedPayload("processing_job.cancel_requested.v1", { jobId: job(1), actorKind: "a customer label" }), TypeError);
   for (const reason of EXECUTION_FAILURE_REASONS) assert.ok((FAILURE_REASONS as ReadonlyArray<string>).includes(reason), reason);
+});
+
+test("B06-R1 seam (b08/land): a job's JOB_ATTEMPT checkpoint is KAURO_JOB_ATTEMPT_CHECKPOINT_V1 over the job, its scope, its entitlement and its admitted input binding — the one durable point every attempt of the job starts from, another for any other job or input, and never the input binding itself", () => {
+  const admitted = {
+    jobId: job(1),
+    agencyId: agency(1),
+    projectId: "01920000-0000-7000-8000-000000000001",
+    authorizationId: "01930000-0000-7000-8000-000000000001",
+    inputBindingHash: "a".repeat(64),
+  };
+  const checkpoint = jobAttemptCheckpointOf(admitted);
+  // the canonical wrapper of the platform domain, with the restart rule named in the payload: an attempt reruns from the admitted
+  // input under the same entitlement and resumes nothing an earlier attempt left in scratch or staging (R2-076)
+  assert.equal(checkpoint, rawDigest(canonicalBytes({ domain: "KAURO_JOB_ATTEMPT_CHECKPOINT_V1", version: 1, payload: { ...admitted, resumesFrom: "ADMITTED_INPUT" } })));
+  assert.equal(jobAttemptCheckpointOf({ ...admitted }), checkpoint, "every attempt of the job names the same checkpoint");
+  for (const [member, other] of [
+    ["jobId", job(2)],
+    ["agencyId", agency(2)],
+    ["projectId", "01920000-0000-7000-8000-000000000002"],
+    ["authorizationId", "01930000-0000-7000-8000-000000000002"],
+    ["inputBindingHash", "b".repeat(64)],
+  ] as const) {
+    assert.notEqual(jobAttemptCheckpointOf({ ...admitted, [member]: other }), checkpoint, `${member} binds the checkpoint`);
+  }
+  assert.notEqual(checkpoint, admitted.inputBindingHash, "the checkpoint is not the lease subject");
 });
