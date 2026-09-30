@@ -198,3 +198,6 @@ export * from "./ports/index.js";
 
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
+
+// agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md)
+export * from "./commercial/index.js";
