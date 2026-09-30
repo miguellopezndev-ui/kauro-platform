@@ -1,7 +1,8 @@
 # B10 — Agency recurrence and commission domain: design
 
-Branch `b10/design` from `integration/b07-b09` (`0f15636`: B06, the foundation, B07 and B09 merged; migrations 0001–0018; verify
-green on Windows and Linux, `docs/design/B07-B09-merge.md`). Package B10 (22: "Implement agency-level first/repeat counts,
+Branch `b10/design` was written on `integration/b07-b09` (`0f15636`); the branch `b10/base` carries it on main `f87a4cb` (B06, the
+foundation, B07, B09 and CI; B06, B07 and B09 REVIEW_ACCEPTED; migrations 0001–0020; `docs/design/B07-B09-merge.md`) after the
+checks of §19 (decisions D10-BASE-1, D10-BASE-2, D10-ADJ-2, D10-CONS-2, D10-SRC-1, D10-AGY-4). Package B10 (22: "Implement agency-level first/repeat counts,
 discounts, founding slots, attribution, twelve-month residuals, refund adjustments, statements and payout intents"; "Test
 simultaneous first purchases, another end client, claim conflicts, splits, termination tail, full refund to zero and post-window
 organic purchase"). Gate G-COMMERCIAL (owner 17). Manuals 12, 15, 16, 17, 18 as amended by A3 (founding slots open to admitted
@@ -20,15 +21,15 @@ integration obligation §15 item 12. Every rule is quoted authority or a decisio
 
 ## 1. Base, stages and what B10 owns
 
-B10 numbers 0025–0028 on a contiguous runner that refuses a gap; B08 (0019–0021) and B11 (0022–0024) are not on the base, so the
-first schema mandate adds six reservation files (D10-BASE-1). Fourteen mandates (`B10-mandates.json`, about one agent-day each) run in
+B10 numbers 0028–0031 on a contiguous runner that refuses a gap; main ends at 0020, B08 (0021–0023) and B11 (0024–0027) are not on
+the base, so the first schema mandate adds seven reservation files (D10-BASE-1). Fourteen mandates (`B10-mandates.json`, about one agent-day each) run in
 four stages, at most five at once (A4 "lanes of at most five concurrent agents"); each lane owns its files, so no stage waits on a
 parallel lane (D10-STAGE-1):
 
 | stage | mandates (branch `b10/<key without B10- in lower case>`) | merged into |
 |---|---|---|
-| 1 | B10-MODEL ∥ B10-PORTS-FAKES ∥ B10-SCHEMA-RECURRENCE, then B10-SCHEMA-COMMISSION from the head of B10-SCHEMA-RECURRENCE (the runner is contiguous) | `b10/stage-1` (from `b10/design`) |
-| 2 | B10-ADAPTERS-RECURRENCE ∥ B10-ADAPTERS-SALES ∥ B10-ADAPTERS-LEDGER ∥ B10-AGENCY-LIFECYCLE (CMD002, CMD043: they need only 0025 and stage 1) | `b10/stage-2` (the integrator binds the agency, sales and ledger repositories into the commercial unit of work of B10-ADAPTERS-RECURRENCE) |
+| 1 | B10-MODEL ∥ B10-PORTS-FAKES ∥ B10-SCHEMA-RECURRENCE, then B10-SCHEMA-COMMISSION from the head of B10-SCHEMA-RECURRENCE (the runner is contiguous) | `b10/stage-1` (from `b10/base`) |
+| 2 | B10-ADAPTERS-RECURRENCE ∥ B10-ADAPTERS-SALES ∥ B10-ADAPTERS-LEDGER ∥ B10-AGENCY-LIFECYCLE (CMD002, CMD043: they need only 0028 and stage 1) | `b10/stage-2` (the integrator binds the agency, sales and ledger repositories into the commercial unit of work of B10-ADAPTERS-RECURRENCE) |
 | 3 | B10-COMMANDS-QUOTE ∥ B10-COMMANDS-PROSPECTS ∥ B10-COMMANDS-SELLERS ∥ B10-COMMISSION-SERVICE ∥ B10-STATEMENTS-PAYOUTS | `b10/stage-3` |
 | 4 | B10-INTEGRATION (the cross-lane races, the worked examples end to end through the public commands, the PERIODS sweep in the commission service's cycle, case-map statuses, verify on Windows and Linux) | `b10/integration` |
 
@@ -112,7 +113,7 @@ agency recurrence (shared) → snapshot → price → founding slot → quote. P
 (PRECONDITION_FAILED NO_BILLABLE_UNITS: no minimum-price sale); units within the offered envelope, pricing band ≤
 capacity.launchSourceUnits (CAPABILITY_UNAVAILABLE ENVELOPE_NOT_OFFERED for 500 001–1 000 000); mode offered; buyer type recorded
 (PRECONDITION_FAILED BUYER_TYPE_UNSET, A3 3.7, read through BuyerTypeReader); source SEALED and available (B07
-SourceAvailabilityReader: SOURCE_EXPIRED); billingProfileRef the agency's current profile (BILLING_PROFILE_MISMATCH) with a reviewed
+SourceAvailabilityReader on the database clock, D10-SRC-1: SOURCE_EXPIRED); billingProfileRef the agency's current profile (BILLING_PROFILE_MISMATCH) with a reviewed
 treatment (FISCAL_TREATMENT_UNREVIEWED, R2-082). Writes: the snapshot (set, count, tier, founding rate and reservation, applied =
 max, 8760-hour lookback, `as_of` = issuance), the quote DRAFT → ISSUED (base band, discount rounded once, service, reviewed tax,
 total, 336-hour expiry, `source_available_until` = min(expiry, B07's effective deadline), terms hash KAURO_QUOTE_TERMS_V1 over the
@@ -146,10 +147,10 @@ signature); billingProfileRef the agency's current reviewed fiscal profile (BILL
 **CMD043 CloseAgency** `POST /api/v1/agencies/{agencyId}/closure-requests` `{ expectedVersion, assuranceProofRef }`: the OWNER with a
 fresh step-up (Agency guard "Step-up and current owner authority"); a payment order or refund in flight or uncertain is
 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED; otherwise an `agency_closures` row with the obligations inventory (open quotes
-withdrawn, live authorizations, open refunds, non-terminal tax documents, active work through B06's ActiveWorkInspector, the
-managed-deletion schedule) and the agency ACTIVE, RESTRICTED or DRAFT → CLOSING (`agency.closing.v1`); new work stops because B06 and
-B09 require ACTIVE. `agencies_closure_residuals` refuses CLOSING → CLOSED (KC006) while any payment, refund, live authorization or tax
-document of the agency is non-terminal; commission, fiscal and ledger rows are never deleted (no DELETE grant, FK RESTRICT) and a
+withdrawn, live authorizations, open refunds, non-terminal tax documents, open reconciliation cases with their amounts (D10-AGY-4),
+active work through B06's ActiveWorkInspector, the managed-deletion schedule) and the agency ACTIVE, RESTRICTED or DRAFT → CLOSING (`agency.closing.v1`); new work stops because B06 and
+B09 require ACTIVE. `agencies_closure_residuals` refuses CLOSING → CLOSED (KC006) while any payment, refund, live authorization, tax
+document or reconciliation case of the agency is non-terminal or OPEN (D10-AGY-4); commission, fiscal and ledger rows are never deleted (no DELETE grant, FK RESTRICT) and a
 closing agency's commission lines keep their path to payment. The CLOSED edge's performer is B16 (verified managed deletion).
 
 **Rename and consolidation (R2-141)**: every recurrence, founding, attribution and ledger fact keys on `agency_id`; a display-name
@@ -224,7 +225,7 @@ the line is born HELD PROVIDER_TIME_UNVERIFIED, never guessed (example 10).
 
 **Lines** (registry CommissionLine, one per pool and beneficiary): `rate_bps`, `net_service_basis_cents`, `cumulative_entitlement_cents`,
 `previous_posted_cents` (the first posting), `paid_cents`, state, `eligible_at`, policy version. **Adjustments**: every basis change
-(`refund.completed.v1` `serviceBasisAfterCents`, `capture.reversed.v1`) recomputes each pool and allocation cumulatively and appends
+(`refund.completed.v1` `serviceBasisAfterCents`, `capture.reversed.v1`; the basis only falls, D10-ADJ-2) recomputes each pool and allocation cumulatively and appends
 one `commission_adjustments` row per changed line (REFUND or REVERSAL, direction, |new − previous|, new cumulative, source event id;
 KC015), UNIQUE (line, source event) so a replay adds nothing. Basis zero → VOID from ACCRUED_PENDING, HELD or ELIGIBLE; after PAID →
 ADJUSTED (and ADJUSTED → ADJUSTED); a PAYABLE line keeps its state and the adjustment goes to the next statement. The designation,
@@ -385,20 +386,21 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | CommissionHold | OPEN | hold_upheld | UPHELD | B12 | reviewed decision; an AGREED_ERROR_CORRECTION adjustment |
 | CommissionPeriod | OPEN | period_closed | CLOSED | CMD051 | inputs reconciled; cutoff hash equal |
 
-## 9. Migrations 0019–0028
+## 9. Migrations 0021–0031
 
 | file | content | mandate |
 |---|---|---|
-| 0019_reserved_b08.sql | reservation of B08's number: a header and `SELECT 1;` (D10-BASE-1) | B10-SCHEMA-RECURRENCE |
-| 0020_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
-| 0021_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
-| 0022_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
-| 0023_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0021_reserved_b08.sql | reservation of B08's number: a header and `SELECT 1;` (D10-BASE-1) | B10-SCHEMA-RECURRENCE |
+| 0022_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
+| 0023_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
 | 0024_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
-| 0025_recurrence_founding_agency.sql | group `kauro_commission`; `agency_recurrence`, `qualifying_purchases`, the designation trigger on `commercial_authorizations`, the recurrence-lock triggers on `refunds` and `capture_facts`, `kauro.qualifying_projects_at`, `kauro.eligibility_findings`; `founding_slots` (seeded 1..3 for R2-INITIAL), `founding_slot_reservations`, `quote_issuances`; `service_agreement_versions`, `agency_agreement_acceptances`, `agency_closures`, `agency_relationship_decisions`, `agencies_closure_residuals`, the set-once first designation on `agencies`; `agency.first_purchase_designated.v1`; subscriptions `capture.funds_observed.v1` and `commercial_authorization.delivered.v1` → COMMISSIONS; quote expiry grants for `kauro_commission`; machine FoundingReservation; `commercial_transitions` history | B10-SCHEMA-RECURRENCE |
-| 0026_sales_attribution.sql | `sellers`, `seller_agreements`, `seller_legal_reviews`, `seller_payout_destinations`, seller tax and assessment records, `prospect_source_evidence`, `prospect_contacts`, `prospects`, `prospect_suppressions`, `claim_evidence`, `attribution_claims`, `attribution_allocations`, `allocation_shares`, `commission_entitlements`, `sales_accounts`, `service_assignments`, `account_assignments`, `assistance_agreements`, `termination_manifests`, `seller_terminations`, `termination_tail_entries`; `kauro.current_seller_id()`; machines Seller, Prospect, AttributionClaim, CommissionEntitlement, PayoutDestination | B10-SCHEMA-COMMISSION |
-| 0027_commission_ledger.sql | `purchase_completions`, `commission_pools`, `commission_lines` (registry machine CommissionLine), `commission_adjustments`, `commission_holds` (machine CommissionHold), `capture_funds_observations` | B10-SCHEMA-COMMISSION |
-| 0028_statements_payouts.sql | `banking_calendars`, `commission_periods`, `commission_statements`, `statement_items`, `payout_intents`, `payout_reconciliations`, `compensation_guard_reviews`; machines CommissionPeriod, CommissionStatement, PayoutIntent | B10-SCHEMA-COMMISSION |
+| 0025_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0026_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0027_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0028_recurrence_founding_agency.sql | group `kauro_commission`; `agency_recurrence`, `qualifying_purchases`, the designation trigger on `commercial_authorizations`, the recurrence-lock triggers on `refunds` and `capture_facts`, `kauro.qualifying_projects_at`, `kauro.eligibility_findings`; `founding_slots` (seeded 1..3 for R2-INITIAL), `founding_slot_reservations`, `quote_issuances`; `service_agreement_versions`, `agency_agreement_acceptances`, `agency_closures`, `agency_relationship_decisions`, `agencies_closure_residuals`, the set-once first designation on `agencies`; `agency.first_purchase_designated.v1`; subscriptions `capture.funds_observed.v1` and `commercial_authorization.delivered.v1` → COMMISSIONS; quote expiry grants for `kauro_commission`; machine FoundingReservation; `commercial_transitions` history | B10-SCHEMA-RECURRENCE |
+| 0029_sales_attribution.sql | `sellers`, `seller_agreements`, `seller_legal_reviews`, `seller_payout_destinations`, seller tax and assessment records, `prospect_source_evidence`, `prospect_contacts`, `prospects`, `prospect_suppressions`, `claim_evidence`, `attribution_claims`, `attribution_allocations`, `allocation_shares`, `commission_entitlements`, `sales_accounts`, `service_assignments`, `account_assignments`, `assistance_agreements`, `termination_manifests`, `seller_terminations`, `termination_tail_entries`; `kauro.current_seller_id()`; machines Seller, Prospect, AttributionClaim, CommissionEntitlement, PayoutDestination | B10-SCHEMA-COMMISSION |
+| 0030_commission_ledger.sql | `purchase_completions`, `commission_pools`, `commission_lines` (registry machine CommissionLine), `commission_adjustments`, `commission_holds` (machine CommissionHold), `capture_funds_observations` | B10-SCHEMA-COMMISSION |
+| 0031_statements_payouts.sql | `banking_calendars`, `commission_periods`, `commission_statements`, `statement_items`, `payout_intents`, `payout_reconciliations`, `compensation_guard_reviews`; machines CommissionPeriod, CommissionStatement, PayoutIntent | B10-SCHEMA-COMMISSION |
 
 Conventions (07 "Database representation", B09 §4): UUIDv7 ids, BIGINT cents within `kauro.is_money`, `timestamptz` instants,
 durations in exact hours (336, 720, 2160, 8760), calendar months only through `AT TIME ZONE 'America/Bogota'` plus `interval '12
@@ -500,7 +502,7 @@ intent/commit boundary" (D10-CASEMAP-1).
 ## 14. Consumer, sweeps and events (D10-CONS-1)
 
 The commission service runs `apps/api/src/commissions/`: the `kauro_commission` pool, outbox claims through B06's
-`PgOutboxDispatchStore` under `kauro_control` with one lease for COMMISSIONS (B09 D-M3-B8), each effect in its own SERVICE unit of
+`PgOutboxDispatchStore` under `kauro_control` with one lease for COMMISSIONS taken as D10-CONS-2 says (B09 D-M3-B8), each effect in its own SERVICE unit of
 work, idempotent by durable identity (a pool per purchase and source, an adjustment per line and source event, a completion per
 purchase and kind). **COMMISSIONS** on `capture.completed.v1` (the purchase's pools and lines; the first-designation mirror),
 `refund.completed.v1` and `capture.reversed.v1` (adjustments), `capture.funds_observed.v1` (funds facts, holds), and
@@ -515,10 +517,10 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 ## 15. Integration obligations
 
 1. **B08**: perform the DELIVERED edge that `AuthorizationDeliveryCompletionSource` reads as the FINAL completion of a single-stage
-   purchase (0025 routes `commercial_authorization.delivered.v1` to COMMISSIONS); renumber nothing (B08 owns 0019–0021): the integrator deletes `0019_reserved_b08.sql` …
-   `0021_reserved_b08.sql` when B08's files land (the runner's "duplicate migration version" makes a miss loud).
+   purchase (0028 routes `commercial_authorization.delivered.v1` to COMMISSIONS); renumber nothing (B08 owns 0021–0023): the integrator deletes `0021_reserved_b08.sql` …
+   `0023_reserved_b08.sql` when B08's files land (the runner's "duplicate migration version" makes a miss loud).
 2. **B11**: bind BuyerTypeReader to W6's `agency_buyer_types` (CMD027 refuses a quote while it is unset; CMD047 refuses an unset or IN_HOUSE agency);
-   bind FoundingOfferReader to the pricing page's founding line; delete `0022_reserved_b11.sql` … `0024_reserved_b11.sql`.
+   bind FoundingOfferReader to the pricing page's founding line; delete `0024_reserved_b11.sql` … `0027_reserved_b11.sql` (B11 owns 0024–0027).
 3. **B12**: the prospect-stage, seller suspension, destination, dispute and hold edges of §8 marked B12; the seller and owner screens
    read B10's views; outreach (CMD061–CMD064) respects `prospect_suppressions`.
 4. **B13**: the FINAL completion of a staged purchase through PreparationCompletionSource.
@@ -526,13 +528,14 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
    a COP payout with its recorded source.
 6. **B16**: the CLOSED edge and managed deletion, never touching B10's ledger rows.
 7. **B09 fixtures**: `issueQuote`, `paidPurchase` and `commerce-support.ts` keep their fabricated founding references (D10-REC-3); a
-   later change that routes them through CMD027's core lets 0029+ add the snapshot guards (Q10-1).
+   later change that routes them through CMD027's core lets 0032+ add the snapshot guards (Q10-1).
 
 ## 16. Decisions register
 
 | id | decision | authority / rationale |
 |---|---|---|
-| D10-BASE-1 | B10 numbers 0025–0028; its branches carry six reservation files 0019–0024 (a header and `SELECT 1;`, nothing created) so the contiguous runner applies the real numbers before B08 and B11 land; the cross-package integrator deletes each reservation when its owner's file arrives. No persistent database applies them (every suite builds a fresh cluster; no environment is deployed), so the checksum ledger never sees the swap | the task's numbering rule; `runner.ts` "migration versions must be contiguous from 0001" and "duplicate migration version"; `migrations.test.ts` lists every file |
+| D10-BASE-1 | B10 numbers 0028–0031 on main `f87a4cb` (0001–0020); the contiguous runner's numbers are B08 0021–0023, B11 0024–0027 and B10 0028 onward. The first schema mandate's branch carries seven reservation files 0021–0027 (B08 three, B11 four; a header and `SELECT 1;`, nothing created) so the runner applies the real numbers before B08 and B11 land; the cross-package integrator deletes each reservation when its owner's file arrives. No persistent database applies them (every suite builds a fresh cluster; no environment is deployed), so the checksum ledger never sees the swap | the task's numbering rule for `b10/base`; `runner.ts` "migration versions must be contiguous from 0001" and "duplicate migration version"; `migrations.test.ts` lists every file (0019 `unknown_refund_cases` and 0020 `source_object_holds` are the last on main) |
+| D10-BASE-2 | The base is main, not the older candidate: every rule of this design stands on B06 with D-LEASE-3 and D-SRC-1, B07 with the provider holds of 0020 and B09 with D-REF-B8, D-LEDGER-B7 and 0019 as they are. The checks of §19 found four assumptions to correct (D10-ADJ-2, D10-CONS-2, D10-SRC-1, D10-AGY-4) and none else; no B06, B07 or B09 file is edited by B10 to make them hold | the task's checks for `b10/base`; B06 §12d.7 (B06-R1, B06-R2); B07 D-HOLD-1..4; B09 §17 (B09-R1..B09-R5) |
 | D10-STAGE-1 | Four stages of fourteen mandates of about one agent-day, at most five at once; one owner per test file, migration and fake; no test of a lane needs a parallel lane's code (the agency lifecycle runs in stage 2 beside the adapters, CMD050 against CMD047 and the PERIODS sweep's registration wait for B10-INTEGRATION); stage 2's integrator binds the agency, sales and ledger repositories into the commercial unit of work | A4 "lanes of at most five concurrent agents"; B08 D8 staging; B09 D-STAGE-B1 |
 | D10-CTX-1 | One new runtime group `kauro_commission` (NOSUPERUSER, NOBYPASSRLS, one login per group) serves the service identities commission-service → COMMISSION_SERVICE and finance-service → FINANCE_SERVICE (SERVICE_ROLE_TABLE); a SERVICE unit of work adopts an agency only from a durable work item | 08 "a service account has only its technical role"; 10 "Internal command authentication"; B09 D-CTX-B1, D-AUTHZ-B3; B07 D-CTRL-1 |
 | D10-CTX-2 | Sellers act in B09's OPERATOR context as their individually managed corporate identity; the database finds the seller through `kauro.current_seller_id()` and admits seller writes only while its row is ACTIVE; the owner is `kauro.holds_corporate_role('KAURO_OWNER')` | 08 "Corporate operators and sellers use individually managed corporate identities"; 12 "Seller onboarding and access lifecycle"; B09 D-CTX-B2 |
@@ -552,8 +555,9 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-QUOTE-3 | The included replacement re-binds a paid, unexecuted purchase to a same-band replacement quote through B09's PurchaseRebinder within the allowance; any other scope is refused with the comparison and charged only after refund and a new accepted quote | 16 "Scope changes and credits"; example 18; B09 D-QUOTE-B6, §15 item 12; R2-092, R2-093 |
 | D10-QUOTE-4 | The replacement path is intent (tenant), settle (payment service), complete (tenant) with `quote_issuances` naming the journal entry; a refused re-binding withdraws the replacement | B09 D-PROTO-B1, D-PROTO-B2, D-M3-B6; B06 D-IDEM-1 |
 | D10-AGY-1 | CMD002 accepts only the published agreement versions and the agency's current reviewed billing profile, records an append-only acceptance and activates without writing capabilities | registry Agency machine guard; CMD002; 16 "Offer and buyer fit"; B06 `agencies_activation_requires_agreements` |
-| D10-AGY-2 | CMD043 refuses while payments are in flight, records the obligations inventory and moves to CLOSING; CLOSED is refused while payments, refunds, live authorizations or tax documents are open (KC006); ledger rows are never deleted; the CLOSED performer is re-assigned to B16 | registry Agency (owner_requests_closure, closure_obligations_completed); CMD043; 16 "Agency lifecycle"; B06 `agencies_authority` admits only the owner |
+| D10-AGY-2 | CMD043 refuses while payments are in flight, records the obligations inventory and moves to CLOSING; CLOSED is refused while payments, refunds, live authorizations, tax documents or reconciliation cases are open (KC006, D10-AGY-4); ledger rows are never deleted; the CLOSED performer is re-assigned to B16 | registry Agency (owner_requests_closure, closure_obligations_completed); CMD043; 16 "Agency lifecycle"; B06 `agencies_authority` admits only the owner |
 | D10-AGY-3 | Rename changes no commercial fact; consolidation is a recorded, reviewed decision with no data effect | 16 "A new legal agency under the same holding company is not automatically merged"; example 24; R2-141 |
+| D10-AGY-4 | CMD043 and KC006 read B09's reconciliation cases: a case OPEN for the agency — every kind, and since 0019 an UNKNOWN_REFUND keyed by `provider_ref`, money that left with no local refund and that the `refunds` table never shows — is inventoried with its kind, amount and age, and `agencies_closure_residuals` refuses CLOSING → CLOSED (KC006) while any is OPEN; resolving it is B09's reviewed resolution. The request itself is refused only for a payment or refund in flight or uncertain: an open case does not stop the agency from closing its intake, it stops it from being closed | B09 D-REF-B8 (B09-R1), D-LEDGER-B4; 15 "Operational ledger" ("Unexplained differences create a case with amount and age"); CMD043 failure (closure cannot erase customer refund rights) |
 | D10-SELL-1 | Activation requires a signed agreement, a legal review of the classification's substance, assessment, confidentiality, verified payment and tax facts, verified identity with MFA and the owner's step-up, repeated by the database (KC005) | 17 "Activation prerequisites"; 12 "Seller onboarding and access lifecycle"; CMD049 failure |
 | D10-SELL-2 | A payout destination verifies only with the seller's own step-up at the change and an owner verification 172 800 s later; an intent binds the version and digest it was approved with | 12 "Changing a payout destination requires step-up and a cooling/verification procedure"; example 22; R2-103; Q10-5 |
 | D10-PROS-1 | Prospects are agencies from lawful, dated, agency-segment evidence; one live prospect per normalized organization key; suppression by organization and contact key survives spelling and re-import | 18 "Prospect qualification" (A3); 12 "Prospect record"; CMD045 failure; A3 3.7 |
@@ -566,6 +570,7 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-POOL-1 | One pool per purchase and source on the allocated service net of refunds, rounded once; largest-remainder shares with ties by beneficiary id; database-checked | 17 "Commission basis", "Claim validity and conflicts"; policy splitRemainder; examples 1, 8, 19, 20 |
 | D10-RATE-1 | First 1000 bps for sequence 1; 400 bps for a later purchase whose verified provider completion precedes the exclusive window end; implausible provider times are held, never guessed | 17 "First qualifying project", "Recurring entitlement"; policy subsequentCutoff; examples 9, 10, 11 |
 | D10-ADJ-1 | Every basis change recomputes cumulatively and appends one adjustment per changed line, idempotent by source event; VOID at zero before payout, ADJUSTED after | 17 "For a full refund, cumulative commission after all adjustments must be exactly zero"; registry CommissionLine, CommissionAdjustment; examples 5, 6 |
+| D10-ADJ-2 | A commission basis only falls: a line's new basis is the smaller of its current basis and what the event names — `refund.completed.v1` `serviceBasisAfterCents` (the capture's allocated service less its completed service refunds, which does not know a reversal) or zero for `capture.reversed.v1`. A refund that completes after the capture's reversal — one in flight when the chargeback came — changes nothing and appends no adjustment; the refund's approved components stay the commissions' basis, as B09 keeps them (`returned*Cents` 0 is the ledger's fact, not the basis). So the events of one capture in every delivery order end at the same cumulative entitlements, each adjustment still unique per (line, source event), and `kauro.qualifying_projects_at` stays at zero basis for a REVERSED capture | B09 D-LEDGER-B7, D-REF-B8 (B09-R2: "every return nets against the capture once whatever the observation order"); 17 "For a full refund, cumulative commission after all adjustments must be exactly zero"; D10-ADJ-1 |
 | D10-ELIG-1 | Eligibility is 720 hours after a FINAL completion with funds AVAILABLE and no covering hold; a STAGE completion starts nothing | 17 "Accrual, eligibility and payout"; policy eligibilityDaysAfterFinalCompletion; examples 14, 15 |
 | D10-HOLD-1 | Holds are amounts with reason and review date; only a hold of the whole unpaid amount makes a line HELD; the statement withholds exactly the held cents | 17 "An unresolved claim dispute holds only the contested compensation allocation"; 12 "Seller dispute flow"; example 21 |
 | D10-NEG-1 | A negative position after payout is shown and offset only under signed offset terms (KC017), otherwise carried as an owner recovery item; nothing debits a seller | 17 "Refunds after payout and negative balances"; example 7 |
@@ -576,11 +581,13 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-PAY-2 | CMD053 accepts only authenticated evidence matching the intent; submission is not settlement; failed or returned transfers stay recorded and hold the lines | CMD053; registry CommissionLine; example 22; 15 "Payout receipts reconcile to bank/provider evidence" |
 | D10-TX-1 | The global lock order of §10 and the new transition subjects | B06 D-TX-2; B09 D-TX-B1 |
 | D10-CONS-1 | The COMMISSIONS consumer and sweeps run in the commission service, each effect idempotent by its durable identity; accrual reconciliation covers late acceptances | 07 "Consumers deduplicate by their own durable inbox identity"; B09 D-CONS-B1, D-M3-B8 |
+| D10-CONS-2 | The COMMISSIONS dispatcher takes its lease as B06 leaves it after D-LEASE-3: resource kind OUTBOX_DISPATCH, one resource for the consumer (a name-based UUID of B10's own namespace, never B09's), `costAuthorityId` and `checkpointHash` null — the lease spends nothing, so an expired one is a takeover under the next fence and needs no checkpoint (only a MODEL_TASK or JOB_ATTEMPT is refused without one). It never caches a fence: it takes it from each claim and each heartbeat, its own re-claim after expiry advances it, and a dispatcher whose heartbeat is refused settles nothing more. It reuses B09's dispatch constants and settlement rules and edits no file of `apps/api/src/payments/` | B06 D-LEASE-3 (B06-R1), D-OUTBOX-1; B09 D-M3-B8, D-CONS-B1 |
 | D10-FAKE-1 | The four B10 fakes are labelled CONTRACT_FAKE and SIMULATED, owned by B10-PORTS-FAKES, on the testing subpath, bound by no composition root; B09's fakes are reused, never copied | 21 "Evidence classes"; B09 D-FAKE-B1 |
 | D10-API-1 | B10 routes follow B06 and B09 conventions: closed schemas with registry field names, views withholding contact details, destination digests and other sellers' rows | 10 "Read endpoints return safe projections"; B06 D-RESP-1; B09 D-RESP-B1 |
 | D10-CASEMAP-1 | Every DENY and RACE title states its registry scenario; a row is SIMULATED only when a fake decides its asserted clause | cases.json scenarios; B09 D-CASEMAP-B1; 21 "Evidence classes" |
 | D10-BIND-1 | No composition root binds a fake: until its real implementer lands, a B10 port is bound to an honest platform implementation — the buyer type unset (every quote refused), completion from B09's delivered authorization, the latest recorded VERIFIED_FEED calendar (none: the close is refused), payout evidence unavailable (reconciliation refused) — and the tests inject the labelled fakes | B09 D-FAKE-B1 and D-MERGE-2; A3 3.7 ("before its first quote"); 17 "Business-day calendar" ("from the current verified calendar"); CMD053 precondition |
 | D10-CLOCK-1 | Every instant is `kauro.server_now()`; durations are exact hours; calendar months through America/Bogota; tests stand at another instant only through the labelled TEST CLOCK | B07 D-CLOCK-1; B09 D-TIME-B1; policy commission.operationalTimezone |
+| D10-SRC-1 | CMD027 reads source availability through B07's `SourceAvailabilityReader` as main binds it (`PgSourceAvailabilityReader`, D-RET-2): the revision SEALED and a governing retention record ACTIVE with an effective deadline ahead of `kauro.server_now()`, so a SEALED revision whose retention lapsed is SOURCE_EXPIRED whether or not the sweeper took retention_expires; the quote's `source_available_until` is the earlier of its expiry and that deadline. B10's tests reach a current source only through `w.revision(agency, projectId, "SEALED")` of `apps/api/test/support.ts` (sealed an hour ago, retention ahead; `h.sealedRevision` without `base` seals fifteen days ago, past the deadline) and an expired one by the labelled TEST CLOCK past the deadline; none seals through CMD017, so no B10 row depends on the seal's provider holds (0020: 503 GENERATION_NOT_OBSERVED, 422 SOURCE_SERVICES_UNAVAILABLE), whose fake object storage stays B07's | B06 D-SRC-1 (B06-R2); B07 D-RET-2, D-CLOCK-1, D-HOLD-1..4; D10-CLOCK-1 |
 
 ## 17. Open questions for the authority
 
@@ -601,5 +608,20 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 `docs/design/B10-mandates.json` carries the fourteen mandates with their start, dependencies, fakes, migrations and test files; the case
 map names every case's tests under exact titles. `tools/test/b10-case-map.test.mjs` checks both documents against this design, the
 registry and each other: citations, mandate ownership, the status table, the machine edges, the decisions and the migrations.
-Verification of this branch: the focused design test only (`node --test tools/test/b10-case-map.test.mjs`); the first full
-`pnpm run verify` runs with the first mandate that changes code.
+Verification of this branch: the focused design test (`node --test tools/test/b10-case-map.test.mjs`) and one full
+`pnpm run verify` on Windows; the branch changes documents and that test only, so no suite of B06, B07 or B09 is touched.
+
+## 19. Checks against main (b10/base)
+
+The design was written on `0f15636`; main `f87a4cb` adds the B06, B07 and B09 package-close review fixes and migrations 0019 and
+0020. Each assumption below was read against main's code and design; a correction is a decision of §16.
+
+| assumption of the design | main | outcome |
+|---|---|---|
+| a refund's `serviceBasisAfterCents` is the commissions' basis after every refund (§3.2, §6) | `refund.completed.v1` carries it as allocated less completed service refunds, unaware of a reversal, plus `returnedServiceCents/TaxCents/ExcessCents` (`refundReturnOf`; D-LEDGER-B7): a refund completing after REVERSED returns nothing but its basis is still positive | corrected: D10-ADJ-2 (a basis never rises) |
+| one COMMISSIONS lease, B09's dispatcher shape (§14) | D-LEASE-3: an expired lease is a takeover under the next fence, checkpoint stored or none; B09's dispatcher claims OUTBOX_DISPATCH with no checkpoint and reads the fence from each claim and heartbeat | corrected: D10-CONS-2 |
+| CMD027 needs a sealed, available source; fixtures seal one (§3.4) | D-SRC-1 and `PgSourceAvailabilityReader`: retention ahead of the database clock; `w.revision` seals an hour ago; `sealedRevision` defaults to fifteen days; a seal now places provider holds (0020) and can be refused 503 or 422 | corrected: D10-SRC-1 |
+| CloseAgency's obligations are payments, refunds, authorizations and tax documents (§4) | 0019: an unexplained provider refund is its own UNKNOWN_REFUND case, invisible to `refunds`; open cases of every kind are `reconciliation_cases` rows | corrected: D10-AGY-4 |
+| the base ends at 0018 with B08 at 0019–0021 and B11 at 0022–0024 (§1, §9) | main ends at 0020; B08 0021–0023, B11 0024–0027 | renumbered: D10-BASE-1 |
+| capture, fee, funds and delivery events and their COMMISSIONS subscriptions (§14, §9) | `capture.completed.v1`, `capture.reversed.v1` and `refund.completed.v1` route to COMMISSIONS in 0013; `capture.funds_observed.v1` and `commercial_authorization.delivered.v1` exist and route elsewhere until 0028; a fee after a reversal is a ledger fact only | unchanged |
+| recurrence lock, transition subjects, `kauro.server_now()` (§3.2, §10) | `PgSourceAvailabilityReader` awaits the revision's transition subject before reading, as §10's lock order has it | unchanged |
