@@ -13,7 +13,7 @@
 -- owner_requests_closure, closure_obligations_completed; firstQualifyingCaptureId), policy pricing (foundingAgencyCount 3,
 -- repeatLookbackDays 365) and commission (firstProjectDesignation STICKY_AFTER_FIRST_CAPTURE); COMMERCIAL_LEDGER_WORKED_EXAMPLES
 -- 2, 4, 5, 9, 16, 17, 24. Design: docs/design/B10-commercial-domain.md §3, §4, §9, §10 (D10-CTX-1, D10-FIRST-1, D10-FIRST-2,
--- D10-REC-1..3, D10-FOUND-1..4, D10-QUOTE-1, D10-AGY-1..5, D10-EVT-1, D10-TX-1, D10-BASE-1). This file references B06 and B09 objects
+-- D10-REC-1..3, D10-FOUND-1..5, D10-QUOTE-1, D10-AGY-1..5, D10-EVT-1, D10-TX-1, D10-BASE-1). This file references B06 and B09 objects
 -- and the foundation's registry (0008); it edits no B06 or B09 rule — it adds triggers, policies and grants beside them.
 --
 -- SQLSTATE vocabulary added by B10 (a class of its own; the stage-2 adapters translate each, design §12):
@@ -136,14 +136,15 @@ INSERT INTO kauro.state_transitions (machine, from_state, to_state) VALUES
   ('FoundingReservation', 'RECONCILIATION_HOLD', 'CONSUMED'),
   ('FoundingReservation', 'RECONCILIATION_HOLD', 'RELEASED');
 
--- --- the founding cohort: slots (D10-FOUND-1, D10-FOUND-2) --------------------------------------------------------------------------
+-- --- the founding cohort: slots (D10-FOUND-1, D10-FOUND-2, D10-FOUND-5) --------------------------------------------------------------
 -- One row per slot of a price policy's cohort: R2-INITIAL has 1..3 (policy pricing.foundingAgencyCount; the persistence test proves
 -- the count equal). A slot is held by at most one reservation, the one it names (live_reservation_id, with that reservation's
 -- agency): RESERVED or RECONCILIATION_HOLD while it lives, CONSUMED for ever once a qualifying purchase used it (R2-096). The last-slot
 -- race is decided on this row: CMD027 takes a slot with UPDATE ... WHERE slot_no = $n AND NOT held in ascending order, a contender
 -- waits for the first transaction's row lock, re-checks NOT held and moves to the next slot or to none (example 17). A freed slot's
 -- reservation was RELEASED in the same transaction, and a consumed one is never freed (KC014). The slot rows are platform rows: the
--- request handlers and the commission service read which slots are held, never which agency holds one (column grants below).
+-- request handlers and the commission service read which slots are held, never which agency holds one (column grants below;
+-- D10-FOUND-5).
 CREATE TABLE kauro.founding_slots (
   policy_version       text NOT NULL REFERENCES kauro.price_policies (policy_version),
   slot_no              integer NOT NULL CHECK (slot_no >= 1),
@@ -750,7 +751,7 @@ $$;
 CREATE TRIGGER agency_agreement_acceptances_guard BEFORE INSERT ON kauro.agency_agreement_acceptances
   FOR EACH ROW EXECUTE FUNCTION kauro.agency_agreement_acceptances_guard();
 
--- --- the closure record (D10-AGY-2, D10-AGY-4) ----------------------------------------------------------------------------------------
+-- --- the closure record (D10-AGY-2, D10-AGY-4) ---------------------------------------------------------------------------------------
 -- CMD043's record, written with the move to CLOSING (checked at COMMIT; named check violation agency_closures_agency_closing, 23514)
 -- by the agency's ACTIVE OWNER under a step-up proof of its own: the state it left and the obligations inventory — open quotes
 -- withdrawn, live authorizations, open refunds, non-terminal tax documents, OPEN reconciliation cases with kind, amount and age, active
@@ -806,7 +807,7 @@ $$;
 CREATE CONSTRAINT TRIGGER agency_closures_agency_closing AFTER INSERT ON kauro.agency_closures
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.agency_closures_agency_closing();
 
--- --- reviewed relationship decisions (R2-141; D10-AGY-3) ------------------------------------------------------------------------------
+-- --- reviewed relationship decisions (R2-141; D10-AGY-3) -----------------------------------------------------------------------------
 -- A consolidation of legal agencies is a recorded, reviewed decision of the corporate owner — the agencies, the evidence, the effective
 -- instant and an enumerated treatment — that merges no dataset, membership, designation or attribution and changes no quote
 -- eligibility (Q10-3: no grouping). A display-name change is no decision at all: every B10 fact keys on agency_id. Append-only.
@@ -1023,7 +1024,7 @@ CREATE POLICY commerce_event_bindings_commission_read ON kauro.commerce_event_bi
 CREATE POLICY security_events_commission_write ON kauro.security_events FOR INSERT TO kauro_commission
   WITH CHECK (agency_id IS NULL AND actor_kind = 'SERVICE' AND outcome IN ('ALLOW', 'DENY'));
 
--- --- grants (no DELETE for any runtime role) ------------------------------------------------------------------------------------------
+-- --- grants (no DELETE for any runtime role) -----------------------------------------------------------------------------------------
 GRANT SELECT, INSERT ON kauro.commercial_transitions TO kauro_app, kauro_commission;
 GRANT INSERT ON kauro.commercial_transitions TO kauro_payment;
 -- the slots' holding agency is never readable by the request handlers or the commission service: they read which slot is held

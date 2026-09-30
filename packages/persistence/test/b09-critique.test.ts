@@ -9,6 +9,7 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import {
   COMMERCE_EVENT_SUBSCRIPTIONS,
+  COMMERCIAL_EVENT_SUBSCRIPTIONS,
   COMMERCE_EVENT_TYPES,
   COMMERCE_REQUEST_HANDLER_EVENT_TYPES,
   COMMERCE_STATE_EVENT_TYPES,
@@ -790,7 +791,7 @@ function postSet(ag: AgencyFixture, eventId: string, kind: string, sourceRef: st
 }
 
 test("B09-N1: an event records a version of an aggregate of its own kind and the state that version reaches — the request handlers publish only their own edges' events, every other commerce type is refused to them, an outbox record reaches only its event's subscribers, and a posting names its own source's event", async () => {
-  // the database's bindings and subscriptions are the domain's (D-EVT-B3)
+  // the database's bindings and subscriptions are the domain's (D-EVT-B3), package B10's COMMISSIONS subscriptions appended by 0028
   const bindings = await h.oracle.query<{ event_type: string; aggregate_kind: string; recorded_state: string | null; recorded_fact: string | null; request_handler: string | null }>(
     "SELECT event_type, aggregate_kind, recorded_state, recorded_fact, request_handler FROM kauro.commerce_event_bindings ORDER BY event_type",
   );
@@ -805,7 +806,7 @@ test("B09-N1: an event records a version of an aggregate of its own kind and the
   ].sort((a, b) => (a.event_type < b.event_type ? -1 : 1));
   assert.deepEqual(bindings.rows, expected);
   const subscriptions = await h.oracle.query<{ event_type: string; consumer: string }>("SELECT event_type, consumer FROM kauro.commerce_event_subscriptions ORDER BY 1, 2");
-  assert.deepEqual(subscriptions.rows, COMMERCE_EVENT_SUBSCRIPTIONS.map((s) => ({ event_type: s.eventType, consumer: s.consumer })).sort((a, b) => (a.event_type === b.event_type ? (a.consumer < b.consumer ? -1 : 1) : a.event_type < b.event_type ? -1 : 1)));
+  assert.deepEqual(subscriptions.rows, [...COMMERCE_EVENT_SUBSCRIPTIONS, ...COMMERCIAL_EVENT_SUBSCRIPTIONS].map((s) => ({ event_type: s.eventType, consumer: s.consumer })).sort((a, b) => (a.event_type === b.event_type ? (a.consumer < b.consumer ? -1 : 1) : a.event_type < b.event_type ? -1 : 1)));
 
   // the probe: issuing its own quote, the agency writes the quote's next version as capture.completed.v1 — refused on the kind
   // (KA003) — and as the event of another state of its own quote (quote.issued.v1 for a WITHDRAWN version) — refused at COMMIT
