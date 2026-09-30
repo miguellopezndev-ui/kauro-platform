@@ -280,3 +280,52 @@ The two routes of §5 W5b, `apps/api/src/public-routes.ts`, tested on real Postg
 | D-PUB-D1 | *Deviation from the mandate's test.* `apps/api/test/b11-public-routes.test.ts` line 635 expected `["INSERT", "SELECT"]` for `kauro_app` on `inquiry_admissions`, an order its own SELECT-then-INSERT loop cannot produce; only that literal became `["SELECT", "INSERT"]` (commit 30f5fe0), the assertion still requires exactly those two privileges. | mandate: acceptance tests first, unedited |
 | D-PUB-D2 | *Deviation (shared harness).* `waitForLockWait` calls `pg_stat_clear_snapshot()` before every poll: the polling session reads `pg_stat_activity` inside a transaction, whose cached snapshot keeps a waiter's `state` and `query` stale while `wait_event` is live. | mandate: no sleeps as synchronization |
 | D-PUB-D3 | *INT-1.* `packages/application/src/support/content-detector.ts` is byte-identical to W4's (keep one); the operational-request hunks in `tools/openapi.mjs`, the admission and the response schemas run parallel to W2's; the migration is 0009 here, 0024 after INT-1 (W2 0022, W4 0023; D-INT1-1). | mandate INT-1 |
+
+## 14. Stage-1 integration (INT-1)
+
+`b11/stage-1` is the B07+B09 candidate `0f15636` (the task names it `0f156365`; the full id is `0f15636018f1…`) with `b11/design`,
+W2, W4, W1, W3, W5b and W5a merged in that order (`f6334f0`, `1a25690`, `c7301c9`, `820fbb0`, `d67912d`, `67f79db`, `26c39af`),
+then the seam commits. Shared files were resolved as one implementation; OpenAPI (49 operations), the matrix (29 machines, 21
+commands), the web client (46 browser operations) and the runtime-boundary fixture (three-way union) are regenerated, not hand-merged.
+
+### Decisions
+
+| id | decision | authority |
+|---|---|---|
+| D-INT1-1 | *Deviation from the INT-1 mandate (0009–0011).* B11's migrations are `0022_web_sessions` (W2), `0023_support_cases` (W4) and `0024_inquiries` (W5b); B08 owns `0019`–`0021`, absent here, so `0019_reserved_b08.sql`…`0021_reserved_b08.sql` (a header and `SELECT 1`) keep the runner contiguous and are deleted by the integrator that brings B08 in (a missed one fails as a duplicate version). | runner.ts "migration versions must be contiguous"; B10 D10-BASE-1; B08 D8-BASE-1 |
+| D-INT1-2 | One session boundary on every person route: AMBIGUOUS_CREDENTIALS is in the outcome kit's EVERY_ROUTE (B09's service commands leave it out with the person-only outcomes), the cookie CSRF block is in B07's commands and selection-manifest intake and in B09's person commands, and the intake authenticates with the request-aware form. | D-AUTH-5 "CSRF on every unsafe method authenticated by cookie" |
+| D-INT1-3 | One operational-route machinery: W5b carried a copy of W2's (request bodies, body-less replies, closed operational catalogues, `http.ts`); W2's is kept and the public routes' catalogues are closed catalogues of the kit. W5b's detector is byte-identical to W4's, so `support/content-detector.ts` is the one module of CMD044 and the inquiry. | D-W2-4, D-PUB-8, D-PUB-D3 |
+| D-INT1-4 | *Deviation from W2's endpoint (an origin).* The identity fake composes: W2's server also serves the web adapter's wire (`kauro-fake-identity-v1`), and the api announces the fake at a path of the application origin (`IdentityConfigView.endpoint`, `KAURO_IDENTITY_FAKE_ENDPOINT`) that the edge routes to it, so the page's connect-src stays `'self'`; the web reads the announcement through its generated guard. | D-SEC-1, D-AUTH-2, D-W3-8, §6 |
+| D-INT1-5 | The session calls are the generated operations (D-W3-1 closed): SessionView is the served shape (both instants always sent, null when unset). With nothing planned in the generated client the edge fake mounts one synthetic planned operation, `HarnessProbe`, for the harness specs; the fake's own tests keep W3's session descriptors as test-only stand-ins. | D-GEN-1, D-E2E-2 |
+| D-INT1-6 | One application origin: `KAURO_APP_ORIGIN` of the public routes (W5b) must be one of the session boundary's `KAURO_APP_ORIGINS` (W2). | D-TOPO-2, D-AUTH-5, D-PUB-2 |
+| D-INT1-7 | The web client leaves out the operations of a principal no browser acts as (`x-kauro-principal` PROVIDER, PAYMENT_SERVICE: B09's webhook and payment-service routes) and names them in its header; an unknown principal is a failure. | D-GEN-1 |
+| D-INT1-8 | The api's code set gained CONTENT_REFUSED (W4): the web state table decides it (UNSAVED, the text kept, next step SECURE_UPLOAD with its copy). | D-STATE-1, D-SUP-2 |
+| D-INT1-9 | One copy catalogue (D-W5a-2): `EN` is the application's entries and `PUBLIC_COPY` by key prefix, no id in both, so each A3 sentence stands once. | D-COPY-1, A3 3.7 |
+| D-INT1-10 | The public screens W5a built are implemented screens (UI01–UI08, UI48, UI49 pages; UI45–UI47 document route handlers), and the page walk counts a document route handler. The `(public)` layout is W5a's SiteFrame; W3's PublicFrame stays the landmark primitive. | D-W3-12, D-W3-17, D-LEGAL-1 |
+| D-INT1-11 | OpenAPI documents a person's route (B07's intake, B09's person commands and reads) with `bearerAuth` or `sessionCookie` and the CSRF parameter on unsafe cookie routes; the public routes (identity-config among them) an empty security requirement. | D-AUTH-5, D-PUB-1 |
+| D-INT1-12 | The evidence tool runs the `ui` and `web` suites the design added; the test world's identity issuer and verifier share the movable process clock of the B07+B09 world. | 21 "Evidence classes"; D-RUN-2 |
+
+### Seams (each test fails without its fix)
+
+| seam | test file :: exact title | fix | commit |
+|---|---|---|---|
+| W2 × B07/B09 | `apps/api/test/b11-stage1-seams.test.ts` :: "B11 INT-1 seam, the session boundary across B07 and B09 (D-AUTH-5): an unsafe request the session cookie authenticates — a B07 command, the B07 selection manifest intake, a B09 payment command — is refused ORIGIN_REJECTED or CSRF_TOKEN_INVALID before its journal and its handler, a cookie beside a bearer token is AMBIGUOUS_CREDENTIALS on each, and every refusal is an anonymous fact of its action" | D-INT1-2 | `1a25690` |
+| W2 × W5b | `apps/api/test/b11-stage1-seams.test.ts` :: "B11 INT-1 seam, one application origin and a same-origin identity endpoint (D-INT1-4, D-INT1-6): the configuration refuses a public inquiry origin (W5b) that the session boundary (W2) does not accept as an application origin, and a contract-fake endpoint that is not a path of the application origin" | D-INT1-4, D-INT1-6 | `14e2e8b` |
+| W2 × W3 | `tools/test/b11-identity-fake.test.mjs` :: "B11 INT-1 seam, the identity contract fake (design §6, D-W3-8, D-INT1-4): W3's web adapter, chosen from the api's same-origin announcement, signs in through W2's fake server behind the edge — password, TOTP challenge, TOTP enrolment, e-mail verification and re-authentication — and every token it hands out passes the api's own verifier" | D-INT1-4 | `14e2e8b` |
+| W3 × B09 | `tools/test/web-client.test.mjs` :: "negative controls: every construct the generator does not translate is a failure that names where, and no module is produced" | D-INT1-7 | `d67912d` |
+| W4 × W3 | `apps/web/test/states.test.ts` :: "D-STATE-1: the table covers exactly the api's closed code set, which is manual 10's seventeen stable codes and four the api adds" | D-INT1-8 | `d67912d` |
+| W3 × W5a | `apps/web/test/copy-lint.test.ts` :: "B11 INT-1 seam, one copy catalogue (D-COPY-1, D-W5a-2): EN is the application's entries and the public site's, merged by key prefix with no id defined by both, so the A3 sentences stand once over everything a person reads" | D-INT1-9 | `26c39af` |
+| W3 × W5a | `apps/web/test/screens.test.ts` :: "D-ROUTE-1: navigation offers only agency-level screens that exist, in reference order, and each link resolves to a page file" | D-INT1-10 | `26c39af` |
+| W4 × B09 | the build: B09's in-memory commerce unit of work lacked the new `supportCases` repository | `supportCases: b06.supportCases` | `c7301c9` |
+| design × evidence | `tools/test/evidence.test.mjs` :: "the suites the tool runs are the packages' own test scripts, one for every workspace package that has one, and canonical JSON is key-order independent" | D-INT1-12 | `c7301c9` |
+
+`apps/web/test/public-contract.test.ts` holds W5a's form and publication reader equal to W5b's served contract (a guard; it passed
+at the merge).
+
+### Open for stage 2
+
+- W6's `agency_buyer_types` (§5) needs a migration number: B11's range `0022`–`0024` is used by stage 1 and B10 owns `0025` onward.
+- The e2e launcher (W6): the api on a temporary PostgreSQL 17 behind the edge (`KAURO_E2E_API_ORIGIN`), the fake identity server as
+  a process with `--origin` the edge's origin, and the edge route `/__kauro-identity/*` to it; W5a's public specs keep their
+  in-worker publication fake (D-W5a-9) until then.
+- D-W5a-1 (swapping the public markup for `@kauro/ui`) is left to the screen mandates.

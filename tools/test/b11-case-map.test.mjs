@@ -89,6 +89,11 @@ test("B11 case map: a cited test on the branch exists under exactly its title; a
         assert.match(row.status, /^\*\*(MISSING|PARTIAL)\*\*/, `${row.caseId}: a planned test leaves the case MISSING or PARTIAL`);
       }
     }
+    // since INT-1 a status is also what is on the branch: MISSING cites no test that exists, EXECUTED_LOCAL plans none (above)
+    assert.match(row.status, /^\*\*(MISSING|PARTIAL|EXECUTED_LOCAL)\*\*/, `${row.caseId}: status`);
+    const present = row.citations.filter(({ file }) => existsSync(join(root, file)));
+    if (row.status.startsWith("**MISSING**")) assert.deepEqual(present, [], `${row.caseId}: a MISSING case has no cited test on the branch`);
+    if (row.status.startsWith("**PARTIAL**")) assert.ok(present.length > 0 && planned.length > 0, `${row.caseId}: a PARTIAL case runs a half and plans the rest`);
     for (const key of planned) {
       assert.ok(mandateByKey.has(key), `${row.caseId}: PLANNED names the unknown mandate ${key}`);
       assert.ok(mandateByKey.get(key).cases.includes(row.caseId), `${row.caseId}: mandate ${key} does not list the case`);
@@ -121,9 +126,11 @@ test("B11 case map: every target is EXECUTED_LOCAL or PARTIAL; a PARTIAL target 
     else assert.equal(row.remaining, "—", `${row.caseId}: nothing remains`);
   }
   const executed = map.filter((r) => r.target === "EXECUTED_LOCAL").length;
-  const missing = map.filter((r) => r.status.startsWith("**MISSING**")).length;
   const text = readFileSync(CASE_MAP, "utf8");
-  assert.ok(text.includes(`Counts at design: ${map.length} cases — 0 EXECUTED_LOCAL, 0 SIMULATED, 0 PARTIAL, ${missing} MISSING (all planned).`));
+  // the counts at design stay as they were; the counts at stage 1 are the status cells' own (INT-1)
+  assert.ok(text.includes(`Counts at design: ${map.length} cases — 0 EXECUTED_LOCAL, 0 SIMULATED, 0 PARTIAL, ${map.length} MISSING (all planned).`));
+  const count = (prefix) => map.filter((r) => r.status.startsWith(`**${prefix}**`)).length;
+  assert.ok(text.includes(`Counts at stage 1 (INT-1, \`b11/stage-1\`): ${map.length} cases — ${count("EXECUTED_LOCAL")} EXECUTED_LOCAL, 0 SIMULATED, ${count("PARTIAL")} PARTIAL, ${count("MISSING")} MISSING (planned for stage 2).`));
   assert.ok(text.includes(`Target at B11 closure: ${executed}\nEXECUTED_LOCAL`) || text.includes(`Target at B11 closure: ${executed} EXECUTED_LOCAL`));
   assert.ok(text.includes(`${map.length - executed} PARTIAL`));
 });
