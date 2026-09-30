@@ -114,7 +114,7 @@ const CASE_ID = /\b(?:S\d{3}|R2-\d{3}|CMD\d{3}-(?:OK|DENY|RACE)|MC-\d{2}|IC-\d{2
 
 test("B08 case map: every case of the package has its section and one status row whose counts are its section's rows, a PARTIAL case names its later package and registry case, and the totals follow", () => {
   assert.equal(b08.caseIds.length, 15);
-  const start = text.indexOf("\n## Status at `b08/integration`\n");
+  const start = text.indexOf("\n## Status at `b08/land`\n");
   assert.ok(start >= 0, "the case map has its status section");
   const end = text.indexOf("\n## ", start + 1);
   const section = text.slice(start, end < 0 ? undefined : end).split("\n");
@@ -158,6 +158,11 @@ test("B08 case map after B08-INTEGRATION: no row is PLANNED, and every row a B08
   for (const m of rows) {
     const parts = m[3].split(";").map((p) => p.trim());
     if (parts[0].startsWith("existing")) continue;
+    // a row the landing on main added for a seam (design §17) names the landing first and its commit last
+    if (parts[0] === "b08/land") {
+      assert.match(parts[parts.length - 1], /^[0-9a-f]{7,40}$/, `a landing row names its commit last: ${m[3]}`);
+      continue;
+    }
     assert.ok(keys.has(parts[0]), `a landed row names its mandate first: ${m[3]}`);
     assert.match(parts[parts.length - 1], /^[0-9a-f]{7,40}$/, `a landed row names its commit last: ${m[3]}`);
   }

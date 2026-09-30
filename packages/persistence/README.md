@@ -14,7 +14,10 @@ PostgreSQL 17 persistence of the Kauro platform (layer `adapter`: it implements 
   labelled TEST CLOCK in its temporary clusters only). `migrations/0013..0017_*.sql` — the B09 payments and fiscal workflow
   (`docs/design/B09-payments-fiscal.md`; numbered 0009..0013 on its branch), `0018` — the B07 + B09 merge's payment-service read
   of retention records (`docs/design/B07-B09-merge.md`) —, and `0019` — B09's package-close review: a provider refund no local refund
-  explains is its own reconciliation case (`reconciliation_cases.provider_ref`, D-REF-B8). Every tenant table has row-level security enabled and
+  explains is its own reconciliation case (`reconciliation_cases.provider_ref`, D-REF-B8), `0020` — B07's package-close re-check:
+  the provider hold of a seal's accepted generations (`object_holds`, D-HOLD-1..4), and `0021..0023` — B08's processing and audit
+  authority: jobs, attempts and capacity; staging, verification and packages; audits and cost grants
+  (`docs/design/B08-audit-approval-jobs.md` §9; numbered 0019..0021 on its branch, D8-LAND-1). Every tenant table has row-level security enabled and
   forced; every tenant-owned foreign key is composite `(agency_id, id)`; every aggregate carries a version whose bump requires its event
   (an event of its own agency, bound to an aggregate of that agency at or below its version); every aggregate is born in its
   machine's initial state (`kauro.state_machines`, seeded from the registry) and changes state only along a listed edge.

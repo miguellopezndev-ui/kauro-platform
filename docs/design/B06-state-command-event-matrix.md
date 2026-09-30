@@ -22,7 +22,7 @@ Registry: commands.json `6fa1a124821609a5ac911779304e8876df1a6954c530e895604da10
 
 `Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the
 edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;
-**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review, 0020 of B07’s, 0021–0023 of B08) stores the aggregate and seeds the edge in
+**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review, 0020 of B07's, 0021–0023 of B08) stores the aggregate and seeds the edge in
 `kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and
 checked; **—** — the aggregate is not stored yet.
 

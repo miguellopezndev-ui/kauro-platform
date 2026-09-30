@@ -30,15 +30,17 @@ Row classes (21 "Evidence classes"; A4 records: case | test file :: exact title 
 - **SIMULATED** (mandate; commit) — the clause passes through a labelled contract fake (core, worker host, object storage) and is never
   EXECUTED_PROVIDER; the mandate wrote it first on a **PLANNED SIMULATED** row.
 - **EXECUTED_LOCAL (existing)** — a test already on the base that demonstrates a half of the case.
+- **EXECUTED_LOCAL (b08/land; decision; commit)** — a test the landing on `main` added for a seam with main's review fixes (design §17).
 
 When a mandate lands, its rows lose the word PLANNED and gain the commit; nothing is PASS by being listed.
 
-## Status at `b08/integration`
+## Status at `b08/land`
 
 The status of each case with every mandate landed: **EXECUTED_LOCAL** when no clause needs a later package; **PARTIAL** when one does,
 named with its package and registry case (or "no registry case" with the gate). The check keeps the counts equal to the section's rows
 and the status consistent with the later column. Recomputed by B08-INTEGRATION: every row stands, so every status is the one the design
-planned.
+planned. Recomputed at the landing on `main` (`b08/land`, design §17): every row stands on the merged tree, S056 gains the two
+rows of the B06-R1 seam (D8-LAND-2), and no status changes.
 
 Totals: 15 cases — 7 EXECUTED_LOCAL, 8 PARTIAL.
 
@@ -46,7 +48,7 @@ Totals: 15 cases — 7 EXECUTED_LOCAL, 8 PARTIAL.
 |---|---|---|---|
 | S035 | PARTIAL | 1 EXECUTED_LOCAL, 2 SIMULATED — the scratch store's exact causes; the fenced writer; the job FAILED end to end with its staging cleaned | B01 — the Migration core's own ENOSPC, short-write and corrupt-read causes (G-MC-SEMANTICS, no registry case); B14 — the 64 GiB Batch scratch (G-CLOUD, no registry case) |
 | S055 | EXECUTED_LOCAL | 3 EXECUTED_LOCAL, 0 SIMULATED — job, event and outbox atomically; the lost answer replayed; the undelivered record admitted once | none (B14 repeats the dispatch on Cloud Tasks under G-CLOUD) |
-| S056 | PARTIAL | 2 EXECUTED_LOCAL, 2 SIMULATED — the lease fence; stale attempts refused at the database; identity-keyed host; duplicate, ambiguous and surviving attempts end to end | B14 — Cloud Batch job names and a real ambiguous submission (G-CLOUD, no registry case; S074 nearest) |
+| S056 | PARTIAL | 4 EXECUTED_LOCAL, 2 SIMULATED — the lease fence; stale attempts refused at the database; identity-keyed host; duplicate, ambiguous and surviving attempts end to end; takeovers and re-dispatches only from the stored checkpoint (b08/land) | B14 — Cloud Batch job names and a real ambiguous submission (G-CLOUD, no registry case; S074 nearest) |
 | S061 | PARTIAL | 1 EXECUTED_LOCAL, 2 SIMULATED — read-back evidence required at the database; the verifier fake; partial and foreign blobs end to end | B01 and B02 — the real verifyPackage (MC-07); B14 — real storage generations (G-CLOUD, no registry case) |
 | S062 | PARTIAL | 3 EXECUTED_LOCAL, 1 SIMULATED — cancellation and publication on the job row, deletion on the project lock, through the route; stale authority at publication | B16 — RequestDeletion through its command (CMD042-RACE) |
 | S075 | PARTIAL | 1 EXECUTED_LOCAL, 2 SIMULATED — the cleanup record bound to one attempt; the host fake's resources; the janitor end to end | B14 — the real Batch VM and disk janitor (G-CLOUD, no registry case); B16 — blobs left after deletion (S064) |
@@ -86,6 +88,8 @@ Expected (registry): only current authority publishes; reconcile provider identi
 - EXECUTED_LOCAL (B08-PERSISTENCE-EXECUTION; 7936e2b) `packages/persistence/test/execution-migrations.test.ts` :: "S056 at the database: a staged manifest, a verification or a publication of an attempt whose fence is not its job lease's current fence is refused KA080, and an attempt's provider job identity is its own deterministic identity, learned once" — observes: KA080, the identity CHECK, KA004 on a second provider job id.
 - SIMULATED (B08-WORKER-HOST; 57d6bee) `packages/data-plane/test/worker-host-fake.test.ts` :: "the labelled worker-host fake keys every provider job by the attempt's deterministic identity — a second create answers ALREADY_EXISTS, a scripted timeout after creation leaves a job that observe finds, termination acts on that identity only — and every record carries evidence class SIMULATED" — observes: the fake's call log and identities.
 - SIMULATED (B08-CONTROL-EXECUTION; 7f8ee1d) `apps/control/test/job-execution.test.ts` :: "S056: a duplicated admission delivery launches nothing twice; an ambiguous launch is reconciled by observing the attempt's identity before any other create; the old attempt that survives a takeover finishes a valid package that is never submitted, verified or published" — observes: one create per identity, observe before create, the old attempt's objects left private for the janitor.
+- EXECUTED_LOCAL (b08/land; D8-LAND-2; tests first at 3391952; 88dc1e8) `packages/persistence/test/execution-adapters.test.ts` :: "B06-R1 seam (b08/land): the JOB_ATTEMPT lease is born at admission with the job's checkpoint — KAURO_JOB_ATTEMPT_CHECKPOINT_V1 over its admitted input — so once the lease lapsed the control plane abandons attempt 1 and PgExecutionStore.takeOver resumes the lease under fence 2 naming exactly that checkpoint; while the lease is live the takeover is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing" — observes: the lease row born at admission with the job's checkpoint (oracle), HELD while live, a lapsed lease refused KA005 RESUME_WITHOUT_CHECKPOINT / CHECKPOINT_MISMATCH with nothing changed, then attempt 1 ABANDONED LEASE_LAPSED and attempt 2 CLAIMED at fence 2 with the same checkpoint; the old fence is fenced out (the KA080 row above).
+- EXECUTED_LOCAL (b08/land; D8-LAND-2; tests first at 3391952; 88dc1e8) `packages/persistence/test/audit-adapters.test.ts` :: "B06-R1 seam (b08/land): the MODEL_TASK lease is born with the model task's checkpoint — KAURO_MODEL_TASK_CHECKPOINT_V1 over its planned request — so once its dispatch owner's lease lapsed another owner's beginDispatch resumes it under fence 2 naming exactly that checkpoint and reserves its own intent at that fence; while the lease is live the other owner is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing" — observes: a duplicate dispatch owner HELD while the task's lease is live, the refused resumes with nothing changed, the resume at fence 2 from the stored checkpoint with its own intent, both fences' reservations on the audit's grant.
 
 ### S061 — Worker finalization references a partial blob or foreign generation
 
