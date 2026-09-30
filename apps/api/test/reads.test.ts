@@ -194,7 +194,7 @@ test("N16 permitted actions on the command replies: derived from the caller's ro
   assert.deepEqual([withdrawn.data.approval.permittedActions, withdrawn.data.plan.permittedActions], [[], []]);
   const revisable = await w.approvable(w.A, projectId, "n16-actions-revise");
   const revised = completed<{ plan: { permittedActions: string[] } }>(await call(w, { url: routes.revisePlan(revisable.planId), token: w.operator.token, body: { expectedVersion: revisable.version, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "N16" }) } }), 201);
-  assert.deepEqual(revised.data.plan.permittedActions, ["RevisePlan"], "an OPERATOR may revise the VALIDATION_REQUIRED successor, never approve it");
+  assert.deepEqual(revised.data.plan.permittedActions, ["RevisePlan", "ValidatePlan"], "an OPERATOR may revise or validate the VALIDATION_REQUIRED successor, never approve it");
 });
 
 test("N16: every read answers only the outcomes of its catalogue — each listed problem passes its route's send guard and an unlisted one is refused", () => {
@@ -211,7 +211,7 @@ test("N16: every read answers only the outcomes of its catalogue — each listed
       assert.throws(() => checkReply(w.validator, contract, problem.status, "application/problem+json", problem), (e: unknown) => e instanceof ResponseContractViolation, `${operationId} ${code}`);
     }
   }
-  // the five manual-10 reads, the seven source reads (B07 design §9.1) and GetJob (B08 design §12)
-  assert.ok(Object.keys(READ_OUTCOMES).length === 13 && (w.A.agencyId as AgencyId).length > 0);
+  // the five manual-10 reads, the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12)
+  assert.ok(Object.keys(READ_OUTCOMES).length === 14 && (w.A.agencyId as AgencyId).length > 0);
   assert.ok(READ_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
 });

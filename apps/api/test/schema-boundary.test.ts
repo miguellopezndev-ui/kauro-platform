@@ -21,6 +21,8 @@ import {
   COMMERCE_COMMAND_RESPONSES,
   COMMERCE_READ_ROUTES,
   COMMERCE_REQUEST_SCHEMAS,
+  AUDIT_REQUEST_SCHEMA_IDS,
+  DECISION_ARTIFACT_SCHEMA_ID,
   EXECUTION_REQUEST_SCHEMA_IDS,
   INTAKE_OPERATION_IDS,
   OPERATIONAL_ROUTES,
@@ -121,9 +123,10 @@ test("the validator the api composes is closed: exactly the contract names, the 
     ...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId),
     ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId),
   ];
-  // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits, B09's seven and B08's two
+  // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits, B09's seven, B08's two job commands and
+  // four audit commands and the decision artifact document its intake admits
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS];
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID];
   const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

@@ -43,6 +43,9 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type {
   AcceptedResponse,
+  AuditHandlers,
+  AuditIntakeHandlers,
+  AuditReadHandlers,
   B06Handlers,
   B07Handlers,
   CommandEnvelope,
@@ -139,12 +142,12 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) and the two B08 execution commands (B08 design §12). */
-  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16), the source reads (B07 design §9.1) and GetJob (B08 design §12). */
-  readonly reads: ReadHandlers & SourceReadHandlers & ExecutionReadHandlers;
-  /** The document intakes: the selection manifest (B07 D-SEL-2). */
-  readonly intakes: SourceIntakeHandlers;
+  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) the two B08 execution commands and the four B08 audit commands (B08 design §12). */
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers;
+  /** The manual-10 agency, team, client and project reads (re-check finding N16), the source reads (B07 design §9.1) GetJob and GetAudit (B08 design §12). */
+  readonly reads: ReadHandlers & SourceReadHandlers & ExecutionReadHandlers & AuditReadHandlers;
+  /** The document intakes: the selection manifest (B07 D-SEL-2) and the decision artifact (B08 D8-PLAN-1). */
+  readonly intakes: SourceIntakeHandlers & AuditIntakeHandlers;
   /**
    * The served routes of the payments workflow (package B09; docs/design/B09-payments-fiscal.md §10, D-REQ-B7): its commands and its
    * reads, each registered with its own admission spec and its declared replies (the 202 ACCEPTED envelope of a provider effect

@@ -6,8 +6,8 @@ generated one or when a source it is generated from changed without it. Sources:
 and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07; the commerce machines of B09)
 and its event registry
 (`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`
-(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest
-intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition
+(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS` and, since mandate B08-COMMANDS-AUDIT, `AUDIT_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the document
+intakes with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS, B08's decision artifact intake by B08-COMMANDS-AUDIT), the transition
 seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the
 owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served
 commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision
@@ -87,7 +87,7 @@ registry machine; initial QUEUED; terminal DRAFT_READY, NEEDS_DECISION, UNSUPPOR
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial QUEUED) | QUEUED | CMD020 StartAudit (B03) | audit.queued.v1 | database |
+| — | (initial QUEUED) | QUEUED | CMD020 StartAudit (B03) | audit.queued.v1 | route |
 | QUEUED | profile_worker_claims | PROFILING | B08: durable profile/interpret/validate orchestration | audit.profiling.v1 | database |
 | PROFILING | profile_and_candidates_complete | INTERPRETING | B08: durable orchestration | audit.interpreting.v1 | database |
 | INTERPRETING | compiled_decisions_ready | VALIDATING | B08: durable orchestration | audit.validating.v1 | database |
@@ -95,10 +95,10 @@ registry machine; initial QUEUED; terminal DRAFT_READY, NEEDS_DECISION, UNSUPPOR
 | INTERPRETING | capability_not_supported | UNSUPPORTED | B08: durable orchestration | audit.unsupported.v1 | database |
 | VALIDATING | complete_valid_receipt_and_current_authority | DRAFT_READY | B08: durable orchestration | audit.draft_ready.v1 | database |
 | VALIDATING | validatable_issue_needs_agency_choice | NEEDS_DECISION | B08: durable orchestration | audit.needs_decision.v1 | database |
-| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
-| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
-| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
-| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | database |
+| QUEUED | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
+| PROFILING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
+| INTERPRETING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
+| VALIDATING | cancellation_wins | CANCELLED | CMD021 CancelAudit (B03) | audit.cancelled.v1 | route |
 | QUEUED | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
 | PROFILING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
 | INTERPRETING | absolute_deadline | EXPIRED | B08: the audit's absolute deadline | audit.expired.v1 | database |
@@ -113,11 +113,11 @@ registry machine; initial DRAFT; terminal SUPERSEDED, WITHDRAWN; unlisted edges:
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial DRAFT) | DRAFT | CMD022 CreatePlan (B03); CMD023 RevisePlan (B06) creates the successor DRAFT of a revision | plan.created.v1 | database |
-| DRAFT | compiled_or_edited | VALIDATION_REQUIRED | CMD023 RevisePlan (B06); the successor of a revision; CMD022 CreatePlan (B03) compiles a first plan | plan.validation_required.v1 | route |
-| VALIDATION_REQUIRED | validation_admitted | VALIDATING | CMD024 ValidatePlan (B01) | plan.validating.v1 | database |
-| VALIDATING | valid_receipt | VALIDATED | CMD024 ValidatePlan (B01) | plan.validated.v1 | database |
-| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | CMD024 ValidatePlan (B01) | plan.validation_required.v1 | database |
+| — | (initial DRAFT) | DRAFT | CMD022 CreatePlan (B03); CMD023 RevisePlan (B06) creates the successor DRAFT of a revision | plan.created.v1 | route |
+| DRAFT | compiled_or_edited | VALIDATION_REQUIRED | CMD023 RevisePlan (B06); the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it | plan.validation_required.v1 | route |
+| VALIDATION_REQUIRED | validation_admitted | VALIDATING | CMD024 ValidatePlan (B01) | plan.validating.v1 | route |
+| VALIDATING | valid_receipt | VALIDATED | B08: the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-10); CMD024 records the intent and answers 202 | plan.validated.v1 | database |
+| VALIDATING | invalid_receipt_result | VALIDATION_REQUIRED | B08: the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CAU-10) | plan.validation_required.v1 | database |
 | VALIDATED | agency_approval | APPROVED | CMD025 ApprovePlan (B06) | plan.approved.v1 | route |
 | DRAFT | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
 | VALIDATION_REQUIRED | new_plan_revision | SUPERSEDED | CMD023 RevisePlan (B06) | plan.superseded.v1 | route |
@@ -213,8 +213,8 @@ registry machine; initial PREPARED; terminal CLOSED, EXPIRED; unlisted edges: RE
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial PREPARED) | PREPARED | B03: the durable audit request reserves a grant (CMD020 StartAudit) | cost_grant.prepared.v1 | database |
-| PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9) | cost_grant.authorized.v1 | database |
+| — | (initial PREPARED) | PREPARED | CMD020 StartAudit (B03); the AUDIT grant is born PREPARED and authorized from its funded pool in the same unit of work (cost_grant.authorized.v1, D8-GRANT-1) | cost_grant.prepared.v1 | route |
+| PREPARED | actual_authorization_and_funding | AUTHORIZED | B03: the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9); an AUDIT grant is authorized by CMD020 from its pool (D8-GRANT-1) | cost_grant.authorized.v1 | database |
 | AUTHORIZED | remaining_budget_unavailable | EXHAUSTED | B03: bounded reservations | cost_grant.exhausted.v1 | database |
 | EXHAUSTED | reconciliation_releases_unused_reserve | AUTHORIZED | B03: reconciled reservations | cost_grant.authorized.v1 | database |
 | AUTHORIZED | expiry_reached | EXPIRED | B03: the grant's expiry | cost_grant.expired.v1 | database |
@@ -500,6 +500,10 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD017 SealRevision | POST /api/v1/revisions/{revisionId}/seal | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision seal_command; RetentionRecord (initial ACTIVE) | retention_record.created.v1, dataset_revision.sealed.v1 | dataset_revision.sealed.v1 → NOTIFICATIONS |
 | CMD036 ExecuteProject | POST /api/v1/projects/{projectId}/execute | AGENCY_OPERATOR | AGENCY_HEADER | — | Job (initial QUEUED) | processing_job.queued.v1 | processing_job.queued.v1 → JOB_EXECUTION |
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
+| CMD020 StartAudit | POST /api/v1/revisions/{revisionId}/audits | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit (initial QUEUED); CostGrant (initial PREPARED) | cost_grant.prepared.v1, cost_grant.authorized.v1, audit.queued.v1 | audit.queued.v1 → AUDIT_ORCHESTRATION |
+| CMD021 CancelAudit | POST /api/v1/audits/{auditId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit cancellation_wins | audit.cancelled.v1 | audit.cancelled.v1 → AUDIT_ORCHESTRATION |
+| CMD022 CreatePlan | POST /api/v1/audits/{auditId}/plans | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan (initial DRAFT) | plan.created.v1, plan.validation_required.v1 | — |
+| CMD024 ValidatePlan | POST /api/v1/plans/{planId}/validate | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan validation_admitted | plan.validating.v1 | plan.validating.v1 → PLAN_VALIDATION |
 | CMD028 CreatePaymentOrder | POST /api/v1/quotes/{quoteId}/payment-orders | AGENCY_BILLING | AGENCY_HEADER | — | PaymentAttempt (initial PREPARED); Quote accept_terms_for_checkout; PaymentOrder (initial INTENT_CREATED); PaymentOrder dispatch_intent_committed; PaymentOrder provider_order_created | quote.accepted_for_checkout.v1, payment_order.intent_created.v1, payment_attempt.prepared.v1, payment_attempt.dispatching.v1, payment_order.creating.v1, payment_order.created.v1, payment_order.failed.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, reconciliation_case.opened.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; reconciliation_case.opened.v1 → NOTIFICATIONS |
 | CMD029 CapturePayment | POST /api/v1/payment-orders/{orderId}/capture | AGENCY_BILLING | AGENCY_HEADER | — | PaymentAttempt dispatch_intent_committed; PaymentOrder capture_dispatch_committed; PaymentOrder capture_ambiguous; PaymentOrder capture_proved_no_effect; PaymentOrder capture_proved_no_effect_unapproved; CommercialAuthorization (initial ACTIVE) | payment_attempt.prepared.v1, payment_attempt.dispatching.v1, payment_order.capturing.v1, payment_order.captured.v1, payment_order.capture_uncertain.v1, payment_order.approved.v1, payment_order.created.v1, payment_attempt.confirmed.v1, payment_attempt.provider_pending.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, commercial_authorization.issued.v1, refund.requested.v1, reconciliation_case.opened.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
 | CMD030 ReceivePaymentWebhook | POST /api/v1/payments/webhooks/{provider} | AUTHENTICATED_PROVIDER | PROVIDER_INGRESS | — | PaymentAttempt authenticated_pending; PaymentAttempt authenticated_completed; PaymentOrder buyer_approval_observed; PaymentOrder capture_observed; PaymentOrder order_voided; PaymentOrder order_expired; CaptureFact (initial PENDING); CaptureFact provider_completed; CaptureFact provider_denied; CaptureFact provider_reversed; CommercialAuthorization authority_revoked | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1 | payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS |
@@ -713,7 +717,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
-| 422 | INTEGRITY_FAILURE | PLAN_SERVICES_UNAVAILABLE | — | — | COMMAND | the plan services this command needs are not bound in this edition (I-INT-2) |
+| 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -763,7 +767,6 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the plan's source revision of its own project is no longer SEALED (N9) |
 | 422 | TARGET_STALE | — | — | — | COMMAND | the plan's target contract of its own project is not confirmed and current (N4, N9) |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
-| 422 | INTEGRITY_FAILURE | PLAN_SERVICES_UNAVAILABLE | — | — | COMMAND | the plan services this command needs are not bound in this edition (I-INT-2) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -1137,6 +1140,160 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the job's current version; the current safe version and state come back |
 | 409 | PRECONDITION_FAILED | JOB_TERMINAL | — | always | COMMAND | the job already ended (FAILED, CANCELLED or EXPIRED): a cancellation has nothing left to stop |
 | 409 | PRECONDITION_FAILED | JOB_ALREADY_READY | — | always | COMMAND | the publication committed first (S062): the job is READY and current names its package; a cancellation never rolls a package back |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD020 StartAudit
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the revision is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | REVISION_NOT_SEALED | — | always | COMMAND | the revision is not SEALED: a draft, a locked or a rejected revision has no immutable manifest to audit; current names its version and state |
+| 409 | PRECONDITION_FAILED | AUDIT_EXISTS | — | — | COMMAND | the revision was already audited against this target contract: one audit per subject, for good (D8-AUD-1); a retry is not a new free audit |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the sealed revision is no longer available (EXPIRED, DELETED, or its retention deadline was reached, D8-STALE-1) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the target contract is not a confirmed, current contract of the revision's project (D8-STALE-1) |
+| 429 | ADMISSION_LIMITED | AUDIT_CONCURRENCY_LIMITED | — | — | COMMAND | the agency already holds its live audits (policy capacity.agencyAudits, 1): retry once one ends |
+| 429 | BUDGET_EXHAUSTED | NO_FUNDED_GRANT | — | — | COMMAND | no funded platform pool can carve the audit's grant (R2-044): nothing was written |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD021 CancelAudit
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the audit is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the audit's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | AUDIT_TERMINAL | — | always | COMMAND | the audit already ended: a cancellation has nothing left to stop; current names its version and state |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD022 CreatePlan
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | UNKNOWN_REFERENCE | UNKNOWN_REFERENCE | — | COMMAND | the candidate decision artifact is not a CANDIDATE_DECISIONS artifact of this audit |
+| 400 | INVALID_REQUEST | PATCH_UNKNOWN_CANDIDATE | PATCH_UNKNOWN_CANDIDATE | — | COMMAND | the candidate decisions name a candidate the audit does not have |
+| 400 | INVALID_REQUEST | PATCH_UNKNOWN_FIELD | PATCH_UNKNOWN_FIELD | — | COMMAND | the candidate decisions name a field the audit does not have |
+| 400 | INVALID_REQUEST | PATCH_EFFECT_NOT_PERMITTED | PATCH_EFFECT_NOT_PERMITTED | — | COMMAND | the candidate decisions ask for an effect the plan does not permit, or compile to a plan of another source or target than the audit's (N10) |
+| 400 | INVALID_REQUEST | PATCH_MALFORMED | PATCH_MALFORMED | — | COMMAND | the candidate decisions are not a decisions document |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the audit is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | AUDIT_NOT_DECIDABLE | — | always | COMMAND | the audit is not NEEDS_DECISION: it has no candidate decisions awaiting the agency; current names its version and state |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a compiled plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
+| 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD024 ValidatePlan
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the plan is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the plan's current version, or planHash is not its body hash (current.mismatch names it); the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | PLAN_NOT_VALIDATABLE | — | always | COMMAND | the plan is not VALIDATION_REQUIRED: only that state takes a validation intent; current names its version and state |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -1617,6 +1774,62 @@ the check proves every citation resolves to an existing test.
 | lost response | `cmd037-cancel-job.test.ts` :: "RACE: an identical retry replays the 200…"<br>`cmd037-cancel-job.test.ts` :: "RACE (S062): CancelJob through the route racing the publication…" |
 | external uncertainty | NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062) |
 
+### CMD020 StartAudit
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd020-start-audit.test.ts` :: "OK: StartAudit on a sealed, available revision…"<br>`cmd020-start-audit.test.ts` :: "R2-044: a revision sealed through SealRevision with no funded grant…" |
+| wrong role | `cmd020-start-audit.test.ts` :: "DENY and RACE: a VIEWER is 403, another agency's revision 404…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| wrong agency | `cmd020-start-audit.test.ts` :: "DENY and RACE: a VIEWER is 403, another agency's revision 404…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| stale version | NOT_APPLICABLE: StartAudit carries no expectedVersion (registry fields: targetContractId, auditPolicyVersion) — it creates the audit; the revision's seal, the source's availability and the target's currency are read after their locks (D-TX-2) and a fact that changed is refused with its own reason (REVISION_NOT_SEALED, SOURCE_EXPIRED, TARGET_STALE, AUDIT_EXISTS), never with STALE_VERSION |
+| duplicate request | `cmd020-start-audit.test.ts` :: "DENY and RACE: a VIEWER is 403, another agency's revision 404…" |
+| changed-body same key | `cmd020-start-audit.test.ts` :: "DENY and RACE: a VIEWER is 403, another agency's revision 404…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd020-start-audit.test.ts` :: "DENY and RACE: a VIEWER is 403, another agency's revision 404…"<br>`idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: StartAudit reaches no provider — it queues one audit and carves its grant from the pool in one database transaction (R2-044 proves the core fakes recorded no call); AUDIT_ORCHESTRATION runs the model tasks after COMMIT (mandate B08-CONTROL-AUDIT), and the uncertainty of a task is that consumer's |
+
+### CMD021 CancelAudit
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…" |
+| wrong role | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| wrong agency | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| stale version | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…" |
+| duplicate request | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…" |
+| changed-body same key | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd021-cancel-audit.test.ts` :: "OK, DENY and RACE: CancelAudit advances the cancellation version…"<br>`idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: CancelAudit records the cancellation on the audit row and calls no provider; the control plane's AUDIT_ORCHESTRATION stops the audit's work by its fence (mandate B08-CONTROL-AUDIT), and a cancellation wins over a step that finishes later |
+
+### CMD022 CreatePlan
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…" |
+| wrong role | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| wrong agency | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| stale version | NOT_APPLICABLE: CreatePlan carries no expectedVersion (registry fields: candidateDecisionArtifactRef) — it creates a plan and writes no audit row; the audit's state is read under its row lock and a fact that changed is refused with its own reason (AUDIT_NOT_DECIDABLE), an artifact of another audit, agency or kind as UNKNOWN_REFERENCE, never with STALE_VERSION |
+| duplicate request | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…" |
+| changed-body same key | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd022-create-plan.test.ts` :: "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact…"<br>`idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: CreatePlan reaches the Intelligence core only through PlanCompilerPort — a deterministic, local compile over the stored artifact that writes nothing outside the unit of work, so a failure rolls back with no journal row and a retry recompiles; a deployment without the core answers CORE_SERVICES_UNAVAILABLE (D8-PORT-1), and the core the test binds is a labelled contract fake (SIMULATED, B08 case map) |
+
+### CMD024 ValidatePlan
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…" |
+| wrong role | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| wrong agency | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…"<br>`audit-role-matrix.test.ts` :: "every audit command, the decision-artifact intake and the audit read against every role…" |
+| stale version | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…" |
+| duplicate request | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…" |
+| changed-body same key | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd024-validate-plan.test.ts` :: "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING…"<br>`idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: ValidatePlan records one validation intent and calls no provider or core — the deterministic validation runs after COMMIT in the control plane's PLAN_VALIDATION (mandate B08-CONTROL-AUDIT), whose receipt settles the intent; a lost delivery leaves the intent due (D8-PLAN-2) |
+
 ### CMD028 CreatePaymentOrder
 
 | Mutation | Applicability |
@@ -1726,7 +1939,8 @@ carries the caller's permitted actions (`api/permitted-actions`). Package B09's 
 reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),
 and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER). Package B08's GetJob
 (D8-API-1) is the status path of CMD036's 202: every member reads the job of the agency, a job of another agency answers NOT_FOUND,
-and the view is the job's safe progress, never a provider identity, a fence or a lease.
+and the view is the job's safe progress, never a provider identity, a fence or a lease; its GetAudit is the status path of CMD020's 202 under the
+same rules (the view: phase, deadlines, grant classification and pending decisions, never a model task, a prompt or the pool).
 
 | Read | Route | Scope | List | Reply view | Action token | Authority |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1743,6 +1957,7 @@ and the view is the job's safe progress, never a provider identity, a fence or a
 | GetUploadSession | GET /api/v1/uploads/{uploadId}/session | AGENCY_HEADER | — | ProtectedSessionView | READ_UPLOAD_SESSION | 10 "Upload and target routes" (the provider session through the protected response only); 09 "Resumable session security"; D-SESSION-2 |
 | PreviewTable | GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview | AGENCY_HEADER | — | TablePreviewView | PREVIEW_TABLE | 10 "Upload and target routes" (a bounded authorized sample with safe display escaping and no shared caching); D-SAPI-7 |
 | GetJob | GET /api/v1/jobs/{jobId} | AGENCY_HEADER | — | JobView | GET_JOB | B08 design §12 (D8-API-1): the status path of ExecuteProject's ACCEPTED answer; 10 "Long work returns 202 with operationId, current state, status URL and allowed polling guidance"; Q8-8 (only the package id) |
+| GetAudit | GET /api/v1/audits/{auditId} | AGENCY_HEADER | — | AuditView | GET_AUDIT | B08 design §12 (D8-API-1): the status path of StartAudit's ACCEPTED answer; 10 "Long work returns 202 with operationId, current state, status URL and allowed polling guidance"; 10 "Responses and safe errors" |
 | GetQuote | GET /api/v1/quotes/{quoteId} | AGENCY_HEADER | — | QuoteView | READ_QUOTE | 10 "Quote and payment routes": "GET /quotes/{quoteId} returns price components, tax status, discount provenance, expiry and data availability. It also returns checkoutReady and structured blockers" |
 | GetPaymentOrder | GET /api/v1/payment-orders/{orderId} | AGENCY_HEADER | — | PaymentOrderDetailView | READ_PAYMENT_ORDER | 10 "Quote and payment routes": "A browser return endpoint only navigates to server-side reconciliation"; 15 "Payment state transitions" |
 | GetRefund | GET /api/v1/refunds/{refundId} | AGENCY_HEADER | — | RefundView | READ_REFUND | 10 "Refund request, review, execute and reconcile"; 15 "Refund policy and calculation" |
@@ -2041,6 +2256,29 @@ and the view is the job's safe progress, never a provider identity, a fence or a
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### GetAudit
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | UNKNOWN_FIELD, TYPE | — | ADMISSION | the read takes no query parameter, or one was repeated |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the audit is not visible to the caller's agency |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ### GetQuote
 
 | Status | Code | Reason | Field codes | current | Layer | Meaning |
@@ -2129,7 +2367,7 @@ and the view is the job's safe progress, never a provider identity, a fence or a
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
-## 5a. The document intakes (B07 D-SEL-2)
+## 5a. The document intakes (B07 D-SEL-2; B08 D8-CAU-7)
 
 A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was
 already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live
@@ -2138,6 +2376,7 @@ membership after its transition lock) plus the intake's own role; every denial i
 | Intake | Route | Scope | Reply view | Action token | Authority |
 | --- | --- | --- | --- | --- | --- |
 | SubmitSelectionManifest | POST /api/v1/revisions/{revisionId}/selection-manifests | AGENCY_HEADER | SelectionManifestIntakeView | SUBMIT_SELECTION_MANIFEST | 10 "Upload and target routes" (selection edits require the revision version: the version is compared by CMD016); D-SEL-2 |
+| SubmitDecisionArtifact | POST /api/v1/audits/{auditId}/decision-artifacts | AGENCY_HEADER | DecisionArtifactIntakeView | SUBMIT_DECISION_ARTIFACT | B08 design §8, §12 (D8-PLAN-1, D8-API-1): the agency's decisions enter as evidence, never through a command; B07 D-SEL-2: a non-journaled, content-idempotent intake |
 
 ### SubmitSelectionManifest
 
@@ -2172,6 +2411,36 @@ membership after its transition lock) plus the intake's own role; every denial i
 | 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
 | 404 | NOT_FOUND | — | — | — | COMMAND | the revision is not visible to the caller's agency |
 | 409 | PRECONDITION_FAILED | REVISION_NOT_SELECTABLE | — | always | COMMAND | the revision takes no new selection (not DRAFT, UPLOADING, INSPECTING or READY_TO_SEAL) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### SubmitDecisionArtifact
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the audit is not visible to the caller's agency |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |

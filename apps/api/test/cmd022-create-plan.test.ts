@@ -7,7 +7,6 @@
 // command.
 import assert from "node:assert/strict";
 import { after, afterEach, before, test } from "node:test";
-import { readData } from "./commerce-support.js";
 import {
   AUDIT_ROW_LOCK,
   auditRow,
@@ -23,10 +22,10 @@ import {
   startedAudit,
   storeDecisionArtifact,
   storedCandidates,
+  storedData,
   type AuditWorld,
   type CompilerReason,
   type CreatedPlanView,
-  type StoredArtifact,
 } from "./audit-support.js";
 import { SimulatedCrash, asProblem, bodyHashOf, completed, freshKey, outcome, planBodyOf, replayTextOf, sha, waitForApiLockWait } from "./support.js";
 import { reachedHold } from "./writers.js";
@@ -108,7 +107,7 @@ test("OK, DENY and RACE: CreatePlan compiles the agency's candidate decision art
   // the intake is content-idempotent: the same decisions again are the same artifact (200, created false), other decisions are another one
   const again = await storeDecisionArtifact(w, auditId, { kind: "CANDIDATE_DECISIONS", document: { body } });
   assert.equal(again.status, 200);
-  assert.deepEqual(readData<StoredArtifact>(again), { ...stored, created: false });
+  assert.deepEqual(storedData(again), { ...stored, created: false });
   const other = await storedCandidates(w, auditId, decidedBody(subject, "cmd022-other"));
   assert.notEqual(other.artifactRef, stored.artifactRef);
   assert.notEqual(other.contentHash, stored.contentHash);
@@ -147,7 +146,7 @@ test("OK, DENY and RACE: CreatePlan compiles the agency's candidate decision art
   // a reference that names no artifact of this audit is 400 UNKNOWN_REFERENCE on the field, whatever it names: nothing, another audit's artifact,
   // or a decision patch (the other kind of artifact, which RevisePlan resolves and CreatePlan does not)
   const field = [{ field: "candidateDecisionArtifactRef", code: "UNKNOWN_REFERENCE" }];
-  const nothing = await refused("unknown artifact", () => createPlan(w, auditId, { candidateDecisionArtifactRef: sha("no-such-artifact") }), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
+  const nothing = await refused("unknown artifact", () => createPlan(w, auditId, { candidateDecisionArtifactRef: "00000000-0000-4000-8000-0000000000a1" }), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
   assert.deepEqual(asProblem(w, nothing).errors, field);
   const elsewhere = await startedAudit(aw);
   await driveTo(w, elsewhere, "NEEDS_DECISION");
@@ -155,7 +154,7 @@ test("OK, DENY and RACE: CreatePlan compiles the agency's candidate decision art
   await refused("another audit's artifact", () => createPlan(w, auditId, { candidateDecisionArtifactRef: strangers.artifactRef }), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
   const patch = await storeDecisionArtifact(w, auditId, { kind: "DECISION_PATCH", document: { candidate: "Phone", reasonCode: "AGENCY_DECISION" } });
   assert.equal(patch.status, 201, patch.text);
-  await refused("a decision patch", () => createPlan(w, auditId, { candidateDecisionArtifactRef: readData<StoredArtifact>(patch).artifactRef }), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
+  await refused("a decision patch", () => createPlan(w, auditId, { candidateDecisionArtifactRef: storedData(patch).artifactRef }), "400 INVALID_REQUEST UNKNOWN_REFERENCE");
   // the compiler's four reasons, told to the port one after another, each answered 400 on the field with the reason itself (D-PLAN-1 vocabulary)
   const wire: Readonly<Record<CompilerReason, string>> = {
     UNKNOWN_CANDIDATE: "PATCH_UNKNOWN_CANDIDATE",
@@ -171,7 +170,7 @@ test("OK, DENY and RACE: CreatePlan compiles the agency's candidate decision art
   // decisions that are no candidate decisions at all (the fake's port compiles only `{ body }`) are a malformed patch, from the port itself
   const invented = await storeDecisionArtifact(w, auditId, { kind: "CANDIDATE_DECISIONS", document: { candidate: "Fax", invented: true } });
   assert.equal(invented.status, 201, invented.text);
-  await refused("invented candidate", () => createPlan(w, auditId, { candidateDecisionArtifactRef: readData<StoredArtifact>(invented).artifactRef }), "400 INVALID_REQUEST PATCH_MALFORMED");
+  await refused("invented candidate", () => createPlan(w, auditId, { candidateDecisionArtifactRef: storedData(invented).artifactRef }), "400 INVALID_REQUEST PATCH_MALFORMED");
   // a plan of another revision or target is no plan of this audit: a compiled body that names a subject other than the audit's is refused
   const stray = await storedCandidates(w, auditId, planBodyOf(sha("another-revision") as never, subject.targetContractHash as never, "cmd022-stray"));
   await refused("another revision", () => createPlan(w, auditId, { candidateDecisionArtifactRef: stray.artifactRef }), "400 INVALID_REQUEST PATCH_EFFECT_NOT_PERMITTED");

@@ -25,6 +25,7 @@ export type { StrictJsonOptions, StrictJsonReason } from "./api/strict-json.js";
 export { parseStrictJson, StrictJsonError } from "./api/strict-json.js";
 export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js";
 export { compileSchemaBundle, isCalendarDateTime, SchemaCompileError, SUPPORTED_KEYWORDS, ANNOTATION_KEYWORDS } from "./api/json-schema.js";
+export { INTAKE_ROUTES } from "./api/intake-routes.js";
 export type { ContractSchemaBundle } from "./api/schema-validation.js";
 export { createSchemaValidator, PROBLEM_SCHEMA } from "./api/schema-validation.js";
 export type {

@@ -76,6 +76,14 @@ export type StoredArtifact = {
   readonly created: boolean;
 };
 
+/** The STORED envelope's data of an intake reply: 201 when the artifact was created, 200 for the same content again. */
+export function storedData(reply: Reply): StoredArtifact {
+  if (reply.status !== 200 && reply.status !== 201) throw new Error(`expected 200 or 201, got ${reply.status}: ${reply.text}`);
+  const body = reply.json<{ kind: string; data: StoredArtifact }>();
+  if (body.kind !== "STORED") throw new Error(`expected a STORED reply: ${reply.text}`);
+  return body.data;
+}
+
 export interface CallOptions {
   readonly key?: string;
   readonly token?: string;
@@ -231,7 +239,7 @@ export async function auditWorld(): Promise<AuditWorld> {
 }
 
 /** The owner's funding act (Q8-1): the platform's monthly pool, on the control plane's own login. */
-export async function fundPool(aw: AuditWorld, ceilingCents = 22_000n): Promise<string> {
+export async function fundPool(aw: Pick<AuditWorld, "w" | "poolId">, ceilingCents = 22_000n): Promise<string> {
   const client = await aw.w.h.controlPool.raw.connect();
   try {
     const poolId = await fundPlatformPool(client, { ceilingCents });
@@ -267,7 +275,7 @@ export interface StartedAudit {
 }
 
 /** StartAudit through its route on a fresh subject; the pool must be funded and no other audit of the agency live. */
-export async function startedAudit(aw: AuditWorld, options: CallOptions = {}): Promise<StartedAudit> {
+export async function startedAudit(aw: Pick<AuditWorld, "w">, options: CallOptions = {}): Promise<StartedAudit> {
   const subject = await subjectOf(aw.w);
   const reply = await startAudit(aw.w, subject.revisionId, { targetContractId: subject.contractId }, options);
   const auditId = auditIdOf(reply);
@@ -555,7 +563,7 @@ export async function endLiveAudits(w: World): Promise<void> {
 export async function storedCandidates(w: World, auditId: string, body: PlanBody, person: World["operator"] = w.operator): Promise<StoredArtifact> {
   const reply = await storeDecisionArtifact(w, auditId, { kind: "CANDIDATE_DECISIONS", document: candidateDocument(body) }, { token: person.token });
   assert.equal(reply.status, 201, reply.text);
-  return readData<StoredArtifact>(reply);
+  return storedData(reply);
 }
 
 /** The plan body of an audit's subject, the way the tests' agency decides it. */
@@ -565,7 +573,7 @@ export function decidedBody(subject: Subject, seed: string): PlanBody {
 
 /** A plan revision of the subject at VALIDATION_REQUIRED (v2), written the way CMD022 leaves it. */
 export function requiredPlan(w: World, subject: Subject, seed: string): Promise<PlanFixture> {
-  return w.plan(w.A, subject.projectId as never, { revisionHash: subject.revisionHash as never, targetContractHash: subject.targetContractHash as never, seed });
+  return w.plan(w.A, subject.projectId as never, { revisionHash: subject.revisionHash as never, targetContractHash: subject.targetContractHash as never, seed, state: "VALIDATION_REQUIRED" });
 }
 
 // --- what a view must never carry ------------------------------------------------------------------------------------------------------

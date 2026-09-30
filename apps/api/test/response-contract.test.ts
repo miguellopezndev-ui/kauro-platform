@@ -167,6 +167,11 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job
       ["POST", "/api/v1/projects/:projectId/execute", "ExecuteProject", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/jobs/:jobId/cancel", "CancelJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD037" } }],
+      // the four audit commands (B08 design §12): StartAudit and ValidatePlan answer the shared ACCEPTED envelope
+      ["POST", "/api/v1/revisions/:revisionId/audits", "StartAudit", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      ["POST", "/api/v1/audits/:auditId/cancel", "CancelAudit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD021" } }],
+      ["POST", "/api/v1/audits/:auditId/plans", "CreatePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD022" } }],
+      ["POST", "/api/v1/plans/:planId/validate", "ValidatePlan", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
@@ -183,8 +188,12 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/revisions/:revisionId/tables/:tableId/preview", "PreviewTable", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTable" } }],
       // GetJob (B08 design §12)
       ["GET", "/api/v1/jobs/:jobId", "GetJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetJob" } }],
+      // GetAudit (B08 design §12)
+      ["GET", "/api/v1/audits/:auditId", "GetAudit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAudit" } }],
       // the selection manifest intake: 201 stored, 200 the same document again (B07 D-SEL-2)
       ["POST", "/api/v1/revisions/:revisionId/selection-manifests", "SubmitSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitSelectionManifest" } }],
+      // the decision artifact intake: 201 stored, 200 the same document again (B08 D8-CAU-7)
+      ["POST", "/api/v1/audits/:auditId/decision-artifacts", "SubmitDecisionArtifact", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitDecisionArtifact" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:intake:SubmitDecisionArtifact" } }],
       // package B09's request side (M4, D-REQ-B7): a provider command declares its 202 accepted observation beside its success
       ["POST", "/api/v1/quotes/:quoteId/payment-orders", "CreatePaymentOrder", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD028" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/payment-orders/:orderId/capture", "CapturePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD029" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],

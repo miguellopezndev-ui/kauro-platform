@@ -30,7 +30,7 @@ export {
 export type { ApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
-export { activeWorkInspector, externalActionInspector, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, unavailablePlanServices, commerceEdition, deliveryCapacity, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
+export { activeWorkInspector, externalActionInspector, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, planServices, commerceEdition, deliveryCapacity, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
 export type { PlanServices } from "./edition.js";
 export {
   openDatabase,

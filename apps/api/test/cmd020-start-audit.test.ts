@@ -104,7 +104,7 @@ test("OK: StartAudit on a sealed, available revision with a confirmed current ta
     [w.A.agencyId, subject.projectId, subject.revisionId, subject.revisionHash, subject.contractId, subject.targetContractHash, "R2-INITIAL", w.memberships.operator],
   );
   assert.deepEqual([audit.state, audit.version, audit.fence, audit.cancel_version, audit.draft_plan_id, audit.terminal_reason], ["QUEUED", "1", "0", "0", null, null]);
-  assert.equal(await w.count("audits", "agency_id = $1", [w.A.agencyId]), 1);
+  assert.equal(await w.count("audits", "revision_id = $1", [subject.revisionId]), 1, "one audit of the subject");
 
   // its deadlines are the database's instant: started now (between two readings of the server's clock), absolute deadline a day later, the
   // interpretation deadline stamped only when the audit reaches INTERPRETING

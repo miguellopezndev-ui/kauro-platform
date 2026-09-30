@@ -16,7 +16,9 @@
 // SourceFile, RetentionRecord; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs
 // and their outcome catalogues of @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the
 // source reads and the selection manifest intake, and since mandate B08-COMMANDS-EXECUTION B08's two execution commands (CMD036 ExecuteProject,
-// CMD037 CancelJob) with the GetJob read, whose events are read from the execution store's methods — the transition seeds of the migrations, the events each handler publishes (read
+// CMD037 CancelJob) with the GetJob read and since mandate B08-COMMANDS-AUDIT its four audit commands (CMD020 StartAudit, CMD021 CancelAudit, CMD022
+// CreatePlan, CMD024 ValidatePlan) with the GetAudit read and the decision artifact intake, whose events are read from the execution and audit stores' methods
+// and CMD022's handler — the transition seeds of the migrations, the events each handler publishes (read
 // from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
 //
 // Package B09's served commands and reads (decision D-REQ-B7) join the served sections from the application's served lists
@@ -128,10 +130,10 @@ export const EDGE_OWNERS = {
   },
   Plan: {
     "(initial DRAFT)": { command: "CMD022", event: "plan.created.v1", note: "CMD023 RevisePlan (B06) creates the successor DRAFT of a revision" },
-    compiled_or_edited: { command: "CMD023", event: "plan.validation_required.v1", note: "the successor of a revision; CMD022 CreatePlan (B03) compiles a first plan" },
+    compiled_or_edited: { command: "CMD023", event: "plan.validation_required.v1", note: "the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it" },
     validation_admitted: { command: "CMD024", event: "plan.validating.v1" },
-    valid_receipt: { command: "CMD024", event: "plan.validated.v1" },
-    invalid_receipt_result: { command: "CMD024", event: "plan.validation_required.v1" },
+    valid_receipt: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane) on plan.validating.v1: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-10); CMD024 records the intent and answers 202", event: "plan.validated.v1" },
+    invalid_receipt_result: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane): an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED (D8-PLAN-2, D8-CAU-10)", event: "plan.validation_required.v1" },
     agency_approval: { command: "CMD025", event: "plan.approved.v1" },
     new_plan_revision: { command: "CMD023", event: "plan.superseded.v1" },
     withdraw_approval: { command: "CMD026", event: "plan.withdrawn.v1" },
@@ -187,9 +189,9 @@ export const EDGE_OWNERS = {
     material_counterexample: { command: "CMD059", event: null },
   },
   CostGrant: {
-    "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: "cost_grant.prepared.v1" },
+    "(initial PREPARED)": { command: "CMD020", event: "cost_grant.prepared.v1", note: "the AUDIT grant is born PREPARED and authorized from its funded pool in the same unit of work (cost_grant.authorized.v1, D8-GRANT-1)" },
     // B09 funds no cost grant: the grant's own package records the owner's funding evidence (B09 open question Q-B09-9; B09-F17)
-    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: "cost_grant.authorized.v1" },
+    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9); an AUDIT grant is authorized by CMD020 from its pool (D8-GRANT-1)", event: "cost_grant.authorized.v1" },
     remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: "cost_grant.exhausted.v1" },
     reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: "cost_grant.authorized.v1" },
     expiry_reached: { owner: "B03", why: "the grant's expiry", event: "cost_grant.expired.v1" },
@@ -562,6 +564,62 @@ APPLICABILITY.CMD037 = {
   "external uncertainty": "NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062)",
 };
 
+// package B08's audit commands (mandate B08-COMMANDS-AUDIT; docs/design/B08-case-map.md CMD020, CMD021, CMD022, CMD024 and R2-044): each
+// command's own OK / DENY / RACE tests and the role matrix of the four commands, the decision artifact intake and the GetAudit read
+const START_AUDIT = "cmd020-start-audit.test.ts";
+const CANCEL_AUDIT = "cmd021-cancel-audit.test.ts";
+const CREATE_PLAN = "cmd022-create-plan.test.ts";
+const VALIDATE_PLAN = "cmd024-validate-plan.test.ts";
+const AUDIT_ROLE_MATRIX = ["audit-role-matrix.test.ts", "every audit command, the decision-artifact intake and the audit read against every role"];
+const START_DENY = "DENY and RACE: a VIEWER is 403, another agency's revision 404";
+const CANCEL_OK = "OK, DENY and RACE: CancelAudit advances the cancellation version";
+const CREATE_OK = "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact";
+const VALIDATE_OK = "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING";
+APPLICABILITY.CMD020 = {
+  "legitimate state": [[START_AUDIT, "OK: StartAudit on a sealed, available revision"], [START_AUDIT, "R2-044: a revision sealed through SealRevision with no funded grant"]],
+  "wrong role": [[START_AUDIT, START_DENY], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[START_AUDIT, START_DENY], AUDIT_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: StartAudit carries no expectedVersion (registry fields: targetContractId, auditPolicyVersion) — it creates the audit; the revision's seal, the source's availability and the target's currency are read after their locks (D-TX-2) and a fact that changed is refused with its own reason (REVISION_NOT_SEALED, SOURCE_EXPIRED, TARGET_STALE, AUDIT_EXISTS), never with STALE_VERSION",
+  "duplicate request": [[START_AUDIT, START_DENY]],
+  "changed-body same key": [[START_AUDIT, START_DENY]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[START_AUDIT, START_DENY], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: StartAudit reaches no provider — it queues one audit and carves its grant from the pool in one database transaction (R2-044 proves the core fakes recorded no call); AUDIT_ORCHESTRATION runs the model tasks after COMMIT (mandate B08-CONTROL-AUDIT), and the uncertainty of a task is that consumer's",
+};
+APPLICABILITY.CMD021 = {
+  "legitimate state": [[CANCEL_AUDIT, CANCEL_OK]],
+  "wrong role": [[CANCEL_AUDIT, CANCEL_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[CANCEL_AUDIT, CANCEL_OK], AUDIT_ROLE_MATRIX],
+  "stale version": [[CANCEL_AUDIT, CANCEL_OK]],
+  "duplicate request": [[CANCEL_AUDIT, CANCEL_OK]],
+  "changed-body same key": [[CANCEL_AUDIT, CANCEL_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CANCEL_AUDIT, CANCEL_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: CancelAudit records the cancellation on the audit row and calls no provider; the control plane's AUDIT_ORCHESTRATION stops the audit's work by its fence (mandate B08-CONTROL-AUDIT), and a cancellation wins over a step that finishes later",
+};
+APPLICABILITY.CMD022 = {
+  "legitimate state": [[CREATE_PLAN, CREATE_OK]],
+  "wrong role": [[CREATE_PLAN, CREATE_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[CREATE_PLAN, CREATE_OK], AUDIT_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: CreatePlan carries no expectedVersion (registry fields: candidateDecisionArtifactRef) — it creates a plan and writes no audit row; the audit's state is read under its row lock and a fact that changed is refused with its own reason (AUDIT_NOT_DECIDABLE), an artifact of another audit, agency or kind as UNKNOWN_REFERENCE, never with STALE_VERSION",
+  "duplicate request": [[CREATE_PLAN, CREATE_OK]],
+  "changed-body same key": [[CREATE_PLAN, CREATE_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CREATE_PLAN, CREATE_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: CreatePlan reaches the Intelligence core only through PlanCompilerPort — a deterministic, local compile over the stored artifact that writes nothing outside the unit of work, so a failure rolls back with no journal row and a retry recompiles; a deployment without the core answers CORE_SERVICES_UNAVAILABLE (D8-PORT-1), and the core the test binds is a labelled contract fake (SIMULATED, B08 case map)",
+};
+APPLICABILITY.CMD024 = {
+  "legitimate state": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "wrong role": [[VALIDATE_PLAN, VALIDATE_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[VALIDATE_PLAN, VALIDATE_OK], AUDIT_ROLE_MATRIX],
+  "stale version": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "duplicate request": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "changed-body same key": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[VALIDATE_PLAN, VALIDATE_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: ValidatePlan records one validation intent and calls no provider or core — the deterministic validation runs after COMMIT in the control plane's PLAN_VALIDATION (mandate B08-CONTROL-AUDIT), whose receipt settles the intent; a lost delivery leaves the intent due (D8-PLAN-2)",
+};
+
 // --- sources --------------------------------------------------------------------------------------------------------------------
 
 export async function loadMatrixSources() {
@@ -593,6 +651,7 @@ export async function loadMatrixSources() {
     CMD015: "sources/handlers/cancel-upload.ts",
     CMD016: "sources/handlers/select-input-tables.ts",
     CMD017: "sources/handlers/seal-revision.ts",
+    CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};
   for (const [id, file] of Object.entries(HANDLER_FILES)) {
@@ -610,8 +669,31 @@ export async function loadMatrixSources() {
   };
   published.CMD036 = storeEvents("queueJob");
   published.CMD037 = storeEvents("requestCancellation");
+  // package B08's audit commands (D8-API-1): the audit store writes each event in the statement that changes the aggregate, so the events are
+  // read from the store methods the handlers call - startAudit (the audit's literal event and the grant's events by the states the grant
+  // reaches), cancelAudit (a literal) and requestValidation (the plan edge through movePlan's state-to-event table)
+  const auditStore = readFileSync(join(root, "packages", "persistence", "src", "audit", "store.ts"), "utf8");
+  const auditMethod = (method) => {
+    const start = auditStore.search(new RegExp(`^  (?:private )?async ${method}\\(`, "m"));
+    if (start < 0) throw new Error(`the audit store has no method ${method}`);
+    return auditStore.slice(start, auditStore.indexOf("\n  }\n", start));
+  };
+  const planEdge = auditMethod("movePlan");
+  const planEventOf = new Map([...planEdge.matchAll(/to === "([A-Z_]+)" \? "(plan\.[a-z_.0-9]+)"/g)].map((m) => [m[1], m[2]]));
+  const planElse = planEdge.match(/: "(plan\.[a-z_.0-9]+)";/);
+  if (planEventOf.size === 0 || planElse === null) throw new Error("the audit store's movePlan no longer maps a state to its event");
+  const literalEvents = (text) => [...text.matchAll(/"(audit\.[a-z_.0-9]+)"/g)].map((m) => m[1]);
+  const grantEvents = (text) => {
+    const states = ["PREPARED", ...[...text.matchAll(/UPDATE kauro\.cost_grants SET[^`]*?state = '([A-Z_]+)'/g)].map((m) => m[1])];
+    return states.map((state) => domain.costGrantEventTypeOf(state));
+  };
+  const planEvents = (text) => [...text.matchAll(/this\.movePlan\([^,]+,[^,]+,[^,]+, "([A-Z_]+)"/g)].map((m) => planEventOf.get(m[1]) ?? planElse[1]);
+  const startAudit = auditMethod("startAudit");
+  published.CMD020 = [...new Set([...grantEvents(startAudit), ...literalEvents(startAudit)])];
+  published.CMD021 = [...new Set(literalEvents(auditMethod("cancelAudit")))];
+  published.CMD024 = [...new Set(planEvents(auditMethod("requestValidation")))];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];
@@ -650,7 +732,7 @@ export async function loadMatrixSources() {
     reads,
     readOutcomes,
     readViews,
-    intakes: application.SOURCE_INTAKE_ROUTES,
+    intakes: application.INTAKE_ROUTES,
     intakeOutcomes: application.INTAKE_OUTCOMES,
     intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
@@ -729,8 +811,8 @@ export function generateMatrix(s) {
   line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07; the commerce machines of B09)");
   line("and its event registry");
   line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
-  line("(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
-  line("intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition");
+  line("(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS` and, since mandate B08-COMMANDS-AUDIT, `AUDIT_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the document");
+  line("intakes with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS, B08's decision artifact intake by B08-COMMANDS-AUDIT), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
   line("commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision");
@@ -852,7 +934,8 @@ export function generateMatrix(s) {
   line("reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),");
   line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER). Package B08's GetJob");
   line("(D8-API-1) is the status path of CMD036's 202: every member reads the job of the agency, a job of another agency answers NOT_FOUND,");
-  line("and the view is the job's safe progress, never a provider identity, a fence or a lease.");
+  line("and the view is the job's safe progress, never a provider identity, a fence or a lease; its GetAudit is the status path of CMD020's 202 under the");
+  line("same rules (the view: phase, deadlines, grant classification and pending decisions, never a model task, a prompt or the pool).");
   line();
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");
@@ -870,7 +953,7 @@ export function generateMatrix(s) {
     }
     line();
   }
-  line("## 5a. The document intakes (B07 D-SEL-2)");
+  line("## 5a. The document intakes (B07 D-SEL-2; B08 D8-CAU-7)");
   line();
   line("A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was");
   line("already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live");
@@ -926,7 +1009,7 @@ async function main() {
     return;
   }
   const edges = s.machines.reduce((n, m) => n + m.transitions.length + 1, 0);
-  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands, ${Object.keys(s.reads).length} reads and ${Object.keys(s.intakes).length} intake with their catalogues, every applicability citation resolved)\n`);
+  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands, ${Object.keys(s.reads).length} reads and ${Object.keys(s.intakes).length} intakes with their catalogues, every applicability citation resolved)\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
