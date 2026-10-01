@@ -522,3 +522,15 @@ export function barrier(): { readonly wait: Promise<void>; open(): void } {
   });
   return { wait, open: () => open() };
 }
+
+/**
+ * Marks a promise a test starts now and settles later as observed from its creation. A race test starts one side, drives the
+ * other side and the lock holder, and only then awaits (or asserts the refusal of) the first; the first side can fail the moment
+ * the holder ends, before the test attaches its handler, and node:test fails the running test on that "unhandled rejection"
+ * although the refusal is exactly what the test expects. The returned promise is the same one: `await` and `assert.rejects` see
+ * the outcome unchanged.
+ */
+export function handled<T>(promise: Promise<T>): Promise<T> {
+  promise.catch(() => undefined);
+  return promise;
+}

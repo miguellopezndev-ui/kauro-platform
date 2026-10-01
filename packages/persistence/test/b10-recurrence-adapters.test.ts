@@ -11,6 +11,7 @@
 // (Fenix); R2-127 reserves and releases slot 2 (Gaia), consumes slot 1 by payment (Fenix) and holds slot 2 for reconciliation
 // (Kestrel); R2-090 races for slot 3, the last free slot; R2-091 consumes the cohort.
 import assert from "node:assert/strict";
+import type { UtcInstant } from "@kauro/contracts";
 import { after, before, test } from "node:test";
 import {
   isDomainFailure,
@@ -36,7 +37,7 @@ import {
   type QuoteIssuance,
 } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgFoundingOfferReader, foundingOf, recurrenceOf, translateDatabaseError, type PgCommercialUnitOfWorkFactory } from "../src/index.js";
-import { barrier, waitForLockWait } from "../src/testing/harness.js";
+import { barrier, handled, waitForLockWait } from "../src/testing/harness.js";
 import {
   commercialUnits,
   commissionUnitsAhead,
@@ -156,6 +157,12 @@ async function writerOf(sql: string, params: ReadonlyArray<unknown>): Promise<st
   return r.rows[0]!.x;
 }
 
+/** An instant `hours` after (or, negative, before) an exact server instant, exact to the microsecond as the database compares them. */
+async function exactAround(at: string, hours: number): Promise<UtcInstant> {
+  const r = await w.h.oracle.query<{ t: string }>(`SELECT to_char(($1::timestamptz + make_interval(secs => $2::double precision)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS t`, [at, hours * 3600]);
+  return r.rows[0]!.t as UtcInstant;
+}
+
 const sortedIds = (xs: ReadonlyArray<string>): string[] => [...xs].sort();
 
 /**
@@ -181,15 +188,15 @@ async function providerCreated(ag: Agency, order: OrderFixture): Promise<void> {
 async function race(first: { ag: Agency; s: ApprovedSubject }, second: { ag: Agency; s: ApprovedSubject }): Promise<{ first: QuoteIssuance; second: QuoteIssuance; waiter: number }> {
   const reached = barrier();
   const release = barrier();
-  const one = quoteFor(first.ag, first.s, {
+  const one = handled(quoteFor(first.ag, first.s, {
     beforeCommit: async () => {
       reached.open();
       await release.wait;
     },
-  });
+  }));
   try {
     await Promise.race([reached.wait, one.then(() => Promise.reject(new Error("the first issuance committed without reaching its hold point")))]);
-    const two = quoteFor(second.ag, second.s);
+    const two = handled(quoteFor(second.ag, second.s));
     const waiter = await waitForLockWait(w.h.oracle, "kauro-test-api", "founding_slots");
     release.open();
     return { first: await one, second: await two, waiter };
@@ -369,6 +376,8 @@ test("R2-127: a reservation ends at its quote's 336-hour expiry, a superseding o
     const quoteId = uow.ids.next() as QuoteId;
     const snapshotId = uow.ids.next() as EligibilitySnapshotId;
     const issuedMs = Date.parse(issuedAt);
+    const expiresAt = await exactAround(issuedAt, 336);
+    const lookbackStartsAt = await exactAround(issuedAt, -8760);
     const quote = await uow.commerce.quotes.issue(
       {
         quoteId,
@@ -396,7 +405,7 @@ test("R2-127: a reservation ends at its quote's 336-hour expiry, a superseding o
         termsHash: sha(`replacement-terms-${quoteId}`),
         termsVersion: paidQuote.termsVersion,
         issuedAt,
-        expiresAt: toUtcInstant(issuedMs + 336 * HOUR_MS),
+        expiresAt,
         sourceAvailableUntil: toUtcInstant(issuedMs + 168 * HOUR_MS),
         replacesQuoteId: paidQuote.quoteId,
         createdByMembershipId: fenix.ag.ownerMembershipId as MembershipId,
@@ -406,7 +415,7 @@ test("R2-127: a reservation ends at its quote's 336-hour expiry, a superseding o
         snapshotId,
         quoteId,
         asOf: issuedAt,
-        lookbackStartsAt: toUtcInstant(issuedMs - 8760 * HOUR_MS),
+        lookbackStartsAt,
       },
     );
     const record = await recurrenceOf(uow).recordIssuance({ journalEntryId: (entry as { entryId: JournalEntryId }).entryId, agencyId: quote.agencyId, projectId: quote.projectId, quoteId, snapshotId, replacesQuoteId: paidQuote.quoteId, issuedAt });
