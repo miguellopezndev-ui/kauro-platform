@@ -1,0 +1,139 @@
+{
+  "verdict": "REJECT",
+  "summary": "Source admission revocation can be bypassed at publication, partial cleanup cannot recover, and delivery-failure and cost reporting have recovery gaps. Provider/core fakes are honestly labelled SIMULATED and later-package clauses are named, but passing tests miss these defects.",
+  "verify_observed": "verify.log ends with 'verify exit 0'. Nine test summaries report 860 tests, 860 passes, zero failures and zero skipped tests. All 49 test citations for the fifteen B08 registry cases have matching passing entries. No tests were rerun.",
+  "cases": [
+    {
+      "id": "S035",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Cited scratch, writer and job-execution tests pass and distinguish exhaustion, short writes and corruption. B01/B14 deferrals are explicit. Bounded cleanup fails after a transient scratch-removal error: B08-R2."
+    },
+    {
+      "id": "S055",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing PostgreSQL persistence, API and control tests demonstrate atomic job/event/outbox creation, lost-answer replay and admission after undelivered intent without a second logical job."
+    },
+    {
+      "id": "S056",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Passing tests demonstrate real PostgreSQL fence/checkpoint enforcement and simulated identity-based provider reconciliation. B14 is named. Current source authority is incompletely checked: B08-R1."
+    },
+    {
+      "id": "S061",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Passing PostgreSQL guards and labelled verifier/storage fakes reject partial, foreign and changed-generation artifacts with a complete positive neighbour. Publication remains protected, but interrupted delivery failure does not recover to the classified terminal outcome: B08-R3."
+    },
+    {
+      "id": "S062",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Passing PostgreSQL/API races observe actual lock waits in both publication/cancellation and project-deletion interleavings. B16 is named. The stale-authority test omits source-file admission revocation, which publication can bypass: B08-R1."
+    },
+    {
+      "id": "S075",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Passing tests demonstrate cleanup ownership, preservation of neighbouring resources and simulated host cost reporting. B14/B16 deferrals are explicit. Transient cleanup or resource-report failures leave unrecoverable results: B08-R2 and B08-R4."
+    },
+    {
+      "id": "R2-044",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing tests seal through the real handler, reject unfunded audit reservations on PostgreSQL, observe no dispatch intent or core call, and admit a funded neighbour."
+    },
+    {
+      "id": "R2-045",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing PostgreSQL authorization/publication races and the simulated worker continuation deny publication after revocation while retaining valid evidence privately. Actual provider refund handling is explicitly B15-owned."
+    },
+    {
+      "id": "R2-046",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing scheduler, PostgreSQL ledger, API refusal and concurrent admission tests demonstrate deterministic fairness, one ACTIVE/three WAITING globally and three live jobs per agency."
+    },
+    {
+      "id": "CMD036-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing real API/PostgreSQL tests demonstrate one QUEUED job with its outbox and atomic entitlement consumption at admission. The broader provider/core end-to-end test is separately labelled SIMULATED."
+    },
+    {
+      "id": "CMD036-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Passing tests cover roles, foreign tenants, duplicate authorizations, queue capacity and several revoked prerequisites. They omit revoked admission of an included source file, which the shared authority reader accepts: B08-R1."
+    },
+    {
+      "id": "CMD036-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing real API/PostgreSQL tests observe serialization, journal replay/conflict, one job across two keys, rollback before commit and both commercial-revocation interleavings."
+    },
+    {
+      "id": "CMD037-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing API/PostgreSQL tests advance the cancellation fence and minimize job reads. The simulated continuation reconciles the exact provider identity and releases capacity once; actual Batch termination is explicitly B14-owned."
+    },
+    {
+      "id": "CMD037-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Passing real denial/database tests and labelled simulation hold points demonstrate that committed cancellation blocks old-worker submission and publication, including a valid old package. READY cancellation makes no CRM rollback promise."
+    },
+    {
+      "id": "CMD037-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Passing real journal/version races preserve one cancellation. Labelled provider simulation preserves uncertainty until exact-identity observation proves termination; the actual provider ambiguity clause is explicitly B14-owned."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B08-R1",
+      "severity": "BLOCKING",
+      "title": "Revoked source-file admission does not fence execution or publication",
+      "file": "packages/persistence/src/execution/store.ts",
+      "line": 292,
+      "detail": "readAuthority checks the revision's state but never checks admission of its INCLUDED sealed files. A GENERATION_MISSING or GENERATION_CHANGED revocation leaves the revision SEALED. ExecuteProject and lostAuthority therefore accept it; the publication guard in 0022_staging_verification_packages.sql:554 also checks only SEALED. Protection depends on asynchronous EXECUTION_CONTROL delivery. Once publication wins, liveJobsRelyingOn excludes READY jobs, so the delayed revocation does not repair the unauthorized AVAILABLE package.",
+      "reproduction": "Bring a job to VERIFIED_PRIVATE using the job-execution fixture. Commit revokeAdmission for an INCLUDED sealed source file with GENERATION_CHANGED, together with source_file.admission_revoked.v1, as OBJECT_INVENTORY does. Delay EXECUTION_CONTROL delivery and call pipeline.publish. The unchanged revision, authorization and other facts permit READY/AVAILABLE/DELIVERED. Deliver the revocation afterward: READY is excluded from cancellation discovery. Revoking before ExecuteProject likewise passes its source prerequisite while the event is delayed.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B08-R2",
+      "severity": "BLOCKING",
+      "title": "A PARTIAL cleanup permanently prevents further scratch cleanup",
+      "file": "packages/persistence/src/execution/discovery.ts",
+      "line": 71,
+      "detail": "Cleanup discovery excludes every attempt with any cleanup record, including PARTIAL. janitor.ts:66 also refuses direct retries once a record exists. A scratch-removal exception is caught and recorded as PARTIAL with scratch_deleted=false. The unique, append-only cleanup table prevents completing that record later. A transient filesystem failure consequently defeats the bounded cleanup/recovery outcome of S035/S075.",
+      "reproduction": "Use the S075 abandoned-attempt setup with leftover scratch. Cause removeAttemptScratch to fail once with a filesystem permission or I/O error, then allow it to succeed. The first sweep records PARTIAL/scratch_deleted=false. Subsequent sweeps never select the attempt, and clean(attemptId, agencyId) returns NOT_TO_CLEAN; its scratch remains.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B08-R3",
+      "severity": "MAJOR",
+      "title": "Delivery read-back failure is forgotten after a crash",
+      "file": "apps/control/src/execution/pipeline.ts",
+      "line": 746,
+      "detail": "Delivery-copy and negative read-back rows commit before failFor is called at line 777. On replay, every recorded copy is skipped regardless of its read-back result, and copyProblem is computed only from newly made copies. The classified failure is therefore lost. The database correctly refuses publication with KA084 because negative read-backs remain, but the job stays VERIFYING and holds capacity until its deadline instead of failing and revoking its private package.",
+      "reproduction": "Start with a VERIFIED_PRIVATE package and make one delivery read-back return a partial blob. Crash immediately after the copy/read-back transaction at lines 761–776 commits, before failFor. Replay the verified_private event after restoring storage. The recorded copy is skipped, no DELIVERY_READBACK_PARTIAL_BLOB failure is applied, and publication repeatedly fails KA084. Observe VERIFYING/VERIFIED_PRIVATE and the held ACTIVE slot until deadline expiry.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B08-R4",
+      "severity": "MAJOR",
+      "title": "Transient host-report failure permanently discards cleanup cost evidence",
+      "file": "apps/control/src/execution/janitor.ts",
+      "line": 84,
+      "detail": "Any resources() exception is converted to null and cleanup proceeds. Successful object/scratch deletion then records CLEANED with all VM, disk, runtime and cost fields null. That attempt is permanently excluded from cleanup discovery, and its unique append-only record cannot be enriched. A temporary reporting outage thus permanently loses the S075 cost/resource evidence even when the host later reports it.",
+      "reproduction": "Use the existing S075 setup for a known provider job with reportable resources. Make host.resources(identity) reject once with a transient timeout while termination and deletion succeed. Observe a CLEANED cleanup row with null resource/cost columns. Restore resources() and sweep again: the attempt is not selected and its report is never recorded.",
+      "status": "OPEN"
+    }
+  ]
+}
