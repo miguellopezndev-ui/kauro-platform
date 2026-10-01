@@ -84,3 +84,10 @@ export type { RequestTransitionSubject } from "./repositories/commerce-request-r
 // the seams of the B07 + B09 merge: the source lifecycle's answers to the payments workflow (docs/design/B07-B09-merge.md)
 export { PgCommercialSourceReads } from "./source/commercial-reads.js";
 export type { CommercialSourceAvailability, CommercialSourceLineage } from "./source/commercial-reads.js";
+// package B10 (docs/design/B10-commercial-domain.md; mandate B10-ADAPTERS-RECURRENCE): the commercial unit of work and the recurrence and founding adapters
+export { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory, createCommercialUnitOfWorkFactory, recurrenceOf, foundingOf } from "./commercial-unit-of-work.js";
+export type { CommercialDependencies } from "./commercial-unit-of-work.js";
+export { PgRecurrenceRepository } from "./repositories/commercial-recurrence.js";
+export { PgFoundingRepository } from "./repositories/commercial-founding.js";
+export { PgFoundingOfferReader } from "./repositories/commercial-offer.js";
+export type { FoundingOffer } from "./repositories/commercial-offer.js";
