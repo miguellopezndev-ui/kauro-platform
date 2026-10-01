@@ -129,6 +129,7 @@ export type {
 export type {
   QuoteIssuanceRequest,
   RecurrenceRepository,
+  AgencyDesignation,
   NewFoundingReservation,
   FoundingRepository,
   NewAgreementAcceptance,

@@ -159,12 +159,14 @@ export interface RecurrenceRepository {
   /** The agency's qualifying purchases by confirmation sequence. */
   purchasesOf(agencyId: AgencyId): Promise<ReadonlyArray<QualifyingPurchaseRecord>>;
   /**
-   * The CMD027 issuance core, one call in the lock order of §3.4 and §10: the project's live quote FOR UPDATE, the recurrence lock's
-   * shared half, the snapshot's INSERT … SELECT of `kauro.qualifying_projects_at` with its count and tier, the founding slot taken in
-   * ascending order when the agency is eligible (FoundingRepository.reserve), the price over B09's quote model and money kernel, the
-   * quote DRAFT → ISSUED with its KAURO_QUOTE_TERMS_V1 terms hash, the previous unpaid quote SUPERSEDED with its reservation
-   * released, and `quote_issuances` naming the journal entry, the quote and the reservation (D10-QUOTE-1). The caller publishes
-   * quote.drafted.v1, quote.issued.v1 and quote.superseded.v1.
+   * The CMD027 issuance core, one call in the lock order of §3.4 and §10: the project's live quote FOR UPDATE and, when it is the
+   * previous unpaid quote, SUPERSEDED (its transition lock before the recurrence lock); the recurrence lock's shared half; the founding
+   * reservation of the superseded quote released with its slot; the founding slot taken in ascending order when the agency is eligible
+   * (FoundingRepository.takeSlot); the price over B09's quote model and money kernel; the quote DRAFT → ISSUED with its
+   * KAURO_QUOTE_TERMS_V1 terms hash and the snapshot's INSERT … SELECT of `kauro.qualifying_projects_at` with its count and tier; the
+   * reservation recorded (FoundingRepository.recordReservation); and `quote_issuances` naming the journal entry, the quote and the
+   * reservation (D10-QUOTE-1, D10-QUOTE-5). Each quote version publishes its own event through B09's quote model (quote.drafted.v1,
+   * quote.issued.v1, the superseded quote's quote.superseded.v1; B09 D-EVT-B3).
    */
   issueQuote(request: QuoteIssuanceRequest): Promise<QuoteIssuance>;
   /** The issuance a journal entry recorded (resume after a lost response or a crash, D10-QUOTE-4). */
@@ -173,18 +175,27 @@ export interface RecurrenceRepository {
   recordIssuance(issuance: QuoteIssuanceRecord): Promise<QuoteIssuanceRecord>;
   /**
    * The COMMISSIONS consumer's mirror of sequence 1 into `agencies.first_qualifying_capture_id` (D10-FIRST-2): agency row first,
-   * version bumped, set once; `mirrored` is false when it was already set (the caller then publishes nothing).
+   * version bumped, set once; `mirrored` is false when it was already set (the caller then publishes nothing). The agency answers the
+   * columns the commission service may read (D10-FIRST-3).
    */
-  mirrorFirstDesignation(agencyId: AgencyId, now: UtcInstant): Promise<{ readonly mirrored: boolean; readonly agency: AgencyRecord }>;
+  mirrorFirstDesignation(agencyId: AgencyId, now: UtcInstant): Promise<{ readonly mirrored: boolean; readonly agency: AgencyDesignation }>;
   /** `kauro.eligibility_findings()` (D10-REC-3). */
   eligibilityFindings(): Promise<ReadonlyArray<EligibilityFinding>>;
 }
+
+/**
+ * What the commission service reads of an agency row (0028's column grant to kauro_commission: agency_id, version, state,
+ * first_qualifying_capture_id): the answer of the first designation's mirror (D10-FIRST-3).
+ */
+export type AgencyDesignation = Pick<AgencyRecord, "agencyId" | "version" | "state" | "firstQualifyingCaptureId">;
 
 export interface NewFoundingReservation {
   readonly reservationId: FoundingReservationId;
   readonly policyVersion: string;
   readonly agencyId: AgencyId;
   readonly quoteId: QuoteId;
+  /** The slot this unit of work took for the reservation (FoundingRepository.takeSlot). */
+  readonly slotNo: number;
   /** The quote's expiry: the reservation's end, never extended (D10-FOUND-3). */
   readonly endsAt: UtcInstant;
   readonly createdAt: UtcInstant;
@@ -200,10 +211,18 @@ export interface FoundingRepository {
   /** The agency's one reservation of the cohort, in any state (one per agency per cohort, ever; D10-FOUND-1). */
   reservationOfAgency(policyVersion: string, agencyId: AgencyId): Promise<FoundingReservationRecord | null>;
   /**
-   * Takes the first free slot in ascending order (`UPDATE founding_slots … WHERE slot_no = $n AND NOT held`): a contender for the
-   * same row waits for the first transaction, re-checks and moves to the next slot or to none (D10-FOUND-2). Null when none is free.
+   * Takes the first free slot of the cohort in ascending order for a reservation of the agency (`UPDATE founding_slots … WHERE
+   * slot_no = $n AND NOT held`): a contender for the same row waits for the first transaction, re-checks and moves to the next slot or
+   * to none (D10-FOUND-2). Returns the slot, or null when none is free. The slot names the reservation before its row exists (the
+   * slot's key to the reservation is checked at COMMIT); the caller prices the quote with the founding rate, writes the quote and then
+   * records the reservation in the same transaction (recordReservation; D10-QUOTE-5).
    */
-  reserve(reservation: NewFoundingReservation): Promise<FoundingReservationRecord | null>;
+  takeSlot(policyVersion: string, reservationId: FoundingReservationId, agencyId: AgencyId): Promise<number | null>;
+  /**
+   * Records the RESERVED reservation of the slot this unit of work took, once its quote exists (the reservation's key to its quote is
+   * immediate): it ends at the quote's expiry, and the quote's snapshot names it (checked at COMMIT; D10-FOUND-1).
+   */
+  recordReservation(reservation: NewFoundingReservation): Promise<FoundingReservationRecord>;
   /** RESERVED or RECONCILIATION_HOLD → RELEASED with the slot freed; refused KC014 unless the quote is EXPIRED, SUPERSEDED or WITHDRAWN. */
   release(reservationId: FoundingReservationId, expectedVersion: number, now: UtcInstant): Promise<VersionedWrite<FoundingReservationRecord>>;
   /** RESERVED → RECONCILIATION_HOLD: the reservation ended while its quote has a payment in flight (D10-FOUND-4; R2-127). */

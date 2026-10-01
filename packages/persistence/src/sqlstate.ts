@@ -44,6 +44,10 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
+  // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)
+  DESIGNATION_REWRITE: "KC001",
+  RESERVATION_RELEASE_REFUSED: "KC014",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -89,6 +93,10 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // package B10 (D10-ERR-1): a designation or a qualifying purchase is written by the designation trigger alone and never rewritten;
+  // a founding reservation is released only once its quote ended, naming how, with its slot freed (a race with a checkout meets it)
+  KC001: { code: "INTEGRITY_FAILURE", reason: "DESIGNATION_REWRITE" },
+  KC014: { code: "PRECONDITION_FAILED", reason: "RESERVATION_RELEASE_REFUSED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -189,6 +197,19 @@ export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * B10's named checks of the recurrence and founding cohort (migration 0028), decided by their name: a reservation held for
+ * reconciliation only after its end with its quote still in checkout is the edge's guard, which a sweep racing a checkout can meet
+ * (PRECONDITION_FAILED, as B09's KA008 answers a quote that cannot leave checkout); the reservation's and the issuance's bindings are
+ * written by the issuance core alone, so only a writer bypassing it meets them (INTEGRITY_FAILURE).
+ */
+const COMMERCIAL_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason?: FailureReason }>> = Object.freeze({
+  founding_slot_reservations_hold_guard: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
+  founding_slot_reservations_snapshot_binding: { sqlState: "23514", code: "INTEGRITY_FAILURE" },
+  quote_issuances_binding: { sqlState: "23514", code: "INTEGRITY_FAILURE" },
+  founding_slots_live_reservation_fk: { sqlState: "23503", code: "INTEGRITY_FAILURE" },
+});
+
+/**
  * Translates a database error code into a DomainFailure, or null when the adapter must decide by context (a unique violation
  * is IDEMPOTENCY replay, LAST-approval race or DRAFT_AGENCY_EXISTS depending on the constraint name it carries).
  */
@@ -197,6 +218,10 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
   const source = constraint === undefined ? undefined : SOURCE_CONSTRAINT_FAILURES[constraint];
   if (source !== undefined && source.sqlState === sqlState) {
     return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
+  }
+  const commercial = constraint === undefined ? undefined : COMMERCIAL_CONSTRAINT_FAILURES[constraint];
+  if (commercial !== undefined && commercial.sqlState === sqlState) {
+    return new DomainFailure(commercial.code, `database refused the write (${sqlState} ${constraint ?? ""})`, commercial.reason === undefined ? {} : { reason: commercial.reason });
   }
   if (constraint !== undefined && COMMERCE_INTEGRITY_CONSTRAINTS.has(constraint) && (sqlState === SQLSTATE.CHECK_VIOLATION || sqlState === SQLSTATE.FOREIGN_KEY_VIOLATION || sqlState === SQLSTATE.UNIQUE_VIOLATION)) {
     return new DomainFailure("INTEGRITY_FAILURE", `database refused the write (${sqlState} ${constraint})`);
