@@ -12,7 +12,7 @@ import { EXECUTION_POLICY, isDomainFailure, jobAttemptCheckpointOf, type Attempt
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { PgExecutionStore } from "../src/execution/store.js";
 import { clockAt } from "../src/testing/source-lifecycle.js";
-import { backendPid, barrier, settlesOrWaits, waitForLockWait } from "../src/testing/harness.js";
+import { backendPid, barrier, handled, settlesOrWaits, waitForLockWait } from "../src/testing/harness.js";
 import { admitJob, controlOf, endJob, launchJob, queueJob, stageJob, verifyJob } from "../src/testing/execution-fixtures.js";
 import { tenant, within } from "./commerce-support.js";
 import { asControl, causeConstraint, causeState, closeExecutionEnv, openExecutionEnv, oracle, purchase, refused, type ExecutionEnv } from "./execution-support.js";
@@ -156,7 +156,7 @@ test("S062 deletion half at the database: a project entering DELETION_REQUESTED 
   let late: Promise<PublicationOutcome> | undefined;
   await within(env.app, tenant(A), async (c) => {
     await requestDeletion(c, one.p.projectId);
-    late = publication(one, "deleted");
+    late = handled(publication(one, "deleted"));
     // the publication's first lock is the project's shared transition lock (D8-PUB-2): it waits on the advisory lock
     const pid = await waitForLockWait(env.h.oracle, "kauro-test-control", "kauro.await_transition");
     assert.deepEqual(await oracle(env, "SELECT wait_event FROM pg_stat_activity WHERE pid = $1", [pid]), [{ wait_event: "advisory" }]);

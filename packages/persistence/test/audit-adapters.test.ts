@@ -34,7 +34,7 @@ import { PgAuditStore } from "../src/audit/store.js";
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { clockAt } from "../src/testing/source-lifecycle.js";
 import { service, within } from "./commerce-support.js";
-import { barrier, waitForLockWait } from "../src/testing/harness.js";
+import { barrier, handled, waitForLockWait } from "../src/testing/harness.js";
 import { fundPlatformPool } from "../src/testing/audit-fixtures.js";
 import { controlOf } from "../src/testing/execution-fixtures.js";
 import { auditSubject, closeAuditEnv, failureOf, newAudit, openAuditEnv, type AuditEnv } from "./audit-support.js";
@@ -85,7 +85,7 @@ test("the audit store through every repository method as the owning roles: two S
   });
   await carved.wait;
   const inputB = newAudit(B, sB);
-  const startB = h.audit.run(tenantOf(B.agencyId), (uow) => uow.audits.startAudit(inputB));
+  const startB = handled(h.audit.run(tenantOf(B.agencyId), (uow) => uow.audits.startAudit(inputB)));
   // B's StartAudit waits on the pool's row A holds (its SELECT ... FOR UPDATE), observed in pg_stat_activity
   await waitForLockWait(h.oracle, "kauro-test-api", POOL_ROW_LOCK);
   commitA.open();

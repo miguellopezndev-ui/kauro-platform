@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { DomainFailure, commandRequestDigest, isDomainFailure, type ApprovalId, type AssuranceProofId, type CausationId, type ClientId, type IdempotencyIdentity, type PlanId, type ProcessingAuthorityId, type ProjectId, type RequestId, type RevisionId, type TaskId, type UserId } from "@kauro/domain";
-import { barrier, clock, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { barrier, clock, handled, sha, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { fundPlatformPool } from "../src/testing/audit-fixtures.js";
 import { plan as planFixture } from "./support.js";
 
@@ -115,15 +115,15 @@ test("a concurrent duplicate waits on the identity index until the first transac
   const digest = sha("same request");
   const reserved = barrier();
   const release = barrier();
-  const first = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+  const first = handled(h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
     const r = await uow.journal.reserve(identity(key), digest, uow.context.correlationId);
     assert.equal(r.kind, "RESERVED");
     reserved.open();
     await release.wait;
     await uow.journal.commit(r.entryId, { responseStatus: 200, responseBody: { ok: true }, resourceKind: "end_client", resourceId: uow.ids.next() });
-  });
+  }));
   await reserved.wait;
-  const second = h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.reserve(identity(key), digest, uow.context.correlationId));
+  const second = handled(h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.journal.reserve(identity(key), digest, uow.context.correlationId)));
   await waitForLockWait(h.oracle, "kauro-test-api", "INSERT INTO kauro.command_journal");
   release.open();
   await first;

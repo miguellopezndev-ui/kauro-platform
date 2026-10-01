@@ -70,7 +70,7 @@ import {
   type VersionedWrite,
 } from "@kauro/domain";
 import { PgEventPublisher, PgSourceStore, SOURCE_CONSTRAINT_FAILURES, failureOfSqlState, type KauroPool, type SourceAudience } from "../src/index.js";
-import { barrier, clock, correlation, ids, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { barrier, clock, handled, correlation, ids, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import {
   admitSourceFile,
   bindSourceSelection,
@@ -957,10 +957,10 @@ test("R2-052 through UploadSessionRepository.insert: two reservations that each 
   });
   await firstIn.wait;
   // the second reservation, checked alone, fits (0 + 2e9 <= 5e9 in its snapshot)
-  const b = h.app.runSource(asOwner(t), async (uow) => {
+  const b = handled(h.app.runSource(asOwner(t), async (uow) => {
     assert.equal((await uow.sources.uploads.quota(p.revisionId)).reservedBytes, 0, "the second writer's own read cannot see the first reservation");
     return reserveVia(uow.sources, emitOf(uow, t), t, p, 2 * GB, { lockRevision: false });
-  });
+  }));
   try {
     const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
     // the second reservation's insert takes the revision row in its trigger (FOR NO KEY UPDATE, D-LOCK-1), which the first holds
@@ -1004,10 +1004,10 @@ test("the capacity race through UploadSessionRepository.insert: two reservations
     await release.wait;
   });
   await holding.wait;
-  const b = h.app.runSource(asOwner(t), async (uow) => {
+  const b = handled(h.app.runSource(asOwner(t), async (uow) => {
     assert.deepEqual(await uow.sources.uploads.capacity(t.ag.agencyId), { agencyId: t.ag.agencyId, activeSessions: 1, sessionLimit: 2 }, "the loser read a free slot");
     return reserveVia(uow.sources, emitOf(uow, t), t, p3, 10, { first: true });
-  });
+  }));
   try {
     const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
     // different revisions: the only row both reservations update is the agency's capacity ledger
