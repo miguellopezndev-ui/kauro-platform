@@ -44,6 +44,13 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // package B10 (migrations 0030 and 0031): the ledger and statement backstops (B10-ADAPTERS-LEDGER)
+  COMMISSION_POOL_MISMATCH: "KC002",
+  ELIGIBILITY_WITHOUT_FINAL_COMPLETION: "KC007",
+  PAYEE_UNVERIFIED: "KC009",
+  PAYOUT_NOT_SETTLED: "KC010",
+  ADJUSTMENT_NOT_CUMULATIVE: "KC015",
+  OFFSET_NOT_AUTHORIZED: "KC017",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -89,6 +96,16 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // B10's ledger backstops answer as the commands would (design 12): a pool that is not round(basis x rate) once and the exact sum of its
+  // lines, an eligibility without a FINAL completion 720 hours old with funds available and no covering hold, and an adjustment that is not
+  // the cumulative difference or a basis that rises are the database refusing what the adapter never writes (INTEGRITY_FAILURE); a payee
+  // that is not a verified destination version, a payout without its settled evidence and an offset without signed terms are the caller's
+  KC002: { code: "INTEGRITY_FAILURE", reason: "COMMISSION_POOL_MISMATCH" },
+  KC007: { code: "INTEGRITY_FAILURE", reason: "ELIGIBILITY_WITHOUT_FINAL_COMPLETION" },
+  KC015: { code: "INTEGRITY_FAILURE", reason: "ADJUSTMENT_NOT_CUMULATIVE" },
+  KC009: { code: "PRECONDITION_FAILED", reason: "PAYEE_UNVERIFIED" },
+  KC010: { code: "PRECONDITION_FAILED", reason: "PAYOUT_NOT_SETTLED" },
+  KC017: { code: "PRECONDITION_FAILED", reason: "OFFSET_NOT_AUTHORIZED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },

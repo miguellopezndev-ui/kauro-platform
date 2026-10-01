@@ -56,3 +56,5 @@ export { recordQualifiedPaymentRoute, recordQualifiedFiscalIssuer, grantCorporat
 export type { QualifiedRoute } from "./commerce-fixtures.js";
 export { activateAgency, recordReviewedFiscalProfile, issueQuote, checkoutOrder, paidPurchase } from "./commerce-purchases.js";
 export type { ReviewedTreatment, QuoteInput, IssuedQuote, PurchaseInput, CheckoutOrder, PaidPurchase, ProviderIdentities } from "./commerce-purchases.js";
+export { recordAccruedLine, recordEligibleLine, recordHold, recordIssuedStatement } from "./ledger-fixtures.js";
+export type { LedgerLineInput, RecordedLine } from "./ledger-fixtures.js";

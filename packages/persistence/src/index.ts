@@ -84,3 +84,11 @@ export type { RequestTransitionSubject } from "./repositories/commerce-request-r
 // the seams of the B07 + B09 merge: the source lifecycle's answers to the payments workflow (docs/design/B07-B09-merge.md)
 export { PgCommercialSourceReads } from "./source/commercial-reads.js";
 export type { CommercialSourceAvailability, CommercialSourceLineage } from "./source/commercial-reads.js";
+// the commission ledger, periods, statements and payouts of package B10 (mandate B10-ADAPTERS-LEDGER; docs/design/B10-commercial-domain.md
+// section 6, 7, 11): the CommissionLedgerRepository and StatementRepository adapters, their accessors over a unit of work and the platform
+// bindings of the recorded ports (D10-BIND-1)
+export { PgCommissionLedgerRepository } from "./repositories/commercial-ledger.js";
+export { PgStatementRepository } from "./repositories/commercial-statements.js";
+export { ledgerOf, statementsOf } from "./commercial-ledger-access.js";
+export { RecordedBankingCalendarSource, AuthorizationDeliveryCompletionSource, AUTHORIZATION_DELIVERY_EVIDENCE_DOMAIN } from "./commercial-bindings.js";
+export type { RecordedCalendarVersion, RecordedCompletion } from "./commercial-bindings.js";
