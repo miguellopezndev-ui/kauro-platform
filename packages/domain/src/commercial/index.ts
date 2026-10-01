@@ -38,5 +38,8 @@ export type {
 } from "./ledger.js";
 export { commissionBasis, commissionPoolCents, allocatePool, recomputePool, linePosition, RECOVERY_ACTIONS, applyNegativeBalance, compensationGuard } from "./ledger.js";
 
+export type { LineOffsetTerms, CaptureFunds, PeriodLedgerRows, ComposedStatementItem, StatementComposition } from "./statements.js";
+export { COMMISSION_CUTOFF_DOMAIN, commissionCutoffHash, composeStatement } from "./statements.js";
+
 export type { AcquisitionRateFacts, AcquisitionRateDecision, EligibilityFacts, EligibilityDecision, CommissionPeriodDates } from "./time.js";
 export { recurrenceWindowEndsAt, providerTimePlausible, acquisitionRate, eligibleAtOf, holdCoversLine, eligibilityDecision, commissionPeriodOf } from "./time.js";

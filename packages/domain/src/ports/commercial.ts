@@ -111,6 +111,7 @@ import type {
   TerminationTailEntryRecord,
   TerminationTermsRef,
 } from "../commercial/records.js";
+import type { PeriodLedgerRows } from "../commercial/statements.js";
 
 // --- recurrence and quote issuance (§3; B10-ADAPTERS-RECURRENCE) -------------------------------------------------------------------
 
@@ -558,13 +559,20 @@ export interface CommissionLedgerRepository {
 
 // --- periods, statements and payouts (§7; B10-ADAPTERS-LEDGER) --------------------------------------------------------------------
 
-/** What a period close reads at its cutoff: the included rows and the COMMISSIONS records still undelivered before it. */
-export interface PeriodInputs {
+/**
+ * What a period close reads at its cutoff (D10-STMT-3): the included rows — every line created before it with its adjustments and
+ * holds, over which KAURO_COMMISSION_CUTOFF_V1 is computed (commercial commissionCutoffHash), and what composeStatement itemizes them
+ * with — and the COMMISSIONS records still undelivered before it.
+ */
+export interface PeriodInputs extends PeriodLedgerRows {
   readonly lines: ReadonlyArray<CommissionLineRecord>;
   readonly adjustments: ReadonlyArray<CommissionAdjustmentRecord>;
   readonly holds: ReadonlyArray<CommissionHoldRecord>;
-  /** COMMISSIONS outbox records with occurred_at before the cutoff not yet delivered (CMD051 INPUTS_UNRECONCILED). */
-  readonly undeliveredBeforeCutoff: number;
+  /**
+   * COMMISSIONS outbox records created before the cutoff and not yet delivered (CMD051 INPUTS_UNRECONCILED); null when the session
+   * cannot read the COMMISSIONS outbox — never zero for want of a read, so an unobservable input is unreconciled, not reconciled.
+   */
+  readonly undeliveredBeforeCutoff: number | null;
 }
 
 export interface NewCommissionStatement {
