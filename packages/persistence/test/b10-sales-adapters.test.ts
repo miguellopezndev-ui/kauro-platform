@@ -45,9 +45,9 @@ const asOwner = <T>(work: (uow: PgCommerceUnitOfWork) => Promise<T>): Promise<T>
 const asPerson = <T>(userId: string, work: (uow: PgCommerceUnitOfWork) => Promise<T>): Promise<T> =>
   w.h.commerce.run(w.h.operator(userId as Parameters<typeof w.h.operator>[0]), (uow) => work(uow as PgCommerceUnitOfWork));
 
-/** A column read by the oracle as its exact instant (microseconds), as the adapters read it. */
+/** A column read by the oracle as the domain's canonical instant (UTC, milliseconds), as the adapters read it (commercial-sales-rows.ts). */
 async function exactInstant(sql: string, params: ReadonlyArray<unknown>): Promise<string> {
-  const r = await w.h.oracle.query<{ at: string }>(`SELECT to_char(x.at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at FROM (${sql}) x`, [...params]);
+  const r = await w.h.oracle.query<{ at: string }>(`SELECT to_char(x.at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at FROM (${sql}) x`, [...params]);
   assert.equal(r.rows.length, 1, "one instant");
   return r.rows[0]!.at;
 }
@@ -190,7 +190,7 @@ test("R2-099: an assistance agreement records its seller, agency, project or nex
 
   /** The applicability query as the commission service runs it, in the agency it adopted: the agreement ids, in order. */
   const applicable = (projectId: string, orderCreatedAt: string) =>
-    within(w.commission, service(ag.agencyId), async (c) => (await new PgSalesRepository(c).assistanceAgreementsFor(ag.agencyId as AgencyId, projectId as ProjectId, orderCreatedAt)).map((a) => a.assistanceAgreementId as string));
+    within(w.commission, service(ag.agencyId), async (c) => (await new PgSalesRepository(c, ids).assistanceAgreementsFor(ag.agencyId as AgencyId, projectId as ProjectId, orderCreatedAt)).map((a) => a.assistanceAgreementId as string));
 
   // X's purchase settles after the signing, but its order was created before it: no agreement applies to it — not the next-purchase
   // agreement, and not a project agreement either, even one naming the project whose order was created at that instant

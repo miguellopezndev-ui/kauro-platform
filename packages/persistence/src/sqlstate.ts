@@ -44,6 +44,12 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): the sales and attribution backstops (0029) the
+  // sales adapters surface
+  SHARES_NOT_WHOLE: "KC003",
+  SELLER_NOT_ACTIVATABLE: "KC005",
+  TAIL_NOT_ENUMERATED: "KC011",
+  PROSPECT_SUPPRESSED: "KC016",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -89,6 +95,13 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // B10's sales backstops answer as the commands would (design §12): an allocation whose shares are not exactly 10000 bps of accepted
+  // claims under signed agreements, an activation missing a fact, a tail entry for an opportunity the termination could not
+  // enumerate, a prospect whose organization or contact is suppressed
+  KC003: { code: "PRECONDITION_FAILED", reason: "SHARES_NOT_WHOLE" },
+  KC005: { code: "PRECONDITION_FAILED", reason: "SELLER_NOT_ACTIVATABLE" },
+  KC011: { code: "PRECONDITION_FAILED", reason: "TAIL_NOT_ENUMERATED" },
+  KC016: { code: "PRECONDITION_FAILED", reason: "PROSPECT_SUPPRESSED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -143,6 +156,17 @@ const COMMERCE_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = 
   payment_orders_one_open_per_project: () => new DomainFailure("PAYMENT_PENDING", "the project already has an open checkout", { reason: "CREATION_IN_PROGRESS" }, true),
   refunds_one_requested_per_origin: () => new DomainFailure("PRECONDITION_FAILED", "a request of this capture already awaits review", { reason: "REFUND_REQUEST_OPEN" }),
   domain_events_capture_completed_once: () => new DomainFailure("INTEGRITY_FAILURE", "a capture publishes its completion once", { reason: "EVENT_MISSING" }),
+});
+
+/**
+ * B10's sales unique indexes decided by their name (design §12): a second live prospect of a normalized organization key is
+ * PROSPECT_EXISTS, a seller's second live claim on a prospect CLAIM_EXISTS, and a second frozen allocation of an agency
+ * ATTRIBUTION_EXISTS ("the pool does not become 10% for each seller").
+ */
+export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = Object.freeze({
+  prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
+  attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
+  attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
 });
 
 /**
@@ -205,6 +229,8 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
     if (constraint === "agencies_one_draft_per_creator") return new DomainFailure("ADMISSION_LIMITED", "one draft agency per identity", { reason: "DRAFT_AGENCY_EXISTS" });
     const commerce = constraint === undefined ? undefined : COMMERCE_UNIQUE_FAILURES[constraint];
     if (commerce !== undefined) return commerce();
+    const commercial = constraint === undefined ? undefined : COMMERCIAL_UNIQUE_FAILURES[constraint];
+    if (commercial !== undefined) return commercial();
     // command_journal_identity (concurrent duplicate), approvals_one_live_per_plan (lost approval race) and
     // plans_supersedes_once (lost revision race) are decided by the handler, which re-reads the current row and answers
     // with the replayed result or STALE_VERSION carrying the current safe version; so are the commerce replay constraints

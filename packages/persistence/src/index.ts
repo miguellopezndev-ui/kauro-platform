@@ -23,6 +23,7 @@ export {
 } from "./migrations/runner.js";
 export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection, LedgerEntry, SchemaCompatibility } from "./migrations/runner.js";
 export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, commerceReplayOf, COMMERCE_REPLAY_CONSTRAINTS, COMMERCE_INTEGRITY_CONSTRAINTS } from "./sqlstate.js";
+export { COMMERCIAL_UNIQUE_FAILURES } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
@@ -84,3 +85,9 @@ export type { RequestTransitionSubject } from "./repositories/commerce-request-r
 // the seams of the B07 + B09 merge: the source lifecycle's answers to the payments workflow (docs/design/B07-B09-merge.md)
 export { PgCommercialSourceReads } from "./source/commercial-reads.js";
 export type { CommercialSourceAvailability, CommercialSourceLineage } from "./source/commercial-reads.js";
+// the sales and attribution records of package B10 (mandate B10-ADAPTERS-SALES; docs/design/B10-commercial-domain.md §5, §11): the
+// SalesRepository and AttributionRepository adapters, the CommercialPrincipalReader, and their accessors over a unit of work
+export { PgSalesRepository, PgCommercialPrincipalReader } from "./repositories/commercial-sales.js";
+export type { SellerPrincipalFacts, OwnerGrantFacts } from "./repositories/commercial-sales.js";
+export { PgAttributionRepository } from "./repositories/commercial-attribution.js";
+export { salesOf, attributionOf, commercialPrincipalsOf } from "./commercial-sales-access.js";
