@@ -10,20 +10,29 @@ import type { AgencyFixture } from "../src/testing/harness.js";
 import type { AgreementAcceptanceId, CausationId, RelationshipDecisionId, UserId } from "@kauro/domain";
 import { PgAgencyLifecycleRepository, agencyLifecycleOf, type PgCommerceUnitOfWork } from "../src/index.js";
 import { barrier, clock, waitForLockWait } from "../src/testing/harness.js";
+import { commerceEvent, type QuoteFixture } from "./commerce-support.js";
 import {
+  acceptAttribution,
   accrue,
-  acquired,
   activeSeller,
   agencyWith,
   closeWorld,
+  convert,
   digest,
   ids,
   openWorld,
+  orderOf,
+  prepareAllocation,
   purchase,
   refusedWith,
+  registerProspect,
+  settle,
   sha,
+  submitClaim,
   subjectOf,
+  tenant,
   within,
+  type Agency,
   type World,
 } from "./b10-commission-support.js";
 
@@ -35,6 +44,9 @@ before(async () => {
 after(async () => {
   await closeWorld(w);
 });
+
+/** A refusal the adapter translated (execute()): the raw database error it carries is the one with this SQLSTATE. */
+const translatedRefusal = (code: string) => (e: unknown): boolean => refusedWith(code)((e as { cause?: unknown }).cause);
 
 /** A member's own TENANT unit of work of an agency (the request handlers' session). */
 const asMember = <T>(agency: AgencyFixture, userId: string, work: (uow: PgCommerceUnitOfWork) => Promise<T>): Promise<T> =>
@@ -94,7 +106,7 @@ test("CMD002 through the adapters: the published agreement versions are read aft
     assert.ok(terms !== null && privacy !== null);
     return life.recordAcceptance({ acceptanceId: ids.next() as AgreementAcceptanceId, agencyId: D.agencyId as never, membershipId: D.ownerMembershipId, terms, privacy, legalProfileRef: ids.next(), acceptedAt: clock.now() });
   });
-  await assert.rejects(refusedAcceptance, refusedWith("42501"));
+  await assert.rejects(refusedAcceptance, translatedRefusal("42501"));
   const refusedActivation = within(w.app, { agencyId: D.agencyId, userId: billing }, (c) =>
     c.query("UPDATE kauro.agencies SET state = 'ACTIVE', version = 2, terms_version = 'TERMS-ADP-2', privacy_agreement_version = 'PRIVACY-ADP-1', legal_profile_ref = $2 WHERE agency_id = $1", [D.agencyId, ids.next()]),
   );
@@ -145,6 +157,47 @@ test("CMD002 through the adapters: the published agreement versions are read aft
   assert.deepEqual(agency.rows, [{ state: "ACTIVE", terms_version: "TERMS-ADP-2", privacy_agreement_version: "PRIVACY-ADP-1", legal_profile_ref: profile, version: "2" }]);
 });
 
+/**
+ * The founding quote CMD027 issues for the agency's first project (design §3.3): slot 1 taken, the quote at 2500 bps (129500 - 32375 = 97125,
+ * example 1) whose eligibility snapshot names the reservation, the reservation RESERVED until the quote's expiry. The purchase of it
+ * consumes the reservation (the designation of 0028).
+ */
+async function foundingQuote(ag: Agency, seed: string, slotNo: number): Promise<QuoteFixture> {
+  const subject = await subjectOf(w, ag, seed);
+  const reservationId = ids.next();
+  return within(w.app, tenant(ag), async (c) => {
+    const took = await c.query("UPDATE kauro.founding_slots SET held = true, live_reservation_id = $2, live_agency_id = kauro.current_agency_id(), updated_at = now() WHERE policy_version = 'R2-INITIAL' AND slot_no = $1 AND NOT held", [slotNo, reservationId]);
+    assert.equal(took.rowCount, 1, "the slot is free");
+    const quoteId = ids.next();
+    const snapshotId = ids.next();
+    const termsHash = sha(`terms-${quoteId}`);
+    await c.query(
+      `INSERT INTO kauro.quotes (quote_id, agency_id, project_id, plan_id, approval_id, revision_hash, plan_hash, target_contract_hash, billable_units, mode,
+         price_policy_version, discount_policy_version, base_service_cents, discount_bps, discount_cents, service_cents, fiscal_profile_id, issuer_ref,
+         tax_treatment, tax_rule, tax_rate_bps, tax_cents, total_cents, currency, eligibility_snapshot_id, terms_hash, terms_version, issued_at, expires_at,
+         source_available_until, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 40000, 'HUBSPOT', 'R2-INITIAL', 'R2-INITIAL', 129500, 2500, 32375, 97125, $9, $10, 'EXEMPT_EXPORT', 'ZERO_REVIEWED', 0, 0, 97125, 'USD',
+         $11, $12, 'TERMS-2026-01', now(), now() + interval '336 hours', now() + interval '168 hours', $13, now(), now())`,
+      [quoteId, ag.agencyId, subject.projectId, subject.planId, subject.approvalId, subject.revisionHash, subject.planHash, subject.targetContractHash, ag.profileId, w.routes.issuerRef, snapshotId, termsHash, ag.ownerMembershipId],
+    );
+    const actor = { kind: "USER" as const, id: ag.ownerUserId };
+    await commerceEvent(c, "quote", quoteId, 1, ag.agencyId, "quote.drafted.v1", actor);
+    await c.query(
+      `INSERT INTO kauro.price_eligibility_snapshots (snapshot_id, agency_id, quote_id, project_id, as_of, lookback_starts_at, qualifying_project_ids, qualifying_count, repeat_discount_bps,
+         founding_slot_ref, founding_discount_bps, applied_discount_bps, policy_version, created_at)
+       VALUES ($1, $2, $3, $4, now(), now() - interval '8760 hours', '{}'::uuid[], 0, 0, $5, 2500, 2500, 'R2-INITIAL', now())`,
+      [snapshotId, ag.agencyId, quoteId, subject.projectId, reservationId],
+    );
+    await c.query("UPDATE kauro.quotes SET state = 'ISSUED', version = 2 WHERE quote_id = $1", [quoteId]);
+    await commerceEvent(c, "quote", quoteId, 2, ag.agencyId, "quote.issued.v1", actor);
+    await c.query(
+      "INSERT INTO kauro.founding_slot_reservations (reservation_id, agency_id, quote_id, policy_version, slot_no, ends_at, created_at, updated_at) SELECT $1, $2, $3, 'R2-INITIAL', $4, q.expires_at, now(), now() FROM kauro.quotes q WHERE q.quote_id = $3",
+      [reservationId, ag.agencyId, quoteId, slotNo],
+    );
+    return { quoteId, projectId: subject.projectId, subject, serviceCents: 97125, taxCents: 0, totalCents: 97125, termsHash, billableUnits: 40000, mode: "HUBSPOT", profileId: ag.profileId };
+  });
+}
+
 // --- R2-141 ------------------------------------------------------------------------------------------------------------------------------
 
 test("R2-141 (example 24): a display-name and owner e-mail change leaves the agency's id, first designation, consumed slot, recurrence set, attribution and ledger rows unchanged, and a recorded consolidation decision of two agencies merges no dataset, membership, designation or attribution and changes neither's quote eligibility", async () => {
@@ -152,7 +205,14 @@ test("R2-141 (example 24): a display-name and owner e-mail change leaves the age
   // agency R acquired by seller S1 (example 1): the founding first purchase (129500 - 32375 = 97125), its first designation, its consumed
   // founding slot, one accrued line of 9713 at 1000 bps, and a second project of its own in the eligibility set
   const S1 = await activeSeller(w, "r141-seller");
-  const R = await acquired(w, "B10 R2-141 R", [{ seller: S1, shareBps: 10000 }], { foundingFixture: true });
+  const ag = await agencyWith(w, "B10 R2-141 R");
+  const prospect = await registerProspect(w, S1, "b10-r2-141-r.example");
+  const claimId = await submitClaim(w, S1, prospect);
+  const allocationId = await prepareAllocation(w, ag, prospect, [{ seller: S1, claimId, shareBps: 10000 }]);
+  await acceptAttribution(w, ag, allocationId, [claimId]);
+  const first = await settle(w, ag, await orderOf(w, ag, await foundingQuote(ag, "r141-r-first", 1)));
+  const entitlements = await convert(w, ag, allocationId);
+  const R = { ag, prospect, allocationId, first, entitlements };
   await accrue(w, R.ag, R.first, R.allocationId, { rateKind: "FIRST", rateBps: 1000, basisCents: 97125, poolCents: 9713, sequence: 1 }, [
     { sellerId: S1.sellerId, entitlementId: R.entitlements.get(S1.sellerId)!, shareBps: 10000, cents: 9713 },
   ]);
@@ -178,8 +238,8 @@ test("R2-141 (example 24): a display-name and owner e-mail change leaves the age
   });
   const before = await snapshot();
   assert.deepEqual(before.r.set, [R.first.projectId], "R's first purchase is the one project that makes its second repeat");
-  assert.equal(before.r.identity[0]?.first_qualifying_capture_id, R.first.captureId, "R's first designation");
-  assert.equal((await h.oracle.query("SELECT 1 FROM kauro.founding_slots WHERE live_agency_id = $1 AND held", [R.ag.agencyId])).rowCount, 1, "R's founding slot is consumed");
+  assert.equal((await h.oracle.query<{ first_capture_id: string }>("SELECT first_capture_id FROM kauro.agency_recurrence WHERE agency_id = $1", [R.ag.agencyId])).rows[0]?.first_capture_id, R.first.captureId, "R's first designation");
+  assert.deepEqual((await h.oracle.query("SELECT r.state, s.held FROM kauro.founding_slot_reservations r JOIN kauro.founding_slots s ON s.policy_version = r.policy_version AND s.slot_no = r.slot_no AND s.live_reservation_id = r.reservation_id WHERE r.agency_id = $1", [R.ag.agencyId])).rows, [{ state: "CONSUMED", held: true }], "R's founding slot is consumed");
 
   // the rename: the agency's display name and its owner's verification fact change (the platform's own records; no B10 row names either).
   // No runtime role edits them and no B10 command is the rename, so the support operation is made by the oracle with triggers off
@@ -220,7 +280,7 @@ test("R2-141 (example 24): a display-name and owner e-mail change leaves the age
     within(w.app, { agencyId: R.ag.agencyId, userId: R.ag.ownerUserId }, (c) =>
       new PgAgencyLifecycleRepository(c, ids).recordRelationshipDecision({ decisionId: ids.next() as RelationshipDecisionId, agencyId: R.ag.agencyId as never, relatedAgencyId: T.agencyId as never, treatment: "COMMON_CONTROL_RECORDED", evidenceHash: evidenceHash as never, reviewedBy: R.ag.ownerUserId as never, effectiveAt: clock.now(), decidedAt: clock.now() }),
     ),
-    refusedWith("42501"),
+    translatedRefusal("42501"),
   );
 
   // the decision merges nothing: no dataset, membership, designation, attribution or ledger row of either agency moved, neither's

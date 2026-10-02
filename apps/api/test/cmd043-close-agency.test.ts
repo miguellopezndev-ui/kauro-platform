@@ -86,7 +86,7 @@ async function paidProject(s: Selling, label: string): Promise<PaidPurchase> {
   return paidPurchase(pw.w.h, { agency: s.agency, planId: plan.planId as PlanId, route: pw.route, issuerRef: pw.issuerRef, profileId: s.profileId, treatment: "EXEMPT_EXPORT" });
 }
 
-const agencyRow = (agencyId: string) => pw.w.row<{ state: string; version: string }>("agencies", "agency_id = $1", [agencyId]);
+const agencyRow = async (agencyId: string) => (await pw.w.h.oracle.query<{ state: string; version: string }>("SELECT state, version::text AS version FROM kauro.agencies WHERE agency_id = $1", [agencyId])).rows[0] ?? null;
 
 async function close(s: Pick<Selling, "agency" | "owner">, options: { readonly token?: string; readonly key?: string; readonly expectedVersion?: number; readonly proof?: string; readonly agencyId?: string; readonly body?: Record<string, unknown> } = {}): Promise<Reply> {
   const version = options.expectedVersion ?? Number((await agencyRow(s.agency.agencyId))?.version);
@@ -276,16 +276,18 @@ test("OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency wi
 test("OK (new work stops): after CloseAgency the agency's ISSUED quote is WITHDRAWN with its founding reservation RELEASED, CreatePaymentOrder and CreateProject of the agency are refused AGENCY_NOT_ACTIVE, and its sellers' commission lines are unchanged with their edges to payment intact", async () => {
   const { w } = pw;
   const s = await sellingAgency("cmd043-stop");
-  // the seller acquired the agency before its first purchase (accepted allocation); the first purchase accrues its line (9713 of 97125
-  // at 1000 bps, example 1); a founding quote of a second project is ISSUED with its slot held
+  // the seller acquired the agency before its first purchase (accepted allocation); the first purchase accrues its line: 1000 bps of the
+  // service basis 52125 (CLEAN, 40,000 units: 69500 less the founding 17375) is 5212.5, rounded half up once to 5213; a founding quote of a
+  // second project is ISSUED with its slot held
   const acquired = await recordAcquisition(w.h, { agency: s.agency, ownerUserId: pw.kora.userId as UserId, name: "cmd043-stop" });
   const purchase = await paidProject(s, "cmd043-stop-paid");
-  const line = await recordFirstPurchaseLine(w.h, { acquired, authorizationId: purchase.authorizationId, captureId: purchase.captureId, projectId: purchase.projectId });
+  const line = await recordFirstPurchaseLine(w.h, { acquired, authorizationId: purchase.authorizationId, captureId: purchase.captureId, projectId: purchase.projectId, basisCents: 52125n, poolCents: 5213n });
+  assert.equal(purchase.serviceCents, 52125n, "the purchase's service is the basis the line is accrued on");
   const quote = await issuedQuote(s, "cmd043-stop-quote", { slotNo: 2 });
   assert.deepEqual((await w.h.oracle.query("SELECT state FROM kauro.founding_slot_reservations WHERE reservation_id = $1", [quote.reservationId])).rows, [{ state: "RESERVED" }]);
-  const linesOf = () => w.h.oracle.query("SELECT line_id, state, version, cumulative_entitlement_cents::text, previous_posted_cents::text, net_service_basis_cents::text, eligible_at, hold_id FROM kauro.commission_lines WHERE agency_id = $1 ORDER BY line_id", [s.agency.agencyId]).then((r) => JSON.stringify(r.rows));
+  const linesOf = () => w.h.oracle.query("SELECT row_to_json(l)::text AS row FROM kauro.commission_lines l WHERE agency_id = $1 ORDER BY line_id", [s.agency.agencyId]).then((r) => JSON.stringify(r.rows));
   const linesBefore = await linesOf();
-  assert.deepEqual(JSON.parse(linesBefore).map((l: { state: string; cumulative_entitlement_cents: string }) => [l.state, l.cumulative_entitlement_cents]), [["ACCRUED_PENDING", "9713"]]);
+  assert.deepEqual((JSON.parse(linesBefore) as Array<{ row: string }>).map((l) => JSON.parse(l.row) as { state: string; cumulative_entitlement_cents: string }).map((l) => [l.state, String(l.cumulative_entitlement_cents)]), [["ACCRUED_PENDING", "5213"]]);
 
   completed<AgencyClosureView>(await close(s), 200);
 
@@ -311,7 +313,7 @@ test("OK (new work stops): after CloseAgency the agency's ISSUED quote is WITHDR
   assert.equal(await linesOf(), linesBefore, "the closure wrote no commission line");
   const capture = await w.h.oracle.query<{ version: string }>("SELECT version::text FROM kauro.capture_facts WHERE capture_id = $1", [purchase.captureId]);
   await makeLineEligible(w.h, { agencyId: s.agency.agencyId, lineId: line.lineId, authorizationId: purchase.authorizationId, captureId: purchase.captureId, captureVersion: Number(capture.rows[0]!.version) });
-  assert.deepEqual((await w.h.oracle.query("SELECT state, cumulative_entitlement_cents::text, version::text FROM kauro.commission_lines WHERE line_id = $1", [line.lineId])).rows, [{ state: "ELIGIBLE", cumulative_entitlement_cents: "9713", version: "2" }]);
+  assert.deepEqual((await w.h.oracle.query("SELECT state, cumulative_entitlement_cents::text, version::text FROM kauro.commission_lines WHERE line_id = $1", [line.lineId])).rows, [{ state: "ELIGIBLE", cumulative_entitlement_cents: "5213", version: "2" }]);
   assert.equal(await w.count("commission_lines", "agency_id = $1", [s.agency.agencyId]), 1, "no line was deleted or added");
 });
 
@@ -359,7 +361,7 @@ test("DENY: another agency's closure is a foreign tenant (404) and a BILLING mem
   const uncertain = await close(u);
   assert.equal(outcome(w, uncertain), "409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED");
   assert.deepEqual(await footprint(u.agency.agencyId), before, "an uncertain refund: the agency and its obligations as they were");
-  assert.equal(await w.count("agency_closures"), 0, "no closure was recorded anywhere");
+  assert.equal(await w.count("agency_closures", "agency_id = ANY($1::uuid[])", [[s.agency.agencyId, u.agency.agencyId, stranger.agency.agencyId]]), 0, "no closure was recorded for any agency of this case");
 });
 
 test("RACE: an identical retry replays the 200, the same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT, CloseAgency racing CreatePaymentOrder of the agency's issued quote serializes on the agency in both orders — the order commits first and the closure is 409 CLOSURE_OBLIGATIONS_UNRECONCILED, or the closure commits first and the order is refused AGENCY_NOT_ACTIVE — and a crash before COMMIT leaves the agency ACTIVE", async () => {
@@ -369,28 +371,29 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   const quote = await issuedQuote(s, "cmd043-race-quote");
   const key = freshKey("cmd043-race");
   const proof = await w.stepUp(s.owner);
+  const version = Number((await agencyRow(s.agency.agencyId))!.version);
   const before = await footprint(s.agency.agencyId);
   w.holds.arm("journal.commit", { fail: new SimulatedCrash("before COMMIT") });
-  const crashed = await close(s, { key, proof });
+  const crashed = await close(s, { key, proof, expectedVersion: version });
   assert.equal(outcome(w, crashed), "500 INTERNAL_ERROR -");
   assert.deepEqual(await footprint(s.agency.agencyId), before, "the agency stays ACTIVE with its quote ISSUED and no closure record");
   assert.equal(await w.journal(key), null);
   // the retry under the same key closes it once; the identical retry replays the journaled 200 byte for byte
-  const first = await close(s, { key, proof });
+  const first = await close(s, { key, proof, expectedVersion: version });
   completed<AgencyClosureView>(first, 200);
   assert.equal(await w.count("agency_closures", "agency_id = $1", [s.agency.agencyId]), 1);
-  const replay = await close(s, { key, proof });
-  assert.equal(replay.status, 200);
+  const replay = await close(s, { key, proof, expectedVersion: version });
+  assert.equal(replay.status, 200, replay.text);
   assert.equal(replay.text, replayTextOf(first));
   assert.equal(await w.count("agency_closures", "agency_id = $1", [s.agency.agencyId]), 1, "the replay recorded no second closure");
   // the same key with another proof reference is another request: a conflict, and nothing happens
   const afterFirst = await footprint(s.agency.agencyId);
-  assert.equal(outcome(w, await close(s, { key, proof: await w.stepUp(s.owner) })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
+  assert.equal(outcome(w, await close(s, { key, proof: await w.stepUp(s.owner), expectedVersion: version })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
   assert.deepEqual(await footprint(s.agency.agencyId), afterFirst, "no effect");
   assert.equal((await w.row<{ state: string }>("quotes", "quote_id = $1", [quote.quoteId]))?.state, "WITHDRAWN");
 
-  // the order commits first: the order's intent holds the agency's shared half and waits before its commit; CloseAgency takes the agency's
-  // row lock and then the exclusive half, observed waiting in pg_stat_activity, reads the order once it commits and refuses
+  // the order commits first: the order's intent holds the agency (its shared half and its row, read for sharing) and waits before its
+  // commit; CloseAgency waits for the agency's row lock (observed in pg_stat_activity), reads the order once it commits and refuses
   const a = await sellingAgency("cmd043-race-order-first");
   const quoteA = await issuedQuote(a, "cmd043-race-order-first-quote");
   const proofA = await w.stepUp(a.owner);
@@ -399,7 +402,7 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   await hold.reached;
   const closing = close(a, { proof: proofA });
   try {
-    await waitForApiLockWait(w, "pg_advisory_xact_lock");
+    await waitForApiLockWait(w, "FROM kauro.agencies");
   } finally {
     hold.release();
   }
@@ -410,8 +413,8 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.equal(await w.count("payment_orders", "quote_id = $1", [quoteA.quoteId]), 1);
   assert.equal(await w.count("agency_closures", "agency_id = $1", [a.agency.agencyId]), 0);
 
-  // the closure commits first: it holds the agency's row and exclusive half until its commit; the order's intent waits for the shared
-  // half (observed), reads the agency CLOSING and is refused
+  // the closure commits first: it holds the agency's row and exclusive half until its commit; the order's journal reservation waits for
+  // the agency (observed), reads it CLOSING and is refused
   const b = await sellingAgency("cmd043-race-close-first");
   const quoteB = await issuedQuote(b, "cmd043-race-close-first-quote");
   const proofB = await w.stepUp(b.owner);
@@ -420,7 +423,7 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   await commit.reached;
   const ordersAfter = call(w, { url: paymentRoutes.createPaymentOrder(quoteB.quoteId), token: b.billing.token, agency: b.agency.agencyId, key: freshKey("cmd043-race-late-order"), body: { termsHash: quoteB.termsHash } });
   try {
-    await waitForApiLockWait(w, "await_transition");
+    await waitForApiLockWait(w, "INSERT INTO kauro.command_journal");
   } finally {
     commit.release();
   }

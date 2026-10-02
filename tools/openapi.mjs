@@ -121,7 +121,17 @@ export function runtimeSchemas(sources) {
     if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B09 request schema of ${command} collides with a served one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   }
-  const defs = { ...bundle.$defs, ...responses.defs, ...commerce.defs };
+  // package B10: the commercial commands' closed schemas, derived under the same rules over the earlier packages' views (a served route's
+  // components are generated below; the others stay out of the document until their command lane serves them)
+  const commercial = application.buildCommercialResponseSchemas(bundle, { ...responses.defs, ...commerce.defs });
+  for (const id of Object.keys(commercial.roots)) if (id in byId) throw new Error(`the B10 schema ${id} collides with an earlier package's`);
+  for (const name of Object.keys(commercial.defs)) if (name in responses.defs || name in commerce.defs) throw new Error(`the B10 view ${name} collides with an earlier package's`);
+  Object.assign(byId, commercial.roots);
+  for (const [command, schema] of Object.entries(application.COMMERCIAL_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B10 request schema of ${command} collides with an earlier one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
+  const defs = { ...bundle.$defs, ...responses.defs, ...commerce.defs, ...commercial.defs };
   return { byId, defs };
 }
 
@@ -447,6 +457,61 @@ export function generateOpenApi(sources) {
     };
     if (application.isServedCommerceRead(operationId)) serve("GET", spec.path, operation);
     else planned[`GET ${spec.path}`] = operation;
+  }
+
+  // package B10: the served commercial commands (docs/design/B10-commercial-domain.md §13; COMMERCIAL_SERVED_COMMAND_IDS), generated from the
+  // application contracts exactly as the payment routes are; a command no lane serves yet is not documented
+  for (const spec of Object.values(application.COMMERCIAL_COMMANDS)) {
+    if (!application.isServedCommercialCommand(spec.id)) continue;
+    const command = registryCommands.find((c) => c.id === spec.id);
+    if (!command) throw new Error(`${spec.id} is served but absent from the registry`);
+    if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
+      throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
+    }
+    const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
+    addComponent(`${spec.name}Request`, byId[requestId], requestId);
+    const reply = application.COMMERCIAL_COMMAND_RESPONSES[spec.id];
+    const replyId = application.commercialCommandResponseSchemaId(spec.id);
+    addComponent(`${spec.name}Completed`, byId[replyId], replyId);
+    const responses = {
+      [String(reply.status)]: {
+        description: `COMPLETED: ${command.effect}`,
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } },
+      },
+    };
+    Object.assign(responses, problemResponses(application.COMMERCIAL_COMMAND_OUTCOMES[spec.id]));
+    const contract = application.commercialCommandRouteResponses(spec.id);
+    const documented = Object.keys(responses).filter((status) => Number(status) < 400);
+    if (!isDeepStrictEqual(documented.sort(), Object.keys(contract.declared).sort())) throw new Error(`${spec.id}: the documented replies ${documented} differ from the route's ${Object.keys(contract.declared)}`);
+    serve(spec.method, spec.path, {
+      operationId: spec.name,
+      summary: `${spec.id} ${spec.name}`,
+      description: `Precondition: ${command.precondition}
+
+Effect: ${command.effect}
+
+Failure: ${command.failure}`,
+      "x-kauro-command": spec.id,
+      "x-kauro-role": spec.role,
+      "x-kauro-principal": spec.principal,
+      "x-kauro-runtime-role": spec.runtimeRole,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-idempotency": command.idempotency,
+      "x-kauro-step-up": spec.stepUp ? "REQUIRED" : "NEVER",
+      "x-kauro-gate": command.gate,
+      "x-kauro-cases": command.testIds ?? [],
+      "x-kauro-package": "B10",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
+        { $ref: "#/components/parameters/IdempotencyKey" },
+        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
+      responses,
+    });
   }
 
   for (const route of operationalRoutes) {

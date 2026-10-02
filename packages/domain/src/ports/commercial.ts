@@ -243,8 +243,17 @@ export interface AgencyLifecycleRepository {
   /** Appends an acceptance (append-only; the database checks the accepting OWNER membership and the published versions). */
   recordAcceptance(acceptance: NewAgreementAcceptance): Promise<AgreementAcceptanceRecord>;
   acceptancesOf(agencyId: AgencyId): Promise<ReadonlyArray<AgreementAcceptanceRecord>>;
-  /** The obligations inventory of a closure, read after the agency's row lock and exclusive half (D10-AGY-2, D10-AGY-4). */
-  closureObligations(agencyId: AgencyId): Promise<ClosureObligations>;
+  /**
+   * The obligations inventory of a closure, read after the agency's exclusive transition half (taken here, so a payment order or refund
+   * committing meanwhile is wholly seen; D10-AGY-2, D10-AGY-4). `activeWork` is B06's ActiveWorkInspector count of the agency (the
+   * handler sums it over the agency's clients); every other member is read in this call.
+   */
+  closureObligations(agencyId: AgencyId, activeWork: number): Promise<ClosureObligations>;
+  /**
+   * RESERVED or RECONCILIATION_HOLD → RELEASED (QUOTE_WITHDRAWN) of the founding reservation of a quote the caller has just WITHDRAWN,
+   * with its slot freed in the same transaction (KC014 refuses it otherwise); null when the quote holds none.
+   */
+  releaseFoundingReservation(quoteId: QuoteId): Promise<FoundingReservationId | null>;
   recordClosure(closure: NewAgencyClosure): Promise<AgencyClosureRecord>;
   closureOf(agencyId: AgencyId): Promise<AgencyClosureRecord | null>;
   /** Appends a reviewed relationship decision; it merges no dataset, membership, designation or attribution (R2-141). */

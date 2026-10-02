@@ -51,6 +51,7 @@ import type {
   CommandSpec,
   CommerceCommandHandler,
   CommerceReadHandler,
+  CommercialCommandHandler,
   CompletedResponse,
   IntakeHandler,
   IntakeResult,
@@ -81,6 +82,7 @@ import {
   commandRouteResponses,
   commerceCommandRouteResponses,
   commerceReadRouteResponses,
+  commercialCommandRouteResponses,
   correlationIdOf,
   envelopeOf,
   internalProblem,
@@ -88,6 +90,7 @@ import {
   isServedCommand,
   isServedCommerceCommand,
   isServedCommerceRead,
+  isServedCommercialCommand,
   problemOf,
   readRouteResponses,
   repeatedHeaderNames,
@@ -151,6 +154,14 @@ export interface ApiServerOptions {
   readonly commerce?: {
     readonly commands: ReadonlyArray<CommerceCommandHandler<unknown, unknown>>;
     readonly reads: ReadonlyArray<CommerceReadHandler<unknown>>;
+  };
+  /**
+   * The served routes of the agency recurrence and commission domain (package B10; docs/design/B10-commercial-domain.md §13): each
+   * command registered with its own admission spec and its declared replies, under the same admission pipeline, send guard and route
+   * inventory as the B06 and B09 routes. The command lanes of B10 each add the commands they serve (COMMERCIAL_SERVED_COMMAND_IDS).
+   */
+  readonly commercial?: {
+    readonly commands: ReadonlyArray<CommercialCommandHandler<unknown, unknown>>;
   };
   readonly authenticator: Authenticator;
   /**
@@ -470,6 +481,12 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     const spec = handler.spec;
     if (!isServedCommerceRead(spec.operationId)) throw new Error(`${spec.operationId} has a handler but is not a served B09 read (COMMERCE_SERVED_READ_IDS of @kauro/application)`);
     registerRead(app, options, handler.admission, commerceReadRouteResponses(spec.operationId), (request) => handler.execute(request), sink);
+  }
+  // package B10: each served commercial command with the spec its admission reads and the replies its closed catalogue declares
+  for (const handler of options.commercial?.commands ?? []) {
+    const spec = handler.spec;
+    if (!isServedCommercialCommand(spec.id)) throw new Error(`${spec.id} has a handler but is not a served B10 command (COMMERCIAL_SERVED_COMMAND_IDS of @kauro/application)`);
+    registerCommand(app, options, handler.admission, commercialCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress);
   }
   options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   return app;

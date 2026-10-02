@@ -189,6 +189,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/payment-orders/:orderId", "GetPaymentOrder", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetPaymentOrder" } }],
       ["GET", "/api/v1/refunds/:refundId", "GetRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefund" } }],
       ["GET", "/api/v1/operations/refunds/:refundId", "GetRefundReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefundReview" } }],
+      // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE): both complete synchronously, no 202
+      ["POST", "/api/v1/agencies/:agencyId/activate", "ActivateAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD002" } }],
+      ["POST", "/api/v1/agencies/:agencyId/closure-requests", "CloseAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD043" } }],
       // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
       // where a provider effect may stay unknown (CMD033)
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],

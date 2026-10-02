@@ -253,10 +253,10 @@ export interface RecordedLine {
 /**
  * The COMMISSIONS consumer's work for the agency's first purchase, as the commission service writes it in the agency it adopted: the
  * claim CONVERTED into its ACQUISITION entitlement (the window from the first designation to twelve calendar months later in
- * America/Bogota), and the pool and the ACCRUED_PENDING line of the first purchase at 1000 bps of the 97125 service basis — 9713 cents
- * (example 1), stated here as the example's integer cents.
+ * America/Bogota), and the pool and the ACCRUED_PENDING line of the first purchase at 1000 bps of the service basis the caller states —
+ * the pool's integer cents are the caller's too (a worked example's cents are written in the test, never computed here).
  */
-export async function recordFirstPurchaseLine(h: Harness, input: { readonly acquired: AcquiredAgency; readonly authorizationId: string; readonly captureId: string; readonly projectId: string }): Promise<RecordedLine> {
+export async function recordFirstPurchaseLine(h: Harness, input: { readonly acquired: AcquiredAgency; readonly authorizationId: string; readonly captureId: string; readonly projectId: string; readonly basisCents: bigint; readonly poolCents: bigint }): Promise<RecordedLine> {
   const { acquired } = input;
   const entitlementId = ids.next();
   const poolId = ids.next();
@@ -276,14 +276,14 @@ export async function recordFirstPurchaseLine(h: Harness, input: { readonly acqu
       await c.query(
         `INSERT INTO kauro.commission_pools (pool_id, agency_id, authorization_id, capture_id, confirmation_seq, project_id, source, allocation_id, rate_kind, rate_bps, initial_basis_cents, basis_cents, pool_cents,
            policy_version, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 1, $5, 'ACQUISITION', $6, 'FIRST', 1000, 97125, 97125, 9713, 'R2-INITIAL', now(), now())`,
-        [poolId, acquired.agencyId, input.authorizationId, input.captureId, input.projectId, acquired.allocationId],
+         VALUES ($1, $2, $3, $4, 1, $5, 'ACQUISITION', $6, 'FIRST', 1000, $7, $7, $8, 'R2-INITIAL', now(), now())`,
+        [poolId, acquired.agencyId, input.authorizationId, input.captureId, input.projectId, acquired.allocationId, input.basisCents.toString(), input.poolCents.toString()],
       );
       await c.query(
         `INSERT INTO kauro.commission_lines (line_id, agency_id, pool_id, entitlement_id, seller_id, authorization_id, capture_id, share_bps, rate_bps, net_service_basis_cents, cumulative_entitlement_cents,
            previous_posted_cents, policy_version, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 10000, 1000, 97125, 9713, 9713, 'R2-INITIAL', now(), now())`,
-        [lineId, acquired.agencyId, poolId, entitlementId, acquired.sellerId, input.authorizationId, input.captureId],
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 10000, 1000, $8, $9, $9, 'R2-INITIAL', now(), now())`,
+        [lineId, acquired.agencyId, poolId, entitlementId, acquired.sellerId, input.authorizationId, input.captureId, input.basisCents.toString(), input.poolCents.toString()],
       );
     }),
   );

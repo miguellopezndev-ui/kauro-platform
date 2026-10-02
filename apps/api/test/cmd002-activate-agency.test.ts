@@ -66,8 +66,8 @@ const bodyFor = (profileId: string, overrides: Record<string, unknown> = {}): Re
   ...overrides,
 });
 
-const agencyRow = (agencyId: string) =>
-  w.row<{ state: string; version: string; terms_version: string | null; privacy_agreement_version: string | null; legal_profile_ref: string | null }>("agencies", "agency_id = $1", [agencyId]);
+const agencyRow = async (agencyId: string) =>
+  (await w.h.oracle.query<{ state: string; version: string; terms_version: string | null; privacy_agreement_version: string | null; legal_profile_ref: string | null }>("SELECT state, version::text AS version, terms_version, privacy_agreement_version, legal_profile_ref FROM kauro.agencies WHERE agency_id = $1", [agencyId])).rows[0] ?? null;
 
 test("OK: the agency's OWNER activates its DRAFT agency with the published terms and privacy versions and its current reviewed billing profile — 200 with the agency ACTIVE at the next version, one append-only acceptance naming both versions, their document hashes and the membership, agency.activated.v1, and no capability written", async () => {
   const d = await draftAgency("cmd002-ok");
@@ -191,7 +191,7 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   completed<AgencyActivationView>(first, 200);
   assert.equal(await acceptancesOf(d.agency.agencyId), 1);
   const replay = await activate(d, { key, body });
-  assert.equal(replay.status, 200);
+  assert.equal(replay.status, 200, replay.text);
   assert.equal(replay.text, replayTextOf(first));
   assert.equal(await acceptancesOf(d.agency.agencyId), 1, "the replay recorded no second acceptance");
 
@@ -201,15 +201,16 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   assert.equal(await acceptancesOf(d.agency.agencyId), 1);
   assert.equal((await agencyRow(d.agency.agencyId))?.version, "2");
 
-  // two keys racing on one expectedVersion: A holds inside its unit of work with the agency's row locked; B blocks on the row lock
-  // (observed in pg_stat_activity), reads the agency at version 2 after A commits and answers STALE_VERSION with the current state
+  // two keys racing on one expectedVersion: A holds inside its unit of work with the agency's row written; B blocks on the agency's row
+  // already at its journal reservation (the entry's agency foreign key waits for A's transaction; observed in pg_stat_activity), reads
+  // the agency at version 2 after A commits and answers STALE_VERSION with the current state
   const racing = await draftAgency("cmd002-race-two");
   const hold = w.holds.arm("journal.commit");
   const requestA = activate(racing, { key: freshKey("cmd002-race-a"), body: bodyFor(racing.profileId) });
   await hold.reached;
   const requestB = activate(racing, { key: freshKey("cmd002-race-b"), body: bodyFor(racing.profileId) });
   try {
-    await waitForApiLockWait(w, "FOR UPDATE");
+    await waitForApiLockWait(w, "INSERT INTO kauro.command_journal");
   } finally {
     hold.release();
   }
