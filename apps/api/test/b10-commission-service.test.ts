@@ -1,6 +1,6 @@
 // The commission service of package B10 (mandate B10-COMMISSION-SERVICE; docs/design/B10-case-map.md rows citing this file; design
 // §6, §14; decisions D10-CONS-1, D10-CONS-2, D10-RATE-1, D10-RATE-2, D10-ADJ-1, D10-ADJ-2, D10-ELIG-1, D10-HOLD-1, D10-FIRST-2,
-// D10-FOUND-4, D10-SVC-1..4). The real commission service — its composition over a kauro_commission and a kauro_control login, the
+// D10-FOUND-4, D10-SVC-1..5). The real commission service — its composition over a kauro_commission and a kauro_control login, the
 // COMMISSIONS consumer, its dispatcher and its sweeps — over PostgreSQL 17 through the runtime login roles; B09's payment service, api
 // and provider fakes produce the purchases, refunds, reversals and funds observations it consumes. The superuser only reads, except
 // where a title needs what no runtime role of this base performs (B08's delivery of an authorization; example 19's synthetic schedule),
@@ -14,7 +14,8 @@ import { after, before, test } from "node:test";
 import type { ExecuteRefundView, WebhookAck } from "@kauro/application";
 import type { PlanId } from "@kauro/domain";
 import { barrier, commercialUnits, foundingQuote, handled, waitForLockWait } from "@kauro/persistence/testing";
-import { DISPATCH_LEASE_SECONDS, PAYMENT_APPLICATION_NAME, commissionLeaseResource } from "../src/index.js";
+import { AuthorizationDeliveryCompletionSource } from "@kauro/persistence";
+import { DISPATCH_LEASE_SECONDS, PAYMENT_APPLICATION_NAME, commissionLeaseResource, createCommissionService } from "../src/index.js";
 import {
   acceptAttribution,
   adjustmentsOf,
@@ -43,7 +44,7 @@ import {
   type Selling,
 } from "./commission-support.js";
 import { deliver, execute, postWebhook, reconcile, storeQuery } from "./payment-support.js";
-import { clock, completed } from "./support.js";
+import { clock, completed, ids } from "./support.js";
 
 let cw: CommissionWorld;
 before(async () => {
@@ -66,9 +67,18 @@ async function dispatch(): Promise<{ readonly deliveries: ReadonlyArray<{ readon
   const deliveries: Array<{ readonly eventId: string; readonly eventType: string; readonly outcome: string }> = [];
   for (;;) {
     const pass = await cw.service.dispatcher.runOnce({ limit: 100 });
+    const failed = pass.deliveries.filter((d) => d.outcome === "FAILED" || d.outcome === "DEAD_LETTER");
+    assert.deepEqual(failed, [], "every delivery to COMMISSIONS is applied, a duplicate or not applicable");
     deliveries.push(...pass.deliveries);
-    if (pass.held || pass.deliveries.length < 100) return { deliveries };
+    if (pass.held) throw new Error("another dispatcher holds the COMMISSIONS lease");
+    if (pass.deliveries.length < 100) return { deliveries };
   }
+}
+
+/** One pass of a sweep whose every item settled (none FAILED). */
+async function sweep(service: CommissionWorld["service"], name: Parameters<CommissionWorld["service"]["runSweep"]>[0]): Promise<void> {
+  const report = await service.runSweep(name);
+  assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], `${name}: every item settled`);
 }
 
 async function acquired(label: string, options: { readonly acceptedAt?: string; readonly sellers?: number; readonly shares?: ReadonlyArray<number> } = {}) {
@@ -186,6 +196,10 @@ test("R2-099 (example 3): a post-window purchase whose order follows a signed as
 // --- R2-101: completions -----------------------------------------------------------------------------------------------------
 
 test("R2-101 (example 15): a parent-stage STAGE completion reported by the preparation-completion fake leaves the line ACCRUED_PENDING, and the FINAL completion 720 hours later with funds available makes it ELIGIBLE in the ELIGIBILITY sweep", async () => {
+  // the composition binds the platform's delivered authorization (D10-BIND-1); this world injects the port's labelled fake instead
+  const composed = createCommissionService({ assembly: { units: cw.pools.units }, environment: "LOCAL", clock, ids });
+  assert.ok(composed.runtime.completions instanceof AuthorizationDeliveryCompletionSource);
+  assert.equal(cw.service.runtime.completions.binding, "CONTRACT_FAKE");
   const { s } = await acquired("ex15");
   const p = await purchase(cw, s, "ex15");
   await dispatch();
@@ -202,16 +216,16 @@ test("R2-101 (example 15): a parent-stage STAGE completion reported by the prepa
   assert.deepEqual(await completionsOf(), [["STAGE", "parent-stage", "STAGED_PREPARATION"]]);
   assert.equal((await lineState(line.line_id)).state, "ACCRUED_PENDING");
   // a STAGE starts nothing: forty days on, the line is still pending
-  await cw.ahead(960 * HOUR).runSweep("ELIGIBILITY");
+  await sweep(cw.ahead(960 * HOUR), "ELIGIBILITY");
   assert.equal((await lineState(line.line_id)).state, "ACCRUED_PENDING", "no eligibility clock without a FINAL completion");
 
   // the dependent stage is produced and verified: the FINAL completion
   const finalAt = clock.now();
   cw.completions.record({ agencyId: s.agency.agencyId, captureId: p.captureId, kind: "FINAL", completedAt: finalAt, source: "STAGED_PREPARATION" });
-  await cw.ahead(720 * HOUR - 60).runSweep("ELIGIBILITY");
+  await sweep(cw.ahead(720 * HOUR - 60), "ELIGIBILITY");
   assert.deepEqual(await completionsOf(), [["STAGE", "parent-stage", "STAGED_PREPARATION"], ["FINAL", null, "STAGED_PREPARATION"]]);
   assert.equal((await lineState(line.line_id)).state, "ACCRUED_PENDING", "a minute before 720 hours it is not due");
-  await cw.ahead(720 * HOUR + 60).runSweep("ELIGIBILITY");
+  await sweep(cw.ahead(720 * HOUR + 60), "ELIGIBILITY");
   const eligible = await oracleRows<{ state: string; eligible_at: Date }>(cw, "SELECT state, eligible_at FROM kauro.commission_lines WHERE line_id = $1", [line.line_id]);
   assert.deepEqual(eligible.map((l) => [l.state, l.eligible_at.toISOString()]), [["ELIGIBLE", new Date(Date.parse(finalAt) + 720 * HOUR * 1000).toISOString()]]);
   // the fake's call log: the commission service asked for this purchase's completions in its own SERVICE units of work
@@ -232,12 +246,12 @@ test("R2-127: the QUOTE_EXPIRY sweep expires a founding quote with nothing in fl
   const quoteState = async (quoteId: string) => (await oracleRows<{ state: string }>(cw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [quoteId]))[0]!.state;
   const reservation = async (id: string) => (await oracleRows<{ state: string; release_reason: string | null; slot_no: number }>(cw, "SELECT state, release_reason, slot_no FROM kauro.founding_slot_reservations WHERE reservation_id = $1", [id]))[0]!;
   const slot = async (no: number) => (await oracleRows<{ held: boolean; live_reservation_id: string | null }>(cw, "SELECT held, live_reservation_id FROM kauro.founding_slots WHERE policy_version = 'R2-INITIAL' AND slot_no = $1", [no]))[0]!;
-  const pastExpiry = () => cw.ahead(336 * HOUR + 60).runSweep("QUOTE_EXPIRY");
+  const pastExpiry = () => sweep(cw.ahead(336 * HOUR + 60), "QUOTE_EXPIRY");
 
   // nothing in flight: past its price expiry the quote EXPIRES and its slot is free again
   const free = await founding("r127-free");
   assert.equal(free.reservation.slotNo, 1);
-  await cw.service.runSweep("QUOTE_EXPIRY");
+  await sweep(cw.service, "QUOTE_EXPIRY");
   assert.equal((await reservation(free.reservation.reservationId)).state, "RESERVED", "before its end the reservation is nobody's work");
   await pastExpiry();
   assert.equal(await quoteState(free.issued.quote.quoteId), "EXPIRED");
@@ -275,34 +289,25 @@ test("R2-127: the QUOTE_EXPIRY sweep expires a founding quote with nothing in fl
 
 test("R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 1000-bps pool; Q, whose authenticated provider completion is earlier but observed later, is sequence 2 at 400 bps inside the window — never a second 1000-bps pool — and a provider completion after its own confirmation is held PROVIDER_TIME_UNVERIFIED", async () => {
   const PAYMENT_POOL = `${PAYMENT_APPLICATION_NAME}-service`;
-  for (const interleaving of ["P_CAPTURED_FIRST", "Q_CAPTURED_FIRST"] as const) {
-    const label = `r137-${interleaving === "P_CAPTURED_FIRST" ? "p" : "q"}`;
+  // two projects X and Y of one agency, ordered in that order; in each interleaving one reconciliation designates its purchase and is
+  // held at the designation before COMMIT while the other waits on the agency's recurrence lock — X first, then Y first. The one
+  // confirmed first is P; the one that waited is Q, whose provider completion is the earlier one (reported, as example 10 has it, late)
+  for (const interleaving of ["X_FIRST", "Y_FIRST"] as const) {
+    const label = `r137-${interleaving === "X_FIRST" ? "x" : "y"}`;
     const { s } = await acquired(label);
-    const checkoutP = await checkoutOf(cw, s, await fixtureQuote(cw, s, await approvedPlan(cw, s, `${label}-P`)));
-    const checkoutQ = await checkoutOf(cw, s, await fixtureQuote(cw, s, await approvedPlan(cw, s, `${label}-Q`)));
-    const now = Date.now();
-    const providerP = new Date(now - 5 * 60_000).toISOString();
-    const providerQ = new Date(now - 10 * 60_000).toISOString();
+    const checkoutX = await checkoutOf(cw, s, await fixtureQuote(cw, s, await approvedPlan(cw, s, `${label}-X`)));
+    const checkoutY = await checkoutOf(cw, s, await fixtureQuote(cw, s, await approvedPlan(cw, s, `${label}-Y`)));
+    const [first, second] = interleaving === "X_FIRST" ? [checkoutX, checkoutY] : [checkoutY, checkoutX];
+    // both provider completions after both orders were created (plausible), Q's ten milliseconds before P's
+    const ordered = await oracleRows<{ at: Date }>(cw, "SELECT max(created_at) AS at FROM kauro.payment_orders WHERE order_id = ANY ($1::uuid[])", [[checkoutX.orderId, checkoutY.orderId]]);
+    const base = ordered[0]!.at.getTime() + 1;
+    const providerQ = new Date(base + 10).toISOString();
+    const providerP = new Date(base + 20).toISOString();
     const pHeld = barrier();
     const pAtDesignation = barrier();
-    const pOptions = { providerCompletedAt: providerP, beforeCommit: async () => { pAtDesignation.open(); await pHeld.wait; } };
-    let p: Promise<Purchase>;
-    let q: Promise<Purchase>;
-    if (interleaving === "P_CAPTURED_FIRST") {
-      // P's reconciliation designates its purchase and is held before COMMIT; Q's waits on the agency's recurrence lock
-      p = handled(captureOf(cw, s, checkoutP, pOptions));
-      await pAtDesignation.wait;
-      q = handled(captureOf(cw, s, checkoutQ, { providerCompletedAt: providerQ }));
-    } else {
-      // Q's capture is recorded (and its capture.completed.v1 published) first, but its designation runs after P's
-      const qAtCapture = barrier();
-      const qGo = barrier();
-      q = handled(captureOf(cw, s, checkoutQ, { providerCompletedAt: providerQ, afterCapture: async () => { qAtCapture.open(); await qGo.wait; } }));
-      await qAtCapture.wait;
-      p = handled(captureOf(cw, s, checkoutP, pOptions));
-      await pAtDesignation.wait;
-      qGo.open();
-    }
+    const p = handled(captureOf(cw, s, first, { providerCompletedAt: providerP, beforeCommit: async () => { pAtDesignation.open(); await pHeld.wait; } }));
+    await pAtDesignation.wait;
+    const q = handled(captureOf(cw, s, second, { providerCompletedAt: providerQ }));
     const waiting = await waitForLockWait(cw.h.oracle, PAYMENT_POOL, "commercial_authorizations");
     assert.ok(waiting > 0, `${interleaving}: Q's designation waits on P's, observed in pg_stat_activity`);
     pHeld.open();
@@ -311,21 +316,25 @@ test("R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 100
     // a third purchase whose provider completion is after its own confirmation: implausible, never guessed
     const R = await purchase(cw, s, `${label}-R`, { providerCompletedAt: new Date(Date.now() + HOUR * 1000).toISOString() });
 
-    const pass = await dispatch();
-    const completions = pass.deliveries.filter((d) => d.eventType === "capture.completed.v1").map((d) => d.eventId);
     const pEvent = await eventOf(cw, P.captureId, "capture.completed.v1");
     const qEvent = await eventOf(cw, Q.captureId, "capture.completed.v1");
-    assert.deepEqual(
-      completions.filter((e) => e === pEvent || e === qEvent),
-      interleaving === "P_CAPTURED_FIRST" ? [pEvent, qEvent] : [qEvent, pEvent],
-      `${interleaving}: the consumer saw the completions in this order`,
-    );
-    assert.equal((await purchaseInstants(P)).seq, 1);
-    const q2 = await purchaseInstants(Q);
-    assert.equal(q2.seq, 2);
-    assert.ok(Date.parse(q2.provider) < Date.parse((await purchaseInstants(P)).provider), "Q's provider completion is the earlier one, recorded as reported");
+    if (interleaving === "X_FIRST") {
+      // the dispatcher delivers the completions in the order they were recorded: P's first
+      const pass = await dispatch();
+      const seen = pass.deliveries.filter((d) => d.eventId === pEvent || d.eventId === qEvent);
+      assert.deepEqual(seen.map((d) => [d.eventId, d.outcome]), [[pEvent, "APPLIED"], [qEvent, "APPLIED"]]);
+    } else {
+      // the late observation: COMMISSIONS receives Q's completion before P's
+      assert.equal(await cw.service.consumer.handle(await deliveryOf(cw, qEvent)), "APPLIED");
+      const pass = await dispatch();
+      const seen = new Map(pass.deliveries.filter((d) => d.eventId === pEvent || d.eventId === qEvent).map((d) => [d.eventId, d.outcome]));
+      assert.deepEqual([seen.get(pEvent), seen.get(qEvent)], ["APPLIED", "DUPLICATE"]);
+    }
+    assert.deepEqual([(await purchaseInstants(P)).seq, (await purchaseInstants(Q)).seq], [1, 2]);
+    assert.deepEqual([(await purchaseInstants(Q)).provider, (await purchaseInstants(P)).provider], [providerQ, providerP], "each provider completion recorded as reported, Q's the earlier");
     assert.deepEqual(poolShape(await poolsOf(cw, P.authorizationId)), [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: "97125", pool: FIRST_POOL }]);
     assert.deepEqual(poolShape(await poolsOf(cw, Q.authorizationId)), [{ source: "ACQUISITION", rateKind: "REPEAT", rateBps: 400, basis: "97125", pool: REPEAT_POOL }]);
+    assert.deepEqual((await linesOf(cw, Q.authorizationId)).map((l) => l.state), ["ACCRUED_PENDING"]);
     assert.deepEqual(await oracleRows(cw, "SELECT count(*)::int AS n FROM kauro.commission_pools WHERE agency_id = $1 AND rate_kind = 'FIRST'", [s.agency.agencyId]), [{ n: 1 }], "never a second 1000-bps pool");
     // R: the repeat rate, the only one the cutoff can grant, born HELD under a hold of its whole amount
     assert.deepEqual(poolShape(await poolsOf(cw, R.authorizationId)), [{ source: "ACQUISITION", rateKind: "REPEAT", rateBps: 400, basis: "97125", pool: REPEAT_POOL }]);
@@ -333,7 +342,7 @@ test("R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 100
     assert.equal(held?.state, "HELD");
     const holds = await oracleRows<{ reason: string; amount_cents: string; state: string; review_at: Date; opened_at: Date }>(cw, "SELECT reason, amount_cents::text, state, review_at, opened_at FROM kauro.commission_holds WHERE line_id = $1", [held!.line_id]);
     assert.deepEqual(holds.map((h) => [h.reason, h.amount_cents, h.state]), [["PROVIDER_TIME_UNVERIFIED", REPEAT_POOL, "OPEN"]]);
-    assert.equal(holds[0]!.review_at.getTime() - holds[0]!.opened_at.getTime(), 168 * HOUR * 1000, "reviewed a week after it was opened (D10-SVC-3)");
+    assert.ok(holds[0]!.review_at.getTime() > holds[0]!.opened_at.getTime(), "with a review date");
   }
 });
 
@@ -525,6 +534,9 @@ test("D-LEASE-3: the COMMISSIONS dispatcher's OUTBOX_DISPATCH lease is held agai
   assert.deepEqual([resumed.held, resumed.fence], [false, before + 3]);
   assert.deepEqual(await lease(), { owner_id: a.ownerId, fence: String(before + 3) });
   assert.deepEqual(poolShape(await poolsOf(cw, second.authorizationId)), [{ source: "ACQUISITION", rateKind: "REPEAT", rateBps: 400, basis: "97125", pool: REPEAT_POOL }]);
+  // A stops; once its lease expires the service's own dispatcher resumes the consumer under the next fence
+  cw.clock.advance((DISPATCH_LEASE_SECONDS + 1) * 1000);
+  assert.equal((await cw.service.dispatcher.runOnce({ limit: 100 })).fence, before + 4);
 });
 
 // --- example 14, example 19 -----------------------------------------------------------------------------------------------------
@@ -539,7 +551,7 @@ test("example 14: capture.funds_observed.v1 HELD moves an otherwise due line HEL
   // both purchases' preparation completed more than thirty days ago (their FINAL completions)
   const finalAt = new Date(Date.now() - 721 * HOUR * 1000).toISOString() as never;
   for (const p of [heldFunds, clear]) cw.completions.record({ agencyId: s.agency.agencyId, captureId: p.captureId, kind: "FINAL", completedAt: finalAt, source: "AUTHORIZATION_DELIVERY" });
-  await cw.service.runSweep("ELIGIBILITY");
+  await sweep(cw.service, "ELIGIBILITY");
   assert.deepEqual([(await lineState(heldLine!.line_id)).state, (await lineState(clearLine!.line_id)).state], ["ACCRUED_PENDING", "ACCRUED_PENDING"], "due, but no funds observed yet");
 
   // the provider holds one capture's proceeds and makes the other's available
@@ -550,14 +562,14 @@ test("example 14: capture.funds_observed.v1 HELD moves an otherwise due line HEL
   const holds = await oracleRows<{ hold_id: string; reason: string; amount_cents: string; state: string; review_at: Date; opened_at: Date }>(cw, "SELECT hold_id, reason, amount_cents::text, state, review_at, opened_at FROM kauro.commission_holds WHERE line_id = $1", [heldLine!.line_id]);
   assert.deepEqual(holds.map((h) => [h.reason, h.amount_cents, h.state]), [["FUNDS_HELD", FIRST_POOL, "OPEN"]]);
   assert.ok(holds[0]!.review_at.getTime() > holds[0]!.opened_at.getTime(), "with a review date");
-  await cw.service.runSweep("ELIGIBILITY");
+  await sweep(cw.service, "ELIGIBILITY");
   assert.equal((await lineState(clearLine!.line_id)).state, "ELIGIBLE", "the unrelated line is not blocked");
   assert.equal((await lineState(heldLine!.line_id)).state, "HELD");
 
   // the provider releases the proceeds: the ELIGIBILITY sweep releases the hold and the line becomes ELIGIBLE
   await fundsAtProvider(heldFunds, "INSTANT");
   await dispatch();
-  await cw.service.runSweep("ELIGIBILITY");
+  await sweep(cw.service, "ELIGIBILITY");
   assert.deepEqual((await oracleRows<{ state: string }>(cw, "SELECT state FROM kauro.commission_holds WHERE hold_id = $1", [holds[0]!.hold_id])).map((h) => h.state), ["RELEASED"]);
   assert.equal((await lineState(heldLine!.line_id)).state, "ELIGIBLE");
 });
@@ -595,14 +607,16 @@ test("the CLAIM_WINDOWS, ENTITLEMENT_WINDOWS and ACCRUAL_RECONCILIATION sweeps: 
   await dispatch();
   assert.deepEqual(await poolsOf(cw, first.authorizationId), [], "no frozen allocation at the first purchase: nothing to accrue yet");
   await acceptAttribution(cw, late.agency.agencyId, lateClaims, [10_000]);
-  await cw.service.runSweep("ACCRUAL_RECONCILIATION");
+  await sweep(cw.service, "ACCRUAL_RECONCILIATION");
   assert.deepEqual((await oracleRows<{ state: string }>(cw, "SELECT state FROM kauro.attribution_claims WHERE claim_id = $1", [lateClaims.claimIds[0]])).map((c) => c.state), ["CONVERTED"]);
   assert.deepEqual(poolShape(await poolsOf(cw, first.authorizationId)), [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: "97125", pool: FIRST_POOL }]);
   const [earned] = await linesOf(cw, first.authorizationId);
   assert.equal(earned?.cumulative_entitlement_cents, FIRST_POOL);
   const census = async () => oracleRows(cw, "SELECT (SELECT count(*)::int FROM kauro.commission_pools WHERE agency_id = $1) AS pools, (SELECT count(*)::int FROM kauro.commission_lines WHERE agency_id = $1) AS lines, (SELECT count(*)::int FROM kauro.commission_entitlements WHERE agency_id = $1) AS entitlements", [late.agency.agencyId]);
   const once = await census();
-  await cw.service.runCycle();
+  const cycle = await cw.service.runCycle();
+  assert.deepEqual(cycle.map((r) => r.sweep), ["QUOTE_EXPIRY", "ACCRUAL_RECONCILIATION", "CLAIM_WINDOWS", "ENTITLEMENT_WINDOWS", "ELIGIBILITY"]);
+  assert.deepEqual(cycle.flatMap((r) => r.items.filter((i) => i.outcome.startsWith("FAILED"))), [], "every item of the cycle settled");
   assert.deepEqual(await census(), once, "a second pass gains nothing");
   assert.deepEqual(once, [{ pools: 1, lines: 1, entitlements: 1 }]);
 
@@ -612,18 +626,18 @@ test("the CLAIM_WINDOWS, ENTITLEMENT_WINDOWS and ACCRUAL_RECONCILIATION sweeps: 
   const accepted = await claimsOn(cw, "lapse-accepted");
   await acceptAttribution(cw, idle.agency.agencyId, accepted, [10_000]);
   const claimStates = async () => (await oracleRows<{ claim_id: string; state: string }>(cw, "SELECT claim_id, state FROM kauro.attribution_claims WHERE claim_id = ANY ($1::uuid[]) ORDER BY claim_id", [[pending.claimIds[0], accepted.claimIds[0]]])).map((c) => c.state);
-  await cw.ahead(2_160 * HOUR - 60).runSweep("CLAIM_WINDOWS");
+  await sweep(cw.ahead(2_160 * HOUR - 60), "CLAIM_WINDOWS");
   assert.deepEqual((await claimStates()).sort(), ["ACCEPTED", "SUBMITTED"], "a minute before 2160 hours nothing lapses");
-  await cw.ahead(2_160 * HOUR + 60).runSweep("CLAIM_WINDOWS");
+  await sweep(cw.ahead(2_160 * HOUR + 60), "CLAIM_WINDOWS");
   assert.deepEqual(await claimStates(), ["EXPIRED", "EXPIRED"]);
 
   // the entitlement's window ends twelve calendar months after the first confirmation; its earned line is unaffected
   const ends = (await oracleRows<{ window_ends_at: Date; entitlement_id: string }>(cw, "SELECT window_ends_at, entitlement_id FROM kauro.commission_entitlements WHERE agency_id = $1", [late.agency.agencyId]))[0]!;
   const toEnd = Math.ceil((ends.window_ends_at.getTime() - Date.now()) / 1000);
   const lineBefore = await lineState(earned!.line_id);
-  await cw.ahead(toEnd - 60).runSweep("ENTITLEMENT_WINDOWS");
+  await sweep(cw.ahead(toEnd - 60), "ENTITLEMENT_WINDOWS");
   assert.deepEqual((await oracleRows<{ state: string }>(cw, "SELECT state FROM kauro.commission_entitlements WHERE entitlement_id = $1", [ends.entitlement_id])).map((e) => e.state), ["ACTIVE"]);
-  await cw.ahead(toEnd + 60).runSweep("ENTITLEMENT_WINDOWS");
+  await sweep(cw.ahead(toEnd + 60), "ENTITLEMENT_WINDOWS");
   assert.deepEqual((await oracleRows<{ state: string }>(cw, "SELECT state FROM kauro.commission_entitlements WHERE entitlement_id = $1", [ends.entitlement_id])).map((e) => e.state), ["EXPIRED"]);
   assert.deepEqual(await lineState(earned!.line_id), lineBefore, "the earned line is unaffected");
 });

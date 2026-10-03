@@ -548,7 +548,7 @@ export interface Purchase {
 export interface CaptureOptions {
   /** The reconciliation's confirmation instant: the payment service's transaction stands there on the labelled TEST CLOCK. */
   readonly confirmedAt?: string;
-  /** The provider's authenticated completion instant (default: the provider fake's now). */
+  /** The provider's authenticated completion instant (default: now, before the reconciliation's transaction begins). */
   readonly providerCompletedAt?: string;
   /** Runs after the capture fact is recorded, before the authorization (and its designation) is issued — inside the transaction. */
   readonly afterCapture?: () => Promise<void>;
@@ -565,8 +565,10 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
   const { pw } = cw;
   const route = pw.route;
   const { quote } = checkout;
+  // the provider completed the capture before the payment service learned of it (default: now, before the reconciliation begins)
+  const providerCompletedAt = (options.providerCompletedAt ?? clock.now()) as UtcInstant;
   pw.paypal.approve(checkout.providerOrderId);
-  const providerCaptureId = pw.paypal.captureAtProvider(checkout.providerOrderId, options.providerCompletedAt !== undefined ? { completedAt: options.providerCompletedAt as UtcInstant } : {});
+  const providerCaptureId = pw.paypal.captureAtProvider(checkout.providerOrderId, { completedAt: providerCompletedAt });
   const service: ServiceContext = { kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId };
   const paid = await pw.pools.commerce.run(service, async (uow) => {
     if ((await uow.adoptScope("PAYMENT_ORDER", checkout.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
@@ -589,7 +591,7 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
       amountCents: quote.totalCents,
       allocation: { serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0n },
       fundsState: "UNKNOWN",
-      providerCompletedAt: (options.providerCompletedAt ?? now) as UtcInstant,
+      providerCompletedAt,
       firstObservationSource: "WEBHOOK",
       observedAt: now,
       evidenceHash: sha(`capture-evidence-${captureId}`),
