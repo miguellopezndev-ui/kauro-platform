@@ -506,7 +506,7 @@ test("CMD051 through the adapters: the cutoff hash KAURO_COMMISSION_CUTOFF_V1 ov
     assert.equal(current.state, "OPEN");
     const inputs = await statements.periodInputs(period as never, cutoffAt);
     const hash = commissionCutoffHash({ periodId: period as never, cutoffAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds });
-    assert.equal(inputs.undeliveredBeforeCutoff, null, "the commission service cannot read the COMMISSIONS outbox: unobservable, never reconciled by default");
+    assert.equal(typeof inputs.undeliveredBeforeCutoff, "number", "the commission service reads its COMMISSIONS records since migration 0034 (D10-STMT-4): the count, never zero for want of a read");
     const done = await statements.closePeriod(period as never, current.version, hash, clock.now());
     assert.equal(done.kind, "APPLIED");
     return { done, hash };

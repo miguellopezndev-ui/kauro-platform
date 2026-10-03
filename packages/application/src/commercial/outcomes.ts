@@ -9,8 +9,17 @@ import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type Proble
 import { CREATE_QUOTE_OUTCOMES } from "./quotes/outcomes.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
 import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
+import type { CommercialReadOperationId } from "./response-schemas.js";
+import {
+  APPROVE_COMMISSION_PAYOUT_OUTCOMES,
+  CLOSE_COMMISSION_PERIOD_OUTCOMES,
+  COMMISSION_SERVICE_ACCESS,
+  EVERY_SERVICE_ROUTE,
+  GET_COMMISSION_STATEMENT_OUTCOMES,
+  RECONCILE_COMMISSION_PAYOUT_OUTCOMES,
+} from "./statements/outcomes.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, NO_QUERY } = OUTCOME_BLOCKS;
 
 /** The corporate principals of the sales commands (D10-CTX-1, D10-CTX-2): a person without the ACTIVE seller row or owner grant the command needs. */
 const CORPORATE_ACCESS: ReadonlyArray<ProblemOutcome> = Object.freeze([
@@ -83,4 +92,13 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD050: closedCatalogue("CMD050", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...TERMINATE_SELLER_OUTCOMES]),
   // CreateQuote (B10-COMMANDS-QUOTE): the agency is selected by the header and the project is the path id
   CMD027: closedCatalogue("CMD027", [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...CREATE_QUOTE_OUTCOMES]),
+  // the statement and payout commands (B10-STATEMENTS-PAYOUTS): the commission group's service routes and the owner's approval
+  CMD051: closedCatalogue("CMD051", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...CLOSE_COMMISSION_PERIOD_OUTCOMES]),
+  CMD052: closedCatalogue("CMD052", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...APPROVE_COMMISSION_PAYOUT_OUTCOMES]),
+  CMD053: closedCatalogue("CMD053", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...RECONCILE_COMMISSION_PAYOUT_OUTCOMES]),
+});
+
+/** The closed problem catalogue of each served B10 read route (GetCommissionStatement: no query, the path id, the seller's or owner's access). */
+export const COMMERCIAL_READ_OUTCOMES: Readonly<Record<CommercialReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  GetCommissionStatement: closedCatalogue("GetCommissionStatement", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...GET_COMMISSION_STATEMENT_OUTCOMES]),
 });

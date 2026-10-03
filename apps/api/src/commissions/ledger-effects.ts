@@ -40,7 +40,7 @@ import {
   type PurchaseCompletionId,
   type QualifyingPurchaseRecord,
 } from "@kauro/domain";
-import { attributionOf, ledgerOf, recurrenceOf, salesOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
+import { attributionOf, commissionWorkOf, ledgerOf, recurrenceOf, salesOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
 import { COMMISSION_SERVICE_ID, HOLD_REVIEW_HOURS, type CommissionRuntime } from "./runtime.js";
 
 /** The server's instant of the unit of work (kauro.server_now(), D10-CLOCK-1), as the domain's canonical instant (milliseconds). */
@@ -270,6 +270,8 @@ export async function accruePurchase(rt: CommissionRuntime, uow: PgCommercialUni
 export async function applyBasisChange(uow: PgCommercialUnitOfWork, captureId: CaptureId, change: BasisChange, sourceEventId: EventId, now: UtcInstant): Promise<number> {
   const ledger = ledgerOf(uow);
   let changed = 0;
+  // the open periods first (design §10; D10-STMT-4): a basis change serializes with a close, its adjustment in that statement or the next
+  await commissionWorkOf(uow).shareOpenPeriods();
   for (const { pool, lines } of await ledger.lockPoolsOfCapture(captureId)) {
     const recomputed = recomputePool(
       { basisCents: pool.basisCents, rateBps: pool.rateBps, lines: lines.map((l) => ({ lineId: l.lineId, sellerId: l.sellerId, shareBps: l.shareBps, cumulativeCents: l.cumulativeEntitlementCents })) },

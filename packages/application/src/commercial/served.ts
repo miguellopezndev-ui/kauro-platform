@@ -10,6 +10,8 @@
  *
  * B10-COMMANDS-SELLERS serves CMD048 AssignAccount, CMD049 ActivateSeller and CMD050 TerminateSeller, each answering 200 with its view.
  * B10-COMMANDS-QUOTE serves CMD027 CreateQuote, answering 201 with its view.
+ * B10-STATEMENTS-PAYOUTS serves CMD051 CloseCommissionPeriod and CMD053 ReconcileCommissionPayout (the commission group's service routes),
+ * CMD052 ApproveCommissionPayout (the owner's) and the read GetCommissionStatement, each command answering 200 with its view.
  * B10-AGENCY-LIFECYCLE serves CMD002 ActivateAgency and CMD043 CloseAgency. Both answer 200 with their COMPLETED envelope (the agency is the
  * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202.
  */
@@ -17,11 +19,11 @@ import { HEADERS } from "../api/envelope.js";
 import { PROBLEM_RESPONSE, type DeclaredResponse, type RouteResponses } from "../api/response-contract.js";
 import type { KnownSchemaId } from "../ports/schema-validator.js";
 import { COMMERCIAL_COMMANDS } from "./contracts.js";
-import { COMMERCIAL_COMMAND_OUTCOMES } from "./outcomes.js";
-import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, type CommercialServedCommandId } from "./response-schemas.js";
+import { COMMERCIAL_COMMAND_OUTCOMES, COMMERCIAL_READ_OUTCOMES } from "./outcomes.js";
+import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, commercialReadResponseSchemaId, type CommercialReadOperationId, type CommercialServedCommandId } from "./response-schemas.js";
 
 /** The B10 commands the api serves. */
-export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
+export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
 export type CommercialServedRouteCommandId = (typeof COMMERCIAL_SERVED_COMMAND_IDS)[number];
 
 export function isServedCommercialCommand(id: string): id is CommercialServedRouteCommandId {
@@ -59,6 +61,10 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
   CMD050: [],
   // CreateQuote: the quote's own versions, the superseded unpaid quote's, and — of an included replacement — the payment service's re-binding
   // and the withdrawal of a replacement it refused
+  // the statement and payout commands: corporate aggregates publish no event (D10-EVT-1); their transitions are commercial_transitions
+  CMD051: [],
+  CMD052: [],
+  CMD053: [],
   CMD027: [
     "quote.drafted.v1",
     "quote.issued.v1",
@@ -69,3 +75,21 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
     "commercial_authorization.issued.v1",
   ],
 });
+
+/** The B10 reads the api serves (design §13): GetCommissionStatement since B10-STATEMENTS-PAYOUTS. */
+export const COMMERCIAL_SERVED_READ_IDS = Object.freeze(["GetCommissionStatement"] as const satisfies ReadonlyArray<CommercialReadOperationId>);
+
+export function isServedCommercialRead(id: string): id is CommercialReadOperationId {
+  return (COMMERCIAL_SERVED_READ_IDS as ReadonlyArray<string>).includes(id);
+}
+
+/** The declared replies of a served B10 read route: its READ envelope at 200 and the Problem document of its closed catalogue. */
+export function commercialReadRouteResponses(operationId: CommercialReadOperationId): RouteResponses {
+  if (!isServedCommercialRead(operationId)) throw new TypeError(`${operationId} is not a served commercial read (COMMERCIAL_SERVED_READ_IDS)`);
+  return Object.freeze({
+    operationId,
+    declared: Object.freeze({ "200": Object.freeze({ contentType: HEADERS.contentType, schemaId: commercialReadResponseSchemaId(operationId) as KnownSchemaId }) }),
+    problem: PROBLEM_RESPONSE,
+    outcomes: COMMERCIAL_READ_OUTCOMES[operationId],
+  });
+}

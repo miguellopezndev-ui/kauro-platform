@@ -126,6 +126,34 @@ export class PgCommissionWork {
     return r.rows.map((x) => ({ lineId: x.line_id as CommissionLineId, agencyId: x.agency_id as AgencyId, version: int(x.version), reviewAt: x.review_at === null ? null : instantOf(x.review_at) }));
   }
 
+  // --- periods and statements (mandate B10-STATEMENTS-PAYOUTS; decision D10-STMT-4) -------------------------------------------------
+
+  /**
+   * Every OPEN commission period FOR SHARE: a basis change takes it before its pools and lines (design §10: commission period before
+   * statement, payout intent and line), so it serializes with a period's close, which holds the period FOR UPDATE — the adjustment is
+   * in that close's statement or the next one, never both or neither. Concurrent basis changes share it. Answers how many it holds.
+   */
+  async shareOpenPeriods(): Promise<number> {
+    const r = await execute<{ period_id: string }>(this.db, "SELECT period_id FROM kauro.commission_periods WHERE state = 'OPEN' ORDER BY period_month FOR SHARE");
+    return r.rows.length;
+  }
+
+  /** The OPEN periods whose month has ended on the server's clock, oldest first: the PERIODS sweep proposes their close. */
+  async endedOpenPeriods(limit: number): Promise<ReadonlyArray<{ readonly periodId: string; readonly month: string }>> {
+    const r = await execute<{ period_id: string; month: string }>(
+      this.db,
+      "SELECT period_id, to_char(period_month, 'YYYY-MM') AS month FROM kauro.commission_periods WHERE state = 'OPEN' AND ends_at <= kauro.server_now() ORDER BY period_month LIMIT $1",
+      [limit],
+    );
+    return r.rows.map((row) => ({ periodId: row.period_id, month: row.month }));
+  }
+
+  /** The adjustments an issued statement already reports (statement_items ADJUSTMENT): a close reports each adjustment once. */
+  async reportedAdjustments(): Promise<ReadonlySet<string>> {
+    const r = await execute<{ adjustment_id: string }>(this.db, "SELECT DISTINCT adjustment_id FROM kauro.statement_items WHERE item_kind = 'ADJUSTMENT' AND adjustment_id IS NOT NULL");
+    return new Set(r.rows.map((row) => row.adjustment_id));
+  }
+
   /**
    * Runs one write the database may refuse under a savepoint, so a refusal leaves the unit of work usable: the value, or the refusal.
    * Only for a refusal the caller answers (a guard it cannot read beforehand); anything else it rethrows.

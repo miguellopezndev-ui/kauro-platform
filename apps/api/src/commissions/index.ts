@@ -66,3 +66,7 @@ export { commissionLeaseResource, createCommissionDispatcher } from "./dispatche
 export type { CommissionDispatcher, CommissionDispatchPass, CommissionDeliveryOutcome } from "./dispatcher.js";
 export { COMMISSION_SWEEPS, runSweep } from "./sweeps.js";
 export type { CommissionSweepName, CycleSweep, SweepReport } from "./sweeps.js";
+// mandate B10-STATEMENTS-PAYOUTS: the commission group's service routes (CMD051, CMD053) and the PERIODS sweep
+export { registerCommissionRoutes, statementServiceRuntime } from "./routes.js";
+export type { CommissionRoutesBinding, CommissionRouteDependencies } from "./routes.js";
+export { createPeriodsSweep, periodCloseKey } from "./periods.js";

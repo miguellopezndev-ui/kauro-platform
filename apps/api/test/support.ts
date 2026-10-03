@@ -60,7 +60,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
-import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type DatabaseHandle, type PaymentService, type RequestUnitOfWorkFactory } from "../src/index.js";
+import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, openDatabase, activeWorkInspector, subjectOf, type CommissionRoutesBinding, type DatabaseHandle, type PaymentService, type RequestUnitOfWorkFactory } from "../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 
@@ -485,6 +485,12 @@ export interface WorldOptions {
    * (test/payment-support.ts paymentWorld({ requestSide: true })).
    */
   readonly payments?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly service: PaymentService; close(): Promise<void> }>;
+  /**
+   * Package B10 (mandate B10-STATEMENTS-PAYOUTS): the commission group's service routes the api binds (ApiAssembly.commissions: the
+   * commission service's units of work, the labelled banking-calendar and payout-evidence fakes, the service commands' hold), built over
+   * the harness before the server is assembled and closed by stop() after the server, before the database (test/statements-support.ts).
+   */
+  readonly commissions?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly binding: CommissionRoutesBinding; close(): Promise<void> }>;
 }
 
 export interface RawEvent {
@@ -527,6 +533,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: commercialScopeInspector };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
   const payments = options.payments !== undefined ? await options.payments(h, db) : null;
+  const commissions = options.commissions !== undefined ? await options.commissions(h, db) : null;
 
   const base: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
@@ -560,6 +567,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     ...(options.quotes !== undefined ? { quotes: options.quotes(h) } : {}),
     ...(payments !== null ? { payments: payments.service } : {}),
+    ...(commissions !== null ? { commissions: commissions.binding } : {}),
     validator,
     clock: options.clock ?? processClock,
     ids,
@@ -842,6 +850,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     async stop() {
       await app.close();
       if (payments !== null) await payments.close();
+      if (commissions !== null) await commissions.close();
       await db.close();
       await h.stop();
     },

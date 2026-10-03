@@ -716,7 +716,8 @@ export class PgStatementRepository implements StatementRepository {
    * read, and an unobservable input is unreconciled, never reconciled (CMD051 INPUTS_UNRECONCILED).
    */
   private async undeliveredBefore(cutoffAt: UtcInstant): Promise<number | null> {
-    const sees = await execute<{ ok: boolean }>(this.db, "SELECT pg_has_role(current_user, 'kauro_control', 'USAGE') AS ok");
+    // the commission service reads the COMMISSIONS records themselves since migration 0034 (outbox_records_commission_inputs; D10-STMT-4)
+    const sees = await execute<{ ok: boolean }>(this.db, "SELECT pg_has_role(current_user, 'kauro_control', 'USAGE') OR pg_has_role(current_user, 'kauro_commission', 'USAGE') AS ok");
     if (sees.rows[0]?.ok !== true) return null;
     const r = await execute<{ n: string }>(this.db, "SELECT count(*)::text AS n FROM kauro.outbox_records WHERE consumer = 'COMMISSIONS' AND state <> 'DELIVERED' AND created_at < $1::timestamptz", [cutoffAt]);
     return int(r.rows[0]?.n ?? "0");

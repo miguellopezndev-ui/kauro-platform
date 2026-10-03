@@ -38,6 +38,7 @@ import type { PaymentService } from "./payments/index.js";
 import { createPurchaseRebinder } from "./payments/rebinder.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
 import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
+import type { CommissionRoutesBinding } from "./commissions/routes.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -248,6 +249,14 @@ export interface ApiAssembly {
    * when one is bound) and the test-only hold of the replacement protocol. The acceptance tests bind the labelled contract fakes here.
    */
   readonly quotes?: Partial<QuoteCollaborators>;
+  /**
+   * The commission group's service commands of package B10 (commissions/routes.ts; mandate B10-STATEMENTS-PAYOUTS): CloseCommissionPeriod
+   * (CMD051) and ReconcileCommissionPayout (CMD053) run in the commission service's units of work (openCommissionPools), with the
+   * platform's banking calendar and payout evidence (RecordedBankingCalendarSource, UnavailablePayoutEvidenceVerifier; D10-BIND-1) unless
+   * the binding names others. Their routes are registered in every edition; without a binding they find no verified service identity.
+   * The acceptance tests bind the labelled contract fakes of @kauro/application/testing here, never the production wiring.
+   */
+  readonly commissions?: CommissionRoutesBinding;
 }
 
 /**
