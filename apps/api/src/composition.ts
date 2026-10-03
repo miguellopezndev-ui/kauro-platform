@@ -20,21 +20,22 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
-import { UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createProspectHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated, createSellerCommandHandlers } from "@kauro/application";
+import type { B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
+import { UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createProspectHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated, createSellerCommandHandlers, createQuoteHandlers } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf } from "@kauro/persistence";
+import { agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
-import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
+import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, sourceLineageReader, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
 import { loadContractSchemas } from "./schemas.js";
 import { createApiServer, type ApiServerOptions, type HttpLimits } from "./server.js";
 import type { PaymentService } from "./payments/index.js";
+import { createPurchaseRebinder } from "./payments/rebinder.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
 import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
 
@@ -126,7 +127,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   }
   // one factory on the one verified pool: TENANT, IDENTITY, ANONYMOUS and OPERATOR contexts run under kauro_app; the payment
   // service's SERVICE contexts run on its own pool, which this process does not open here (the payment service's composition)
-  const unitOfWork = createCommerceUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
+  const unitOfWork = createCommercialUnitOfWorkFactory({ app: pool }, { clock, random, defaultStatementTimeoutMs: statementTimeoutMs });
   return {
     pool,
     unitOfWork,
@@ -241,6 +242,12 @@ export interface ApiAssembly {
    * the acceptance tests bind the labelled contract fake of @kauro/application/testing (SIMULATED).
    */
   readonly commercial?: { readonly buyerTypes?: BuyerTypeReader };
+  /**
+   * CMD027 CreateQuote's collaborators that replace the edition's (package B10, mandate B10-COMMANDS-QUOTE): the recorded buyer type (the
+   * edition records none, so a quote is refused BUYER_TYPE_UNSET until B11 binds it), the re-binder of a paid purchase (the payment service's
+   * when one is bound) and the test-only hold of the replacement protocol. The acceptance tests bind the labelled contract fakes here.
+   */
+  readonly quotes?: Partial<QuoteCollaborators>;
 }
 
 /**
@@ -290,7 +297,8 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const paymentService: Partial<CommerceRequestCollaborators> =
     assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
-  const commerce = createCommerceRequestHandlers(commerceRuntime, { ...commerceEdition(), ...paymentService, ...assembly.commerce });
+  const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, ...assembly.commerce };
+  const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
   const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier() });
@@ -306,12 +314,22 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   // package B10: the seller commands (CMD048, CMD049, CMD050) on the same runtime, over the sales and attribution adapters, the commercial
   // authorizer (the corporate owner's grant) and the step-up verifier
   const sellers = createSellerCommandHandlers(commerceRuntime, { sales: salesOf, attribution: attributionOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() });
+  // package B10: CreateQuote (CMD027) on the same runtime, over the recurrence adapter and its issuance core, the recorded buyer type and
+  // B09's re-binding of a paid purchase (the payment service's when bound, else the edition's lineage reader)
+  const quotes = createQuoteHandlers(commerceRuntime, {
+    request: commerceCollaborators,
+    buyerType: assembly.commercial?.buyerTypes ?? new UnrecordedBuyerTypeReader(),
+    recurrence: recurrenceOf,
+    reads: quoteReadsOf,
+    rebinder: assembly.payments?.rebinder ?? createPurchaseRebinder({ lineage: sourceLineageReader }),
+    ...assembly.quotes,
+  });
   return createApiServer({
     environment: assembly.environment,
     handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
     intakes: createSourceIntakeHandlers(readRuntime),
-    commercial: { commands: [...Object.values(commercial), ...Object.values(prospects), ...Object.values(sellers)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>> },
+    commercial: { commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>> },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),

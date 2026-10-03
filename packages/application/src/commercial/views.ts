@@ -51,8 +51,13 @@ export interface QuoteEligibilityView {
 /** A replaced quote and the authorization its replacement revoked, when a new quote supersedes a paid one (design §3.4). */
 export interface QuoteReplacementView {
   readonly replacedQuoteId: string;
-  readonly revokedAuthorizationId: string;
+  /** The entitlement the re-binding revoked (SOURCE_REPLACED); absent when the payment service refused the re-binding. */
+  readonly revokedAuthorizationId?: string;
   readonly approvalRequired: boolean;
+  /** REBOUND: the purchase now stands on the replacement; WITHDRAWN: the payment service refused the re-binding (D10-QUOTE-6). */
+  readonly outcome: "REBOUND" | "WITHDRAWN";
+  /** The first blocker that refused the re-binding, as the payment service names it. */
+  readonly reason?: string;
 }
 
 export interface CreateQuoteView {

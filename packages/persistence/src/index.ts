@@ -112,3 +112,5 @@ export type { RecordedCalendarVersion, RecordedCompletion } from "./commercial-b
 // of R2-141, and the accessor over a unit of work
 export { PgAgencyLifecycleRepository } from "./repositories/commercial-agency-lifecycle.js";
 export { agencyLifecycleOf } from "./commercial-agency-access.js";
+// CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
+export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";

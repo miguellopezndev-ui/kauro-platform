@@ -9,6 +9,7 @@
  * envelope and a Problem of its closed catalogue otherwise.
  *
  * B10-COMMANDS-SELLERS serves CMD048 AssignAccount, CMD049 ActivateSeller and CMD050 TerminateSeller, each answering 200 with its view.
+ * B10-COMMANDS-QUOTE serves CMD027 CreateQuote, answering 201 with its view.
  * B10-AGENCY-LIFECYCLE serves CMD002 ActivateAgency and CMD043 CloseAgency. Both answer 200 with their COMPLETED envelope (the agency is the
  * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202.
  */
@@ -20,7 +21,7 @@ import { COMMERCIAL_COMMAND_OUTCOMES } from "./outcomes.js";
 import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, type CommercialServedCommandId } from "./response-schemas.js";
 
 /** The B10 commands the api serves. */
-export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
+export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
 export type CommercialServedRouteCommandId = (typeof COMMERCIAL_SERVED_COMMAND_IDS)[number];
 
 export function isServedCommercialCommand(id: string): id is CommercialServedRouteCommandId {
@@ -56,4 +57,15 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
   CMD048: [],
   CMD049: [],
   CMD050: [],
+  // CreateQuote: the quote's own versions, the superseded unpaid quote's, and — of an included replacement — the payment service's re-binding
+  // and the withdrawal of a replacement it refused
+  CMD027: [
+    "quote.drafted.v1",
+    "quote.issued.v1",
+    "quote.superseded.v1",
+    "quote.withdrawn.v1",
+    "quote.accepted_for_checkout.v1",
+    "commercial_authorization.revoked.v1",
+    "commercial_authorization.issued.v1",
+  ],
 });

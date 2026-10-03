@@ -19,3 +19,4 @@ export * from "./served.js";
 export * from "./agency/index.js";
 export * from "./prospects/index.js";
 export * from "./sellers/index.js";
+export * from "./quotes/index.js";

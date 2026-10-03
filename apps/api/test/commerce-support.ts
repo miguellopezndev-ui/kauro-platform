@@ -21,7 +21,7 @@
  * price past its expiry without backdating any database row.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { CommerceReconciler, DurableOperation, ProtocolHold, ProtocolPoint } from "@kauro/application";
+import type { CommerceReconciler, DurableOperation, ProtocolHold, ProtocolPoint, QuoteCollaborators } from "@kauro/application";
 import { createCommerceReconciler } from "@kauro/application";
 import {
   createDeliveryCapacityFake,
@@ -33,7 +33,7 @@ import {
 } from "@kauro/application/testing";
 import type { CausationId, Clock, FiscalIssuerRef, FiscalProfileId, InboxId, PlanId, ProjectId, UserId } from "@kauro/domain";
 import { COMMERCE_EVENT_SUBSCRIPTIONS, toUtcInstant } from "@kauro/domain";
-import { activateAgency, issueQuote, paidPurchase, recordReviewedFiscalProfile, type IssuedQuote, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
+import { activateAgency, issueQuote, paidPurchase, recordReviewedFiscalProfile, type Harness, type IssuedQuote, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
 import { purchasedSubjectReader } from "../src/index.js";
 import { SimulatedCrash, approveThroughRoute, call, freshKey, ids, sha, world, type Person, type PlanFixture, type Reply, type World, type WorldOptions } from "./support.js";
 
@@ -167,7 +167,7 @@ export interface ReadyQuote extends IssuedQuote {
  */
 export type EditionCollaborator = "payment" | "provider" | "capacity";
 
-export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly commercial?: WorldOptions["commercial"] } = {}): Promise<PaymentsWorld> {
+export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly commercial?: WorldOptions["commercial"]; readonly quotes?: (h: Harness) => Partial<QuoteCollaborators> } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
@@ -178,6 +178,7 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
   const w = await world({
     clock,
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    ...(options.quotes !== undefined ? { quotes: options.quotes } : {}),
     commerce: (h) => ({
       ...(unbound.has("payment") ? {} : { payment: h.commerce }),
       ...(unbound.has("provider") ? {} : { provider }),

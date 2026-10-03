@@ -200,6 +200,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/sales/agencies/:agencyId/assignment", "AssignAccount", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD048" } }],
       ["POST", "/api/v1/sales/sellers/:sellerId/activate", "ActivateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD049" } }],
       ["POST", "/api/v1/sales/sellers/:sellerId/terminate", "TerminateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD050" } }],
+      // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE): synchronous, 201 with its view, no 202
+      ["POST", "/api/v1/projects/:projectId/quotes", "CreateQuote", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD027" } }],
       // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
       // where a provider effect may stay unknown (CMD033)
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],

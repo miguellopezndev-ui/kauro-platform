@@ -286,15 +286,15 @@ platform machine (B09 decision D-MACH-B1); initial DRAFT; terminal EXPIRED, SUPE
 
 | From | Event | To | Performed by | Event type | Stored |
 | --- | --- | --- | --- | --- | --- |
-| — | (initial DRAFT) | DRAFT | CMD027 CreateQuote (B10); drafted and issued in one transaction | quote.drafted.v1 | database |
-| DRAFT | issue_quote | ISSUED | CMD027 CreateQuote (B10) | quote.issued.v1 | database |
+| — | (initial DRAFT) | DRAFT | CMD027 CreateQuote (B10); drafted and issued in one transaction | quote.drafted.v1 | route |
+| DRAFT | issue_quote | ISSUED | CMD027 CreateQuote (B10) | quote.issued.v1 | route |
 | DRAFT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
 | ISSUED | accept_terms_for_checkout | ACCEPTED_FOR_CHECKOUT | CMD028 CreatePaymentOrder (B09); a replacement quote is accepted only by the payment service's re-binding of the paid capture (D-QUOTE-B6) | quote.accepted_for_checkout.v1 | route |
 | ISSUED | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
-| ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | database |
+| ISSUED | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | route |
 | ISSUED | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
 | ACCEPTED_FOR_CHECKOUT | price_expiry_reached | EXPIRED | B10: the quote lifecycle records the price expiry (checkout already refuses an expired price as QUOTE_EXPIRED) | quote.expired.v1 | database |
-| ACCEPTED_FOR_CHECKOUT | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | database |
+| ACCEPTED_FOR_CHECKOUT | superseding_quote_issued | SUPERSEDED | CMD027 CreateQuote (B10); the new binding quote supersedes the previous one before it is created; a paid quote is superseded only once its purchase is closed, or by the replacement its capture is re-bound to (D-QUOTE-B4, D-QUOTE-B6) | quote.superseded.v1 | route |
 | ACCEPTED_FOR_CHECKOUT | withdraw_quote | WITHDRAWN | B10: the quote lifecycle of the recurrence package: an authorized billing actor withdraws an offer; no registry command names it | quote.withdrawn.v1 | database |
 
 ### PaymentOrder
@@ -507,6 +507,7 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD033 ExecuteRefund | POST /api/v1/refunds/{refundId}/execute | PAYMENT_SERVICE | STORED_OPERATION | — | Refund dispatch_intent_committed; Refund authenticated_completed; Refund ambiguous_transport_result; Refund proved_no_effect; Refund provider_refused | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1, payment_attempt.prepared.v1, payment_attempt.dispatching.v1, refund.submitting.v1 | payment_attempt.dispatching.v1 → PAYMENT_SERVICE; payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS; capture.funds_observed.v1 → COMMISSIONS |
 | CMD034 ReconcilePayment | POST /api/v1/payment-orders/{orderId}/reconcile | PAYMENT_SERVICE | STORED_OPERATION | — | PaymentAttempt proved_no_effect; PaymentAttempt reconciliation_completed; PaymentAttempt reconciliation_proves_no_effect; PaymentOrder creation_proved_no_effect; PaymentOrder reconciliation_proves_no_capture; PaymentOrder reconciliation_proves_no_capture_unapproved; Refund reconciliation_completed; Refund reconciliation_proves_no_effect; Refund reconciliation_proves_refusal; ReconciliationCase (initial OPEN) | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1 | payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS; capture.funds_observed.v1 → COMMISSIONS |
 | CMD002 ActivateAgency | POST /api/v1/agencies/{agencyId}/activate | AGENCY_OWNER | AGENCY_PATH | — | Agency agreements_and_profile_accepted | agency.activated.v1 | — |
+| CMD027 CreateQuote | POST /api/v1/projects/{projectId}/quotes | AGENCY_BILLING | AGENCY_HEADER | — | Quote (initial DRAFT); Quote issue_quote; Quote superseding_quote_issued | quote.drafted.v1, quote.issued.v1, quote.superseded.v1, quote.withdrawn.v1, quote.accepted_for_checkout.v1, commercial_authorization.revoked.v1, commercial_authorization.issued.v1 | quote.issued.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS |
 | CMD043 CloseAgency | POST /api/v1/agencies/{agencyId}/closure-requests | AGENCY_OWNER | AGENCY_PATH | fresh | Agency owner_requests_closure; Agency owner_abandons_setup | agency.closing.v1, quote.withdrawn.v1 | — |
 | CMD045 RegisterProspect | POST /api/v1/sales/prospects | ACTIVE_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
 | CMD046 ClaimProspect | POST /api/v1/sales/prospects/{prospectId}/claims | ACTIVE_SELLER | CORPORATE | — |  |  | — |
@@ -1367,6 +1368,61 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD027 CreateQuote
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project or the plan is not visible to the caller's agency: a foreign and a nonexistent id answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | the project's live quote changed under this request (two requests for one project): the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | AGENCY_NOT_ACTIVE | — | always | COMMAND | the agency is not ACTIVE (DRAFT, RESTRICTED, CLOSING or CLOSED sell nothing) |
+| 409 | PRECONDITION_FAILED | AGREEMENTS_INCOMPLETE | — | always | COMMAND | the agency has accepted no terms version |
+| 409 | PRECONDITION_FAILED | PLAN_NOT_APPROVED | — | always | COMMAND | the plan is not APPROVED |
+| 409 | PRECONDITION_FAILED | PLAN_SUPERSEDED | — | always | COMMAND | the plan was superseded by a newer revision |
+| 409 | PRECONDITION_FAILED | PLAN_WITHDRAWN | — | always | COMMAND | the plan's approval was withdrawn |
+| 409 | PRECONDITION_FAILED | APPROVAL_NOT_CURRENT | — | — | COMMAND | the plan has no live, unwithdrawn approval |
+| 409 | PRECONDITION_FAILED | NO_BILLABLE_UNITS | — | — | COMMAND | the sealed source freezes no billable units: there is no minimum-price sale |
+| 409 | PRECONDITION_FAILED | BUYER_TYPE_UNSET | — | — | COMMAND | no buyer type is recorded for the agency (A3 3.7): the quote waits for the recorded type |
+| 409 | PRECONDITION_FAILED | BILLING_PROFILE_MISMATCH | — | — | COMMAND | billingProfileRef is not the agency's current fiscal profile |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_UNREVIEWED | — | — | COMMAND | the agency's current fiscal profile carries no reviewed treatment (R2-082): incomplete tax facts block issuance |
+| 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_CHANGED | — | — | COMMAND | the reviewed tax rule is not the one the paid terms were priced with |
+| 409 | PRECONDITION_FAILED | EXECUTION_STARTED | — | always | COMMAND | the paid execution has started: the entitlement can no longer be re-bound to a replacement (R2-092) |
+| 409 | PRECONDITION_FAILED | REPLACEMENT_SCOPE_CHANGED | — | always | COMMAND | the replacement is not of the paid mode, target and band: current.mismatch carries the base comparison; a larger scope is charged only after a refund and a new accepted quote (R2-093) |
+| 409 | PRECONDITION_FAILED | REPLACEMENT_ALLOWANCE_SPENT | — | always | COMMAND | the one included pre-execution source replacement of this purchase is spent |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | CAPABILITY_UNAVAILABLE | ENVELOPE_NOT_OFFERED | — | — | COMMAND | the billable units are beyond the offered launch envelope (a band above capacity.launchSourceUnits) |
+| 422 | CAPABILITY_UNAVAILABLE | MODE_NOT_OFFERED | — | — | COMMAND | the project's mode capability is not offered |
+| 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the plan's source revision is not SEALED or its effective deadline has passed on the database clock |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the plan's target contract is not confirmed and current |
+| 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment service or re-binder is bound in this edition: a replacement of a paid purchase writes nothing |
+| 422 | INTEGRITY_FAILURE | PLAN_SERVICES_UNAVAILABLE | — | — | COMMAND | no source availability reader is bound in this edition |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ### CMD043 CloseAgency
 
 | Status | Code | Reason | Field codes | current | Layer | Meaning |
@@ -1902,6 +1958,20 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd002-activate-agency.test.ts` :: "RACE: an identical retry replays the 200 without a second acceptance…" |
 | external uncertainty | NOT_APPLICABLE: an activation reaches no provider; the acceptance, the agency's move and the journal entry are rows of one database transaction, and the capabilities offered are answered, never written |
+
+### CMD027 CreateQuote
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd027-create-quote.test.ts` :: "OK: an AGENCY_BILLING member's CreateQuote…"<br>`cmd027-create-quote.test.ts` :: "R2-092 (example 18)…" |
+| wrong role | `cmd027-create-quote.test.ts` :: "DENY: another agency's project is a foreign tenant (404) and a VIEWER or APPROVER a wrong role (403)…" |
+| wrong agency | `cmd027-create-quote.test.ts` :: "DENY: another agency's project is a foreign tenant (404)…" |
+| stale version | `cmd027-create-quote.test.ts` :: "RACE: an identical retry replays the 201 with the same quote…" |
+| duplicate request | `cmd027-create-quote.test.ts` :: "RACE: an identical retry replays the 201…" |
+| changed-body same key | `cmd027-create-quote.test.ts` :: "RACE: an identical retry replays the 201 with the same quote, the same key with another planId is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd027-create-quote.test.ts` :: "RACE (replacement): a crash before the replacement's intent commits…" |
+| external uncertainty | `cmd027-create-quote.test.ts` :: "RACE (replacement): a crash before the replacement's intent commits…" |
 
 ### CMD043 CloseAgency
 

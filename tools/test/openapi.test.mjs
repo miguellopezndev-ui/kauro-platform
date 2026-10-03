@@ -30,7 +30,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the served commands of package
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD045, CMD046 and CMD047, mandate B10-COMMANDS-PROSPECTS)
   // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the two served commands of package
-  // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD048..CMD050, mandate B10-COMMANDS-SELLERS)
+  // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -64,6 +64,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/quotes CreateQuote",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",

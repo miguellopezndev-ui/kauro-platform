@@ -504,6 +504,19 @@ export const APPLICABILITY = {
     "lost response": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
     "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the acceptance, the agency's move and the journal entry are rows of one database transaction, and the capabilities offered are answered, never written",
   },
+  // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE; docs/design/B10-case-map.md CMD027): no provider is reached; the included replacement's
+  // re-binding is the payment service's database act, resumable from the journal entry
+  CMD027: {
+    "legitimate state": [["cmd027-create-quote.test.ts", "OK: an AGENCY_BILLING member's CreateQuote"], ["cmd027-create-quote.test.ts", "R2-092 (example 18)"]],
+    "wrong role": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404) and a VIEWER or APPROVER a wrong role (403)"]],
+    "wrong agency": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404)"]],
+    "stale version": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote"]],
+    "duplicate request": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote, the same key with another planId is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+    "external uncertainty": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+  },
   CMD043: {
     "legitimate state": [["cmd043-close-agency.test.ts", "OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency with nothing in flight"], ["cmd043-close-agency.test.ts", "OK (new work stops): after CloseAgency"]],
     "wrong role": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403)"]],
