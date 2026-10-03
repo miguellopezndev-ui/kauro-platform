@@ -1,18 +1,25 @@
 /**
  * Failure-matrix cells as tests (docs/design/FAULT-HARNESS.md): one cell { step, fault, expect } becomes one node:test test whose
  * title is the cell and whose body receives a fresh FaultContext (named points, a controlled clock, the interleaving helpers).
- * After the body the cell checks that its fault was really injected — a race observed a lock wait, an expiry or timeout moved the
- * clock, a crash fired, a retry ran the request again — and that every armed point was reached, so a cell can never pass without
- * exercising the failure it names. `faultMatrix` registers a whole matrix and refuses one whose cells and bodies do not map 1:1.
+ * A cell can never pass unless its fault demonstrably happened at the boundary it names: the helpers record evidence only of what
+ * they observed — a lock wait of the operation's own backend on the intended holder, the clock crossing a declared deadline and
+ * then being used, a crash firing at the cell's commit boundary, a request attempt that ran and settled, a revocation that took
+ * effect followed by an operation refused after it, a failure at a point after an earlier step of the same operation completed —
+ * and after the body the cell fails (FaultNotInjected) unless its kind's evidence is there and every armed point was reached.
+ * `faultMatrix` registers a whole matrix and refuses one whose cells and bodies do not map 1:1.
  */
 import { test, type TestOptions } from "node:test";
 import type { Client } from "pg";
-import { controlledClock, type ControlledClock, type InstantLike } from "./clock.js";
-import { bothOrders, concurrently, inOrder, mustWait, sequentially, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
-import { FaultPoints, terminateBackend } from "./points.js";
+import type { UtcInstant } from "@kauro/contracts";
+import { toUtcInstant } from "@kauro/domain";
+import { controlledClock, epochMs, type ControlledClock, type InstantLike } from "./clock.js";
+import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, sequentially, settledOrderOf, type ActorOutcome, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
+import { FaultPoints, commitCrashesOf, crashedAt, terminateBackend } from "./points.js";
 
 export const FAULT_KINDS = ["race", "timeout", "expiry", "crash-before-commit", "crash-after-commit", "retry", "revocation", "partial"] as const;
 export type FaultKind = (typeof FAULT_KINDS)[number];
+
+const CRASH_KINDS: ReadonlyArray<FaultKind> = ["crash-before-commit", "crash-after-commit"];
 
 export interface MatrixCell {
   /** The case or finding the cell covers (e.g. "S090", "B06-R1"), first in the title. */
@@ -20,34 +27,67 @@ export interface MatrixCell {
   /** The step under the fault (a command, a store method, a consumer). */
   readonly step: string;
   readonly fault: FaultKind;
+  /**
+   * The commit boundary a crash cell names (required for crash-before-commit and crash-after-commit): the name of the
+   * crashableFactory whose `<at>.before-commit` / `<at>.after-commit` the crash must fire at.
+   */
+  readonly at?: string;
   /** The required end state, in words (the assertions of the body prove it). */
   readonly expect: string;
 }
 
-/** The title a cell's test carries: `<id> [<fault>] <step> -> <expect>`. */
-export function cellTitle(cell: MatrixCell): string {
+function validCell(cell: MatrixCell): void {
   if (!FAULT_KINDS.includes(cell.fault)) throw new Error(`unknown fault kind ${String(cell.fault)}`);
-  return `${cell.id !== undefined ? `${cell.id} ` : ""}[${cell.fault}] ${cell.step} -> ${cell.expect}`;
+  if (CRASH_KINDS.includes(cell.fault) && (typeof cell.at !== "string" || cell.at.length === 0)) throw new Error(`a ${cell.fault} cell names its commit boundary (at: the crashableFactory name)`);
 }
 
-/** What one cell's body works with; the helpers record what they injected so the cell can check its fault happened. */
+/** The title a cell's test carries: `<id> [<fault>] <step> -> <expect>`, a crash cell `[<fault> at <at>]`. */
+export function cellTitle(cell: MatrixCell): string {
+  validCell(cell);
+  const fault = cell.at !== undefined && CRASH_KINDS.includes(cell.fault) ? `${cell.fault} at ${cell.at}` : cell.fault;
+  return `${cell.id !== undefined ? `${cell.id} ` : ""}[${fault}] ${cell.step} -> ${cell.expect}`;
+}
+
+/** What one cell's body works with; the helpers record what they observed so the cell can check its fault happened. */
 export interface FaultContext {
   readonly cell: MatrixCell;
   readonly points: FaultPoints;
   readonly clock: ControlledClock;
+  /**
+   * Declares a deadline the cell's fault crosses (an expiry, a lease's time to live, a provider-call timeout). Every declared
+   * deadline must be crossed by one move of the clock (before < deadline <= after) and the clock used after that move at or past
+   * it (onServer on the transaction under test, or the application instant read for the step); expiry and timeout cells need one.
+   */
+  deadline(instant: InstantLike, what?: string): UtcInstant;
   /** mustWait, counted as an observed wait. */
   mustWait<T>(oracle: Client, probe: WaitProbe, operation: Promise<T>, what: string, limitMs?: number): Promise<Waiting<T>>;
   /** bothOrders, each order counted as an observed wait. */
   bothOrders<S>(scenario: RaceScenario<S>): Promise<readonly [RaceRun<S>, RaceRun<S>]>;
   /** inOrder, counted as an observed wait. */
   inOrder<S>(scenario: RaceScenario<S>, first: string): Promise<RaceRun<S>>;
-  /** concurrently, counted as repeated attempts. */
+  /** concurrently; each copy counted as an attempt once it ran and settled. */
   concurrently<T>(times: number, request: (copy: number) => Promise<T>): Promise<PromiseSettledResult<T>[]>;
-  /** sequentially, counted as repeated attempts. */
+  /** sequentially; each attempt counted once it ran and settled. */
   sequentially<T>(times: number, request: (attempt: number) => Promise<T>): Promise<PromiseSettledResult<T>[]>;
-  /** Marks one more attempt of a request the body repeats by hand (a retry past a bound, a redelivery). */
-  retried(): void;
-  /** terminateBackend, recorded as a crash. */
+  /** Runs one attempt of the request the cell repeats (a retry past a bound, a redelivery), counted once it ran and settled. */
+  attempt<T>(request: () => Promise<T>): Promise<T>;
+  /**
+   * The revocation the cell names, taking effect: runs `revocation` (it must resolve), or credits a race actor's outcome the
+   * harness produced (it must have committed). Returns what the revocation returned.
+   */
+  revoked<T>(what: string, revocation: (() => Promise<T>) | ActorOutcome): Promise<T | undefined>;
+  /**
+   * An operation fenced by an earlier revocation: runs `operation` (it must reject with an error `refusal` accepts), or credits a
+   * race actor's outcome the harness settled after the revocation (it must not have committed; its COMMIT's or else its write's
+   * error must satisfy `refusal`). Returns the refusal.
+   */
+  fenced(what: string, operation: (() => Promise<unknown>) | ActorOutcome, refusal: (e: unknown) => boolean): Promise<unknown>;
+  /**
+   * A partial failure: arms a crash at the point `at`, runs `operation`, and requires it to fail there after at least one earlier
+   * point of the same run passed (a step that completed). Returns the failure; the body asserts what survived.
+   */
+  partial(what: string, at: string, operation: () => Promise<unknown>): Promise<unknown>;
+  /** terminateBackend (recorded in points.crashes; never a crash at a commit boundary). */
   kill(oracle: Client, client: Client, name?: string): Promise<number>;
   readonly observedWaits: number;
   readonly attempts: number;
@@ -69,15 +109,44 @@ export interface CellOptions {
 
 export type CellBody = (ctx: FaultContext) => Promise<void>;
 
+interface Evidence {
+  readonly deadlines: Array<{ readonly at: number; readonly what: string }>;
+  readonly revocations: number[];
+  fenced: number;
+  partials: number;
+}
+
+const evidenceOf = new WeakMap<FaultContext, Evidence>();
+
+/** When the harness's interleaving settled `outcome` (a fenced actor must have settled after the revocation). */
+function settledOrder(outcome: ActorOutcome, what: string): number {
+  const order = settledOrderOf(outcome);
+  if (order === undefined) throw new FaultNotInjected(`${what}: not an outcome the harness's interleaving produced`);
+  return order;
+}
+
 function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
   const points = new FaultPoints();
   const clock = controlledClock(options.clockStart);
+  const evidence: Evidence = { deadlines: [], revocations: [], fenced: 0, partials: 0 };
   let observedWaits = 0;
   let attempts = 0;
-  return {
+  const counted = <A extends unknown[], T>(request: (...args: A) => Promise<T>) => async (...args: A): Promise<T> => {
+    try {
+      return await request(...args);
+    } finally {
+      attempts += 1;
+    }
+  };
+  const ctx: FaultContext = {
     cell,
     points,
     clock,
+    deadline(instant, what = "deadline") {
+      const at = Math.trunc(epochMs(instant));
+      evidence.deadlines.push({ at, what });
+      return toUtcInstant(at);
+    },
     async mustWait(oracle, probe, operation, what, limitMs) {
       const waiting = await mustWait(oracle, probe, operation, what, limitMs);
       observedWaits += 1;
@@ -93,16 +162,62 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       observedWaits += 1;
       return run;
     },
-    concurrently(times, request) {
-      attempts += times;
-      return concurrently(times, request);
+    concurrently: (times, request) => concurrently(times, counted(request)),
+    sequentially: (times, request) => sequentially(times, counted(request)),
+    attempt: (request) => counted(request)(),
+    async revoked(what, revocation) {
+      if (typeof revocation === "function") {
+        const out = await revocation();
+        // anything the interleavings settle from now on settled after this revocation took effect
+        evidence.revocations.push(lastSettledOrder());
+        return out;
+      }
+      const order = settledOrder(revocation, `revocation ${what}`);
+      if (!revocation.committed) throw new FaultNotInjected(`revocation ${what} did not commit`);
+      evidence.revocations.push(order);
+      return undefined;
     },
-    sequentially(times, request) {
-      attempts += times;
-      return sequentially(times, request);
+    async fenced(what, operation, refusal) {
+      if (evidence.revocations.length === 0) throw new FaultNotInjected(`${what}: fenced before any revocation took effect`);
+      const firstRevocation = Math.min(...evidence.revocations);
+      let reason: unknown;
+      if (typeof operation === "function") {
+        let ran = false;
+        try {
+          await operation();
+          ran = true;
+        } catch (e) {
+          reason = e;
+        }
+        if (ran) throw new FaultNotInjected(`${what} was not refused after the revocation`);
+      } else {
+        const order = settledOrder(operation, what);
+        if (order <= firstRevocation) throw new FaultNotInjected(`${what} settled before the revocation took effect`);
+        if (operation.committed) throw new FaultNotInjected(`${what} committed after the revocation`);
+        reason = operation.commit?.status === "rejected" ? operation.commit.reason : operation.act.status === "rejected" ? operation.act.reason : undefined;
+      }
+      if (!refusal(reason)) throw new FaultNotInjected(`${what} failed, but not with the refusal the cell names: ${reason instanceof Error ? reason.message : String(reason)}`);
+      evidence.fenced += 1;
+      return reason;
     },
-    retried() {
-      attempts += attempts === 0 ? 2 : 1;
+    async partial(what, at, operation) {
+      points.crash(at);
+      const from = points.passed.length;
+      let failure: unknown;
+      let ran = false;
+      try {
+        await operation();
+        ran = true;
+      } catch (e) {
+        failure = e;
+      }
+      if (ran) throw new FaultNotInjected(`${what} completed: it never failed at ${at}`);
+      if (!crashedAt(at)(failure)) throw new FaultNotInjected(`${what} failed, but not at ${at}: ${failure instanceof Error ? failure.message : String(failure)}`);
+      const run = points.passed.slice(from);
+      const failedAt = run.indexOf(at);
+      if (failedAt < 1) throw new FaultNotInjected(`${what} failed at ${at} before any earlier step of it completed: nothing was partial`);
+      evidence.partials += 1;
+      return failure;
     },
     kill: (oracle, client, name) => terminateBackend(oracle, client, points, name),
     get observedWaits() {
@@ -112,26 +227,53 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       return attempts;
     },
   };
+  evidenceOf.set(ctx, evidence);
+  return ctx;
 }
 
-/** The proof a cell's fault was injected, checked after its body (revocation and partial are proven by the body's assertions). */
+/** Why every declared deadline is proven crossed and used, or the first one that is not. */
+function deadlineGap(ctx: FaultContext, evidence: Evidence): string | undefined {
+  const moves = ctx.clock.moveLog;
+  const uses = ctx.clock.useLog;
+  for (const d of evidence.deadlines) {
+    const crossing = moves.find((m) => m.from < d.at && d.at <= m.to);
+    if (crossing === undefined) return `the clock never crossed the ${d.what} ${toUtcInstant(d.at)} (no move from before it to at or past it)`;
+    if (!uses.some((u) => u.seq > crossing.seq && u.at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no onServer, no application instant read)`;
+  }
+  return undefined;
+}
+
+/** The proof a cell's fault was injected at the boundary it names, checked after its body. */
 function assertInjected(ctx: FaultContext): void {
-  const { fault } = ctx.cell;
+  const { fault, at } = ctx.cell;
+  const evidence = evidenceOf.get(ctx);
+  if (evidence === undefined) throw new Error("a FaultContext of another run");
+  const commits = commitCrashesOf(ctx.points);
   const missing =
-    fault === "race" && ctx.observedWaits === 0
-      ? "no lock wait was observed"
-      : (fault === "expiry" || fault === "timeout") && ctx.clock.moves === 0
-        ? "the controlled clock never moved"
-        : (fault === "crash-before-commit" || fault === "crash-after-commit") && ctx.points.crashes.length === 0
-          ? "no crash fired"
-          : fault === "retry" && ctx.attempts < 2
-            ? "the request was never repeated"
-            : undefined;
+    deadlineGap(ctx, evidence) ??
+    (fault === "race" && ctx.observedWaits === 0
+      ? "no lock wait of the operation on the intended holder was observed"
+      : (fault === "expiry" || fault === "timeout") && evidence.deadlines.length === 0
+        ? "no deadline was declared (ctx.deadline), so no crossing can be proven"
+        : fault === "crash-before-commit" && !commits.some((c) => c.name === at && c.boundary === "BEFORE_COMMIT")
+          ? `no crash fired at ${at}.before-commit with COMMIT never issued`
+          : fault === "crash-after-commit" && !commits.some((c) => c.name === at && c.boundary === "AFTER_COMMIT")
+            ? `no crash fired at ${at}.after-commit once COMMIT answered COMMIT`
+            : fault === "retry" && ctx.attempts < 2
+              ? `the request ran and settled ${ctx.attempts} time(s), never repeated`
+              : fault === "revocation" && (evidence.revocations.length === 0 || evidence.fenced === 0)
+                ? evidence.revocations.length === 0
+                  ? "no revocation took effect (ctx.revoked)"
+                  : "no operation was observed refused after the revocation (ctx.fenced)"
+                : fault === "partial" && evidence.partials === 0
+                  ? "no operation failed part-way at a named point (ctx.partial)"
+                  : undefined);
   if (missing !== undefined) throw new FaultNotInjected(`cell [${fault}] ${ctx.cell.step}: ${missing}`);
 }
 
 /** Runs one cell's body with a fresh context and checks that its fault happened and every armed point was reached. */
 export async function runCell(cell: MatrixCell, body: CellBody, options: CellOptions = {}): Promise<FaultContext> {
+  validCell(cell);
   const ctx = contextOf(cell, options);
   await body(ctx);
   ctx.points.assertAllReached();

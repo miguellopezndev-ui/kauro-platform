@@ -4,13 +4,17 @@
 //   B08-R1  execution-migrations.test.ts   a revoked source admission fencing a job's publication          [revocation]
 //   R2-045  execution-migrations.test.ts   the authorization's revocation vs the publication, both orders  [race]
 //   B07-R1  source-adapters.test.ts        a retried release claim vs a newer hold                         [retry]
-// Each cell asserts what its original asserts; the harness adds that the fault really happened (the clock moved, the wait was
-// observed in pg_stat_activity in every order, the request was repeated) and fails the cell otherwise.
+// Each cell asserts everything its original asserts; the harness adds the proof that the fault happened at the boundary the cell
+// names (the clock crossed the declared deadline and was used past it; the waiter's own backend was observed blocked by the
+// holder's in every order; the revocation committed and the publication was refused after it; the request ran again) and fails
+// the cell otherwise.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { Client } from "pg";
+import { HOLD_RELEASE_CLAIM_SECONDS, PROVIDER_CALL_TIMEOUT_MS, isDomainFailure, toUtcInstant } from "@kauro/domain";
 import type {
   EventProvenance,
+  HoldReassertionId,
   HoldReleaseId,
   LeaseOwnerId,
   ObjectHoldId,
@@ -25,9 +29,9 @@ import type {
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { PgExecutionStore } from "../src/execution/store.js";
 import { PgSourceStore } from "../src/index.js";
-import { admitJob, endJob, faultCell, launchJob, publishJob, queueJob, readySourceRevision, admitSourceFile, stageJob, verifyJob, type RaceRun } from "../src/testing/index.js";
-import { commerceEvent, service } from "./commerce-support.js";
-import { closeExecutionEnv, oracle, openExecutionEnv, purchase, refusedTransaction, revokeAuthorization, type ExecutionEnv } from "./execution-support.js";
+import { admitJob, endJob, faultCell, launchJob, publishJob, queueJob, readySourceRevision, admitSourceFile, stageJob, verifyJob, type ActorOutcome, type RaceRun } from "../src/testing/index.js";
+import { commerceEvent, service, within } from "./commerce-support.js";
+import { causeState, closeExecutionEnv, oracle, openExecutionEnv, purchase, revokeAuthorization, type ExecutionEnv } from "./execution-support.js";
 import { clock, ids, project, sha, sourceSessions, sqlState, tx } from "./support.js";
 
 let env: ExecutionEnv;
@@ -97,7 +101,7 @@ faultCell(
     const owner1 = ids.next() as LeaseOwnerId;
     const owner2 = ids.next() as LeaseOwnerId;
     const deadline = ctx.clock.at(3_600_000);
-    const expiresAt = ctx.clock.at(120_000);
+    const expiresAt = ctx.deadline(ctx.clock.at(120_000), "lease's time to live");
     const claim = (resourceKind: "JOB_ATTEMPT" | "MODEL_TASK" | "OUTBOX_DISPATCH", resourceId: ResourceId, ownerId: LeaseOwnerId, checkpointHash: string | null) =>
       env.h.control.run(env.h.system(), (uow) =>
         uow.leases.claim({ resourceKind, resourceId, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha(resourceKind === "OUTBOX_DISPATCH" ? "dispatch" : "subject"), costAuthorityId: resourceKind === "OUTBOX_DISPATCH" ? null : ids.next(), checkpointHash }, ctx.clock.now()),
@@ -150,10 +154,12 @@ faultCell(
             { name: "publication", client: env.control, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => publishRaw(c, v, "b08-r1-one") },
           ],
           setup: () => verifiedJob("cell-b08-r1-revocation-first"),
-          verify({ outcomes }) {
+          async verify({ outcomes }) {
             assert.equal(outcomes["revocation"]?.committed, true);
             assert.equal(outcomes["publication"]?.act.status, "fulfilled", "the publication writes its edges; the database decides at COMMIT");
             assert.ok(rejectedWith(outcomes["publication"]?.commit, "KA081"), "no package becomes AVAILABLE once an included file's admission is revoked");
+            await ctx.revoked("the included file's admission", outcomes["revocation"] as ActorOutcome);
+            await ctx.fenced("the publication waiting on the revocation", outcomes["publication"] as ActorOutcome, (e) => sqlState(e) === "KA081");
           },
         },
         "revocation",
@@ -165,7 +171,7 @@ faultCell(
     assert.deepEqual(await oracle(env, "SELECT r.state FROM kauro.dataset_revisions r JOIN kauro.projects p ON p.current_revision_id = r.revision_id WHERE p.project_id = $1", [one.p.projectId]), [{ state: "SEALED" }], "the revision itself is still SEALED");
     assert.deepEqual(await oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [one.pkg.packageVersionId]), [{ state: "VERIFIED_PRIVATE" }]);
     assert.deepEqual(await oracle(env, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1", [one.p.authorizationId]), [{ state: "CONSUMED" }], "never DELIVERED");
-    await refusedTransaction(env.control, service(env.A.agencyId), (c) => publishRaw(c, one, "b08-r1-again"), "KA081", "a publication after the committed revocation");
+    await ctx.fenced("a publication after the committed revocation", () => within(env.control, service(env.A.agencyId), (c) => publishRaw(c, one, "b08-r1-again")), (e) => causeState(e) === "KA081");
     await endJob(env.h, env.A, one.job.jobId, "SOURCE_ADMISSION_REVOKED");
     const neighbour = await verifiedJob("cell-b08-r1-neighbour");
     assert.equal((await publishJob(env.h, env.A, neighbour.job.jobId)).kind, "PUBLISHED");
@@ -218,13 +224,24 @@ faultCell(
   },
 );
 
-// --- B07-R1 (source-adapters.test.ts) ----------------------------------------------------------------------------------------------
+// --- B07-R1 (source-adapters.test.ts, "B07-R1 (second re-check), the release claim and its in-flight bound") -----------------------
+// Every assertion of the original, in its order but for one: the clock never moves backwards, so the database's refusal of a claim
+// for an undecided release (the original's inFlightUntil + 5 s) runs last, after the newer hold — which is INTENDED, not RELEASING,
+// so the release is still undecided there.
+const EXACT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+const plusSeconds = async (instant: string, seconds: number): Promise<string> =>
+  (await oracle<{ t: string }>(env, `SELECT to_char(($1::timestamptz + make_interval(secs => $2)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS t`, [instant, seconds]))[0]!.t;
+const failsWith = (code: string) => (e: unknown) => sqlState(e) === code;
+const refusedAs = (code: string, reason: string, state: string) => (e: unknown) =>
+  isDomainFailure(e) && e.code === code && e.reason === reason && sqlState((e as { cause?: unknown }).cause) === state;
+
 faultCell(
   {
     id: "B07-R1",
     step: "SealHolds release claim retried past its bound while a newer hold of the same object is intended",
     fault: "retry",
-    expect: "a retry within the claim's bound is IN_FLIGHT; past it the retry claims anew and the first claimant's late answer is STALE; the newer hold is RELEASE_PENDING until the first claim's in-flight bound and INTENDED after it",
+    expect:
+      "one claim per decided release with a 900 s bound and an in-flight bound 10 s past it; a retry within the bound is IN_FLIGHT and the database refuses a second live claim; past it the retry claims anew; an unclaimed or superseded answer is STALE and refused KA071; the claimant's answer records once; a newer hold is RELEASE_PENDING (KA071) until the in-flight bound and INTENDED after it",
   },
   async (ctx) => {
     const B = env.B;
@@ -247,40 +264,106 @@ faultCell(
       generation: admitted.acceptedGeneration,
       placedByUserId: B.ownerUserId as UserId,
     });
-    /** The source store as the request handlers (REQUEST) or the control plane (CONTROL); on the controlled clock when `onClock`. */
-    const store = <T>(who: "REQUEST" | "CONTROL", onClock: boolean, fn: (s: PgSourceStore) => Promise<T>) =>
+    /** One transaction as the request handlers (REQUEST) or the control plane (CONTROL); on the controlled clock when `onClock`. */
+    const raw = <T>(who: "REQUEST" | "CONTROL", onClock: boolean, fn: (c: Client) => Promise<T>) =>
       tx(who === "CONTROL" ? env.control : env.app, who === "CONTROL" ? { agencyId: B.agencyId } : { agencyId: B.agencyId, userId: B.ownerUserId }, async (c) => {
         if (onClock) await ctx.clock.onServer(c);
-        return fn(new PgSourceStore(c, who));
+        return fn(c);
       });
+    const store = <T>(who: "REQUEST" | "CONTROL", onClock: boolean, fn: (s: PgSourceStore) => Promise<T>) => raw(who, onClock, (c) => fn(new PgSourceStore(c, who)));
+    const insertHold = (c: Client) =>
+      c.query(
+        `INSERT INTO kauro.object_holds (hold_id, attempt_id, agency_id, project_id, revision_id, file_id, object_id, generation, hold_kind, reason, placed_by_user_id, state, intended_at, attempt_expires_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'TEMPORARY', 'SEAL_INTEGRITY', $9, 'INTENDED', kauro.server_now(), kauro.server_now() + interval '900 seconds', now(), now())`,
+        [ids.next(), ids.next(), B.agencyId, p.projectId, ready.revisionId, admitted.fileId, objectId, admitted.acceptedGeneration, B.ownerUserId],
+      );
+    const insertClaim = (c: Client, sequence: number) =>
+      c.query(
+        `INSERT INTO kauro.object_hold_releases (release_id, agency_id, object_id, generation, sequence, claimed_at, claim_expires_at, in_flight_until, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, kauro.server_now(), kauro.server_now() + interval '900 seconds', kauro.server_now() + interval '910 seconds', now(), now())`,
+        [ids.next(), B.agencyId, objectId, admitted.acceptedGeneration, sequence],
+      );
+    const requestRelease = (who: "REQUEST" | "CONTROL", onClock: boolean) => ctx.attempt(() => store(who, onClock, (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId)));
+    const holdStates = async () => (await store("REQUEST", false, (s) => s.holds.forObject(objectId))).map((x) => x.state);
 
     // a seal attempt that did not seal: closed, so its release is decided and claimed by the first caller
     const attempt = hold();
     await store("REQUEST", false, (s) => s.holds.intend(attempt));
     await store("REQUEST", false, (s) => s.holds.closeAttempt(attempt.attemptId));
-    const first = await store("REQUEST", false, (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+    const first = await requestRelease("REQUEST", false);
     assert.equal(first.kind, "RELEASE");
     if (first.kind !== "RELEASE") throw new Error("the first caller claims the release");
     const [c1] = await store("REQUEST", false, (s) => s.holds.releasesOf(objectId));
     assert.ok(c1);
-    // a retry within the claim's bound is left out
-    assert.deepEqual(await store("CONTROL", false, (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId)), { kind: "IN_FLIGHT" });
-    // past the claim's bound the retry claims anew; the first claimant's late answer records nothing
-    ctx.clock.past(c1.claimExpiresAt, 1_000);
-    ctx.retried();
-    const second = await store("CONTROL", true, (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+    assert.deepEqual([c1.releaseId, c1.sequence, c1.generation, c1.answeredAt, c1.claimedAt, c1.claimExpiresAt], [first.releaseId, 1, admitted.acceptedGeneration, undefined, first.claimedAt, first.claimExpiresAt]);
+    assert.match(c1.claimedAt, EXACT);
+    assert.equal(c1.claimExpiresAt, await plusSeconds(c1.claimedAt, HOLD_RELEASE_CLAIM_SECONDS), "the claim's bound");
+    assert.equal(HOLD_RELEASE_CLAIM_SECONDS, 900, "a 900-second claim");
+    assert.equal(c1.inFlightUntil, await plusSeconds(c1.claimExpiresAt, PROVIDER_CALL_TIMEOUT_MS / 1000), "the in-flight bound: the claim's bound plus the provider call timeout");
+    assert.equal(PROVIDER_CALL_TIMEOUT_MS, 10_000, "an in-flight bound 10 seconds past the claim's");
+    const claimBound = ctx.deadline(c1.claimExpiresAt, "claim's bound");
+    const inFlightBound = ctx.deadline(c1.inFlightUntil, "in-flight bound");
+    const at = (instant: string, seconds: number) => toUtcInstant(Date.parse(instant) + seconds * 1000);
+
+    // exactly one caller: a second one within the claim's bound is left out, and the database refuses a second live claim
+    assert.deepEqual(await requestRelease("CONTROL", false), { kind: "IN_FLIGHT" });
+    await assert.rejects(raw("CONTROL", false, (c) => insertClaim(c, 2)), failsWith("KA071"), "a second live claim");
+    // a caller that holds no claim records nothing: the adapter answers STALE, and the database releases no hold but under the claim
+    // answered in that very transaction
+    assert.deepEqual(await store("CONTROL", false, (s) => s.holds.recordRelease(ids.next() as HoldReleaseId, "RELEASED")), { kind: "STALE" });
+    await assert.rejects(
+      raw("CONTROL", false, (c) => c.query("UPDATE kauro.object_holds SET state = 'RELEASED', released_at = kauro.server_now(), release_result = 'RELEASED', released_by = $2 WHERE hold_id = $1", [attempt.holdId, first.releaseId])),
+      failsWith("KA071"),
+      "a hold released under a claim nobody answered",
+    );
+    assert.deepEqual(await holdStates(), ["RELEASING"]);
+
+    // past the claim's bound the release is claimed again (a new token); the first claimant's late answer is refused
+    ctx.clock.set(at(claimBound, 1));
+    const second = await requestRelease("CONTROL", true);
     assert.equal(second.kind, "RELEASE");
     if (second.kind !== "RELEASE") throw new Error("the retry claims the release");
     assert.notEqual(second.releaseId, first.releaseId);
-    ctx.clock.advance(1_000);
+    ctx.clock.set(at(claimBound, 2));
     assert.deepEqual(await store("REQUEST", true, (s) => s.holds.recordRelease(first.releaseId, "RELEASED")), { kind: "STALE" }, "a superseded claimant records nothing");
-    ctx.clock.advance(1_000);
+    await assert.rejects(
+      raw("REQUEST", true, (c) => c.query("UPDATE kauro.object_hold_releases SET answered_at = kauro.server_now(), release_result = 'RELEASED' WHERE release_id = $1", [first.releaseId])),
+      failsWith("KA071"),
+      "the database refuses the answer of a superseded claim",
+    );
+    assert.deepEqual(await holdStates(), ["RELEASING"]);
+
+    // the claimant's own answer records: the claim answered, the hold RELEASED naming it; the first claim stays unanswered (evidence)
+    ctx.clock.set(at(claimBound, 3));
     assert.deepEqual(await store("CONTROL", true, (s) => s.holds.recordRelease(second.releaseId, "RELEASED")), { kind: "RECORDED", holds: 1 });
-    // the first claim may still land at the provider until its in-flight bound: no newer hold before it, one after it
-    ctx.clock.before(c1.inFlightUntil, 2_000);
+    assert.deepEqual(await store("CONTROL", true, (s) => s.holds.recordRelease(second.releaseId, "RELEASED")), { kind: "STALE" }, "an answer is recorded once");
+    const claims = await store("REQUEST", false, (s) => s.holds.releasesOf(objectId));
+    assert.deepEqual(claims.map((x) => [x.sequence, x.releaseId, x.releaseResult ?? null]), [[1, first.releaseId, null], [2, second.releaseId, "RELEASED"]]);
+    assert.deepEqual((await store("REQUEST", false, (s) => s.holds.forObject(objectId))).map((x) => [x.state, x.releaseResult, x.releasedBy]), [["RELEASED", "RELEASED", second.releaseId]]);
+    await assert.rejects(
+      raw("CONTROL", false, (c) => c.query("UPDATE kauro.object_hold_releases SET release_result = 'ABSENT' WHERE release_id = $1", [second.releaseId])),
+      failsWith("KA004"),
+      "an answer is set once",
+    );
+
+    // nothing is RELEASING, yet the first claim may still land at the provider until its in-flight bound: no hold is intended before it
+    // (RELEASE_PENDING; the database refuses the row, KA071) — and one is intended after it
+    ctx.clock.set(at(inFlightBound, -2));
     assert.deepEqual(await store("REQUEST", true, (s) => s.holds.intend(hold())), { kind: "RELEASE_PENDING" });
-    ctx.clock.past(c1.inFlightUntil, 2_000);
-    const newer = await store("REQUEST", true, (s) => s.holds.intend(hold()));
-    assert.equal(newer.kind, "INTENDED", "past the in-flight bound no earlier release can land: the newer hold is intended");
+    await assert.rejects(raw("REQUEST", true, (c) => insertHold(c)), failsWith("KA071"), "a hold row before the in-flight bound");
+    ctx.clock.set(at(inFlightBound, 2));
+    const admittedAfter = await store("REQUEST", true, (s) => s.holds.intend(hold()));
+    assert.equal(admittedAfter.kind, "INTENDED", "past the in-flight bound no earlier release can land: the hold is intended");
+
+    // a re-assertion names a SEALED hold: the database refuses one of a hold that is only INTENDED (KA072)
+    if (admittedAfter.kind !== "INTENDED") throw new Error("the newer hold is intended");
+    ctx.clock.set(at(inFlightBound, 3));
+    await assert.rejects(
+      store("REQUEST", true, (s) => s.holds.recordReassertion({ reassertionId: ids.next() as HoldReassertionId, holdId: admittedAfter.record.holdId, result: "HELD", reassertedBy: "SEAL" })),
+      refusedAs("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"),
+    );
+    // a claim is taken only for a decided release (no hold of the object RELEASING any more)
+    ctx.clock.set(at(inFlightBound, 5));
+    await assert.rejects(raw("CONTROL", true, (c) => insertClaim(c, 3)), failsWith("KA072"), "a claim for an undecided release");
   },
 );
