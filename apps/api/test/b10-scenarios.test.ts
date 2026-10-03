@@ -12,9 +12,36 @@
 // pg_stat_activity. The founding cohort's three slots serve the whole cluster, so the three titles that take them run first.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { integrationWorld, type IntegrationWorld } from "./integration-support.js";
+import {
+  acceptedThrough,
+  agentOf,
+  anotherClient,
+  assignedThrough,
+  bought,
+  claimed,
+  closedAt,
+  madeEligible,
+  statementReads,
+  statementsOfSeller,
+  type Agent,
+  type Claimed,
+  dispatched,
+  integrationWorld,
+  linesOf,
+  oracleRows,
+  paidThrough,
+  planOf,
+  poolsOf,
+  providerReports,
+  quoted,
+  refundedThrough,
+  terminatedThrough,
+  type IntegrationWorld,
+} from "./integration-support.js";
 
 let iw: IntegrationWorld;
+/** The agency of example 1, left by R2-079 for the titles that continue its history (examples 2 and 6). */
+let example1: { readonly a: Agent; readonly attribution: Claimed; readonly firstAuthorizationId: string } | null = null;
 before(async () => {
   iw = await integrationWorld();
 });
@@ -22,14 +49,107 @@ after(async () => {
   await iw.stop();
 });
 
+async function adjustmentRows(lineId: string): Promise<Array<{ direction: string; amount_cents: string; new_cumulative_entitlement_cents: string; new_basis_cents: string }>> {
+  return oracleRows(iw, "SELECT direction, amount_cents::text, new_cumulative_entitlement_cents::text, new_basis_cents::text FROM kauro.commission_adjustments WHERE line_id = $1 ORDER BY adjustment_seq", [lineId]);
+}
+
 test("R2-079 (example 1): a founding agency's first HubSpot purchase of 50000 units, quoted by CreateQuote at 129500 - 32375 = 97125 and paid through CreatePaymentOrder and CapturePayment, accrues one 9713-cent ACCRUED_PENDING line for its accepted seller — not payable at capture, the 5275-cent fee recorded apart, the founding slot CONSUMED", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
+  const a = await agentOf(iw, "ex1");
+  const attribution = await claimed(iw, "ex1");
+  const { allocationId } = await acceptedThrough(iw, a.s.agency.agencyId, attribution, [10_000]);
+
+  // CreateQuote: 50,000 HubSpot units are the first band, 129,500 cents; the founding rate 2500 bps takes 32,375 (129,500 x 0.25 exactly);
+  // the service is 129,500 - 32,375 = 97,125 and an exempt export adds no tax
+  const paid = await bought(iw, a, "ex1", { units: 50_000 });
+  const quote = paid.quote.quote;
+  assert.deepEqual(
+    [quote.billableUnits, quote.baseServiceCents, quote.discountCents, quote.serviceCents, quote.taxCents, quote.totalCents, quote.discount.bps, quote.discount.basis],
+    [50_000, "129500", "32375", "97125", "0", "97125", 2500, "FOUNDING"],
+  );
+  assert.equal(paid.quote.eligibility.foundingOffer, "RESERVED");
+  assert.deepEqual([paid.order.order.expectedAmountCents, paid.captured.capture?.amountCents], ["97125", "97125"]);
+
+  // the provider reports its fee after the completion: 5,275 cents, a fact of the capture recorded apart from the basis
+  await providerReports(iw, paid.purchase, { feeCents: 5_275n });
+  await dispatched(iw);
+  const capture = await oracleRows<{ provider_fee_cents: string | null; amount_cents: string }>(iw, "SELECT provider_fee_cents::text, amount_cents::text FROM kauro.capture_facts WHERE capture_id = $1", [paid.purchase.captureId]);
+  assert.deepEqual(capture, [{ provider_fee_cents: "5275", amount_cents: "97125" }]);
+
+  // one pool, 97,125 x 1000 bps = 9712.5 -> 9713 half up, on the full service basis (never the 91,850 net of the fee, which would be 9185)
+  assert.deepEqual(
+    (await poolsOf(iw, paid.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents, p.confirmation_seq]),
+    [["ACQUISITION", "FIRST", 1000, "97125", "9713", 1]],
+  );
+  const lines = await linesOf(iw, paid.purchase.authorizationId);
+  assert.deepEqual(lines.map((l) => [l.seller_id, l.share_bps, l.rate_bps, l.net_service_basis_cents, l.cumulative_entitlement_cents, l.state]), [[attribution.sellers[0]!.sellerId, 10_000, 1000, "97125", "9713", "ACCRUED_PENDING"]]);
+  // not payable at capture: no eligibility instant, no statement item, no payout intent
+  assert.deepEqual(await oracleRows(iw, "SELECT eligible_at FROM kauro.commission_lines WHERE line_id = $1", [lines[0]!.line_id]), [{ eligible_at: null }]);
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS n FROM kauro.statement_items WHERE line_id = $1", [lines[0]!.line_id]), [{ n: 0 }]);
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS n FROM kauro.payout_intents"), [{ n: 0 }]);
+  // the claim converted into the seller's entitlement by the first purchase, the allocation as accepted
+  assert.deepEqual(await oracleRows(iw, "SELECT state FROM kauro.attribution_claims WHERE claim_id = $1", [attribution.claimIds[0]]), [{ state: "CONVERTED" }]);
+  assert.deepEqual(await oracleRows(iw, "SELECT allocation_id, state FROM kauro.commission_entitlements WHERE agency_id = $1", [a.s.agency.agencyId]), [{ allocation_id: allocationId, state: "ACTIVE" }]);
+  // the founding slot of the quote is CONSUMED by the paid purchase
+  assert.deepEqual(await oracleRows(iw, "SELECT r.state FROM kauro.founding_slot_reservations r WHERE r.quote_id = $1", [paid.purchase.quoteId]), [{ state: "CONSUMED" }]);
+
+  example1 = { a, attribution, firstAuthorizationId: paid.purchase.authorizationId };
+
+  // control: the half-up kernel at the rate's tie and a cent either side of it (97,124 -> 9712.4, 97,126 -> 9712.6)
+  assert.deepEqual(await oracleRows(iw, "SELECT kauro.round_half_up_bps(97124, 1000)::text AS below, kauro.round_half_up_bps(97125, 1000)::text AS tie, kauro.round_half_up_bps(97126, 1000)::text AS above"), [{ below: "9712", tie: "9713", above: "9713" }]);
 });
 
 test("R2-080 (examples 2 and 6): the agency's second project, for another end client, is quoted at 123025 and accrues 4921 at 400 bps; RequestRefund, ApproveRefund and ExecuteRefund of 20000 service cents revise the line to 4121 with one -800 adjustment, and the owner's and the seller's statement projections show the same cents", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
+  assert.ok(example1 !== null, "R2-079 left the agency of example 1");
+  const { a, attribution } = example1;
+  const seller = attribution.sellers[0]!;
+  const otherClient = await anotherClient(iw, a, "ex2 second end client");
+
+  // the second project, for another end client: 129,500 less the recurrence discount of 500 bps (6,475 exactly) is 123,025
+  const second = await bought(iw, a, "ex2", { units: 50_000, clientId: otherClient });
+  const quote = second.quote.quote;
+  assert.deepEqual(
+    [quote.baseServiceCents, quote.discountCents, quote.serviceCents, quote.totalCents, quote.discount.bps, quote.discount.basis],
+    ["129500", "6475", "123025", "123025", 500, "REPEAT"],
+  );
+  assert.equal(second.quote.eligibility.qualifyingProjectCount, 1, "the first purchase is the one qualifying project");
+  await dispatched(iw);
+
+  // the repeat pool: 123,025 x 400 bps = 4,921 exactly; the line follows
+  assert.deepEqual(
+    (await poolsOf(iw, second.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents, p.confirmation_seq]),
+    [["ACQUISITION", "REPEAT", 400, "123025", "4921", 2]],
+  );
+  const [line] = await linesOf(iw, second.purchase.authorizationId);
+  assert.deepEqual([line?.seller_id, line?.cumulative_entitlement_cents, line?.state], [seller.sellerId, "4921", "ACCRUED_PENDING"]);
+
+  // the customer's refund of 20,000 service cents through the public commands: the basis falls to 103,025 and 103,025 x 400 bps = 4,121 exactly
+  const refund = await refundedThrough(iw, a, second.purchase, 20_000n);
+  await dispatched(iw);
+  const revised = await oracleRows<{ net_service_basis_cents: string; cumulative_entitlement_cents: string; state: string }>(iw, "SELECT net_service_basis_cents::text, cumulative_entitlement_cents::text, state FROM kauro.commission_lines WHERE line_id = $1", [line!.line_id]);
+  assert.deepEqual(revised, [{ net_service_basis_cents: "103025", cumulative_entitlement_cents: "4121", state: "ACCRUED_PENDING" }]);
+  const adjustments = await adjustmentRows(line!.line_id);
+  assert.deepEqual(adjustments, [{ direction: "DECREASE", amount_cents: "800", new_cumulative_entitlement_cents: "4121", new_basis_cents: "103025" }], "one adjustment of -800");
+  assert.equal(refund.executed.refund.serviceCents, "20000");
+
+  // control: a refund event delivered twice changes nothing (one adjustment per changed line and event)
+  await dispatched(iw);
+  assert.equal((await adjustmentRows(line!.line_id)).length, 1);
+
+  // the statement: the line made ELIGIBLE the way production does, the period closed through CMD051 (a close standing after the 5th banking day)
+  await madeEligible(iw, a.s.agency.agencyId, second.purchase);
+  const { view } = await closedAt(iw, "2026-06", "2026-10-07T17:00:00Z");
+  assert.equal(view.statementCount, 1);
+  const [statement] = await statementsOfSeller(iw, seller.sellerId);
+  const reads = await statementReads(iw, statement!.statement_id, seller.person.token);
+  assert.deepEqual(reads.owner, reads.seller, "the owner's and the seller's projections are the same");
+  const item = reads.seller.items.find((i) => i.lineId === line!.line_id);
+  assert.deepEqual(
+    [item?.sequence, item?.netServiceBasisCents, item?.rateBps, item?.cumulativeEntitlementCents, item?.previouslyPaidCents, item?.payableCents],
+    ["REPEAT", "103025", 400, "4121", "0", "4121"],
+  );
+  assert.equal(reads.seller.payableCents, "4121");
+  const [firstLine] = await linesOf(iw, example1.firstAuthorizationId);
+  assert.deepEqual(reads.seller.items.filter((i) => i.lineId === firstLine!.line_id).map((i) => [i.cumulativeEntitlementCents, i.payableCents]), [["9713", "0"]], "the first project's 9713 cents still await their final completion: never payable");
 });
 
 test("R2-092 (example 18): a paid agency replaces its source once before execution — CreateRevision, seal, a new approval and the replacement quote — and ExecuteProject's authority is the re-bound entitlement, the old one never reusable", async () => {

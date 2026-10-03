@@ -7,18 +7,32 @@
 // contract (status, COMPLETED envelope) before a test reads it; the superuser only reads. A leg of a scenario that stands at another
 // instant (a purchase after a window's end) runs through the labelled TEST CLOCK of the support it reuses (D10-CLOCK-1).
 import assert from "node:assert/strict";
-import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
+import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
 import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
 import type { ProjectId } from "@kauro/domain";
 import { recordClaim, recordProspect, type RecordedSeller } from "@kauro/persistence/testing";
 import { prepareAllocation } from "./sales-support.js";
 import { claimsOn, linesOf, oracleRows, poolsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
-import { bankCash, claimedCents, closePeriod, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
 import { paymentRoutes } from "./commerce-support.js";
 
 export { claimsOn, linesOf, oracleRows, poolsOf, recordClaim, recordProspect };
+
+/** Sellers whose persons hold bearer tokens, the prospect the first registered and each one's SUBMITTED claim on it (CMD045 and CMD046 as their writes). */
+export interface Claimed extends Attribution {
+  readonly sellers: ReadonlyArray<RecordedSeller & { readonly person: Person }>;
+}
+
+export async function claimed(iw: IntegrationWorld, label: string, count = 1): Promise<Claimed> {
+  const sellers: Array<RecordedSeller & { readonly person: Person }> = [];
+  for (let i = 0; i < count; i++) sellers.push(await seller(iw, `${label}-${i + 1}`));
+  const prospect = await recordProspect(iw.h, { by: sellers[0]!, domain: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example` });
+  const claimIds: string[] = [];
+  for (const s of sellers) claimIds.push((await recordClaim(iw.h, { seller: s, prospectId: prospect.prospectId })).claimId);
+  return { sellers, prospectId: prospect.prospectId, claimIds };
+}
 
 export interface IntegrationWorld extends StatementsWorld {
   /** B11's buyer type port, bound to its labelled contract fake (SIMULATED): every selling agency below is an AGENCY. */
@@ -189,13 +203,38 @@ export async function dispatched(iw: IntegrationWorld): Promise<ReadonlyArray<{ 
   }
 }
 
+/**
+ * The line of a purchase made ELIGIBLE the way production makes it: the funds AVAILABLE (the provider's instant disbursement, applied
+ * through CMD034), the FINAL completion the preparation-completion fake reports now, and the ELIGIBILITY sweep standing 720 hours and a
+ * minute ahead on the labelled TEST CLOCK (D10-CLOCK-1).
+ */
+export async function madeEligible(iw: IntegrationWorld, agencyId: string, p: Purchase): Promise<void> {
+  await providerReports(iw, p, { disbursement: "INSTANT" });
+  await dispatched(iw);
+  iw.completions.record({ agencyId: agencyId as never, captureId: p.captureId, kind: "FINAL", completedAt: clock.now(), source: "STAGED_PREPARATION" });
+  const report = await iw.ahead(720 * 3600 + 60).runSweep("ELIGIBILITY");
+  assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], "every item of the ELIGIBILITY sweep settled");
+}
+
+/** Opens a month's period and closes it through the CMD051 route as the commission service, the close standing at `at` on the labelled TEST CLOCK. */
+export async function closedAt(iw: IntegrationWorld, month: string, at: string): Promise<{ readonly periodId: string; readonly view: PeriodCloseView }> {
+  const periodId = await openMonth(iw, month);
+  const ledgerCutoffHash = await proposal(iw, periodId);
+  iw.standAt(at);
+  try {
+    return { periodId, view: completed<PeriodCloseView>(await closePeriod(iw, periodId, { ledgerCutoffHash }), 200).data };
+  } finally {
+    iw.standAt(null);
+  }
+}
+
 /** The statement, the owner's and the seller's projections of it (GetCommissionStatement, D10-API-1). */
-export async function statementReads(iw: IntegrationWorld, statementId: string, sellerToken: string): Promise<{ readonly owner: unknown; readonly seller: unknown }> {
+export async function statementReads(iw: IntegrationWorld, statementId: string, sellerToken: string): Promise<{ readonly owner: CommissionStatementView; readonly seller: CommissionStatementView }> {
   const owner = await readStatement(iw, statementId, iw.owner.token);
   const seller = await readStatement(iw, statementId, sellerToken);
   assert.equal(owner.status, 200, owner.text);
   assert.equal(seller.status, 200, seller.text);
-  return { owner: owner.json<{ data: unknown }>().data, seller: seller.json<{ data: unknown }>().data };
+  return { owner: owner.json<{ data: CommissionStatementView }>().data, seller: seller.json<{ data: CommissionStatementView }>().data };
 }
 
 export {
