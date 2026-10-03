@@ -42,6 +42,7 @@ Codex's design-time review of the B10 matrix (r1, 17 findings) found the same fe
 7. **The expected behaviour is read from the design section that governs it, with the decision id.** Pre-settlement and post-settlement behaviour are different cells; an expiry cell names the deadline that governs (for a claim, its tail end when listed); the race cell names every actor on the calculation, not only a copy of the same command (B10-M9, M13, M14, M16).
 8. **Authority revocation covers every prerequisite of the step, not only the grant.** A mandatory fact the step reads (identity, MFA, destination, agreement) is revocable mid-way and needs its own REVOCATION cell (B10-M17).
 9. **Money and authority GAPs are tier 1, whatever the column.** A crash, partial or retry GAP of an effect that decides payable rights, forfeits a right or admits an expired actor is tier 1; tier 3 is a retriable error with no wrong outcome (B10-M15).
+10. **Name the state a compensation leaves, not the state it started from; and assert the amount, not the object.** A refusal or rollback preserves what another actor already committed (an entitlement CONSUMED or REVOKED stays so), and a partial hold withholds its cents while the rest of the line is paid (B10-M9, M14 r2).
 
 ## Mapping to the fault harness (`docs/design/FAULT-HARNESS.md`)
 
