@@ -12,7 +12,8 @@
  * read through BuyerTypeReader (unset: BUYER_TYPE_UNSET; IN_HOUSE: IN_HOUSE_NOT_ATTRIBUTABLE; D58) → no payment order of the agency
  * precedes the claim (CLAIM_AFTER_FIRST_ORDER), read in the agency's finance scope. Writes: every beneficiary claim ACCEPTED, running
  * 2160 hours from the server's instant, every other live claim of the prospect REJECTED by the allocation, and the allocation frozen
- * once (its shares sum to 10 000 bps at COMMIT, KC003). The corporate machines publish no domain event (D10-EVT-2).
+ * once (its shares sum to 10 000 bps at COMMIT, KC003). The answer names the decision by a server token, never by the owner's ruling text.
+ * The corporate machines publish no domain event (D10-EVT-2).
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { AttributionAllocationId, AttributionClaimId, AttributionClaimRecord } from "@kauro/domain";
@@ -30,6 +31,9 @@ import { claimView } from "./shared.js";
 export const ALLOCATION_TOTAL_BPS = 10_000;
 
 const REVIEWABLE: ReadonlySet<string> = new Set(["SUBMITTED", "DISPUTED"]);
+
+/** The server tokens that say why a claim was accepted; the owner's own ruling text stays with the allocation and never leaves in an answer. */
+export const DECISION_REASONS = Object.freeze({ CONFLICT_RESOLVED: "CONFLICT_RESOLVED_BY_RULING", AGREED_SPLIT: "AGREED_SPLIT", COMPETITORS_REJECTED: "COMPETING_CLAIMS_REJECTED", SOLE_CLAIM: "SOLE_CLAIM_ACCEPTED" } as const);
 
 export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: ProspectCollaborators): CommercialCommandHandler<AcceptAttributionBody, AttributionView> {
   const spec = ACCEPT_ATTRIBUTION;
@@ -102,7 +106,7 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
               claim: claimView(accepted),
               allocationId: allocation.allocationId,
               agencyId: allocation.agencyId,
-              decisionReason: allocation.rulingReason,
+              decisionReason: claim.state === "DISPUTED" ? DECISION_REASONS.CONFLICT_RESOLVED : beneficiaries.size > 1 ? DECISION_REASONS.AGREED_SPLIT : competing.length > 0 ? DECISION_REASONS.COMPETITORS_REJECTED : DECISION_REASONS.SOLE_CLAIM,
               beneficiaryCount: beneficiaries.size,
               rejectedClaimCount: competing.length,
             },

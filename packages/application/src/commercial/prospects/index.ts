@@ -26,4 +26,4 @@ export function createProspectHandlers(runtime: CommerceRequestRuntime, co: Pros
 export type { ProspectCollaborators } from "./runtime.js";
 export { registerProspectHandler } from "./register-prospect.js";
 export { claimProspectHandler, CLAIM_CONFLICT_REASONS } from "./claim-prospect.js";
-export { acceptAttributionHandler, ALLOCATION_TOTAL_BPS } from "./accept-attribution.js";
+export { acceptAttributionHandler, ALLOCATION_TOTAL_BPS, DECISION_REASONS } from "./accept-attribution.js";

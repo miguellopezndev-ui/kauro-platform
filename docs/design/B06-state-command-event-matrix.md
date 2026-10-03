@@ -508,6 +508,9 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD034 ReconcilePayment | POST /api/v1/payment-orders/{orderId}/reconcile | PAYMENT_SERVICE | STORED_OPERATION | — | PaymentAttempt proved_no_effect; PaymentAttempt reconciliation_completed; PaymentAttempt reconciliation_proves_no_effect; PaymentOrder creation_proved_no_effect; PaymentOrder reconciliation_proves_no_capture; PaymentOrder reconciliation_proves_no_capture_unapproved; Refund reconciliation_completed; Refund reconciliation_proves_no_effect; Refund reconciliation_proves_refusal; ReconciliationCase (initial OPEN) | payment_order.created.v1, payment_order.approved.v1, payment_order.capture_uncertain.v1, payment_order.captured.v1, payment_order.failed.v1, payment_order.cancelled.v1, payment_order.expired.v1, payment_attempt.provider_pending.v1, payment_attempt.confirmed.v1, payment_attempt.failed_no_effect.v1, payment_attempt.uncertain.v1, capture.pending.v1, capture.completed.v1, capture.denied.v1, capture.reversed.v1, capture.fee_observed.v1, capture.funds_observed.v1, commercial_authorization.issued.v1, commercial_authorization.revoked.v1, refund.requested.v1, refund.approved.v1, refund.uncertain.v1, refund.completed.v1, refund.failed.v1, reconciliation_case.opened.v1 | payment_attempt.provider_pending.v1 → PAYMENT_SERVICE; payment_attempt.uncertain.v1 → PAYMENT_SERVICE; payment_order.capture_uncertain.v1 → NOTIFICATIONS; payment_order.captured.v1 → NOTIFICATIONS; capture.completed.v1 → FINANCE; capture.completed.v1 → FISCAL; capture.completed.v1 → COMMISSIONS; capture.fee_observed.v1 → FINANCE; capture.funds_observed.v1 → FINANCE; capture.reversed.v1 → FINANCE; capture.reversed.v1 → COMMISSIONS; capture.reversed.v1 → NOTIFICATIONS; commercial_authorization.issued.v1 → EXECUTION_CONTROL; commercial_authorization.issued.v1 → NOTIFICATIONS; commercial_authorization.revoked.v1 → EXECUTION_CONTROL; commercial_authorization.revoked.v1 → NOTIFICATIONS; refund.requested.v1 → NOTIFICATIONS; refund.approved.v1 → PAYMENT_SERVICE; refund.uncertain.v1 → PAYMENT_SERVICE; refund.completed.v1 → FINANCE; refund.completed.v1 → FISCAL; refund.completed.v1 → COMMISSIONS; refund.completed.v1 → NOTIFICATIONS; refund.failed.v1 → NOTIFICATIONS; reconciliation_case.opened.v1 → NOTIFICATIONS; capture.funds_observed.v1 → COMMISSIONS |
 | CMD002 ActivateAgency | POST /api/v1/agencies/{agencyId}/activate | AGENCY_OWNER | AGENCY_PATH | — | Agency agreements_and_profile_accepted | agency.activated.v1 | — |
 | CMD043 CloseAgency | POST /api/v1/agencies/{agencyId}/closure-requests | AGENCY_OWNER | AGENCY_PATH | fresh | Agency owner_requests_closure; Agency owner_abandons_setup | agency.closing.v1, quote.withdrawn.v1 | — |
+| CMD045 RegisterProspect | POST /api/v1/sales/prospects | ACTIVE_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
+| CMD046 ClaimProspect | POST /api/v1/sales/prospects/{prospectId}/claims | ACTIVE_SELLER | CORPORATE | — |  |  | — |
+| CMD047 AcceptAttribution | POST /api/v1/sales/claims/{claimId}/accept | KAURO_OWNER | CORPORATE | — |  |  | — |
 
 ## 2a. The source-lifecycle routes (B07)
 
@@ -1399,6 +1402,104 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD045 RegisterProspect
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row (or, for the owner commands, no ACTIVE KAURO_OWNER grant), read after its transition lock: an agency member, a CANDIDATE, SUSPENDED or TERMINATED seller and a revoked owner answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is not of the AGENCY segment: another seller's record is as unknown as a missing one |
+| 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the organization key or the contact key is suppressed, however the organization is spelled (KC016) |
+| 409 | PRECONDITION_FAILED | PROSPECT_EXISTS | — | — | COMMAND | the organization already has a live prospect (the unique index answers for a prospect the caller cannot read) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD046 ClaimProspect
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row (or, for the owner commands, no ACTIVE KAURO_OWNER grant), read after its transition lock: an agency member, a CANDIDATE, SUSPENDED or TERMINATED seller and a revoked owner answer alike |
+| 404 | NOT_FOUND | — | — | — | ACCESS | the prospect is not one the seller owns: a foreign and a nonexistent prospect answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | AGREEMENT_VERSION_MISMATCH | — | — | COMMAND | agreementVersion is not the version of the seller's agreement in force |
+| 409 | PRECONDITION_FAILED | CLAIM_EVIDENCE_INSUFFICIENT | — | — | COMMAND | evidenceHash is not the seller's own evidence for this prospect, or records only a list import or a tracking link |
+| 409 | PRECONDITION_FAILED | CLAIM_EXISTS | — | — | COMMAND | the seller already has a live claim on the prospect |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD047 AcceptAttribution
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row (or, for the owner commands, no ACTIVE KAURO_OWNER grant), read after its transition lock: an agency member, a CANDIDATE, SUSPENDED or TERMINATED seller and a revoked owner answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the claim, or the allocation on its prospect, is unknown |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the claim's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | CLAIM_NOT_REVIEWABLE | — | sometimes | COMMAND | the claim (or a claim the allocation names) is not SUBMITTED or DISPUTED |
+| 409 | PRECONDITION_FAILED | SHARES_NOT_WHOLE | — | — | COMMAND | the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003) |
+| 409 | PRECONDITION_FAILED | ATTRIBUTION_EXISTS | — | — | COMMAND | the agency already has a frozen allocation: the pool does not become 10% for each seller |
+| 409 | PRECONDITION_FAILED | BUYER_TYPE_UNSET | — | — | COMMAND | the agency's buyer type is not recorded (D58) |
+| 409 | PRECONDITION_FAILED | IN_HOUSE_NOT_ATTRIBUTABLE | — | — | COMMAND | the agency is an in-house tenant: no seller attribution arises from prospecting it |
+| 409 | PRECONDITION_FAILED | CLAIM_AFTER_FIRST_ORDER | — | — | COMMAND | the claim was submitted after the agency's first payment order |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ## 4. Contract-test applicability (manual 10)
 
 "For each command, tests cover the legitimate state, wrong role, wrong agency, stale version, duplicate request, changed-body
@@ -1713,6 +1814,48 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd043-close-agency.test.ts` :: "RACE: an identical retry replays the 200…" |
 | external uncertainty | NOT_APPLICABLE: a closure reaches no provider; a payment order or refund in flight or uncertain refuses it (CLOSURE_OBLIGATIONS_UNRECONCILED) and an open reconciliation case is inventoried for its own reviewed resolution (D10-AGY-4) |
+
+### CMD045 RegisterProspect
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd045-register-prospect.test.ts` :: "OK: an ACTIVE seller registers a prospect from its own AGENCY-segment source evidence…" |
+| wrong role | `cmd045-register-prospect.test.ts` :: "DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403)…" |
+| wrong agency | NOT_APPLICABLE: RegisterProspect is corporate-scoped (no agency selector, no agency in its path or journal); an agency member's tenant session holds neither the seller row nor the owner grant and is refused as a wrong role |
+| stale version | NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: organizationLabel, businessContactRef, sourceEvidenceHash, jurisdiction); the live prospect of the organization key is read before the insert and the unique index answers for a prospect the caller cannot read (PROSPECT_EXISTS) |
+| duplicate request | `cmd045-register-prospect.test.ts` :: "RACE: an identical retry replays the 201…" |
+| changed-body same key | `cmd045-register-prospect.test.ts` :: "RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd045-register-prospect.test.ts` :: "RACE: an identical retry replays the 201…" |
+| external uncertainty | NOT_APPLICABLE: a registration reaches no provider; the prospect and its journal entry are rows of one database transaction |
+
+### CMD046 ClaimProspect
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd046-claim-prospect.test.ts` :: "OK: an ACTIVE seller claims a prospect it owns with substantive evidence…" |
+| wrong role | `cmd046-claim-prospect.test.ts` :: "DENY: another seller's prospect is a foreign scope (404) and the owner or an agency member a wrong role (403)…" |
+| wrong agency | `cmd046-claim-prospect.test.ts` :: "DENY: another seller's prospect is a foreign scope (404)…" |
+| stale version | NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: evidenceHash, agreementVersion); the seller's agreement version in force is compared (AGREEMENT_VERSION_MISMATCH) and the prospect's claims are read after their lock |
+| duplicate request | `cmd046-claim-prospect.test.ts` :: "RACE: an identical retry replays the 201…" |
+| changed-body same key | `cmd046-claim-prospect.test.ts` :: "RACE: an identical retry replays the 201, the same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd046-claim-prospect.test.ts` :: "RACE: an identical retry replays the 201…" |
+| external uncertainty | NOT_APPLICABLE: a claim reaches no provider; the claim, its conflict review and its journal entry are rows of one database transaction |
+
+### CMD047 AcceptAttribution
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd047-accept-attribution.test.ts` :: "OK: the owner accepts a SUBMITTED claim with a prepared allocation…"<br>`cmd047-accept-attribution.test.ts` :: "OK (split): an allocation of two sellers' claims at 6000/4000…" |
+| wrong role | `cmd047-accept-attribution.test.ts` :: "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403)…" |
+| wrong agency | NOT_APPLICABLE: AcceptAttribution is corporate-scoped (the claim is the aggregate; no agency selector, no agency in its path or journal); an agency member's tenant session holds no owner grant and is refused as a wrong role |
+| stale version | `cmd047-accept-attribution.test.ts` :: "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version…" |
+| duplicate request | `cmd047-accept-attribution.test.ts` :: "RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd047-accept-attribution.test.ts` :: "RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd047-accept-attribution.test.ts` :: "RACE: an identical retry replays the 200…" |
+| external uncertainty | NOT_APPLICABLE: an acceptance reaches no provider; the buyer type is read through a platform port that is itself never a provider effect (D58), and the ruling, the frozen allocation and the journal entry are rows of one database transaction |
 
 ## 5. The manual-10 reads (re-check finding N16)
 

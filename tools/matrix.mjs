@@ -515,6 +515,41 @@ export const APPLICABILITY = {
     "lost response": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
     "external uncertainty": "NOT_APPLICABLE: a closure reaches no provider; a payment order or refund in flight or uncertain refuses it (CLOSURE_OBLIGATIONS_UNRECONCILED) and an open reconciliation case is inventoried for its own reviewed resolution (D10-AGY-4)",
   },
+  // package B10's prospects and attribution (mandate B10-COMMANDS-PROSPECTS; docs/design/B10-case-map.md CMD045..CMD047): corporate commands in the
+  // caller's own OPERATOR context, none of which reaches a provider
+  CMD045: {
+    "legitimate state": [["cmd045-register-prospect.test.ts", "OK: an ACTIVE seller registers a prospect from its own AGENCY-segment source evidence"]],
+    "wrong role": [["cmd045-register-prospect.test.ts", "DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: RegisterProspect is corporate-scoped (no agency selector, no agency in its path or journal); an agency member's tenant session holds neither the seller row nor the owner grant and is refused as a wrong role",
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: organizationLabel, businessContactRef, sourceEvidenceHash, jurisdiction); the live prospect of the organization key is read before the insert and the unique index answers for a prospect the caller cannot read (PROSPECT_EXISTS)",
+    "duplicate request": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a registration reaches no provider; the prospect and its journal entry are rows of one database transaction",
+  },
+  CMD046: {
+    "legitimate state": [["cmd046-claim-prospect.test.ts", "OK: an ACTIVE seller claims a prospect it owns with substantive evidence"]],
+    "wrong role": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404) and the owner or an agency member a wrong role (403)"]],
+    "wrong agency": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404)"]],
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: evidenceHash, agreementVersion); the seller's agreement version in force is compared (AGREEMENT_VERSION_MISMATCH) and the prospect's claims are read after their lock",
+    "duplicate request": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a claim reaches no provider; the claim, its conflict review and its journal entry are rows of one database transaction",
+  },
+  CMD047: {
+    "legitimate state": [["cmd047-accept-attribution.test.ts", "OK: the owner accepts a SUBMITTED claim with a prepared allocation"], ["cmd047-accept-attribution.test.ts", "OK (split): an allocation of two sellers' claims at 6000/4000"]],
+    "wrong role": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: AcceptAttribution is corporate-scoped (the claim is the aggregate; no agency selector, no agency in its path or journal); an agency member's tenant session holds no owner grant and is refused as a wrong role",
+    "stale version": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version"]],
+    "duplicate request": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: an acceptance reaches no provider; the buyer type is read through a platform port that is itself never a provider effect (D58), and the ruling, the frozen allocation and the journal entry are rows of one database transaction",
+  },
 };
 
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
