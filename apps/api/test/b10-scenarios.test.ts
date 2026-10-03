@@ -11,7 +11,7 @@
 // labelled TEST CLOCK (D10-CLOCK-1). Nothing sleeps: interleavings are held at named points and every wait is observed in
 // pg_stat_activity. The founding cohort's three slots serve the whole cluster, so the three titles that take them run first.
 import assert from "node:assert/strict";
-import type { CreateQuoteView } from "@kauro/application";
+import type { CreateQuoteView, PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
 import { after, before, test } from "node:test";
 import type { UserId } from "@kauro/domain";
 import { recordAssistanceAgreement, recordServiceAssignment } from "@kauro/persistence/testing";
@@ -20,7 +20,15 @@ import {
   acceptedThrough,
   agentOf,
   anotherClient,
+  approvePayout,
   assertCohortConsumed,
+  bankCash,
+  capturedLater,
+  claimedCents,
+  intentOf,
+  orderedThrough,
+  reconcilePayout,
+  scriptEvidence,
   assignedThrough,
   seller,
   bought,
@@ -368,10 +376,58 @@ test("R2-095 (example 12): after AssignAccount moves A's acquired agency to sell
   assert.deepEqual(await oracleRows(iw, "SELECT cumulative_entitlement_cents::text AS cents FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]), [{ cents: "12950" }]);
 });
 test("R2-098 (example 3): after the window the agency's next project is still quoted at its 500-bps recurrence discount, its capture accrues nothing for the seller, and the seller's earlier ELIGIBLE line is paid on the next statement", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const a = await agentOf(iw, "ex3");
+  const acquired = await claimed(iw, "ex3");
+  const S = acquired.sellers[0]!;
+  await acceptedThrough(iw, a.s.agency.agencyId, acquired, [10_000]);
 
+  // the agency's first two projects, inside the window, through the public commands: 129,500 x 1000 bps = 12,950; then 123,025 x 400 bps = 4,921
+  const first = await bought(iw, a, "ex3-first", { units: 50_000 });
+  const second = await bought(iw, a, "ex3-second", { units: 50_000 });
+  assert.deepEqual([first.quote.quote.serviceCents, second.quote.quote.serviceCents], ["129500", "123025"]);
+  await dispatched(iw);
+  const [firstLine] = await linesOf(iw, first.purchase.authorizationId);
+  const [secondLine] = await linesOf(iw, second.purchase.authorizationId);
+  assert.deepEqual([firstLine?.cumulative_entitlement_cents, secondLine?.cumulative_entitlement_cents], ["12950", "4921"]);
+  await madeEligible(iw, a.s.agency.agencyId, first.purchase);
+  assert.equal((await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]))[0]?.state, "ELIGIBLE");
+
+  // the window of twelve calendar months ends; the next project is still quoted at its recurrence discount: two qualifying projects are
+  // still the 500-bps tier (the next tier starts at ten), 129,500 less 6,475 exactly is 123,025
+  const [window] = await oracleRows<{ window_ends_at: Date }>(iw, "SELECT window_ends_at FROM kauro.commission_entitlements WHERE agency_id = $1", [a.s.agency.agencyId]);
+  const third = await quoted(iw, a, await planOf(iw, a, "ex3-third", { units: 50_000 }));
+  assert.deepEqual([third.quote.baseServiceCents, third.quote.discountCents, third.quote.serviceCents, third.quote.discount.bps, third.eligibility.qualifyingProjectCount], ["129500", "6475", "123025", 500, 2]);
+  const order = await orderedThrough(iw, a, third);
+  // its capture is confirmed a day after the window's end, the provider's authenticated completion exactly at it (the labelled TEST CLOCK)
+  const endsAt = window!.window_ends_at.getTime();
+  const purchase = await capturedLater(iw, a, third, order, { confirmedAt: new Date(endsAt + 86_400_000).toISOString(), providerCompletedAt: new Date(endsAt).toISOString() });
+  await dispatched(iw);
+  assert.deepEqual(await poolsOf(iw, purchase.authorizationId), [], "no acquisition pool, and no assistance pool without a prior agreement");
+  assert.deepEqual(await linesOf(iw, purchase.authorizationId), [], "nothing accrues for the seller");
+  assert.deepEqual(await oracleRows(iw, "SELECT confirmation_seq FROM kauro.qualifying_purchases WHERE authorization_id = $1", [purchase.authorizationId]), [{ confirmation_seq: 3 }], "still the agency's third qualifying purchase");
+  assert.deepEqual(await oracleRows(iw, "SELECT cumulative_entitlement_cents::text AS cents, state FROM kauro.commission_lines WHERE line_id = ANY ($1::uuid[]) ORDER BY cents", [[firstLine!.line_id, secondLine!.line_id]]), [{ cents: "12950", state: "ELIGIBLE" }, { cents: "4921", state: "ACCRUED_PENDING" }], "the earned lines keep their path");
+
+  // the next statement pays the earlier ELIGIBLE line: 12,950 payable, the second project's 4,921 still awaiting its final completion
+  const { view } = await closedAt(iw, "2026-05", "2026-10-07T17:00:00Z");
+  assert.equal(view.payableTotalCents, "12950", "of every seller's statement of the close, only this seller has a line due (the others' lines still await their completions)");
+  const [statement] = await statementsOfSeller(iw, S.sellerId);
+  assert.ok(statement !== undefined);
+  const reads = await statementReads(iw, statement!.statement_id, S.person.token);
+  assert.deepEqual(reads.owner, reads.seller);
+  assert.deepEqual(reads.seller.items.map((i) => [i.lineId === firstLine!.line_id ? "FIRST" : "SECOND", i.cumulativeEntitlementCents, i.payableCents]), [["FIRST", "12950", "12950"], ["SECOND", "4921", "0"]]);
+  assert.deepEqual([reads.seller.payableCents, reads.seller.heldCents], ["12950", "0"]);
+
+  // the owner approves the payout: one AUTHORIZED intent of exactly the payable; the finance service reconciles the bank's evidence: the line PAID
+  await bankCash(iw, (await claimedCents(iw)) + 12_950n);
+  const approved = completed<PayoutIntentView>(await approvePayout(iw, statement!.statement_id, { expectedVersion: Number(statement!.version), payeeRef: S.destinationId, authorizationRef: await iw.w.stepUp(iw.owner) }), 200);
+  assert.deepEqual([approved.data.state, approved.data.amountCents, approved.data.statementState], ["AUTHORIZED", "12950", "APPROVED"]);
+  const intent = await intentOf(iw, statement!.statement_id);
+  const evidence = iw.payouts.matching({ reference: intent.reference, destinationDigest: intent.destinationDigest, amountCents: intent.amount, currency: intent.currency }, "SETTLED");
+  const settled = completed<PayoutReconciliationView>(await reconcilePayout(iw, statement!.statement_id, { providerPayoutEvidenceRef: scriptEvidence(iw, evidence) }), 200);
+  assert.deepEqual([settled.data.intentState, settled.data.statementState, settled.data.linesPaid], ["SETTLED", "PAID", 1]);
+  assert.deepEqual(await oracleRows(iw, "SELECT state, paid_cents::text FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]), [{ state: "PAID", paid_cents: "12950" }]);
+});
 test("R2-100: an enumerated opportunity's first purchase inside the tail converts its claim and creates the departed seller's entitlement; a first purchase after the tail's end or of an unlisted agency creates none", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");

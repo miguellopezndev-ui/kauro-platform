@@ -12,7 +12,7 @@ import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
 import type { ProjectId } from "@kauro/domain";
 import { recordClaim, recordProspect, type RecordedSeller } from "@kauro/persistence/testing";
 import { prepareAllocation } from "./sales-support.js";
-import { claimsOn, linesOf, oracleRows, poolsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
+import { captureOf, claimsOn, linesOf, oracleRows, poolsOf, quoteFactsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
 import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { approveThroughRoute, call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
@@ -118,12 +118,31 @@ export interface Paid {
   readonly purchase: Purchase;
 }
 
-/** CreatePaymentOrder (CMD028), the buyer's approval at the provider fake and CapturePayment (CMD029) of an issued quote. */
-export async function paidThrough(iw: IntegrationWorld, a: Agent, quote: CreateQuoteView): Promise<Paid> {
+/** CreatePaymentOrder (CMD028): the buyer's explicit acceptance of an issued quote; the provider fake creates the order. */
+export async function orderedThrough(iw: IntegrationWorld, a: Agent, quote: CreateQuoteView): Promise<CreatePaymentOrderView> {
   const created = completed<CreatePaymentOrderView>(
     await call(iw.w, { url: paymentRoutes.createPaymentOrder(quote.quote.quoteId), token: a.billing.token, agency: a.s.agency.agencyId, key: freshKey("int-order"), body: { termsHash: quote.quote.termsHash } }),
     201,
   );
+  assert.ok(created.data.order.providerOrderId !== undefined, "the provider created the order");
+  return created.data;
+}
+
+/**
+ * The capture of an order the public CreatePaymentOrder created, confirmed by the payment service at another instant — the labelled TEST
+ * CLOCK stands its reconciliation there (D10-CLOCK-1) — with the provider's authenticated completion at `providerCompletedAt`: what no
+ * route can do, because a route confirms at the database's own instant.
+ */
+export async function capturedLater(iw: IntegrationWorld, a: Agent, quote: CreateQuoteView, order: CreatePaymentOrderView, when: { readonly confirmedAt: string; readonly providerCompletedAt: string }): Promise<Purchase> {
+  const facts = await quoteFactsOf(iw, a.s, quote.quote.quoteId as never);
+  const attempt = await oracleRows<{ attempt_id: string }>(iw, "SELECT attempt_id FROM kauro.payment_attempts WHERE order_id = $1 AND operation = 'CREATE_ORDER'", [order.order.orderId]);
+  assert.equal(attempt.length, 1);
+  return captureOf(iw, a.s, { agencyId: a.s.agency.agencyId, quote: facts, orderId: order.order.orderId, attemptId: attempt[0]!.attempt_id, providerOrderId: order.order.providerOrderId! } as never, when);
+}
+
+/** CreatePaymentOrder (CMD028), the buyer's approval at the provider fake and CapturePayment (CMD029) of an issued quote. */
+export async function paidThrough(iw: IntegrationWorld, a: Agent, quote: CreateQuoteView): Promise<Paid> {
+  const created = { data: await orderedThrough(iw, a, quote) };
   const providerOrderId = created.data.order.providerOrderId;
   assert.ok(providerOrderId !== undefined, "the provider created the order");
   iw.pw.paypal.approve(providerOrderId);
