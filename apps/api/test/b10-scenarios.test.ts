@@ -11,15 +11,22 @@
 // labelled TEST CLOCK (D10-CLOCK-1). Nothing sleeps: interleavings are held at named points and every wait is observed in
 // pg_stat_activity. The founding cohort's three slots serve the whole cluster, so the three titles that take them run first.
 import assert from "node:assert/strict";
+import type { CreateQuoteView } from "@kauro/application";
 import { after, before, test } from "node:test";
+import type { UserId } from "@kauro/domain";
+import { recordAssistanceAgreement, recordServiceAssignment } from "@kauro/persistence/testing";
+import { asProblem, call, completed, freshKey, outcome, replayTextOf } from "./support.js";
 import {
   acceptedThrough,
   agentOf,
   anotherClient,
+  assertCohortConsumed,
   assignedThrough,
+  seller,
   bought,
   claimed,
   closedAt,
+  replacementPlanOf,
   madeEligible,
   statementReads,
   statementsOfSeller,
@@ -225,20 +232,141 @@ test("R2-096 (example 5): with the agency's first purchase fully refunded, its n
 });
 
 test("R2-092 (example 18): a paid agency replaces its source once before execution — CreateRevision, seal, a new approval and the replacement quote — and ExecuteProject's authority is the re-bound entitlement, the old one never reusable", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const a = await agentOf(iw, "ex18");
+  const paid = await bought(iw, a, "ex18-paid", { units: 40_000 });
+  assert.deepEqual([paid.quote.quote.baseServiceCents, paid.quote.quote.totalCents], ["129500", "129500"], "the paid band: 129,500 cents");
+  const ordersBefore = await iw.w.count("payment_orders");
+  const capturesBefore = await iw.w.count("capture_facts");
 
+  // before execution the agency corrects its source: CreateRevision, the seal, a new approval and CreateQuote for the new plan in the same band
+  const plan = await replacementPlanOf(iw, a, paid, { units: 45_000, seed: "ex18-replacement" });
+  const key = freshKey("ex18");
+  const request = { url: `/api/v1/projects/${plan.projectId}/quotes`, token: a.billing.token, agency: a.s.agency.agencyId, key, body: { planId: plan.planId, billingProfileRef: a.s.profileId } };
+  const reply = await call(iw.w, request);
+  const view = completed<CreateQuoteView>(reply, 201).data;
+  assert.deepEqual([view.replacement?.outcome, view.replacement?.replacedQuoteId, view.replacement?.revokedAuthorizationId], ["REBOUND", paid.purchase.quoteId, paid.purchase.authorizationId]);
+  // the replacement carries exactly the paid terms: no order, no new fee
+  assert.deepEqual([view.quote.state, view.quote.baseServiceCents, view.quote.serviceCents, view.quote.totalCents], ["ACCEPTED_FOR_CHECKOUT", "129500", "129500", "129500"]);
+  assert.equal(await iw.w.count("payment_orders"), ordersBefore, "no order");
+  assert.equal(await iw.w.count("capture_facts"), capturesBefore, "no new capture");
+
+  // the authorization chain: the old entitlement REVOKED SOURCE_REPLACED and never reusable, the re-bound one ACTIVE on the new quote and approval
+  const chain = await oracleRows<{ authorization_id: string; quote_id: string; state: string; revocation_code: string | null; approval_id: string; rebinding_id: string | null }>(
+    iw,
+    "SELECT authorization_id, quote_id, state, revocation_code, approval_id, rebinding_id FROM kauro.commercial_authorizations WHERE capture_id = $1 ORDER BY created_at",
+    [paid.purchase.captureId],
+  );
+  assert.deepEqual(chain.map((c) => [c.quote_id, c.state, c.revocation_code]), [
+    [paid.purchase.quoteId, "REVOKED", "SOURCE_REPLACED"],
+    [view.quote.quoteId, "ACTIVE", null],
+  ]);
+  assert.equal(chain[0]!.authorization_id, paid.purchase.authorizationId);
+  assert.notEqual(chain[0]!.approval_id, chain[1]!.approval_id, "the new approval, not the old one");
+  assert.ok(chain[1]!.rebinding_id !== null, "the live entitlement is the re-bound one");
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS live FROM kauro.commercial_authorizations WHERE capture_id = $1 AND state = 'ACTIVE'", [paid.purchase.captureId]), [{ live: 1 }], "the only authority ExecuteProject can read is the re-bound entitlement");
+  assert.equal((await call(iw.w, request)).text, replayTextOf(reply), "the replay answers the journaled 201 byte for byte");
+
+  // control: the allowance is spent once — a second replacement in the same band writes nothing
+  const second = await replacementPlanOf(iw, a, { purchase: paid.purchase, plan }, { units: 46_000, seed: "ex18-second" });
+  const refused = await call(iw.w, { url: `/api/v1/projects/${second.projectId}/quotes`, token: a.billing.token, agency: a.s.agency.agencyId, key: freshKey("ex18-second"), body: { planId: second.planId, billingProfileRef: a.s.profileId } });
+  assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
+  assert.equal(await iw.w.count("capture_facts"), capturesBefore);
+  assert.equal((await oracleRows(iw, "SELECT 1 FROM kauro.purchase_rebindings WHERE capture_id = $1", [paid.purchase.captureId])).length, 1, "never re-bound twice");
+});
 test("R2-093: the larger scope is charged only after the paid purchase is refunded and a new quote is issued and explicitly accepted by CreatePaymentOrder; no capture ever covers the difference silently", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const a = await agentOf(iw, "ex18-larger");
+  const paid = await bought(iw, a, "ex18-larger-paid", { units: 50_000 });
+  assert.equal(paid.quote.quote.baseServiceCents, "129500");
+  const capturesBefore = await iw.w.count("capture_facts");
+  const ordersBefore = await iw.w.count("payment_orders");
 
+  // a corrected revision of 50,001 billable units is the next band, 199,500 cents: the replacement is refused with the price comparison
+  // and nothing is charged, ordered or captured for the difference
+  const larger = await replacementPlanOf(iw, a, paid, { units: 50_001, seed: "ex18-larger" });
+  const refused = await call(iw.w, { url: `/api/v1/projects/${larger.projectId}/quotes`, token: a.billing.token, agency: a.s.agency.agencyId, key: freshKey("ex18-larger"), body: { planId: larger.planId, billingProfileRef: a.s.profileId } });
+  assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_SCOPE_CHANGED");
+  assert.deepEqual((asProblem(iw.w, refused).current as { mismatch?: unknown } | undefined)?.mismatch, ["baseServiceCents", "paid129500", "replacement199500"]);
+  assert.equal(await iw.w.count("capture_facts"), capturesBefore, "no capture covers the difference");
+  assert.equal(await iw.w.count("payment_orders"), ordersBefore, "no order");
+
+  // the paid purchase is refunded in full through the public commands, then the larger scope is quoted anew and explicitly accepted
+  const refund = await refundedThrough(iw, a, paid.purchase, 129_500n);
+  const quote = await quoted(iw, a, larger);
+  assert.deepEqual([quote.quote.baseServiceCents, quote.quote.discountCents, quote.quote.serviceCents, quote.quote.state], ["199500", "0", "199500", "ISSUED"]);
+  const next = await paidThrough(iw, a, quote);
+  assert.deepEqual([next.order.order.expectedAmountCents, next.captured.capture?.amountCents], ["199500", "199500"]);
+
+  // the rows in order: the refund completed, the new quote issued, the order created, the new capture observed — one capture per quote, each for its own total
+  const timeline = await oracleRows<{ what: string; at: Date }>(
+    iw,
+    `SELECT 'REFUND' AS what, completed_at AS at FROM kauro.refunds WHERE refund_id = $1
+     UNION ALL SELECT 'QUOTE', issued_at FROM kauro.quotes WHERE quote_id = $2
+     UNION ALL SELECT 'ORDER', created_at FROM kauro.payment_orders WHERE quote_id = $2
+     UNION ALL SELECT 'CAPTURE', observed_at FROM kauro.capture_facts WHERE capture_id = $3
+     ORDER BY at`,
+    [refund.refundId, quote.quote.quoteId, next.purchase.captureId],
+  );
+  assert.deepEqual(timeline.map((t) => t.what), ["REFUND", "QUOTE", "ORDER", "CAPTURE"]);
+  const captures = await oracleRows<{ capture_id: string; amount_cents: string }>(iw, "SELECT capture_id, amount_cents::text FROM kauro.capture_facts WHERE order_id = ANY (SELECT order_id FROM kauro.payment_orders WHERE agency_id = $1) ORDER BY observed_at", [a.s.agency.agencyId]);
+  assert.deepEqual(captures.map((c) => c.amount_cents), ["129500", "199500"]);
+});
 test("R2-095 (example 12): after AssignAccount moves A's acquired agency to seller B, the agency's next purchase inside A's window accrues A's 400-bps line and no line for B; B's assistance agreement signed before a later order accrues B's own 400-bps pool beside A's, never reducing it", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const owner = iw.owner.userId as UserId;
+  const a = await agentOf(iw, "ex12");
+  const acquired = await claimed(iw, "ex12-a");
+  const A = acquired.sellers[0]!;
+  await acceptedThrough(iw, a.s.agency.agencyId, acquired, [10_000]);
 
+  // seller A acquired the agency: its first purchase (no founding slot is left: 129,500 undiscounted) accrues 129,500 x 1000 bps = 12,950
+  const first = await bought(iw, a, "ex12-first", { units: 50_000 });
+  assert.deepEqual([first.quote.quote.serviceCents, first.quote.quote.discount.basis], ["129500", "NONE"]);
+  await dispatched(iw);
+  const [firstLine] = await linesOf(iw, first.purchase.authorizationId);
+  assert.deepEqual([firstLine?.seller_id, firstLine?.cumulative_entitlement_cents], [A.sellerId, "12950"]);
+
+  // the owner opens the agency's account with A, then moves it to seller B (AssignAccount through its route, both service assignments prepared)
+  const B = await seller(iw, "ex12-b");
+  const opened = await assignedThrough(iw, a.s.agency.agencyId, { expectedVersion: 0, sellerId: A.sellerId, serviceAssignmentRef: await recordServiceAssignment(iw.h, { ownerUserId: owner, agencyId: a.s.agency.agencyId, sellerId: A.sellerId }) });
+  assert.deepEqual([opened.version, opened.sellerId], [1, A.sellerId]);
+  const moved = await assignedThrough(iw, a.s.agency.agencyId, { expectedVersion: 1, sellerId: B.sellerId, serviceAssignmentRef: await recordServiceAssignment(iw.h, { ownerUserId: owner, agencyId: a.s.agency.agencyId, sellerId: B.sellerId }) });
+  assert.deepEqual([moved.version, moved.sellerId, moved.newWorkCompensation], [2, B.sellerId, "NONE"]);
+
+  // the next purchase, inside A's window: one more project, a recurrence discount of 500 bps (6,475 exactly) so 123,025, and A's 400-bps
+  // line of 123,025 x 400 bps = 4,921 exactly; B signed nothing before the order, so B accrues nothing
+  const next = await bought(iw, a, "ex12-next", { units: 50_000 });
+  assert.deepEqual([next.quote.quote.serviceCents, next.quote.quote.discount.bps, next.quote.quote.discount.basis], ["123025", 500, "REPEAT"]);
+  await dispatched(iw);
+  assert.deepEqual(
+    (await poolsOf(iw, next.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents]),
+    [["ACQUISITION", "REPEAT", 400, "123025", "4921"]],
+  );
+  assert.deepEqual((await linesOf(iw, next.purchase.authorizationId)).map((l) => [l.seller_id, l.cumulative_entitlement_cents]), [[A.sellerId, "4921"]]);
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS lines FROM kauro.commission_lines WHERE seller_id = $1", [B.sellerId]), [{ lines: 0 }], "no line for B");
+
+  // B's assistance agreement for the agency's next purchase is signed before a later order: that purchase accrues B's own 400-bps pool
+  // beside A's, 4,921 each, A's never reduced
+  const assistance = await recordAssistanceAgreement(iw.h, { ownerUserId: owner, agencyId: a.s.agency.agencyId, seller: B, scope: "NEXT_PURCHASE" });
+  const later = await bought(iw, a, "ex12-later", { units: 50_000 });
+  assert.equal(later.quote.quote.serviceCents, "123025");
+  await dispatched(iw);
+  assert.deepEqual(
+    (await poolsOf(iw, later.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents]),
+    [
+      ["ACQUISITION", "REPEAT", 400, "123025", "4921"],
+      ["ASSISTANCE", "ASSISTANCE", 400, "123025", "4921"],
+    ],
+  );
+  assert.deepEqual(
+    (await linesOf(iw, later.purchase.authorizationId)).map((l) => [l.seller_id, l.cumulative_entitlement_cents]).sort(),
+    [[A.sellerId, "4921"], [B.sellerId, "4921"]].sort(),
+  );
+  assert.deepEqual(await oracleRows(iw, "SELECT assistance_agreement_id FROM kauro.commission_pools WHERE authorization_id = $1 AND source = 'ASSISTANCE'", [later.purchase.authorizationId]), [{ assistance_agreement_id: assistance }]);
+  // A's acquisition entitlement, allocation and earlier lines are as they were
+  assert.deepEqual(await oracleRows(iw, "SELECT cumulative_entitlement_cents::text AS cents FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]), [{ cents: "12950" }]);
+});
 test("R2-098 (example 3): after the window the agency's next project is still quoted at its 500-bps recurrence discount, its capture accrues nothing for the seller, and the seller's earlier ELIGIBLE line is paid on the next statement", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");

@@ -15,7 +15,8 @@ import { prepareAllocation } from "./sales-support.js";
 import { claimsOn, linesOf, oracleRows, poolsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
 import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
-import { call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
+import { approveThroughRoute, call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
+import { createRevision, projectPointer } from "./source-support.js";
 import { paymentRoutes } from "./commerce-support.js";
 
 export { claimsOn, linesOf, oracleRows, poolsOf, recordClaim, recordProspect };
@@ -64,7 +65,6 @@ export async function planOf(iw: IntegrationWorld, a: Agent, label: string, opti
   const { w } = iw;
   const { projectId } = await w.project(a.s.agency, (options.clientId ?? a.s.clientId) as never, { mode: "HUBSPOT" });
   const plan = await w.approvable(a.s.agency, projectId, label, "SET", { recent: true, mode: "HUBSPOT", ...(options.units !== undefined ? { billableSourceUnits: options.units } : {}) });
-  const { approveThroughRoute } = await import("./support.js");
   await approveThroughRoute(w, plan, a.s.owner, a.s.agency.agencyId);
   return plan;
 }
@@ -73,6 +73,29 @@ export async function planOf(iw: IntegrationWorld, a: Agent, label: string, opti
 export async function anotherClient(iw: IntegrationWorld, a: Agent, name: string): Promise<string> {
   const authority = await iw.h.processingAuthority(a.s.agency);
   return iw.h.endClient(a.s.agency, authority, name);
+}
+
+/**
+ * A corrected revision of a paid project, sealed through the source lifecycle (B07's CMD012 through its route supersedes the paid one; the
+ * seal freezes `units` billable units), a plan over it and the same target, approved through CMD025: what a replacement quote or a larger
+ * scope is quoted on.
+ */
+export async function replacementPlanOf(iw: IntegrationWorld, a: Agent, paid: { readonly purchase: Purchase; readonly plan: PlanFixture }, options: { readonly units: number; readonly seed: string }): Promise<PlanFixture> {
+  const { w } = iw;
+  const projectId = paid.purchase.projectId as ProjectId;
+  const replaced = (await oracleRows<{ revision_id: string }>(iw, "SELECT revision_id FROM kauro.dataset_revisions WHERE project_id = $1 AND manifest_hash = $2", [projectId, paid.plan.revisionHash]))[0]!.revision_id;
+  const pointer = await projectPointer(w, projectId);
+  const created = completed<{ revision: { revisionId: string } }>(await createRevision(w, projectId, pointer.version, replaced, { person: a.s.owner, agency: a.s.agency.agencyId }), 201);
+  const sealed = await w.h.sealedRevision(a.s.agency, projectId, "SEALED", { base: new Date(Date.now() - 3_600_000), billableSourceUnits: options.units });
+  assert.equal(sealed.revisionId, created.data.revision.revisionId, "the source lifecycle sealed CMD012's successor");
+  const plan = await w.plan(a.s.agency, projectId, { revisionHash: sealed.revisionHash, targetContractHash: paid.plan.targetContractHash, seed: options.seed, state: "VALIDATED" });
+  await approveThroughRoute(w, plan, a.s.owner, a.s.agency.agencyId);
+  return plan;
+}
+
+/** The founding cohort's three slots are consumed (the titles that run first took them): the cents of a later quote are then the undiscounted band less its repeat tier. */
+export async function assertCohortConsumed(iw: IntegrationWorld): Promise<void> {
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*) FILTER (WHERE held)::int AS held, count(*)::int AS slots FROM kauro.founding_slots WHERE policy_version = 'R2-INITIAL'"), [{ held: 3, slots: 3 }], "the founding cohort is consumed: run the whole file in order");
 }
 
 // --- the payment commands ----------------------------------------------------------------------------------------------------------
@@ -248,6 +271,7 @@ export {
   proposal,
   reconcilePayout,
   scriptEvidence,
+  seller,
   serviceToken,
   statementsOfSeller,
 };
