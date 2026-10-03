@@ -97,6 +97,7 @@ import type {
   SellerActivationFacts,
   SellerAgreementId,
   SellerAgreementRecord,
+  SellerAssessmentId,
   SellerId,
   SellerRecord,
   SellerState,
@@ -276,6 +277,13 @@ export interface AgencyLifecycleRepository {
 export interface SellerChange {
   readonly state: SellerState;
   readonly activeAgreementId?: SellerAgreementId;
+  /**
+   * seller_activated (CMD049, CANDIDATE → ACTIVE): the passed assessment the activation stands on (assessmentEvidenceRef) and the
+   * owner's own fresh step-up (assuranceProofRef); the database records the activating person and instant itself and repeats every
+   * activation fact (KC005).
+   */
+  readonly activationAssessmentId?: SellerAssessmentId;
+  readonly activationProofId?: AssuranceProofId;
 }
 
 export interface NewProspect {
@@ -321,8 +329,11 @@ export interface SalesRepository {
   getAgreement(agreementId: SellerAgreementId): Promise<SellerAgreementRecord | null>;
   /** The seller's agreement in force at `at` (claims cite its version; entitlements bind it). */
   agreementInForce(sellerId: SellerId, at: UtcInstant): Promise<SellerAgreementRecord | null>;
-  /** The CMD049 prerequisites the database repeats (KC005), read after the seller's lock. */
-  activationFacts(sellerId: SellerId, agreementId: SellerAgreementId): Promise<SellerActivationFacts>;
+  /**
+   * The CMD049 prerequisites the database repeats (KC005), read after the seller's lock: the assessment is the one CMD049 names
+   * (assessmentEvidenceRef) when given, else the seller's latest passed one.
+   */
+  activationFacts(sellerId: SellerId, agreementId: SellerAgreementId, assessmentId?: SellerAssessmentId): Promise<SellerActivationFacts>;
   getDestination(destinationId: PayoutDestinationId): Promise<PayoutDestinationRecord | null>;
   /** The seller's latest destination version (PENDING_VERIFICATION or VERIFIED), or null. */
   currentDestination(sellerId: SellerId): Promise<PayoutDestinationRecord | null>;

@@ -58,3 +58,5 @@ export { activateAgency, recordReviewedFiscalProfile, issueQuote, checkoutOrder,
 export type { ReviewedTreatment, QuoteInput, IssuedQuote, PurchaseInput, CheckoutOrder, PaidPurchase, ProviderIdentities } from "./commerce-purchases.js";
 export { commercialUnits, commissionUnitsAhead, issueCommercialQuote, foundingQuote, qualifyingHistory } from "./commercial-recurrence.js";
 export type { CommercialQuoteInput, QualifyingPurchase } from "./commercial-recurrence.js";
+export { recordActiveSeller, recordProspect, recordClaim, recordFrozenAllocation, recordConversion, recordServiceAssignment, recordAssistanceAgreement } from "./sales-fixtures.js";
+export type { RecordedSeller, RecordedProspect, SellerTerms } from "./sales-fixtures.js";

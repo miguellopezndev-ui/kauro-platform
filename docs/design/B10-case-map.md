@@ -195,7 +195,7 @@ automatic residual.
 Expected (registry): keep A's contractual residual; B's new service compensation is separately agreed rather than duplicating or
 erasing the acquisition pool.
 
-- PLANNED EXECUTED_LOCAL (B10-ADAPTERS-SALES) `packages/persistence/test/b10-sales-adapters.test.ts` :: "R2-095 (example 12): reassigning seller A's acquired agency to seller B appends B's current assignment and service assignment while A's entitlement, allocation, window and accrued lines are unchanged row for row" — observes: row digests before and after.
+- EXECUTED_LOCAL (B10-ADAPTERS-SALES, 7fc0be2) `packages/persistence/test/b10-sales-adapters.test.ts` :: "R2-095 (example 12): reassigning seller A's acquired agency to seller B appends B's current assignment and service assignment while A's entitlement, allocation, window and accrued lines are unchanged row for row" — observes: row digests before and after.
 - PLANNED EXECUTED_LOCAL (B10-COMMANDS-SELLERS) `apps/api/test/cmd048-assign-account.test.ts` :: "R2-095: AssignAccount to seller B with a prepared assistance agreement answers the new operational owner and B's compensation for new work, while seller A's entitlement, allocation share, window and accrued lines stay A's and B gains no row of them" — observes: the answer, both sellers' rows through their own sessions.
 - PLANNED EXECUTED_LOCAL (B10-INTEGRATION) `apps/api/test/b10-scenarios.test.ts` :: "R2-095 (example 12): after AssignAccount moves A's acquired agency to seller B, the agency's next purchase inside A's window accrues A's 400-bps line and no line for B; B's assistance agreement signed before a later order accrues B's own 400-bps pool beside A's, never reducing it" — observes: pools and lines of both purchases.
 
@@ -229,7 +229,7 @@ Expected (registry): no automatic acquisition residual; earned prior lines remai
 Expected (registry): create a prospective project-assistance agreement before requiring work; do not condition old rights on unpaid
 future activity.
 
-- PLANNED EXECUTED_LOCAL (B10-ADAPTERS-SALES) `packages/persistence/test/b10-sales-adapters.test.ts` :: "R2-099: an assistance agreement records its seller, agency, project or next purchase, 400 bps and signing instant before any work, and an agreement signed after a purchase's order was created applies to no pool of that purchase" — observes: the agreement row, the applicability query.
+- EXECUTED_LOCAL (B10-ADAPTERS-SALES, 7fc0be2) `packages/persistence/test/b10-sales-adapters.test.ts` :: "R2-099: an assistance agreement records its seller, agency, project or next purchase, 400 bps and signing instant before any work, and an agreement signed after a purchase's order was created applies to no pool of that purchase" — observes: the agreement row, the applicability query.
 - PLANNED EXECUTED_LOCAL (B10-COMMISSION-SERVICE) `apps/api/test/b10-commission-service.test.ts` :: "R2-099 (example 3): a post-window purchase whose order follows a signed assistance agreement accrues one ASSISTANCE pool at 400 bps for that seller only, separate from any acquisition pool, and the seller's old lines never wait on the new work" — observes: pools by source, the old lines' states.
 
 ### R2-100 — Termination tail scope
