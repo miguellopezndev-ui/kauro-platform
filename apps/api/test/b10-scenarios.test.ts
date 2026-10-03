@@ -678,5 +678,34 @@ test("CMD050-RACE: TerminateSeller racing AcceptAttribution of the seller's unli
     assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS live FROM kauro.attribution_claims WHERE seller_id = $1 AND state IN ('SUBMITTED', 'ACCEPTED')", [D.sellerId]), [{ live: 0 }], "no live claim of a terminated seller remains");
     assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS entitlements FROM kauro.commission_entitlements WHERE seller_id = $1", [D.sellerId]), [{ entitlements: 0 }]);
   }
+
+  // every scenario of the file has settled: one whole cycle of the commission service — the five sweeps and PERIODS — finds nothing to repair
+  await dispatched(iw);
+  const census = async () =>
+    oracleRows(
+      iw,
+      `SELECT (SELECT count(*) FROM kauro.commission_pools)::int AS pools, (SELECT count(*) FROM kauro.commission_adjustments)::int AS adjustments,
+              (SELECT count(*) FROM kauro.commission_holds)::int AS holds, (SELECT count(*) FROM kauro.commission_statements)::int AS statements,
+              (SELECT count(*) FROM kauro.payout_intents)::int AS intents,
+              (SELECT md5(string_agg(line_id::text || state || version::text, ',' ORDER BY line_id)) FROM kauro.commission_lines) AS lines,
+              (SELECT md5(string_agg(claim_id::text || state || version::text, ',' ORDER BY claim_id)) FROM kauro.attribution_claims) AS claims,
+              (SELECT md5(string_agg(entitlement_id::text || state, ',' ORDER BY entitlement_id)) FROM kauro.commission_entitlements) AS entitlements,
+              (SELECT md5(string_agg(reservation_id::text || state, ',' ORDER BY reservation_id)) FROM kauro.founding_slot_reservations) AS reservations`,
+    );
+  const before = await census();
+  const cycle = await iw.service.runCycle();
+  assert.deepEqual(cycle.map((r) => r.sweep), ["QUOTE_EXPIRY", "ACCRUAL_RECONCILIATION", "CLAIM_WINDOWS", "ENTITLEMENT_WINDOWS", "ELIGIBILITY", "PERIODS"], "PERIODS joins the cycle after the five sweeps");
+  // nothing to repair: no conversion, accrual, expiry, release, eligibility, completion, close or failure; the ones that look and find nothing
+  // are NOTHING_TO_CONVERT, LACKING n (purchases that accrue no pool, as example 3's post-window capture), NOTHING_TO_ACCRUE and NO_COMPLETION
+  const repairs = (reports: ReadonlyArray<{ readonly sweep: string; readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> }>): string[] =>
+    reports.flatMap((r) => r.items.filter((i) => !/^(NOTHING_TO_CONVERT|LACKING \d+|NOTHING_TO_ACCRUE|NO_COMPLETION|OPENED \d{4}-\d{2}|EXISTS \d{4}-\d{2})$/.test(i.outcome)).map((i) => `${r.sweep} ${i.subject} ${i.outcome}`));
+  assert.deepEqual(repairs(cycle), []);
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit" }).format(new Date());
+  assert.deepEqual(cycle.find((r) => r.sweep === "PERIODS")?.items, [{ subject: "OPEN", outcome: `OPENED ${month}` }], "the month the server stands in is opened, and no due period is left open to close");
+  assert.deepEqual(await census(), before, "the cycle changed no row of the ledger, the claims, the entitlements, the reservations or the statements");
+  const again = await iw.service.runCycle();
+  assert.deepEqual(repairs(again), []);
+  assert.deepEqual(again.find((r) => r.sweep === "PERIODS")?.items, [{ subject: "OPEN", outcome: `EXISTS ${month}` }], "a second pass finds the month open");
+  assert.deepEqual(await census(), before);
 });
 
