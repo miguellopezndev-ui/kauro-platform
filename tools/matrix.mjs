@@ -52,7 +52,7 @@ export const EDGE_OWNERS = {
     restriction_remedied: { owner: "B16", why: "the reviewed remedy of the same incident; no registry command names it", event: "agency.restriction_remedied.v1" },
     owner_requests_closure: { command: "CMD043", event: "agency.closing.v1" },
     owner_abandons_setup: { command: "CMD043", event: "agency.closing.v1" },
-    closure_obligations_completed: { owner: "B10", why: "the closure workflow of CMD043 once jobs, access, data and financial residuals are accounted for", event: "agency.closed.v1" },
+    closure_obligations_completed: { owner: "B16", why: "the verified managed deletion once jobs, access, data and financial residuals are accounted for (D10-AGY-2; B10's agencies_closure_residuals refuses the edge, KC006, while a payment, refund, live authorization, tax document or reconciliation case of the agency is open)", event: "agency.closed.v1" },
   },
   Membership: {
     "(initial INVITED)": { command: "CMD003", event: "membership.invited.v1", note: "CMD001 creates the founding OWNER ACTIVE (membership.created.v1; decision D-CTX-2)" },
@@ -492,6 +492,29 @@ export const APPLICABILITY = {
     "lost response": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "external uncertainty": "NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service)",
   },
+  // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
+  CMD002: {
+    "legitimate state": [["cmd002-activate-agency.test.ts", "OK: the agency's OWNER activates its DRAFT agency"]],
+    "wrong role": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404) and a BILLING member a wrong role (403 ROLE_INSUFFICIENT)"]],
+    "wrong agency": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404)"]],
+    "stale version": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "duplicate request": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "changed-body same key": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance, the same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the acceptance, the agency's move and the journal entry are rows of one database transaction, and the capabilities offered are answered, never written",
+  },
+  CMD043: {
+    "legitimate state": [["cmd043-close-agency.test.ts", "OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency with nothing in flight"], ["cmd043-close-agency.test.ts", "OK (new work stops): after CloseAgency"]],
+    "wrong role": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403)"]],
+    "wrong agency": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404)"]],
+    "stale version": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403); then one missing prerequisite at a time — no fresh step-up ASSURANCE_REQUIRED, a stale version STALE_VERSION"]],
+    "duplicate request": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200, the same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: a closure reaches no provider; a payment order or refund in flight or uncertain refuses it (CLOSURE_OBLIGATIONS_UNRECONCILED) and an open reconciliation case is inventoried for its own reviewed resolution (D10-AGY-4)",
+  },
 };
 
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
@@ -579,6 +602,13 @@ export async function loadMatrixSources() {
     outcomes[id] = application.COMMERCE_COMMAND_OUTCOMES[id];
     published[id] = [...application.COMMERCE_COMMAND_EVENTS[id]];
   }
+  // package B10's served commands (docs/design/B10-commercial-domain.md §13): their specs, catalogues and published events from the application's served lists
+  for (const id of application.COMMERCIAL_SERVED_COMMAND_IDS) {
+    const c = application.COMMERCIAL_COMMANDS[id];
+    specs[id] = { name: c.name, method: c.method, path: c.path, role: c.role, scope: c.scope, stepUpRequired: c.stepUp, stepUp: c.stepUp ? "REQUIRED" : "NEVER" };
+    outcomes[id] = application.COMMERCIAL_COMMAND_OUTCOMES[id];
+    published[id] = [...application.COMMERCIAL_COMMAND_EVENTS[id]];
+  }
   const reads = { ...application.READ_ROUTES };
   const readOutcomes = { ...application.READ_OUTCOMES };
   const readViews = { ...application.READ_RESPONSES };
@@ -615,7 +645,7 @@ export async function loadMatrixSources() {
     intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
-    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS]),
+    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS, ...application.COMMERCIAL_SERVED_COMMAND_IDS]),
     seeded,
     published,
     tests,
@@ -681,7 +711,7 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06, B07 and B09 served)");
+  line("# State, command and event matrix (B06, B07, B09 and B10 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
@@ -695,7 +725,8 @@ export function generateMatrix(s) {
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
   line("commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision");
   line("D-REQ-B7): their specs, catalogues (`COMMERCE_COMMAND_OUTCOMES`, `COMMERCE_READ_OUTCOMES`) and published events");
-  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Authority:");
+  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Package B10's served commands join them from");
+  line("`COMMERCIAL_SERVED_COMMAND_IDS` (specs `COMMERCIAL_COMMANDS`, catalogues `COMMERCIAL_COMMAND_OUTCOMES`, events `COMMERCIAL_COMMAND_EVENTS`). Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
   line("obligations\". Re-check finding N13.");
   line();

@@ -61,6 +61,8 @@ export const SQLSTATE = Object.freeze({
   PAYOUT_NOT_SETTLED: "KC010",
   ADJUSTMENT_NOT_CUMULATIVE: "KC015",
   OFFSET_NOT_AUTHORIZED: "KC017",
+  // package B10 (migration 0028): the agency closure residuals the lifecycle adapter surfaces (docs/design/B10-commercial-domain.md §12)
+  CLOSURE_RESIDUALS_OPEN: "KC006",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -127,6 +129,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KC009: { code: "PRECONDITION_FAILED", reason: "PAYEE_UNVERIFIED" },
   KC010: { code: "PRECONDITION_FAILED", reason: "PAYOUT_NOT_SETTLED" },
   KC017: { code: "PRECONDITION_FAILED", reason: "OFFSET_NOT_AUTHORIZED" },
+  // CLOSING -> CLOSED while a payment, refund, authorization, tax document or reconciliation case of the agency is open (D10-AGY-4)
+  KC006: { code: "PRECONDITION_FAILED", reason: "CLOSURE_RESIDUALS_OPEN" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -281,6 +285,10 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
   }
   if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint !== undefined && LABEL_CONSTRAINT_FIELDS[constraint] !== undefined) {
     return new DomainFailure("INVALID_REQUEST", `database refused the write (${sqlState} ${constraint})`, { reason: "SCHEMA_VIOLATION", fields: [{ field: LABEL_CONSTRAINT_FIELDS[constraint] as string, code: "FORMAT" }] });
+  }
+  // B10: an acceptance of a version retired between the read and the write (the guard of 0028 reads it after its transition lock)
+  if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint === "agency_agreement_acceptances_published") {
+    return new DomainFailure("PRECONDITION_FAILED", "database refused the write (23514 agency_agreement_acceptances_published)", { reason: "AGREEMENT_VERSION_NOT_PUBLISHED" });
   }
   const m = MAP[sqlState];
   if (!m) return null;

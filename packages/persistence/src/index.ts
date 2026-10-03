@@ -106,3 +106,8 @@ export { PgStatementRepository } from "./repositories/commercial-statements.js";
 export { ledgerOf, statementsOf } from "./commercial-ledger-access.js";
 export { RecordedBankingCalendarSource, AuthorizationDeliveryCompletionSource, AUTHORIZATION_DELIVERY_EVIDENCE_DOMAIN } from "./commercial-bindings.js";
 export type { RecordedCalendarVersion, RecordedCompletion } from "./commercial-bindings.js";
+// the agency lifecycle of package B10 (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-commercial-domain.md §4, §8.1, §11): the published
+// agreement versions and acceptances CMD002 records, the closure CMD043 records with its obligations inventory, the relationship decisions
+// of R2-141, and the accessor over a unit of work
+export { PgAgencyLifecycleRepository } from "./repositories/commercial-agency-lifecycle.js";
+export { agencyLifecycleOf } from "./commercial-agency-access.js";

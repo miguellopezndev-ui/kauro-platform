@@ -62,3 +62,7 @@ export { recordActiveSeller, recordProspect, recordClaim, recordFrozenAllocation
 export type { RecordedSeller, RecordedProspect, SellerTerms } from "./sales-fixtures.js";
 export { recordAccruedLine, recordEligibleLine, recordHold, recordIssuedStatement } from "./ledger-fixtures.js";
 export type { LedgerLineInput, RecordedLine } from "./ledger-fixtures.js";
+// the agency lifecycle of package B10 (mandate B10-AGENCY-LIFECYCLE): the agreement versions the control plane publishes, the founding
+// reservation of a quote and the commission lines of a closing agency
+export { publishAgreementVersions, reserveFoundingSlot, recordAcquisition, recordFirstPurchaseLine, makeLineEligible } from "./agency-fixtures.js";
+export type { PublishedAgreement, PublishedAgreements, AcquiredAgency, RecordedLine } from "./agency-fixtures.js";

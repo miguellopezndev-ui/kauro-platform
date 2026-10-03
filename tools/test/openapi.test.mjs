@@ -27,7 +27,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1) and the two served commands of package
+  // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -50,7 +51,9 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
+      "POST /api/v1/agencies/{agencyId}/activate ActivateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
+      "POST /api/v1/agencies/{agencyId}/closure-requests CloseAgency",
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",

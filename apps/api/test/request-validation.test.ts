@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { B06_COMMANDS, B07_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, SOURCE_INTAKE_ROUTES, SOURCE_REQUEST_SCHEMA_IDS, requestSchemaId } from "@kauro/application";
+import { B06_COMMANDS, B07_COMMANDS, COMMERCIAL_COMMANDS, COMMERCIAL_SERVED_COMMAND_IDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, SOURCE_INTAKE_ROUTES, SOURCE_REQUEST_SCHEMA_IDS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -250,11 +250,15 @@ test("exactly the thirteen catalogue routes and the selection manifest intake ar
   const commerceGets = new Set(COMMERCE_SERVED_READ_IDS.map((id) => fastifyPath(COMMERCE_READ_ROUTES[id].path)));
   for (const path of commercePosts) assert.ok(w.app.hasRoute({ method: "POST", url: path }) && path.startsWith("/api/v1/"), path);
   for (const path of commerceGets) assert.ok(w.app.hasRoute({ method: "GET", url: path }) && path.startsWith("/api/v1/"), path);
+  // package B10's served commands (mandate B10-AGENCY-LIFECYCLE; each command lane adds its own to COMMERCIAL_SERVED_COMMAND_IDS)
+  const commercialPosts = new Set(COMMERCIAL_SERVED_COMMAND_IDS.map((id) => fastifyPath(COMMERCIAL_COMMANDS[id].path)));
+  for (const path of commercialPosts) assert.ok(w.app.hasRoute({ method: "POST", url: path }) && path.startsWith("/api/v1/"), path);
   const inventory = routeInventoryOf(w.app);
   // B06's seven commands, B07's six (design §11) and the selection manifest intake (D-SEL-2); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url)).length, 14);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url)).length, 14);
+  assert.deepEqual(inventory.filter((r) => commercialPosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercialPosts].sort());
   // the five manual-10 reads and the seven source reads (B07 design §9.1)
   assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url)).length, 12);
   assert.deepEqual(inventory.filter((r) => commercePosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercePosts].sort());
@@ -264,6 +268,7 @@ test("exactly the thirteen catalogue routes and the selection manifest intake ar
   for (const id of SOURCE_REQUEST_SCHEMA_IDS) assert.ok(w.validator.knownSchemaIds.includes(id), id);
   for (const route of Object.values(SOURCE_INTAKE_ROUTES)) assert.ok(w.validator.knownSchemaIds.includes(route.schemaId), route.schemaId);
   for (const id of COMMERCE_SERVED_COMMAND_IDS) assert.ok((w.validator.knownSchemaIds as ReadonlyArray<string>).includes(`${REQUEST_SCHEMA_PREFIX}${id}`), id);
+  for (const id of COMMERCIAL_SERVED_COMMAND_IDS) assert.ok((w.validator.knownSchemaIds as ReadonlyArray<string>).includes(`${REQUEST_SCHEMA_PREFIX}${id}`), id);
 });
 
 test("an unexpected exception is 500 INTERNAL_ERROR with only the correlation id, RETRY_SAME_KEY and the safe classification handed to the sink; no stack, SQL or message reaches the wire", async () => {

@@ -313,6 +313,8 @@ export interface AgreementAcceptanceRecord {
 export interface ClosureCaseEntry {
   readonly caseId: string;
   readonly kind: string;
+  /** The case's detail code (an UNKNOWN_REFUND is a PROVIDER_INCONSISTENCY whose detail names it; migration 0019). */
+  readonly detailCode?: string;
   readonly amountCents?: bigint;
   readonly openedAt: UtcInstant;
 }
