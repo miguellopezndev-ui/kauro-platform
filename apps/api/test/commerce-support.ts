@@ -35,7 +35,7 @@ import type { CausationId, Clock, FiscalIssuerRef, FiscalProfileId, InboxId, Pla
 import { COMMERCE_EVENT_SUBSCRIPTIONS, toUtcInstant } from "@kauro/domain";
 import { activateAgency, issueQuote, paidPurchase, recordReviewedFiscalProfile, type IssuedQuote, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
 import { purchasedSubjectReader } from "../src/index.js";
-import { SimulatedCrash, approveThroughRoute, call, freshKey, ids, sha, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
+import { SimulatedCrash, approveThroughRoute, call, freshKey, ids, sha, world, type Person, type PlanFixture, type Reply, type World, type WorldOptions } from "./support.js";
 
 // --- the clock -------------------------------------------------------------------------------------------------------------------
 
@@ -167,7 +167,7 @@ export interface ReadyQuote extends IssuedQuote {
  */
 export type EditionCollaborator = "payment" | "provider" | "capacity";
 
-export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator> } = {}): Promise<PaymentsWorld> {
+export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly commercial?: WorldOptions["commercial"] } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
@@ -177,6 +177,7 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
   const unbound = new Set(options.unbound ?? []);
   const w = await world({
     clock,
+    ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     commerce: (h) => ({
       ...(unbound.has("payment") ? {} : { payment: h.commerce }),
       ...(unbound.has("provider") ? {} : { provider }),

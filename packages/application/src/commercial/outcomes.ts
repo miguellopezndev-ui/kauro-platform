@@ -10,6 +10,11 @@ import type { CommercialServedRouteCommandId } from "./served.js";
 
 const { EVERY_ROUTE, PATH_IDS, TENANT } = OUTCOME_BLOCKS;
 
+/** The corporate principals of the sales commands (D10-CTX-1, D10-CTX-2): a person without the ACTIVE seller row or owner grant the command needs. */
+const CORPORATE_ACCESS: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("ACCESS", "NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING", "the caller holds no ACTIVE seller row (or, for the owner commands, no ACTIVE KAURO_OWNER grant), read after its transition lock: an agency member, a CANDIDATE, SUSPENDED or TERMINATED seller and a revoked owner answer alike"),
+]);
+
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 
 /** The command-layer outcomes of each served B10 command (design §4, §12; reference/COMMAND_CATALOGUE preconditions and failures). */
@@ -23,6 +28,30 @@ const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, Readonly
     outcome("COMMAND", "PRECONDITION_FAILED", "FISCAL_TREATMENT_UNREVIEWED", "the agency's current fiscal profile carries no reviewed treatment (R2-082): activation does not rest on an unknown treatment"),
   ],
   // CMD043: the path agency's OWNER with a fresh step-up; the step-up, then the version, then the state, then the obligations (D10-AGY-2, D10-AGY-4)
+  // CMD045: an ACTIVE seller or the owner; the label, then the caller's own AGENCY-segment evidence and contact, suppression, then a live duplicate (D10-PROS-1)
+  CMD045: [
+    outcome("COMMAND", "PRECONDITION_FAILED", "SOURCE_EVIDENCE_INVALID", "sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is not of the AGENCY segment: another seller's record is as unknown as a missing one"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROSPECT_SUPPRESSED", "the organization key or the contact key is suppressed, however the organization is spelled (KC016)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROSPECT_EXISTS", "the organization already has a live prospect (the unique index answers for a prospect the caller cannot read)"),
+  ],
+  // CMD046: an ACTIVE seller on a prospect it owns; the agreement version, the evidence, then its own live claim (D10-CLAIM-1)
+  CMD046: [
+    outcome("ACCESS", "NOT_FOUND", null, "the prospect is not one the seller owns: a foreign and a nonexistent prospect answer alike"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "AGREEMENT_VERSION_MISMATCH", "agreementVersion is not the version of the seller's agreement in force"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EVIDENCE_INSUFFICIENT", "evidenceHash is not the seller's own evidence for this prospect, or records only a list import or a tracking link"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EXISTS", "the seller already has a live claim on the prospect"),
+  ],
+  // CMD047: the owner; the claim, the version, its state, the prepared allocation, the split, the agency's single allocation, its buyer type and its first order (D10-ATTR-1, D58)
+  CMD047: [
+    outcome("COMMAND", "NOT_FOUND", null, "the claim, or the allocation on its prospect, is unknown"),
+    STALE("claim"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_NOT_REVIEWABLE", "the claim (or a claim the allocation names) is not SUBMITTED or DISPUTED", { current: "SOMETIMES" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "SHARES_NOT_WHOLE", "the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "ATTRIBUTION_EXISTS", "the agency already has a frozen allocation: the pool does not become 10% for each seller"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "BUYER_TYPE_UNSET", "the agency's buyer type is not recorded (D58)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "IN_HOUSE_NOT_ATTRIBUTABLE", "the agency is an in-house tenant: no seller attribution arises from prospecting it"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_AFTER_FIRST_ORDER", "the claim was submitted after the agency's first payment order"),
+  ],
   CMD043: [
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "no step-up proof, or not a step-up proof"),
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the proof is not the caller's"),
@@ -36,8 +65,14 @@ const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, Readonly
 /** A tenant command whose path names the agency: the authorizer's membership decisions and the path id, no agency selector. */
 const agencyPathCommand = (id: CommercialServedRouteCommandId) => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
 
+/** A corporate command: the seller or owner access decision, the path id when the route has one, and the command's own outcomes. */
+const corporateCommand = (id: CommercialServedRouteCommandId, pathId: boolean) => closedCatalogue(id, [...EVERY_ROUTE, ...(pathId ? PATH_IDS : []), ...CORPORATE_ACCESS, ...COMMAND_SPECIFIC[id]]);
+
 /** The closed problem catalogue of each served B10 command route. */
 export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD002: agencyPathCommand("CMD002"),
   CMD043: agencyPathCommand("CMD043"),
+  CMD045: corporateCommand("CMD045", false),
+  CMD046: corporateCommand("CMD046", true),
+  CMD047: corporateCommand("CMD047", true),
 });
