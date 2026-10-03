@@ -152,6 +152,78 @@ test("R2-080 (examples 2 and 6): the agency's second project, for another end cl
   assert.deepEqual(reads.seller.items.filter((i) => i.lineId === firstLine!.line_id).map((i) => [i.cumulativeEntitlementCents, i.payableCents]), [["9713", "0"]], "the first project's 9713 cents still await their final completion: never payable");
 });
 
+test("R2-097: AcceptAttribution freezing a 6000/4000 split of two sellers' claims makes the agency's first purchase accrue one 9713-cent pool with lines of 5828 and 3885 cents, never two 10% pools", async () => {
+  const a = await agentOf(iw, "ex8");
+  const attribution = await claimed(iw, "ex8", 2);
+  const [first, second] = attribution.sellers as [(typeof attribution.sellers)[number], (typeof attribution.sellers)[number]];
+  // CMD047 freezes one allocation of the two claims at 6000 and 4000 bps: both ACCEPTED, no second full-rate pool
+  const accepted = await acceptedThrough(iw, a.s.agency.agencyId, attribution, [6_000, 4_000]);
+  assert.deepEqual([accepted.view.beneficiaryCount, accepted.view.rejectedClaimCount, accepted.view.decisionReason], [2, 0, "AGREED_SPLIT"]);
+
+  const paid = await bought(iw, a, "ex8", { units: 50_000 });
+  assert.deepEqual([paid.quote.quote.serviceCents, paid.quote.quote.discount.basis], ["97125", "FOUNDING"]);
+  await dispatched(iw);
+
+  // one pool: 97,125 x 1000 bps = 9,712.5 -> 9,713, shared 6000/4000 by largest remainder (5,827.8 and 3,885.2 floor to 5,827 and 3,885;
+  // the one cent left goes to the larger remainder): 5,828 and 3,885 — never two 10% pools
+  assert.deepEqual(
+    (await poolsOf(iw, paid.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents]),
+    [["ACQUISITION", "FIRST", 1000, "97125", "9713"]],
+  );
+  const lines = await linesOf(iw, paid.purchase.authorizationId);
+  const bySeller = new Map(lines.map((l) => [l.seller_id, l]));
+  assert.equal(lines.length, 2);
+  assert.deepEqual(
+    [first, second].map((s) => [bySeller.get(s.sellerId)?.share_bps, bySeller.get(s.sellerId)?.cumulative_entitlement_cents]),
+    [[6_000, "5828"], [4_000, "3885"]],
+  );
+  assert.equal(5_828n + 3_885n, 9_713n, "the shares add up to the pool exactly");
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS pools FROM kauro.commission_pools WHERE agency_id = $1", [a.s.agency.agencyId]), [{ pools: 1 }]);
+  // control: the half-up kernel alone rounds each share of the 9,713 pool (5,827.8 and 3,885.2) to the same two lines
+  assert.deepEqual(await oracleRows(iw, "SELECT kauro.round_half_up_bps(9713, 6000)::text AS big, kauro.round_half_up_bps(9713, 4000)::text AS small"), [{ big: "5828", small: "3885" }]);
+});
+
+test("R2-096 (example 5): with the agency's first purchase fully refunded, its next purchase inside the window accrues 400 bps, never 1000; the first designation, the window and the CONSUMED founding slot are unchanged and the first line is VOID at zero", async () => {
+  const a = await agentOf(iw, "ex5");
+  const attribution = await claimed(iw, "ex5");
+  const seller = attribution.sellers[0]!;
+  await acceptedThrough(iw, a.s.agency.agencyId, attribution, [10_000]);
+  const first = await bought(iw, a, "ex5-first", { units: 50_000 });
+  assert.equal(first.quote.quote.serviceCents, "97125");
+  await dispatched(iw);
+  const [firstLine] = await linesOf(iw, first.purchase.authorizationId);
+  assert.deepEqual([firstLine?.cumulative_entitlement_cents, firstLine?.state], ["9713", "ACCRUED_PENDING"]);
+  const recurrence = async () => ({
+    designation: await oracleRows(iw, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1", [a.s.agency.agencyId]),
+    window: await oracleRows(iw, "SELECT window_starts_at, window_ends_at, state FROM kauro.commission_entitlements WHERE agency_id = $1", [a.s.agency.agencyId]),
+    slot: await oracleRows(iw, "SELECT r.state FROM kauro.founding_slot_reservations r WHERE r.agency_id = $1", [a.s.agency.agencyId]),
+  });
+  const before = await recurrence();
+  assert.deepEqual(before.designation, [{ first_qualifying_capture_id: first.purchase.captureId }]);
+  assert.deepEqual(before.slot, [{ state: "CONSUMED" }]);
+
+  // the first purchase is refunded in full through the public commands: its pool falls to zero and the line is VOID at zero
+  await refundedThrough(iw, a, first.purchase, 97_125n);
+  await dispatched(iw);
+  assert.deepEqual(
+    await oracleRows(iw, "SELECT state, net_service_basis_cents::text, cumulative_entitlement_cents::text FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]),
+    [{ state: "VOID", net_service_basis_cents: "0", cumulative_entitlement_cents: "0" }],
+  );
+  assert.deepEqual(await recurrence(), before, "the first designation, the window and the CONSUMED founding slot are unchanged");
+
+  // the agency's next purchase inside the window: the repeat rate, never the first-purchase rate again. The refunded project is not a
+  // qualifying one, so the quote carries no discount: 129,500 in the first band, and 129,500 x 400 bps = 5,180 exactly (1000 bps would be 12,950)
+  const next = await bought(iw, a, "ex5-next", { units: 50_000, clientId: await anotherClient(iw, a, "ex5 second end client") });
+  assert.deepEqual([next.quote.quote.baseServiceCents, next.quote.quote.discountCents, next.quote.quote.serviceCents], ["129500", "0", "129500"]);
+  await dispatched(iw);
+  assert.deepEqual(
+    (await poolsOf(iw, next.purchase.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents, p.confirmation_seq]),
+    [["ACQUISITION", "REPEAT", 400, "129500", "5180", 2]],
+  );
+  assert.deepEqual((await linesOf(iw, next.purchase.authorizationId)).map((l) => [l.seller_id, l.rate_bps, l.cumulative_entitlement_cents]), [[seller.sellerId, 400, "5180"]]);
+  assert.deepEqual(await recurrence(), before, "the next purchase changes none of them either");
+});
+
 test("R2-092 (example 18): a paid agency replaces its source once before execution — CreateRevision, seal, a new approval and the replacement quote — and ExecuteProject's authority is the re-bound entitlement, the old one never reusable", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");
@@ -163,16 +235,6 @@ test("R2-093: the larger scope is charged only after the paid purchase is refund
 });
 
 test("R2-095 (example 12): after AssignAccount moves A's acquired agency to seller B, the agency's next purchase inside A's window accrues A's 400-bps line and no line for B; B's assistance agreement signed before a later order accrues B's own 400-bps pool beside A's, never reducing it", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
-
-test("R2-096 (example 5): with the agency's first purchase fully refunded, its next purchase inside the window accrues 400 bps, never 1000; the first designation, the window and the CONSUMED founding slot are unchanged and the first line is VOID at zero", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
-
-test("R2-097: AcceptAttribution freezing a 6000/4000 split of two sellers' claims makes the agency's first purchase accrue one 9713-cent pool with lines of 5828 and 3885 cents, never two 10% pools", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");
 });
