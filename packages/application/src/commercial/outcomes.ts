@@ -7,6 +7,7 @@
  */
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
+import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 
 const { EVERY_ROUTE, PATH_IDS, TENANT } = OUTCOME_BLOCKS;
 
@@ -18,7 +19,7 @@ const CORPORATE_ACCESS: ReadonlyArray<ProblemOutcome> = Object.freeze([
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 
 /** The command-layer outcomes of each served B10 command (design §4, §12; reference/COMMAND_CATALOGUE preconditions and failures). */
-const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046" | "CMD047", ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   // CMD002: the path agency's OWNER; the version, then DRAFT, then the agreements, then the billing profile (D10-AGY-1)
   CMD002: [
     STALE("agency"),
@@ -63,10 +64,10 @@ const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, Readonly
 });
 
 /** A tenant command whose path names the agency: the authorizer's membership decisions and the path id, no agency selector. */
-const agencyPathCommand = (id: CommercialServedRouteCommandId) => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
+const agencyPathCommand = (id: "CMD002" | "CMD043") => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
 
 /** A corporate command: the seller or owner access decision, the path id when the route has one, and the command's own outcomes. */
-const corporateCommand = (id: CommercialServedRouteCommandId, pathId: boolean) => closedCatalogue(id, [...EVERY_ROUTE, ...(pathId ? PATH_IDS : []), ...CORPORATE_ACCESS, ...COMMAND_SPECIFIC[id]]);
+const corporateCommand = (id: "CMD045" | "CMD046" | "CMD047", pathId: boolean) => closedCatalogue(id, [...EVERY_ROUTE, ...(pathId ? PATH_IDS : []), ...CORPORATE_ACCESS, ...COMMAND_SPECIFIC[id]]);
 
 /** The closed problem catalogue of each served B10 command route. */
 export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
@@ -75,4 +76,8 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD045: corporateCommand("CMD045", false),
   CMD046: corporateCommand("CMD046", true),
   CMD047: corporateCommand("CMD047", true),
+  // the corporate owner's seller commands (B10-COMMANDS-SELLERS): the path id, the owner's access, the command-layer outcomes of sellers/outcomes
+  CMD048: closedCatalogue("CMD048", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ASSIGN_ACCOUNT_OUTCOMES]),
+  CMD049: closedCatalogue("CMD049", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ACTIVATE_SELLER_OUTCOMES]),
+  CMD050: closedCatalogue("CMD050", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...TERMINATE_SELLER_OUTCOMES]),
 });
