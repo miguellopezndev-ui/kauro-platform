@@ -26,7 +26,9 @@ import {
   capturedLater,
   claimedCents,
   intentOf,
+  opportunityOf,
   orderedThrough,
+  terminationBody,
   reconcilePayout,
   scriptEvidence,
   assignedThrough,
@@ -429,10 +431,50 @@ test("R2-098 (example 3): after the window the agency's next project is still qu
   assert.deepEqual(await oracleRows(iw, "SELECT state, paid_cents::text FROM kauro.commission_lines WHERE line_id = $1", [firstLine!.line_id]), [{ state: "PAID", paid_cents: "12950" }]);
 });
 test("R2-100: an enumerated opportunity's first purchase inside the tail converts its claim and creates the departed seller's entitlement; a first purchase after the tail's end or of an unlisted agency creates none", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const D = await seller(iw, "ex13-d");
+  // three accepted opportunities of the seller: two it hands over (X, Y) and one it does not (Z)
+  const x = await opportunityOf(iw, D, "ex13-x");
+  const y = await opportunityOf(iw, D, "ex13-y");
+  const z = await opportunityOf(iw, D, "ex13-z");
+  const done = await terminatedThrough(iw, D.sellerId, await terminationBody(iw, D.sellerId, [x.claimId, y.claimId]));
+  assert.equal(done.tailEntries, 2);
+  const [tail] = await oracleRows<{ ends_at: Date }>(iw, "SELECT max(ends_at) AS ends_at FROM kauro.termination_tail_entries WHERE seller_id = $1", [D.sellerId]);
+  assert.equal(tail!.ends_at.getTime(), Date.parse(done.tailEndsAt));
+  const claimStates = async () => Object.fromEntries((await oracleRows<{ claim_id: string; state: string }>(iw, "SELECT claim_id, state FROM kauro.attribution_claims WHERE claim_id = ANY ($1::uuid[])", [[x.claimId, y.claimId, z.claimId]])).map((c) => [c.claim_id, c.state]));
+  assert.deepEqual(await claimStates(), { [x.claimId]: "ACCEPTED", [y.claimId]: "ACCEPTED", [z.claimId]: "EXPIRED" }, "the listed claims run on for their tail; the unlisted one lapsed with the termination");
 
+  // X: the first purchase inside the tail (the public commands, now): the claim converts and the departed seller's entitlement is created,
+  // with the pool 129,500 x 1000 bps = 12,950 (no founding slot is left) and its line
+  const paidX = await bought(iw, x.a, "ex13-x", { units: 50_000 });
+  assert.equal(paidX.quote.quote.serviceCents, "129500");
+  await dispatched(iw);
+  assert.equal((await claimStates())[x.claimId], "CONVERTED");
+  const entitlements = (agencyId: string) => oracleRows<{ seller_id: string; state: string; kind: string }>(iw, "SELECT seller_id, state, kind FROM kauro.commission_entitlements WHERE agency_id = $1", [agencyId]);
+  assert.deepEqual((await entitlements(x.a.s.agency.agencyId)).map((e) => [e.seller_id, e.kind]), [[D.sellerId, "ACQUISITION"]]);
+  assert.deepEqual((await linesOf(iw, paidX.purchase.authorizationId)).map((l) => [l.seller_id, l.rate_bps, l.cumulative_entitlement_cents]), [[D.sellerId, 1000, "12950"]]);
+
+  // Y: the first purchase after the tail's end — the order is accepted now and the payment service confirms the capture a day after the
+  // tail ended (the labelled TEST CLOCK): no entitlement, no pool, no line
+  const quoteY = await quoted(iw, y.a, await planOf(iw, y.a, "ex13-y", { units: 50_000 }));
+  const orderY = await orderedThrough(iw, y.a, quoteY);
+  const purchaseY = await capturedLater(iw, y.a, quoteY, orderY, { confirmedAt: new Date(tail!.ends_at.getTime() + 86_400_000).toISOString(), providerCompletedAt: new Date(tail!.ends_at.getTime() + 3_600_000).toISOString() });
+  await dispatched(iw);
+  assert.deepEqual(await entitlements(y.a.s.agency.agencyId), []);
+  assert.deepEqual(await poolsOf(iw, purchaseY.authorizationId), []);
+  assert.deepEqual(await linesOf(iw, purchaseY.authorizationId), []);
+  assert.notEqual((await claimStates())[y.claimId], "CONVERTED");
+
+  // Z: the unlisted opportunity buys inside what would have been its window: its claim lapsed at the termination, so nothing converts
+  const paidZ = await bought(iw, z.a, "ex13-z", { units: 50_000 });
+  await dispatched(iw);
+  assert.deepEqual(await entitlements(z.a.s.agency.agencyId), []);
+  assert.deepEqual(await poolsOf(iw, paidZ.purchase.authorizationId), []);
+  assert.deepEqual(await linesOf(iw, paidZ.purchase.authorizationId), []);
+  assert.equal((await claimStates())[z.claimId], "EXPIRED");
+  // nothing of the ledger was deleted: the one line of X is the seller's only
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS lines FROM kauro.commission_lines WHERE seller_id = $1", [D.sellerId]), [{ lines: 1 }]);
+});
 test("R2-104 (examples 7 and 25): a 20000-cent service refund after the seller was paid 4921 posts -800, the line PAID to ADJUSTED, and the next statement shows the original accrual, the payout, the adjustment and the -800 balance with its project and reason; no port can debit the seller", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");

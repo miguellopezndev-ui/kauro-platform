@@ -9,9 +9,10 @@
 import assert from "node:assert/strict";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
 import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
-import type { ProjectId } from "@kauro/domain";
+import type { ProjectId, UserId } from "@kauro/domain";
 import { recordClaim, recordProspect, type RecordedSeller } from "@kauro/persistence/testing";
 import { prepareAllocation } from "./sales-support.js";
+import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { captureOf, claimsOn, linesOf, oracleRows, poolsOf, quoteFactsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
 import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
@@ -96,6 +97,33 @@ export async function replacementPlanOf(iw: IntegrationWorld, a: Agent, paid: { 
 /** The founding cohort's three slots are consumed (the titles that run first took them): the cents of a later quote are then the undiscounted band less its repeat tier. */
 export async function assertCohortConsumed(iw: IntegrationWorld): Promise<void> {
   assert.deepEqual(await oracleRows(iw, "SELECT count(*) FILTER (WHERE held)::int AS held, count(*)::int AS slots FROM kauro.founding_slots WHERE policy_version = 'R2-INITIAL'"), [{ held: 3, slots: 3 }], "the founding cohort is consumed: run the whole file in order");
+}
+
+/** An accepted opportunity of the seller: an agency, the prospect the seller registered for it and its claim, accepted through CMD047. */
+export interface Opportunity {
+  readonly a: Agent;
+  readonly prospectId: string;
+  readonly claimId: string;
+  readonly allocationId: string;
+}
+
+export async function opportunityOf(iw: IntegrationWorld, s: RecordedSeller, label: string, options: { readonly accept?: boolean } = {}): Promise<Opportunity> {
+  const a = await agentOf(iw, label);
+  const prospect = await recordProspect(iw.h, { by: s, domain: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example` });
+  const { claimId } = await recordClaim(iw.h, { seller: s, prospectId: prospect.prospectId });
+  if (options.accept === false) return { a, prospectId: prospect.prospectId, claimId, allocationId: "" };
+  const { allocationId } = await acceptedThrough(iw, a.s.agency.agencyId, { sellers: [s], prospectId: prospect.prospectId, claimIds: [claimId] }, [10_000]);
+  return { a, prospectId: prospect.prospectId, claimId, allocationId };
+}
+
+/** The termination's body: the owner's prepared terms and the manifest of the claims it hands over (CMD050). */
+export async function terminationBody(iw: IntegrationWorld, sellerId: string, handedOver: ReadonlyArray<string>): Promise<{ expectedVersion: number; terminationTermsRef: string; activeOpportunityManifestRef: string }> {
+  const [row] = await oracleRows<{ version: string }>(iw, "SELECT version::text FROM kauro.sellers WHERE seller_id = $1", [sellerId]);
+  return {
+    expectedVersion: Number(row!.version),
+    terminationTermsRef: await prepareTerminationTerms(iw.h, iw.owner.userId as UserId, sellerId),
+    activeOpportunityManifestRef: await prepareManifest(iw.h, iw.owner.userId as UserId, sellerId, handedOver),
+  };
 }
 
 // --- the payment commands ----------------------------------------------------------------------------------------------------------
