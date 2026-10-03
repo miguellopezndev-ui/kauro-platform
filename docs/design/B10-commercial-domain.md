@@ -621,6 +621,9 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-BIND-1 | No composition root binds a fake: until its real implementer lands, a B10 port is bound to an honest platform implementation — the buyer type unset (every quote refused), completion from B09's delivered authorization, the latest recorded VERIFIED_FEED calendar (none: the close is refused), payout evidence unavailable (reconciliation refused) — and the tests inject the labelled fakes | B09 D-FAKE-B1 and D-MERGE-2; A3 3.7 ("before its first quote"); 17 "Business-day calendar" ("from the current verified calendar"); CMD053 precondition |
 | D10-CLOCK-1 | Every instant is `kauro.server_now()`; durations are exact hours; calendar months through America/Bogota; tests stand at another instant only through the labelled TEST CLOCK | B07 D-CLOCK-1; B09 D-TIME-B1; policy commission.operationalTimezone |
 | D10-SRC-1 | CMD027 reads source availability through B07's `SourceAvailabilityReader` as main binds it (`PgSourceAvailabilityReader`, D-RET-2): the revision SEALED and a governing retention record ACTIVE with an effective deadline ahead of `kauro.server_now()`, so a SEALED revision whose retention lapsed is SOURCE_EXPIRED whether or not the sweeper took retention_expires; the quote's `source_available_until` is the earlier of its expiry and that deadline. B10's tests reach a current source only through `w.revision(agency, projectId, "SEALED")` of `apps/api/test/support.ts` (sealed an hour ago, retention ahead; `h.sealedRevision` without `base` seals fifteen days ago, past the deadline) and an expired one by the labelled TEST CLOCK past the deadline; none seals through CMD017, so no B10 row depends on the seal's provider holds (0020: 503 GENERATION_NOT_OBSERVED, 422 SOURCE_SERVICES_UNAVAILABLE), whose fake object storage stays B07's | B06 D-SRC-1 (B06-R2); B07 D-RET-2, D-CLOCK-1, D-HOLD-1..4; D10-CLOCK-1 |
+| D10-INT-1 | The loser of CMD050 against CMD047 waits on the claim's transition lock (the shared row both commands contest: the seller row is only read by AcceptAttribution), and when TerminateSeller wins its AcceptAttribution on the version the owner had read is 409 STALE_VERSION naming the claim EXPIRED (B06's version check precedes the state check); the owner's retry on that version is the 409 CLAIM_NOT_REVIEWABLE | CMD050-RACE; D10-TERM-1; B06 compare-and-set; example 13 |
+| D10-INT-2 | PERIODS joins the commission service's cycle: `runCycle` runs the five sweeps and then PERIODS (open the month the server stands in, close each due period through CMD051 under `period-close-<periodId>`) with the banking calendar and hold `createCommissionService({ periods })` is given (the platform's recorded calendar when absent); `also` still adds sweeps after it | §14; D10-CAL-1, D10-STMT-1, D10-BIND-1 |
+| D10-INT-3 | The end-to-end scenarios run the public commands at the database's own instant; a leg that must stand at another instant (a capture confirmed after a window's or a tail's end) is confirmed by the payment service on the labelled TEST CLOCK over an order CreatePaymentOrder created, and a leg that needs a statement closes its period with the service route standing on the TEST CLOCK | D10-CLOCK-1; examples 3 and 13 |
 
 ## 17. Open questions for the authority
 
@@ -643,6 +646,11 @@ map names every case's tests under exact titles. `tools/test/b10-case-map.test.m
 registry and each other: citations, mandate ownership, the status table, the machine edges, the decisions and the migrations.
 Verification of this branch: the focused design test (`node --test tools/test/b10-case-map.test.mjs`) and one full
 `pnpm run verify` on Windows; the branch changes documents and that test only, so no suite of B06, B07 or B09 is touched.
+
+Verification of `b10/integration` (B10-INTEGRATION; `apps/api/test/b10-scenarios.test.ts`, twelve titles, no row of the case map PLANNED):
+
+- Windows: one `pnpm run verify` (PGBIN=C:Toolspgsql17in), log `C:ProjectsKauro	ools10ci10-integration-win-verify.log`: VERIFY_WIN_PENDING
+- Linux: pending (integrator runs tools/review/linux-verify.sh)
 
 ## 19. Checks against main (b10/base)
 
