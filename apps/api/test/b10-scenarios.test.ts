@@ -15,12 +15,13 @@ import type { CreatePaymentOrderView, CreateQuoteView, PayoutIntentView, PayoutR
 import { after, before, test } from "node:test";
 import type { UserId } from "@kauro/domain";
 import { recordAssistanceAgreement, recordServiceAssignment } from "@kauro/persistence/testing";
-import type { WebhookAck } from "@kauro/application";
-import { handled, waitForLockWait } from "@kauro/persistence/testing";
+import type { AttributionView, SellerTerminationView, WebhookAck } from "@kauro/application";
+import { handled, recordClaim, recordProspect, waitForLockWait } from "@kauro/persistence/testing";
+import { prepareAllocation } from "./sales-support.js";
 import { PAYMENT_APPLICATION_NAME } from "../src/index.js";
 import { deliver } from "./payment-support.js";
 import { deliveryOf, eventOf, type Purchase } from "./commission-support.js";
-import { asProblem, call, completed, freshKey, outcome, replayTextOf } from "./support.js";
+import { asProblem, call, completed, freshKey, outcome, replayTextOf, waitForApiLockWait, type Reply } from "./support.js";
 import {
   acceptedThrough,
   agentOf,
@@ -627,7 +628,55 @@ test("R2-137 (example 9): two projects' capture reconciliations of one agency he
   assert.deepEqual(finals[1], finals[0], "the same final statement projection in both interleavings");
 });
 test("CMD050-RACE: TerminateSeller racing AcceptAttribution of the seller's unlisted claim, held at the seller row, serializes in both orders — acceptance first: the claim is ACCEPTED, then EXPIRED as unlisted by the termination; termination first: the claim is EXPIRED and AcceptAttribution is 409 CLAIM_NOT_REVIEWABLE — and no live claim of a terminated seller remains", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
+  // TerminateSeller (CMD050) and AcceptAttribution (CMD047) of one of the seller's claims it does not hand over, both through their routes:
+  // the first to reach its journal commit is held there (the hold point) with the claim's transition lock taken; the second waits on that lock,
+  // observed in pg_stat_activity — the seller row itself is only read by AcceptAttribution, so the serialization point both orders share is the claim
+  for (const order of ["ACCEPT_FIRST", "TERMINATE_FIRST"] as const) {
+    const label = `race-${order === "ACCEPT_FIRST" ? "a" : "t"}`;
+    const D = await seller(iw, label);
+    const a = await agentOf(iw, label);
+    const prospect = await recordProspect(iw.h, { by: D, domain: `${label}.example` });
+    const { claimId } = await recordClaim(iw.h, { seller: D, prospectId: prospect.prospectId });
+    const allocationId = await prepareAllocation(iw.h, { ownerUserId: iw.owner.userId, agencyId: a.s.agency.agencyId, prospectId: prospect.prospectId, shares: [{ seller: D, claimId, shareBps: 10_000 }] });
+    const termination = await terminationBody(iw, D.sellerId, []);
+    const accept = (): Promise<Reply> => call(iw.w, { url: `/api/v1/sales/claims/${claimId}/accept`, token: iw.owner.token, agency: null, key: freshKey("int-race-accept"), body: { expectedVersion: 1, shareAllocationRef: allocationId } });
+    const terminate = (): Promise<Reply> => call(iw.w, { url: `/api/v1/sales/sellers/${D.sellerId}/terminate`, token: iw.owner.token, agency: null, key: freshKey("int-race-terminate"), body: termination });
+
+    const hold = iw.w.holds.arm("journal.commit");
+    const winner = handled(order === "ACCEPT_FIRST" ? accept() : terminate());
+    await hold.reached;
+    const loser = handled(order === "ACCEPT_FIRST" ? terminate() : accept());
+    try {
+      assert.ok((await waitForApiLockWait(iw.w, "pg_advisory_xact_lock(kauro.transition_key('kauro.attribution_claims'")) > 0, `${order}: the second command waits on the claim's transition lock, observed in pg_stat_activity`);
+    } finally {
+      hold.release();
+    }
+    const [won, lost] = [await winner, await loser];
+    const claim = async () => (await oracleRows<{ state: string; allocation_id: string | null }>(iw, "SELECT state, allocation_id FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]))[0]!;
+    const allocation = async () => (await oracleRows<{ frozen: boolean }>(iw, "SELECT frozen_at IS NOT NULL AS frozen FROM kauro.attribution_allocations WHERE allocation_id = $1", [allocationId]))[0]!;
+    if (order === "ACCEPT_FIRST") {
+      // acceptance first: the claim is ACCEPTED under the frozen allocation, then EXPIRED as unlisted by the termination
+      assert.equal(completed<AttributionView>(won, 200).data.claim.state, "ACCEPTED");
+      completed<SellerTerminationView>(lost, 200);
+      assert.deepEqual(await claim(), { state: "EXPIRED", allocation_id: allocationId });
+      assert.deepEqual(await allocation(), { frozen: true });
+    } else {
+      // termination first: the claim is EXPIRED and AcceptAttribution is refused, the allocation never frozen
+      completed<SellerTerminationView>(won, 200);
+      // the version check precedes the state check (B06's compare-and-set): the request made on the version the owner had read is stale and
+      // names the claim's current state; the owner's retry on that version is the 409 CLAIM_NOT_REVIEWABLE (decision D10-INT-1)
+      assert.equal(outcome(iw.w, lost), "409 STALE_VERSION -");
+      const current = asProblem(iw.w, lost).current as { readonly version: number; readonly state: string };
+      assert.equal(current.state, "EXPIRED");
+      const retried = await call(iw.w, { url: `/api/v1/sales/claims/${claimId}/accept`, token: iw.owner.token, agency: null, key: freshKey("int-race-retry"), body: { expectedVersion: current.version, shareAllocationRef: allocationId } });
+      assert.equal(outcome(iw.w, retried), "409 PRECONDITION_FAILED CLAIM_NOT_REVIEWABLE");
+      assert.deepEqual(await claim(), { state: "EXPIRED", allocation_id: null });
+      assert.deepEqual(await allocation(), { frozen: false });
+    }
+    // in both runs the seller is TERMINATED and no live claim of it remains
+    assert.deepEqual(await oracleRows(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [D.sellerId]), [{ state: "TERMINATED" }]);
+    assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS live FROM kauro.attribution_claims WHERE seller_id = $1 AND state IN ('SUBMITTED', 'ACCEPTED')", [D.sellerId]), [{ live: 0 }], "no live claim of a terminated seller remains");
+    assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS entitlements FROM kauro.commission_entitlements WHERE seller_id = $1", [D.sellerId]), [{ entitlements: 0 }]);
+  }
 });
 
