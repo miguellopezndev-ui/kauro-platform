@@ -56,8 +56,8 @@ export interface QuoteReplacementView {
   readonly approvalRequired: boolean;
   /** REBOUND: the purchase now stands on the replacement; WITHDRAWN: the payment service refused the re-binding (D10-QUOTE-6). */
   readonly outcome: "REBOUND" | "WITHDRAWN";
-  /** The blockers that refused the re-binding, as the payment service names them. */
-  readonly reasons?: ReadonlyArray<string>;
+  /** The first blocker that refused the re-binding, as the payment service names it. */
+  readonly reason?: string;
 }
 
 export interface CreateQuoteView {

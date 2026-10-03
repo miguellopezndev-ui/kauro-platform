@@ -260,7 +260,7 @@ export async function completeReplacement(
         ...(revoked !== null ? { revokedAuthorizationId: revoked.authorizationId } : {}),
         approvalRequired: false,
         outcome: settled.kind === "REBOUND" ? "REBOUND" : "WITHDRAWN",
-        ...(settled.kind === "REFUSED" ? { reasons: [...settled.blockers] } : {}),
+        ...(settled.kind === "REFUSED" ? { reason: settled.blockers[0] ?? "NOT_A_REPLACEMENT" } : {}),
       },
     };
     const committed = await uow.journal.commit(ctx.entryId, { responseStatus: 201, responseBody: view, resourceKind: "quote", resourceId: ctx.toQuoteId });

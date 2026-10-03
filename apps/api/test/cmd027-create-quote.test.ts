@@ -962,7 +962,7 @@ test("R2-092: a replacement whose re-binding the payment service refuses is with
     rebinderMode = "LINEAGE";
   }
   assert.equal(refusedView.replacement?.outcome, "WITHDRAWN");
-  assert.deepEqual(refusedView.replacement?.reasons, ["LINEAGE_MISSING"]);
+  assert.equal(refusedView.replacement?.reason, "LINEAGE_MISSING");
   assert.equal(refusedView.replacement?.revokedAuthorizationId, undefined);
   assert.equal(refusedView.quote.state, "WITHDRAWN");
   assert.equal((await quoteRow(refusedView.quote.quoteId)).state, "WITHDRAWN");

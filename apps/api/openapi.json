@@ -7284,6 +7284,563 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/quotes": {
+      "post": {
+        "operationId": "CreateQuote",
+        "summary": "CMD027 CreateQuote",
+        "description": "Precondition: The scope, exact count, capability, customer identity and fiscal treatment are resolved for a saleable order.\n\nEffect: Compute server price, maximum eligible discount, taxes, expiry and immutable terms.\n\nFailure: Zero-unit or unqualified work cannot be charged as a minimum-price project; incomplete tax facts block issuance.",
+        "x-kauro-command": "CMD027",
+        "x-kauro-role": "AGENCY_BILLING",
+        "x-kauro-principal": "AGENCY_MEMBER",
+        "x-kauro-runtime-role": "kauro_app",
+        "x-kauro-scope": "AGENCY_HEADER",
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-step-up": "NEVER",
+        "x-kauro-gate": "G-COMMERCIAL",
+        "x-kauro-cases": [
+          "CMD027-OK",
+          "CMD027-DENY",
+          "CMD027-RACE"
+        ],
+        "x-kauro-package": "B10",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "description": "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/AgencySelector"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateQuoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "COMPLETED: Compute server price, maximum eligible discount, taxes, expiry and immutable terms.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateQuoteCompleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 400, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "HEADER_REPEATED",
+                "layer": "TRANSPORT",
+                "meaning": "a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "REQUEST_MALFORMED",
+                "layer": "TRANSPORT",
+                "meaning": "the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "CONTENT_TYPE_UNSUPPORTED",
+                "layer": "ADMISSION",
+                "meaning": "the body is not application/json (UTF-8)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "BODY_TOO_LARGE",
+                "layer": "ADMISSION",
+                "meaning": "the body exceeds the policy's api.jsonBytes (1 MiB)"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_SYNTAX",
+                "layer": "ADMISSION",
+                "meaning": "the body is not strict UTF-8 JSON"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DUPLICATE_KEY",
+                "layer": "ADMISSION",
+                "meaning": "an object of the body repeats a member name"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_DEPTH_EXCEEDED",
+                "layer": "ADMISSION",
+                "meaning": "the body nests deeper than the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "JSON_STRING_TOO_LONG",
+                "layer": "ADMISSION",
+                "meaning": "a string of the body exceeds the parser bound"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "SCHEMA_VIOLATION",
+                "fieldCodes": [
+                  "REQUIRED",
+                  "UNKNOWN_FIELD",
+                  "TYPE",
+                  "FORMAT",
+                  "RANGE",
+                  "ENUM"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_MISSING",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is absent"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "IDEMPOTENCY_KEY_INVALID",
+                "layer": "ADMISSION",
+                "meaning": "the Idempotency-Key header is not a key of the accepted shape"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "PATH_ID_INVALID",
+                "fieldCodes": [
+                  "FORMAT"
+                ],
+                "layer": "ADMISSION",
+                "meaning": "a path parameter is not an id"
+              },
+              {
+                "code": "INVALID_REQUEST",
+                "reason": "AGENCY_SELECTOR_INVALID",
+                "layer": "ADMISSION",
+                "meaning": "the X-Kauro-Agency selector is absent or not an id"
+              }
+            ]
+          },
+          "401": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 401, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": null,
+                "layer": "AUTHENTICATION",
+                "meaning": "no authenticated subject: the anonymous denial is recorded"
+              },
+              {
+                "code": "AUTHENTICATION_REQUIRED",
+                "reason": "SUBJECT_UNAUTHENTICATED",
+                "layer": "AUTHENTICATION",
+                "meaning": "the subject is not the identity the unit of work is bound to"
+              }
+            ]
+          },
+          "403": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 403, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "IDENTITY_DISABLED",
+                "layer": "ACCESS",
+                "meaning": "the token's or the stored identity state is DISABLED"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "IDENTITY_UNVERIFIED",
+                "layer": "ACCESS",
+                "meaning": "the launch policy needs a verified email and enrolled MFA"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "MEMBERSHIP_SUSPENDED",
+                "layer": "ACCESS",
+                "meaning": "the caller's membership is SUSPENDED"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "MEMBERSHIP_NOT_ACTIVE",
+                "layer": "ACCESS",
+                "meaning": "the caller's membership is not ACTIVE (INVITED)"
+              },
+              {
+                "code": "NOT_AUTHORIZED",
+                "reason": "ROLE_INSUFFICIENT",
+                "layer": "ACCESS",
+                "meaning": "the caller's role does not hold the route's role"
+              }
+            ]
+          },
+          "404": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "NOT_FOUND",
+                "reason": "TENANT_CONTEXT_MISSING",
+                "layer": "ACCESS",
+                "meaning": "the request is not bound to the agency it selects"
+              },
+              {
+                "code": "NOT_FOUND",
+                "reason": "NOT_A_MEMBER",
+                "layer": "ACCESS",
+                "meaning": "no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike"
+              },
+              {
+                "code": "NOT_FOUND",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the project or the plan is not visible to the caller's agency: a foreign and a nonexistent id answer alike"
+              }
+            ]
+          },
+          "409": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 17 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": "REQUEST_DIGEST_DIFFERS",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the key was used with another request: nothing was executed again"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "OPERATION_PENDING",
+                "layer": "IDEMPOTENCY",
+                "meaning": "the first request under this key is still in flight; retry with the same key"
+              },
+              {
+                "code": "STALE_VERSION",
+                "reason": null,
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the project's live quote changed under this request (two requests for one project): the current safe version and state come back"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "AGENCY_NOT_ACTIVE",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the agency is not ACTIVE (DRAFT, RESTRICTED, CLOSING or CLOSED sell nothing)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "AGREEMENTS_INCOMPLETE",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the agency has accepted no terms version"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PLAN_NOT_APPROVED",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the plan is not APPROVED"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PLAN_SUPERSEDED",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the plan was superseded by a newer revision"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PLAN_WITHDRAWN",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the plan's approval was withdrawn"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "APPROVAL_NOT_CURRENT",
+                "layer": "COMMAND",
+                "meaning": "the plan has no live, unwithdrawn approval"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "NO_BILLABLE_UNITS",
+                "layer": "COMMAND",
+                "meaning": "the sealed source freezes no billable units: there is no minimum-price sale"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "BUYER_TYPE_UNSET",
+                "layer": "COMMAND",
+                "meaning": "no buyer type is recorded for the agency (A3 3.7): the quote waits for the recorded type"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "BILLING_PROFILE_MISMATCH",
+                "layer": "COMMAND",
+                "meaning": "billingProfileRef is not the agency's current fiscal profile"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "FISCAL_TREATMENT_UNREVIEWED",
+                "layer": "COMMAND",
+                "meaning": "the agency's current fiscal profile carries no reviewed treatment (R2-082): incomplete tax facts block issuance"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "FISCAL_TREATMENT_CHANGED",
+                "layer": "COMMAND",
+                "meaning": "the reviewed tax rule is not the one the paid terms were priced with"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "EXECUTION_STARTED",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the paid execution has started: the entitlement can no longer be re-bound to a replacement (R2-092)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "REPLACEMENT_SCOPE_CHANGED",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the replacement is not of the paid mode, target and band: current.mismatch carries the base comparison; a larger scope is charged only after a refund and a new accepted quote (R2-093)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "REPLACEMENT_ALLOWANCE_SPENT",
+                "current": "ALWAYS",
+                "layer": "COMMAND",
+                "meaning": "the one included pre-execution source replacement of this purchase is spent"
+              }
+            ]
+          },
+          "422": {
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "RESPONSE_CONTRACT_VIOLATION",
+                "layer": "PLATFORM",
+                "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              },
+              {
+                "code": "CAPABILITY_UNAVAILABLE",
+                "reason": "ENVELOPE_NOT_OFFERED",
+                "layer": "COMMAND",
+                "meaning": "the billable units are beyond the offered launch envelope (a band above capacity.launchSourceUnits)"
+              },
+              {
+                "code": "CAPABILITY_UNAVAILABLE",
+                "reason": "MODE_NOT_OFFERED",
+                "layer": "COMMAND",
+                "meaning": "the project's mode capability is not offered"
+              },
+              {
+                "code": "SOURCE_EXPIRED",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the plan's source revision is not SEALED or its effective deadline has passed on the database clock"
+              },
+              {
+                "code": "TARGET_STALE",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the plan's target contract is not confirmed and current"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "PROVIDER_SERVICES_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "no payment service or re-binder is bound in this edition: a replacement of a paid purchase writes nothing"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "PLAN_SERVICES_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "no source availability reader is bound in this edition"
+              }
+            ]
+          },
+          "500": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 500, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "INTERNAL_ERROR",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "an unexpected exception, recorded under the correlation id; retry with the same key"
+              }
+            ]
+          },
+          "503": {
+            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "x-kauro-outcomes": [
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": null,
+                "layer": "PLATFORM",
+                "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              }
+            ]
+          }
+        }
+      }
+    },
     "/api/v1/projects/{projectId}/refund-requests": {
       "post": {
         "operationId": "RequestRefund",
@@ -17082,6 +17639,84 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD011"
       },
+      "CreateQuoteCompleted": {
+        "title": "CMD027 COMPLETED",
+        "description": "Synchronous success: the validated DTO and the version of the aggregate the command edited or created (10 \"Responses and safe errors\"); replayed is true when an idempotent replay returned the journaled result (10 \"Idempotency contract\").",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "COMPLETED"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreateQuoteView"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:CMD027"
+      },
+      "CreateQuoteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "planId",
+          "billingProfileRef"
+        ],
+        "properties": {
+          "planId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "billingProfileRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD027"
+      },
+      "CreateQuoteView": {
+        "title": "CreateQuoteView",
+        "description": "CMD027: the issued quote (B09 QuoteView), how its discount was decided, and any quote it superseded.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "quote",
+          "eligibility"
+        ],
+        "properties": {
+          "quote": {
+            "$ref": "#/components/schemas/QuoteView",
+            "description": "The quote, exactly as the B09 views answer it."
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/QuoteEligibilityView",
+            "description": "The discount decision."
+          },
+          "supersededQuoteId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "The still-open quote this one superseded."
+          },
+          "replacement": {
+            "$ref": "#/components/schemas/QuoteReplacementView",
+            "description": "Present when the new quote replaced a paid one."
+          }
+        }
+      },
       "CreateRevisionCompleted": {
         "title": "CMD012 COMPLETED",
         "description": "Synchronous success: the validated DTO and the version of the aggregate the command edited or created (10 \"Responses and safe errors\"); replayed is true when an idempotent replay returned the journaled result (10 \"Idempotency contract\").",
@@ -19081,6 +19716,94 @@
               "SESSION_PENDING"
             ],
             "description": "Why the session is not delivered."
+          }
+        }
+      },
+      "QuoteEligibilityView": {
+        "title": "QuoteEligibilityView",
+        "description": "How the quote's discount was decided (design §3.2, §3.3; 16 \"the highest eligible rate, never a sum\"): the repeat lookback and the founding offer.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "qualifyingProjectCount",
+          "repeatDiscountBps",
+          "foundingOffer",
+          "appliedDiscountBps",
+          "lookbackStartsAt"
+        ],
+        "properties": {
+          "qualifyingProjectCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Qualifying completed purchases of this agency inside the lookback window."
+          },
+          "repeatDiscountBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The discount the repeat rule allowed, in basis points."
+          },
+          "foundingOffer": {
+            "type": "string",
+            "enum": [
+              "RESERVED",
+              "NOT_ELIGIBLE",
+              "NONE_AVAILABLE"
+            ],
+            "description": "What the founding offer did: reserved a slot, the agency was not eligible, or no slot remained."
+          },
+          "appliedDiscountBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The one discount applied to the quote: the highest eligible rate."
+          },
+          "lookbackStartsAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$",
+            "description": "The start of the repeat lookback window."
+          }
+        }
+      },
+      "QuoteReplacementView": {
+        "title": "QuoteReplacementView",
+        "description": "A superseded quote and the authorization its replacement revoked, when a new quote replaces one already paid (design §3.4).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "replacedQuoteId",
+          "approvalRequired",
+          "outcome"
+        ],
+        "properties": {
+          "replacedQuoteId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "The quote the new one replaces."
+          },
+          "revokedAuthorizationId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "description": "The commercial authorization revoked by the replacement; absent when the re-binding was refused."
+          },
+          "approvalRequired": {
+            "type": "boolean",
+            "description": "The new plan must be approved again before it can be paid."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "REBOUND",
+              "WITHDRAWN"
+            ],
+            "description": "REBOUND: the paid purchase stands on the replacement. WITHDRAWN: the payment service refused the re-binding and the replacement was withdrawn."
+          },
+          "reason": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+            "description": "The first blocker that refused the re-binding, as the payment service names it."
           }
         }
       },
