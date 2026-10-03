@@ -1136,6 +1136,14 @@
       "using": "kauro.acting_corporate_owner()",
       "check": "(kauro.acting_corporate_owner() AND ((decided_by_user_id IS NULL) OR (decided_by_user_id = kauro.current_user_id())))"
     },
+    "attribution_claims/attribution_claims_prospect_reader_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.prospects p\n  WHERE (p.prospect_id = attribution_claims.prospect_id)))",
+      "check": null
+    },
     "attribution_claims/attribution_claims_seller_conflict": {
       "command": "UPDATE",
       "roles": [

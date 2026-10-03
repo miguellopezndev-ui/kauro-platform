@@ -29,7 +29,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator } from "@kauro/application";
 import { ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
@@ -474,6 +474,8 @@ export interface WorldOptions {
    * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
    */
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
+  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader; test/sales-support.ts). */
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader };
   /**
    * Package B09 (stage-2 integration): the payment service the api binds (ApiAssembly.payments), built over the harness and the
    * api's verified request-handler pool before the server is assembled — so one api serves the B06 routes, the request side and the
@@ -553,6 +555,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     collaborators,
     sources,
     ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
+    ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     ...(payments !== null ? { payments: payments.service } : {}),
     validator,
     clock: options.clock ?? processClock,

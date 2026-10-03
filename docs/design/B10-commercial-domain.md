@@ -180,8 +180,8 @@ minimized, owned by the registering seller; no claim, no attribution, no custome
 **Claims (D10-CLAIM-1).** **CMD046 ClaimProspect** `{ evidenceHash, agreementVersion }` (ACTIVE seller, its active agreement version,
 a prospect it owns or is assigned): `claim_evidence` of substantive work (first meaningful contact, qualified need, activity kinds; a
 list import or tracking link alone is CLAIM_EVIDENCE_INSUFFICIENT); born SUBMITTED with a review deadline of 2160 h; an accepted live
-claim on the organization key, another seller's live claim, or a prospect linked to an agency with an order or purchase moves it
-DISPUTED in the same transaction (conflict review). One live claim per seller and prospect (CLAIM_EXISTS). Submission owns nothing.
+claim on the organization key or another seller's live claim moves it DISPUTED in the same transaction (conflict review; D10-CLAIM-2: a
+prospect linked to an agency with an order or purchase is the owner's to judge at CMD047). One live claim per seller and prospect (CLAIM_EXISTS). Submission owns nothing.
 
 **Attribution (D10-ATTR-1, D10-ATTR-2).** **CMD047 AcceptAttribution** `{ expectedVersion, shareAllocationRef }` (owner, CAS on the
 claim) freezes an owner-prepared `attribution_allocations` row: the agency the prospect is (identity evidence), the claims it rules
@@ -387,7 +387,7 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | CommissionHold | OPEN | hold_upheld | UPHELD | B12 | reviewed decision; an AGREED_ERROR_CORRECTION adjustment |
 | CommissionPeriod | OPEN | period_closed | CLOSED | CMD051 | inputs reconciled; cutoff hash equal |
 
-## 9. Migrations 0021–0031
+## 9. Migrations 0021–0032
 
 | file | content | mandate |
 |---|---|---|
@@ -402,6 +402,7 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | 0029_sales_attribution.sql | `sellers`, `seller_agreements`, `seller_legal_reviews`, `seller_payout_destinations`, seller tax, assessment and confidentiality records (D10-SELL-3), `prospect_source_evidence`, `prospect_contacts`, `prospects`, `prospect_suppressions`, `claim_evidence`, `attribution_claims`, `attribution_allocations`, `allocation_shares`, `commission_entitlements`, `sales_accounts`, `service_assignments`, `account_assignments`, `assistance_agreements`, `termination_manifests`, `seller_terminations`, `termination_tail_entries`; `kauro.current_seller_id()`; machines Seller, Prospect, AttributionClaim, CommissionEntitlement, PayoutDestination | B10-SCHEMA-COMMISSION |
 | 0030_commission_ledger.sql | `purchase_completions`, `commission_pools`, `commission_lines` (registry machine CommissionLine), `commission_adjustments`, `commission_holds` (machine CommissionHold), `capture_funds_observations`, `commission_offsets` (D10-NEG-2) | B10-SCHEMA-COMMISSION |
 | 0031_statements_payouts.sql | `banking_calendars`, `commission_periods`, `commission_statements`, `statement_items`, `payout_intents`, `payout_reconciliations`, `compensation_guard_reviews`; machines CommissionPeriod, CommissionStatement, PayoutIntent | B10-SCHEMA-COMMISSION |
+| 0032_claim_conflict_review.sql | the policy `attribution_claims_prospect_reader_read`: the claims on a prospect the session can read (D10-CLAIM-2) | B10-COMMANDS-PROSPECTS |
 
 Conventions (07 "Database representation", B09 §4): UUIDv7 ids, BIGINT cents within `kauro.is_money`, `timestamptz` instants,
 durations in exact hours (336, 720, 2160, 8760), calendar months only through `AT TIME ZONE 'America/Bogota'` plus `interval '12
@@ -571,6 +572,7 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-SELL-4 | A seller's own payout destination change is admitted in any state of its row — a candidate needs a VERIFIED destination to be activated and a departed seller keeps its payment route — while its other writes need its row ACTIVE (D10-CTX-2) | 17 "Activation prerequisites", "Termination and tail" ("The final payment route must support a departed seller's lawful records"); D10-SELL-2 |
 | D10-PROS-1 | Prospects are agencies from lawful, dated, agency-segment evidence; one live prospect per normalized organization key; suppression by organization and contact key survives spelling and re-import | 18 "Prospect qualification" (A3); 12 "Prospect record"; CMD045 failure; A3 3.7 |
 | D10-CLAIM-1 | A claim needs its seller's active agreement and substantive evidence; conflicts (an accepted or competing claim, customer history) make it DISPUTED in the same transaction; submission owns nothing | 17 "Attribution subject", "Claim validity and conflicts"; 12 "Attribution and assignment views"; CMD046 |
+| D10-CLAIM-2 | CMD046's conflict review reads, in the claiming seller's own session, the claims on any prospect that session can read (migration 0032, one SELECT policy: no function, no SECURITY DEFINER, no write), because 0029 let a seller read only its own claims and so the review could never see the claim it is made against; an agency's orders and purchases are not a seller's to read, so customer history is judged by the owner at CMD047 (CLAIM_AFTER_FIRST_ORDER) and the CMD046-DENY conflict row no longer names it | 17 "Claim validity and conflicts"; 08 "Database isolation"; D10-CLAIM-1, D10-CTX-3 |
 | D10-ATTR-1 | Acceptance freezes one allocation per agency with shares of exactly 10 000 bps and the owner's reason; refused for an in-house agency or one whose buyer type is unset, and for a claim after the first order | 17 "The default is one attribution owner", "A claim must be submitted before the first paid order"; A3 7.1 ("no seller attribution claim can arise from prospecting an in-house team"), A3 3.7 (answered once, "before its first quote"), D58; CMD047 |
 | D10-ATTR-2 | Entitlements are created by the commission service at conversion, one per beneficiary, with the window from the first purchase's confirmation to twelve calendar months later in America/Bogota with the day clamped; immutable | 17 "Recurring entitlement"; policy windowAnchor, calendarMonthRollover; example 11 |
 | D10-ASSIGN-1 | Assignment changes only the current operational owner; new work is compensated only by a prepared service assignment | 17 "Assignment changes"; example 12; R2-095 |
