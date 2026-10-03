@@ -98,3 +98,11 @@ export { PgSalesRepository, PgCommercialPrincipalReader } from "./repositories/c
 export type { SellerPrincipalFacts, OwnerGrantFacts } from "./repositories/commercial-sales.js";
 export { PgAttributionRepository } from "./repositories/commercial-attribution.js";
 export { salesOf, attributionOf, commercialPrincipalsOf } from "./commercial-sales-access.js";
+// the commission ledger, periods, statements and payouts of package B10 (mandate B10-ADAPTERS-LEDGER; docs/design/B10-commercial-domain.md
+// section 6, 7, 11): the CommissionLedgerRepository and StatementRepository adapters, their accessors over a unit of work and the platform
+// bindings of the recorded ports (D10-BIND-1)
+export { PgCommissionLedgerRepository } from "./repositories/commercial-ledger.js";
+export { PgStatementRepository } from "./repositories/commercial-statements.js";
+export { ledgerOf, statementsOf } from "./commercial-ledger-access.js";
+export { RecordedBankingCalendarSource, AuthorizationDeliveryCompletionSource, AUTHORIZATION_DELIVERY_EVIDENCE_DOMAIN } from "./commercial-bindings.js";
+export type { RecordedCalendarVersion, RecordedCompletion } from "./commercial-bindings.js";

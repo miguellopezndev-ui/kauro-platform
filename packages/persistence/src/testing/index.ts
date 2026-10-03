@@ -60,3 +60,5 @@ export { commercialUnits, commissionUnitsAhead, issueCommercialQuote, foundingQu
 export type { CommercialQuoteInput, QualifyingPurchase } from "./commercial-recurrence.js";
 export { recordActiveSeller, recordProspect, recordClaim, recordFrozenAllocation, recordConversion, recordServiceAssignment, recordAssistanceAgreement } from "./sales-fixtures.js";
 export type { RecordedSeller, RecordedProspect, SellerTerms } from "./sales-fixtures.js";
+export { recordAccruedLine, recordEligibleLine, recordHold, recordIssuedStatement } from "./ledger-fixtures.js";
+export type { LedgerLineInput, RecordedLine } from "./ledger-fixtures.js";
