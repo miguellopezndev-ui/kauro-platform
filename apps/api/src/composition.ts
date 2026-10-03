@@ -21,13 +21,14 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { B06Collaborators, B07Collaborators, CommercialCommandHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime } from "@kauro/application";
-import { createAgencyLifecycleHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
+import { createAgencyLifecycleHandlers, createB06Handlers, createCommercialAuthorizer, createSellerCommandHandlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
 import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { agencyLifecycleOf, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
+import { agencyLifecycleOf, attributionOf, salesOf, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, listMigrations, readSchemaLedger } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
+import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
 import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, noExternalActionsInThisEdition, unavailablePlanServices } from "./edition.js";
 import type { DatabaseReadiness, HealthOptions, ReadinessResponse } from "./health.js";
@@ -287,12 +288,15 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
   const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier() });
+  // package B10: the seller commands (CMD048, CMD049, CMD050) on the same runtime, over the sales and attribution adapters, the commercial
+  // authorizer (the corporate owner's grant) and the step-up verifier
+  const sellers = createSellerCommandHandlers(commerceRuntime, { sales: salesOf, attribution: attributionOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() });
   return createApiServer({
     environment: assembly.environment,
     handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
     intakes: createSourceIntakeHandlers(readRuntime),
-    commercial: { commands: Object.values(commercial) as ReadonlyArray<CommercialCommandHandler<unknown, unknown>> },
+    commercial: { commands: [...Object.values(commercial), ...Object.values(sellers)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>> },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),

@@ -90,7 +90,7 @@ async function prepared(sellerId: string, handedOver: ReadonlyArray<string>, exp
   };
 }
 
-/** Everything the termination may touch, as the superuser reads it: the seller, its claims, entitlements, assignments, prospects, tail, terminations and ledger rows. */
+/** Everything the termination may touch, as the superuser reads it: the seller, its claims, entitlements, assignments, prospects, tail, effective terminations (the owner's prepared terms are its own records) and ledger rows. */
 async function footprint(sellerId: string): Promise<ReadonlyArray<string>> {
   const { h } = pw.w;
   return [
@@ -101,7 +101,7 @@ async function footprint(sellerId: string): Promise<ReadonlyArray<string>> {
     await digest(h, "SELECT * FROM kauro.sales_accounts WHERE agency_id IN (SELECT agency_id FROM kauro.account_assignments WHERE seller_id = $1)", [sellerId]),
     await digest(h, "SELECT * FROM kauro.prospects WHERE registered_by_seller_id = $1", [sellerId]),
     await digest(h, "SELECT * FROM kauro.termination_tail_entries WHERE seller_id = $1", [sellerId]),
-    await digest(h, "SELECT * FROM kauro.seller_terminations WHERE seller_id = $1", [sellerId]),
+    await digest(h, "SELECT * FROM kauro.seller_terminations WHERE seller_id = $1 AND effective_at IS NOT NULL", [sellerId]),
     await digest(h, "SELECT * FROM kauro.commission_lines WHERE seller_id = $1", [sellerId]),
     await digest(h, "SELECT * FROM kauro.commission_adjustments WHERE line_id IN (SELECT line_id FROM kauro.commission_lines WHERE seller_id = $1)", [sellerId]),
     await digest(h, "SELECT * FROM kauro.commission_statements WHERE seller_id = $1", [sellerId]),
@@ -174,16 +174,16 @@ test("OK: the owner terminates an ACTIVE seller with prepared terms and an enume
   // the answer: TERMINATED at the effective instant, what it did to claims, prospects, assignments and entitlements
   assert.deepEqual(
     [done.data.sellerId, done.data.state, done.data.version, done.data.tailEntries, done.data.entitlementsResidual, done.data.claimsExpired, done.data.prospectsUnassigned, done.data.assignmentsEnded],
-    [d.seller.sellerId, "TERMINATED", 2, 2, 1, 2, prospectsBefore, 1],
+    [d.seller.sellerId, "TERMINATED", 3, 2, 1, 2, prospectsBefore, 1],
   );
-  assert.equal(done.version, 2);
+  assert.equal(done.version, 3);
   assert.equal(Date.parse(done.data.tailEndsAt) - Date.parse(done.data.effectiveAt), 2160 * HOUR_MS);
   // the rows: the seller TERMINATED at the termination's effective instant
   const row = await w.h.oracle.query<{ state: string; version: string; same: boolean; by_owner: boolean }>(
     "SELECT s.state, s.version::text, s.terminated_at = t.effective_at AS same, t.terminated_by_user_id = $2 AS by_owner FROM kauro.sellers s JOIN kauro.seller_terminations t ON t.seller_id = s.seller_id WHERE s.seller_id = $1 AND t.termination_id = $3",
     [d.seller.sellerId, ownerId(), body.terminationTermsRef],
   );
-  assert.deepEqual(row.rows, [{ state: "TERMINATED", version: "2", same: true, by_owner: true }]);
+  assert.deepEqual(row.rows, [{ state: "TERMINATED", version: "3", same: true, by_owner: true }]);
   assert.equal(new Date(row.rows.length > 0 ? (await sellerRow(d.seller.sellerId)).terminated_at! : 0).toISOString(), done.data.effectiveAt);
   // its assignments ended: the agency's chain gained a SELLER_TERMINATED link naming nobody; the earlier link stays
   const links = await w.h.oracle.query<{ reason: string; seller_id: string | null }>("SELECT reason, seller_id FROM kauro.account_assignments WHERE agency_id = $1 ORDER BY effective_at, assignment_id", [d.listed[0].agency.agencyId]);
@@ -213,7 +213,7 @@ test("OK: the owner terminates an ACTIVE seller with prepared terms and an enume
     ledgerBefore,
   );
   // access ended: the departed seller's token no longer acts as a seller (its row is TERMINATED), and a second termination is refused
-  assert.equal(outcome(w, await terminate(d.seller.sellerId, await prepared(d.seller.sellerId, [], 2))), "409 PRECONDITION_FAILED UNLISTED_TRANSITION");
+  assert.equal(outcome(w, await terminate(d.seller.sellerId, await prepared(d.seller.sellerId, [], 3))), "409 PRECONDITION_FAILED UNLISTED_TRANSITION");
 });
 
 test("DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written", async () => {
@@ -293,7 +293,7 @@ test("RACE: an identical retry replays the 200, the same key with another manife
   const replay = await terminate(d.seller.sellerId, body, { key });
   assert.equal(replay.status, 200, replay.text);
   assert.equal(replay.text, replayTextOf(first));
-  assert.equal((await sellerRow(d.seller.sellerId)).version, "2", "the replay terminated nothing a second time");
+  assert.equal((await sellerRow(d.seller.sellerId)).version, "3", "the replay terminated nothing a second time");
   const other = await prepareManifest(w.h, ownerId(), d.seller.sellerId, [d.listed[0].claimId]);
   assert.equal(outcome(w, await terminate(d.seller.sellerId, { ...body, activeOpportunityManifestRef: other }, { key })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
   assert.equal(await w.count("termination_tail_entries", "seller_id = $1", [d.seller.sellerId]), 2, "the conflicting request had no effect");
@@ -315,7 +315,7 @@ test("RACE: an identical retry replays the 200, the same key with another manife
   const [won, lost] = await Promise.all([winner, loser]);
   completed<SellerTerminationView>(won, 200);
   assert.equal(outcome(w, lost), "409 STALE_VERSION -");
-  assert.deepEqual(asProblem(w, lost).current, { version: 2, state: "TERMINATED" });
+  assert.deepEqual(asProblem(w, lost).current, { version: 3, state: "TERMINATED" });
   assert.equal((await sellerRow(two.seller.sellerId)).state, "TERMINATED");
   assert.equal(await w.count("seller_terminations", "seller_id = $1 AND effective_at IS NOT NULL", [two.seller.sellerId]), 1, "one termination became effective");
   assert.equal(await w.count("termination_tail_entries", "seller_id = $1", [two.seller.sellerId]), 1);

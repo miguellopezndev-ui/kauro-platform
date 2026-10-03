@@ -163,7 +163,7 @@ export async function scrapedProspects(h: Harness, seller: { readonly sellerId: 
     await c.query("INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at) VALUES ($1, $2, $3, 'Operations lead', 'Head of operations', 'EMAIL', now())", [contactId, seller.userId, sha(`contact:${contactId}`)]);
     await c.query(
       `INSERT INTO kauro.prospects (prospect_id, organization_label, organization_key, business_contact_id, source_evidence_hash, jurisdiction, registered_by_user_id, registered_by_seller_id, owner_seller_id, created_at, updated_at)
-       SELECT p.id, 'Scraped agency ' || p.n, encode(sha256(convert_to('scraped:' || $5 || ':' || p.n, 'UTF8')), 'hex'), $2, $3, 'United States', $4, $5, $5, now(), now()
+       SELECT p.id, 'Scraped agency ' || p.n, encode(sha256(convert_to('scraped:' || $5::text || ':' || p.n, 'UTF8')), 'hex'), $2::uuid, $3, 'United States', $4::uuid, $5::uuid, $5::uuid, now(), now()
          FROM unnest($1::uuid[]) WITH ORDINALITY AS p(id, n)`,
       [prospectIds, contactId, evidenceHash, seller.userId, seller.sellerId],
     );

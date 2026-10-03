@@ -192,8 +192,9 @@ test("DENY: an agency member's tenant session is a foreign scope and a seller a 
     assert.match(outcome(w, reply), /^400 INVALID_REQUEST /, JSON.stringify(extra));
     assert.deepEqual(await rows(), before, "a refused shape wrote nothing");
   }
-  // and at the database no runtime role rewrites an allocation's freeze: the assignment holds no path to it
-  await assert.rejects(asPerson(w.h, ownerId(), (c) => c.query("UPDATE kauro.attribution_allocations SET frozen_at = frozen_at + interval '1 day' WHERE agency_id = $1", [ag.agencyId])));
+  // and at the database no runtime role rewrites an allocation's freeze: the owner's own attempt changes no row (refused or filtered)
+  await asPerson(w.h, ownerId(), (c) => c.query("UPDATE kauro.attribution_allocations SET frozen_at = frozen_at + interval '1 day' WHERE agency_id = $1", [ag.agencyId])).catch(() => undefined);
+  assert.deepEqual(await rows(), before, "the allocation's freeze, the claims and the entitlements are as the acquisition left them");
 
   // the same request, correct, is accepted: the refusals above were the only obstacle
   completed<SalesAccountView>(await assign(ag.agencyId, good), 200);

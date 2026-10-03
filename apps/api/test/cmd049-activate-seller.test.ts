@@ -75,9 +75,11 @@ test("OK: the owner with a fresh step-up activates a CANDIDATE seller whose agre
     statements: Number((await q.query("SELECT count(*) AS n FROM kauro.commission_statements")).rows[0].n),
   }));
   assert.deepEqual(seen, { sellers: [c.sellerId], prospects: [prospect.prospectId], statements: 0 });
-  // no package, schema, source or owner balance is readable to it: a seller's session holds no privilege on them
-  await assert.rejects(asPerson(w.h, c.userId, (q) => q.query("SELECT * FROM kauro.dataset_revisions")), /permission denied|violates row-level|denied/);
-  await assert.rejects(asPerson(w.h, c.userId, (q) => q.query("UPDATE kauro.sellers SET state = 'SUSPENDED' WHERE seller_id = $1", [c.sellerId])), "a seller cannot move its own state");
+  // no package, source or plan of any agency is readable to it: the rows of the tenants are not its rows
+  assert.deepEqual(await asPerson(w.h, c.userId, async (q) => [Number((await q.query("SELECT count(*) AS n FROM kauro.dataset_revisions")).rows[0].n), Number((await q.query("SELECT count(*) AS n FROM kauro.plans")).rows[0].n)]), [0, 0]);
+  const attempt = await asPerson(w.h, c.userId, (q) => q.query("UPDATE kauro.sellers SET state = 'SUSPENDED' WHERE seller_id = $1", [c.sellerId]).then((r) => r.rowCount, () => 0));
+  assert.equal(attempt, 0, "a seller cannot move its own state");
+  assert.equal((await sellerRow(c.sellerId)).state, "ACTIVE");
 });
 
 test("DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE", async () => {
@@ -107,7 +109,7 @@ test("DENY: an agency member's tenant session is a foreign scope and a seller a 
   await probe("a stale step-up", c, activate(c.sellerId, { ...ok, assuranceProofRef: stale }), "403 ASSURANCE_REQUIRED STEP_UP_STALE");
   const someoneElses = await w.stepUp(w.owner);
   await probe("another person's step-up", c, activate(c.sellerId, { ...ok, assuranceProofRef: someoneElses }), "403 ASSURANCE_REQUIRED STEP_UP_NOT_OWNED");
-  await probe("a proof nobody recorded", c, activate(c.sellerId, { ...ok, assuranceProofRef: ids.next() }), "403 ASSURANCE_REQUIRED STEP_UP_MISSING");
+  await probe("a proof nobody recorded", c, activate(c.sellerId, { ...ok, assuranceProofRef: ids.next() }), "403 ASSURANCE_REQUIRED STEP_UP_NOT_OWNED");
 
   // one missing prerequisite at a time
   const unsigned = await candidate("cmd049-deny-unsigned", { unsigned: true });

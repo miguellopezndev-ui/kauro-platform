@@ -17,6 +17,8 @@ import { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, type RequestSchema } from "../api
 
 const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
+/** CMD048 only: an agency with no sales account is at version 0 and its first assignment opens the account (D10-ASSIGN-3). */
+const ACCOUNT_VERSION = { type: "integer", minimum: 0, maximum: 9007199254740991 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
 
@@ -55,7 +57,7 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   /** AcceptAttribution: the claim version the owner reviewed and the share allocation it commits to. */
   CMD047: schema("CMD047", ["expectedVersion", "shareAllocationRef"], { expectedVersion: VERSION, shareAllocationRef: ID }),
   /** AssignAccount: the agency assignment version, the seller who services the account and the assignment record. */
-  CMD048: schema("CMD048", ["expectedVersion", "sellerId", "serviceAssignmentRef"], { expectedVersion: VERSION, sellerId: ID, serviceAssignmentRef: ID }),
+  CMD048: schema("CMD048", ["expectedVersion", "sellerId", "serviceAssignmentRef"], { expectedVersion: ACCOUNT_VERSION, sellerId: ID, serviceAssignmentRef: ID }),
   /** ActivateSeller: the signed agreement, the reviewed classification evidence and the activating owner's step-up proof. */
   CMD049: schema("CMD049", ["agreementId", "assessmentEvidenceRef", "assuranceProofRef"], { agreementId: ID, assessmentEvidenceRef: ID, assuranceProofRef: ID }),
   /** TerminateSeller: the seller version, the termination terms and the manifest of the seller's active opportunities. */

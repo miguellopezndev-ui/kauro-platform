@@ -7,13 +7,14 @@
  */
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
+import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 
 const { EVERY_ROUTE, PATH_IDS, TENANT } = OUTCOME_BLOCKS;
 
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 
 /** The command-layer outcomes of each served B10 command (design §4, §12; reference/COMMAND_CATALOGUE preconditions and failures). */
-const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043", ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   // CMD002: the path agency's OWNER; the version, then DRAFT, then the agreements, then the billing profile (D10-AGY-1)
   CMD002: [
     STALE("agency"),
@@ -34,10 +35,14 @@ const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, Readonly
 });
 
 /** A tenant command whose path names the agency: the authorizer's membership decisions and the path id, no agency selector. */
-const agencyPathCommand = (id: CommercialServedRouteCommandId) => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
+const agencyPathCommand = (id: "CMD002" | "CMD043") => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
 
 /** The closed problem catalogue of each served B10 command route. */
 export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD002: agencyPathCommand("CMD002"),
   CMD043: agencyPathCommand("CMD043"),
+  // the corporate owner's seller commands (B10-COMMANDS-SELLERS): the path id, the owner's access, the command-layer outcomes of sellers/outcomes
+  CMD048: closedCatalogue("CMD048", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ASSIGN_ACCOUNT_OUTCOMES]),
+  CMD049: closedCatalogue("CMD049", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ACTIVATE_SELLER_OUTCOMES]),
+  CMD050: closedCatalogue("CMD050", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...TERMINATE_SELLER_OUTCOMES]),
 });

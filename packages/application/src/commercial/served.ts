@@ -5,6 +5,7 @@
  * B06 and B09 routes (COMMAND_RESPONSES, COMMERCE_SERVED_COMMAND_IDS). The command lanes of B10 each add their commands to
  * COMMERCIAL_SERVED_COMMAND_IDS (and the catalogue of commercial/outcomes and the events of COMMERCIAL_COMMAND_EVENTS) with their handler.
  *
+ * B10-COMMANDS-SELLERS serves CMD048 AssignAccount, CMD049 ActivateSeller and CMD050 TerminateSeller, each answering 200 with its view.
  * B10-AGENCY-LIFECYCLE serves CMD002 ActivateAgency and CMD043 CloseAgency. Both answer 200 with their COMPLETED envelope (the agency is the
  * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202.
  */
@@ -16,7 +17,7 @@ import { COMMERCIAL_COMMAND_OUTCOMES } from "./outcomes.js";
 import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, type CommercialServedCommandId } from "./response-schemas.js";
 
 /** The B10 commands the api serves. */
-export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD043"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
+export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD043", "CMD048", "CMD049", "CMD050"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
 export type CommercialServedRouteCommandId = (typeof COMMERCIAL_SERVED_COMMAND_IDS)[number];
 
 export function isServedCommercialCommand(id: string): id is CommercialServedRouteCommandId {
@@ -44,4 +45,8 @@ export function commercialCommandRouteResponses(command: CommercialServedRouteCo
 export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<string>>> = Object.freeze({
   CMD002: ["agency.activated.v1"],
   CMD043: ["agency.closing.v1", "quote.withdrawn.v1"],
+  // a corporate aggregate publishes no event (D10-EVT-1): the seller commands' transitions are kept in commercial_transitions by the database
+  CMD048: [],
+  CMD049: [],
+  CMD050: [],
 });

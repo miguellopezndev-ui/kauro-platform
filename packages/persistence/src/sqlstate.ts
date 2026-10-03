@@ -4,7 +4,7 @@
  * 0013..0017, package B09) and its translation into the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
  * the SQL message never leaves the server (10 "Responses and safe errors").
  */
-import { DomainFailure, type FailureCode, type FailureReason } from "@kauro/domain";
+import { DomainFailure, StaleVersionFailure, type FailureCode, type FailureReason } from "@kauro/domain";
 
 export const SQLSTATE = Object.freeze({
   LAST_OWNER: "KA001",
@@ -196,6 +196,8 @@ export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFai
   prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
   attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
   attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
+  // CMD048: two first assignments of one agency race to open its sales account; the loser finds it opened at version 1 (D10-ASSIGN-3)
+  sales_accounts_pkey: () => new StaleVersionFailure(1, "ASSIGNED"),
 });
 
 /**
