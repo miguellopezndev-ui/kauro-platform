@@ -1,6 +1,6 @@
 # B10 failure-mode matrix
 
-Status: test inventory at `b10/failure-matrix` (from `b10/stage-3` d0ee96a, all stage 1 to 3 lanes merged). Documentation only; no product code.
+Status: test inventory at `b10/failure-matrix` (from `b10/stage-3` d0ee96a, all stage 1 to 3 lanes merged), revision r1 after Codex's design-time review. Documentation only; no product code.
 Template and column definitions: `docs/design/FAILURE-MATRIX-TEMPLATE.md`. Fault harness: `docs/design/FAULT-HARNESS.md` (built separately).
 Design source: `docs/design/B10-commercial-domain.md` (decisions D10-*).
 
@@ -9,7 +9,7 @@ How to read a cell. Every cell starts with its status.
 - **GAP** `<code>`: not proven by any existing test; the text is the behaviour the design implies; the code names the entry in the GAP list at the end, which holds the proposed test title.
 - **N/A**: the reason the failure mode cannot occur in that step.
 
-Counting rule. A cell is **C** only if an existing test title asserts that behaviour. A retry test proves the replay of a committed answer, so the "crash after COMMIT" column of a single-transaction command is a GAP (code CMD_CRA / PAY_CRA / CLOSE_CRA / CONS_CRA) until the harness injects the loss. "Crash before COMMIT" is covered where the command's RACE title says so. Database-level tests (`... at the database`) are cited for PARTIAL and RACE where they show the invariant the half-state would violate.
+Counting rule. A cell is **C** only if an existing test title asserts that behaviour. A retry test proves the replay of a committed answer, so the "crash after COMMIT" column of a single-transaction command is a GAP (code CMD_CRA / PAY_CRA / CLOSE_CRA / CONS_CRA) until the harness injects the loss. "Crash before COMMIT" is covered only where the cited test dies after the step's last write and before its own COMMIT. Revision r1 (after Codex's design-time review, `Codex r1 findings` at the end) applies the family rules of the template: sequential calls never prove a race; a guard or database invariant is a DENY or OK test, never a PARTIAL cell (PARTIAL needs a failure injected at a later write); every external effect with more than one durable write has one row per write. Database-level tests (`... at the database`) are cited only for single-statement steps, as N/A reasons.
 
 
 ## CMD002 ActivateAgency
@@ -18,39 +18,42 @@ One tenant transaction: shared locks on the published versions, then the append-
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: acceptance insert + agency ACTIVE + agency.activated.v1 (one COMMIT) | **C** two keys on one expectedVersion: one activation, one 409 STALE_VERSION, wait observed `[a02race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `AGREEMENT_EXP`: version unpublished/superseded while waiting: the version read after its shared lock decides (locks tested, interleaving not) | **C** crash before COMMIT leaves the agency DRAFT with no acceptance `[a02race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200 without a second acceptance; same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT `[a02race]` | **GAP** `TEN_REV`: OWNER membership removed mid-way: refused by agencies_authority at the write (static admit-only-current-OWNER is tested) | **C** acceptance names published versions and the accepting OWNER; append-only (a half cannot commit) `[d02db]` |
+| W: acceptance insert + agency ACTIVE + agency.activated.v1 (one COMMIT) | **C** two keys on one expectedVersion: one activation, one 409 STALE_VERSION, wait observed `[a02race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `AGREEMENT_EXP`: version unpublished/superseded while waiting: the version read after its shared lock decides (locks tested, interleaving not) | **C** crash before COMMIT leaves the agency DRAFT with no acceptance `[a02race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200 without a second acceptance; same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT `[a02race]` | **GAP** `TEN_REV`: OWNER membership removed mid-way: refused by agencies_authority at the write (static admit-only-current-OWNER is tested) | **GAP** `ACT_PAR`: failure injected after the acceptance insert and before the agency DRAFT to ACTIVE CAS (and before agency.activated.v1) rolls both back: the agency stays DRAFT with no acceptance. `[d02db]` shows the acceptance is append-only and names published versions (a DENY invariant), and `b10-recurrence-migrations.test.ts` commits an acceptance alone, so neither proves atomicity |
 | R: published versions and billing profile read after their shared locks | **C** versions read after shared locks, so a concurrent publish cannot interleave a stale read `[d02ad]` | **GAP** `CMD_TMO`: shared-lock wait past the timeout: retriable failure, nothing written | N/A: a version expiring while the step runs is the AGREEMENT_EXP gap of W | N/A: read-only step | N/A: read-only step | N/A: read-only step | **C** only the agency's current OWNER is admitted `[d02ad]` | N/A: read-only step |
 
 ## CMD043 CloseAgency
 
-One tenant transaction on the agency's row and exclusive half: obligations inventory, open quotes WITHDRAWN with reservations RELEASED, closure record, agency to CLOSING.
+One tenant transaction on the agency's row and exclusive half: obligations inventory (including B06 ActiveWorkInspector over the agency's clients, D10-AGY-6), open quotes WITHDRAWN with reservations RELEASED, closure record, agency to CLOSING.
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
+| W0: ActiveWorkInspector port call (B06) over each client of the agency, inside the exclusive half (D10-AGY-6) | **GAP** `CLOSE_INFLIGHT`: work started on a client after its inspection and before COMMIT: the exclusive half makes CreateProject AGENCY_NOT_OPEN (D10-AGY-6), so the inventory is complete at COMMIT or the closure is refused | **GAP** `INSPECT_FAIL`: the inspector timing out or unavailable: retriable refusal, nothing withdrawn, no closure; an unavailable inventory is never read as zero active work | N/A: no deadline inside the step | N/A: read step (the writes are W1 and W2) | N/A: read step | N/A: read step | N/A: the port carries no authority of its own; the acting OWNER is W1 TEN_REV | **GAP** `INSPECT_FAIL`: inspector fails after inspecting some clients: retriable refusal with no withdrawals and no closure committed, never a closure over a partial inventory (only the success count is tested, `[a43new]`) |
 | W1: withdraw open quotes + release reservations (B09 release guard) | **GAP** `QUOTE_CLOSE`: CreateQuote racing the closure: quote withdrawn by it or refused AGENCY_NOT_ACTIVE | **GAP** `CMD_TMO`: lock wait timeout: retriable, nothing written | N/A: no deadline inside the step | **C** crash before COMMIT leaves the agency ACTIVE `[a43race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the closure | **C** identical retry replays the 200; same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT `[a43race]` | **GAP** `TEN_REV`: OWNER removed or step-up expired mid-way: refused, nothing withdrawn | **C** a quote WITHDRAWN with its reservation RELEASED after closure; a release refused by B09 (payment in flight) refuses the closure CLOSURE_OBLIGATIONS_UNRECONCILED `[a43new]`, `[a43deny]` |
-| W2: closure record with obligations inventory + agency CLOSING + agency.closing.v1 | **C** CloseAgency racing CreatePaymentOrder serializes on the agency in both orders (409 CLOSURE_OBLIGATIONS_UNRECONCILED or AGENCY_NOT_ACTIVE) `[a43race]` | **GAP** `CMD_TMO`: lock wait timeout: retriable, nothing written | N/A: no deadline inside the step; step-up freshness is in the REVOCATION column | **C** crash before COMMIT leaves the agency ACTIVE `[a43race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** identical retry replays the 200 `[a43race]` | **GAP** `TEN_REV`: see W1 | **C** CLOSING to CLOSED refused while any order, refund, authorization or tax document is non-terminal or any reconciliation case OPEN (KC006) `[d43db]` |
+| W2: closure record with obligations inventory + agency CLOSING + agency.closing.v1 | **C** CloseAgency racing CreatePaymentOrder serializes on the agency in both orders (409 CLOSURE_OBLIGATIONS_UNRECONCILED or AGENCY_NOT_ACTIVE) `[a43race]` | **GAP** `CMD_TMO`: lock wait timeout: retriable, nothing written | N/A: no deadline inside the step; step-up freshness is in the REVOCATION column | **C** crash before COMMIT leaves the agency ACTIVE `[a43race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** identical retry replays the 200 `[a43race]` | **GAP** `TEN_REV`: see W1 | **GAP** `CLOSE_PAR`: failure injected after the quote withdrawals and reservation releases (W1) and before the closure record, or after the closure record and before agency CLOSING / agency.closing.v1, rolls back the whole transaction: agency ACTIVE, quotes ISSUED, reservations held. `[d43db]` tests only the later CLOSING to CLOSED guard (KC006), not an inner-write failure |
 | W3: obligation inventory read (captures, refunds, authorizations arriving mid-way) | **GAP** `CLOSE_INFLIGHT`: a capture or refund request landing between the inventory and COMMIT is listed or refuses the closure | **GAP** `CMD_TMO`: timeout: retriable | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
 
 ## CMD027 CreateQuote (issuance)
 
-One tenant transaction under the recurrence lock's shared half: source/plan/profile reads, snapshot INSERT ... SELECT, founding slot update, supersession of the previous unpaid quote, quote, quote_issuances.
+One tenant transaction under the recurrence lock's shared half: source/plan/profile reads, snapshot INSERT ... SELECT, founding slot update, supersession of the previous unpaid quote, quote DRAFT to ISSUED, quote_issuances, quote events and the journal result (W4: `quote.drafted.v1`, `quote.issued.v1`, `quote.superseded.v1`).
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | R: source availability, plan, billing profile, BuyerTypeReader | N/A: reads inside the issuance transaction; races are in the write rows | **GAP** `BUYER_TMO`: BuyerTypeReader timing out: retriable failure, nothing written | **C** a source past its retention deadline on the database clock is SOURCE_EXPIRED before the sweeper ran `[a27s060]` | N/A: read step | N/A: read step | N/A: read step | N/A: authority of the AGENCY_BILLING member is in the W row | N/A: read step |
-| W1: snapshot INSERT ... SELECT of qualifying_projects_at + count and tier | **C** a designation of the same agency serializes with the issuance in both orders: the set includes the new purchase with its tier or excludes it wholly `[a27des]` | **GAP** `CMD_TMO`: wait on the exclusive half past the timeout: retriable | **GAP** `TOCTOU_SOURCE`: source deadline passing while the locks are held | **C** crash before COMMIT leaves no quote, snapshot or reservation `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** identical retry replays the 201; same key with another planId is 409 IDEMPOTENCY_CONFLICT `[a27race]` | **GAP** `TEN_REV`: AGENCY_BILLING removed mid-way | **C** the snapshot is inserted in the same statement as its count and tier; a rounded discount the database refuses `[d27core]` |
-| W2: founding slot take (UPDATE founding_slots ... held) + reservation | **C** two agencies racing the last slot serialize on the slot row: one RESERVED, one standard; slots taken in ascending order `[a27slot]`, `[d27slot]` | **GAP** `CMD_TMO`: slot-row wait past the timeout: retriable | **C** a reservation ends at the quote's 336-hour expiry; a superseding or replacement quote never inherits it `[d27res]`, `[a27res]` | **C** crash before COMMIT leaves no reservation `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** same retry replays the same reservation `[a27race]` | N/A: no authority step | **C** a slot holds one live reservation; one founding reservation per agency per cohort ever; reservation names an ISSUED quote of its agency `[d27slotdb]`, `[d27db]` |
-| W3: supersede previous unpaid quote + release its reservation | **C** two keys for one project serialize on its live quote with the wait observed and supersede exactly once `[a27race]` | **GAP** `CMD_TMO`: wait on the live quote past the timeout: retriable | N/A: no deadline inside the step | **C** crash before COMMIT leaves the previous quote ISSUED `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** retry replays; no second supersession `[a27race]` | **GAP** `SLOT_RELEASE_RACE`: the QUOTE_EXPIRY sweep or CMD043 releasing the same reservation | **GAP** `CMD_PAR`: failure after the previous quote is superseded and before the new one is inserted rolls both back |
+| W1: snapshot INSERT ... SELECT of qualifying_projects_at + count and tier | **C** a designation of the same agency serializes with the issuance in both orders: the set includes the new purchase with its tier or excludes it wholly `[a27des]` | **GAP** `CMD_TMO`: wait on the exclusive half past the timeout: retriable | **GAP** `TOCTOU_SOURCE`: source deadline passing while the locks are held | **C** crash before COMMIT leaves no quote, snapshot or reservation `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** identical retry replays the 201; same key with another planId is 409 IDEMPOTENCY_CONFLICT `[a27race]` | **GAP** `TEN_REV`: AGENCY_BILLING removed mid-way | N/A: one INSERT ... SELECT statement; the rounded-discount refusal at the database is a DENY invariant `[d27core]`, not a partial failure |
+| W2: founding slot take (UPDATE founding_slots ... held) + reservation | **C** two agencies racing the last slot serialize on the slot row: one RESERVED, one standard; slots taken in ascending order `[a27slot]`, `[d27slot]` | **GAP** `CMD_TMO`: slot-row wait past the timeout: retriable | **C** a reservation ends at the quote's 336-hour expiry; a superseding or replacement quote never inherits it `[d27res]`, `[a27res]` | **C** crash before COMMIT leaves no reservation `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** same retry replays the same reservation `[a27race]` | N/A: no authority step | **GAP** `QUOTE_PAR`: failure injected after the founding slot update and before the reservation insert (or the reverse) rolls both back; the slot-row and reservation invariants `[d27slotdb]`, `[d27db]` are DENY guards at the database, not an injected failure |
+| W3: supersede previous unpaid quote + release its reservation | **C** two keys for one project serialize on its live quote with the wait observed and supersede exactly once `[a27race]` | **GAP** `CMD_TMO`: wait on the live quote past the timeout: retriable | N/A: no deadline inside the step | **C** crash before COMMIT leaves the previous quote ISSUED `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT | **C** retry replays; no second supersession `[a27race]` | **GAP** `SLOT_RELEASE_RACE`: the QUOTE_EXPIRY sweep or CMD043 releasing the same reservation | **GAP** `QUOTE_PAR`: failure after the previous quote is superseded (and its reservation released) and before the new one is inserted rolls both back |
+| W4: new quote DRAFT to ISSUED (base band, discount, service, tax, total, 336-hour expiry, source_available_until, terms hash) + quote_issuances (journal entry to quote, reservation) + quote.drafted/issued/superseded events + journal result (the final COMMIT) | N/A: runs under the locks taken in W1 to W3; the races are in those rows | **GAP** `CMD_TMO`: wait for the final write past the timeout: retriable, nothing written | N/A: the 336-hour expiry is stamped at issuance from the database clock; the source deadline is TOCTOU_SOURCE in W1 | **C** crash before COMMIT leaves no quote, snapshot, issuance, event or reservation `[a27race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the issued quote | **C** identical retry replays the 201 with the same quote; same key with another planId is 409 IDEMPOTENCY_CONFLICT `[a27race]` | **GAP** `TEN_REV`: AGENCY_BILLING removed before the final write: refused, nothing written | **GAP** `QUOTE_PAR`: failure after the quote insert and before quote_issuances, after the issuance binding and before the events are published, or after the events and before the journal result, rolls everything back (D10-QUOTE-1: one transaction); a quote with no issuance is not committable |
 
 ## CMD027 included-replacement protocol
 
-Paid project, entitlement ACTIVE, allowance unspent: intent (tenant: replacement ISSUED, quote_issuances) then settle (payment service: PurchaseRebinder) then complete (tenant: journal). A refusal withdraws the replacement.
+Paid project, entitlement ACTIVE, allowance unspent (D10-QUOTE-3, D10-QUOTE-4, R2-092): intent (tenant COMMIT: replacement ISSUED, quote_issuances, journal entry RESERVED) then settle (SERVICE unit of work, PurchaseRebinder, one COMMIT: re-binding recorded with its allowance ordinal, old entitlement REVOKED SOURCE_REPLACED, replaced quote SUPERSEDED, replacement ACCEPTED_FOR_CHECKOUT, new entitlement issued under the re-binding) then complete (tenant COMMIT: journal COMMITTED with the answer; D10-QUOTE-6). A refused re-binding writes nothing in the SERVICE transaction and is followed by the compensation row S2r (withdraw the replacement, complete the journal with outcome WITHDRAWN). The old entitlement is revoked and the allowance spent by S2, not by the tenant completion S3. The success path is asserted by `[a27rep]`, `[d27db]` (OK tests, not fault cells); the sequential spent-allowance refusal and the refused-re-binding withdrawal `[a27ref]` and the scope refusal `[a27scope]` are DENY guards and prove no fault cell.
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| S1: intent (tenant COMMIT: replacement ISSUED + journal entry) | **C** two replacements: a second same-band replacement after the allowance is spent is REPLACEMENT_ALLOWANCE_SPENT with nothing written `[a27ref]` | **GAP** `CMD_TMO`: lock wait timeout: retriable, nothing written | **C** a changed band, mode or target is REPLACEMENT_SCOPE_CHANGED with the price comparison, writing nothing `[a27scope]` | **C** crash before the replacement's intent commits leaves nothing `[a27crash]` | **C** crash between the intent commit and the re-binding resumes from the journal entry `[a27crash]` | **C** identical retry resumes the one replacement `[a27crash]` | **GAP** `REPL_REVOKE`: paid entitlement consumed or order refunded before S2 | **GAP** `CMD_PAR`: intent committed, quote_issuances missing: not committable (confirm at the database) |
-| S2: settle (SERVICE unit of work: PurchaseRebinder re-binds the paid purchase; call-out) | **C** never re-bound twice across a crash and a retry `[a27crash]` | **GAP** `REPL_TMO`: re-binding timing out after the call: observed by identity, never repeated, retriable answer | N/A: no deadline inside the step | **C** crash before the re-binding `[a27crash]` | **C** crash after the re-binding completes the same answer `[a27crash]` | **C** a retry after the re-binding completes the same answer, the purchase is never re-bound twice `[a27crash]` | **GAP** `REPL_REVOKE`: execution starting or refund between S1 and S2 | **C** a refused re-binding withdraws the replacement with its reason `[a27ref]` |
-| S3: complete (tenant COMMIT: old entitlement REVOKED SOURCE_REPLACED, allowance spent, journal COMMITTED) | **GAP** `QUOTE_CLOSE`: CloseAgency racing the completion: refused or withdrawn consistently | **GAP** `CMD_TMO`: lock wait timeout: retriable, the journal entry stays open | N/A: no deadline inside the step | **C** crash between the re-binding and the completion resumes from the journal entry to the same answer `[a27crash]` | **GAP** `CMD_CRA`: response lost after the completion commit | **C** a retry replays the completed answer `[a27rep]` | **GAP** `REPL_REVOKE`: see S1 | **C** replacement carries paid terms; old entitlement revoked, allowance spent, no order and no fee `[a27rep]`, `[d27db]` |
+| S1: intent (tenant COMMIT: replacement ISSUED + quote_issuances + journal entry RESERVED) | **GAP** `REPL_RACE`: two intents on different keys, or an intent and a settler, contending for the one paid allowance, both orders and concurrent recovery: one replacement is rebound and one allowance spent, the other REPLACEMENT_ALLOWANCE_SPENT with nothing written (`[a27ref]` completes the first replacement before it attempts the second: sequential, not a race) | **GAP** `CMD_TMO`: lock wait timeout: retriable, nothing written | N/A: no deadline of its own (the paid terms carry no 336-hour expiry); a changed band, mode or target is the DENY guard `[a27scope]` | **C** crash before the replacement's intent commits leaves nothing: footprint equal, no journal entry, no re-binding `[a27crash]` | **C** crash between the intent commit and the re-binding resumes from the journal entry (RESERVED, replacement ISSUED, not re-bound) `[a27crash]` | **C** identical retry resumes the one replacement `[a27crash]` | **GAP** `REPL_REVOKE`: paid entitlement consumed (execution started) or order refunded between S1 and S2: the re-binding is refused before any write and the replacement is withdrawn through S2r, the old entitlement stays ACTIVE and the allowance is not spent | **GAP** `QUOTE_PAR`: failure injected between the replacement insert, quote_issuances and the journal entry rolls all three back; an intent with quote_issuances missing is not committable (confirm at the database) |
+| S2: settle (SERVICE COMMIT in the payment service: re-binding + old entitlement REVOKED + replaced quote SUPERSEDED + replacement ACCEPTED + new entitlement; call-out) | **GAP** `REPL_RACE`: two settlers (a second key, or recovery of the first key, against the first holding the rebinder's locks on the replaced entitlement, the capture and its refund commitment lock): exactly one re-binding and one allowance ordinal, both orders | **GAP** `REPL_TMO`: re-binding timing out after the call: observed by identity, never repeated, retriable answer | N/A: no deadline inside the step | **GAP** `REPL_CRB`: crash injected after the rebinder's last write (allowance ordinal recorded) and before the SERVICE COMMIT (the cited `[a27crash]` injects AFTER_INTENT, before the rebinder runs): nothing of the re-binding remains, the old entitlement is still ACTIVE, and the same key resumes to one re-binding | **C** crash after the re-binding committed (AFTER_SETTLE) leaves it durable with the journal entry RESERVED; the same key completes the REBOUND answer and the purchase is never re-bound twice `[a27crash]` | **C** a retry after the re-binding completes the same answer, the purchase is never re-bound twice `[a27crash]` | **GAP** `REPL_REVOKE`: execution starting or a refund opening between S1 and S2 (pre-settlement): refused by the rebinder and KP013 under the replaced entitlement's exclusive lock; the compensation is S2r | **GAP** `REPL_PAR`: failure injected inside the SERVICE transaction after the old authorization's revocation, after the replacement's acceptance and after the allowance ordinal is recorded rolls the whole re-binding back (old entitlement ACTIVE, allowance unspent); a refused re-binding `[a27ref]` writes nothing and is not an injected failure |
+| S2r: refusal compensation (tenant COMMIT: withdraw_quote of the replacement + quote.withdrawn + journal COMMITTED with outcome WITHDRAWN and the reason, D10-QUOTE-6) | **GAP** `QUOTE_CLOSE`: CloseAgency racing the withdrawal: refused or withdrawn consistently, never an ISSUED orphan replacement | **GAP** `CMD_TMO`: lock wait timeout: retriable, the journal entry stays RESERVED | N/A: no deadline inside the step | **GAP** `REPL_REFUSE`: stop after the refusal and before the withdrawal commits: the same key resumes from the journal entry, re-asks the rebinder by identity and either honors a re-binding now durable or repeats the refusal and withdraws; an ISSUED replacement is never left under a COMMITTED journal | **GAP** `CMD_CRA`: response lost after the withdrawal commit: the same key replays the WITHDRAWN 201 | **GAP** `REPL_REFUSE`: a retry after the withdrawal replays the 201 WITHDRAWN and does not re-bind (D10-QUOTE-6: the journal stores 2xx answers only) | N/A: no authority step (the acting AGENCY_BILLING is S1) | **GAP** `REPL_REFUSE`: failure between the withdrawal and the journal completion rolls both back (the entry stays RESERVED, the replacement ISSUED, recoverable by the same key); the withdrawal and the quote.withdrawn publication fail separately |
+| S3: complete (tenant COMMIT: journal COMMITTED with the REBOUND answer; nothing else is written) | **GAP** `QUOTE_CLOSE`: CloseAgency racing the completion: refused or withdrawn consistently | **GAP** `CMD_TMO`: lock wait timeout: retriable, the journal entry stays RESERVED | N/A: no deadline inside the step | **GAP** `REPL_COMPLETE`: crash after the journal update and before the S3 COMMIT (the cited AFTER_SETTLE crashes before S3 begins and proves S2 CRASH-AFTER): recovery honors the committed re-binding and its new authorization, never revives the old authorization, never resets the allowance | **GAP** `CMD_CRA`: response lost after the completion commit | **C** a retry replays the completed answer, the journaled data unchanged `[a27crash]` | **GAP** `REPL_POST`: execution or a refund/reversal reaching the NEW authorization after the durable re-binding and before the journal completion: recovery completes the journal with the committed re-binding (D10-QUOTE-4: complete after settle), the old entitlement stays REVOKED SOURCE_REPLACED and the allowance stays spent; the event acts on the new authorization through its own path | N/A: one journal row update |
 
 ## CMD045 RegisterProspect
 
@@ -58,7 +61,7 @@ One corporate transaction: source-evidence check, prospect with organization key
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: prospect + source-evidence binding (one COMMIT) | **C** two sellers registering one organization yield one prospect and one 409 PROSPECT_EXISTS, wait observed `[a45race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | N/A: no deadline inside the step | **C** crash before COMMIT leaves no prospect `[a45race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 201; same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT `[a45race]` | **GAP** `SELLER_ACT_RACE`: seller terminated mid-way (CMD050): written before and handled by it, or SELLER_NOT_ACTIVE; also CORP_REV for the owner path | **C** one live prospect per normalized organization key; evidence admits the AGENCY segment only (a half cannot commit) `[d45db]` |
+| W: prospect + source-evidence binding (one COMMIT) | **C** two sellers registering one organization yield one prospect and one 409 PROSPECT_EXISTS, wait observed `[a45race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | N/A: no deadline inside the step | **C** crash before COMMIT leaves no prospect `[a45race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 201; same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT `[a45race]` | **GAP** `SELLER_ACT_RACE`: seller terminated mid-way (CMD050): written before and handled by it, or SELLER_NOT_ACTIVE; also CORP_REV for the owner path | **GAP** `PROS_PAR`: failure after the prospect insert and before the source-evidence binding (or the reverse) rolls both back; the organization-key and evidence-segment checks `[d45db]` are DENY guards at the database |
 
 ## CMD046 ClaimProspect
 
@@ -66,7 +69,7 @@ One corporate transaction on the prospect's claims lock: claim SUBMITTED (or DIS
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: claim + deadline + conflict review (one COMMIT) | **C** two sellers' claims of one prospect serialize on its claims lock, wait observed; the second is DISPUTED and owns nothing `[a46race]`, `[a46conf]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `AGREEMENT_EXP`: agreement version superseded mid-way: AGREEMENT_VERSION_MISMATCH (the stale version is tested sequentially in a46deny) | **C** crash before COMMIT leaves no claim `[a46race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 201; same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT `[a46race]` | **GAP** `SELLER_ACT_RACE`: seller terminated by CMD050 mid-way: SELLER_NOT_ACTIVE or handled by the termination | **C** one live claim per seller and prospect; seller ACTIVE with that agreement version; evidence and deadline fixed (a half cannot commit) `[d46db]` |
+| W: claim + deadline + conflict review (one COMMIT) | **C** two sellers' claims of one prospect serialize on its claims lock, wait observed; the second is DISPUTED and owns nothing `[a46race]`, `[a46conf]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `AGREEMENT_EXP`: agreement version superseded mid-way: AGREEMENT_VERSION_MISMATCH (the stale version is tested sequentially in a46deny) | **C** crash before COMMIT leaves no claim `[a46race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 201; same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT `[a46race]` | **GAP** `SELLER_ACT_RACE`: seller terminated by CMD050 mid-way: SELLER_NOT_ACTIVE or handled by the termination | **GAP** `PROS_PAR`: failure after the claim insert and before the deadline/conflict-review write (DISPUTED in the same transaction) rolls the whole back; `[d46db]` (one live claim, ACTIVE seller, fixed evidence) is a DENY guard, not an injected failure |
 
 ## CMD047 AcceptAttribution
 
@@ -74,8 +77,8 @@ One corporate transaction, owner: BuyerTypeReader call-out, frozen allocation (s
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| R: BuyerTypeReader (call-out) | N/A: read of a port; no write | **GAP** `BUYER_TMO`: BuyerTypeReader timing out: retriable, nothing written | N/A: no deadline | N/A: no write | N/A: no write | N/A: no write | N/A: no authority in the port | **C** unset or IN_HOUSE refuses and writes nothing `[a47buy]` |
-| W: allocation + shares + claims state + pools terms (one COMMIT) | **C** two acceptances for one agency yield one allocation and one ATTRIBUTION_EXISTS, wait observed `[a47race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `CLAIM_DEADLINE`: claim past its review deadline on the database clock before the sweep ran | **C** crash before COMMIT leaves the claim SUBMITTED `[a47race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT `[a47race]` | **GAP** `TERM_ACCEPT`: a share's seller terminated mid-way (CMD050): consistent in both orders; also CORP_REV | **C** one frozen allocation per agency; shares sum to 10000 bps at COMMIT; pool terms equal the signed agreement; SHARES_NOT_WHOLE refused `[d47db]`, `[a47deny]` |
+| R: BuyerTypeReader (call-out) | N/A: read of a port; no write | **GAP** `BUYER_TMO`: BuyerTypeReader timing out: retriable, nothing written | N/A: no deadline | N/A: no write | N/A: no write | N/A: no write | N/A: no authority in the port | N/A: read step; the unset or IN_HOUSE refusal `[a47buy]` is a DENY guard |
+| W: allocation + shares + claims state + pools terms (one COMMIT) | **C** two acceptances for one agency yield one allocation and one ATTRIBUTION_EXISTS, wait observed `[a47race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `CLAIM_DEADLINE`: claim past its review deadline on the database clock before the sweep ran | **C** crash before COMMIT leaves the claim SUBMITTED `[a47race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT `[a47race]` | **GAP** `TERM_ACCEPT`: a share's seller terminated mid-way (CMD050): consistent in both orders; also CORP_REV | **GAP** `ATTR_PAR`: failure after the allocation, after the shares, after the claims ACCEPTED / competing REJECTED update, or after the pool terms rolls everything back (shares always sum to 10000 bps at COMMIT); `[d47db]`, `[a47deny]` are DENY guards |
 | W2: claim lapse against the CLAIM_WINDOWS sweep | **GAP** `CLAIM_LAPSE_ACCEPT`: acceptance racing the lapse of the same claim | **GAP** `CMD_TMO`: timeout | **GAP** `CLAIM_DEADLINE`: deadline instant exactly | N/A: single writer per row | N/A: single writer per row | N/A: single writer per row | N/A: no authority | N/A: single writer per row |
 
 ## CMD048 AssignAccount
@@ -84,7 +87,7 @@ One corporate transaction: current assignment ended, new current assignment appe
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: end previous assignment + append new current + service assignment link (one COMMIT) | **C** two assignments on one version yield one and one 409 STALE_VERSION, wait observed `[a48race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | N/A: no deadline inside the step | **C** crash before COMMIT leaves the previous assignment current `[a48race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another sellerId is 409 IDEMPOTENCY_CONFLICT `[a48race]` | **GAP** `SELLER_ACT_RACE`: target seller terminated mid-way: SELLER_NOT_ACTIVE (static refusal tested in a48deny); also CORP_REV | **C** assignments append-only, one current per agency; no runtime role can alter an entitlement's first capture or window (half-state cannot commit) `[d48db]`, `[d48ad]` |
+| W: end previous assignment + append new current + service assignment link (one COMMIT) | **C** two assignments on one version yield one and one 409 STALE_VERSION, wait observed `[a48race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | N/A: no deadline inside the step | **C** crash before COMMIT leaves the previous assignment current `[a48race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another sellerId is 409 IDEMPOTENCY_CONFLICT `[a48race]` | **GAP** `SELLER_ACT_RACE`: target seller terminated mid-way: SELLER_NOT_ACTIVE (static refusal tested in a48deny); also CORP_REV | **GAP** `ATTR_PAR`: failure after the previous assignment is ended and before the new current assignment (or the service assignment link) is appended rolls both back, leaving exactly one current assignment; `[d48db]`, `[d48ad]` are DENY invariants |
 
 ## CMD049 ActivateSeller
 
@@ -92,7 +95,8 @@ One corporate transaction, owner with a fresh step-up: seller CANDIDATE to ACTIV
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: seller ACTIVE (one COMMIT; KC005 checked at the database) | **C** two activations racing yield one ACTIVE seller, wait observed `[a49race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `CMD_EXP_ASSURE`: step-up expiring mid-way | **C** crash before COMMIT leaves the seller CANDIDATE `[a49race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another agreementId is 409 IDEMPOTENCY_CONFLICT `[a49race]` | **GAP** `CORP_REV`: grant revoked, destination superseded or agreement withdrawn mid-way: refused (static presence tested in d49db) | **C** a seller becomes ACTIVE only with every prerequisite present (a half cannot commit) `[d49db]` |
+| W: seller ACTIVE (one COMMIT; KC005 checked at the database) | **C** two activations racing yield one ACTIVE seller, wait observed `[a49race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **GAP** `CMD_EXP_ASSURE`: owner step-up expiring mid-way: ASSURANCE_REQUIRED at the database instant, the seller stays CANDIDATE (an expired step-up must not admit the activation) | **C** crash before COMMIT leaves the seller CANDIDATE `[a49race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another agreementId is 409 IDEMPOTENCY_CONFLICT `[a49race]` | **GAP** `CORP_REV`: grant revoked, destination superseded or agreement withdrawn mid-way: refused (static presence tested in d49db) | N/A: one seller row UPDATE; the prerequisite check at the database (KC005) is a DENY guard `[d49db]` |
+| I: candidate seller's ACTIVE verified identity with verified e-mail and MFA, read through the owner's policy (D10-SELL-1, D10-SELL-3, KC005) | **GAP** `SELLER_IDENT_RACE`: identity deactivated or MFA removed between the prerequisite read and COMMIT: activation refused, or committed before the withdrawal and then handled by it, never an activation resting on stale identity authority, both orders (an identity missing before activation is only the DENY `b10-sales-migrations.test.ts:615-628`) | **GAP** `CMD_TMO`: timeout reading the identity: retriable, nothing written | N/A: no deadline of the identity | N/A: read step | N/A: read step | N/A: read step | **GAP** `SELLER_IDENT_RACE`: the target identity revoked or MFA withdrawn mid-way: refused at the write by the database re-check (KC005) | N/A: read step |
 
 ## CMD050 TerminateSeller
 
@@ -100,8 +104,8 @@ One corporate transaction, owner: seller TERMINATED, assignments ended, prospect
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: seller + assignments + prospects + entitlements + claims + tail entries (one COMMIT) | **C** two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION, wait observed `[a50race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **C** tail entries end 2160 h after the effective instant `[a50r100]` | **C** crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged `[a50race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another manifest is 409 IDEMPOTENCY_CONFLICT `[a50race]` | **GAP** `TERM_ACCEPT`: an AcceptAttribution or an accrual landing mid-way (end to end planned in B10-INTEGRATION); also CORP_REV | **C** a tail entry exists only for an ACCEPTED unexpired claim of the terminated seller whose agency has no purchase (KC011); no runtime role can DELETE a ledger row `[d50tail]`, `[d50db]` |
-| X: manifest entry whose claim lapses or whose agency purchases mid-way | **GAP** `TAIL_PURCHASE_RACE`: agency's first purchase designated while the manifest is checked (KC011 at the database) | **GAP** `CMD_TMO`: timeout | **GAP** `CLAIM_LAPSE_ACCEPT`: claim expiring at the effective instant | N/A: see W | N/A: see W | N/A: see W | N/A: see W | **C** a manifest of an agency that already purchased, or of another seller's claim, is TAIL_NOT_ENUMERATED `[a50deny]` |
+| W: seller + assignments + prospects + entitlements + claims + tail entries (one COMMIT) | **C** two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION, wait observed `[a50race]` | **GAP** `CMD_TMO`: lock wait past the timeout: retriable failure, nothing written | **C** tail entries end 2160 h after the effective instant `[a50r100]` | **C** crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged `[a50race]` | **GAP** `CMD_CRA`: response lost after COMMIT: the same key returns the committed answer | **C** identical retry replays the 200; same key with another manifest is 409 IDEMPOTENCY_CONFLICT `[a50race]` | **GAP** `TERM_ACCEPT`: an AcceptAttribution or an accrual landing mid-way (end to end planned in B10-INTEGRATION); also CORP_REV | **GAP** `TERM_PAR`: failure after the seller TERMINATED and before the assignments, prospects, entitlements TERMINATED_WITH_RESIDUAL, unlisted claims EXPIRED or tail entries rolls everything back; `[d50tail]`, `[d50db]` are DENY invariants |
+| X: manifest entry whose claim lapses or whose agency purchases mid-way | **GAP** `TAIL_PURCHASE_RACE`: agency's first purchase designated while the manifest is checked (KC011 at the database) | **GAP** `CMD_TMO`: timeout | **GAP** `CLAIM_LAPSE_ACCEPT`: claim expiring at the effective instant | N/A: see W | N/A: see W | N/A: see W | N/A: see W | N/A: check step; a manifest of an agency that already purchased, or of another seller's claim, is the DENY guard TAIL_NOT_ENUMERATED `[a50deny]` |
 
 ## CMD051 CloseCommissionPeriod
 
@@ -110,7 +114,17 @@ Commission service, STORED_OPERATION journal: period OPEN and due, no undelivere
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | R: BankingCalendarSource (call-out) + cutoff recomputation | **GAP** `CLOSE_CAL`: a newer calendar version recorded mid-way | **GAP** `CLOSE_TMO`: calendar or recomputation timing out: retriable, period stays OPEN | **C** a period not yet due is PERIOD_NOT_DUE; period stores the calendar version it came from; no VERIFIED_FEED is CALENDAR_UNAVAILABLE `[a51deny]`, `[d51cal]`, `[d51cal2]` | N/A: read step | N/A: read step | N/A: read step | N/A: service identity checked at the pipeline; no per-request authority | N/A: read step |
-| W: statements + items + PAYABLE transitions + holds + guard review + period CLOSED (one COMMIT) | **C** a close racing a refund adjustment serializes on the period in both orders: in this statement or the next, never both or neither `[a51race]` | **GAP** `CLOSE_TMO`: lock wait past the timeout: retriable, nothing written | **C** a due period closes on the test calendar; a line awaiting FINAL completion or AVAILABLE funds is a reasoned hold item, never payable `[a51ok]`, `[a51deny]` | **C** crash before COMMIT leaves the period OPEN `[a51race]` | **GAP** `CLOSE_CRA`: crash or lost response after COMMIT; the journal replays the same statements | **C** identical retry replays the 200 with the same statements; same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT `[a51race]` | **GAP** `CLOSE_VS_DELIVERY`: a late COMMISSIONS delivery before the cutoff (also the INPUTS_UNRECONCILED check); a hold opened mid-way is the ELIG_REV case | **C** a line becomes PAYABLE only through an ISSUED statement item naming it; the cutoff hash is recomputed identically from the rows; disputed 1000 cents held, undisputed 50000 payable `[d51db]`, `[d51ad]`, `[a51r102]` |
+| H: cutoff recomputation, input reads (lines, adjustments, holds, funds) and statement composition before the COMMIT (D10-STMT-4: the ledger as it stands at the close, hashed with the period's end as cutoff; D10-STMT-2, D10-HOLD-1: the statement withholds exactly the held cents) | **GAP** `CLOSE_HOLD_RACE`: a full or partial hold committed between the cutoff/input reads and the statement COMMIT, in both orders: the close refuses the changed inputs (STALE_VERSION LEDGER_CHANGED) or the statement withholds exactly the held cents; contested cents are never PAYABLE (the existing `[a51race]` races a refund adjustment, not a hold) | **GAP** `CLOSE_TMO`: recomputation or input reads timing out: retriable, period stays OPEN | N/A: no deadline inside the step | N/A: read step | N/A: read step | N/A: read step | N/A: service identity checked at the pipeline | N/A: read step |
+| W: statements + items + PAYABLE transitions + holds + guard review + period CLOSED (one COMMIT) | **C** a close racing a refund adjustment serializes on the period in both orders: in this statement or the next, never both or neither `[a51race]` | **GAP** `CLOSE_TMO`: lock wait past the timeout: retriable, nothing written | **C** a due period closes on the test calendar; a line awaiting FINAL completion or AVAILABLE funds is a reasoned hold item, never payable `[a51ok]`, `[a51deny]` | **C** crash before COMMIT leaves the period OPEN `[a51race]` | **GAP** `CLOSE_CRA`: crash or lost response after COMMIT; the journal replays the same statements | **C** identical retry replays the 200 with the same statements; same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT `[a51race]` | **GAP** `CLOSE_VS_DELIVERY`: a late COMMISSIONS delivery before the cutoff (also the INPUTS_UNRECONCILED check); a hold opened mid-way is CLOSE_HOLD_RACE of row H | **GAP** `CLOSEP_PAR`: failure injected after some statements are inserted, after the items, after the ELIGIBLE to PAYABLE transitions, after the holds or guard review, or before the period CLOSED rolls everything back: period OPEN, no statement, no PAYABLE line. `[d51db]`, `[d51ad]`, `[a51r102]` are DENY invariants of what a committed close looks like |
+
+## CMD051 correcting statement (correction_issued)
+
+Design: `CommissionStatement ISSUED/DISPUTED to CORRECTED` on `correction_issued`, performer CMD051, "a correcting statement supersedes it" (B10-commercial-domain.md, statement transitions; `DISPUTED to ISSUED` on `dispute_scoped` is B12). The CMD051 command text describes only the closure of an OPEN period and no stage 3 route issues a correction; Q10-6 sends a transfer returned after SETTLED to "owner recovery through a reviewed correction". The performer must be fixed before B10-INTEGRATION (a CMD051 variant, or the owner's reviewed correction); the rows below hold for either, and their authority cell is CORR_AUTH. A correcting statement carries the successor's items; a line is payable through exactly one live ISSUED statement item (D10-STMT-2), and an APPROVED or PAID statement has no edge to CORRECTED.
+
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| K1: correcting statement inserted (successor ISSUED with its items, payable and held totals) (same COMMIT as K2) | **GAP** `CORR_APPROVE`: correction racing CMD052 approval of the predecessor, both orders: approval first, then no correction (APPROVED has no edge to CORRECTED); correction first, then the approval is 409 STALE_VERSION; never an intent against a CORRECTED statement. Also racing B12's dispute_scoped (DISPUTED to ISSUED) | **GAP** `CMD_TMO`: lock wait on the predecessor row past the timeout: retriable, nothing written | N/A: no deadline inside the step | **GAP** `CORR_CRASH`: crash after the last write and before COMMIT leaves the predecessor unchanged and no successor | **GAP** `CORR_CRASH`: response lost after COMMIT: the same key returns the committed successor | **GAP** `CORR_DUP`: the same correction twice (same key: replay; another key, same predecessor: one successor and one refusal STALE_VERSION), so the lines are payable through one live statement item, never two | **GAP** `CORR_AUTH`: the performer's authority (service identity, or the owner's grant and fresh step-up if the correction is the owner's reviewed recovery) withdrawn mid-way: refused, nothing written | **GAP** `CORR_PAR`: failure between issuing the successor and marking the predecessor CORRECTED (or between the items and the statement totals) rolls both back |
+| K2: predecessor ISSUED/DISPUTED to CORRECTED + statement transition record | **GAP** `CORR_APPROVE`: see K1: the predecessor row is the contested lock | N/A: same lock wait as K1 | N/A: no deadline inside the step | N/A: same COMMIT as K1 (CORR_CRASH) | N/A: same COMMIT as K1 (CORR_CRASH) | **GAP** `CORR_DUP`: see K1: a second correction of a CORRECTED predecessor is refused UNLISTED_TRANSITION and writes nothing | N/A: see K1 | **GAP** `CORR_PAR`: see K1 |
 
 ## CMD052 ApproveCommissionPayout
 
@@ -118,8 +132,10 @@ Owner, fresh step-up, CAS on an ISSUED statement: payee check, bank-available ca
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| R: bank-available cash (latest settlement with bank evidence) and live intents | **GAP** `PAY_CASH_RACE`: two approvals of two statements racing on the same cash | **GAP** `CMD_TMO`: timeout reading settlements: retriable, nothing written | N/A: cash is the latest recorded settlement, no deadline | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
-| W: intent AUTHORIZED (amount = payable, destination version and digest, stable reference) + statement APPROVED (one COMMIT) | **C** two approvals of one statement yield one intent and one 409 STALE_VERSION, wait observed `[a52race]` | **GAP** `CMD_TMO`: lock wait on the statement row past the timeout: retriable, nothing written | **GAP** `PAY_REV`: step-up window passing mid-way | **C** crash before COMMIT leaves the statement ISSUED with no intent `[a52race]` | **GAP** `PAY_CRA`: response lost after COMMIT | **C** identical retry replays the 200; same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT `[a52race]` | **GAP** `PAY_DEST_RACE`: destination change mid-way (a bank change just before payout is refused sequentially); KAURO_OWNER grant revocation is in PAY_REV | **C** an intent's amount equals the statement's payable, its payee a VERIFIED destination version of the seller (KC009), one live intent per statement; an intent keeps its destination `[d52db]`, `[a52r103]`, `[d52sales]` |
+| R1: bank-available cash read (latest settlement with bank evidence) against concurrent approvals | **GAP** `PAY_CASH_RACE`: two approvals of two statements racing on the same cash: one intent, the other FUNDS_UNAVAILABLE (cash is fixed in `cmd052-approve-commission-payout.test.ts:240`) | **GAP** `CMD_TMO`: timeout reading settlements: retriable, nothing written | N/A: cash is the latest recorded settlement, no deadline | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
+| R2: bank-available cash against a newer bank-evidenced settlement (B09 settlements) recorded between the read and authorization | **GAP** `PAY_CASH_BASIS`: a settlement that lowers or changes the available cash committing between the cash read and the intent COMMIT, both orders: the authorization uses one consistent cash basis and never spends cash made available only by a stale snapshot (D10-PAY-1, design section 7 CMD052: cash of the latest settlement covers the payable and every unsettled authorized intent) | N/A: same read as R1 | N/A: no deadline | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
+| R3: live unsettled intents against CMD053 reconciling an intent (SETTLED, FAILED or RETURNED) between the read and authorization | **GAP** `PAY_INTENT_BASIS`: CMD053 changing which intents remain unsettled while CMD052 reads them, both orders: the coverage is computed on one consistent set of unsettled intents plus its cash; a settled intent is not double counted and a returned intent does not free cash the settlement basis does not show | N/A: same read as R1 | N/A: no deadline | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
+| W: intent AUTHORIZED (amount = payable, destination version and digest, stable reference) + statement APPROVED (one COMMIT) | **C** two approvals of one statement yield one intent and one 409 STALE_VERSION, wait observed `[a52race]` | **GAP** `CMD_TMO`: lock wait on the statement row past the timeout: retriable, nothing written | **GAP** `PAY_REV`: step-up window passing mid-way | **C** crash before COMMIT leaves the statement ISSUED with no intent `[a52race]` | **GAP** `PAY_CRA`: response lost after COMMIT | **C** identical retry replays the 200; same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT `[a52race]` | **GAP** `PAY_DEST_RACE`: destination change mid-way (a bank change just before payout is refused sequentially); KAURO_OWNER grant revocation is in PAY_REV | **GAP** `PAY_PAR`: failure injected after the AUTHORIZED payout_intents insert and before the statement APPROVED rolls both back: statement ISSUED, no intent. `[d52db]`, `[a52r103]`, `[d52sales]` (amount, payee, one live intent per statement) are DENY guards |
 | X: statement state ISSUED/APPROVED against CMD053's FAILED or RETURNED reconciliation | **GAP** `PAY_APPROVE_VS_FAIL`: approval racing the reconciliation that returns the statement to ISSUED | N/A: same lock wait as W | N/A: no deadline | N/A: single statement of W | N/A: single statement of W | N/A: covered by the stale-version retry of W | N/A: covered in W | N/A: covered in W |
 
 ## CMD053 ReconcileCommissionPayout
@@ -129,7 +145,17 @@ Finance service, STORED_OPERATION journal: PayoutEvidenceVerifier call-out, evid
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | R: PayoutEvidenceVerifier (call-out) | **GAP** `PAY_SETTLE_FLIP`: SETTLED and RETURNED evidence for the same intent arriving in different orders | **GAP** `PAY_VERIFIER_TMO`: verifier timing out: retriable, nothing changes | N/A: evidence has no expiry in the design | N/A: read step | N/A: read step | N/A: read step | N/A: read step | N/A: read step |
-| W: intent SETTLED/FAILED/RETURNED + statement PAID/ISSUED + lines PAID/HELD (one COMMIT) | **C** two reconciliations of one intent yield one settlement, wait observed; settling takes the statement's row lock `[a53race]`, `[d53ad]` | **GAP** `CMD_TMO`: lock wait on the statement row past the timeout: retriable | N/A: no deadline inside the step | **C** crash before COMMIT leaves the intent AUTHORIZED and the lines PAYABLE `[a53race]` | **GAP** `PAY_CRA`: response lost after COMMIT | **C** identical retry replays the 200; same key with other evidence is 409 IDEMPOTENCY_CONFLICT; the same evidence applied again returns its recorded state `[a53race]` | **C** evidence of another reference, destination or amount is PAYOUT_EVIDENCE_MISMATCH and changes nothing; SUBMITTED-only is PAYOUT_NOT_SETTLED `[a53deny]`, `[a53r103]` | **C** a line becomes PAID only when its statement's intent is SETTLED with an evidence hash (KC010); FAILED or RETURNED keeps the intent, statement ISSUED and lines HELD PAYOUT_FAILED `[d53db]`, `[a53ok]` |
+| W: intent SETTLED/FAILED/RETURNED + statement PAID/ISSUED + lines PAID/HELD (one COMMIT) | **C** two reconciliations of one intent yield one settlement, wait observed; settling takes the statement's row lock `[a53race]`, `[d53ad]` | **GAP** `CMD_TMO`: lock wait on the statement row past the timeout: retriable | N/A: no deadline inside the step | **C** crash before COMMIT leaves the intent AUTHORIZED and the lines PAYABLE `[a53race]` | **GAP** `PAY_CRA`: response lost after COMMIT | **C** identical retry replays the 200; same key with other evidence is 409 IDEMPOTENCY_CONFLICT; the same evidence applied again returns its recorded state `[a53race]` | **C** evidence of another reference, destination or amount is PAYOUT_EVIDENCE_MISMATCH and changes nothing; SUBMITTED-only is PAYOUT_NOT_SETTLED `[a53deny]`, `[a53r103]` | **GAP** `SETTLE_PAR`: failure after the intent is settled and before the statement PAID, after the statement and before one line update, or before the hold writes rolls back the whole branch (intent AUTHORIZED, lines PAYABLE). `[d53db]`, `[a53ok]` are guard and success tests, not an injected failure |
+
+## Qualifying-purchase trigger (reconciler transaction)
+
+D10-FIRST-1: a qualifying purchase is an original CommercialAuthorization; B10's trigger on its insert, in the payment service reconciler's transaction, serializes on the agency recurrence lock and row, assigns the confirmation sequence, records the purchase and consumes its founding reservation; sequence 1 is the sticky first designation. The COMMISSIONS consumer's mirror (D10-FIRST-2) is a later, separate effect.
+
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| T1: authorization insert + trigger: recurrence lock, confirmation sequence, purchase record | **C** two first captures of one agency serialize on the recurrence lock in both orders: sequence 1 and 2, neither rewritable `[r137db]` | **GAP** `CMD_TMO`: recurrence-lock wait past the timeout: the reconciler transaction fails, nothing written, retried | N/A: the confirmation instant is the transaction's own; no deadline | **GAP** `TRG_CRASH`: crash after the trigger's last write and immediately before the reconciler COMMIT: no authorization, sequence, designation or slot change remains | **GAP** `TRG_CRASH`: crash right after the reconciler COMMIT: the reconciler's retry finds the purchase confirmed once | **GAP** `TRG_CRASH`: the same capture confirmation delivered again inserts no second purchase, designation or consumption | N/A: service identity; no per-request authority | **GAP** `TRG_PAR`: failure between the purchase insertion and the recurrence update rolls both back |
+| T2: agency_recurrence update (sequence 1 designation) in the same transaction | **C** see T1 `[r137db]` | N/A: same lock wait as T1 | N/A: no deadline | N/A: same COMMIT as T1 (TRG_CRASH) | N/A: same COMMIT as T1 (TRG_CRASH) | N/A: see T1 | N/A: service identity | **GAP** `TRG_PAR`: failure between the recurrence update and the founding reservation consumption rolls both back: one designation and one consumption, or neither |
+| T3: founding reservation consumption (slot RESERVED to CONSUMED) in the same transaction | **GAP** `QE_CAPTURE_RACE`: consumption racing the QUOTE_EXPIRY sweep: consumed once or released once, never both (see Sweep QUOTE_EXPIRY) | N/A: same lock wait as T1 | **GAP** `QE_CAPTURE_RACE`: capture confirmed at or after the reservation's 336-hour end: the slot is consumed or released by the rule of the sweep, never both | N/A: same COMMIT as T1 (TRG_CRASH) | N/A: same COMMIT as T1 (TRG_CRASH) | N/A: see T1 | N/A: service identity | **GAP** `TRG_PAR`: failure after the consumption and before the transaction COMMIT leaves the reservation RESERVED and no purchase |
 
 ## COMMISSIONS consumer: capture.completed.v1
 
@@ -137,7 +163,16 @@ Each effect in its own SERVICE unit of work: pool per purchase and source, line 
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: pools + lines + holds + designation mirror (one COMMIT per delivery) | **C** two first captures of one agency serialize on its recurrence lock in both orders: sequence 1 and 2; a transaction beginning earlier but designating later is refused DESIGNATION_REWRITE `[r137]`, `[r137db]`, `[d27uow]` | **GAP** `CONS_TMO`: PreparationCompletionSource timing out inside the effect | **C** a subsequent capture one second before / exactly at the local twelve-month endpoint accrues / does not accrue by the provider-completion instant `[r094]`, `[r138]` | **GAP** `CONS_CRB`: crash before the effect COMMIT | **GAP** `CONS_CRA`: crash after the effect COMMIT and before delivery settled | **C** a duplicated delivery and a second full capture add nothing; one pool per purchase and source; a replay adds nothing `[r140]`, `[cap]` | **GAP** `CONS_REV`: entitlement or seller terminated mid-way (also TERM_ACCRUAL) | **C** a pool's cents equal round(basis x rate) and its lines sum to it at COMMIT (KC002); one pool per purchase and source `[l097]`, `[lkc]` |
+| W: pools + lines + holds + designation mirror (one COMMIT per delivery) | **C** two first captures of one agency serialize on its recurrence lock in both orders: sequence 1 and 2; a transaction beginning earlier but designating later is refused DESIGNATION_REWRITE `[r137]`, `[r137db]`, `[d27uow]` | **GAP** `CONS_TMO`: PreparationCompletionSource timing out inside the effect | **C** a subsequent capture one second before / exactly at the local twelve-month endpoint accrues / does not accrue by the provider-completion instant `[r094]`, `[r138]` | **GAP** `CONS_CRB`: crash before the effect COMMIT | **GAP** `CONS_CRA`: crash after the effect COMMIT and before delivery settled | **C** a duplicated delivery and a second full capture add nothing; one pool per purchase and source; a replay adds nothing `[r140]`, `[cap]` | **GAP** `CONS_REV`: entitlement or seller terminated mid-way (also TERM_ACCRUAL) | **GAP** `CONS_PAR`: failure after the pool, after some lines, after a hold or after the designation mirror rolls back the effect (a pool's lines sum to its cents at COMMIT); `[l097]`, `[lkc]` are database invariants (KC002), not an injected failure |
+
+## Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION)
+
+D10-ATTR-2, design section 6 and the claim transitions (ACCEPTED to CONVERTED, "the agency's first purchase confirmed before the claim's (or tail's) end, claim before the first order"): the commission service converts at the agency's first qualifying purchase confirmed before the claim's end, or its termination tail's end (D10-TERM-1): one `commission_entitlements` row per beneficiary (window from the first purchase's confirmation, twelve calendar months at America/Bogota, share and agreement immutable), the claim CONVERTED. The OK path is observed by `b10-commission-service.test.ts` (conversion and a new entitlement), which proves the step exists and that no fault cell is tested. C2 applies where the ACCRUAL_RECONCILIATION sweep performs the conversion for an acceptance that follows the first purchase.
+
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| C1: consumer: entitlement inserts per beneficiary + claim ACCEPTED to CONVERTED (one COMMIT) | **GAP** `CONV_RACE`: conversion racing the CLAIM_WINDOWS lapse, CMD050 listing the claim, a competing acceptance or another accrual of the same agency, both orders: one entitlement per beneficiary, the claim CONVERTED once, nothing converted after a lapse or an unlisted termination | **GAP** `CONS_TMO`: PreparationCompletionSource or lock wait timing out: nothing converted, the next pass retries | **GAP** `CLAIM_TAIL`: a first purchase after the original expires_at and inside the termination tail still converts; at the exact tail end it does not; the purchase's own confirmation instant decides (D10-TERM-1; tail end instead of expires_at, claim transitions table) | **GAP** `CONV_CRASH`: crash after the entitlement inserts and before COMMIT leaves no entitlement and the claim ACCEPTED | **GAP** `CONV_CRASH`: crash after COMMIT and before the delivery is settled: the redelivery converts nothing again | **GAP** `CONV_CRASH`: duplicate delivery of the first capture: one entitlement per beneficiary and the claim CONVERTED once | **GAP** `CONV_RACE`: seller terminated mid-way: the entitlement is created TERMINATED_WITH_RESIDUAL or the claim is in the tail, in both orders, never lost | **GAP** `CONV_PAR`: failure between the beneficiary entitlement inserts and the claim CONVERTED (or between two beneficiaries) rolls all back |
+| C2: ACCRUAL_RECONCILIATION: the same conversion for an acceptance that follows the first purchase | **GAP** `CONV_RACE`: see C1; also racing the consumer's accrual of the same purchase (ACCRUAL_REC_RACE) | **GAP** `SWEEP_TMO`: timeout: retry next pass | **GAP** `CLAIM_TAIL`: see C1: tail end, not expires_at | **GAP** `CONV_CRASH`: see C1 | **GAP** `CONV_CRASH`: see C1 | **GAP** `CONV_CRASH`: see C1: a second pass converts nothing | N/A: service identity only | **GAP** `CONV_PAR`: see C1 |
 
 ## COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1
 
@@ -145,16 +180,18 @@ One adjustment per changed line and event; a basis only falls; a refund before i
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: adjustment append + line state (VOID/HELD/PAYABLE adjusted) | **GAP** `CONS_DUP_LINE`: the existing order test is sequential; concurrent dispatchers untested | **GAP** `CONS_TMO`: timeout inside the effect | N/A: no deadline | **GAP** `CONS_CRB`: crash before the effect COMMIT | **GAP** `CONS_CRA`: crash after COMMIT before delivery settled | **C** every order of completion, refund and reversal ends at the same cumulative entitlements with one adjustment per changed line and event; a replay adds nothing `[ord]`, `[cap]` | **GAP** `CONS_REV`: entitlement expired or seller terminated mid-way | **C** a basis only falls (a refund after the reversal, or one naming a higher basis, appends nothing); cumulative adjustments (KC015); a PAID line moves to ADJUSTED with an appended adjustment `[ladj]`, `[r104]` |
+| W: adjustment append + line state (VOID/HELD/PAYABLE adjusted) | **GAP** `CONS_DUP_LINE`: the existing order test is sequential; concurrent dispatchers untested | **GAP** `CONS_TMO`: timeout inside the effect | N/A: no deadline | **GAP** `CONS_CRB`: crash before the effect COMMIT | **GAP** `CONS_CRA`: crash after COMMIT before delivery settled | **C** every order of completion, refund and reversal ends at the same cumulative entitlements with one adjustment per changed line and event; a replay adds nothing `[ord]`, `[cap]` | **GAP** `CONS_REV`: entitlement expired or seller terminated mid-way | **GAP** `CONS_PAR`: failure after one line's adjustment and before another line's, or between the adjustment append and the line state update, rolls the whole effect back; `[ladj]`, `[r104]` (basis only falls, cumulative adjustments) are guard tests, not an injected failure |
 
 ## COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1
 
-Funds facts and holds (HELD / AVAILABLE) and FINAL/STAGE completions from PreparationCompletionSource.
+Funds facts and holds (HELD / AVAILABLE) and FINAL/STAGE completions from PreparationCompletionSource. The funds effect is three separate durable writes (fact, hold, line transition), one row each; `[funds]` observes the HELD line and the separate OPEN hold on the success path only.
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W1: funds fact + FUNDS_HELD hold (review date 168 h) | **GAP** `ELIG_REV`: funds fact racing the ELIGIBILITY pass | **GAP** `CONS_TMO`: timeout | N/A: no deadline | **GAP** `CONS_CRB`: crash before COMMIT | **GAP** `CONS_CRA`: crash after COMMIT | **C** HELD moves an otherwise due line to HELD FUNDS_HELD with a review date and blocks no unrelated line `[funds]` | N/A: no authority | N/A: single row write |
-| W2: completion record via PreparationCompletionSource (call-out) | **GAP** `CONS_DUP_LINE`: STAGE and FINAL completion for one purchase delivered concurrently | **GAP** `CONS_TMO`: source timing out: the line stays ACCRUED_PENDING, next pass retries | N/A: 720 h are counted from the completion's own instant, not from processing | **GAP** `CONS_CRB`: crash before COMMIT | **GAP** `CONS_CRA`: crash after COMMIT | **C** a completion per purchase and kind; STAGE leaves ACCRUED_PENDING, FINAL 720 h later with funds available makes ELIGIBLE `[r101]` | N/A: no authority | **C** ELIGIBLE only with a FINAL completion at least 720 h old and AVAILABLE funds (KC007) `[l101]` |
+| F1: funds fact recorded (capture's latest observation HELD or AVAILABLE) | **GAP** `ELIG_REV`: funds fact racing the ELIGIBILITY pass: a line is never ELIGIBLE under a HELD observation | **GAP** `CONS_TMO`: timeout: retriable | N/A: no deadline | **GAP** `CONS_CRB`: crash before COMMIT | **GAP** `CONS_CRA`: crash after COMMIT | **GAP** `FUNDS_RETRY`: the identical HELD event delivered again records no second fact (the existing `[funds]` test observes one delivery and a later release, never a redelivery) | N/A: no authority | **GAP** `FUNDS_PAR`: failure after the funds fact and before the first hold or line update rolls back |
+| F2: FUNDS_HELD hold opened per affected line (review date 168 h, D10-SVC-3) | **GAP** `ELIG_REV`: hold opened while the ELIGIBILITY pass reads the line | N/A: same COMMIT as F1 | N/A: no deadline of its own: review date is 168 h after opening | N/A: same COMMIT as F1 (CONS_CRB) | N/A: same COMMIT as F1 (CONS_CRA) | **GAP** `FUNDS_RETRY`: redelivery of the same event: one applicable hold per line, never a duplicate | N/A: no authority | **GAP** `FUNDS_PAR`: failure after the first hold and before the second line's hold rolls all back |
+| F3: affected lines transition to HELD FUNDS_HELD | **GAP** `ELIG_REV`: line transition racing the ELIGIBILITY pass | N/A: same COMMIT as F1 | N/A: no deadline | N/A: same COMMIT as F1 (CONS_CRB) | N/A: same COMMIT as F1 (CONS_CRA) | **GAP** `FUNDS_RETRY`: redelivery leaves each line HELD once and never moves a PAID or VOID line | N/A: no authority | **GAP** `FUNDS_PAR`: failure after the hold and before its line update (or after one line's) rolls back: half-state would enable or withhold payout |
+| W2: completion record via PreparationCompletionSource (call-out) | **GAP** `CONS_DUP_LINE`: STAGE and FINAL completion for one purchase delivered concurrently | **GAP** `CONS_TMO`: source timing out: the line stays ACCRUED_PENDING, next pass retries | N/A: 720 h are counted from the completion's own instant, not from processing | **GAP** `CONS_CRB`: crash before COMMIT | **GAP** `CONS_CRA`: crash after COMMIT | **C** a completion per purchase and kind; STAGE leaves ACCRUED_PENDING, FINAL 720 h later with funds available makes ELIGIBLE `[r101]` | N/A: no authority | **GAP** `CONS_PAR`: failure between the completion record and the line transition rolls back; `[l101]` (ELIGIBLE only with a FINAL completion at least 720 h old and AVAILABLE funds) is a guard test |
 
 ## COMMISSIONS dispatcher lease (OUTBOX_DISPATCH)
 
@@ -162,7 +199,8 @@ One lease resource for the consumer; fence read from each claim and heartbeat, n
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| L1: claim / takeover | **C** held against a second dispatcher; the former owner resumes under the next fence once it expired `[lease]` | N/A: claim is one statement; the heartbeat timeout is L2 | **C** expired lease is a takeover under the next fence `[lease]` | **GAP** `LEASE_CRASH`: dispatcher stopped right after the claim | N/A: claim is the commit; the next heartbeat or takeover is observed in L2 | **C** its own re-claim after expiry advances the fence `[lease]` | **C** a dispatcher whose heartbeat is refused settles nothing more `[lease]` | N/A: one row |
+| L1: claim / takeover | **C** held against a second dispatcher; the former owner resumes under the next fence once it expired `[lease]` | **GAP** `LEASE_TMO`: the claim statement waiting or losing its answer: retriable, no ownership assumed; recovery reads the committed ownership and fence | **C** expired lease is a takeover under the next fence `[lease]` | **GAP** `LEASE_CRASH`: dispatcher stopped right after the claim | N/A: claim is the commit; the next heartbeat or takeover is observed in L2 | **C** its own re-claim after expiry advances the fence `[lease]` | **C** a dispatcher whose heartbeat is refused settles nothing more `[lease]` | N/A: one row |
+| D: durable delivery claims (outbox records marked CLAIMED in a batch, own COMMIT, after the lease is held; distinct from the lease row) | **GAP** `DELIV_CLAIM`: a second dispatcher after a takeover claiming the same records: the former owner's late batch is refused by its stale fence, each record is CLAIMED by one owner | **GAP** `LEASE_TMO`: the batch claim statement delayed or answer lost: retriable, nothing assumed claimed | **GAP** `DELIV_CLAIM`: lease expiring between lease acquisition and the batch COMMIT: the claims are fenced | **GAP** `DELIV_CRASH`: dispatcher stopped after lease acquisition and before the batch COMMIT: nothing claimed, the takeover claims the deliveries | **GAP** `DELIV_CRASH`: dispatcher stopped after the batch COMMIT and before any effect: the takeover reclaims the CLAIMED records after the lease expiry, none stranded (evidence `b10-commission-service.test.ts:504-508` shows two records durably CLAIMED) | **GAP** `DELIV_CRASH`: reclaimed deliveries are redelivered once; an effect already committed adds nothing | **GAP** `DELIV_CLAIM`: a dispatcher whose heartbeat is refused claims no further record | **GAP** `DELIV_CRASH`: batch claiming stopping part way: committed claims stay owned, the rest stay unclaimed |
 | L2: heartbeat and settle of deliveries | **GAP** `CONS_LEASE_EXP`: lease expiring mid-effect: late COMMIT fenced | **GAP** `LEASE_CRASH`: a heartbeat that does not arrive in time | **C** a refused heartbeat settles nothing more `[lease]` | **GAP** `CONS_CRB`: see consumer tables | **GAP** `CONS_CRA`: see consumer tables | **C** redelivery adds nothing `[cap]` | **C** refused heartbeat ends the dispatcher's settling `[lease]` | N/A: each delivery is its own unit of work |
 
 ## Sweep QUOTE_EXPIRY
@@ -175,11 +213,12 @@ kauro_commission reads live founding reservations past their end (migration 0033
 
 ## Sweep CLAIM_WINDOWS
 
-Claims lapse at their review or acceptance deadline with no first purchase.
+Claims lapse at their review or acceptance deadline with no first purchase. A claim listed in a termination tail does not lapse at its original `expires_at` but at its tail end (design claim transitions: "`expires_at` (or its tail end) passed with no first purchase"; D10-TERM-1, D10-TERM-2); the database refuses to lapse a listed claim before then (`attribution_claims_lapse`, `[d50tail]`).
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: claim EXPIRED | **GAP** `CLAIM_LAPSE_ACCEPT`: lapse racing AcceptAttribution | **GAP** `SWEEP_TMO`: timeout: retry next pass | **C** claims lapse at their deadline with no first purchase `[sweeps]` | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **GAP** `SWEEP_RACE`: second pass over the same claim adds nothing | N/A: service identity only | N/A: one row per effect |
+| W1: claim EXPIRED (ordinary submitted or accepted claim, no tail) | **GAP** `CLAIM_LAPSE_ACCEPT`: lapse racing AcceptAttribution | **GAP** `SWEEP_TMO`: timeout: retry next pass | **C** an ordinary claim lapses at its deadline with no first purchase `[sweeps]` (no terminated seller and no tail in that test) | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **GAP** `SWEEP_RACE`: second pass over the same claim adds nothing | N/A: service identity only | N/A: one row per effect |
+| W2: claim EXPIRED for an ACCEPTED claim protected by a termination tail | **GAP** `CLAIM_TAIL`: conversion racing the lapse at the tail end, both orders: converted before the tail end or EXPIRED at it, never both, never lapsed early | **GAP** `SWEEP_TMO`: timeout: retry next pass | **GAP** `CLAIM_TAIL`: terminate shortly before the original expires_at; run the sweep after that expiry and before the tail end: the claim stays ACCEPTED and a first purchase inside the tail still converts; at the exact tail endpoint it lapses. Applying the acceptance deadline here would forfeit earned acquisition rights | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **GAP** `SWEEP_RACE`: second pass adds nothing | N/A: service identity only | N/A: one row per effect |
 
 ## Sweep ENTITLEMENT_WINDOWS
 
@@ -195,7 +234,7 @@ Accrues a purchase lacking the lines of an applicable entitlement (e.g. an accep
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: pool + lines for a late purchase | **GAP** `ACCRUAL_REC_RACE`: racing the COMMISSIONS accrual of the same purchase | **GAP** `SWEEP_TMO`: timeout | N/A: no deadline of its own | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **C** an acceptance after the first purchase gains its missing lines once `[sweeps]` | N/A: service identity only | **C** a pool's cents equal round(basis x rate) and its lines sum to it at COMMIT (KC002) `[l097]` |
+| W: pool + lines for a late purchase | **GAP** `ACCRUAL_REC_RACE`: racing the COMMISSIONS accrual of the same purchase | **GAP** `SWEEP_TMO`: timeout | N/A: no deadline of its own | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **C** an acceptance after the first purchase gains its missing lines once `[sweeps]` | N/A: service identity only | **GAP** `SWEEP_PAR`: failure after the pool and before the last line (a zero-basis line born and voided at once) rolls back; `[l097]` (KC002, lines sum to the pool) is a database invariant |
 
 ## Sweep ELIGIBILITY
 
@@ -203,7 +242,7 @@ ACCRUED_PENDING to ELIGIBLE (FINAL completion + 720 h, funds AVAILABLE, no cover
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| W: line ELIGIBLE / hold RELEASED | **GAP** `ELIG_REV`: a hold or adjustment landing mid-way | **GAP** `CONS_TMO`: PreparationCompletionSource timing out: the line stays ACCRUED_PENDING | **C** FINAL completion 720 h later with funds available makes the line ELIGIBLE; AVAILABLE releases a funds hold `[r101]`, `[funds]` | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **GAP** `SWEEP_RACE`: second pass adds nothing | N/A: service identity only | **C** a line becomes ELIGIBLE only with a FINAL completion at least 720 h old and AVAILABLE funds (KC007) `[l101]`, `[lkc]` |
+| W: line ELIGIBLE / hold RELEASED | **GAP** `ELIG_REV`: a hold or adjustment landing mid-way | **GAP** `CONS_TMO`: PreparationCompletionSource timing out: the line stays ACCRUED_PENDING | **C** FINAL completion 720 h later with funds available makes the line ELIGIBLE; AVAILABLE releases a funds hold `[r101]`, `[funds]` | **GAP** `SWEEP_CRASH`: crash before COMMIT | **GAP** `SWEEP_CRASH`: crash after COMMIT | **GAP** `SWEEP_RACE`: second pass adds nothing | N/A: service identity only | **GAP** `SWEEP_PAR`: failure between the line becoming ELIGIBLE and the funds hold RELEASED (or between two lines) rolls back; `[l101]`, `[lkc]` (KC007) are database guards, not an injected failure |
 
 ## Sweep PERIODS
 
@@ -216,11 +255,13 @@ Opens the month's period undated; closes a due period through CMD051 under journ
 
 ## Summary
 
-Tables: 23. Cells: 328. Covered (C): 107. GAP: 134. N/A: 87.
+Tables: 26. Cells: 472. Covered (C): 83. GAP: 232. N/A: 157.
+
+Revision r1 (Codex design-time review, 17 findings) lowered the covered count: cells whose cited test is a sequential call, a guard or a crash outside the COMMIT boundary are GAP, and 144 cells were added by the new rows (qualifying-purchase trigger, claim conversion, correction, ordinary quote writes, ActiveWorkInspector, replacement refusal, funds writes, durable delivery claims, tail expiry, close-versus-hold, cash basis, seller identity). Tier-1 GAP codes: 71; tier 2: 6; tier 3: 5.
 
 ## GAP list, by risk
 
-Tier 1 = money or authority (a wrong outcome pays, withholds or attributes money, or admits a revoked actor). Tier 2 = ledger and data integrity (a wrong outcome corrupts the cumulative ledger, a slot or a window). Tier 3 = availability and operability (the wrong outcome is a retriable error or a lost response). Within tier 1 the order is by money impact (payout, then statements, then replacement, then attribution); within the other tiers by number of cells. Each proposed title follows the existing convention (`RACE ...`, `DENY ...`) and is the test-first input of B10-INTEGRATION and of the Codex review.
+Tier 1 = money or authority: a wrong outcome pays, withholds, forfeits or attributes money or a contractual right, admits a revoked or expired actor, or leaves a half-state of a write that decides payable rights (accrual, conversion, hold, statement, intent, re-binding, quote price, closure). Every money or authority GAP is tier 1, including its crash, partial and retry cells. Tier 2 = ledger and delivery integrity that does not by itself change a payable right (a sweep timing out holds rather than releases, a duplicated period open, a stranded delivery, a source deadline). Tier 3 = availability and operability (the wrong outcome is a retriable error or a lost response). Within tier 1 the order is by money impact (payout and cash, then statements and corrections, then accrual, conversion and holds, then replacement and quote, then attribution and authority); within tiers 2 and 3 by number of cells. Each proposed title follows the existing convention (`RACE ...`, `DENY ...`) and is the test-first input of B10-INTEGRATION and of the Codex review. A cell is closed by a test that uses the matching harness facility; a sequential call, a guard or a database invariant does not close a RACE, CRASH or PARTIAL cell.
 
 ### Tier 1
 
@@ -228,185 +269,333 @@ Tier 1 = money or authority (a wrong outcome pays, withholds or attributes money
    Proposed test: `RACE: two ApproveCommissionPayout calls on two statements whose payables each fit the bank-available cash but not together admit one intent and refuse the other FUNDS_UNAVAILABLE, in both orders`  
    Cells: CMD052 ApproveCommissionPayout / RACE
 
-2. `PAY_REV` (1 cell): CMD052: KAURO_OWNER grant revoked or step-up expiring between guard and COMMIT.  
+2. `PAY_CASH_BASIS` (1 cell): CMD052: a newer bank-evidenced settlement recorded between the cash read and the intent COMMIT (D10-PAY-1: cash of the latest settlement covers the payable and every unsettled authorized intent).  
+   Proposed test: `RACE: a settlement that lowers the bank-available cash committing while ApproveCommissionPayout holds its cash read, in both orders: the approval uses one consistent cash basis and is FUNDS_UNAVAILABLE rather than spending cash shown only by the stale snapshot`  
+   Cells: CMD052 ApproveCommissionPayout / RACE
+
+3. `PAY_INTENT_BASIS` (1 cell): CMD052 against CMD053: a reconciliation (SETTLED, FAILED or RETURNED) changing which authorized intents remain unsettled while the approval reads cash and intents.  
+   Proposed test: `RACE: ReconcileCommissionPayout of an earlier intent committing while ApproveCommissionPayout is held after its cash and intents reads, in both orders: coverage is computed on one consistent cash and unsettled-intent basis, never double counting a settled intent nor freeing cash a returned one does not`  
+   Cells: CMD052 ApproveCommissionPayout / RACE
+
+4. `PAY_REV` (1 cell): CMD052: KAURO_OWNER grant revoked or step-up expiring between guard and COMMIT.  
    Proposed test: `RACE: a KAURO_OWNER grant revoked while ApproveCommissionPayout waits on the statement row refuses with NOT_AUTHORIZED and writes no intent; a step-up older than its window at the database instant is ASSURANCE_REQUIRED`  
    Cells: CMD052 ApproveCommissionPayout / EXPIRY
 
-3. `PAY_DEST_RACE` (1 cell): CMD052: a payout-destination change committed between the payee check and the intent insert (R2-103 is only sequential).  
+5. `PAY_DEST_RACE` (1 cell): CMD052: a payout-destination change committed between the payee check and the intent insert (R2-103 is only sequential).  
    Proposed test: `RACE: a payout-destination change racing ApproveCommissionPayout serializes in both orders: the intent binds the destination VERIFIED at its commit, or the approval is 409 PAYEE_UNVERIFIED, never a half-verified one`  
    Cells: CMD052 ApproveCommissionPayout / REVOCATION
 
-4. `PAY_SETTLE_FLIP` (1 cell): CMD053: SETTLED evidence applied, then FAILED or RETURNED evidence (or the reverse) for the same intent; the design has no SETTLED to RETURNED edge.  
+6. `PAY_SETTLE_FLIP` (1 cell): CMD053: SETTLED evidence applied, then FAILED or RETURNED evidence (or the reverse) for the same intent; the design has no SETTLED to RETURNED edge.  
    Proposed test: `RACE: SETTLED and RETURNED evidence for one intent delivered in both orders: the first terminal state stands, the second is refused PAYOUT_EVIDENCE_MISMATCH or INTENT_TERMINAL, no line leaves PAID and the contradiction is a visible case`  
    Cells: CMD053 ReconcileCommissionPayout / RACE
 
-5. `CLOSE_VS_DELIVERY` (1 cell): CMD051: a COMMISSIONS record with occurred_at before the cutoff delivered between the INPUTS_UNRECONCILED check and COMMIT (the existing race is a refund adjustment on the ledger, not a late delivery).  
-   Proposed test: `RACE: a capture.completed.v1 delivery with occurred_at before the cutoff racing CloseCommissionPeriod: the close is INPUTS_UNRECONCILED or includes the line, never a statement that omits it, in both orders`  
-   Cells: CMD051 CloseCommissionPeriod / REVOCATION
-
-6. `REPL_REVOKE` (3 cells): CMD027 replacement: the paid entitlement consumed (execution started) or its order refunded between the intent commit and the re-binding.  
-   Proposed test: `RACE (replacement): execution starting between the replacement's intent and its re-binding withdraws the replacement with EXECUTION_STARTED, the old entitlement stays, the allowance is not spent`  
-   Cells: CMD027 included-replacement protocol / REVOCATION; CMD027 included-replacement protocol / REVOCATION; CMD027 included-replacement protocol / REVOCATION
-
-7. `TERM_ACCRUAL` (1 cell): COMMISSIONS accrual racing CMD050: the line of a capture.completed.v1 accrued while the seller terminates.  
-   Proposed test: `RACE: capture.completed.v1 accrual racing TerminateSeller in both orders: one line, same share, entitlement TERMINATED_WITH_RESIDUAL, inside the window nothing lost`  
-   Cells: Sweep ENTITLEMENT_WINDOWS / REVOCATION
-
-8. `TERM_ACCEPT` (2 cells): CMD050 against CMD047: termination racing an acceptance that names the seller's claim (planned for B10-INTEGRATION).  
-   Proposed test: `RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders: the allocation is frozen with the seller before the termination (claim in the manifest or tail) or the acceptance is refused SELLER_NOT_ACTIVE, never a share for a TERMINATED seller without tail`  
-   Cells: CMD047 AcceptAttribution / REVOCATION; CMD050 TerminateSeller / REVOCATION
-
-9. `PAY_APPROVE_VS_FAIL` (1 cell): CMD052 racing CMD053 FAILED or RETURNED of an earlier intent of the same statement (statement APPROVED to ISSUED while a second approval waits).  
+7. `PAY_APPROVE_VS_FAIL` (1 cell): CMD052 racing CMD053 FAILED or RETURNED of an earlier intent of the same statement (statement APPROVED to ISSUED while a second approval waits).  
    Proposed test: `RACE: ApproveCommissionPayout racing the FAILED reconciliation of the statement's earlier intent yields at most one live intent in both orders`  
    Cells: CMD052 ApproveCommissionPayout / RACE
 
-10. `REPL_TMO` (1 cell): CMD027 replacement: PurchaseRebinder times out after the intent committed (re-binding of a paid purchase).  
-   Proposed test: `RACE (replacement): a re-binding that times out leaves the replacement ISSUED with its journal entry open, the same key observes the re-binding by its identity and never re-binds twice, and the answer is the retriable 202`  
-   Cells: CMD027 included-replacement protocol / TIMEOUT
+8. `PAY_PAR` (1 cell): CMD052: failure after the AUTHORIZED intent insert and before the statement APPROVED.  
+   Proposed test: `RACE (partial): a failure injected after the payout_intents insert and before the statement APPROVED commits neither; the statement stays ISSUED and the same key approves once`  
+   Cells: CMD052 ApproveCommissionPayout / PARTIAL
 
-11. `QE_CAPTURE_RACE` (1 cell): QUOTE_EXPIRY sweep racing a capture that settles (hold versus consume), interleaved in both orders.  
-   Proposed test: `RACE: a capture settling while the QUOTE_EXPIRY sweep decides on its reservation: the slot is consumed once or released once, never both, in both orders`  
-   Cells: Sweep QUOTE_EXPIRY / RACE
+9. `SETTLE_PAR` (1 cell): CMD053: failure inside the SETTLED, FAILED or RETURNED branch after the intent transition and before the statement or line writes.  
+   Proposed test: `RACE (partial): a failure injected after the intent settles and before the statement PAID, after the statement and before one line update, and before the hold writes rolls the whole branch back; the same key then settles once`  
+   Cells: CMD053 ReconcileCommissionPayout / PARTIAL
 
-12. `SLOT_RELEASE_RACE` (1 cell): CMD027 supersession, CMD043 withdrawal and the QUOTE_EXPIRY sweep racing on one quote and its reservation.  
-   Proposed test: `RACE: the QUOTE_EXPIRY sweep racing a superseding CreateQuote of the same quote releases its slot exactly once in both orders, and the slot is free for exactly one next reservation`  
-   Cells: CMD027 CreateQuote (issuance) / REVOCATION
-
-13. `CLAIM_LAPSE_ACCEPT` (3 cells): CMD047 against the CLAIM_WINDOWS sweep: a claim lapsing at its review deadline while accepted.  
-   Proposed test: `RACE: AcceptAttribution racing the CLAIM_WINDOWS lapse of the same claim at its deadline: one wins in both orders; accepting a lapsed claim is 409 CLAIM_EXPIRED and writes no allocation`  
-   Cells: CMD047 AcceptAttribution / RACE; CMD050 TerminateSeller / EXPIRY; Sweep CLAIM_WINDOWS / RACE
-
-14. `CLAIM_DEADLINE` (2 cells): CMD047 on a claim past its 2160 h review deadline whose sweep has not yet run (the database clock decides, as S060 does for sources).  
-   Proposed test: `DENY: AcceptAttribution of a SUBMITTED claim past its review deadline on the database clock, before the sweep ran, is 409 CLAIM_EXPIRED and writes nothing`  
-   Cells: CMD047 AcceptAttribution / EXPIRY; CMD047 AcceptAttribution / EXPIRY
-
-15. `CORP_REV` (1 cell): CMD045, CMD047, CMD048, CMD049, CMD050: KAURO_OWNER grant revoked (or step-up expired for CMD049) between the guard and COMMIT.  
-   Proposed test: `RACE: a KAURO_OWNER grant revoked while the command waits on its row refuses with NOT_AUTHORIZED and writes nothing (one per command)`  
-   Cells: CMD049 ActivateSeller / REVOCATION
-
-16. `TEN_REV` (4 cells): CMD002, CMD043 and CMD027: the agency OWNER or AGENCY_BILLING membership removed, or the step-up of CMD043 expiring, between the guard and COMMIT.  
-   Proposed test: `RACE: removing the acting OWNER membership while the command waits refuses with NOT_AUTHORIZED and writes nothing; CMD043: a step-up older than its window at the database instant is ASSURANCE_REQUIRED`  
-   Cells: CMD002 ActivateAgency / REVOCATION; CMD043 CloseAgency / REVOCATION; CMD043 CloseAgency / REVOCATION; CMD027 CreateQuote (issuance) / REVOCATION
-
-17. `QUOTE_CLOSE` (2 cells): CMD027 racing CMD043 (new quote against a closure), both orders.  
-   Proposed test: `RACE: CreateQuote racing CloseAgency of the same agency in both orders: the quote commits first and is WITHDRAWN by the closure with its reservation released, or the closure commits first and the quote is AGENCY_NOT_ACTIVE`  
-   Cells: CMD043 CloseAgency / RACE; CMD027 included-replacement protocol / RACE
-
-18. `CLOSE_INFLIGHT` (1 cell): CMD043 against a capture, webhook or refund request arriving between the inventory and COMMIT.  
-   Proposed test: `RACE: a capture settling or a refund request filed while CloseAgency runs: the closure lists it in its inventory or is CLOSURE_OBLIGATIONS_UNRECONCILED, never a closure that omits a live obligation, in both orders`  
-   Cells: CMD043 CloseAgency / RACE
-
-19. `TAIL_PURCHASE_RACE` (1 cell): CMD050: an agency's first purchase designated between the manifest check and COMMIT.  
-   Proposed test: `RACE: an agency's first-purchase designation racing TerminateSeller whose manifest names that agency's claim: the entry is TAIL_NOT_ENUMERATED or the tail precedes the purchase, in both orders`  
-   Cells: CMD050 TerminateSeller / RACE
-
-20. `SELLER_ACT_RACE` (3 cells): CMD045 and CMD046 against CMD050: a seller terminated between the ACTIVE check and the write.  
-   Proposed test: `RACE: TerminateSeller racing RegisterProspect or ClaimProspect of the seller in both orders: the write commits before the termination and is handled by it, or is refused SELLER_NOT_ACTIVE`  
-   Cells: CMD045 RegisterProspect / REVOCATION; CMD046 ClaimProspect / REVOCATION; CMD048 AssignAccount / REVOCATION
-
-21. `CLOSE_CAL` (1 cell): CMD051: a newer VERIFIED_FEED banking-calendar version recorded between the calendar read and COMMIT.  
-   Proposed test: `RACE: a banking-calendar version recorded while CloseCommissionPeriod runs: the statement stores the version it read and its pay date follows that version, in both orders`  
-   Cells: CMD051 CloseCommissionPeriod / RACE
-
-22. `PAY_VERIFIER_TMO` (1 cell): CMD053: PayoutEvidenceVerifier times out or answers ambiguously (PayoutEvidenceVerifier is a port to B15).  
+10. `PAY_VERIFIER_TMO` (1 cell): CMD053: PayoutEvidenceVerifier times out or answers ambiguously (PayoutEvidenceVerifier is a port to B15).  
    Proposed test: `DENY: a PayoutEvidenceVerifier that times out answers the retriable 503 PAYOUT_EVIDENCE_UNAVAILABLE, nothing changes, and the same key then settles once`  
    Cells: CMD053 ReconcileCommissionPayout / TIMEOUT
 
-23. `PAY_CRA` (2 cells): CMD052 and CMD053: response lost after COMMIT (retry replays; the injected loss is not tested).  
+11. `PAY_CRA` (2 cells): CMD052 and CMD053: response lost after COMMIT (retry replays; the injected loss is not tested).  
    Proposed test: `RACE (crash after COMMIT): the response lost after the intent (or settlement) commits is recovered by the same key as the same answer, one intent, one settlement`  
    Cells: CMD052 ApproveCommissionPayout / CRASH-AFTER; CMD053 ReconcileCommissionPayout / CRASH-AFTER
 
-24. `CLOSE_CRA` (2 cells): CMD051 and the PERIODS sweep: crash after the close COMMITs and before the sweep records the result.  
+12. `CLOSE_HOLD_RACE` (1 cell): CMD051: a full or partial hold committed between the cutoff/input reads and the statement COMMIT (not the ELIGIBILITY sweep). D10-STMT-4 hashes holds in the cutoff; D10-STMT-2 and D10-HOLD-1: the statement withholds exactly the held cents.  
+   Proposed test: `RACE: a full hold and a partial hold each committed between CloseCommissionPeriod's cutoff/input reads and its statement COMMIT, in both orders: the close refuses with STALE_VERSION LEDGER_CHANGED or the statement withholds exactly the held cents, and a contested line is never PAYABLE`  
+   Cells: CMD051 CloseCommissionPeriod / RACE
+
+13. `CLOSE_VS_DELIVERY` (1 cell): CMD051: a COMMISSIONS record with occurred_at before the cutoff delivered between the INPUTS_UNRECONCILED check and COMMIT (the existing race is a refund adjustment on the ledger, not a late delivery).  
+   Proposed test: `RACE: a capture.completed.v1 delivery with occurred_at before the cutoff racing CloseCommissionPeriod: the close is INPUTS_UNRECONCILED or includes the line, never a statement that omits it, in both orders`  
+   Cells: CMD051 CloseCommissionPeriod / REVOCATION
+
+14. `CORR_APPROVE` (2 cells): CMD051 correction: a correcting statement racing CMD052 approval of the predecessor (or B12's dispute_scoped); APPROVED has no edge to CORRECTED.  
+   Proposed test: `RACE: a correcting statement racing ApproveCommissionPayout of the same statement, in both orders: approval first refuses the correction, correction first makes the approval 409 STALE_VERSION, and no intent ever names a CORRECTED statement`  
+   Cells: CMD051 correcting statement (correction_issued) / RACE; CMD051 correcting statement (correction_issued) / RACE
+
+15. `CORR_DUP` (2 cells): CMD051 correction: the same correction twice.  
+   Proposed test: `RACE: two corrections of one ISSUED statement on two keys yield one successor and one STALE_VERSION; the same key replays; each line is payable through exactly one live statement item`  
+   Cells: CMD051 correcting statement (correction_issued) / RETRY; CMD051 correcting statement (correction_issued) / RETRY
+
+16. `CORR_PAR` (2 cells): CMD051 correction: failure between issuing the successor and marking the predecessor CORRECTED.  
+   Proposed test: `RACE (partial): a failure injected after the successor statement is inserted and before the predecessor is marked CORRECTED rolls both back`  
+   Cells: CMD051 correcting statement (correction_issued) / PARTIAL; CMD051 correcting statement (correction_issued) / PARTIAL
+
+17. `CORR_CRASH` (2 cells): CMD051 correction: crash before or after the correction COMMIT.  
+   Proposed test: `RACE (crash): a crash before the correction COMMIT leaves the predecessor unchanged; the response lost after it is recovered by the same key as the same successor`  
+   Cells: CMD051 correcting statement (correction_issued) / CRASH-BEFORE; CMD051 correcting statement (correction_issued) / CRASH-AFTER
+
+18. `CORR_AUTH` (1 cell): CMD051 correction: the performer's authority withdrawn mid-way (performer to be fixed before B10-INTEGRATION).  
+   Proposed test: `RACE: the correcting performer's authority (service identity, or the owner's grant and fresh step-up) withdrawn while the correction waits refuses it and writes nothing`  
+   Cells: CMD051 correcting statement (correction_issued) / REVOCATION
+
+19. `CLOSEP_PAR` (1 cell): CMD051: failure after some statements, items, PAYABLE transitions, holds or the guard review and before the period CLOSED.  
+   Proposed test: `RACE (partial): a failure injected after the first statement, after the items, after the PAYABLE transitions, after the holds and before the period CLOSED leaves the period OPEN with no statement and no PAYABLE line, and the same journal key then closes once`  
+   Cells: CMD051 CloseCommissionPeriod / PARTIAL
+
+20. `CLOSE_CAL` (1 cell): CMD051: a newer VERIFIED_FEED banking-calendar version recorded between the calendar read and COMMIT.  
+   Proposed test: `RACE: a banking-calendar version recorded while CloseCommissionPeriod runs: the statement stores the version it read and its pay date follows that version, in both orders`  
+   Cells: CMD051 CloseCommissionPeriod / RACE
+
+21. `CLOSE_CRA` (2 cells): CMD051 and the PERIODS sweep: crash after the close COMMITs and before the sweep records the result.  
    Proposed test: `RACE (crash after COMMIT): the PERIODS sweep stopped after CloseCommissionPeriod committed re-runs under period-close-<periodId> and replays the same statements, no second set`  
    Cells: CMD051 CloseCommissionPeriod / CRASH-AFTER; Sweep PERIODS / CRASH-AFTER
 
-25. `CLOSE_TMO` (3 cells): CMD051: BankingCalendarSource or the cutoff recomputation exceeding a timeout.  
+22. `CLOSE_TMO` (4 cells): CMD051: BankingCalendarSource or the cutoff recomputation exceeding a timeout.  
    Proposed test: `DENY: a BankingCalendarSource that times out answers the retriable failure, the period stays OPEN, and the same journal key period-close-<periodId> then closes once`  
-   Cells: CMD051 CloseCommissionPeriod / TIMEOUT; CMD051 CloseCommissionPeriod / TIMEOUT; Sweep PERIODS / TIMEOUT
+   Cells: CMD051 CloseCommissionPeriod / TIMEOUT; CMD051 CloseCommissionPeriod / TIMEOUT; CMD051 CloseCommissionPeriod / TIMEOUT; Sweep PERIODS / TIMEOUT
 
-### Tier 2
+23. `TRG_PAR` (3 cells): Qualifying-purchase trigger: failure between the purchase insertion, the recurrence update and the founding reservation consumption (D10-FIRST-1).  
+   Proposed test: `RACE (partial): a failure injected between the authorization insert, the agency_recurrence update and the reservation consumption rolls all back; recovery preserves one designation and one consumption, never a half-state`  
+   Cells: Qualifying-purchase trigger (reconciler transaction) / PARTIAL; Qualifying-purchase trigger (reconciler transaction) / PARTIAL; Qualifying-purchase trigger (reconciler transaction) / PARTIAL
 
-26. `SWEEP_CRASH` (14 cells): A sweep effect stopped before or after its COMMIT (each effect is its own SERVICE unit of work).  
-   Proposed test: `RACE (crash): a sweep stopped before an effect's COMMIT leaves nothing and the next pass applies it once; stopped after, the next pass finds it done and adds nothing`  
-   Cells: Sweep QUOTE_EXPIRY / CRASH-BEFORE; Sweep QUOTE_EXPIRY / CRASH-AFTER; Sweep QUOTE_EXPIRY / PARTIAL; Sweep CLAIM_WINDOWS / CRASH-BEFORE; Sweep CLAIM_WINDOWS / CRASH-AFTER; Sweep ENTITLEMENT_WINDOWS / CRASH-BEFORE; Sweep ENTITLEMENT_WINDOWS / CRASH-AFTER; Sweep ACCRUAL_RECONCILIATION / CRASH-BEFORE; Sweep ACCRUAL_RECONCILIATION / CRASH-AFTER; Sweep ELIGIBILITY / CRASH-BEFORE; Sweep ELIGIBILITY / CRASH-AFTER; Sweep PERIODS / CRASH-BEFORE; Sweep PERIODS / CRASH-AFTER; Sweep PERIODS / CRASH-BEFORE
+24. `TRG_CRASH` (3 cells): Qualifying-purchase trigger: crash immediately before or after the reconciler COMMIT, and redelivery of the same confirmation.  
+   Proposed test: `RACE (crash): a crash immediately before the reconciler COMMIT leaves no authorization, sequence, designation or slot change; a crash immediately after it, and the reconciler retried, find one designation and one consumption`  
+   Cells: Qualifying-purchase trigger (reconciler transaction) / CRASH-BEFORE; Qualifying-purchase trigger (reconciler transaction) / CRASH-AFTER; Qualifying-purchase trigger (reconciler transaction) / RETRY
 
-27. `CONS_CRA` (5 cells): COMMISSIONS: crash after an effect commits and before the outbox delivery is marked (a redelivery must add nothing).  
-   Proposed test: `RACE (crash after COMMIT): a dispatcher stopped after the accrual committed and before the delivery was settled redelivers and the accrual adds no pool, line or adjustment`  
-   Cells: COMMISSIONS consumer: capture.completed.v1 / CRASH-AFTER; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / CRASH-AFTER; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-AFTER; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-AFTER; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-AFTER
+25. `CONV_RACE` (3 cells): Claim conversion (ACCEPTED to CONVERTED) and entitlement creation racing the CLAIM_WINDOWS lapse, CMD050 termination, a competing acceptance or another accrual; also the seller terminated mid-way.  
+   Proposed test: `RACE: conversion of an ACCEPTED claim racing its lapse, TerminateSeller and a second accrual of the agency, in every pairing and both orders: one entitlement per beneficiary, the claim CONVERTED once, and no conversion after a lapse`  
+   Cells: Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / RACE; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / REVOCATION; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / RACE
 
-28. `CONS_CRB` (5 cells): COMMISSIONS: crash injected before an effect's COMMIT leaves nothing and the delivery stays unsettled.  
-   Proposed test: `RACE (crash before COMMIT): a dispatcher stopped before the effect commits leaves no pool, line or adjustment, and the redelivery produces them once`  
-   Cells: COMMISSIONS consumer: capture.completed.v1 / CRASH-BEFORE; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / CRASH-BEFORE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-BEFORE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-BEFORE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-BEFORE
+26. `CLAIM_TAIL` (4 cells): Claim expiry ignores the termination tail: an ACCEPTED claim in a termination tail expires at its tail end, not at the original expires_at (claim transitions; D10-TERM-1, D10-TERM-2; the database refuses an early lapse).  
+   Proposed test: `RACE: terminate a seller shortly before a claim's original expiry; run CLAIM_WINDOWS after that expiry and before the tail end: the claim stays ACCEPTED, a first purchase inside the tail converts, at the exact tail endpoint it lapses; conversion and lapse racing at the endpoint resolve once in both orders`  
+   Cells: Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / EXPIRY; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / EXPIRY; Sweep CLAIM_WINDOWS / RACE; Sweep CLAIM_WINDOWS / EXPIRY
 
-29. `CONS_TMO` (5 cells): COMMISSIONS: PreparationCompletionSource (D10-SVC-4) timing out inside an effect.  
-   Proposed test: `DENY: a PreparationCompletionSource that times out leaves the line ACCRUED_PENDING with the delivery unsettled and the next pass completes it once`  
-   Cells: COMMISSIONS consumer: capture.completed.v1 / TIMEOUT; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / TIMEOUT; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / TIMEOUT; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / TIMEOUT; Sweep ELIGIBILITY / TIMEOUT
+27. `CONV_PAR` (2 cells): Claim conversion: failure between the beneficiary entitlement inserts and the claim CONVERTED.  
+   Proposed test: `RACE (partial): a failure injected after the first beneficiary's entitlement insert, and after the last and before the claim CONVERTED, rolls all back; the redelivery converts once`  
+   Cells: Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / PARTIAL; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / PARTIAL
 
-30. `SWEEP_TMO` (5 cells): A sweep's call-out (QUOTE_EXPIRY to the payment service's release guard; ELIGIBILITY to PreparationCompletionSource) times out.  
-   Proposed test: `DENY: a timed-out release guard keeps the reservation RECONCILIATION_HOLD or RESERVED (never RELEASED), and the next pass decides it once`  
-   Cells: Sweep QUOTE_EXPIRY / TIMEOUT; Sweep CLAIM_WINDOWS / TIMEOUT; Sweep ENTITLEMENT_WINDOWS / TIMEOUT; Sweep ACCRUAL_RECONCILIATION / TIMEOUT; Sweep PERIODS / TIMEOUT
+28. `CONV_CRASH` (6 cells): Claim conversion: crash before or after the COMMIT, and duplicate delivery of the first capture.  
+   Proposed test: `RACE (crash): a crash before the conversion COMMIT leaves the claim ACCEPTED with no entitlement; a crash after it, and the redelivery, add no second entitlement per beneficiary`  
+   Cells: Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / CRASH-BEFORE; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / CRASH-AFTER; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / RETRY; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / CRASH-BEFORE; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / CRASH-AFTER; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / RETRY
 
-31. `SWEEP_RACE` (4 cells): A sweep racing a second sweep instance or the command that touches the same row.  
-   Proposed test: `RACE: two sweep passes over the same work item produce one effect (one release, one lapse, one expiry, one hold release, one line set), in both orders`  
-   Cells: Sweep QUOTE_EXPIRY / RETRY; Sweep CLAIM_WINDOWS / RETRY; Sweep ENTITLEMENT_WINDOWS / RETRY; Sweep ELIGIBILITY / RETRY
+29. `FUNDS_PAR` (3 cells): Funds effect: the fact, the holds and the line transitions are separate writes; a failure between them leaves a half-state that enables or withholds payout.  
+   Proposed test: `RACE (partial): a failure injected after the funds fact and after the first hold or line update rolls the whole effect back; recovery yields the fact, one applicable hold and one HELD transition per line`  
+   Cells: COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / PARTIAL; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / PARTIAL; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / PARTIAL
 
-32. `CONS_REV` (3 cells): COMMISSIONS: an entitlement terminated or expired, or a seller terminated, between the delivery and the accrual.  
-   Proposed test: `RACE: ENTITLEMENT_WINDOWS expiring an entitlement at the instant of a capture.completed.v1 for a purchase completed one second before: the line is accrued by the provider-completion instant, never by the processing instant`  
-   Cells: COMMISSIONS consumer: capture.completed.v1 / REVOCATION; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / REVOCATION; Sweep ENTITLEMENT_WINDOWS / RACE
+30. `FUNDS_RETRY` (3 cells): Funds effect: the identical capture.funds_observed.v1 HELD event delivered again.  
+   Proposed test: `RACE (retry): the identical HELD event delivered twice adds no second fact, one applicable hold per line and no second transition`  
+   Cells: COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RETRY; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RETRY; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RETRY
 
-33. `CONS_DUP_LINE` (2 cells): COMMISSIONS: refund.completed.v1 and capture.reversed.v1 racing each other and the completion in concurrent dispatchers (the existing order test is sequential).  
+31. `ELIG_REV` (4 cells): Sweep ELIGIBILITY and the funds effect: a hold or refund adjustment, or a funds fact, landing between the eligibility read and the ELIGIBLE transition (the period-close case is CLOSE_HOLD_RACE).  
+   Proposed test: `RACE: a hold opened (or a refund adjustment applied, or a HELD fact recorded) while the ELIGIBILITY sweep makes the line ELIGIBLE: the line is HELD or ELIGIBLE with the adjusted cumulative, never ELIGIBLE under a covering hold, in both orders`  
+   Cells: COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RACE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RACE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RACE; Sweep ELIGIBILITY / RACE
+
+32. `CONS_DUP_LINE` (2 cells): COMMISSIONS: refund, reversal and completion racing each other in concurrent dispatchers (the existing order test is sequential).  
    Proposed test: `RACE: two dispatchers (lease handover) applying the refund and the reversal of one capture concurrently end at the same cumulative entitlements`  
    Cells: COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / RACE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RACE
 
-34. `ELIG_REV` (2 cells): ELIGIBILITY racing a hold opened by B12 or a refund adjustment between the eligibility read and the PAYABLE transition (KC007 is checked at the database; the interleaving is untested).  
-   Proposed test: `RACE: a hold opened (or a refund adjustment applied) while the ELIGIBILITY sweep makes the line ELIGIBLE: the line is HELD or ELIGIBLE with the adjusted cumulative, never ELIGIBLE under a covering hold, in both orders`  
-   Cells: COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / RACE; Sweep ELIGIBILITY / RACE
-
-35. `PERIODS_RACE` (2 cells): PERIODS: two sweepers opening the same month or closing the same period.  
-   Proposed test: `RACE: two PERIODS passes opening the same month or closing the same due period produce one period and one statement set (journal key period-close-<periodId>)`  
-   Cells: Sweep PERIODS / RACE; Sweep PERIODS / RACE
-
-36. `BUYER_TMO` (2 cells): CMD027 and CMD047: BuyerTypeReader timing out or answering unset after a change mid-way.  
-   Proposed test: `DENY: a BuyerTypeReader that times out answers the retriable failure and writes nothing; the same key then succeeds once`  
-   Cells: CMD027 CreateQuote (issuance) / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT
-
-37. `CONS_LEASE_EXP` (1 cell): COMMISSIONS: lease expiring while an effect is in flight, a second dispatcher taking over, the first's late COMMIT fenced.  
-   Proposed test: `RACE: a lease expiring between an effect's reads and its COMMIT lets the takeover run it, and the former owner's late COMMIT is refused by its stale fence`  
-   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / RACE
-
-38. `ACCRUAL_REC_RACE` (1 cell): ACCRUAL_RECONCILIATION racing the COMMISSIONS accrual of the same purchase (both write the pool).  
+33. `ACCRUAL_REC_RACE` (1 cell): ACCRUAL_RECONCILIATION racing the COMMISSIONS accrual of the same purchase (both write the pool).  
    Proposed test: `RACE: ACCRUAL_RECONCILIATION racing capture.completed.v1 for the same purchase yields one pool and line set in both orders`  
    Cells: Sweep ACCRUAL_RECONCILIATION / RACE
 
-39. `TOCTOU_SOURCE` (1 cell): CMD027: the source's retention deadline passing between the availability read and COMMIT (S060 covers a deadline already passed).  
+34. `CONS_REV` (3 cells): COMMISSIONS: an entitlement terminated or expired, or a seller terminated, between the delivery and the accrual.  
+   Proposed test: `RACE: ENTITLEMENT_WINDOWS expiring an entitlement at the instant of a capture.completed.v1 for a purchase completed one second before: the line is accrued by the provider-completion instant, never by the processing instant`  
+   Cells: COMMISSIONS consumer: capture.completed.v1 / REVOCATION; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / REVOCATION; Sweep ENTITLEMENT_WINDOWS / RACE
+
+35. `TERM_ACCRUAL` (1 cell): COMMISSIONS accrual racing CMD050: the line of a capture.completed.v1 accrued while the seller terminates.  
+   Proposed test: `RACE: capture.completed.v1 accrual racing TerminateSeller in both orders: one line, same share, entitlement TERMINATED_WITH_RESIDUAL, inside the window nothing lost`  
+   Cells: Sweep ENTITLEMENT_WINDOWS / REVOCATION
+
+36. `CONS_PAR` (3 cells): COMMISSIONS consumers: failure between the writes of one effect (pool, lines, holds, mirror; adjustment and line state; completion and line).  
+   Proposed test: `RACE (partial): a failure injected after the pool, after some lines, after a hold and after the mirror (or between adjustment and line state) rolls the effect back; the redelivery produces it once`  
+   Cells: COMMISSIONS consumer: capture.completed.v1 / PARTIAL; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / PARTIAL; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / PARTIAL
+
+37. `CONS_CRB` (5 cells): COMMISSIONS: crash injected before an effect's COMMIT leaves nothing and the delivery stays unsettled.  
+   Proposed test: `RACE (crash before COMMIT): a dispatcher stopped before the effect commits leaves no pool, line or adjustment, and the redelivery produces them once`  
+   Cells: COMMISSIONS consumer: capture.completed.v1 / CRASH-BEFORE; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / CRASH-BEFORE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-BEFORE; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-BEFORE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-BEFORE
+
+38. `CONS_CRA` (5 cells): COMMISSIONS: crash after an effect commits and before the outbox delivery is marked (a redelivery must add nothing).  
+   Proposed test: `RACE (crash after COMMIT): a dispatcher stopped after the accrual committed and before the delivery was settled redelivers and the accrual adds no pool, line or adjustment`  
+   Cells: COMMISSIONS consumer: capture.completed.v1 / CRASH-AFTER; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / CRASH-AFTER; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-AFTER; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / CRASH-AFTER; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-AFTER
+
+39. `SWEEP_PAR` (2 cells): Sweeps: failure between the writes of one effect (line ELIGIBLE and hold released; pool and lines).  
+   Proposed test: `RACE (partial): a failure injected between the writes of one sweep effect rolls it back and the next pass applies it once`  
+   Cells: Sweep ACCRUAL_RECONCILIATION / PARTIAL; Sweep ELIGIBILITY / PARTIAL
+
+40. `CONS_LEASE_EXP` (1 cell): COMMISSIONS: lease expiring while an effect is in flight, a second dispatcher taking over, the first's late COMMIT fenced.  
+   Proposed test: `RACE: a lease expiring between an effect's reads and its COMMIT lets the takeover run it, and the former owner's late COMMIT is refused by its stale fence`  
+   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / RACE
+
+41. `SWEEP_CRASH` (16 cells): A sweep effect stopped before or after its COMMIT (each effect is its own SERVICE unit of work).  
+   Proposed test: `RACE (crash): a sweep stopped before an effect's COMMIT leaves nothing and the next pass applies it once; stopped after, the next pass finds it done and adds nothing`  
+   Cells: Sweep QUOTE_EXPIRY / CRASH-BEFORE; Sweep QUOTE_EXPIRY / CRASH-AFTER; Sweep QUOTE_EXPIRY / PARTIAL; Sweep CLAIM_WINDOWS / CRASH-BEFORE; Sweep CLAIM_WINDOWS / CRASH-AFTER; Sweep CLAIM_WINDOWS / CRASH-BEFORE; Sweep CLAIM_WINDOWS / CRASH-AFTER; Sweep ENTITLEMENT_WINDOWS / CRASH-BEFORE; Sweep ENTITLEMENT_WINDOWS / CRASH-AFTER; Sweep ACCRUAL_RECONCILIATION / CRASH-BEFORE; Sweep ACCRUAL_RECONCILIATION / CRASH-AFTER; Sweep ELIGIBILITY / CRASH-BEFORE; Sweep ELIGIBILITY / CRASH-AFTER; Sweep PERIODS / CRASH-BEFORE; Sweep PERIODS / CRASH-AFTER; Sweep PERIODS / CRASH-BEFORE
+
+42. `SWEEP_RACE` (5 cells): A sweep racing a second sweep instance or the command that touches the same row.  
+   Proposed test: `RACE: two sweep passes over the same work item produce one effect (one release, one lapse, one expiry, one hold release, one line set), in both orders`  
+   Cells: Sweep QUOTE_EXPIRY / RETRY; Sweep CLAIM_WINDOWS / RETRY; Sweep CLAIM_WINDOWS / RETRY; Sweep ENTITLEMENT_WINDOWS / RETRY; Sweep ELIGIBILITY / RETRY
+
+43. `REPL_RACE` (2 cells): CMD027 replacement: two intents on different keys, or an intent and a settler, contending for the one paid allowance (the existing a27ref attempts the second only after the first completed).  
+   Proposed test: `RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders and with concurrent recovery of the same key: exactly one re-binding and one allowance ordinal, the other REPLACEMENT_ALLOWANCE_SPENT`  
+   Cells: CMD027 included-replacement protocol / RACE; CMD027 included-replacement protocol / RACE
+
+44. `REPL_CRB` (1 cell): CMD027 replacement S2: crash after the rebinder's last write and before its SERVICE COMMIT.  
+   Proposed test: `RACE (crash before COMMIT): a crash injected inside the SERVICE transaction after the old-authorization revocation, the replacement acceptance and the allowance record leaves no re-binding and the old entitlement ACTIVE; the same key then re-binds once`  
+   Cells: CMD027 included-replacement protocol / CRASH-BEFORE
+
+45. `REPL_COMPLETE` (1 cell): CMD027 replacement S3: crash after the journal update and before the completion COMMIT (the committed re-binding must be honored).  
+   Proposed test: `RACE (crash before COMMIT): a crash injected after the journal update and before the completion COMMIT resumes to the committed re-binding and its new authorization, without reviving the old authorization or resetting the allowance`  
+   Cells: CMD027 included-replacement protocol / CRASH-BEFORE
+
+46. `REPL_PAR` (1 cell): CMD027 replacement S2: failure between the rebinder's writes.  
+   Proposed test: `RACE (partial): a failure injected after the old authorization's revocation, after the replacement's acceptance and after the allowance record rolls the re-binding back atomically; the allowance stays unspent`  
+   Cells: CMD027 included-replacement protocol / PARTIAL
+
+47. `REPL_REFUSE` (3 cells): CMD027 replacement refusal compensation: the withdrawal, quote.withdrawn and journal completion as separate writes (D10-QUOTE-6).  
+   Proposed test: `RACE (replacement refusal): stop after the refusal and before the withdrawal, and fail between the withdrawal and the journal completion: the same key recovers the refusal (WITHDRAWN 201) without re-binding and without an orphan ISSUED replacement`  
+   Cells: CMD027 included-replacement protocol / CRASH-BEFORE; CMD027 included-replacement protocol / RETRY; CMD027 included-replacement protocol / PARTIAL
+
+48. `REPL_POST` (1 cell): CMD027 replacement after a durable re-binding: consumption or refund reaching the new authorization before the journal completion.  
+   Proposed test: `RACE (replacement): after AFTER_SETTLE, consume or refund the replacement purchase before the journal completes; recovery honors the committed re-binding, leaves the old entitlement REVOKED SOURCE_REPLACED and the allowance spent`  
+   Cells: CMD027 included-replacement protocol / REVOCATION
+
+49. `REPL_REVOKE` (2 cells): CMD027 replacement: the paid entitlement consumed (execution started) or its order refunded between the intent commit and the re-binding.  
+   Proposed test: `RACE (replacement): execution starting between the replacement's intent and its re-binding withdraws the replacement with EXECUTION_STARTED, the old entitlement stays, the allowance is not spent`  
+   Cells: CMD027 included-replacement protocol / REVOCATION; CMD027 included-replacement protocol / REVOCATION
+
+50. `QE_CAPTURE_RACE` (3 cells): QUOTE_EXPIRY sweep racing a capture that settles (hold versus consume), interleaved in both orders.  
+   Proposed test: `RACE: a capture settling while the QUOTE_EXPIRY sweep decides on its reservation: the slot is consumed once or released once, never both, in both orders`  
+   Cells: Qualifying-purchase trigger (reconciler transaction) / RACE; Qualifying-purchase trigger (reconciler transaction) / EXPIRY; Sweep QUOTE_EXPIRY / RACE
+
+51. `SLOT_RELEASE_RACE` (1 cell): CMD027 supersession, CMD043 withdrawal and the QUOTE_EXPIRY sweep racing on one quote and its reservation.  
+   Proposed test: `RACE: the QUOTE_EXPIRY sweep racing a superseding CreateQuote of the same quote releases its slot exactly once in both orders, and the slot is free for exactly one next reservation`  
+   Cells: CMD027 CreateQuote (issuance) / REVOCATION
+
+52. `QUOTE_PAR` (4 cells): CMD027 issuance and replacement intent: failure between superseding, the slot update and reservation, the quote insert, quote_issuances, the events and the journal result (replaces CMD_PAR).  
+   Proposed test: `RACE (partial): a failure injected after the supersession, after the slot update, after the quote insert, after quote_issuances and after the events rolls the whole issuance back; the same key issues once`  
+   Cells: CMD027 CreateQuote (issuance) / PARTIAL; CMD027 CreateQuote (issuance) / PARTIAL; CMD027 CreateQuote (issuance) / PARTIAL; CMD027 included-replacement protocol / PARTIAL
+
+53. `REPL_TMO` (1 cell): CMD027 replacement: PurchaseRebinder times out after the intent committed (re-binding of a paid purchase).  
+   Proposed test: `RACE (replacement): a re-binding that times out leaves the replacement ISSUED with its journal entry open, the same key observes the re-binding by its identity and never re-binds twice, and the answer is the retriable 202`  
+   Cells: CMD027 included-replacement protocol / TIMEOUT
+
+54. `TERM_ACCEPT` (2 cells): CMD050 against CMD047: termination racing an acceptance that names the seller's claim (planned for B10-INTEGRATION).  
+   Proposed test: `RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders: the allocation is frozen with the seller before the termination (claim in the manifest or tail) or the acceptance is refused SELLER_NOT_ACTIVE, never a share for a TERMINATED seller without tail`  
+   Cells: CMD047 AcceptAttribution / REVOCATION; CMD050 TerminateSeller / REVOCATION
+
+55. `CLAIM_LAPSE_ACCEPT` (3 cells): CMD047 and CMD050 against the CLAIM_WINDOWS sweep: a claim lapsing at its review deadline while accepted or listed.  
+   Proposed test: `RACE: AcceptAttribution racing the CLAIM_WINDOWS lapse of the same claim at its deadline: one wins in both orders; accepting a lapsed claim is 409 CLAIM_EXPIRED and writes no allocation`  
+   Cells: CMD047 AcceptAttribution / RACE; CMD050 TerminateSeller / EXPIRY; Sweep CLAIM_WINDOWS / RACE
+
+56. `CLAIM_DEADLINE` (2 cells): CMD047 on a claim past its 2160 h review deadline whose sweep has not yet run (the database clock decides, as S060 does for sources).  
+   Proposed test: `DENY: AcceptAttribution of a SUBMITTED claim past its review deadline on the database clock, before the sweep ran, is 409 CLAIM_EXPIRED and writes nothing`  
+   Cells: CMD047 AcceptAttribution / EXPIRY; CMD047 AcceptAttribution / EXPIRY
+
+57. `TERM_PAR` (1 cell): CMD050: failure between the seller TERMINATED and the assignments, prospects, entitlements, claims and tail entries.  
+   Proposed test: `RACE (partial): a failure injected after the seller is TERMINATED and before each later write rolls everything back; the same key terminates once`  
+   Cells: CMD050 TerminateSeller / PARTIAL
+
+58. `ATTR_PAR` (2 cells): CMD047 and CMD048: failure between the writes of the acceptance or the assignment.  
+   Proposed test: `RACE (partial): a failure injected after the allocation, after the shares and after the claims update rolls AcceptAttribution back; one injected between ending the previous assignment and appending the new rolls AssignAccount back`  
+   Cells: CMD047 AcceptAttribution / PARTIAL; CMD048 AssignAccount / PARTIAL
+
+59. `PROS_PAR` (2 cells): CMD045 and CMD046: failure between the prospect or claim and its evidence, deadline or conflict review.  
+   Proposed test: `RACE (partial): a failure injected after the prospect (or claim) insert and before its evidence binding (or review write) rolls both back`  
+   Cells: CMD045 RegisterProspect / PARTIAL; CMD046 ClaimProspect / PARTIAL
+
+60. `TAIL_PURCHASE_RACE` (1 cell): CMD050: an agency's first purchase designated between the manifest check and COMMIT.  
+   Proposed test: `RACE: an agency's first-purchase designation racing TerminateSeller whose manifest names that agency's claim: the entry is TAIL_NOT_ENUMERATED or the tail precedes the purchase, in both orders`  
+   Cells: CMD050 TerminateSeller / RACE
+
+61. `SELLER_IDENT_RACE` (2 cells): CMD049: the candidate's verified identity or MFA withdrawn between the prerequisite read and COMMIT (D10-SELL-1, D10-SELL-3, KC005).  
+   Proposed test: `RACE: deactivating the target seller's identity or removing its MFA while ActivateSeller waits, in both orders: the activation is refused or committed before the withdrawal, never based on stale identity authority`  
+   Cells: CMD049 ActivateSeller / RACE; CMD049 ActivateSeller / REVOCATION
+
+62. `CORP_REV` (1 cell): CMD045, CMD047, CMD048, CMD049, CMD050: KAURO_OWNER grant revoked (or step-up expired for CMD049) between the guard and COMMIT.  
+   Proposed test: `RACE: a KAURO_OWNER grant revoked while the command waits on its row refuses with NOT_AUTHORIZED and writes nothing (one per command)`  
+   Cells: CMD049 ActivateSeller / REVOCATION
+
+63. `CMD_EXP_ASSURE` (1 cell): CMD049: a fresh step-up expiring in the step; an expired step-up must not admit the activation (CMD043 in TEN_REV, CMD052 in PAY_REV).  
+   Proposed test: `DENY: a step-up that passes its window between the guard and COMMIT is ASSURANCE_REQUIRED and the seller stays CANDIDATE`  
+   Cells: CMD049 ActivateSeller / EXPIRY
+
+64. `SELLER_ACT_RACE` (3 cells): CMD045 and CMD046 against CMD050: a seller terminated between the ACTIVE check and the write.  
+   Proposed test: `RACE: TerminateSeller racing RegisterProspect or ClaimProspect of the seller in both orders: the write commits before the termination and is handled by it, or is refused SELLER_NOT_ACTIVE`  
+   Cells: CMD045 RegisterProspect / REVOCATION; CMD046 ClaimProspect / REVOCATION; CMD048 AssignAccount / REVOCATION
+
+65. `TEN_REV` (5 cells): CMD002, CMD043 and CMD027: the agency OWNER or AGENCY_BILLING membership removed, or the step-up of CMD043 expiring, between the guard and COMMIT.  
+   Proposed test: `RACE: removing the acting OWNER membership while the command waits refuses with NOT_AUTHORIZED and writes nothing; CMD043: a step-up older than its window at the database instant is ASSURANCE_REQUIRED`  
+   Cells: CMD002 ActivateAgency / REVOCATION; CMD043 CloseAgency / REVOCATION; CMD043 CloseAgency / REVOCATION; CMD027 CreateQuote (issuance) / REVOCATION; CMD027 CreateQuote (issuance) / REVOCATION
+
+66. `AGREEMENT_EXP` (2 cells): CMD002 and CMD046: the published agreement version being superseded while the step runs.  
+   Proposed test: `RACE: a new agreement version published while the command waits: the command binds the version published at its locks, or is AGREEMENT_VERSION_MISMATCH`  
+   Cells: CMD002 ActivateAgency / EXPIRY; CMD046 ClaimProspect / EXPIRY
+
+67. `ACT_PAR` (1 cell): CMD002: failure between the acceptance insert and the agency ACTIVE.  
+   Proposed test: `RACE (partial): a failure injected after the acceptance insert and before the agency ACTIVE leaves the agency DRAFT with no acceptance`  
+   Cells: CMD002 ActivateAgency / PARTIAL
+
+68. `QUOTE_CLOSE` (3 cells): CMD027 racing CMD043 (new quote against a closure), both orders.  
+   Proposed test: `RACE: CreateQuote racing CloseAgency of the same agency in both orders: the quote commits first and is WITHDRAWN by the closure with its reservation released, or the closure commits first and the quote is AGENCY_NOT_ACTIVE`  
+   Cells: CMD043 CloseAgency / RACE; CMD027 included-replacement protocol / RACE; CMD027 included-replacement protocol / RACE
+
+69. `CLOSE_INFLIGHT` (2 cells): CMD043 against a capture, webhook or refund request arriving between the inventory and COMMIT.  
+   Proposed test: `RACE: a capture settling or a refund request filed while CloseAgency runs: the closure lists it in its inventory or is CLOSURE_OBLIGATIONS_UNRECONCILED, never a closure that omits a live obligation, in both orders`  
+   Cells: CMD043 CloseAgency / RACE; CMD043 CloseAgency / RACE
+
+70. `CLOSE_PAR` (1 cell): CMD043: failure between the withdrawals/releases, the closure record and the agency CLOSING.  
+   Proposed test: `RACE (partial): a failure injected after the quote withdrawals, and after the closure record and before CLOSING, rolls back; the agency is ACTIVE, quotes ISSUED and reservations held`  
+   Cells: CMD043 CloseAgency / PARTIAL
+
+71. `INSPECT_FAIL` (2 cells): CMD043: ActiveWorkInspector timing out, unavailable or failing after some clients (D10-AGY-6).  
+   Proposed test: `RACE (partial): an inspector that fails after inspecting one client refuses the closure retriably with no quote withdrawn and no closure committed; a timed-out inventory is never read as zero`  
+   Cells: CMD043 CloseAgency / TIMEOUT; CMD043 CloseAgency / PARTIAL
+
+### Tier 2
+
+72. `SWEEP_TMO` (7 cells): A sweep's call-out (QUOTE_EXPIRY to the payment service's release guard; ELIGIBILITY to PreparationCompletionSource) times out.  
+   Proposed test: `DENY: a timed-out release guard keeps the reservation RECONCILIATION_HOLD or RESERVED (never RELEASED), and the next pass decides it once`  
+   Cells: Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / TIMEOUT; Sweep QUOTE_EXPIRY / TIMEOUT; Sweep CLAIM_WINDOWS / TIMEOUT; Sweep CLAIM_WINDOWS / TIMEOUT; Sweep ENTITLEMENT_WINDOWS / TIMEOUT; Sweep ACCRUAL_RECONCILIATION / TIMEOUT; Sweep PERIODS / TIMEOUT
+
+73. `DELIV_CRASH` (4 cells): Dispatcher: stopped after lease acquisition or after the batch claim, or part way through it.  
+   Proposed test: `RACE (crash): a dispatcher stopped after lease acquisition, after the batch claim COMMIT or part way through it is taken over after the lease expiry and its claimed deliveries are reclaimed once, none stranded`  
+   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-BEFORE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-AFTER; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / RETRY; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / PARTIAL
+
+74. `DELIV_CLAIM` (3 cells): Dispatcher: durable delivery claims (outbox records CLAIMED) racing a takeover, with the lease expiring or the heartbeat refused.  
+   Proposed test: `RACE: a lease expiring between lease acquisition and the batch claim, and a takeover claiming the same records: each record is CLAIMED by one fenced owner and the former owner's late claim is refused`  
+   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / RACE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / EXPIRY; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / REVOCATION
+
+75. `PERIODS_RACE` (2 cells): PERIODS: two sweepers opening the same month or closing the same period.  
+   Proposed test: `RACE: two PERIODS passes opening the same month or closing the same due period produce one period and one statement set (journal key period-close-<periodId>)`  
+   Cells: Sweep PERIODS / RACE; Sweep PERIODS / RACE
+
+76. `LEASE_CRASH` (2 cells): Dispatcher lease: a dispatcher process crash after claim and before its first heartbeat; a clock jump of the holder.  
+   Proposed test: `RACE: a dispatcher stopped right after its claim is taken over after the lease expiry under the next fence on the controlled clock, and its claimed deliveries are redelivered once`  
+   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-BEFORE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / TIMEOUT
+
+77. `TOCTOU_SOURCE` (1 cell): CMD027: the source's retention deadline passing between the availability read and COMMIT (S060 covers a deadline already passed).  
    Proposed test: `RACE: the source deadline passing while CreateQuote holds its locks: the quote's availability is never later than the deadline, or the quote is SOURCE_EXPIRED, never an ISSUED quote past it`  
    Cells: CMD027 CreateQuote (issuance) / EXPIRY
 
 ### Tier 3
 
-40. `CMD_TMO` (21 cells): A lock wait or statement running past its timeout, on any command: nothing written and the same key can retry.  
+78. `CMD_TMO` (26 cells): A lock wait or statement running past its timeout, on any command: nothing written and the same key can retry.  
    Proposed test: `RACE (timeout): the wait on a locked row held past the lock timeout answers the retriable failure with nothing written, and the same key then completes once (one per command)`  
-   Cells: CMD002 ActivateAgency / TIMEOUT; CMD002 ActivateAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 included-replacement protocol / TIMEOUT; CMD027 included-replacement protocol / TIMEOUT; CMD045 RegisterProspect / TIMEOUT; CMD046 ClaimProspect / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT; CMD048 AssignAccount / TIMEOUT; CMD049 ActivateSeller / TIMEOUT; CMD050 TerminateSeller / TIMEOUT; CMD050 TerminateSeller / TIMEOUT; CMD052 ApproveCommissionPayout / TIMEOUT; CMD052 ApproveCommissionPayout / TIMEOUT; CMD053 ReconcileCommissionPayout / TIMEOUT
+   Cells: CMD002 ActivateAgency / TIMEOUT; CMD002 ActivateAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD043 CloseAgency / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 CreateQuote (issuance) / TIMEOUT; CMD027 included-replacement protocol / TIMEOUT; CMD027 included-replacement protocol / TIMEOUT; CMD027 included-replacement protocol / TIMEOUT; CMD045 RegisterProspect / TIMEOUT; CMD046 ClaimProspect / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT; CMD048 AssignAccount / TIMEOUT; CMD049 ActivateSeller / TIMEOUT; CMD049 ActivateSeller / TIMEOUT; CMD050 TerminateSeller / TIMEOUT; CMD050 TerminateSeller / TIMEOUT; CMD051 correcting statement (correction_issued) / TIMEOUT; CMD052 ApproveCommissionPayout / TIMEOUT; CMD052 ApproveCommissionPayout / TIMEOUT; CMD053 ReconcileCommissionPayout / TIMEOUT; Qualifying-purchase trigger (reconciler transaction) / TIMEOUT
 
-41. `CMD_CRA` (13 cells): Crash or lost response after COMMIT: the retry replay is tested, the injected loss is not.  
+79. `CMD_CRA` (15 cells): Crash or lost response after COMMIT: the retry replay is tested, the injected loss is not.  
    Proposed test: `RACE (crash after COMMIT): the response lost after COMMIT is recovered by the same key as the same answer (one per command)`  
-   Cells: CMD002 ActivateAgency / CRASH-AFTER; CMD043 CloseAgency / CRASH-AFTER; CMD043 CloseAgency / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 included-replacement protocol / CRASH-AFTER; CMD045 RegisterProspect / CRASH-AFTER; CMD046 ClaimProspect / CRASH-AFTER; CMD047 AcceptAttribution / CRASH-AFTER; CMD048 AssignAccount / CRASH-AFTER; CMD049 ActivateSeller / CRASH-AFTER; CMD050 TerminateSeller / CRASH-AFTER
+   Cells: CMD002 ActivateAgency / CRASH-AFTER; CMD043 CloseAgency / CRASH-AFTER; CMD043 CloseAgency / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 CreateQuote (issuance) / CRASH-AFTER; CMD027 included-replacement protocol / CRASH-AFTER; CMD027 included-replacement protocol / CRASH-AFTER; CMD045 RegisterProspect / CRASH-AFTER; CMD046 ClaimProspect / CRASH-AFTER; CMD047 AcceptAttribution / CRASH-AFTER; CMD048 AssignAccount / CRASH-AFTER; CMD049 ActivateSeller / CRASH-AFTER; CMD050 TerminateSeller / CRASH-AFTER
 
-42. `CMD_PAR` (2 cells): A failure between the statements of one command (injected at an inner statement) rolls the whole back.  
-   Proposed test: `RACE (partial): a failure injected at the second write of the command commits nothing and the same key completes once (one per command)`  
-   Cells: CMD027 CreateQuote (issuance) / PARTIAL; CMD027 included-replacement protocol / PARTIAL
+80. `CONS_TMO` (6 cells): COMMISSIONS: PreparationCompletionSource (D10-SVC-4) timing out inside an effect.  
+   Proposed test: `DENY: a PreparationCompletionSource that times out leaves the line ACCRUED_PENDING with the delivery unsettled and the next pass completes it once`  
+   Cells: COMMISSIONS consumer: capture.completed.v1 / TIMEOUT; Claim conversion and entitlement creation (COMMISSIONS consumer and ACCRUAL_RECONCILIATION) / TIMEOUT; COMMISSIONS consumer: refund.completed.v1 and capture.reversed.v1 / TIMEOUT; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / TIMEOUT; COMMISSIONS consumer: capture.funds_observed.v1 and commercial_authorization.delivered.v1 / TIMEOUT; Sweep ELIGIBILITY / TIMEOUT
 
-43. `AGREEMENT_EXP` (2 cells): CMD002 and CMD046: the published agreement version being superseded while the step runs.  
-   Proposed test: `RACE: a new agreement version published while the command waits: the command binds the version published at its locks, or is AGREEMENT_VERSION_MISMATCH`  
-   Cells: CMD002 ActivateAgency / EXPIRY; CMD046 ClaimProspect / EXPIRY
+81. `BUYER_TMO` (2 cells): CMD027 and CMD047: BuyerTypeReader timing out or answering unset after a change mid-way.  
+   Proposed test: `DENY: a BuyerTypeReader that times out answers the retriable failure and writes nothing; the same key then succeeds once`  
+   Cells: CMD027 CreateQuote (issuance) / TIMEOUT; CMD047 AcceptAttribution / TIMEOUT
 
-44. `LEASE_CRASH` (2 cells): Dispatcher lease: a dispatcher process crash after claim and before its first heartbeat; a clock jump of the holder.  
-   Proposed test: `RACE: a dispatcher stopped right after its claim is taken over after the lease expiry under the next fence on the controlled clock, and its claimed deliveries are redelivered once`  
-   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / CRASH-BEFORE; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / TIMEOUT
-
-45. `CMD_EXP_ASSURE` (1 cell): A fresh step-up expiring in the step (CMD049; CMD043 in TEN_REV, CMD052 in PAY_REV).  
-   Proposed test: `DENY: a step-up that passes its window between the guard and COMMIT is ASSURANCE_REQUIRED and the seller stays CANDIDATE`  
-   Cells: CMD049 ActivateSeller / EXPIRY
+82. `LEASE_TMO` (2 cells): Dispatcher: the lease or batch claim statement timing out or losing its answer.  
+   Proposed test: `DENY: a lease claim statement delayed past its limit answers a retriable failure, assumes no ownership and the next attempt reads the committed fence`  
+   Cells: COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / TIMEOUT; COMMISSIONS dispatcher lease (OUTBOX_DISPATCH) / TIMEOUT
 
 ## Test index
 
@@ -489,3 +678,28 @@ Every `[key]` above is one test, cited as `file :: "exact title"`.
 - `[qe]` `apps/api/test/b10-commission-service.test.ts` :: "R2-127: the QUOTE_EXPIRY sweep expires a founding quote with nothing in flight and releases its slot; with an uncertain capture it holds the reservation in RECONCILIATION_HOLD until the capture consumes the slot or a proved no-capture releases it"
 - `[sweeps]` `apps/api/test/b10-commission-service.test.ts` :: "the CLAIM_WINDOWS, ENTITLEMENT_WINDOWS and ACCRUAL_RECONCILIATION sweeps: claims lapse at their deadline with no first purchase, entitlements expire at window end with earned lines unaffected, and an acceptance after the first purchase gains its missing lines once"
 - `[r094db]` `packages/persistence/test/b10-sales-migrations.test.ts` :: "R2-094 at the database: an entitlement's window_ends_at must equal twelve calendar months after window_starts_at at the America/Bogota wall time with the day clamped, and its first capture, window, share and agreement cannot change"
+
+## Codex r1 findings to resolution
+
+All 17 findings were accepted; none was rejected. Section names refer to the headings above.
+
+| Id | What changed | Section |
+|---|---|---|
+| B10-M1 | New table "Qualifying-purchase trigger (reconciler transaction)", rows T1 to T3 (D10-FIRST-1): purchase insert and sequence, recurrence update, reservation consumption; GAPs TRG_PAR and TRG_CRASH (tier 1); RACE stays C on `[r137db]` (concurrency only). | Qualifying-purchase trigger |
+| B10-M2 | New table "Claim conversion and entitlement creation", rows C1 (consumer) and C2 (ACCRUAL_RECONCILIATION): GAPs CONV_RACE, CONV_PAR, CONV_CRASH, CLAIM_TAIL (tier 1) with the tail-end endpoint and the entitlement/claim split. | Claim conversion and entitlement creation |
+| B10-M3 | New table "CMD051 correcting statement (correction_issued)", rows K1 and K2: GAPs CORR_APPROVE, CORR_DUP, CORR_PAR, CORR_CRASH, CORR_AUTH (tier 1). Not disagreed with, but the performer is unresolved: the CMD051 text covers only closure and Q10-6 sends a post-SETTLED return to owner recovery; the rows hold for either and the performer is a decision before B10-INTEGRATION. | CMD051 correcting statement |
+| B10-M4 | CMD027 issuance: new row W4 (quote DRAFT to ISSUED, quote_issuances, three events, journal result); W2 and W3 PARTIAL to GAP QUOTE_PAR (replaces CMD_PAR); W1 PARTIAL to N/A (one statement). Crash-before at W4 stays C because `[a27race]` dies at the COMMIT. | CMD027 CreateQuote (issuance) |
+| B10-M5 | CMD043: new row W0 for the ActiveWorkInspector call (D10-AGY-6): GAP INSPECT_FAIL for TIMEOUT and PARTIAL, CLOSE_INFLIGHT for a work item started after inspection; INSPECT_FAIL is tier 1 because a closure over a partial inventory leaves obligations outside KC006. | CMD043 CloseAgency |
+| B10-M6 | Replacement protocol: new row S2r (withdrawal, quote.withdrawn, journal completion with outcome WITHDRAWN, D10-QUOTE-6): GAP REPL_REFUSE (tier 1) for crash before the withdrawal and failure between the withdrawal and the journal completion. | CMD027 included-replacement protocol |
+| B10-M7 | Replacement RACE cells S1 and S2: C to GAP REPL_RACE (tier 1); `[a27ref]` is documented as a sequential DENY guard, `[a27crash]` as sequential crash/recovery. | CMD027 included-replacement protocol |
+| B10-M8 | S2 CRASH-BEFORE to GAP REPL_CRB (inject after the rebinder's last write, before the SERVICE COMMIT); S2 PARTIAL to GAP REPL_PAR (revocation, acceptance, allowance ordinal); `[a27crash]` AFTER_SETTLE is re-cited as S2 CRASH-AFTER. | CMD027 included-replacement protocol |
+| B10-M9 | Section rewritten from the design (D10-QUOTE-4, D10-QUOTE-6, rebinder.ts header): the SERVICE transaction revokes the old entitlement, accepts the replacement and records the allowance ordinal; the tenant completion S3 writes only the journal. Pre-settlement refusal (REPL_REVOKE, S2r) is separated from post-settlement recovery (REPL_COMPLETE, REPL_POST: honor the committed re-binding, never revive the old authorization or reset the allowance). | CMD027 included-replacement protocol |
+| B10-M10 | PARTIAL cells citing guards converted to GAP (ACT_PAR CMD002, CLOSE_PAR CMD043 W2, PAY_PAR CMD052, SETTLE_PAR CMD053) and, by the same family, CMD045/046 (PROS_PAR), CMD047/048 (ATTR_PAR), CMD050 (TERM_PAR), CMD051 (CLOSEP_PAR), consumers (CONS_PAR), sweeps (SWEEP_PAR). Single-write steps (CMD049 W, CMD027 W1, CMD047 R, CMD050 X) became N/A with the guard cited as a DENY. | CMD002, CMD043, CMD052, CMD053 and the PARTIAL cells of every table |
+| B10-M11 | Funds table split into F1 (fact), F2 (hold), F3 (line transition); GAPs FUNDS_PAR and FUNDS_RETRY (tier 1) for the redelivery of the identical HELD event and the failure between the writes; `[funds]` is the success path only. | COMMISSIONS consumer: capture.funds_observed.v1 ... |
+| B10-M12 | Dispatcher: new row D for the durable delivery claims (GAPs DELIV_CLAIM, DELIV_CRASH, tier 2) and a lease-claim TIMEOUT GAP LEASE_TMO (tier 3) replacing the N/A at L1. | COMMISSIONS dispatcher lease |
+| B10-M13 | Sweep CLAIM_WINDOWS split: W1 ordinary claims (EXPIRY stays C, scoped to no tail), new W2 tail-protected claims: GAP CLAIM_TAIL (tier 1). Expiry for a listed claim is the tail end (design claim transitions; D10-TERM-1/2); `attribution_claims_lapse` refuses an early lapse (`[d50tail]`). | Sweep CLAIM_WINDOWS |
+| B10-M14 | CMD051: new row H (cutoff recomputation, input reads, composition) with GAP CLOSE_HOLD_RACE (tier 1): the close either refuses LEDGER_CHANGED or withholds exactly the held cents (D10-STMT-4, D10-STMT-2, D10-HOLD-1). ELIG_REV is rewritten to the ELIGIBILITY/funds case only and promoted to tier 1. | CMD051 CloseCommissionPeriod |
+| B10-M15 | All money/authority GAPs promoted to tier 1: CMD_EXP_ASSURE, AGREEMENT_EXP, CONS_REV, CONS_LEASE_EXP, CONS_DUP_LINE, ACCRUAL_REC_RACE, ELIG_REV, CONS_CRB, CONS_CRA, SWEEP_CRASH, SWEEP_RACE and the new partial/crash codes. CONS_TMO and BUYER_TMO moved to tier 3 (retriable only). Tier definitions rewritten. | GAP list, by risk |
+| B10-M16 | CMD052 read step split into R1 (competing approvals, PAY_CASH_RACE), R2 (newer bank-evidenced settlement, PAY_CASH_BASIS) and R3 (CMD053 changing the unsettled intents, PAY_INTENT_BASIS), all tier 1 (D10-PAY-1; design section 7 CMD052). | CMD052 ApproveCommissionPayout |
+| B10-M17 | CMD049: new row I (candidate identity and MFA, D10-SELL-1, D10-SELL-3, KC005): GAP SELLER_IDENT_RACE for RACE and REVOCATION (tier 1); CMD_EXP_ASSURE moved from tier 3 to tier 1. | CMD049 ActivateSeller |
+

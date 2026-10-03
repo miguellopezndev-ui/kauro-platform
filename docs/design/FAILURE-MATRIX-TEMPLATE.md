@@ -27,7 +27,21 @@ Each cell is exactly one of: **C** expected behaviour plus the proving test as `
 
 ## Rule: a family seen twice becomes a matrix rule
 
-When two Codex findings (in any package) belong to the same column family, the family stops being a finding and becomes a rule here: its column gets a default expected behaviour and a default test title in this template, and every new matrix must fill the cell from it. Rules so far are the eight columns above; add new ones below with the package and finding ids that justified them.
+When two Codex findings (in any package) belong to the same column family, the family stops being a finding and becomes a rule here: its column gets a default expected behaviour and a default test title in this template, and every new matrix must fill the cell from it. Rules so far are the eight columns above and the family rules below; add new ones with the package and finding ids that justified them.
+
+## Family rules learned
+
+Codex's design-time review of the B10 matrix (r1, 17 findings) found the same few mistakes repeatedly. Each recurring family is now a rule that every matrix must satisfy before it is sent to review.
+
+1. **Sequential calls never prove a race.** A RACE cell is C only if the test holds one actor at a named lock or await point and runs the other, in both orders (or concurrent recovery of the same key). A test that finishes the first call before it starts the second is a DENY or OK guard; the cell is a GAP (B10-M7).
+2. **A crash cell names the exact COMMIT it straddles.** CRASH-BEFORE is C only when the injection point is after the step's last write and before its own COMMIT; an injection before the step starts, or before another transaction's COMMIT, proves another cell. CRASH-AFTER names the COMMIT after which the response or the settle is lost (B10-M8, M9).
+3. **Every external effect with more than one durable write is split into one row per write.** A payment-service re-binding, a funds effect, a conversion, a compensation, a delivery claim: one row per transaction and per write that can fail alone, each with its own PARTIAL and CRASH cells (B10-M1, M2, M6, M11, M12).
+4. **A guard, a CHECK or a database invariant is not a partial-failure test.** PARTIAL is C only when a failure is injected at a second or later write and the test asserts the complete footprint, including the journal, rolled back. A single-statement step is N/A with the invariant cited as a DENY (B10-M10).
+5. **A retry or success test proves neither CRASH-AFTER nor RETRY of an event.** Redelivery of the identical event needs its own test; an observed success path is an OK test (B10-M11).
+6. **Every call-out and read in the inventory is a row.** A port call (inspector, verifier, reader), a trigger, a state transition performed by another command, and the ordinary write path of a command all get a row, even when another row already covers the same transaction (B10-M3, M4, M5).
+7. **The expected behaviour is read from the design section that governs it, with the decision id.** Pre-settlement and post-settlement behaviour are different cells; an expiry cell names the deadline that governs (for a claim, its tail end when listed); the race cell names every actor on the calculation, not only a copy of the same command (B10-M9, M13, M14, M16).
+8. **Authority revocation covers every prerequisite of the step, not only the grant.** A mandatory fact the step reads (identity, MFA, destination, agreement) is revocable mid-way and needs its own REVOCATION cell (B10-M17).
+9. **Money and authority GAPs are tier 1, whatever the column.** A crash, partial or retry GAP of an effect that decides payable rights, forfeits a right or admits an expired actor is tier 1; tier 3 is a retriable error with no wrong outcome (B10-M15).
 
 ## Mapping to the fault harness (`docs/design/FAULT-HARNESS.md`)
 
