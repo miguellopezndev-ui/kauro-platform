@@ -17,12 +17,10 @@ import {
   bankCash,
   changeDestination,
   claimedCents,
-  closePeriod,
+  closeMonth,
   commissionToken,
   eligibleLines,
   intentOf,
-  openMonth,
-  proposal,
   reconcilePayout,
   rows,
   scriptEvidence,
@@ -56,8 +54,8 @@ interface Approved {
 async function approved(month: string, sellers: ReadonlyArray<{ readonly s: Seller; readonly cents: bigint }>): Promise<Map<string, Approved>> {
   const lines = new Map<string, string[]>();
   for (const { s, cents } of sellers) lines.set(s.sellerId, (await eligibleLines(sw, `${s.sellerId.slice(-6)} ${month}`, s, WHOLE, [{ basisCents: cents, poolCents: cents }])).lines.map((l) => l.lineId));
-  const periodId = await openMonth(sw, month);
-  completed<PeriodCloseView>(await closePeriod(sw, periodId, { ledgerCutoffHash: await proposal(sw, periodId) }), 200);
+  const { periodId, reply } = await closeMonth(sw, month);
+  completed<PeriodCloseView>(reply, 200);
   const out = new Map<string, Approved>();
   for (const { s } of sellers) {
     const st = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === periodId)!;

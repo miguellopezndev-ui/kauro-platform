@@ -20,7 +20,7 @@
 import type { CommerceEventDelivery } from "@kauro/application";
 import type { AgencyId, CaptureId, EventId, QualifyingPurchaseId } from "@kauro/domain";
 import { COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_SUBSCRIPTIONS, DomainFailure } from "@kauro/domain";
-import { recurrenceOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
+import { commissionWorkOf, recurrenceOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
 import type { ConsumerOutcome } from "../payments/index.js";
 import { accruePurchase, applyBasisChange, convertAcceptedClaims, mirrorDesignation, observeFunds, recordCompletions, serverNow } from "./ledger-effects.js";
 import { COMMISSIONS_CONSUMER, inAgency, type CommissionRuntime } from "./runtime.js";
@@ -72,6 +72,8 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
           case "refund.completed.v1":
           case "capture.reversed.v1": {
             const captureId = text(delivery, "captureId") as CaptureId;
+            // a basis change takes the open periods first, before any pool or line of the purchase (D10-STMT-4): it serializes with a close
+            await commissionWorkOf(uow).shareOpenPeriods();
             const accrued = await accrueOnEvent(rt, uow, agencyId, captureId);
             if (!accrued.found) return "NOT_APPLICABLE";
             const change = delivery.eventType === "capture.reversed.v1" ? ({ kind: "CAPTURE_REVERSED" } as const) : ({ kind: "REFUND_COMPLETED", serviceBasisAfterCents: cents(delivery, "serviceBasisAfterCents") } as const);

@@ -20,13 +20,14 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
-import { UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createProspectHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated, createSellerCommandHandlers, createQuoteHandlers } from "@kauro/application";
+import type { B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
+import { UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createProspectHandlers, createReadHandlers, createSourceIntakeHandlers, createSourceReadHandlers, isCursorKey, refuseUnauthenticated, createSellerCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
-import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions } from "@kauro/domain";
-import { DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
+import type { UtcInstant } from "@kauro/contracts";
+import type { Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
+import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf } from "@kauro/persistence";
+import { agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createCommerceUnitOfWorkFactory, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, MigratorConfig } from "./config.js";
@@ -38,7 +39,7 @@ import type { PaymentService } from "./payments/index.js";
 import { createPurchaseRebinder } from "./payments/rebinder.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
 import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
-import type { CommissionRoutesBinding } from "./commissions/routes.js";
+import { registerCommissionRoutes, type CommissionRoutesBinding } from "./commissions/routes.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -333,12 +334,27 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     rebinder: assembly.payments?.rebinder ?? createPurchaseRebinder({ lineage: sourceLineageReader }),
     ...assembly.quotes,
   });
+  // package B10: the statement and payout operations (mandate B10-STATEMENTS-PAYOUTS). ApproveCommissionPayout (CMD052) and the statement
+  // read on the same runtime, over the statement, ledger and sales adapters, the commercial authorizer and the step-up verifier; the
+  // commission group's service commands (CMD051, CMD053) on the commission service's own units of work, with the platform's calendar
+  // and payout evidence unless the binding names others (D10-BIND-1)
+  const statements = createStatementRequestHandlers(commerceRuntime, {
+    statements: statementsOf,
+    ledger: ledgerOf,
+    sales: salesOf,
+    serverNow: async (uow) => `${(await (uow as unknown as { serverInstant(): Promise<string> }).serverInstant()).slice(0, 23)}Z` as UtcInstant,
+    authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }),
+    assurance: createAssuranceVerifier(),
+  });
   return createApiServer({
     environment: assembly.environment,
     handlers: { ...createB06Handlers(runtime, collaborators), ...createB07Handlers(runtime, sources) },
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources) },
     intakes: createSourceIntakeHandlers(readRuntime),
-    commercial: { commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>> },
+    commercial: {
+      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), statements.CMD052] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
+      reads: [statements.GetCommissionStatement] as ReadonlyArray<CommercialReadHandler<unknown>>,
+    },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator: assembly.authenticator,
     refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
@@ -346,6 +362,20 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     clock,
     ids,
     paymentRoutes: (app, kit) => registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) }),
+    commissionRoutes: (app, kit) =>
+      registerCommissionRoutes(app, kit, {
+        binding: assembly.commissions ?? null,
+        serviceAuthenticator: assembly.commissions?.serviceAuthenticator ?? assembly.payments?.runtime.assembly.serviceAuthenticator ?? null,
+        persons: assembly.authenticator,
+        environment: assembly.environment,
+        validator,
+        clock,
+        refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request),
+        refusePerson: async (action, userId, correlationId, failure) => {
+          await recordOperatorDenial(commerceRuntime, { kind: "OPERATOR", userId: userId as UserId, correlationId }, action, failure, COMMERCE_POLICY_VERSION, null);
+          return problemOf(failure, correlationId);
+        },
+      }),
     health: { readiness: () => assembly.database.readiness(), codeSchemaVersion: assembly.database.codeSchemaVersion, onNotReady: assembly.onNotReady ?? writeNotReady },
     ...(assembly.logger !== undefined ? { logger: assembly.logger } : {}),
     ...(assembly.onInternalError !== undefined ? { onInternalError: assembly.onInternalError } : {}),

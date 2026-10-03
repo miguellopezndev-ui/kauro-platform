@@ -14,11 +14,9 @@ import {
   bankCash,
   changeDestination,
   claimedCents,
-  closePeriod,
+  closeMonth,
   eligibleLines,
   intentOf,
-  openMonth,
-  proposal,
   rows,
   seller,
   statementsOfSeller,
@@ -49,8 +47,8 @@ async function issued(month: string, sellers: ReadonlyArray<{ readonly s: Seller
     lines.set(s.sellerId, sold.lines.map((l) => l.lineId));
     if (hold !== undefined) await recordHold(sw.h, { ownerUserId: sw.owner.userId as UserId, lineId: sold.lines[0]!.lineId, amountCents: hold, reason: "SELLER_DISPUTE" });
   }
-  const periodId = await openMonth(sw, month);
-  completed<PeriodCloseView>(await closePeriod(sw, periodId, { ledgerCutoffHash: await proposal(sw, periodId) }), 200);
+  const { periodId, reply } = await closeMonth(sw, month);
+  completed<PeriodCloseView>(reply, 200);
   const out = new Map<string, { statementId: string; version: number; payable: bigint; lineIds: string[] }>();
   for (const { s } of sellers) {
     const st = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === periodId);

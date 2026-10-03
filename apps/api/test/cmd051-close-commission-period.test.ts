@@ -286,12 +286,20 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
     assert.deepEqual(a.map((x) => [x.direction, x.amount_cents]), [["DECREASE", "10000"]], "one adjustment of the refunded 10000 cents of basis at 100%");
     return a[0]!.adjustment_id;
   };
+  // every COMMISSIONS record recorded so far delivered (the purchases' captures), so the consumer's only work in a race is the refund
+  const drain = async (): Promise<void> => {
+    for (;;) {
+      const pass = await sw.service.dispatcher.runOnce({ limit: 100 });
+      if (pass.deliveries.length < 100) return;
+    }
+  };
   const reportedIn = async (adjustmentId: string): Promise<string[]> => (await rows<{ statement_id: string }>(sw, "SELECT statement_id FROM kauro.statement_items WHERE adjustment_id = $1", [adjustmentId])).map((x) => x.statement_id);
 
   // order 1: the close holds the period; the adjustment waits for it, then goes to the next statement
   const t = await seller(sw, "cmd051-race-close-first", WHOLE);
   const soldT = await eligibleLines(sw, "CMD051 RACE close first", t, WHOLE, [{ basisCents: 97_125n, poolCents: 97_125n }]);
   const april = await openMonth(sw, "2026-04");
+  await drain();
   const held = sw.serviceHolds.arm("CMD051");
   const closing = closeNow(april);
   await held.reached;
@@ -319,6 +327,7 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
   const u = await seller(sw, "cmd051-race-adjust-first", WHOLE);
   const soldU = await eligibleLines(sw, "CMD051 RACE adjustment first", u, WHOLE, [{ basisCents: 97_125n, poolCents: 97_125n }]);
   const february = await openMonth(sw, "2026-02");
+  await drain();
   const proposed = await proposal(sw, february);
   await refundOf(soldU);
   const pool = await sw.h.pg.connect("kauro_commission_test");

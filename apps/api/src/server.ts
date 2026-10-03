@@ -52,6 +52,7 @@ import type {
   CommerceCommandHandler,
   CommerceReadHandler,
   CommercialCommandHandler,
+  CommercialReadHandler,
   CompletedResponse,
   IntakeHandler,
   IntakeResult,
@@ -83,6 +84,7 @@ import {
   commerceCommandRouteResponses,
   commerceReadRouteResponses,
   commercialCommandRouteResponses,
+  commercialReadRouteResponses,
   correlationIdOf,
   envelopeOf,
   internalProblem,
@@ -91,6 +93,7 @@ import {
   isServedCommerceCommand,
   isServedCommerceRead,
   isServedCommercialCommand,
+  isServedCommercialRead,
   problemOf,
   readRouteResponses,
   repeatedHeaderNames,
@@ -162,6 +165,8 @@ export interface ApiServerOptions {
    */
   readonly commercial?: {
     readonly commands: ReadonlyArray<CommercialCommandHandler<unknown, unknown>>;
+    /** The served B10 reads (GetCommissionStatement; COMMERCIAL_SERVED_READ_IDS), each with its admission spec and declared replies. */
+    readonly reads?: ReadonlyArray<CommercialReadHandler<unknown>>;
   };
   readonly authenticator: Authenticator;
   /**
@@ -194,6 +199,11 @@ export interface ApiServerOptions {
    * internal-error sink and the framework-error answer). Every route declares its replies and passes the send guard.
    */
   readonly paymentRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
+  /**
+   * Registers the commission group's service routes (package B10, mandate B10-STATEMENTS-PAYOUTS: CMD051, CMD053; commissions/routes.ts)
+   * with the same transport pieces as the payment routes. Every route declares its replies and passes the send guard.
+   */
+  readonly commissionRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
 }
 
 /** The transport pieces a route registered outside this module answers with (package B09's payment routes). */
@@ -488,7 +498,12 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     if (!isServedCommercialCommand(spec.id)) throw new Error(`${spec.id} has a handler but is not a served B10 command (COMMERCIAL_SERVED_COMMAND_IDS of @kauro/application)`);
     registerCommand(app, options, handler.admission, commercialCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress);
   }
+  for (const handler of options.commercial?.reads ?? []) {
+    if (!isServedCommercialRead(handler.operationId)) throw new Error(`${handler.operationId} has a handler but is not a served B10 read (COMMERCIAL_SERVED_READ_IDS of @kauro/application)`);
+    registerRead(app, options, handler.admission, commercialReadRouteResponses(handler.operationId), (request) => handler.execute(request), sink);
+  }
   options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
+  options.commissionRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   return app;
 }
 

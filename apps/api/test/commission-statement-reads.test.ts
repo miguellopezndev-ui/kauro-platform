@@ -9,7 +9,7 @@ import type { CommissionStatementView, PeriodCloseView } from "@kauro/applicatio
 import { recordHold } from "@kauro/persistence/testing";
 import type { UserId } from "@kauro/domain";
 import { approvedRefund } from "./commission-support.js";
-import { closePeriod, eligibleLines, openMonth, proposal, readStatement, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { closeMonth, eligibleLines, readStatement, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
@@ -39,8 +39,8 @@ test("GetCommissionStatement answers a seller its own statement and the owner an
   // a refund requested by the agency (its CRM-facing reason never reaches a statement)
   await approvedRefund(sw, sold.selling, first.purchase, { serviceCents: 1_000n });
 
-  const periodId = await openMonth(sw, "2026-09");
-  completed<PeriodCloseView>(await closePeriod(sw, periodId, { ledgerCutoffHash: await proposal(sw, periodId) }), 200);
+  const { periodId, reply } = await closeMonth(sw, "2026-09");
+  completed<PeriodCloseView>(reply, 200);
   const [mine] = await statementsOfSeller(sw, s.sellerId);
   const [theirs] = await statementsOfSeller(sw, other.sellerId);
   assert.ok(mine !== undefined && theirs !== undefined);

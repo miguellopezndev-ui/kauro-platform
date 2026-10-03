@@ -243,6 +243,22 @@ export async function periodIdOf(sw: StatementsWorld, month: string): Promise<st
   return r.rows[0].period_id;
 }
 
+/**
+ * Opens a month's period (2026, January to September), and closes it through the CMD051 route with the proposal of the ledger as it
+ * stands, the close standing on 2026-10-07 at noon in Bogota (or at the real clock, when that is later): every month of the fixture's
+ * 2026 is due by then.
+ */
+export async function closeMonth(sw: StatementsWorld, month: string): Promise<{ readonly periodId: string; readonly reply: Reply }> {
+  const periodId = await openMonth(sw, month);
+  const ledgerCutoffHash = await proposal(sw, periodId);
+  sw.standAt("2026-10-07T17:00:00Z");
+  try {
+    return { periodId, reply: await closePeriod(sw, periodId, { ledgerCutoffHash }) };
+  } finally {
+    sw.standAt(null);
+  }
+}
+
 /** The close the commission service would propose now (KAURO_COMMISSION_CUTOFF_V1 of the ledger as it stands; D10-STMT-4). */
 export function proposal(sw: StatementsWorld, periodId: string): Promise<string> {
   return sw.pools.units.run(commissionContext(), async (uow) => {
@@ -383,10 +399,10 @@ export async function eligibleLines(
           purchaseId: p.authorizationId as never,
           agencyId: selling.agency.agencyId,
           kind: "FINAL",
-          completedAt: clock.now(),
+          completedAt: new Date(Date.now() - 60_000).toISOString() as UtcInstant,
           evidenceHash: sha(`final-${p.authorizationId}`),
           source: "AUTHORIZATION_DELIVERY",
-          recordedAt: clock.now(),
+          recordedAt: `${(await uow.serverInstant()).slice(0, 23)}Z` as UtcInstant,
         });
       });
     }
