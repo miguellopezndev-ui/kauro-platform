@@ -1892,6 +1892,14 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
+    "founding_slot_reservations/founding_slot_reservations_commission_due": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "((state = ANY (ARRAY['RESERVED'::text, 'RECONCILIATION_HOLD'::text])) AND (ends_at <= kauro.server_now()))",
+      "check": null
+    },
     "founding_slot_reservations/founding_slot_reservations_commission_read": {
       "command": "SELECT",
       "roles": [

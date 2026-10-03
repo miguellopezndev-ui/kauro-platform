@@ -387,7 +387,7 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | CommissionHold | OPEN | hold_upheld | UPHELD | B12 | reviewed decision; an AGREED_ERROR_CORRECTION adjustment |
 | CommissionPeriod | OPEN | period_closed | CLOSED | CMD051 | inputs reconciled; cutoff hash equal |
 
-## 9. Migrations 0021–0032
+## 9. Migrations 0021–0033
 
 | file | content | mandate |
 |---|---|---|
@@ -403,6 +403,7 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | 0030_commission_ledger.sql | `purchase_completions`, `commission_pools`, `commission_lines` (registry machine CommissionLine), `commission_adjustments`, `commission_holds` (machine CommissionHold), `capture_funds_observations`, `commission_offsets` (D10-NEG-2) | B10-SCHEMA-COMMISSION |
 | 0031_statements_payouts.sql | `banking_calendars`, `commission_periods`, `commission_statements`, `statement_items`, `payout_intents`, `payout_reconciliations`, `compensation_guard_reviews`; machines CommissionPeriod, CommissionStatement, PayoutIntent | B10-SCHEMA-COMMISSION |
 | 0032_claim_conflict_review.sql | the policy `attribution_claims_prospect_reader_read`: the claims on a prospect the session can read (D10-CLAIM-2) | B10-COMMANDS-PROSPECTS |
+| 0033_commission_due_reservations.sql | the policy `founding_slot_reservations_commission_due`: the live founding reservations whose end has passed, the QUOTE_EXPIRY sweep's work (D10-SVC-1) | B10-COMMISSION-SERVICE |
 
 Conventions (07 "Database representation", B09 §4): UUIDv7 ids, BIGINT cents within `kauro.is_money`, `timestamptz` instants,
 durations in exact hours (336, 720, 2160, 8760), calendar months only through `AT TIME ZONE 'America/Bogota'` plus `interval '12

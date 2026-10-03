@@ -114,3 +114,7 @@ export { PgAgencyLifecycleRepository } from "./repositories/commercial-agency-li
 export { agencyLifecycleOf } from "./commercial-agency-access.js";
 // CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
 export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
+// the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):
+// what its sweeps find across agencies before each item is settled in a unit of work that adopts the item's agency
+export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.js";
+export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";

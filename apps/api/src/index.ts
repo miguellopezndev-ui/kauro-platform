@@ -53,3 +53,5 @@ export * from "./payments/index.js";
 export { registerPaymentRoutes } from "./payments/routes.js";
 export type { PaymentRouteDependencies } from "./payments/routes.js";
 export type { RouteKit } from "./server.js";
+// the commission service of package B10 (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14)
+export * from "./commissions/index.js";

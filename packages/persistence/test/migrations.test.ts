@@ -68,6 +68,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0031_statements_payouts.sql",
     // package B10 (mandate B10-COMMANDS-PROSPECTS, D10-CLAIM-2): the claim conflict review reads the claims on a prospect the session can read
     "0032_claim_conflict_review.sql",
+    // package B10 (mandate B10-COMMISSION-SERVICE, D10-SVC-1): the QUOTE_EXPIRY sweep reads the live reservations whose end has passed
+    "0033_commission_due_reservations.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
