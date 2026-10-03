@@ -388,6 +388,14 @@
           "updated_at"
         ]
       },
+      "kauro.outbox_records": {
+        "SELECT": [
+          "consumer",
+          "created_at",
+          "outbox_id",
+          "state"
+        ]
+      },
       "kauro.payout_intents": {
         "UPDATE": [
           "evidence_hash",
@@ -1184,6 +1192,14 @@
       "using": "kauro.acting_corporate_owner()",
       "check": null
     },
+    "banking_calendars/banking_calendars_statement_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.commission_statements s\n  WHERE (s.calendar_id = banking_calendars.calendar_id)))",
+      "check": null
+    },
     "capabilities/capabilities_control": {
       "command": "ALL",
       "roles": [
@@ -1279,6 +1295,14 @@
       ],
       "using": null,
       "check": "(seller_id = kauro.acting_seller_id())"
+    },
+    "command_journal/command_journal_commission": {
+      "command": "ALL",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = ANY (ARRAY['commission-service'::text, 'finance-service'::text])))",
+      "check": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = ANY (ARRAY['commission-service'::text, 'finance-service'::text])))"
     },
     "command_journal/command_journal_control": {
       "command": "SELECT",
@@ -2277,6 +2301,14 @@
       ],
       "using": null,
       "check": "((NOT (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_bindings b ON ((b.event_type = e.event_type)))\n  WHERE (e.event_id = outbox_records.event_id)))) OR (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_subscriptions s ON ((s.event_type = e.event_type)))\n  WHERE ((e.event_id = outbox_records.event_id) AND (s.consumer = outbox_records.consumer)))))"
+    },
+    "outbox_records/outbox_records_commission_inputs": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "(consumer = 'COMMISSIONS'::text)",
+      "check": null
     },
     "outbox_records/outbox_records_control": {
       "command": "ALL",
@@ -4300,6 +4332,11 @@
       "kauro.capture_funds_observations": [
         "INSERT",
         "SELECT"
+      ],
+      "kauro.command_journal": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
       ],
       "kauro.commerce_event_bindings": [
         "SELECT"

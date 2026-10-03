@@ -250,9 +250,9 @@ registry machine; initial ACCRUED_PENDING; terminal VOID; unlisted edges: REJECT
 | ACCRUED_PENDING | eligibility_conditions_met | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
 | ACCRUED_PENDING | justified_dispute_or_funds_hold | HELD | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
 | HELD | hold_resolved_and_eligible | ELIGIBLE | B10: commission domain | — (no event type registered: the owning package registers it with the edge) | database |
-| ELIGIBLE | statement_closed | PAYABLE | CMD051 CloseCommissionPeriod (B10) | — (no event type registered: the owning package registers it with the edge) | database |
-| PAYABLE | settled_payout_evidence | PAID | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | database |
-| PAYABLE | payout_blocked | HELD | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | database |
+| ELIGIBLE | statement_closed | PAYABLE | CMD051 CloseCommissionPeriod (B10) | — (no event type registered: the owning package registers it with the edge) | route |
+| PAYABLE | settled_payout_evidence | PAID | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | route |
+| PAYABLE | payout_blocked | HELD | CMD053 ReconcileCommissionPayout (B10) | — (no event type registered: the owning package registers it with the edge) | route |
 | PAID | reconciled_refund_adjustment | ADJUSTED | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
 | ACCRUED_PENDING | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
 | HELD | full_service_reversal | VOID | B10: refund adjustments | — (no event type registered: the owning package registers it with the edge) | database |
@@ -515,6 +515,9 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD048 AssignAccount | POST /api/v1/sales/agencies/{agencyId}/assignment | KAURO_OWNER | CORPORATE | — |  |  | — |
 | CMD049 ActivateSeller | POST /api/v1/sales/sellers/{sellerId}/activate | KAURO_OWNER | CORPORATE | fresh |  |  | — |
 | CMD050 TerminateSeller | POST /api/v1/sales/sellers/{sellerId}/terminate | KAURO_OWNER | CORPORATE | — |  |  | — |
+| CMD051 CloseCommissionPeriod | POST /api/v1/sales/commission-periods/{periodId}/close | COMMISSION_SERVICE | STORED_OPERATION | — | CommissionLine statement_closed |  | — |
+| CMD052 ApproveCommissionPayout | POST /api/v1/sales/statements/{statementId}/approve-payout | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| CMD053 ReconcileCommissionPayout | POST /api/v1/sales/statements/{statementId}/reconcile-payout | FINANCE_SERVICE | STORED_OPERATION | — | CommissionLine settled_payout_evidence; CommissionLine payout_blocked |  | — |
 
 ## 2a. The source-lifecycle routes (B07)
 
@@ -1658,6 +1661,106 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD051 CloseCommissionPeriod
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no verified service identity and no person: the anonymous denial is recorded |
+| 403 | NOT_AUTHORIZED | SERVICE_NOT_PERMITTED | — | — | ACCESS | a person's token, or a verified service identity without the command's technical role (the other service of the group included) |
+| 403 | NOT_AUTHORIZED | SERVICE_ENVIRONMENT_MISMATCH | — | — | ACCESS | the service identity was issued for another environment |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the period is unknown: a foreign and a nonexistent id answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | UNLISTED_TRANSITION | — | always | COMMAND | the period is already CLOSED |
+| 409 | PRECONDITION_FAILED | CALENDAR_UNAVAILABLE | — | — | COMMAND | no recorded banking calendar version covers the period's close and pay dates |
+| 409 | PRECONDITION_FAILED | PERIOD_NOT_DUE | — | always | COMMAND | the period's close date (the 5th banking day after its end) has not come on the server's clock |
+| 409 | PRECONDITION_FAILED | INPUTS_UNRECONCILED | — | always | COMMAND | a COMMISSIONS record that occurred before the period's end is not yet delivered, or cannot be observed |
+| 409 | STALE_VERSION | LEDGER_CHANGED | — | always | COMMAND | ledgerCutoffHash is not KAURO_COMMISSION_CUTOFF_V1 of the ledger as it stands: the close is proposed again, never re-cut |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD052 ApproveCommissionPayout
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the statement is unknown |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the statement's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | UNLISTED_TRANSITION | — | always | COMMAND | the statement is not ISSUED: already approved, paid, disputed or corrected |
+| 409 | PRECONDITION_FAILED | PAYEE_UNVERIFIED | — | — | COMMAND | payeeRef is not the seller's current VERIFIED destination: a change pending verification, a superseded or another seller's destination (KC009) |
+| 409 | PRECONDITION_FAILED | NOTHING_PAYABLE | — | — | COMMAND | the statement's payable is zero: the only floor (minimumPayoutCents 0) |
+| 409 | PRECONDITION_FAILED | FUNDS_UNAVAILABLE | — | — | COMMAND | bank-available cash of the latest settlement with bank evidence does not cover the payable and every unsettled authorized intent |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD053 ReconcileCommissionPayout
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no verified service identity and no person: the anonymous denial is recorded |
+| 403 | NOT_AUTHORIZED | SERVICE_NOT_PERMITTED | — | — | ACCESS | a person's token, or a verified service identity without the command's technical role (the other service of the group included) |
+| 403 | NOT_AUTHORIZED | SERVICE_ENVIRONMENT_MISMATCH | — | — | ACCESS | the service identity was issued for another environment |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the statement is unknown, or the evidence names an intent of another statement |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | PAYOUT_EVIDENCE_UNAVAILABLE | — | — | COMMAND | no authenticated payout evidence under this reference (no verifier is bound before B15) |
+| 409 | PRECONDITION_FAILED | PAYOUT_EVIDENCE_MISMATCH | — | — | COMMAND | the evidence differs from the statement's intent in reference, destination digest, amount or currency: nothing changes |
+| 409 | PRECONDITION_FAILED | PAYOUT_NOT_SETTLED | — | always | COMMAND | the evidence shows a submitted transfer only: submission is not settlement, nothing changes |
+| 409 | PRECONDITION_FAILED | UNLISTED_TRANSITION | — | always | COMMAND | the intent already ended otherwise (SETTLED, FAILED or RETURNED under other evidence) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ## 4. Contract-test applicability (manual 10)
 
 "For each command, tests cover the legitimate state, wrong role, wrong agency, stale version, duplicate request, changed-body
@@ -2070,6 +2173,48 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd050-terminate-seller.test.ts` :: "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged…" |
 | external uncertainty | NOT_APPLICABLE: a termination reaches no provider; the termination, the tail, the lapsed claims and the journal entry are rows of one database transaction |
+
+### CMD051 CloseCommissionPeriod
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd051-close-commission-period.test.ts` :: "OK: the commission service closes a due September 2026 period on the test calendar…" |
+| wrong role | `cmd051-close-commission-period.test.ts` :: "DENY: a user token or the finance service is a wrong service identity (403)…" |
+| wrong agency | `cmd051-close-commission-period.test.ts` :: "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404)…" |
+| stale version | `cmd051-close-commission-period.test.ts` :: "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404); then one missing prerequisite at a time — an undelivered COMMISSIONS record before the cutoff INPUTS_UNRECONCILED, a changed ledger LEDGER_CHANGED…" |
+| duplicate request | `cmd051-close-commission-period.test.ts` :: "RACE: an identical retry replays the 200 with the same statements…" |
+| changed-body same key | `cmd051-close-commission-period.test.ts` :: "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd051-close-commission-period.test.ts` :: "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT, a close racing a refund adjustment serializes on the period in both orders…" |
+| external uncertainty | NOT_APPLICABLE: a close reaches no provider; the banking calendar is a recorded platform version read in the transaction (D10-BIND-1), and the statements, items, line edges, guard reviews and journal entry are rows of one database transaction |
+
+### CMD052 ApproveCommissionPayout
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd052-approve-commission-payout.test.ts` :: "OK: the owner with a fresh step-up approves an ISSUED statement's payable…" |
+| wrong role | `cmd052-approve-commission-payout.test.ts` :: "DENY: an agency member's tenant session is a foreign scope and the seller a wrong role (403)…" |
+| wrong agency | `cmd052-approve-commission-payout.test.ts` :: "DENY: an agency member's tenant session is a foreign scope…" |
+| stale version | `cmd052-approve-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION…" |
+| duplicate request | `cmd052-approve-commission-payout.test.ts` :: "RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd052-approve-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd052-approve-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT…" |
+| external uncertainty | NOT_APPLICABLE: an approval makes no transfer (the payout adapter is B15's); the intent, the statement's edge, the step-up fact and the journal entry are rows of one database transaction |
+
+### CMD053 ReconcileCommissionPayout
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd053-reconcile-commission-payout.test.ts` :: "OK: the finance service reconciles an intent with SETTLED evidence…" |
+| wrong role | `cmd053-reconcile-commission-payout.test.ts` :: "DENY: a user token or the commission service is a wrong service identity (403)…" |
+| wrong agency | `cmd053-reconcile-commission-payout.test.ts` :: "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404)…" |
+| stale version | NOT_APPLICABLE: ReconcileCommissionPayout carries no expectedVersion (registry fields: providerPayoutEvidenceRef); the statement is locked and the evidence must match its intent, and an intent already ended under other evidence answers UNLISTED_TRANSITION with its current state |
+| duplicate request | `cmd053-reconcile-commission-payout.test.ts` :: "RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd053-reconcile-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd053-reconcile-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT…" |
+| external uncertainty | `cmd053-reconcile-commission-payout.test.ts` :: "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED…" |
 
 ## 5. The manual-10 reads (re-check finding N16)
 

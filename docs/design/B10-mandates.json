@@ -206,7 +206,7 @@
       "starts_from": "b10/stage-2",
       "depends_on": ["B10-ADAPTERS-LEDGER", "B10-ADAPTERS-SALES", "B10-PORTS-FAKES", "B10-MODEL"],
       "owns_fakes": [],
-      "migrations": [],
+      "migrations": ["0034_commission_service_commands.sql"],
       "tests": [
         "apps/api/test/cmd051-close-commission-period.test.ts",
         "apps/api/test/cmd052-approve-commission-payout.test.ts",

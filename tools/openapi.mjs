@@ -502,7 +502,8 @@ Failure: ${command.failure}`,
       "x-kauro-gate": command.gate,
       "x-kauro-cases": command.testIds ?? [],
       "x-kauro-package": "B10",
-      security: [{ bearerAuth: [] }],
+      // the commission group's service commands (CMD051, CMD053) authenticate a verified service identity, every other a person
+      security: [{ [spec.principal === "COMMERCIAL_SERVICE" ? "serviceAuth" : "bearerAuth"]: [] }],
       parameters: [
         ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
         { $ref: "#/components/parameters/IdempotencyKey" },
@@ -511,6 +512,31 @@ Failure: ${command.failure}`,
       ],
       requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
       responses,
+    });
+  }
+
+  // package B10: the served commercial reads (GetCommissionStatement since B10-STATEMENTS-PAYOUTS; COMMERCIAL_SERVED_READ_IDS)
+  for (const [operationId, spec] of Object.entries(application.COMMERCIAL_READ_ROUTES)) {
+    if (!application.isServedCommercialRead(operationId)) continue;
+    const schemaId = application.commercialReadResponseSchemaId(operationId);
+    addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
+    serve("GET", spec.path, {
+      operationId,
+      summary: spec.summary,
+      description: `Authority: ${spec.authority}`,
+      "x-kauro-read": true,
+      "x-kauro-role": spec.role,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-package": "B10",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id; a statement the caller may not read answers as an id nobody holds.", schema: ID })),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      responses: {
+        200: { description: `READ: ${spec.summary}`, headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${operationId}Reply` } } } },
+        ...problemResponses(application.COMMERCIAL_READ_OUTCOMES[operationId]),
+      },
     });
   }
 

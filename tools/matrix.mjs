@@ -599,6 +599,45 @@ export const APPLICABILITY = {
   },
 };
 
+// package B10's statement and payout commands (mandate B10-STATEMENTS-PAYOUTS; docs/design/B10-case-map.md CMD051..CMD053): the commission
+// group's service commands and the owner's approval; none reaches a provider (the payout evidence is read before the transaction)
+const CLOSE = "cmd051-close-commission-period.test.ts";
+const APPROVE_PAYOUT = "cmd052-approve-commission-payout.test.ts";
+const RECONCILE_PAYOUT = "cmd053-reconcile-commission-payout.test.ts";
+APPLICABILITY.CMD051 = {
+  "legitimate state": [[CLOSE, "OK: the commission service closes a due September 2026 period on the test calendar"]],
+  "wrong role": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403)"]],
+  "wrong agency": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404)"]],
+  "stale version": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404); then one missing prerequisite at a time — an undelivered COMMISSIONS record before the cutoff INPUTS_UNRECONCILED, a changed ledger LEDGER_CHANGED"]],
+  "duplicate request": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements"]],
+  "changed-body same key": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT, a close racing a refund adjustment serializes on the period in both orders"]],
+  "external uncertainty": "NOT_APPLICABLE: a close reaches no provider; the banking calendar is a recorded platform version read in the transaction (D10-BIND-1), and the statements, items, line edges, guard reviews and journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD052 = {
+  "legitimate state": [[APPROVE_PAYOUT, "OK: the owner with a fresh step-up approves an ISSUED statement's payable"]],
+  "wrong role": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope and the seller a wrong role (403)"]],
+  "wrong agency": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope"]],
+  "stale version": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION"]],
+  "duplicate request": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": "NOT_APPLICABLE: an approval makes no transfer (the payout adapter is B15's); the intent, the statement's edge, the step-up fact and the journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD053 = {
+  "legitimate state": [[RECONCILE_PAYOUT, "OK: the finance service reconciles an intent with SETTLED evidence"]],
+  "wrong role": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403)"]],
+  "wrong agency": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404)"]],
+  "stale version": "NOT_APPLICABLE: ReconcileCommissionPayout carries no expectedVersion (registry fields: providerPayoutEvidenceRef); the statement is locked and the evidence must match its intent, and an intent already ended under other evidence answers UNLISTED_TRANSITION with its current state",
+  "duplicate request": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED"]],
+};
+
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
 const EXECUTE = "cmd033-execute-refund.test.ts";
