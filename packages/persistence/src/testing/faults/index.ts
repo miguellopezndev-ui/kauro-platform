@@ -11,4 +11,4 @@ export type { Pause, ArmedCrash, CommitCrash } from "./points.js";
 export { InterleavingNotObserved, TransactionNotCommitted, mustWait, inOrder, bothOrders, concurrently, sequentially, partition } from "./interleave.js";
 export type { Waiting, WaitProbe, TxActor, ActorOutcome, RaceRun, RaceScenario } from "./interleave.js";
 export { FAULT_KINDS, FaultNotInjected, cellTitle, cellKey, runCell, faultCell, faultMatrix } from "./matrix.js";
-export type { FaultKind, MatrixCell, FaultContext, CellOptions, CellBody } from "./matrix.js";
+export type { FaultKind, MatrixCell, FaultContext, StepClock, CellOptions, CellBody } from "./matrix.js";

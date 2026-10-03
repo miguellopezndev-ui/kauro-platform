@@ -186,15 +186,15 @@ test("terminateBackend: a killed process's open transaction is aborted by the se
   assert.deepEqual(points.crashes, ["victim.died"]);
 });
 
-test("mustWait: an operation is observed waiting only when its own backend (pid taken before it started) is blocked by the intended holder; one that is not blocked, or blocked by another backend, FAILS with InterleavingNotObserved", async () => {
+test("mustWait: an operation is observed waiting only when its own statement, on the connection the harness hands it, is blocked by the intended holder; one that is not blocked, or blocked by another backend, FAILS with InterleavingNotObserved", async () => {
   const id = await newItem();
   const holder = connectionPid(a);
-  const waiter = connectionPid(b);
+  const waiter = b;
   await a.query("BEGIN");
   try {
     await bump(a, id, "a");
     await b.query("BEGIN");
-    const { pending } = await mustWait(h.oracle, { waiter, holder }, bump(b, id, "b"), "b behind a");
+    const { pending } = await mustWait(h.oracle, { waiter, holder }, (c) => bump(c, id, "b"), "b behind a");
     await a.query("COMMIT");
     assert.equal((await pending).status, "fulfilled");
     await b.query("COMMIT");
@@ -204,16 +204,14 @@ test("mustWait: an operation is observed waiting only when its own backend (pid 
   }
   assert.deepEqual(await item(id), { n: 2, writers: ["a", "b"] });
   // FAILS: nothing holds the row, so the write finishes without waiting
-  await assert.rejects(mustWait(h.oracle, { waiter, holder }, bump(b, id, "b"), "an unblocked write"), InterleavingNotObserved);
+  await assert.rejects(mustWait(h.oracle, { waiter, holder }, (c) => bump(c, id, "b"), "an unblocked write"), InterleavingNotObserved);
   // FAILS: b waits, but on a, not on the holder the probe names
   const other = await h.pg.connect("kauro_control_test");
   await a.query("BEGIN");
   try {
     await bump(a, id, "a");
     await b.query("BEGIN");
-    const blocked = bump(b, id, "b");
-    blocked.catch(() => undefined);
-    await assert.rejects(mustWait(h.oracle, { waiter, holder: connectionPid(other) }, blocked, "b behind a third backend", 500), (e: unknown) => e instanceof InterleavingNotObserved && /never on the holder/.test(e.message));
+    await assert.rejects(mustWait(h.oracle, { waiter, holder: connectionPid(other) }, (c) => bump(c, id, "b"), "b behind a third backend", 500), (e: unknown) => e instanceof InterleavingNotObserved && /never on the holder/.test(e.message));
   } finally {
     await a.query("ROLLBACK").catch(() => undefined);
     await b.query("ROLLBACK").catch(() => undefined);
@@ -301,14 +299,14 @@ test("matrix cells: the title is the cell; a cell whose body injected nothing FA
       ctx.clock.past(deadline);
       await a.query("BEGIN");
       try {
-        assert.equal(Date.parse(await ctx.clock.onServer(a)), Date.parse(deadline) + 1, "the transaction runs past the deadline");
+        await ctx.withClock("the statement past the deadline", async (clock) => {
+          assert.equal(Date.parse(await clock.onServer(a)), Date.parse(deadline) + 1, "the transaction runs past the deadline");
+          const r = await a.query<{ past: boolean }>("SELECT kauro.server_now() > $1::timestamptz AS past", [deadline]);
+          assert.equal(r.rows[0]?.past, true);
+        });
       } finally {
         await a.query("ROLLBACK");
       }
-    });
-    await runCell({ step: "s", fault, expect: "e" }, async (ctx) => {
-      ctx.clock.past(ctx.deadline(ctx.clock.at(10_000), "ttl"));
-      assert.ok(ctx.clock.nowMs() > 0, "the step reads the application instant past the deadline");
     });
   }
   await runCell({ step: "s", fault: "retry", expect: "e" }, async (ctx) => void (await ctx.sequentially(2, async () => 1)));
@@ -334,11 +332,12 @@ test("matrix cells: the title is the cell; a cell whose body injected nothing FA
   await runCell({ step: "s", fault: "partial", expect: "e" }, async (ctx) => {
     const effects: string[] = [];
     const port = instrumentPort({ async place(k: string) { effects.push(k); } }, ctx.points, "storage");
-    await ctx.partial("two placements", "storage.place.after", async () => {
+    const index = instrumentPort({ async put(k: string) { effects.push(`index:${k}`); } }, ctx.points, "index");
+    await ctx.partial("a placement, then its index entry", "index.put.after", async () => {
       await port.place("one");
-      await port.place("two");
+      await index.put("one");
     });
-    assert.deepEqual(effects, ["one"], "the first placement landed, the failure came after it");
+    assert.deepEqual(effects, ["one", "index:one"], "the placement completed; the index entry landed and its answer was lost");
   });
   // an armed point never reached fails the cell
   await assert.rejects(runCell({ step: "s", fault: "partial", expect: "e" }, async (ctx) => void ctx.points.crash("never")), FaultPointNotReached);
@@ -416,7 +415,7 @@ test("FH-R1 (evidence) a revocation cell FAILS without a revocation that took ef
   await assert.rejects(runCell(partial, async (ctx) => void (await ctx.partial("p", "storage.place.before", () => port(ctx.points).place()))), /before any earlier step/);
 });
 
-test("FH-R2 (evidence) an expiry cell FAILS when its declared deadline was not crossed by one move, or the clock was not used past it after the crossing; it passes when onServer positions a transaction past it", async () => {
+test("FH-R2 (evidence) an expiry cell FAILS when its declared deadline was not crossed by one move, or the clock was not used past it after the crossing; a read or onServer in the body is no use (FH-R2 (r3))", async () => {
   const cell = { step: "s", fault: "expiry", expect: "e" } as const;
   await assert.rejects(
     runCell(cell, async (ctx) => {
@@ -446,7 +445,7 @@ test("FH-R2 (evidence) an expiry cell FAILS when its declared deadline was not c
   await assert.rejects(
     runCell({ step: "s", fault: "timeout", expect: "e" }, async (ctx) => {
       ctx.clock.past(ctx.deadline(ctx.clock.at(1_000)));
-      ctx.clock.now();
+      await ctx.withClock("the step", async (clock) => void clock.now());
       ctx.deadline(ctx.clock.at(60_000), "second deadline");
     }),
     /second deadline/,
@@ -461,15 +460,18 @@ test("FH-R2 (evidence) an expiry cell FAILS when its declared deadline was not c
 faultCell({ id: "SELF", step: "OUTBOX_DISPATCH lease claim", fault: "expiry", expect: "HELD while live, taken over at fence 2 once expired" }, async (ctx) => {
   const resourceId = ids.next() as ResourceId;
   const deadlineAt = ctx.clock.at(3_600_000);
-  const claim = (now: string) =>
-    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 120, deadlineAt, subjectHash: sha("self"), costAuthorityId: null, checkpointHash: null }, now));
+  // the claim is the operation under test: it takes its instant through the step clock the harness hands it
+  const claim = () =>
+    ctx.withClock("lease claim", (clock) =>
+      h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 120, deadlineAt, subjectHash: sha("self"), costAuthorityId: null, checkpointHash: null }, clock.now())),
+    );
   const expiresAt = ctx.deadline(ctx.clock.at(120_000), "lease's time to live");
-  assert.equal((await claim(ctx.clock.now())).kind, "CLAIMED");
+  assert.equal((await claim()).kind, "CLAIMED");
   ctx.clock.before(expiresAt);
-  assert.equal((await claim(ctx.clock.now())).kind, "HELD");
-  // the instant a move returns is not a use: the step reads the clock (its Clock port) once it crossed the deadline
+  assert.equal((await claim()).kind, "HELD");
+  // the instant a move returns is not a use: the claim reads the clock once it crossed the deadline
   ctx.clock.past(expiresAt);
-  const taken = await claim(ctx.clock.now());
+  const taken = await claim();
   assert.deepEqual(taken.kind === "CLAIMED" && taken.lease.fence, 2);
 });
 
@@ -621,4 +623,193 @@ test("FH-R8 terminateBackend interrupts a connection blocked on a lock (its pid 
 test("FH-R9 crashableFactory: a method left undecorated runs on the real factory (runSource reaches its private fields)", async () => {
   const f = crashableFactory(h.control, new FaultPoints(), "uow");
   assert.equal(await f.runSource(h.system(), async () => "ran"), "ran");
+});
+
+// --- FH-R1, FH-R2, FH-R6 (Codex re-check 2 of 9de9948): the evidence must come from the operation under test ----------------------
+// Each test below passed vacuously on 9de9948 (or credited evidence the operation never produced).
+
+/** Resolves once the backend `pid` waits on a lock (a statement issued outside the harness, set up as a counterexample). */
+const blockedOnLock = async (pid: number): Promise<void> => {
+  for (let i = 0; i < 500; i++) {
+    if ((await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'", [pid])).rows.length > 0) return;
+    await new Promise((res) => setTimeout(res, 10));
+  }
+  throw new Error(`backend ${pid} never waited on a lock`);
+};
+
+test("FH-R1 (r3) a partial cell FAILS unless a step of the operation COMPLETED before the failure: an outer call's .before point, the failing call's own .after, a point passed by hand are no completed step; an .after point or a committed unit before a later failure point is", async () => {
+  const partial = { step: "s", fault: "partial", expect: "e" } as const;
+  const nothingPartial = (e: unknown) => e instanceof FaultNotInjected && /before any earlier step of it completed/.test(e.message);
+  // Codex's counterexample: nested wrappers, the crash before the first effect; the log is [workflow.run.before, storage.place.before]
+  let effects = 0;
+  await assert.rejects(
+    runCell(partial, async (ctx) => {
+      const storage = instrumentPort({ async place() { effects += 1; } }, ctx.points, "storage");
+      const workflow = instrumentPort({ async run() { await storage.place(); } }, ctx.points, "workflow");
+      await ctx.partial("workflow", "storage.place.before", () => workflow.run());
+    }),
+    nothingPartial,
+    "an outer call's .before point is no completed step",
+  );
+  assert.equal(effects, 0);
+  await assert.rejects(
+    runCell(partial, async (ctx) => {
+      const port = instrumentPort({ async place() { return 1; } }, ctx.points, "storage");
+      await ctx.partial("one placement", "storage.place.after", () => port.place());
+    }),
+    nothingPartial,
+    "the failing call's own .after: its step never completed before the failure",
+  );
+  await assert.rejects(
+    runCell(partial, async (ctx) => {
+      const port = instrumentPort({ async place() { return 1; } }, ctx.points, "storage");
+      await ctx.partial("hand-passed", "storage.place.before", async () => {
+        await ctx.points.pass("index.put.after");
+        await port.place();
+      });
+    }),
+    nothingPartial,
+    "a point passed by hand is no completed step",
+  );
+  // passes: the first port's call answered (its .after passed), the second dies before its effect
+  const placed: string[] = [];
+  await runCell(partial, async (ctx) => {
+    const storage = instrumentPort({ async place(k: string) { placed.push(k); } }, ctx.points, "storage");
+    const index = instrumentPort({ async put(k: string) { placed.push(`index:${k}`); } }, ctx.points, "index");
+    await ctx.partial("place, then index", "index.put.before", async () => {
+      await storage.place("one");
+      await index.put("one");
+    });
+  });
+  assert.deepEqual(placed, ["one"]);
+  // passes: a committed unit of work is a completed step
+  const resourceId = ids.next() as ResourceId;
+  await runCell(partial, async (ctx) => {
+    const control = crashableFactory(h.control, ctx.points, "uow");
+    const notify = instrumentPort({ async send() { return 1; } }, ctx.points, "notify");
+    await ctx.partial("claim, then notify", "notify.send.before", async () => {
+      await control.run(h.system(), leaseClaim(resourceId));
+      await notify.send();
+    });
+  });
+  assert.equal((await h.oracle.query("SELECT 1 FROM kauro.leases WHERE resource_id = $1", [resourceId])).rows.length, 1, "the committed unit survived the failure");
+});
+
+test("FH-R2 (r3) an expiry or timeout cell FAILS when the instant past its deadline was only read in the body (a discarded read, a bare onServer): only an operation run through ctx.withClock uses the clock; it passes once the operation takes the instant through its step clock", async () => {
+  const unused = (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message);
+  for (const fault of ["expiry", "timeout"] as const) {
+    const cell = { step: "lease claim", fault, expect: "expired refusal" } as const;
+    // Codex's counterexample: a deadline crossed and a read discarded, no claim ever executed
+    await assert.rejects(
+      runCell(cell, async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        void ctx.clock.now();
+      }),
+      unused,
+      `${fault}: a discarded read`,
+    );
+    await assert.rejects(
+      runCell(cell, async (ctx) => {
+        ctx.clock.past(ctx.deadline(ctx.clock.at(1000)));
+        await a.query("BEGIN");
+        try {
+          await ctx.clock.onServer(a);
+        } finally {
+          await a.query("ROLLBACK");
+        }
+      }),
+      unused,
+      `${fault}: a transaction positioned in the body, no operation run in it`,
+    );
+  }
+  const cell = { step: "lease claim", fault: "expiry", expect: "taken over" } as const;
+  // a step's clock is closed once the step settled: a read kept for later is refused
+  await assert.rejects(
+    runCell(cell, async (ctx) => {
+      ctx.clock.past(ctx.deadline(ctx.clock.at(1000)));
+      let kept: { nowMs(): number } | undefined;
+      await ctx.withClock("a step that only keeps its clock", async (clock) => void (kept = clock));
+      kept?.nowMs();
+    }),
+    /settled/,
+  );
+  // passes: the claim takes the instant through the step clock, before and past the lease's time to live
+  await runCell(cell, async (ctx) => {
+    const resourceId = ids.next() as ResourceId;
+    const deadlineAt = ctx.clock.at(3_600_000);
+    const expiresAt = ctx.deadline(ctx.clock.at(120_000), "lease's time to live");
+    const claim = () =>
+      ctx.withClock("claim", (clock) =>
+        h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 120, deadlineAt, subjectHash: sha("r3"), costAuthorityId: null, checkpointHash: null }, clock.now())),
+      );
+    assert.equal((await claim()).kind, "CLAIMED");
+    ctx.clock.past(expiresAt);
+    const taken = await claim();
+    assert.deepEqual(taken.kind === "CLAIMED" && taken.lease.fence, 2);
+  });
+  // passes: onServer on the transaction the operation runs in
+  await runCell({ step: "server-clock step", fault: "timeout", expect: "past" }, async (ctx) => {
+    const d = ctx.deadline(ctx.clock.at(5_000), "call timeout");
+    ctx.clock.past(d);
+    await a.query("BEGIN");
+    try {
+      await ctx.withClock("the statement past the timeout", async (clock) => {
+        await clock.onServer(a);
+        const r = await a.query<{ past: boolean }>("SELECT kauro.server_now() > $1::timestamptz AS past", [d]);
+        assert.equal(r.rows[0]?.past, true);
+      });
+    } finally {
+      await a.query("ROLLBACK");
+    }
+  });
+});
+
+test("FH-R6 (r3) mustWait binds the wait to the operation: a bare waiter pid, a connection already running an earlier statement, a statement issued past the connection the harness hands the operation FAIL; the operation's own statement waiting on the holder passes", async () => {
+  const id = await newItem();
+  const holder = connectionPid(a);
+  const race = { step: "SELECT 1", fault: "race", expect: "e" } as const;
+  const loose = (ctx: unknown) => (ctx as { mustWait: (oracle: Client, probe: unknown, op: unknown, what: string, limitMs?: number) => Promise<unknown> }).mustWait;
+  await a.query("BEGIN");
+  try {
+    await bump(a, id, "a");
+    await b.query("BEGIN");
+    const earlier = bump(b, id, "earlier");
+    earlier.catch(() => undefined);
+    await blockedOnLock(connectionPid(b));
+    // Codex's counterexample, exactly: a bare pid and an independent SELECT 1 queued behind b's earlier UPDATE
+    const queued = b.query("SELECT 1");
+    queued.catch(() => undefined);
+    await assert.rejects(runCell(race, async (ctx) => void (await loose(ctx)(h.oracle, { waiter: connectionPid(b), holder }, queued, "SELECT 1", 1_000))), InterleavingNotObserved, "a bare pid is not owned by the operation");
+    // the harness hands the operation b, but b is still running the earlier statement: its wait is not the operation's
+    await assert.rejects(
+      runCell(race, async (ctx) => void (await loose(ctx)(h.oracle, { waiter: b, holder }, (c: Client) => c.query("SELECT 1"), "SELECT 1", 1_000))),
+      (e: unknown) => e instanceof InterleavingNotObserved && /busy/.test(e.message),
+      "a connection already running an earlier statement",
+    );
+  } finally {
+    await a.query("ROLLBACK").catch(() => undefined);
+    await b.query("ROLLBACK").catch(() => undefined);
+  }
+  // a statement issued on the connection itself, not through the handle the harness gave the operation, is refused
+  await a.query("BEGIN");
+  try {
+    await bump(a, id, "a");
+    await b.query("BEGIN");
+    await assert.rejects(runCell(race, async (ctx) => void (await loose(ctx)(h.oracle, { waiter: b, holder }, () => bump(b, id, "b"), "a write past the handle", 1_000))), InterleavingNotObserved);
+    await b.query("ROLLBACK");
+    // passes: the operation's own UPDATE, on the handle, waits on the holder; while it runs the connection is the operation's alone
+    await b.query("BEGIN");
+    await runCell(race, async (ctx) => {
+      const { pending } = (await loose(ctx)(h.oracle, { waiter: b, holder }, (c: Client) => bump(c, id, "b"), "b behind a")) as { pending: Promise<PromiseSettledResult<unknown>> };
+      await assert.rejects(b.query("SELECT 1"), /dedicated/, "a statement queued on the connection outside the operation");
+      await a.query("COMMIT");
+      assert.equal((await pending).status, "fulfilled");
+    });
+    await b.query("COMMIT");
+  } finally {
+    await a.query("ROLLBACK").catch(() => undefined);
+    await b.query("ROLLBACK").catch(() => undefined);
+  }
+  assert.deepEqual(await item(id), { n: 2, writers: ["a", "b"] }, "the holder, then the operation that waited on it");
 });

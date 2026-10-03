@@ -97,6 +97,29 @@ function recordCommitCrash(points: FaultPoints, crash: CommitCrash): void {
   commitCrashes.set(points, list);
 }
 
+/**
+ * The steps that completed for each FaultPoints, as positions in its `passed` log: an instrumented port's `.after` point passed
+ * without a crash once the real method answered, or a crashableFactory's `.after-commit` point passed without a crash once the
+ * factory resolved (the unit committed). Written only by instrumentPort and crashableFactory (module-private: a point passed by
+ * hand is no completed step).
+ */
+const completedSteps = new WeakMap<object, number[]>();
+
+/** The positions in `points.passed` of every step that completed (the partial-failure proof), in order. */
+export function completedStepsOf(points: FaultPoints): ReadonlyArray<number> {
+  return [...(completedSteps.get(points) ?? [])];
+}
+
+/** Passes the closing point of a step that ran and answered; recorded as completed only once the point passed without a crash. */
+async function passCompleted(points: FaultPoints, name: string): Promise<void> {
+  // pass() logs the point synchronously when called: this is its position in `passed`
+  const position = points.passed.length;
+  await points.pass(name);
+  const list = completedSteps.get(points) ?? [];
+  list.push(position);
+  completedSteps.set(points, list);
+}
+
 /** One-shot named points; a test arms them, the instrumented code passes them. */
 export class FaultPoints {
   readonly #armed = new Map<string, Armed>();
@@ -214,7 +237,8 @@ type AnyFn = (...args: never[]) => unknown;
  * committed unit). Only the methods listed are decorated; every other member is the real factory's, read from it and bound to it
  * (its private fields work). A crash firing at either boundary is recorded as a CommitCrash — the only evidence a crash cell
  * accepts: before-commit only when the factory then rejected (it never issued COMMIT), after-commit only after the factory
- * resolved (PgUnitOfWorkFactory resolves only when the server answered COMMIT with COMMIT, unit-of-work.ts).
+ * resolved (PgUnitOfWorkFactory resolves only when the server answered COMMIT with COMMIT, unit-of-work.ts). An after-commit point
+ * passed without a crash is a completed step (completedStepsOf): the unit committed and its caller got the answer.
  */
 export function crashableFactory<F extends object>(factory: F, points: FaultPoints, name: string, methods: ReadonlyArray<keyof F & string> = ["run" as keyof F & string]): F {
   return new Proxy(factory, {
@@ -250,7 +274,7 @@ export function crashableFactory<F extends object>(factory: F, points: FaultPoin
           throw e;
         }
         try {
-          await points.pass(`${name}.after-commit`);
+          await passCompleted(points, `${name}.after-commit`);
         } catch (e) {
           if (e instanceof SimulatedCrash && e.point === `${name}.after-commit`) recordCommitCrash(points, { name, boundary: "AFTER_COMMIT" });
           throw e;
@@ -264,8 +288,9 @@ export function crashableFactory<F extends object>(factory: F, points: FaultPoin
 /**
  * Decorates a port (a provider client, an outbox dispatcher's delivery, a service step): each async method passes
  * `<name>.<method>.before` before it calls the real method (a crash there means the effect never happened) and
- * `<name>.<method>.after` once the real method answered (a crash there means the effect happened and its answer was lost). Other
- * members are read from the real port.
+ * `<name>.<method>.after` once the real method answered (a crash there means the effect happened and its answer was lost). An
+ * `.after` point passed without a crash is a completed step (completedStepsOf); a `.before` point never is. Other members are read
+ * from the real port.
  */
 export function instrumentPort<P extends object>(port: P, points: FaultPoints, name: string): P {
   return new Proxy(port, {
@@ -277,7 +302,7 @@ export function instrumentPort<P extends object>(port: P, points: FaultPoints, n
       return async (...args: never[]) => {
         await points.pass(`${name}.${prop}.before`);
         const out = await method.apply(target, args);
-        await points.pass(`${name}.${prop}.after`);
+        await passCompleted(points, `${name}.${prop}.after`);
         return out;
       };
     },

@@ -2,9 +2,10 @@
  * Failure-matrix cells as tests (docs/design/FAULT-HARNESS.md): one cell { step, fault, expect } becomes one node:test test whose
  * title is the cell and whose body receives a fresh FaultContext (named points, a controlled clock, the interleaving helpers).
  * A cell can never pass unless its fault demonstrably happened at the boundary it names: the helpers record evidence only of what
- * they observed — a lock wait of the operation's own backend on the intended holder, the clock crossing a declared deadline and
- * then being used, a crash firing at the cell's commit boundary, a request attempt that ran and settled, a revocation that took
- * effect followed by an operation refused after it, a failure at a point after an earlier step of the same operation completed —
+ * they observed — a lock wait of the operation's own statement, on the connection the harness handed it, on the intended holder,
+ * the clock crossing a declared deadline and then being used by an operation the harness ran (ctx.withClock), a crash firing at the
+ * cell's commit boundary, a request attempt that ran and settled, a revocation that took effect followed by an operation refused
+ * after it, a failure at a point after an earlier step of the same operation completed (an .after point or a committed unit) —
  * and after the body the cell fails (FaultNotInjected) unless its kind's evidence is there and every armed point was reached.
  * `faultMatrix` registers a whole matrix and refuses one whose cells and bodies do not map 1:1.
  */
@@ -14,7 +15,9 @@ import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
 import { controlledClock, epochMs, type ControlledClock, type InstantLike } from "./clock.js";
 import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, sequentially, settledOrderOf, type ActorOutcome, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
-import { FaultPoints, commitCrashesOf, crashedAt, terminateBackend } from "./points.js";
+import { FaultPoints, commitCrashesOf, completedStepsOf, crashedAt, terminateBackend } from "./points.js";
+import type { SqlSession } from "../source-lifecycle.js";
+import type { Clock } from "@kauro/domain";
 
 export const FAULT_KINDS = ["race", "timeout", "expiry", "crash-before-commit", "crash-after-commit", "retry", "revocation", "partial"] as const;
 export type FaultKind = (typeof FAULT_KINDS)[number];
@@ -48,6 +51,16 @@ export function cellTitle(cell: MatrixCell): string {
   return `${cell.id !== undefined ? `${cell.id} ` : ""}[${fault}] ${cell.step} -> ${cell.expect}`;
 }
 
+/**
+ * The clock an operation under test receives from ctx.withClock: the cell's controlled clock, read (now, nowMs, date) or put on the
+ * operation's transaction (onServer) only while that operation runs. Each use is the cell's evidence that the operation used the
+ * clock at that instant; once the operation settled the step clock refuses every use.
+ */
+export interface StepClock extends Clock {
+  date(): Date;
+  onServer(session: SqlSession): Promise<string>;
+}
+
 /** What one cell's body works with; the helpers record what they observed so the cell can check its fault happened. */
 export interface FaultContext {
   readonly cell: MatrixCell;
@@ -55,12 +68,18 @@ export interface FaultContext {
   readonly clock: ControlledClock;
   /**
    * Declares a deadline the cell's fault crosses (an expiry, a lease's time to live, a provider-call timeout). Every declared
-   * deadline must be crossed by one move of the clock (before < deadline <= after) and the clock used after that move at or past
-   * it (onServer on the transaction under test, or the application instant read for the step); expiry and timeout cells need one.
+   * deadline must be crossed by one move of the clock (before < deadline <= after) and then used at or past it by an operation run
+   * through ctx.withClock (its step clock read for the instant the operation takes, or put on the transaction it runs in with
+   * onServer); a read of ctx.clock or an onServer in the body itself is never a use. Expiry and timeout cells need one.
    */
   deadline(instant: InstantLike, what?: string): UtcInstant;
-  /** mustWait, counted as an observed wait. */
-  mustWait<T>(oracle: Client, probe: WaitProbe, operation: Promise<T>, what: string, limitMs?: number): Promise<Waiting<T>>;
+  /**
+   * Runs the operation under test with a step clock bound to this cell: the only way an operation uses the controlled clock as a
+   * cell's evidence. Every read or onServer of the step clock while the operation runs is recorded once the operation settled.
+   */
+  withClock<T>(what: string, operation: (clock: StepClock) => Promise<T>): Promise<T>;
+  /** mustWait (the operation runs on probe.waiter, handed to it by the harness), counted as an observed wait. */
+  mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: Client) => Promise<T>, what: string, limitMs?: number): Promise<Waiting<T>>;
   /** bothOrders, each order counted as an observed wait. */
   bothOrders<S>(scenario: RaceScenario<S>): Promise<readonly [RaceRun<S>, RaceRun<S>]>;
   /** inOrder, counted as an observed wait. */
@@ -83,8 +102,10 @@ export interface FaultContext {
    */
   fenced(what: string, operation: (() => Promise<unknown>) | ActorOutcome, refusal: (e: unknown) => boolean): Promise<unknown>;
   /**
-   * A partial failure: arms a crash at the point `at`, runs `operation`, and requires it to fail there after at least one earlier
-   * point of the same run passed (a step that completed). Returns the failure; the body asserts what survived.
+   * A partial failure: arms a crash at the point `at`, runs `operation`, and requires it to fail there strictly after a step of the
+   * same run COMPLETED — an instrumented port's `.after` point or a crashableFactory's `.after-commit` passed without a crash (the
+   * call answered, the unit committed). A `.before` point, the failing call's own `.after` or a point passed by hand is no completed
+   * step. Returns the failure; the body asserts what survived.
    */
   partial(what: string, at: string, operation: () => Promise<unknown>): Promise<unknown>;
   /** terminateBackend (recorded in points.crashes; never a crash at a commit boundary). */
@@ -111,6 +132,8 @@ export type CellBody = (ctx: FaultContext) => Promise<void>;
 
 interface Evidence {
   readonly deadlines: Array<{ readonly at: number; readonly what: string }>;
+  /** The instants operations run through ctx.withClock used (recorded once each operation settled). */
+  readonly clockUses: Array<{ readonly at: number; readonly what: string }>;
   readonly revocations: number[];
   fenced: number;
   partials: number;
@@ -128,7 +151,7 @@ function settledOrder(outcome: ActorOutcome, what: string): number {
 function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
   const points = new FaultPoints();
   const clock = controlledClock(options.clockStart);
-  const evidence: Evidence = { deadlines: [], revocations: [], fenced: 0, partials: 0 };
+  const evidence: Evidence = { deadlines: [], clockUses: [], revocations: [], fenced: 0, partials: 0 };
   let observedWaits = 0;
   let attempts = 0;
   const counted = <A extends unknown[], T>(request: (...args: A) => Promise<T>) => async (...args: A): Promise<T> => {
@@ -146,6 +169,37 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       const at = Math.trunc(epochMs(instant));
       evidence.deadlines.push({ at, what });
       return toUtcInstant(at);
+    },
+    async withClock(what, operation) {
+      let open = true;
+      const uses: number[] = [];
+      const usable = () => {
+        if (!open) throw new Error(`the step clock of ${what} is closed: the operation settled, a later read is no use by it`);
+      };
+      const read = (): number => {
+        usable();
+        const at = clock.nowMs();
+        uses.push(at);
+        return at;
+      };
+      const step: StepClock = {
+        now: () => toUtcInstant(read()),
+        nowMs: read,
+        date: () => new Date(read()),
+        async onServer(session) {
+          usable();
+          const now = await clock.onServer(session);
+          uses.push(Date.parse(now));
+          return now;
+        },
+      };
+      try {
+        return await operation(step);
+      } finally {
+        open = false;
+        // the operation ran and settled: what it read of the clock is evidence
+        for (const at of uses) evidence.clockUses.push({ at, what });
+      }
     },
     async mustWait(oracle, probe, operation, what, limitMs) {
       const waiting = await mustWait(oracle, probe, operation, what, limitMs);
@@ -213,9 +267,10 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       }
       if (ran) throw new FaultNotInjected(`${what} completed: it never failed at ${at}`);
       if (!crashedAt(at)(failure)) throw new FaultNotInjected(`${what} failed, but not at ${at}: ${failure instanceof Error ? failure.message : String(failure)}`);
-      const run = points.passed.slice(from);
-      const failedAt = run.indexOf(at);
-      if (failedAt < 1) throw new FaultNotInjected(`${what} failed at ${at} before any earlier step of it completed: nothing was partial`);
+      const failedAt = points.passed.indexOf(at, from);
+      // a step completed in this run, strictly before the failure point: an .after point or a committed unit passed without a crash
+      const completed = completedStepsOf(points).some((position) => position >= from && position < failedAt);
+      if (failedAt < 0 || !completed) throw new FaultNotInjected(`${what} failed at ${at} before any earlier step of it completed (no instrumented call answered, no unit committed before it): nothing was partial`);
       evidence.partials += 1;
       return failure;
     },
@@ -231,14 +286,16 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
   return ctx;
 }
 
-/** Why every declared deadline is proven crossed and used, or the first one that is not. */
+/**
+ * Why every declared deadline is proven crossed and used, or the first one that is not. The clock never moves backwards, so an
+ * instant at or past the deadline was used after the move that crossed it; only an operation run through ctx.withClock uses it.
+ */
 function deadlineGap(ctx: FaultContext, evidence: Evidence): string | undefined {
   const moves = ctx.clock.moveLog;
-  const uses = ctx.clock.useLog;
   for (const d of evidence.deadlines) {
     const crossing = moves.find((m) => m.from < d.at && d.at <= m.to);
     if (crossing === undefined) return `the clock never crossed the ${d.what} ${toUtcInstant(d.at)} (no move from before it to at or past it)`;
-    if (!uses.some((u) => u.seq > crossing.seq && u.at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no onServer, no application instant read)`;
+    if (!evidence.clockUses.some((u) => u.at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no operation run through ctx.withClock read it or put it on its transaction; a read or onServer in the body is no use)`;
   }
   return undefined;
 }

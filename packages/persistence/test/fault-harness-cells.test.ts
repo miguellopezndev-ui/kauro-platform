@@ -102,9 +102,12 @@ faultCell(
     const owner2 = ids.next() as LeaseOwnerId;
     const deadline = ctx.clock.at(3_600_000);
     const expiresAt = ctx.deadline(ctx.clock.at(120_000), "lease's time to live");
+    // the claim is the operation under test: it takes its instant (p_now) through the step clock the harness hands it
     const claim = (resourceKind: "JOB_ATTEMPT" | "MODEL_TASK" | "OUTBOX_DISPATCH", resourceId: ResourceId, ownerId: LeaseOwnerId, checkpointHash: string | null) =>
-      env.h.control.run(env.h.system(), (uow) =>
-        uow.leases.claim({ resourceKind, resourceId, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha(resourceKind === "OUTBOX_DISPATCH" ? "dispatch" : "subject"), costAuthorityId: resourceKind === "OUTBOX_DISPATCH" ? null : ids.next(), checkpointHash }, ctx.clock.now()),
+      ctx.withClock(`${resourceKind} claim`, (clock) =>
+        env.h.control.run(env.h.system(), (uow) =>
+          uow.leases.claim({ resourceKind, resourceId, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha(resourceKind === "OUTBOX_DISPATCH" ? "dispatch" : "subject"), costAuthorityId: resourceKind === "OUTBOX_DISPATCH" ? null : ids.next(), checkpointHash }, clock.now()),
+        ),
       );
     const leaseRow = async (kind: string, resource: ResourceId) => {
       const r = await env.h.oracle.query("SELECT owner_id, fence, checkpoint_hash, expires_at FROM kauro.leases WHERE resource_kind = $1 AND resource_id = $2", [kind, resource]);
@@ -266,10 +269,15 @@ faultCell(
     });
     /** One transaction as the request handlers (REQUEST) or the control plane (CONTROL); on the controlled clock when `onClock`. */
     const raw = <T>(who: "REQUEST" | "CONTROL", onClock: boolean, fn: (c: Client) => Promise<T>) =>
-      tx(who === "CONTROL" ? env.control : env.app, who === "CONTROL" ? { agencyId: B.agencyId } : { agencyId: B.agencyId, userId: B.ownerUserId }, async (c) => {
-        if (onClock) await ctx.clock.onServer(c);
-        return fn(c);
-      });
+      tx(who === "CONTROL" ? env.control : env.app, who === "CONTROL" ? { agencyId: B.agencyId } : { agencyId: B.agencyId, userId: B.ownerUserId }, (c) =>
+        // on the clock, the transaction's server clock is put on the controlled instant by the operation's own step clock
+        onClock
+          ? ctx.withClock(`${who} transaction`, async (clock) => {
+              await clock.onServer(c);
+              return fn(c);
+            })
+          : fn(c),
+      );
     const store = <T>(who: "REQUEST" | "CONTROL", onClock: boolean, fn: (s: PgSourceStore) => Promise<T>) => raw(who, onClock, (c) => fn(new PgSourceStore(c, who)));
     const insertHold = (c: Client) =>
       c.query(

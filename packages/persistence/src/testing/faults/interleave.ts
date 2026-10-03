@@ -1,7 +1,7 @@
 /**
  * Deterministic interleavings of the common fault harness (docs/design/FAULT-HARNESS.md). Two actors contend for the same row:
  * the first runs its write inside an open transaction and stops there; the second starts its own and must be OBSERVED waiting on
- * the first's lock in pg_stat_activity — its own backend, blocked by the first's backend (pg_blocking_pids) — then the first
+ * the first's lock in pg_stat_activity — its own write, on its own connection, blocked by the first's backend (pg_blocking_pids) — then the first
  * commits (or fails at COMMIT) and the second goes on. `bothOrders` runs one scenario under both orders with one call. An
  * interleaving whose wait is not observed throws InterleavingNotObserved: a race test never passes on an order that did not
  * happen. Duplicates and retries of the same request run through `concurrently` and `sequentially`, which report every outcome.
@@ -17,11 +17,13 @@ export class InterleavingNotObserved extends Error {
 }
 
 /**
- * Which wait must be seen: the backend pid of the operation's own connection (taken before the operation started, e.g.
- * connectionPid) and the backend pid of the intended holder, which must be among the waiter's blockers (pg_blocking_pids).
+ * Which wait must be seen: the waiter is the operation's own connection — the harness hands it to the operation and the operation
+ * runs on it alone (its backend pid is the one the server announced, connectionPid) — and the holder is the backend pid of the
+ * intended holder, which must be among the waiter's blockers (pg_blocking_pids). A bare pid is never a waiter: nothing ties it to
+ * the operation.
  */
 export interface WaitProbe {
-  readonly waiter: number;
+  readonly waiter: Client;
   readonly holder: number;
 }
 
@@ -30,39 +32,149 @@ export interface Waiting<T> {
   readonly pending: Promise<PromiseSettledResult<T>>;
 }
 
+/** The connections currently dedicated to an operation under observation. */
+const dedicated = new WeakSet<Client>();
+
+/** The text of a statement as pg_stat_activity shows it (the query text sent), when the call names one. */
+function statementText(config: unknown): string | undefined {
+  if (typeof config === "string") return config;
+  const text = typeof config === "object" && config !== null ? (config as { text?: unknown }).text : undefined;
+  return typeof text === "string" ? text : undefined;
+}
+
+/** pg_stat_activity keeps the first track_activity_query_size bytes of a statement (1024 by default). */
+function sameStatement(observed: string, issued: string): boolean {
+  return observed === issued || (observed.length >= 1000 && issued.startsWith(observed));
+}
+
 /**
- * Observes `operation`, running on the backend `probe.waiter`, until that backend waits on a lock held by `probe.holder`
- * (pg_stat_activity wait_event_type 'Lock' and pg_blocking_pids(waiter) containing holder), and returns `{ pending }`, its eventual
- * outcome (a promise that never rejects; the caller ends the holder, then awaits it). If the operation settles before such a wait
- * is seen (checked again after every look), or none is seen within `limitMs` — the operation runs freely, or waits on someone
- * else — it throws InterleavingNotObserved naming `what`.
+ * Runs `operation` on the waiter connection, handed to it by the harness, until that connection's backend waits — in a statement the
+ * operation issued — on a lock held by `probe.holder` (pg_stat_activity wait_event_type 'Lock', its query one of the operation's
+ * statements still running, and pg_blocking_pids(waiter) containing holder), and returns `{ pending }`, the operation's eventual
+ * outcome (a promise that never rejects; the caller ends the holder, then awaits it).
+ *
+ * The wait is bound to the operation: the waiter must be a connection (never a bare pid) that is idle when the operation starts —
+ * no statement of it running or queued, client or server side — and while the operation runs the connection is the operation's
+ * alone: a statement issued on it other than through the handle the operation received is refused (rejected, never sent). If the
+ * operation settles before such a wait is seen (checked again after every look), or none is seen within `limitMs` — it runs freely,
+ * or waits on someone else — it throws InterleavingNotObserved naming `what` and gives the connection back.
  */
-export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: Promise<T>, what: string, limitMs = 10_000): Promise<Waiting<T>> {
-  if (!Number.isInteger(probe.waiter) || !Number.isInteger(probe.holder) || probe.waiter <= 0 || probe.holder <= 0) throw new Error(`${what}: the waiter's and the holder's backend pids are required`);
-  if (probe.waiter === probe.holder) throw new Error(`${what}: a backend cannot wait on itself`);
+export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: Client) => Promise<T>, what: string, limitMs = 10_000): Promise<Waiting<T>> {
+  const waiter = probe.waiter as unknown;
+  if (typeof waiter !== "object" || waiter === null || typeof (waiter as Client).query !== "function") {
+    throw new InterleavingNotObserved(`${what}: the waiter must be the connection the harness hands the operation, not ${typeof waiter === "number" ? `the bare pid ${waiter}` : String(waiter)}: nothing ties it to the operation`);
+  }
+  if (typeof operation !== "function") throw new InterleavingNotObserved(`${what}: the operation is a function the harness runs on the waiter's connection, not a promise started elsewhere`);
+  const client = waiter as Client;
+  if (client === oracle) throw new Error(`${what}: the oracle observes, it never waits`);
+  const waiterPid = connectionPid(client);
+  if (!Number.isInteger(probe.holder) || probe.holder <= 0) throw new Error(`${what}: the holder's backend pid is required`);
+  if (waiterPid === probe.holder) throw new Error(`${what}: a backend cannot wait on itself`);
+  if (dedicated.has(client)) throw new Error(`${what}: the connection is already dedicated to another operation`);
+
+  // the connection becomes the operation's alone: the handle reaches the real query, the connection itself refuses every statement
+  const slot = client as unknown as { query: unknown };
+  const realQuery = client.query as (...args: unknown[]) => unknown;
+  const ownQuery = Object.prototype.hasOwnProperty.call(client, "query");
+  dedicated.add(client);
+  slot.query = (...args: unknown[]) => {
+    const refusal = new Error(`the connection (backend ${waiterPid}) is dedicated to the operation ${what} until it settles: a statement outside it is refused`);
+    const callback = args.find((x) => typeof x === "function") as ((e: Error) => void) | undefined;
+    if (callback !== undefined) {
+      queueMicrotask(() => callback(refusal));
+      return undefined;
+    }
+    return Promise.reject(refusal);
+  };
+  let given = false;
+  const giveBack = () => {
+    if (given) return;
+    given = true;
+    if (ownQuery) slot.query = realQuery;
+    else delete (slot as { query?: unknown }).query;
+    dedicated.delete(client);
+  };
+  /** The operation's statements still running, in the order it issued them. */
+  const running: Array<{ readonly text: string | undefined }> = [];
+  const handle = new Proxy(client, {
+    get(target, prop) {
+      if (prop === "query") {
+        return (...args: unknown[]) => {
+          const out = realQuery.apply(target, args);
+          if (out !== null && typeof out === "object" && typeof (out as Promise<unknown>).then === "function") {
+            const entry = { text: statementText(args[0]) };
+            running.push(entry);
+            const done = () => {
+              const i = running.indexOf(entry);
+              if (i >= 0) running.splice(i, 1);
+            };
+            (out as Promise<unknown>).then(done, done);
+          }
+          return out;
+        };
+      }
+      const value: unknown = Reflect.get(target, prop, target);
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+
+  try {
+    // idle before the operation starts: a statement already running or queued on the connection is not the operation's
+    const internals = client as unknown as { _activeQuery?: unknown; _queryQueue?: unknown[] };
+    if (internals._activeQuery != null || (internals._queryQueue?.length ?? 0) > 0) throw new InterleavingNotObserved(`${what}: the connection is busy with an earlier statement before the operation started: a wait seen there is not the operation's`);
+    const idle = await oracle.query<{ state: string | null }>("SELECT state FROM pg_stat_activity WHERE pid = $1", [waiterPid]);
+    const state = idle.rows[0]?.state;
+    if (state !== "idle" && state !== "idle in transaction") throw new InterleavingNotObserved(`${what}: the connection's backend is busy (${state ?? "gone"}) before the operation started: a wait seen there is not the operation's`);
+  } catch (e) {
+    giveBack();
+    throw e;
+  }
+
   let outcome: PromiseSettledResult<T> | undefined;
-  const pending = operation.then(
-    (value): PromiseSettledResult<T> => (outcome = { status: "fulfilled", value }),
-    (reason: unknown): PromiseSettledResult<T> => (outcome = { status: "rejected", reason }),
+  let started: Promise<T>;
+  try {
+    started = Promise.resolve(operation(handle));
+  } catch (e) {
+    started = Promise.reject(e);
+  }
+  const pending = started.then(
+    (value): PromiseSettledResult<T> => {
+      giveBack();
+      return (outcome = { status: "fulfilled", value });
+    },
+    (reason: unknown): PromiseSettledResult<T> => {
+      giveBack();
+      return (outcome = { status: "rejected", reason });
+    },
   );
-  const settled = (o: PromiseSettledResult<T>) => new InterleavingNotObserved(`${what} ${o.status === "fulfilled" ? "finished" : "failed"} without waiting on ${probe.holder}'s lock`);
+  const settled = (o: PromiseSettledResult<T>) => new InterleavingNotObserved(`${what} ${o.status === "fulfilled" ? "finished" : `failed (${o.reason instanceof Error ? o.reason.message : String(o.reason)})`} without waiting on ${probe.holder}'s lock`);
   const deadline = Date.now() + limitMs;
   let seen = "never waited on a lock";
-  for (;;) {
-    if (outcome) throw settled(outcome);
-    const r = await oracle.query<{ waiting: boolean; blockers: number[] }>(
-      "SELECT wait_event_type IS NOT DISTINCT FROM 'Lock' AS waiting, pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE pid = $1",
-      [probe.waiter],
-    );
-    // a backend seen blocked cannot have finished meanwhile; one that finished while the oracle looked did not wait
-    if (outcome) throw settled(outcome);
-    const row = r.rows[0];
-    if (row?.waiting === true) {
-      if (row.blockers.map(Number).includes(probe.holder)) return { pending };
-      seen = `waited on ${row.blockers.join(", ") || "nobody"}, never on the holder ${probe.holder}`;
+  try {
+    for (;;) {
+      if (outcome) throw settled(outcome);
+      const r = await oracle.query<{ waiting: boolean; blockers: number[]; query: string | null }>(
+        "SELECT wait_event_type IS NOT DISTINCT FROM 'Lock' AS waiting, pg_blocking_pids(pid) AS blockers, query FROM pg_stat_activity WHERE pid = $1",
+        [waiterPid],
+      );
+      // a backend seen blocked cannot have finished meanwhile; one that finished while the oracle looked did not wait
+      if (outcome) throw settled(outcome);
+      const row = r.rows[0];
+      if (row?.waiting === true) {
+        const statement = row.query ?? "";
+        if (!running.some((s) => s.text !== undefined && sameStatement(statement, s.text))) {
+          throw new InterleavingNotObserved(`${what}: the connection waits in a statement the operation is not running (${statement.slice(0, 120)})`);
+        }
+        if (row.blockers.map(Number).includes(probe.holder)) return { pending };
+        seen = `waited on ${row.blockers.join(", ") || "nobody"}, never on the holder ${probe.holder}`;
+      }
+      if (Date.now() > deadline) throw new InterleavingNotObserved(`${what} neither finished nor waited on ${probe.holder}'s lock within ${limitMs} ms (it ${seen})`);
+      await new Promise((res) => setTimeout(res, 10));
     }
-    if (Date.now() > deadline) throw new InterleavingNotObserved(`${what} neither finished nor waited on ${probe.holder}'s lock within ${limitMs} ms (it ${seen})`);
-    await new Promise((res) => setTimeout(res, 10));
+  } catch (e) {
+    // the wait is not observed: the connection is given back (a rollback may queue behind what the operation still runs)
+    giveBack();
+    throw e;
   }
 }
 
@@ -172,7 +284,6 @@ export async function inOrder<S>(scenario: RaceScenario<S>, first: string): Prom
   if (holder.client === waiter.client) throw new Error("the two actors of a race need distinct connections");
   const order = [holder.name, waiter.name] as const;
   const holderPid = connectionPid(holder.client);
-  const waiterPid = connectionPid(waiter.client);
   const state = await scenario.setup(order);
   let open: Client[] = [];
   try {
@@ -184,7 +295,8 @@ export async function inOrder<S>(scenario: RaceScenario<S>, first: string): Prom
     await waiter.client.query("BEGIN");
     open = [holder.client, waiter.client];
     await waiter.begin?.(waiter.client, state);
-    const { pending } = await mustWait(scenario.oracle, { waiter: waiterPid, holder: holderPid }, waiter.act(waiter.client, state), `${waiter.name} behind the uncommitted ${holder.name}`, scenario.limitMs);
+    // the waiter's write runs on its connection, handed to it by the harness, and must itself be seen waiting on the holder
+    const { pending } = await mustWait(scenario.oracle, { waiter: waiter.client, holder: holderPid }, (c) => waiter.act(c, state), `${waiter.name} behind the uncommitted ${holder.name}`, scenario.limitMs);
     const holderOutcome = await finish(holder.client, holderAct);
     open = [waiter.client];
     const waiterOutcome = await finish(waiter.client, await pending);
