@@ -165,7 +165,7 @@
       "starts_from": "b10/stage-2",
       "depends_on": ["B10-ADAPTERS-SALES", "B10-PORTS-FAKES", "B10-MODEL"],
       "owns_fakes": [],
-      "migrations": [],
+      "migrations": ["0032_claim_conflict_review.sql"],
       "tests": [
         "apps/api/test/cmd045-register-prospect.test.ts",
         "apps/api/test/cmd046-claim-prospect.test.ts",
