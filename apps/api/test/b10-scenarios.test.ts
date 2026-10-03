@@ -476,10 +476,72 @@ test("R2-100: an enumerated opportunity's first purchase inside the tail convert
   assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS lines FROM kauro.commission_lines WHERE seller_id = $1", [D.sellerId]), [{ lines: 1 }]);
 });
 test("R2-104 (examples 7 and 25): a 20000-cent service refund after the seller was paid 4921 posts -800, the line PAID to ADJUSTED, and the next statement shows the original accrual, the payout, the adjustment and the -800 balance with its project and reason; no port can debit the seller", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const a = await agentOf(iw, "ex7");
+  const acquired = await claimed(iw, "ex7");
+  const P = acquired.sellers[0]!;
+  await acceptedThrough(iw, a.s.agency.agencyId, acquired, [10_000]);
 
+  // the agency's first project accrues 12,950 and stays pending; its second, 123,025 x 400 bps = 4,921, is the one the seller is paid
+  const first = await bought(iw, a, "ex7-first", { units: 50_000 });
+  const second = await bought(iw, a, "ex7-second", { units: 50_000 });
+  assert.deepEqual([first.quote.quote.serviceCents, second.quote.quote.serviceCents], ["129500", "123025"]);
+  await dispatched(iw);
+  const [firstLine] = await linesOf(iw, first.purchase.authorizationId);
+  const [line] = await linesOf(iw, second.purchase.authorizationId);
+  assert.deepEqual([firstLine?.cumulative_entitlement_cents, line?.cumulative_entitlement_cents], ["12950", "4921"]);
+  await madeEligible(iw, a.s.agency.agencyId, second.purchase);
+
+  // the first statement pays 4,921: approved by the owner, settled by the bank's evidence
+  const closed = await closedAt(iw, "2026-04", "2026-10-07T17:00:00Z");
+  assert.equal(closed.view.payableTotalCents, "4921");
+  const [paidStatement] = await statementsOfSeller(iw, P.sellerId);
+  await bankCash(iw, (await claimedCents(iw)) + 4_921n);
+  completed<PayoutIntentView>(await approvePayout(iw, paidStatement!.statement_id, { expectedVersion: Number(paidStatement!.version), payeeRef: P.destinationId, authorizationRef: await iw.w.stepUp(iw.owner) }), 200);
+  const intent = await intentOf(iw, paidStatement!.statement_id);
+  const evidence = iw.payouts.matching({ reference: intent.reference, destinationDigest: intent.destinationDigest, amountCents: intent.amount, currency: intent.currency }, "SETTLED");
+  completed<PayoutReconciliationView>(await reconcilePayout(iw, paidStatement!.statement_id, { providerPayoutEvidenceRef: scriptEvidence(iw, evidence) }), 200);
+  assert.deepEqual(await oracleRows(iw, "SELECT state, paid_cents::text, cumulative_entitlement_cents::text AS cumulative FROM kauro.commission_lines WHERE line_id = $1", [line!.line_id]), [{ state: "PAID", paid_cents: "4921", cumulative: "4921" }]);
+
+  // the customer is refunded 20,000 service cents of the second project through the public commands: 103,025 x 400 bps = 4,121, so the line
+  // falls by 800 below what was paid — one -800 adjustment, the line PAID to ADJUSTED, the cents paid untouched
+  await refundedThrough(iw, a, second.purchase, 20_000n);
+  await dispatched(iw);
+  assert.deepEqual(
+    await oracleRows(iw, "SELECT direction, amount_cents::text, new_cumulative_entitlement_cents::text AS cumulative, new_basis_cents::text AS basis, reason FROM kauro.commission_adjustments WHERE line_id = $1", [line!.line_id]),
+    [{ direction: "DECREASE", amount_cents: "800", cumulative: "4121", basis: "103025", reason: "REFUND" }],
+  );
+  assert.deepEqual(await oracleRows(iw, "SELECT state, paid_cents::text, cumulative_entitlement_cents::text AS cumulative FROM kauro.commission_lines WHERE line_id = $1", [line!.line_id]), [{ state: "ADJUSTED", paid_cents: "4921", cumulative: "4121" }]);
+
+  // the next statement shows the original accrual (the first statement, immutable: 4,921 payable), the payout (previously paid 4,921), the
+  // adjustment (-800 on the project) and the 800-cent balance as the owner's repayment review — nothing payable, nothing debited
+  const next = await closedAt(iw, "2026-03", "2026-11-20T17:00:00Z");
+  assert.equal(next.view.payableTotalCents, "0");
+  const all = await statementsOfSeller(iw, P.sellerId);
+  assert.equal(all.length, 2);
+  const statements = [closed.periodId, next.periodId].map((periodId) => all.find((x) => x.period_id === periodId)!);
+  const original = await statementReads(iw, statements[0]!.statement_id, P.person.token);
+  assert.deepEqual(original.seller.items.filter((i) => i.lineId === line!.line_id).map((i) => [i.cumulativeEntitlementCents, i.payableCents]), [["4921", "4921"]]);
+  const later = await statementReads(iw, statements[1]!.statement_id, P.person.token);
+  assert.deepEqual(later.owner, later.seller);
+  assert.deepEqual(
+    later.seller.items.filter((i) => i.lineId === line!.line_id).map((i) => [i.projectId, i.netServiceBasisCents, i.cumulativeEntitlementCents, i.previouslyPaidCents, i.adjustmentCents, i.adjustmentDirection, i.payableCents]),
+    [[second.purchase.projectId, "103025", "4121", "4921", "800", "DECREASE", "0"]],
+  );
+  assert.deepEqual(later.seller.balanceItems, [{ kind: "REPAYMENT_REVIEW", lineId: line!.line_id, amountCents: "800" }]);
+  assert.deepEqual([later.seller.payableCents, later.seller.heldCents], ["0", "0"]);
+  assert.deepEqual(await oracleRows(iw, "SELECT negative_balance_cents::text AS negative FROM kauro.commission_statements WHERE statement_id = $1", [statements[1]!.statement_id]), [{ negative: "800" }]);
+
+  // no port can debit the seller: the approval of the later statement is NOTHING_PAYABLE, no intent of any sign exists beyond the one payout,
+  // the database refuses a non-positive intent, and no port of the platform has a method that collects from a seller
+  const refused = await approvePayout(iw, statements[1]!.statement_id, { expectedVersion: Number(statements[1]!.version), payeeRef: P.destinationId, authorizationRef: await iw.w.stepUp(iw.owner) });
+  assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED NOTHING_PAYABLE");
+  assert.deepEqual(await oracleRows(iw, "SELECT amount_cents::text AS cents, state FROM kauro.payout_intents WHERE statement_id = ANY ($1::uuid[]) ORDER BY authorized_at", [statements.map((x) => x.statement_id)]), [{ cents: "4921", state: "SETTLED" }]);
+  assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS guards FROM pg_constraint WHERE conrelid = 'kauro.payout_intents'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) ILIKE '%amount_cents > 0%'"), [{ guards: 1 }], "an intent is of a positive amount");
+  const surface = [iw.payouts, iw.calendar, iw.completions].flatMap((port) => Object.getOwnPropertyNames(Object.getPrototypeOf(port) as object));
+  assert.ok(surface.length > 0);
+  assert.deepEqual(surface.filter((name) => /debit|charge|clawback|collect|recover|pull|bill/i.test(name)), [], "no port of the commission service can take money from a seller");
+});
 test("R2-137 (example 9): two projects' capture reconciliations of one agency held at the designation trigger in both interleavings end with one first project, one 1000-bps and one 400-bps pool and the same final statement projection", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");
