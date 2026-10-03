@@ -5,7 +5,7 @@
 //   R2-045  execution-migrations.test.ts   the authorization's revocation vs the publication, both orders  [race]
 //   B07-R1  source-adapters.test.ts        a retried release claim vs a newer hold                         [retry]
 // Each cell asserts everything its original asserts; the harness adds the proof that the fault happened at the boundary the cell
-// names (the clock crossed the declared deadline and was used past it; the waiter's own backend was observed blocked by the
+// names (the clock crossed the declared deadline and the claim consumed an instant past it; the waiter's own backend was observed blocked by the
 // holder's in every order; the revocation committed and the publication was refused after it; the request ran again) and fails
 // the cell otherwise.
 import assert from "node:assert/strict";
@@ -29,7 +29,7 @@ import type {
 import { PgEventPublisher } from "../src/event-publisher.js";
 import { PgExecutionStore } from "../src/execution/store.js";
 import { PgSourceStore } from "../src/index.js";
-import { admitJob, endJob, faultCell, launchJob, publishJob, queueJob, readySourceRevision, admitSourceFile, stageJob, verifyJob, type ActorOutcome, type RaceRun } from "../src/testing/index.js";
+import { admitJob, endJob, faultCell, instrumentPort, launchJob, openConnection, publishJob, queueJob, readySourceRevision, admitSourceFile, stageJob, verifyJob, type ActorOutcome, type RaceRun } from "../src/testing/index.js";
 import { commerceEvent, service, within } from "./commerce-support.js";
 import { causeState, closeExecutionEnv, oracle, openExecutionEnv, purchase, revokeAuthorization, type ExecutionEnv } from "./execution-support.js";
 import { clock, ids, project, sha, sourceSessions, sqlState, tx } from "./support.js";
@@ -106,7 +106,7 @@ faultCell(
     const claim = (resourceKind: "JOB_ATTEMPT" | "MODEL_TASK" | "OUTBOX_DISPATCH", resourceId: ResourceId, ownerId: LeaseOwnerId, checkpointHash: string | null) =>
       ctx.withClock(`${resourceKind} claim`, (clock) =>
         env.h.control.run(env.h.system(), (uow) =>
-          uow.leases.claim({ resourceKind, resourceId, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha(resourceKind === "OUTBOX_DISPATCH" ? "dispatch" : "subject"), costAuthorityId: resourceKind === "OUTBOX_DISPATCH" ? null : ids.next(), checkpointHash }, clock.now()),
+          instrumentPort(uow.leases, ctx.points, "leases").claim({ resourceKind, resourceId, ownerId, ttlSeconds: 120, deadlineAt: deadline, subjectHash: sha(resourceKind === "OUTBOX_DISPATCH" ? "dispatch" : "subject"), costAuthorityId: resourceKind === "OUTBOX_DISPATCH" ? null : ids.next(), checkpointHash }, clock.now()),
         ),
       );
     const leaseRow = async (kind: string, resource: ResourceId) => {
@@ -146,7 +146,9 @@ faultCell(
     expect: "the publication waits on the file's transition lock and is refused KA081 at COMMIT, a later one too; the package stays VERIFIED_PRIVATE, the authorization CONSUMED; an admitted neighbour publishes",
   },
   async (ctx) => {
-    const revoker = await env.h.pg.connect("kauro_control_test");
+    // both actors on connections the harness opened: the publication is the observed waiter
+    const revoker = await openConnection(env.h.pg.clientConfig("kauro_control_test"));
+    const publisher = await openConnection(env.h.pg.clientConfig("kauro_control_test"));
     let run: RaceRun<VerifiedJob>;
     try {
       run = await ctx.inOrder<VerifiedJob>(
@@ -154,7 +156,7 @@ faultCell(
           oracle: env.h.oracle,
           actors: [
             { name: "revocation", client: revoker, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => revokeIncludedFile(c, env.A.agencyId, v.p.projectId) },
-            { name: "publication", client: env.control, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => publishRaw(c, v, "b08-r1-one") },
+            { name: "publication", client: publisher, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => publishRaw(c, v, "b08-r1-one") },
           ],
           setup: () => verifiedJob("cell-b08-r1-revocation-first"),
           async verify({ outcomes }) {
@@ -169,6 +171,7 @@ faultCell(
       );
     } finally {
       await revoker.end();
+      await publisher.end();
     }
     const one = run.state;
     assert.deepEqual(await oracle(env, "SELECT r.state FROM kauro.dataset_revisions r JOIN kauro.projects p ON p.current_revision_id = r.revision_id WHERE p.project_id = $1", [one.p.projectId]), [{ state: "SEALED" }], "the revision itself is still SEALED");
@@ -191,39 +194,47 @@ faultCell(
     expect: "they serialize on the authorization's transition lock in both orders: revocation first, the publication is refused KA081 at COMMIT with its evidence and private artifacts kept; publication first, the package is AVAILABLE and the revocation lands POST_DELIVERY",
   },
   async (ctx) => {
-    await ctx.bothOrders<VerifiedJob>({
-      oracle: env.h.oracle,
-      actors: [
-        { name: "revocation", client: env.payment, begin: (c) => bindPayment(c, env.A.agencyId), act: (c, v) => revokeAuthorization(c, env.A, v.p.authorizationId) },
-        { name: "publication", client: env.control, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => publishRaw(c, v, `r2-045-${v.job.jobId}`) },
-      ],
-      setup: (order) => verifiedJob(`cell-r2-045-${order[0]}-first`),
-      async verify({ order, state: v, outcomes }) {
-        const auth = (columns: string) => oracle(env, `SELECT ${columns} FROM kauro.commercial_authorizations WHERE authorization_id = $1`, [v.p.authorizationId]);
-        const pkgState = () => oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [v.pkg.packageVersionId]);
-        assert.equal(outcomes["revocation"]?.committed, true, "the revocation commits in either order");
-        if (order[0] === "revocation") {
-          assert.equal(outcomes["publication"]?.act.status, "fulfilled", "the publication writes its edges; the database decides at COMMIT");
-          assert.ok(rejectedWith(outcomes["publication"]?.commit, "KA081"), "no package becomes AVAILABLE under a REVOKED authorization");
-          assert.deepEqual(await auth("state, revocation_phase"), [{ state: "REVOKED", revocation_phase: "DURING_EXECUTION" }]);
-          assert.deepEqual(await pkgState(), [{ state: "VERIFIED_PRIVATE" }]);
-          assert.deepEqual(await oracle(env, "SELECT result FROM kauro.package_verifications WHERE package_version_id = $1", [v.pkg.packageVersionId]), [{ result: "VALID" }]);
-          assert.deepEqual(
-            await oracle(env, "SELECT count(*)::int AS staged, count(*) FILTER (WHERE o.state = 'VERIFIED')::int AS verified FROM kauro.staged_artifacts a JOIN kauro.stored_objects o ON o.object_id = a.object_id JOIN kauro.processing_jobs j ON j.current_attempt_id = a.attempt_id WHERE j.job_id = $1", [v.job.jobId]),
-            [{ staged: 2, verified: 2 }],
-          );
-          assert.deepEqual(await oracle(env, "SELECT count(*)::int AS n FROM kauro.delivery_artifacts WHERE package_version_id = $1", [v.pkg.packageVersionId]), [{ n: 2 }]);
-          assert.deepEqual(await oracle(env, "SELECT count(*)::int AS n FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'commercial_authorization.delivered.v1'", [v.p.authorizationId]), [{ n: 0 }]);
-          await endJob(env.h, env.A, v.job.jobId, "AUTHORIZATION_REVOKED");
-        } else {
-          assert.equal(outcomes["publication"]?.committed, true);
-          const published = outcomes["publication"]?.act;
-          assert.equal(published?.status === "fulfilled" && (published.value as { kind: string }).kind, "PUBLISHED");
-          assert.deepEqual(await pkgState(), [{ state: "AVAILABLE" }]);
-          assert.deepEqual(await auth("state, revocation_phase, delivered_at IS NOT NULL AS delivered"), [{ state: "REVOKED", revocation_phase: "POST_DELIVERY", delivered: true }]);
-        }
-      },
-    });
+    // each actor is the observed waiter in one order: both on connections the harness opened, as the payment service and the control plane
+    const payment = await openConnection(env.h.pg.clientConfig("kauro_payment_test"));
+    const control = await openConnection(env.h.pg.clientConfig("kauro_control_test"));
+    try {
+      await ctx.bothOrders<VerifiedJob>({
+        oracle: env.h.oracle,
+        actors: [
+          { name: "revocation", client: payment, begin: (c) => bindPayment(c, env.A.agencyId), act: (c, v) => revokeAuthorization(c, env.A, v.p.authorizationId) },
+          { name: "publication", client: control, begin: (c) => bindAgency(c, env.A.agencyId), act: (c, v) => publishRaw(c, v, `r2-045-${v.job.jobId}`) },
+        ],
+        setup: (order) => verifiedJob(`cell-r2-045-${order[0]}-first`),
+        async verify({ order, state: v, outcomes }) {
+          const auth = (columns: string) => oracle(env, `SELECT ${columns} FROM kauro.commercial_authorizations WHERE authorization_id = $1`, [v.p.authorizationId]);
+          const pkgState = () => oracle(env, "SELECT state FROM kauro.package_versions WHERE package_version_id = $1", [v.pkg.packageVersionId]);
+          assert.equal(outcomes["revocation"]?.committed, true, "the revocation commits in either order");
+          if (order[0] === "revocation") {
+            assert.equal(outcomes["publication"]?.act.status, "fulfilled", "the publication writes its edges; the database decides at COMMIT");
+            assert.ok(rejectedWith(outcomes["publication"]?.commit, "KA081"), "no package becomes AVAILABLE under a REVOKED authorization");
+            assert.deepEqual(await auth("state, revocation_phase"), [{ state: "REVOKED", revocation_phase: "DURING_EXECUTION" }]);
+            assert.deepEqual(await pkgState(), [{ state: "VERIFIED_PRIVATE" }]);
+            assert.deepEqual(await oracle(env, "SELECT result FROM kauro.package_verifications WHERE package_version_id = $1", [v.pkg.packageVersionId]), [{ result: "VALID" }]);
+            assert.deepEqual(
+              await oracle(env, "SELECT count(*)::int AS staged, count(*) FILTER (WHERE o.state = 'VERIFIED')::int AS verified FROM kauro.staged_artifacts a JOIN kauro.stored_objects o ON o.object_id = a.object_id JOIN kauro.processing_jobs j ON j.current_attempt_id = a.attempt_id WHERE j.job_id = $1", [v.job.jobId]),
+              [{ staged: 2, verified: 2 }],
+            );
+            assert.deepEqual(await oracle(env, "SELECT count(*)::int AS n FROM kauro.delivery_artifacts WHERE package_version_id = $1", [v.pkg.packageVersionId]), [{ n: 2 }]);
+            assert.deepEqual(await oracle(env, "SELECT count(*)::int AS n FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'commercial_authorization.delivered.v1'", [v.p.authorizationId]), [{ n: 0 }]);
+            await endJob(env.h, env.A, v.job.jobId, "AUTHORIZATION_REVOKED");
+          } else {
+            assert.equal(outcomes["publication"]?.committed, true);
+            const published = outcomes["publication"]?.act;
+            assert.equal(published?.status === "fulfilled" && (published.value as { kind: string }).kind, "PUBLISHED");
+            assert.deepEqual(await pkgState(), [{ state: "AVAILABLE" }]);
+            assert.deepEqual(await auth("state, revocation_phase, delivered_at IS NOT NULL AS delivered"), [{ state: "REVOKED", revocation_phase: "POST_DELIVERY", delivered: true }]);
+          }
+        },
+      });
+    } finally {
+      await payment.end();
+      await control.end();
+    }
   },
 );
 

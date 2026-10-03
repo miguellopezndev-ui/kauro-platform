@@ -9,6 +9,7 @@ import type { Clock } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
 import type { SqlSession } from "../source-lifecycle.js";
 import { TEST_CLOCK_OFFSET_SETTING } from "../temporary-postgres.js";
+import { currentScope, record, sessionKey, tapSession } from "./scope.js";
 
 export type InstantLike = Date | number | string;
 
@@ -35,7 +36,8 @@ export interface ControlledClock extends Clock {
   /** Every forward move, in order: from and to (epoch ms) and its sequence number. */
   readonly moveLog: ReadonlyArray<ClockMove>;
   /**
-   * Every use of the clock by a step: the application read its instant (now, nowMs, date — the Clock port, or an instant a step
+   * Every use of the clock (informational: a cell's proof is what the operation's own scope recorded, docs "Evidence
+   * ownership"): the application read its instant (now, nowMs, date — the Clock port, or an instant a step
    * takes as its parameter) or a transaction's server clock was positioned on it (onServer); with the instant used and its sequence.
    */
   readonly useLog: ReadonlyArray<ClockUse>;
@@ -75,6 +77,9 @@ export function controlledClock(start: InstantLike = Date.now()): ControlledCloc
   };
   const used = (kind: ClockUse["kind"]): number => {
     useLog.push({ kind, at: current, seq: ++seq });
+    // evidence of the operation scope the read happens in (none outside one); a read is no use until a sink consumes it
+    const at = current;
+    record((s) => ({ kind: "CLOCK_READ", at, seq: s }));
     return current;
   };
   return {
@@ -98,6 +103,12 @@ export function controlledClock(start: InstantLike = Date.now()): ControlledCloc
       if (Date.parse(now) !== instant) throw new Error(`the server clock reads ${now}, not the controlled ${toUtcInstant(instant)}`);
       // recorded only once the transaction's server clock demonstrably stands at the instant
       useLog.push({ kind: "SERVER", at: instant, seq: ++seq });
+      // in an operation scope: the application, and from now on the statements of that session, are the scope's evidence
+      const scope = currentScope();
+      if (scope !== undefined && scope.open) {
+        record((s) => ({ kind: "SERVER_APPLIED", at: instant, session: sessionKey(session), seq: s }));
+        tapSession(session, scope);
+      }
       return now;
     },
     get moves() {

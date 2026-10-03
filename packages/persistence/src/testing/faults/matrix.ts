@@ -1,12 +1,16 @@
 /**
  * Failure-matrix cells as tests (docs/design/FAULT-HARNESS.md): one cell { step, fault, expect } becomes one node:test test whose
  * title is the cell and whose body receives a fresh FaultContext (named points, a controlled clock, the interleaving helpers).
- * A cell can never pass unless its fault demonstrably happened at the boundary it names: the helpers record evidence only of what
- * they observed — a lock wait of the operation's own statement, on the connection the harness handed it, on the intended holder,
- * the clock crossing a declared deadline and then being used by an operation the harness ran (ctx.withClock), a crash firing at the
- * cell's commit boundary, a request attempt that ran and settled, a revocation that took effect followed by an operation refused
- * after it, a failure at a point after an earlier step of the same operation completed (an .after point or a committed unit) —
- * and after the body the cell fails (FaultNotInjected) unless its kind's evidence is there and every armed point was reached.
+ * A cell can never pass unless its fault demonstrably happened at the boundary it names. Evidence is owned by an operation: the
+ * operation under test runs in its own scope (ctx.operation, and every helper that runs one), every evidence source records into
+ * the scope it happens in (scope.ts), and a check reads only the scopes of this cell's operations — evidence produced outside
+ * them, by a concurrent unrelated call, never counts. The proofs: a lock wait of the operation's own tagged statement on a
+ * connection the harness opened, blocked by the intended holder; the clock crossing a declared deadline and the instant past it
+ * consumed by an operation (it reached an instrumented call's arguments, or a statement ran after onServer put it on the
+ * transaction); a crash firing at the cell's commit boundary inside an operation; a request attempt that ran and settled; a
+ * revocation that took effect followed by an operation refused after it; a failure at a point after an earlier step of the same
+ * operation completed — and after the body the cell fails (FaultNotInjected) unless its kind's evidence is there and every
+ * armed point was reached.
  * `faultMatrix` registers a whole matrix and refuses one whose cells and bodies do not map 1:1.
  */
 import { test, type TestOptions } from "node:test";
@@ -14,8 +18,9 @@ import type { Client } from "pg";
 import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
 import { controlledClock, epochMs, type ControlledClock, type InstantLike } from "./clock.js";
-import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, sequentially, settledOrderOf, type ActorOutcome, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
-import { FaultPoints, commitCrashesOf, completedStepsOf, crashedAt, terminateBackend } from "./points.js";
+import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, producedIn, sequentially, settledOrderOf, type ActorOutcome, type HarnessConnection, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
+import { FaultPoints, armCrashIn, crashedAt, terminateBackend } from "./points.js";
+import { consumedInstants, inScope, type OperationScope, type ScopeEvent } from "./scope.js";
 import type { SqlSession } from "../source-lifecycle.js";
 import type { Clock } from "@kauro/domain";
 
@@ -52,13 +57,20 @@ export function cellTitle(cell: MatrixCell): string {
 }
 
 /**
- * The clock an operation under test receives from ctx.withClock: the cell's controlled clock, read (now, nowMs, date) or put on the
- * operation's transaction (onServer) only while that operation runs. Each use is the cell's evidence that the operation used the
- * clock at that instant; once the operation settled the step clock refuses every use.
+ * The clock an operation under test receives (ctx.operation, ctx.withClock): the cell's controlled clock, read (now, nowMs, date)
+ * or put on the operation's transaction (onServer) only while that operation runs; once it settled the step clock refuses every
+ * use. A read is recorded in the operation's scope but proves nothing until the operation consumes the instant.
  */
 export interface StepClock extends Clock {
   date(): Date;
   onServer(session: SqlSession): Promise<string>;
+}
+
+/** The operation under test, as ctx.operation runs it: its scope id and name, and its step clock. */
+export interface Operation {
+  readonly id: string;
+  readonly name: string;
+  readonly clock: StepClock;
 }
 
 /** What one cell's body works with; the helpers record what they observed so the cell can check its fault happened. */
@@ -68,18 +80,23 @@ export interface FaultContext {
   readonly clock: ControlledClock;
   /**
    * Declares a deadline the cell's fault crosses (an expiry, a lease's time to live, a provider-call timeout). Every declared
-   * deadline must be crossed by one move of the clock (before < deadline <= after) and then used at or past it by an operation run
-   * through ctx.withClock (its step clock read for the instant the operation takes, or put on the transaction it runs in with
-   * onServer); a read of ctx.clock or an onServer in the body itself is never a use. Expiry and timeout cells need one.
+   * deadline must be crossed by one move of the clock (before < deadline <= after) and an instant at or past it then CONSUMED by
+   * an operation of this cell: within the operation's scope, the instant read from the clock reaches the arguments of an
+   * instrumented call (instrumentPort: a repository or port taking it as p_now), or onServer puts it on a transaction in which a
+   * statement of the operation then executes. A read whose value reaches no sink, or anything in the body outside an operation, is
+   * never a use. Expiry and timeout cells need one.
    */
   deadline(instant: InstantLike, what?: string): UtcInstant;
   /**
-   * Runs the operation under test with a step clock bound to this cell: the only way an operation uses the controlled clock as a
-   * cell's evidence. Every read or onServer of the step clock while the operation runs is recorded once the operation settled.
+   * Runs the operation under test in its own operation scope (a unique id; node:async_hooks AsyncLocalStorage): every evidence
+   * source records into the scope it happens in, and the cell's checks read only its operations' scopes (docs "Evidence
+   * ownership"). The operation receives its step clock.
    */
+  operation<T>(name: string, fn: (op: Operation) => Promise<T>): Promise<T>;
+  /** ctx.operation, handing the operation only its step clock. */
   withClock<T>(what: string, operation: (clock: StepClock) => Promise<T>): Promise<T>;
-  /** mustWait (the operation runs on probe.waiter, handed to it by the harness), counted as an observed wait. */
-  mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: Client) => Promise<T>, what: string, limitMs?: number): Promise<Waiting<T>>;
+  /** mustWait (the operation runs on probe.waiter, a connection the harness opened), counted as an observed wait. */
+  mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: HarnessConnection) => Promise<T>, what: string, limitMs?: number): Promise<Waiting<T>>;
   /** bothOrders, each order counted as an observed wait. */
   bothOrders<S>(scenario: RaceScenario<S>): Promise<readonly [RaceRun<S>, RaceRun<S>]>;
   /** inOrder, counted as an observed wait. */
@@ -102,10 +119,11 @@ export interface FaultContext {
    */
   fenced(what: string, operation: (() => Promise<unknown>) | ActorOutcome, refusal: (e: unknown) => boolean): Promise<unknown>;
   /**
-   * A partial failure: arms a crash at the point `at`, runs `operation`, and requires it to fail there strictly after a step of the
-   * same run COMPLETED — an instrumented port's `.after` point or a crashableFactory's `.after-commit` passed without a crash (the
-   * call answered, the unit committed). A `.before` point, the failing call's own `.after` or a point passed by hand is no completed
-   * step. Returns the failure; the body asserts what survived.
+   * A partial failure: runs `operation` in its own scope with a crash armed at the point `at` for that scope only, and requires it
+   * to fail there strictly after a step of the SAME operation COMPLETED — an instrumented port's `.after` point or a
+   * crashableFactory's `.after-commit` passed without a crash in the operation's scope (the call answered, the unit committed). A
+   * `.before` point, the failing call's own `.after`, a point passed by hand or a step completed by any call outside the operation
+   * (concurrent or not) is no completed step. Returns the failure; the body asserts what survived.
    */
   partial(what: string, at: string, operation: () => Promise<unknown>): Promise<unknown>;
   /** terminateBackend (recorded in points.crashes; never a crash at a commit boundary). */
@@ -132,8 +150,8 @@ export type CellBody = (ctx: FaultContext) => Promise<void>;
 
 interface Evidence {
   readonly deadlines: Array<{ readonly at: number; readonly what: string }>;
-  /** The instants operations run through ctx.withClock used (recorded once each operation settled). */
-  readonly clockUses: Array<{ readonly at: number; readonly what: string }>;
+  /** The scopes of this cell's operations: the only evidence its checks read. */
+  readonly scopes: OperationScope[];
   readonly revocations: number[];
   fenced: number;
   partials: number;
@@ -141,25 +159,58 @@ interface Evidence {
 
 const evidenceOf = new WeakMap<FaultContext, Evidence>();
 
-/** When the harness's interleaving settled `outcome` (a fenced actor must have settled after the revocation). */
-function settledOrder(outcome: ActorOutcome, what: string): number {
+/** Every event the cell's operations recorded (an event of a nested operation appears once), in order. */
+function ownEvents(evidence: Evidence): ScopeEvent[] {
+  const seen = new Set<ScopeEvent>();
+  for (const scope of evidence.scopes) for (const e of scope.events) seen.add(e);
+  return [...seen].sort((x, y) => x.seq - y.seq);
+}
+
+/** When the harness's interleaving settled `outcome`, produced inside one of this cell's operations (ctx.inOrder, ctx.bothOrders). */
+function settledOrder(outcome: ActorOutcome, what: string, evidence: Evidence): number {
   const order = settledOrderOf(outcome);
   if (order === undefined) throw new FaultNotInjected(`${what}: not an outcome the harness's interleaving produced`);
+  const scope = producedIn(outcome);
+  if (!evidence.scopes.some((s) => s.encloses(scope))) throw new FaultNotInjected(`${what}: an outcome produced outside this cell's operations (ctx.inOrder, ctx.bothOrders)`);
   return order;
 }
 
 function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
   const points = new FaultPoints();
   const clock = controlledClock(options.clockStart);
-  const evidence: Evidence = { deadlines: [], clockUses: [], revocations: [], fenced: 0, partials: 0 };
+  const evidence: Evidence = { deadlines: [], scopes: [], revocations: [], fenced: 0, partials: 0 };
   let observedWaits = 0;
   let attempts = 0;
+  /** Runs `fn` as an operation of this cell: a new scope (nested in the current one, if any), owned by the cell. */
+  const own = <T>(name: string, fn: (scope: OperationScope) => Promise<T>): Promise<T> =>
+    inScope(name, (scope) => {
+      evidence.scopes.push(scope);
+      return fn(scope);
+    });
   const counted = <A extends unknown[], T>(request: (...args: A) => Promise<T>) => async (...args: A): Promise<T> => {
     try {
-      return await request(...args);
+      return await own("attempt", () => request(...args));
     } finally {
       attempts += 1;
     }
+  };
+  const stepClock = (scope: OperationScope, what: string): StepClock => {
+    const usable = () => {
+      if (!scope.open) throw new Error(`the step clock of ${what} is closed: the operation settled, a later read is no use by it`);
+    };
+    const read = (): number => {
+      usable();
+      return clock.nowMs();
+    };
+    return {
+      now: () => toUtcInstant(read()),
+      nowMs: read,
+      date: () => new Date(read()),
+      async onServer(session) {
+        usable();
+        return clock.onServer(session);
+      },
+    };
   };
   const ctx: FaultContext = {
     cell,
@@ -170,49 +221,20 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       evidence.deadlines.push({ at, what });
       return toUtcInstant(at);
     },
-    async withClock(what, operation) {
-      let open = true;
-      const uses: number[] = [];
-      const usable = () => {
-        if (!open) throw new Error(`the step clock of ${what} is closed: the operation settled, a later read is no use by it`);
-      };
-      const read = (): number => {
-        usable();
-        const at = clock.nowMs();
-        uses.push(at);
-        return at;
-      };
-      const step: StepClock = {
-        now: () => toUtcInstant(read()),
-        nowMs: read,
-        date: () => new Date(read()),
-        async onServer(session) {
-          usable();
-          const now = await clock.onServer(session);
-          uses.push(Date.parse(now));
-          return now;
-        },
-      };
-      try {
-        return await operation(step);
-      } finally {
-        open = false;
-        // the operation ran and settled: what it read of the clock is evidence
-        for (const at of uses) evidence.clockUses.push({ at, what });
-      }
-    },
+    operation: (name, fn) => own(name, (scope) => fn({ id: scope.id, name, clock: stepClock(scope, name) })),
+    withClock: (what, operation) => ctx.operation(what, (op) => operation(op.clock)),
     async mustWait(oracle, probe, operation, what, limitMs) {
-      const waiting = await mustWait(oracle, probe, operation, what, limitMs);
+      const waiting = await own(`wait: ${what}`, () => mustWait(oracle, probe, operation, what, limitMs));
       observedWaits += 1;
       return waiting;
     },
     async bothOrders(scenario) {
-      const runs = await bothOrders(scenario);
+      const runs = await own("both orders", () => bothOrders(scenario));
       observedWaits += 2;
       return runs;
     },
     async inOrder(scenario, first) {
-      const run = await inOrder(scenario, first);
+      const run = await own(`${first} first`, () => inOrder(scenario, first));
       observedWaits += 1;
       return run;
     },
@@ -221,12 +243,12 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
     attempt: (request) => counted(request)(),
     async revoked(what, revocation) {
       if (typeof revocation === "function") {
-        const out = await revocation();
+        const out = await own(`revocation ${what}`, () => revocation());
         // anything the interleavings settle from now on settled after this revocation took effect
         evidence.revocations.push(lastSettledOrder());
         return out;
       }
-      const order = settledOrder(revocation, `revocation ${what}`);
+      const order = settledOrder(revocation, `revocation ${what}`, evidence);
       if (!revocation.committed) throw new FaultNotInjected(`revocation ${what} did not commit`);
       evidence.revocations.push(order);
       return undefined;
@@ -238,14 +260,14 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       if (typeof operation === "function") {
         let ran = false;
         try {
-          await operation();
+          await own(`fenced ${what}`, () => operation());
           ran = true;
         } catch (e) {
           reason = e;
         }
         if (ran) throw new FaultNotInjected(`${what} was not refused after the revocation`);
       } else {
-        const order = settledOrder(operation, what);
+        const order = settledOrder(operation, what, evidence);
         if (order <= firstRevocation) throw new FaultNotInjected(`${what} settled before the revocation took effect`);
         if (operation.committed) throw new FaultNotInjected(`${what} committed after the revocation`);
         reason = operation.commit?.status === "rejected" ? operation.commit.reason : operation.act.status === "rejected" ? operation.act.reason : undefined;
@@ -255,22 +277,27 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       return reason;
     },
     async partial(what, at, operation) {
-      points.crash(at);
-      const from = points.passed.length;
       let failure: unknown;
       let ran = false;
+      let scope: OperationScope | undefined;
       try {
-        await operation();
+        await own(`partial ${what}`, (s) => {
+          scope = s;
+          // armed for this operation only: the same point passed by any other call passes unarmed
+          armCrashIn(points, at, s);
+          return operation();
+        });
         ran = true;
       } catch (e) {
         failure = e;
       }
       if (ran) throw new FaultNotInjected(`${what} completed: it never failed at ${at}`);
       if (!crashedAt(at)(failure)) throw new FaultNotInjected(`${what} failed, but not at ${at}: ${failure instanceof Error ? failure.message : String(failure)}`);
-      const failedAt = points.passed.indexOf(at, from);
-      // a step completed in this run, strictly before the failure point: an .after point or a committed unit passed without a crash
-      const completed = completedStepsOf(points).some((position) => position >= from && position < failedAt);
-      if (failedAt < 0 || !completed) throw new FaultNotInjected(`${what} failed at ${at} before any earlier step of it completed (no instrumented call answered, no unit committed before it): nothing was partial`);
+      // the crash fired in this operation's scope, and a step completed in that same scope strictly before it
+      const events = scope?.events ?? [];
+      const crash = events.find((e) => e.kind === "CRASH" && e.name === at);
+      const completed = crash !== undefined && events.some((e) => e.kind === "COMPLETED" && e.seq < crash.seq);
+      if (!completed) throw new FaultNotInjected(`${what} failed at ${at} before any earlier step of it completed (no instrumented call of the operation answered, no unit of it committed before it): nothing was partial`);
       evidence.partials += 1;
       return failure;
     },
@@ -287,15 +314,18 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
 }
 
 /**
- * Why every declared deadline is proven crossed and used, or the first one that is not. The clock never moves backwards, so an
- * instant at or past the deadline was used after the move that crossed it; only an operation run through ctx.withClock uses it.
+ * Why every declared deadline is proven crossed and consumed, or the first one that is not. The clock never moves backwards, so an
+ * instant at or past the deadline was read after the move that crossed it; it counts only once an operation of this cell
+ * consumed it within its own scope (scope.ts consumedInstants: it reached an instrumented call's arguments, or a statement of the
+ * operation ran after onServer put it on the transaction).
  */
 function deadlineGap(ctx: FaultContext, evidence: Evidence): string | undefined {
   const moves = ctx.clock.moveLog;
+  const consumed = evidence.scopes.flatMap((scope) => consumedInstants(scope.events));
   for (const d of evidence.deadlines) {
     const crossing = moves.find((m) => m.from < d.at && d.at <= m.to);
     if (crossing === undefined) return `the clock never crossed the ${d.what} ${toUtcInstant(d.at)} (no move from before it to at or past it)`;
-    if (!evidence.clockUses.some((u) => u.at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no operation run through ctx.withClock read it or put it on its transaction; a read or onServer in the body is no use)`;
+    if (!consumed.some((at) => at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no operation consumed an instant at or past it: a read must reach an instrumented call's arguments, or onServer a transaction in which the operation then ran a statement; a discarded read or anything outside an operation is no use)`;
   }
   return undefined;
 }
@@ -305,7 +335,8 @@ function assertInjected(ctx: FaultContext): void {
   const { fault, at } = ctx.cell;
   const evidence = evidenceOf.get(ctx);
   if (evidence === undefined) throw new Error("a FaultContext of another run");
-  const commits = commitCrashesOf(ctx.points);
+  // the commit crashes this cell's operations recorded (a crash outside them is in none of their scopes)
+  const commits = ownEvents(evidence).flatMap((e) => (e.kind === "COMMIT_CRASH" ? [e] : []));
   const missing =
     deadlineGap(ctx, evidence) ??
     (fault === "race" && ctx.observedWaits === 0
@@ -313,9 +344,9 @@ function assertInjected(ctx: FaultContext): void {
       : (fault === "expiry" || fault === "timeout") && evidence.deadlines.length === 0
         ? "no deadline was declared (ctx.deadline), so no crossing can be proven"
         : fault === "crash-before-commit" && !commits.some((c) => c.name === at && c.boundary === "BEFORE_COMMIT")
-          ? `no crash fired at ${at}.before-commit with COMMIT never issued`
+          ? `no crash fired at ${at}.before-commit with COMMIT never issued, inside an operation of this cell (ctx.operation)`
           : fault === "crash-after-commit" && !commits.some((c) => c.name === at && c.boundary === "AFTER_COMMIT")
-            ? `no crash fired at ${at}.after-commit once COMMIT answered COMMIT`
+            ? `no crash fired at ${at}.after-commit once COMMIT answered COMMIT, inside an operation of this cell (ctx.operation)`
             : fault === "retry" && ctx.attempts < 2
               ? `the request ran and settled ${ctx.attempts} time(s), never repeated`
               : fault === "revocation" && (evidence.revocations.length === 0 || evidence.fenced === 0)

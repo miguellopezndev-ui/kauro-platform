@@ -6,8 +6,9 @@
  * interleaving whose wait is not observed throws InterleavingNotObserved: a race test never passes on an order that did not
  * happen. Duplicates and retries of the same request run through `concurrently` and `sequentially`, which report every outcome.
  */
-import type { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 import { connectionPid } from "./points.js";
+import { currentScope, inScope, recordStatement, registerSession, settleStatement, statementText, trackSettlement, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
 
 export class InterleavingNotObserved extends Error {
   constructor(message: string) {
@@ -17,13 +18,127 @@ export class InterleavingNotObserved extends Error {
 }
 
 /**
- * Which wait must be seen: the waiter is the operation's own connection — the harness hands it to the operation and the operation
- * runs on it alone (its backend pid is the one the server announced, connectionPid) — and the holder is the backend pid of the
- * intended holder, which must be among the waiter's blockers (pg_blocking_pids). A bare pid is never a waiter: nothing ties it to
- * the operation.
+ * A connection the harness opened itself (openConnection) and hands out only as this proxy: its `query` is the harness's, so no
+ * query method of the underlying client — bound earlier or cached — exists anywhere. Every statement issued through it inside an
+ * operation scope is prefixed with a unique comment `fault-op:<scope id>:<n>` and recorded in that scope, dispatched only once the
+ * driver actually sent it (not while queued behind another statement). Outside any scope it is a plain connection.
+ */
+export type HarnessConnection = Client;
+
+interface Connection {
+  readonly raw: Client;
+  /** The operation the connection is dedicated to while mustWait observes it (statements from outside its scope are refused). */
+  dedicatedTo: OperationScope | undefined;
+}
+
+const connections = new WeakMap<object, Connection>();
+/** The driver's query object behind each tagged statement (to tell the statement the driver is running from one still queued). */
+const driverQuery = new WeakMap<StatementEvent, object>();
+
+interface DriverInternals {
+  _activeQuery?: object | null;
+  _queryQueue?: Array<{ submit: (...a: unknown[]) => unknown }>;
+}
+
+function refuse(args: unknown[], refusal: Error): unknown {
+  const callback = args.find((x) => typeof x === "function") as ((e: Error) => void) | undefined;
+  if (callback !== undefined) {
+    queueMicrotask(() => callback(refusal));
+    return undefined;
+  }
+  return Promise.reject(refusal);
+}
+
+/** Opens a connection with `config` and returns it only as a HarnessConnection; the caller ends it (end()). */
+export async function openConnection(config: ClientConfig): Promise<HarnessConnection> {
+  const raw = new Client(config);
+  await raw.connect();
+  const conn: Connection = { raw, dedicatedTo: undefined };
+  const realQuery = Client.prototype.query as (...args: unknown[]) => unknown;
+  const internals = raw as unknown as DriverInternals;
+  const holder: { proxy?: Client } = {};
+  const query = (...input: unknown[]): unknown => {
+    const scope = currentScope();
+    const inside = scope !== undefined && scope.open ? scope : undefined;
+    if (conn.dedicatedTo !== undefined && !conn.dedicatedTo.encloses(inside)) {
+      return refuse(input, new Error(`the connection (backend ${connectionPid(raw)}) is dedicated to the operation ${conn.dedicatedTo.name} until it settles: a statement outside it is refused`));
+    }
+    const args = [...input];
+    let issued: IssuedStatement | undefined;
+    if (inside !== undefined) {
+      const config = args[0];
+      const text = statementText(config);
+      // a submittable or a named prepared statement cannot carry a per-call tag: it is recorded untagged (never a wait's proof)
+      const taggable = text !== undefined && !(typeof config === "object" && config !== null && ("submit" in config || "name" in config));
+      const tag = taggable ? inside.nextTag() : undefined;
+      if (tag !== undefined && text !== undefined) {
+        const tagged = `/* ${tag} */ ${text}`;
+        args[0] = typeof config === "string" ? tagged : { ...(config as object), text: tagged };
+      }
+      issued = recordStatement(holder.proxy as object, statementText(args[0]), tag);
+      const cb = args.findIndex((x) => typeof x === "function");
+      if (issued !== undefined && cb >= 0) {
+        const original = args[cb] as (...a: unknown[]) => unknown;
+        const done = issued;
+        args[cb] = (...a: unknown[]) => {
+          settleStatement(done);
+          return original(...a);
+        };
+      }
+    }
+    const activeBefore = internals._activeQuery ?? null;
+    const queuedBefore = internals._queryQueue?.length ?? 0;
+    const out = realQuery.apply(raw, args);
+    if (issued !== undefined) {
+      const event = issued.event;
+      const active = internals._activeQuery ?? null;
+      const queue = internals._queryQueue ?? [];
+      if (active !== null && active !== activeBefore) {
+        // the connection was free: the driver sent it at once
+        driverQuery.set(event, active);
+        event.dispatched = true;
+      } else if (queue.length > queuedBefore) {
+        // queued behind another statement: dispatched only when the driver submits it
+        const q = queue[queue.length - 1]!;
+        driverQuery.set(event, q);
+        const submit = q.submit;
+        q.submit = function (this: unknown, ...a: unknown[]) {
+          event.dispatched = true;
+          return submit.apply(this, a);
+        };
+      }
+      trackSettlement(issued, out);
+    }
+    return out;
+  };
+  const proxy = new Proxy(raw, {
+    get(target, prop) {
+      if (prop === "query") return query;
+      const value: unknown = Reflect.get(target, prop, target);
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+    set(target, prop, value) {
+      if (prop === "query") return false;
+      return Reflect.set(target, prop, value, target);
+    },
+    defineProperty(target, prop, descriptor) {
+      if (prop === "query") return false;
+      return Reflect.defineProperty(target, prop, descriptor);
+    },
+  });
+  holder.proxy = proxy;
+  connections.set(proxy, conn);
+  registerSession(proxy, raw);
+  return proxy;
+}
+
+/**
+ * Which wait must be seen: the waiter is a connection the harness opened (openConnection) — the harness hands it to the operation
+ * and the operation runs in its own scope — and the holder is the backend pid of the intended holder, which must be among the
+ * waiter's blockers (pg_blocking_pids). A bare pid or a client the harness did not open is never a waiter.
  */
 export interface WaitProbe {
-  readonly waiter: Client;
+  readonly waiter: HarnessConnection;
   readonly holder: number;
 }
 
@@ -32,111 +147,56 @@ export interface Waiting<T> {
   readonly pending: Promise<PromiseSettledResult<T>>;
 }
 
-/** The connections currently dedicated to an operation under observation. */
-const dedicated = new WeakSet<Client>();
-
-/** The text of a statement as pg_stat_activity shows it (the query text sent), when the call names one. */
-function statementText(config: unknown): string | undefined {
-  if (typeof config === "string") return config;
-  const text = typeof config === "object" && config !== null ? (config as { text?: unknown }).text : undefined;
-  return typeof text === "string" ? text : undefined;
-}
-
-/** pg_stat_activity keeps the first track_activity_query_size bytes of a statement (1024 by default). */
-function sameStatement(observed: string, issued: string): boolean {
-  return observed === issued || (observed.length >= 1000 && issued.startsWith(observed));
-}
-
 /**
- * Runs `operation` on the waiter connection, handed to it by the harness, until that connection's backend waits — in a statement the
- * operation issued — on a lock held by `probe.holder` (pg_stat_activity wait_event_type 'Lock', its query one of the operation's
- * statements still running, and pg_blocking_pids(waiter) containing holder), and returns `{ pending }`, the operation's eventual
- * outcome (a promise that never rejects; the caller ends the holder, then awaits it).
+ * Runs `operation` in its own operation scope on the waiter connection, handed to it by the harness, until that connection's
+ * backend waits on a lock held by `probe.holder` in a statement of the operation, and returns `{ pending }`, the operation's
+ * eventual outcome (a promise that never rejects; the caller ends the holder, then awaits it).
  *
- * The wait is bound to the operation: the waiter must be a connection (never a bare pid) that is idle when the operation starts —
- * no statement of it running or queued, client or server side — and while the operation runs the connection is the operation's
- * alone: a statement issued on it other than through the handle the operation received is refused (rejected, never sent). If the
- * operation settles before such a wait is seen (checked again after every look), or none is seen within `limitMs` — it runs freely,
- * or waits on someone else — it throws InterleavingNotObserved naming `what` and gives the connection back.
+ * The wait is bound to the operation by evidence it alone produces: the backend's pg_stat_activity row (wait_event_type 'Lock')
+ * shows a query that starts with the unique tag comment `fault-op:<id>:<n>` the waiter connection gave a statement the operation
+ * issued in its scope, that statement is the one the driver is running (dispatched, not queued, not settled), and
+ * pg_blocking_pids(waiter) contains the holder. The connection must be idle when the operation starts (client and server side),
+ * and while the operation runs a statement issued on it from outside the operation's scope is refused. If the operation settles
+ * before such a wait is seen (checked again after every look), the backend waits in a statement that is not the operation's, or
+ * none is seen within `limitMs`, it throws InterleavingNotObserved naming `what` and gives the connection back.
  */
-export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: Client) => Promise<T>, what: string, limitMs = 10_000): Promise<Waiting<T>> {
+export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (client: HarnessConnection) => Promise<T>, what: string, limitMs = 10_000): Promise<Waiting<T>> {
   const waiter = probe.waiter as unknown;
-  if (typeof waiter !== "object" || waiter === null || typeof (waiter as Client).query !== "function") {
-    throw new InterleavingNotObserved(`${what}: the waiter must be the connection the harness hands the operation, not ${typeof waiter === "number" ? `the bare pid ${waiter}` : String(waiter)}: nothing ties it to the operation`);
+  const conn = typeof waiter === "object" && waiter !== null ? connections.get(waiter) : undefined;
+  if (conn === undefined) {
+    throw new InterleavingNotObserved(`${what}: the waiter must be a connection the harness opened (openConnection) and hands the operation, not ${typeof waiter === "number" ? `the bare pid ${waiter}` : "a client opened elsewhere"}: nothing ties it to the operation`);
   }
   if (typeof operation !== "function") throw new InterleavingNotObserved(`${what}: the operation is a function the harness runs on the waiter's connection, not a promise started elsewhere`);
-  const client = waiter as Client;
-  if (client === oracle) throw new Error(`${what}: the oracle observes, it never waits`);
-  const waiterPid = connectionPid(client);
+  const handle = waiter as HarnessConnection;
+  const raw = conn.raw;
+  if (handle === oracle || raw === oracle) throw new Error(`${what}: the oracle observes, it never waits`);
+  const waiterPid = connectionPid(raw);
   if (!Number.isInteger(probe.holder) || probe.holder <= 0) throw new Error(`${what}: the holder's backend pid is required`);
   if (waiterPid === probe.holder) throw new Error(`${what}: a backend cannot wait on itself`);
-  if (dedicated.has(client)) throw new Error(`${what}: the connection is already dedicated to another operation`);
+  if (conn.dedicatedTo !== undefined) throw new Error(`${what}: the connection is already dedicated to another operation`);
 
-  // the connection becomes the operation's alone: the handle reaches the real query, the connection itself refuses every statement
-  const slot = client as unknown as { query: unknown };
-  const realQuery = client.query as (...args: unknown[]) => unknown;
-  const ownQuery = Object.prototype.hasOwnProperty.call(client, "query");
-  dedicated.add(client);
-  slot.query = (...args: unknown[]) => {
-    const refusal = new Error(`the connection (backend ${waiterPid}) is dedicated to the operation ${what} until it settles: a statement outside it is refused`);
-    const callback = args.find((x) => typeof x === "function") as ((e: Error) => void) | undefined;
-    if (callback !== undefined) {
-      queueMicrotask(() => callback(refusal));
-      return undefined;
-    }
-    return Promise.reject(refusal);
-  };
-  let given = false;
+  // idle before the operation starts: a statement already running or queued on the connection is not the operation's
+  const internals = raw as unknown as DriverInternals;
+  const busy = () => internals._activeQuery != null || (internals._queryQueue?.length ?? 0) > 0;
+  if (busy()) throw new InterleavingNotObserved(`${what}: the connection is busy with an earlier statement before the operation started: a wait seen there is not the operation's`);
+  const idle = await oracle.query<{ state: string | null }>("SELECT state FROM pg_stat_activity WHERE pid = $1", [waiterPid]);
+  const state = idle.rows[0]?.state;
+  if (state !== "idle" && state !== "idle in transaction") throw new InterleavingNotObserved(`${what}: the connection's backend is busy (${state ?? "gone"}) before the operation started: a wait seen there is not the operation's`);
+  if (busy()) throw new InterleavingNotObserved(`${what}: a statement was issued on the connection while the harness checked it was idle: a wait seen there is not the operation's`);
+
+  let scope: OperationScope | undefined;
   const giveBack = () => {
-    if (given) return;
-    given = true;
-    if (ownQuery) slot.query = realQuery;
-    else delete (slot as { query?: unknown }).query;
-    dedicated.delete(client);
+    if (scope !== undefined && conn.dedicatedTo === scope) conn.dedicatedTo = undefined;
   };
-  /** The operation's statements still running, in the order it issued them. */
-  const running: Array<{ readonly text: string | undefined }> = [];
-  const handle = new Proxy(client, {
-    get(target, prop) {
-      if (prop === "query") {
-        return (...args: unknown[]) => {
-          const out = realQuery.apply(target, args);
-          if (out !== null && typeof out === "object" && typeof (out as Promise<unknown>).then === "function") {
-            const entry = { text: statementText(args[0]) };
-            running.push(entry);
-            const done = () => {
-              const i = running.indexOf(entry);
-              if (i >= 0) running.splice(i, 1);
-            };
-            (out as Promise<unknown>).then(done, done);
-          }
-          return out;
-        };
-      }
-      const value: unknown = Reflect.get(target, prop, target);
-      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
-    },
-  });
-
-  try {
-    // idle before the operation starts: a statement already running or queued on the connection is not the operation's
-    const internals = client as unknown as { _activeQuery?: unknown; _queryQueue?: unknown[] };
-    if (internals._activeQuery != null || (internals._queryQueue?.length ?? 0) > 0) throw new InterleavingNotObserved(`${what}: the connection is busy with an earlier statement before the operation started: a wait seen there is not the operation's`);
-    const idle = await oracle.query<{ state: string | null }>("SELECT state FROM pg_stat_activity WHERE pid = $1", [waiterPid]);
-    const state = idle.rows[0]?.state;
-    if (state !== "idle" && state !== "idle in transaction") throw new InterleavingNotObserved(`${what}: the connection's backend is busy (${state ?? "gone"}) before the operation started: a wait seen there is not the operation's`);
-  } catch (e) {
-    giveBack();
-    throw e;
-  }
-
   let outcome: PromiseSettledResult<T> | undefined;
-  let started: Promise<T>;
-  try {
-    started = Promise.resolve(operation(handle));
-  } catch (e) {
-    started = Promise.reject(e);
-  }
+  // the operation runs in its own scope; the connection is its alone from its first statement on
+  const started = inScope(`mustWait ${what}`, (s) => {
+    scope = s;
+    conn.dedicatedTo = s;
+    return operation(handle);
+  });
+  const own = scope as OperationScope | undefined;
+  if (own === undefined) throw new Error("the operation scope was not opened");
   const pending = started.then(
     (value): PromiseSettledResult<T> => {
       giveBack();
@@ -162,9 +222,10 @@ export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (
       const row = r.rows[0];
       if (row?.waiting === true) {
         const statement = row.query ?? "";
-        if (!running.some((s) => s.text !== undefined && sameStatement(statement, s.text))) {
-          throw new InterleavingNotObserved(`${what}: the connection waits in a statement the operation is not running (${statement.slice(0, 120)})`);
-        }
+        // the operation's own statement: its unique tag, issued in its scope on this connection, and the one the driver is running
+        const mine = own.events.find((e): e is StatementEvent => e.kind === "STATEMENT" && e.session === raw && e.tag !== undefined && statement.startsWith(`/* ${e.tag} */`));
+        if (mine === undefined) throw new InterleavingNotObserved(`${what}: the connection waits in a statement the operation did not issue (${statement.slice(0, 120)})`);
+        if (!mine.dispatched || mine.settled || internals._activeQuery !== driverQuery.get(mine)) throw new InterleavingNotObserved(`${what}: the waiting statement is not the one the driver is running for the operation`);
         if (row.blockers.map(Number).includes(probe.holder)) return { pending };
         seen = `waited on ${row.blockers.join(", ") || "nobody"}, never on the holder ${probe.holder}`;
       }
@@ -178,10 +239,11 @@ export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (
   }
 }
 
-/** One actor of a two-actor race: a dedicated connection, how its transaction is opened, and the contended write. */
+/** One actor of a two-actor race: a connection the harness opened, how its transaction is opened, and the contended write. */
 export interface TxActor<S> {
   readonly name: string;
-  readonly client: Client;
+  /** A connection the harness opened (openConnection): each actor is the observed waiter in one order of bothOrders. */
+  readonly client: HarnessConnection;
   /** Runs right after BEGIN (bind the actor's context, position its TEST CLOCK). */
   begin?(client: Client, state: S): Promise<void>;
   /** The write that takes (or waits for) the contended lock, inside the open transaction. */
@@ -210,6 +272,13 @@ export class TransactionNotCommitted extends Error {
 /** The order in which the harness settled each actor outcome it produced (module-private: a body cannot forge one). */
 const outcomeOrder = new WeakMap<ActorOutcome, number>();
 let outcomeSeq = 0;
+/** The operation scope each outcome was produced in (a cell credits only outcomes of its own interleavings). */
+const outcomeScope = new WeakMap<ActorOutcome, OperationScope>();
+
+/** The operation scope the harness produced `outcome` in, or undefined (produced outside any scope, or not by the harness). */
+export function producedIn(outcome: ActorOutcome): OperationScope | undefined {
+  return outcomeScope.get(outcome);
+}
 
 /** When the harness settled `outcome` (a sequence number), or undefined for an object the harness did not produce. */
 export function settledOrderOf(outcome: ActorOutcome): number | undefined {
@@ -257,6 +326,8 @@ async function settle<T>(p: Promise<T>): Promise<PromiseSettledResult<T>> {
 
 function produced(outcome: ActorOutcome): ActorOutcome {
   outcomeOrder.set(outcome, ++outcomeSeq);
+  const scope = currentScope();
+  if (scope !== undefined) outcomeScope.set(outcome, scope);
   return outcome;
 }
 

@@ -7,6 +7,7 @@
  * reached is a failed test, never a silent pass (assertAllReached). A crash is recorded only when it fires in the code under test.
  */
 import type { Client } from "pg";
+import { currentScope, record, type OperationScope } from "./scope.js";
 
 /** A simulated process death at a named point: not a DomainFailure, so a unit of work rolls back and a transport answers 500. */
 export class SimulatedCrash extends Error {
@@ -67,6 +68,8 @@ export interface ArmedCrash {
 
 interface Armed {
   readonly kind: "PAUSE" | "CRASH";
+  /** Fires only for a pass inside this operation scope (or one nested in it); elsewhere the point passes unarmed. */
+  readonly scope: OperationScope | undefined;
   readonly reached: () => void;
   readonly release: Promise<void>;
 }
@@ -83,42 +86,22 @@ export interface CommitCrash {
   readonly boundary: "BEFORE_COMMIT" | "AFTER_COMMIT";
 }
 
-/** The commit crashes of each FaultPoints, written only by crashableFactory (module-private: a test body cannot forge one). */
-const commitCrashes = new WeakMap<object, CommitCrash[]>();
-
-/** The crashes crashableFactory recorded at its commit boundaries for `points`, in order (the matrix cells' crash proof). */
-export function commitCrashesOf(points: FaultPoints): ReadonlyArray<CommitCrash> {
-  return [...(commitCrashes.get(points) ?? [])];
-}
-
-function recordCommitCrash(points: FaultPoints, crash: CommitCrash): void {
-  const list = commitCrashes.get(points) ?? [];
-  list.push(crash);
-  commitCrashes.set(points, list);
+/** A crash crashableFactory saw fire at its commit boundary, recorded in the operation scope it fired in (the crash cells' proof). */
+function recordCommitCrash(crash: CommitCrash): void {
+  record((seq) => ({ kind: "COMMIT_CRASH", name: crash.name, boundary: crash.boundary, seq }));
 }
 
 /**
- * The steps that completed for each FaultPoints, as positions in its `passed` log: an instrumented port's `.after` point passed
- * without a crash once the real method answered, or a crashableFactory's `.after-commit` point passed without a crash once the
- * factory resolved (the unit committed). Written only by instrumentPort and crashableFactory (module-private: a point passed by
- * hand is no completed step).
+ * Passes the closing point of a step that ran and answered; recorded as a COMPLETED step of the current operation scope only once
+ * the point passed without a crash (a point passed by hand, or outside any scope, is no completed step of any operation).
  */
-const completedSteps = new WeakMap<object, number[]>();
-
-/** The positions in `points.passed` of every step that completed (the partial-failure proof), in order. */
-export function completedStepsOf(points: FaultPoints): ReadonlyArray<number> {
-  return [...(completedSteps.get(points) ?? [])];
-}
-
-/** Passes the closing point of a step that ran and answered; recorded as completed only once the point passed without a crash. */
 async function passCompleted(points: FaultPoints, name: string): Promise<void> {
-  // pass() logs the point synchronously when called: this is its position in `passed`
-  const position = points.passed.length;
   await points.pass(name);
-  const list = completedSteps.get(points) ?? [];
-  list.push(position);
-  completedSteps.set(points, list);
+  record((seq) => ({ kind: "COMPLETED", name, seq }));
 }
+
+/** Arms a crash at `name` that fires only inside `scope` (ctx.partial: the operation's own failure point). */
+export let armCrashIn: (points: FaultPoints, name: string, scope: OperationScope) => ArmedCrash;
 
 /** One-shot named points; a test arms them, the instrumented code passes them. */
 export class FaultPoints {
@@ -126,7 +109,11 @@ export class FaultPoints {
   readonly #crashes: string[] = [];
   readonly #passed: string[] = [];
 
-  #arm(name: string, kind: Armed["kind"]): { reached: Promise<void>; resolveRelease: () => void; rejectRelease: (e: Error) => void } {
+  static {
+    armCrashIn = (points, name, scope) => ({ reached: points.#arm(name, "CRASH", scope).reached });
+  }
+
+  #arm(name: string, kind: Armed["kind"], scope?: OperationScope): { reached: Promise<void>; resolveRelease: () => void; rejectRelease: (e: Error) => void } {
     if (this.#armed.has(name)) throw new Error(`fault point ${name} is already armed`);
     let reachedResolve: () => void = () => undefined;
     const reached = new Promise<void>((resolve) => {
@@ -140,7 +127,7 @@ export class FaultPoints {
     });
     // the holder awaits `release` once it is reached; this only keeps a crash of a pause never reached from going unhandled
     release.catch(() => undefined);
-    this.#armed.set(name, { kind, reached: reachedResolve, release });
+    this.#armed.set(name, { kind, scope, reached: reachedResolve, release });
     return { reached, resolveRelease, rejectRelease };
   }
 
@@ -184,19 +171,26 @@ export class FaultPoints {
   /** Called by instrumented code at the point `name`: passes, waits (PAUSE) or throws (CRASH). */
   async pass(name: string): Promise<void> {
     this.#passed.push(name);
+    record((seq) => ({ kind: "POINT", name, seq }));
     const armed = this.#armed.get(name);
     if (!armed) return;
+    // a point armed for one operation passes unarmed anywhere else
+    if (armed.scope !== undefined && !armed.scope.encloses(currentScope())) return;
     this.#armed.delete(name);
     armed.reached();
     if (armed.kind === "CRASH") {
       this.#crashes.push(name);
+      record((seq) => ({ kind: "CRASH", name, seq }));
       throw new SimulatedCrash(name);
     }
     try {
       await armed.release;
     } catch (e) {
       // a paused point crashed where it waits: recorded now, as the crash reaches the code under test
-      if (e instanceof SimulatedCrash) this.#crashes.push(name);
+      if (e instanceof SimulatedCrash) {
+        this.#crashes.push(name);
+        record((seq) => ({ kind: "CRASH", name, seq }));
+      }
       throw e;
     }
   }
@@ -206,7 +200,7 @@ export class FaultPoints {
     this.#crashes.push(name);
   }
 
-  /** The points at which a crash fired, in order (any crash; a crash cell's proof is commitCrashesOf). */
+  /** The points at which a crash fired, in order (any crash; a crash cell's proof is the COMMIT_CRASH its operation scope recorded). */
   get crashes(): ReadonlyArray<string> {
     return [...this.#crashes];
   }
@@ -238,7 +232,7 @@ type AnyFn = (...args: never[]) => unknown;
  * (its private fields work). A crash firing at either boundary is recorded as a CommitCrash — the only evidence a crash cell
  * accepts: before-commit only when the factory then rejected (it never issued COMMIT), after-commit only after the factory
  * resolved (PgUnitOfWorkFactory resolves only when the server answered COMMIT with COMMIT, unit-of-work.ts). An after-commit point
- * passed without a crash is a completed step (completedStepsOf): the unit committed and its caller got the answer.
+ * passed without a crash is a completed step of the operation scope it ran in: the unit committed and its caller got the answer.
  */
 export function crashableFactory<F extends object>(factory: F, points: FaultPoints, name: string, methods: ReadonlyArray<keyof F & string> = ["run" as keyof F & string]): F {
   return new Proxy(factory, {
@@ -270,13 +264,13 @@ export function crashableFactory<F extends object>(factory: F, points: FaultPoin
           );
         } catch (e) {
           // the work died at the boundary and the factory gave up without issuing COMMIT
-          if (crashedBeforeCommit) recordCommitCrash(points, { name, boundary: "BEFORE_COMMIT" });
+          if (crashedBeforeCommit) recordCommitCrash({ name, boundary: "BEFORE_COMMIT" });
           throw e;
         }
         try {
           await passCompleted(points, `${name}.after-commit`);
         } catch (e) {
-          if (e instanceof SimulatedCrash && e.point === `${name}.after-commit`) recordCommitCrash(points, { name, boundary: "AFTER_COMMIT" });
+          if (e instanceof SimulatedCrash && e.point === `${name}.after-commit`) recordCommitCrash({ name, boundary: "AFTER_COMMIT" });
           throw e;
         }
         return out;
@@ -289,7 +283,7 @@ export function crashableFactory<F extends object>(factory: F, points: FaultPoin
  * Decorates a port (a provider client, an outbox dispatcher's delivery, a service step): each async method passes
  * `<name>.<method>.before` before it calls the real method (a crash there means the effect never happened) and
  * `<name>.<method>.after` once the real method answered (a crash there means the effect happened and its answer was lost). An
- * `.after` point passed without a crash is a completed step (completedStepsOf); a `.before` point never is. Other members are read
+ * `.after` point passed without a crash is a completed step of the operation scope it ran in, and each call that reached the real method is recorded there with its arguments (a sink for a clock instant); a `.before` point never is a completed step. Other members are read
  * from the real port.
  */
 export function instrumentPort<P extends object>(port: P, points: FaultPoints, name: string): P {
@@ -301,6 +295,8 @@ export function instrumentPort<P extends object>(port: P, points: FaultPoints, n
       const method = value as AnyFn;
       return async (...args: never[]) => {
         await points.pass(`${name}.${prop}.before`);
+        // the call reaches the real method with these arguments: a sink of the operation scope it runs in
+        record((seq) => ({ kind: "CALL", name: `${name}.${prop}`, args: [...(args as unknown[])], seq }));
         const out = await method.apply(target, args);
         await passCompleted(points, `${name}.${prop}.after`);
         return out;
