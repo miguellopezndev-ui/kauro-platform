@@ -27,7 +27,7 @@ import { proposeCommissionClose } from "@kauro/application";
 import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, type CommissionPools, type CommissionService } from "../src/index.js";
 import { CommissionHolds, approvedPlan, captureOf, checkoutOf, purchase, recordSyntheticSchedule, sellingAgency, statedQuote, type CommissionWorld, type Purchase, type Selling } from "./commission-support.js";
 import { paymentWorld, serviceToken, type PaymentWorld } from "./payment-support.js";
-import { call, clock, freshKey, ids, movableClock, sha, type Person, type Reply, type World } from "./support.js";
+import { call, clock, freshKey, ids, movableClock, sha, type Person, type Reply, type World, type WorldOptions } from "./support.js";
 
 export { COMMISSION_APPLICATION_NAME };
 
@@ -131,7 +131,7 @@ export interface StatementsWorld extends CommissionWorld {
   periods(seconds?: number): ReturnType<typeof createPeriodsSweep>;
 }
 
-export async function statementsWorld(): Promise<StatementsWorld> {
+export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"] } = {}): Promise<StatementsWorld> {
   const calendar = new ContractFakeBankingCalendar({ clock });
   const now = clock.now();
   calendar.serve({ calendarVersion: FIXTURE_CALENDAR.calendarVersion, jurisdiction: "CO", source: "TEST_FIXTURE", nonbankingDates: [...BANKING_CALENDAR_FIXTURE_NONBANKING], coversFrom: FIXTURE_CALENDAR.coversFrom, coversTo: FIXTURE_CALENDAR.coversTo, recordedAt: new Date(Date.parse(now) - 3_600_000).toISOString() as UtcInstant, evidenceHash: sha("fixture") as Sha256Hex });
@@ -141,6 +141,7 @@ export async function statementsWorld(): Promise<StatementsWorld> {
   const opened: { pools: CommissionPools | null } = { pools: null };
   const pw: PaymentWorld = await paymentWorld({
     requestSide: true,
+    ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
@@ -158,7 +159,7 @@ export async function statementsWorld(): Promise<StatementsWorld> {
   const holds = new CommissionHolds();
   const backgroundFailures: Array<{ correlationId: string; error: unknown }> = [];
   const serviceOf = (units: PgCommercialUnitOfWorkFactory): CommissionService =>
-    createCommissionService({ assembly: { units, completions, hold: (point) => holds.hook(point) }, environment: "LOCAL", clock: dispatcherClock, ids, onBackgroundFailure: (correlationId, error) => backgroundFailures.push({ correlationId, error }) });
+    createCommissionService({ assembly: { units, completions, hold: (point) => holds.hook(point) }, environment: "LOCAL", clock: dispatcherClock, ids, periods: { calendar, hold: serviceHolds.hook }, onBackgroundFailure: (correlationId, error) => backgroundFailures.push({ correlationId, error }) });
   const service = serviceOf(pools.units);
   const owner = await w.person("statements-owner");
   await h.grantKauroOwner(owner.userId);

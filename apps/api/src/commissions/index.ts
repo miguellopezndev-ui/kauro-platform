@@ -2,12 +2,14 @@
  * The commission service of package B10 in the api (docs/design/B10-commercial-domain.md §14; mandate B10-COMMISSION-SERVICE): its
  * composition (assembly.ts), its runtime and identity (runtime.ts), the COMMISSIONS consumer (consumer.ts) run by the COMMISSIONS
  * dispatcher (dispatcher.ts), and the sweeps with the cycle that runs them (sweeps.ts). `createCommissionService` binds them over one
- * assembly; B10-INTEGRATION enters PERIODS into the cycle through `runCycle({ also })`.
+ * assembly; B10-INTEGRATION entered PERIODS (periods.ts) into the cycle, after the five sweeps.
  */
+import type { BankingCalendarSource, StatementServiceHold } from "@kauro/application";
 import type { Clock, Environment, IdGenerator, LeaseOwnerId } from "@kauro/domain";
 import type { CommissionServiceAssembly } from "./assembly.js";
 import { commissionsConsumer, type CommissionsConsumer } from "./consumer.js";
 import { createCommissionDispatcher, type CommissionDispatcher } from "./dispatcher.js";
+import { createPeriodsSweep } from "./periods.js";
 import { createCommissionRuntime, type CommissionRuntime } from "./runtime.js";
 import { COMMISSION_SWEEPS, runSweep, type CommissionSweepName, type CycleSweep, type SweepReport } from "./sweeps.js";
 
@@ -20,7 +22,7 @@ export interface CommissionService {
   dispatcherOf(options?: { readonly ownerId?: LeaseOwnerId }): CommissionDispatcher;
   /** One bounded pass of one sweep. */
   runSweep(sweep: CommissionSweepName, options?: { readonly limit?: number }): Promise<SweepReport>;
-  /** One bounded pass of every sweep in order, then those `also` names (PERIODS, entered by B10-INTEGRATION). */
+  /** One bounded pass of every sweep in order, PERIODS last (open the month, close each due period through CMD051), then those `also` names. */
   runCycle(options?: { readonly limit?: number; readonly also?: ReadonlyArray<CycleSweep> }): Promise<ReadonlyArray<SweepReport>>;
 }
 
@@ -29,6 +31,8 @@ export function createCommissionService(input: {
   readonly environment: Environment;
   readonly clock: Clock;
   readonly ids: IdGenerator;
+  /** The ports of the PERIODS sweep: the banking calendar CMD051 dates a close with (the platform's recorded one when absent) and a test's hold. */
+  readonly periods?: { readonly calendar?: BankingCalendarSource; readonly hold?: StatementServiceHold };
   /** Receives a failure of work no request waits for, by correlation id; default: one stderr line with the safe classification. */
   readonly onBackgroundFailure?: (correlationId: string, error: unknown) => void;
 }): CommissionService {
@@ -50,6 +54,7 @@ export function createCommissionService(input: {
       const limit = options.limit ?? 100;
       const out: SweepReport[] = [];
       for (const sweep of COMMISSION_SWEEPS) out.push(await runSweep(runtime, sweep, { limit }));
+      out.push(await createPeriodsSweep(runtime, input.periods ?? {}).run({ limit }));
       for (const extra of options.also ?? []) out.push(await extra.run({ limit }));
       return out;
     },

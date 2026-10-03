@@ -615,7 +615,7 @@ test("the CLAIM_WINDOWS, ENTITLEMENT_WINDOWS and ACCRUAL_RECONCILIATION sweeps: 
   const census = async () => oracleRows(cw, "SELECT (SELECT count(*)::int FROM kauro.commission_pools WHERE agency_id = $1) AS pools, (SELECT count(*)::int FROM kauro.commission_lines WHERE agency_id = $1) AS lines, (SELECT count(*)::int FROM kauro.commission_entitlements WHERE agency_id = $1) AS entitlements", [late.agency.agencyId]);
   const once = await census();
   const cycle = await cw.service.runCycle();
-  assert.deepEqual(cycle.map((r) => r.sweep), ["QUOTE_EXPIRY", "ACCRUAL_RECONCILIATION", "CLAIM_WINDOWS", "ENTITLEMENT_WINDOWS", "ELIGIBILITY"]);
+  assert.deepEqual(cycle.map((r) => r.sweep), ["QUOTE_EXPIRY", "ACCRUAL_RECONCILIATION", "CLAIM_WINDOWS", "ENTITLEMENT_WINDOWS", "ELIGIBILITY", "PERIODS"]);
   assert.deepEqual(cycle.flatMap((r) => r.items.filter((i) => i.outcome.startsWith("FAILED"))), [], "every item of the cycle settled");
   assert.deepEqual(await census(), once, "a second pass gains nothing");
   assert.deepEqual(once, [{ pools: 1, lines: 1, entitlements: 1 }]);
