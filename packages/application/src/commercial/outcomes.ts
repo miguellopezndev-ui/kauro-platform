@@ -6,14 +6,15 @@
  * generated from them. B10-AGENCY-LIFECYCLE serves CMD002 and CMD043; each later lane adds the catalogues of its own commands here.
  */
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
+import { CREATE_QUOTE_OUTCOMES } from "./quotes/outcomes.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER } = OUTCOME_BLOCKS;
 
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 
 /** The command-layer outcomes of each served B10 command (design §4, §12; reference/COMMAND_CATALOGUE preconditions and failures). */
-const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043", ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   // CMD002: the path agency's OWNER; the version, then DRAFT, then the agreements, then the billing profile (D10-AGY-1)
   CMD002: [
     STALE("agency"),
@@ -34,10 +35,12 @@ const COMMAND_SPECIFIC: Readonly<Record<CommercialServedRouteCommandId, Readonly
 });
 
 /** A tenant command whose path names the agency: the authorizer's membership decisions and the path id, no agency selector. */
-const agencyPathCommand = (id: CommercialServedRouteCommandId) => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
+const agencyPathCommand = (id: "CMD002" | "CMD043") => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
 
 /** The closed problem catalogue of each served B10 command route. */
 export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD002: agencyPathCommand("CMD002"),
   CMD043: agencyPathCommand("CMD043"),
+  // CreateQuote (B10-COMMANDS-QUOTE): the agency is selected by the header and the project is the path id
+  CMD027: closedCatalogue("CMD027", [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...CREATE_QUOTE_OUTCOMES]),
 });

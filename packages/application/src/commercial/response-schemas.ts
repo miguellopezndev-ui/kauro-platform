@@ -101,8 +101,10 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
     withheld: {},
     members: {
       replacedQuoteId: platform(true, ID, "The quote the new one replaces."),
-      revokedAuthorizationId: platform(true, ID, "The commercial authorization revoked by the replacement."),
+      revokedAuthorizationId: platform(false, ID, "The commercial authorization revoked by the replacement; absent when the re-binding was refused."),
       approvalRequired: platform(true, BOOLEAN, "The new plan must be approved again before it can be paid."),
+      outcome: platform(true, enumOf(["REBOUND", "WITHDRAWN"]), "REBOUND: the paid purchase stands on the replacement. WITHDRAWN: the payment service refused the re-binding and the replacement was withdrawn."),
+      reasons: platform(false, { type: "array", maxItems: 8, items: TOKEN }, "The blockers that refused the re-binding."),
     },
   },
   {
