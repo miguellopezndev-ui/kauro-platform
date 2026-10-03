@@ -126,6 +126,27 @@ export async function terminationBody(iw: IntegrationWorld, sellerId: string, ha
   };
 }
 
+/** The purchase a capture the provider reported through its webhook (CMD030) made: the capture and the authorization it issued, read back. */
+export async function webhookPurchase(iw: IntegrationWorld, quote: CreateQuoteView, order: CreatePaymentOrderView, providerCaptureId: string): Promise<Purchase> {
+  const [capture] = await oracleRows<{ capture_id: string }>(iw, "SELECT capture_id FROM kauro.capture_facts WHERE order_id = $1", [order.order.orderId]);
+  assert.ok(capture !== undefined, "the webhook recorded the capture");
+  const [authorization] = await oracleRows<{ authorization_id: string; project_id: string }>(iw, "SELECT authorization_id, project_id FROM kauro.commercial_authorizations WHERE capture_id = $1", [capture.capture_id]);
+  assert.ok(authorization !== undefined, "the capture issued the original authorization");
+  return {
+    quoteId: quote.quote.quoteId,
+    orderId: order.order.orderId,
+    captureId: capture.capture_id,
+    authorizationId: authorization.authorization_id,
+    projectId: authorization.project_id,
+    providerOrderId: order.order.providerOrderId!,
+    providerCaptureId,
+    serviceCents: BigInt(quote.quote.serviceCents),
+    taxCents: BigInt(quote.quote.taxCents),
+    totalCents: BigInt(quote.quote.totalCents),
+    termsHash: quote.quote.termsHash,
+  } as unknown as Purchase;
+}
+
 // --- the payment commands ----------------------------------------------------------------------------------------------------------
 
 /** CreateQuote (CMD027) as the agency's BILLING member. */

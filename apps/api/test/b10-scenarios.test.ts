@@ -11,10 +11,15 @@
 // labelled TEST CLOCK (D10-CLOCK-1). Nothing sleeps: interleavings are held at named points and every wait is observed in
 // pg_stat_activity. The founding cohort's three slots serve the whole cluster, so the three titles that take them run first.
 import assert from "node:assert/strict";
-import type { CreateQuoteView, PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
+import type { CreatePaymentOrderView, CreateQuoteView, PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
 import { after, before, test } from "node:test";
 import type { UserId } from "@kauro/domain";
 import { recordAssistanceAgreement, recordServiceAssignment } from "@kauro/persistence/testing";
+import type { WebhookAck } from "@kauro/application";
+import { handled, waitForLockWait } from "@kauro/persistence/testing";
+import { PAYMENT_APPLICATION_NAME } from "../src/index.js";
+import { deliver } from "./payment-support.js";
+import { deliveryOf, eventOf, type Purchase } from "./commission-support.js";
 import { asProblem, call, completed, freshKey, outcome, replayTextOf } from "./support.js";
 import {
   acceptedThrough,
@@ -39,6 +44,7 @@ import {
   replacementPlanOf,
   madeEligible,
   statementReads,
+  webhookPurchase,
   statementsOfSeller,
   type Agent,
   type Claimed,
@@ -543,10 +549,83 @@ test("R2-104 (examples 7 and 25): a 20000-cent service refund after the seller w
   assert.deepEqual(surface.filter((name) => /debit|charge|clawback|collect|recover|pull|bill/i.test(name)), [], "no port of the commission service can take money from a seller");
 });
 test("R2-137 (example 9): two projects' capture reconciliations of one agency held at the designation trigger in both interleavings end with one first project, one 1000-bps and one 400-bps pool and the same final statement projection", async () => {
-  assert.ok(iw !== undefined);
-  assert.fail("planned: this scenario is written by the mandate");
-});
+  await assertCohortConsumed(iw);
+  const PAYMENT_POOL = `${PAYMENT_APPLICATION_NAME}-service`;
+  // two projects X and Y of one agency, both quoted and ordered through the public commands before either is captured; the provider
+  // captures both and reports them through the webhook (CMD030). In each interleaving one capture reconciliation is held inside the
+  // payment service just before COMMIT, after its authorization was designated, while the other waits on the agency's recurrence lock
+  // (observed in pg_stat_activity): X first, then Y first. The one confirmed first is P; the one that waited is Q, whose provider
+  // completion is the earlier one.
+  const finals: Array<ReadonlyArray<ReadonlyArray<string>>> = [];
+  const purchases: Array<{ readonly a: Agent; readonly p: Purchase; readonly q: Purchase }> = [];
+  for (const interleaving of ["X_FIRST", "Y_FIRST"] as const) {
+    const label = `ex9-${interleaving === "X_FIRST" ? "x" : "y"}`;
+    const a = await agentOf(iw, label);
+    const acquired = await claimed(iw, label);
+    await acceptedThrough(iw, a.s.agency.agencyId, acquired, [10_000]);
+    const quoteX = await quoted(iw, a, await planOf(iw, a, `${label}-X`, { units: 50_000 }));
+    const quoteY = await quoted(iw, a, await planOf(iw, a, `${label}-Y`, { units: 50_000 }));
+    assert.deepEqual([quoteX.quote.serviceCents, quoteY.quote.serviceCents], ["129500", "129500"], "both quoted before either was captured: no recurrence discount");
+    const orderX = await orderedThrough(iw, a, quoteX);
+    const orderY = await orderedThrough(iw, a, quoteY);
+    const [first, second] = interleaving === "X_FIRST" ? [{ quote: quoteX, order: orderX }, { quote: quoteY, order: orderY }] : [{ quote: quoteY, order: orderY }, { quote: quoteX, order: orderX }];
+    // the provider captures both after both orders were created (plausible): Q's capture ten milliseconds before P's, on the provider fake's own clock
+    const providerOf = (o: CreatePaymentOrderView): string => {
+      iw.pw.paypal.approve(o.order.providerOrderId!);
+      return iw.pw.paypal.captureAtProvider(o.order.providerOrderId!);
+    };
+    const providerQ = providerOf(second.order);
+    iw.pw.providerClock.advance(10);
+    const providerP = providerOf(first.order);
 
+    const pHeld = iw.pw.holds.arm("CMD030", "APPLICATION_BEFORE_COMMIT", "WAIT");
+    const pDelivery = handled(deliver(iw.pw, "PAYMENT.CAPTURE.COMPLETED", providerP));
+    await pHeld.reached;
+    const qDelivery = handled(deliver(iw.pw, "PAYMENT.CAPTURE.COMPLETED", providerQ));
+    const waiting = await waitForLockWait(iw.h.oracle, PAYMENT_POOL, "commercial_authorizations");
+    assert.ok(waiting > 0, `${interleaving}: Q's designation waits on P's, observed in pg_stat_activity`);
+    pHeld.release();
+    for (const d of [await pDelivery, await qDelivery]) assert.equal(completed<WebhookAck>(d.reply, 200).data.inboxState, "APPLIED");
+    const P = await webhookPurchase(iw, first.quote, first.order, providerP);
+    const Q = await webhookPurchase(iw, second.quote, second.order, providerQ);
+
+    const pEvent = await eventOf(iw, P.captureId, "capture.completed.v1");
+    const qEvent = await eventOf(iw, Q.captureId, "capture.completed.v1");
+    if (interleaving === "Y_FIRST") {
+      // the late observation: COMMISSIONS receives Q's completion before P's
+      assert.equal(await iw.service.consumer.handle(await deliveryOf(iw, qEvent)), "APPLIED");
+    }
+    const seen = new Map((await dispatched(iw)).filter((d) => d.eventId === pEvent || d.eventId === qEvent).map((d) => [d.eventId, d.outcome]));
+    assert.deepEqual([seen.get(pEvent), seen.get(qEvent)], interleaving === "X_FIRST" ? ["APPLIED", "APPLIED"] : ["APPLIED", "DUPLICATE"]);
+
+    // one first project, one 1000-bps pool (129,500 x 1000 bps = 12,950) and one 400-bps pool (129,500 x 400 bps = 5,180)
+    const sequence = async (p: Purchase) => (await oracleRows<{ confirmation_seq: number; provider_completed_at: Date }>(iw, "SELECT confirmation_seq, provider_completed_at FROM kauro.qualifying_purchases WHERE authorization_id = $1", [p.authorizationId]))[0]!;
+    assert.deepEqual([(await sequence(P)).confirmation_seq, (await sequence(Q)).confirmation_seq], [1, 2]);
+    const [providerCompletedP, providerCompletedQ] = [(await sequence(P)).provider_completed_at.getTime(), (await sequence(Q)).provider_completed_at.getTime()];
+    assert.ok(providerCompletedQ + 10 <= providerCompletedP, "each provider completion recorded as reported: Q's is the earlier by the ten milliseconds the provider fake's clock advanced");
+    assert.deepEqual((await poolsOf(iw, P.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents]), [["ACQUISITION", "FIRST", 1000, "129500", "12950"]]);
+    assert.deepEqual((await poolsOf(iw, Q.authorizationId)).map((p) => [p.source, p.rate_kind, p.rate_bps, p.basis_cents, p.pool_cents]), [["ACQUISITION", "REPEAT", 400, "129500", "5180"]]);
+    assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS n FROM kauro.commission_pools WHERE agency_id = $1 AND rate_kind = 'FIRST'", [a.s.agency.agencyId]), [{ n: 1 }], "never a second 1000-bps pool");
+    assert.deepEqual(await oracleRows(iw, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1", [a.s.agency.agencyId]), [{ first_qualifying_capture_id: P.captureId }]);
+    purchases.push({ a, p: P, q: Q });
+  }
+
+  // the same final statement projection in both runs: both lines of both agencies made ELIGIBLE, one period closed through CMD051, and each
+  // seller's statement read through GetCommissionStatement as owner and seller
+  for (const { a, p, q } of purchases) {
+    await madeEligible(iw, a.s.agency.agencyId, p);
+    await madeEligible(iw, a.s.agency.agencyId, q);
+  }
+  await closedAt(iw, "2026-02", "2026-10-07T17:00:00Z");
+  for (const { p } of purchases) {
+    const [line] = await oracleRows<{ seller_id: string }>(iw, "SELECT seller_id FROM kauro.commission_lines WHERE authorization_id = $1", [p.authorizationId]);
+    const sellerPerson = (await oracleRows<{ statement_id: string }>(iw, "SELECT statement_id FROM kauro.commission_statements WHERE seller_id = $1", [line!.seller_id]))[0]!;
+    const projection = (await statementReads(iw, sellerPerson.statement_id, iw.owner.token)).owner;
+    finals.push(projection.items.map((i) => [i.sequence, i.netServiceBasisCents, String(i.rateBps), i.cumulativeEntitlementCents, i.payableCents]).sort());
+  }
+  assert.deepEqual(finals[0], [["FIRST", "129500", "1000", "12950", "12950"], ["REPEAT", "129500", "400", "5180", "5180"]], "the statement lines, in cents written here");
+  assert.deepEqual(finals[1], finals[0], "the same final statement projection in both interleavings");
+});
 test("CMD050-RACE: TerminateSeller racing AcceptAttribution of the seller's unlisted claim, held at the seller row, serializes in both orders — acceptance first: the claim is ACCEPTED, then EXPIRED as unlisted by the termination; termination first: the claim is EXPIRED and AcceptAttribution is 409 CLAIM_NOT_REVIEWABLE — and no live claim of a terminated seller remains", async () => {
   assert.ok(iw !== undefined);
   assert.fail("planned: this scenario is written by the mandate");
