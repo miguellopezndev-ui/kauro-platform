@@ -1,0 +1,326 @@
+// Self-test of the common fault harness (docs/design/FAULT-HARNESS.md; @kauro/persistence/testing faults/) on real PostgreSQL 17:
+// every primitive does what it claims AND fails when the fault it stands for did not happen — a crash point never reached, a
+// pause the operation outran, an interleaving whose lock wait was not observed, a matrix cell whose fault was never injected.
+// The contended rows are a probe table of this test's own cluster, written by the control plane's login role.
+import assert from "node:assert/strict";
+import { after, before, test } from "node:test";
+import type { Client } from "pg";
+import type { LeaseOwnerId, ResourceId } from "@kauro/domain";
+import { toUtcInstant } from "@kauro/domain";
+import { ids, sha, start, type Harness } from "../src/testing/harness.js";
+import {
+  FAULT_KINDS,
+  FaultNotInjected,
+  FaultPointNotReached,
+  FaultPoints,
+  InterleavingNotObserved,
+  SimulatedCrash,
+  bothOrders,
+  cellTitle,
+  concurrently,
+  controlledClock,
+  crashableFactory,
+  crashedAt,
+  faultCell,
+  faultMatrix,
+  inOrder,
+  instrumentPort,
+  mustWait,
+  partition,
+  runCell,
+  sequentially,
+  terminateBackend,
+  type RaceScenario,
+} from "../src/testing/index.js";
+
+let h: Harness;
+let a: Client;
+let b: Client;
+
+before(async () => {
+  h = await start();
+  await h.oracle.query("CREATE SCHEMA fault_probe");
+  await h.oracle.query("CREATE TABLE fault_probe.items (id text PRIMARY KEY, n integer NOT NULL DEFAULT 0, writers text[] NOT NULL DEFAULT '{}')");
+  await h.oracle.query("GRANT USAGE ON SCHEMA fault_probe TO kauro_control_test; GRANT SELECT, INSERT, UPDATE ON fault_probe.items TO kauro_control_test");
+  a = await h.pg.connect("kauro_control_test");
+  b = await h.pg.connect("kauro_control_test");
+});
+after(async () => {
+  await a.end();
+  await b.end();
+  await h.stop();
+});
+
+async function item(id: string): Promise<{ n: number; writers: string[] } | undefined> {
+  const r = await h.oracle.query<{ n: number; writers: string[] }>("SELECT n, writers FROM fault_probe.items WHERE id = $1", [id]);
+  return r.rows[0];
+}
+
+async function newItem(): Promise<string> {
+  const id = ids.next();
+  await h.oracle.query("INSERT INTO fault_probe.items (id) VALUES ($1)", [id]);
+  return id;
+}
+
+const bump = (c: Client, id: string, who: string) => c.query("UPDATE fault_probe.items SET n = n + 1, writers = writers || $2::text WHERE id = $1", [id, who]);
+
+test("controlled clock: frozen until moved, never backwards; past/before place an instant on either side of a boundary; onServer sets kauro.server_now() of that transaction exactly to the clock, and only of that transaction", async () => {
+  const clock = controlledClock("2030-01-01T00:00:00.000Z");
+  assert.equal(clock.now(), "2030-01-01T00:00:00.000Z");
+  assert.equal(clock.nowMs(), Date.parse("2030-01-01T00:00:00.000Z"));
+  assert.equal(clock.at(120_000), "2030-01-01T00:02:00.000Z", "at() reads an offset without moving");
+  assert.equal(clock.moves, 0);
+  assert.equal(clock.advance(1_000), "2030-01-01T00:00:01.000Z");
+  assert.equal(clock.past("2030-01-01T00:02:00.000Z"), "2030-01-01T00:02:00.001Z");
+  assert.throws(() => clock.before("2030-01-01T00:02:00.000Z"), RangeError, "before() of a boundary already passed would move backwards");
+  assert.throws(() => clock.set("2029-12-31T23:59:59.000Z"), RangeError);
+  assert.throws(() => clock.advance(0), RangeError);
+  assert.equal(clock.before("2030-01-01T00:05:00.000Z", 1_000), "2030-01-01T00:04:59.000Z");
+  assert.equal(clock.moves, 3);
+  // the server clock of one transaction stands exactly at the controlled instant; the next transaction is back on real time
+  await a.query("BEGIN");
+  try {
+    assert.equal(await clock.onServer(a), "2030-01-01T00:04:59.000000Z");
+    const again = await a.query<{ now: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS now`);
+    assert.equal(again.rows[0]?.now, "2030-01-01T00:04:59.000000Z", "stable within the transaction");
+  } finally {
+    await a.query("COMMIT");
+  }
+  const real = await a.query<{ skew: number }>("SELECT abs(extract(epoch FROM kauro.server_now() - now()))::float8 AS skew");
+  assert.equal(real.rows[0]?.skew, 0, "the offset was transaction-local");
+});
+
+test("fault points: an armed crash throws SimulatedCrash where it is reached; a pause holds until released or crashed; unarmed points pass; an armed point never reached and a pause the operation outran FAIL", async () => {
+  const points = new FaultPoints();
+  const flow = async (log: string[]) => {
+    log.push("start");
+    await points.pass("step.one");
+    log.push("one");
+    await points.pass("step.two");
+    log.push("two");
+  };
+  // crash
+  const crash = points.crash("step.two");
+  const log1: string[] = [];
+  await assert.rejects(flow(log1), (e: unknown) => e instanceof SimulatedCrash && e.point === "step.two");
+  await crash.reached;
+  assert.deepEqual(log1, ["start", "one"]);
+  assert.deepEqual(points.crashes, ["step.two"]);
+  // pause then release
+  const pause = points.pause("step.one");
+  const log2: string[] = [];
+  const running = flow(log2);
+  await pause.reachedBy(running);
+  assert.deepEqual(log2, ["start"], "held at the point");
+  pause.release();
+  await running;
+  assert.deepEqual(log2, ["start", "one", "two"]);
+  // pause then crash where it waits
+  const held = points.pause("step.two");
+  const log3: string[] = [];
+  const doomed = flow(log3);
+  await held.reached;
+  held.crash();
+  await assert.rejects(doomed, SimulatedCrash);
+  assert.deepEqual(log3, ["start", "one"]);
+  points.assertAllReached();
+  // FAILS: a crash point the run never reaches
+  points.crash("step.three");
+  await flow([]);
+  assert.throws(() => points.assertAllReached(), (e: unknown) => e instanceof FaultPointNotReached && /step\.three/.test(e.message));
+  // FAILS: a pause the operation finished without reaching
+  const other = new FaultPoints();
+  const never = other.pause("never.passed");
+  await assert.rejects(never.reachedBy(Promise.resolve("done")), FaultPointNotReached);
+  assert.throws(() => other.crash("never.passed"), /already armed/);
+});
+
+test("crash before and after COMMIT of a real unit of work (crashableFactory over the control plane's PgUnitOfWorkFactory): before, the lease claim rolls back with the unit; after, it is committed and only the answer is lost", async () => {
+  const claim = (resourceId: ResourceId) => (uow: Parameters<Parameters<Harness["control"]["run"]>[1]>[0]) =>
+    uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 120, deadlineAt: toUtcInstant(Date.now() + 3_600_000), subjectHash: sha("fault"), costAuthorityId: null, checkpointHash: null }, toUtcInstant(Date.now()));
+  const leases = async (resourceId: ResourceId) => (await h.oracle.query("SELECT 1 FROM kauro.leases WHERE resource_id = $1", [resourceId])).rows.length;
+  const points = new FaultPoints();
+  const control = crashableFactory(h.control, points, "uow");
+  const r1 = ids.next() as ResourceId;
+  points.crash("uow.before-commit");
+  await assert.rejects(control.run(h.system(), claim(r1)), crashedAt("uow.before-commit"));
+  assert.equal(await leases(r1), 0, "crash before COMMIT: nothing of the unit remains");
+  const r2 = ids.next() as ResourceId;
+  points.crash("uow.after-commit");
+  await assert.rejects(control.run(h.system(), claim(r2)), crashedAt("uow.after-commit"));
+  assert.equal(await leases(r2), 1, "crash after COMMIT: the unit committed, its answer was lost");
+  const r3 = ids.next() as ResourceId;
+  assert.equal((await control.run(h.system(), claim(r3))).kind, "CLAIMED", "unarmed, the decorated factory is the real one");
+  assert.deepEqual(points.passed.slice(-2), ["uow.before-commit", "uow.after-commit"]);
+  points.assertAllReached();
+});
+
+test("instrumentPort: a crash before a provider call means the effect never happened; a crash after it means the effect happened and its answer was lost; the retry that follows sees the effect", async () => {
+  const effects: string[] = [];
+  const provider = { async place(key: string) { effects.push(key); return { placed: key }; } };
+  const points = new FaultPoints();
+  const port = instrumentPort(provider, points, "storage");
+  points.crash("storage.place.before");
+  await assert.rejects(port.place("k1"), crashedAt("storage.place.before"));
+  assert.ok(!crashedAt("storage.place.after")(new SimulatedCrash("storage.place.before")), "crashedAt names the point");
+  assert.deepEqual(effects, []);
+  points.crash("storage.place.after");
+  await assert.rejects(port.place("k1"), SimulatedCrash);
+  assert.deepEqual(effects, ["k1"], "the effect landed although the caller saw a crash");
+  const outcomes = await sequentially(2, () => port.place("k1"));
+  assert.deepEqual(partition(outcomes).fulfilled, [{ placed: "k1" }, { placed: "k1" }]);
+  assert.deepEqual(points.crashes, ["storage.place.before", "storage.place.after"]);
+});
+
+test("terminateBackend: a killed process's open transaction is aborted by the server, never committed, and the crash is recorded", async () => {
+  const id = await newItem();
+  const victim = await h.pg.connect("kauro_control_test");
+  const points = new FaultPoints();
+  await victim.query("BEGIN");
+  await bump(victim, id, "victim");
+  await terminateBackend(h.oracle, victim, points, "victim.died");
+  await assert.rejects(victim.query("SELECT 1"));
+  assert.deepEqual(await item(id), { n: 0, writers: [] });
+  assert.deepEqual(points.crashes, ["victim.died"]);
+});
+
+test("mustWait: an operation behind an uncommitted lock is observed waiting (by pid and by application name); one that is not blocked FAILS with InterleavingNotObserved", async () => {
+  const id = await newItem();
+  await a.query("BEGIN");
+  try {
+    await bump(a, id, "a");
+    await b.query("BEGIN");
+    const pid = (await b.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid ?? 0;
+    const { pending } = await mustWait(h.oracle, { pid }, bump(b, id, "b"), "b behind a");
+    await a.query("COMMIT");
+    assert.equal((await pending).status, "fulfilled");
+    await b.query("COMMIT");
+  } finally {
+    await a.query("ROLLBACK").catch(() => undefined);
+    await b.query("ROLLBACK").catch(() => undefined);
+  }
+  assert.deepEqual(await item(id), { n: 2, writers: ["a", "b"] });
+  // by application name, through the control plane's pool
+  await a.query("BEGIN");
+  try {
+    await bump(a, id, "a");
+    const { pending } = await mustWait(h.oracle, { applicationName: "kauro-test-control", query: "fault_probe.items" }, h.controlPool.raw.query("UPDATE fault_probe.items SET n = n + 1 WHERE id = $1", [id]), "pool write behind a");
+    await a.query("COMMIT");
+    assert.equal((await pending).status, "fulfilled");
+  } finally {
+    await a.query("ROLLBACK").catch(() => undefined);
+  }
+  // FAILS: nothing holds the row, so the write finishes without waiting
+  const pid = (await b.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid ?? 0;
+  await assert.rejects(mustWait(h.oracle, { pid }, bump(b, id, "b"), "an unblocked write"), InterleavingNotObserved);
+  await assert.rejects(mustWait(h.oracle, { applicationName: "kauro-test-control", query: "fault_probe.items" }, h.controlPool.raw.query("SELECT 1 FROM fault_probe.items WHERE id = $1", [id]), "an unblocked read"), InterleavingNotObserved);
+});
+
+test("bothOrders runs one race under both orders with one call — each actor holds the lock once and the other is observed waiting — and FAILS when the second actor never waits", async () => {
+  const seen: string[] = [];
+  const scenario: RaceScenario<{ id: string }> = {
+    oracle: h.oracle,
+    actors: [
+      { name: "A", client: a, act: (c, s) => bump(c, s.id, "A") },
+      { name: "B", client: b, act: (c, s) => bump(c, s.id, "B") },
+    ],
+    setup: async () => ({ id: await newItem() }),
+    async verify(run) {
+      seen.push(run.order.join(">"));
+      assert.ok(run.outcomes["A"]?.committed && run.outcomes["B"]?.committed);
+      assert.deepEqual(await item(run.state.id), { n: 2, writers: [...run.order] }, "the waiter wrote after the holder committed");
+    },
+  };
+  const runs = await bothOrders(scenario);
+  assert.deepEqual(seen, ["A>B", "B>A"]);
+  assert.deepEqual(runs.map((r) => r.order), [["A", "B"], ["B", "A"]]);
+  // a write that fails once its wait ends is reported as the actor's outcome, and its transaction is rolled back
+  const refusing: RaceScenario<{ id: string }> = {
+    ...scenario,
+    actors: [
+      { name: "A", client: a, act: (c, s) => bump(c, s.id, "A") },
+      { name: "B", client: b, act: async (c, s) => { await bump(c, s.id, "B"); await c.query("SELECT 1/0"); } },
+    ],
+    async verify(run) {
+      assert.deepEqual(await item(run.state.id), { n: 1, writers: ["A"] });
+      assert.equal(run.outcomes["A"]?.committed, true);
+      assert.equal(run.outcomes["B"]?.act.status, "rejected");
+      assert.equal(run.outcomes["B"]?.commit, null);
+      assert.equal(run.outcomes["B"]?.committed, false);
+    },
+  };
+  await inOrder(refusing, "A");
+  // FAILS: the actors touch different rows, so the second never waits
+  const disjoint: RaceScenario<{ x: string; y: string }> = {
+    oracle: h.oracle,
+    actors: [
+      { name: "A", client: a, act: (c, s) => bump(c, s.x, "A") },
+      { name: "B", client: b, act: (c, s) => bump(c, s.y, "B") },
+    ],
+    setup: async () => ({ x: await newItem(), y: await newItem() }),
+    verify: () => assert.fail("never reached: the interleaving did not happen"),
+  };
+  await assert.rejects(bothOrders(disjoint), InterleavingNotObserved);
+  // nothing stays open on either connection after a failed race
+  assert.equal((await a.query<{ s: string }>("SELECT 1 AS s")).rows.length, 1);
+  assert.equal((await b.query<{ s: string }>("SELECT 1 AS s")).rows.length, 1);
+});
+
+test("duplicates and retries of one request id: concurrent copies settle with exactly one winner; sequential retries report every attempt", async () => {
+  const requestId = ids.next();
+  const insert = () => h.controlPool.raw.query("INSERT INTO fault_probe.items (id) VALUES ($1)", [requestId]);
+  const copies = partition(await concurrently(4, insert));
+  assert.equal(copies.fulfilled.length, 1);
+  assert.equal(copies.rejected.length, 3);
+  assert.ok(copies.rejected.every((e) => (e as { code?: string }).code === "23505"));
+  const retries = await sequentially(2, insert);
+  assert.deepEqual(retries.map((o) => o.status), ["rejected", "rejected"]);
+  assert.throws(() => concurrently(1, insert), RangeError);
+});
+
+test("matrix cells: the title is the cell; a cell whose fault was never injected FAILS (FaultNotInjected) for race, expiry, timeout, crash and retry, and passes once it was; an armed point never reached FAILS the cell; a matrix whose cells and bodies do not map 1:1 is refused", async () => {
+  assert.equal(cellTitle({ id: "S090", step: "lease takeover", fault: "expiry", expect: "REFUSED" }), "S090 [expiry] lease takeover -> REFUSED");
+  assert.equal(cellTitle({ step: "x", fault: "partial", expect: "y" }), "[partial] x -> y");
+  assert.throws(() => cellTitle({ step: "x", fault: "flaky" as never, expect: "y" }), /unknown fault kind/);
+  assert.deepEqual([...FAULT_KINDS], ["race", "timeout", "expiry", "crash-before-commit", "crash-after-commit", "retry", "revocation", "partial"]);
+  for (const fault of ["race", "timeout", "expiry", "crash-before-commit", "crash-after-commit", "retry"] as const) {
+    await assert.rejects(runCell({ step: "noop", fault, expect: "nothing" }, async () => undefined), FaultNotInjected, fault);
+  }
+  // each passes once its fault happened
+  await runCell({ step: "s", fault: "expiry", expect: "e" }, async (ctx) => void ctx.clock.advance(1));
+  await runCell({ step: "s", fault: "timeout", expect: "e" }, async (ctx) => void ctx.clock.past(ctx.clock.at(10_000)));
+  await runCell({ step: "s", fault: "retry", expect: "e" }, async (ctx) => void (await ctx.sequentially(2, async () => 1)));
+  await runCell({ step: "s", fault: "crash-before-commit", expect: "e" }, async (ctx) => {
+    ctx.points.crash("p");
+    await assert.rejects(ctx.points.pass("p"), SimulatedCrash);
+  });
+  await runCell({ step: "s", fault: "crash-after-commit", expect: "e" }, async (ctx) => {
+    const victim = await h.pg.connect("kauro_control_test");
+    await ctx.kill(h.oracle, victim);
+  });
+  await runCell({ step: "s", fault: "race", expect: "e" }, async (ctx) => {
+    const id = await newItem();
+    await ctx.inOrder({ oracle: h.oracle, actors: [{ name: "A", client: a, act: (c) => bump(c, id, "A") }, { name: "B", client: b, act: (c) => bump(c, id, "B") }], setup: async () => ({}), verify: () => undefined }, "A");
+  });
+  await runCell({ step: "s", fault: "revocation", expect: "e" }, async () => undefined);
+  // an armed point never reached fails the cell even when its fault kind needs no proof
+  await assert.rejects(runCell({ step: "s", fault: "partial", expect: "e" }, async (ctx) => void ctx.points.crash("never")), FaultPointNotReached);
+  // 1:1: a cell without a body, a body without a cell, a duplicated cell
+  const cell = { id: "X1", step: "s", fault: "partial", expect: "e" } as const;
+  assert.throws(() => faultMatrix([cell], {}), /cells without a body: \[X1\|s\|partial\]/);
+  assert.throws(() => faultMatrix([], { "X1|s|partial": async () => undefined }), /bodies without a cell: \[X1\|s\|partial\]/);
+  assert.throws(() => faultMatrix([cell, cell], { "X1|s|partial": async () => undefined }), /duplicated cells: \[X1\|s\|partial\]/);
+});
+
+// a registered cell, as a package's matrix writes one: the clock moves a lease past its time to live between two claims
+faultCell({ id: "SELF", step: "OUTBOX_DISPATCH lease claim", fault: "expiry", expect: "HELD while live, taken over at fence 2 once expired" }, async (ctx) => {
+  const resourceId = ids.next() as ResourceId;
+  const deadlineAt = ctx.clock.at(3_600_000);
+  const claim = (now: string) =>
+    h.control.run(h.system(), (uow) => uow.leases.claim({ resourceKind: "OUTBOX_DISPATCH", resourceId, ownerId: ids.next() as LeaseOwnerId, ttlSeconds: 120, deadlineAt, subjectHash: sha("self"), costAuthorityId: null, checkpointHash: null }, now));
+  const expiresAt = ctx.clock.at(120_000);
+  assert.equal((await claim(ctx.clock.now())).kind, "CLAIMED");
+  assert.equal((await claim(ctx.clock.before(expiresAt))).kind, "HELD");
+  const taken = await claim(ctx.clock.past(expiresAt));
+  assert.deepEqual(taken.kind === "CLAIMED" && taken.lease.fence, 2);
+});
