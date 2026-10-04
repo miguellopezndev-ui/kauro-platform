@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createCommissionService, type CommissionService } from "../src/index.js";
 import type { CommissionSweepName, SweepReport } from "../src/commissions/sweeps.js";
-import type { IntegrationWorld } from "./integration-support.js";
+import { providerReports, type IntegrationWorld } from "./integration-support.js";
 import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, oracleRows, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { ids } from "./support.js";
@@ -194,3 +194,50 @@ export async function observeBlocked(waiter: HarnessConnection, holder: HarnessC
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
+
+// --- the ledger of a purchase, read by the superuser ----------------------------------------------------------------------------------
+
+export interface LineView {
+  readonly lineId: string;
+  readonly state: string;
+  readonly version: number;
+  readonly cumulative: string;
+  readonly holds: ReadonlyArray<readonly [string, string, string]>;
+}
+export interface LedgerView {
+  readonly facts: ReadonlyArray<readonly [number, string]>;
+  readonly lines: ReadonlyArray<LineView>;
+}
+/** What the funds effect writes for a purchase: the funds facts of its capture, each line with its state, version, cumulative and holds (reason, state, cents). */
+export async function ledgerOfPurchase(p: Purchase): Promise<LedgerView> {
+  const facts = await oracleRows<{ capture_version: number; funds_state: string }>(iwOf(), "SELECT capture_version, funds_state FROM kauro.capture_funds_observations WHERE capture_id = $1 ORDER BY capture_version", [p.captureId]);
+  const lines = await oracleRows<{ line_id: string; state: string; version: string; cumulative: string }>(
+    iwOf(),
+    "SELECT line_id, state, version::text, cumulative_entitlement_cents::text AS cumulative FROM kauro.commission_lines WHERE authorization_id = $1 ORDER BY seller_id, line_id",
+    [p.authorizationId],
+  );
+  const out: LineView[] = [];
+  for (const l of lines) {
+    const holds = await oracleRows<{ reason: string; state: string; amount_cents: string }>(iwOf(), "SELECT reason, state, amount_cents::text FROM kauro.commission_holds WHERE line_id = $1 ORDER BY opened_at, hold_id", [l.line_id]);
+    out.push({ lineId: l.line_id, state: l.state, version: Number(l.version), cumulative: l.cumulative, holds: holds.map((h) => [h.reason, h.state, h.amount_cents] as const) });
+  }
+  return { facts: facts.map((f) => [Number(f.capture_version), f.funds_state] as const), lines: out };
+}
+export const stateOf = (l: LineView): string => l.state;
+
+/** Every capture event of a type, oldest version first, as the dispatcher would hand them to COMMISSIONS. */
+export async function eventsOf(captureId: string, eventType: string): Promise<Delivery[]> {
+  const rows = await oracleRows<{ event_id: string }>(iwOf(), "SELECT event_id FROM kauro.domain_events WHERE event_type = $2 AND (aggregate_id = $1::uuid OR payload->>'captureId' = $1::text) ORDER BY aggregate_version, created_at", [captureId, eventType]);
+  return Promise.all(rows.map((r) => deliveryOf(iwOf(), r.event_id)));
+}
+/** The provider changes the capture's disbursement and the payment service applies it (CMD034): the one new capture.funds_observed.v1, not delivered to COMMISSIONS. */
+export async function fundsReport(p: Purchase, disbursement: "INSTANT" | "DELAYED"): Promise<Delivery> {
+  const before = (await eventsOf(p.captureId, "capture.funds_observed.v1")).length;
+  await providerReports(iwOf(), p, { disbursement });
+  const events = await eventsOf(p.captureId, "capture.funds_observed.v1");
+  assert.equal(events.length, before + 1, "the provider's change published one funds observation");
+  const latest = events[events.length - 1]!;
+  assert.equal(latest.payload["fundsState"], disbursement === "INSTANT" ? "AVAILABLE" : "HELD");
+  return latest;
+}
+

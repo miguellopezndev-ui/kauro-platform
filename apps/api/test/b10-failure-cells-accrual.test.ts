@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import { assignedThrough, integrationWorld, oracleRows, providerReports, terminationBody, type IntegrationWorld } from "./integration-support.js";
 import { faultCell, recordServiceAssignment, type FaultContext } from "@kauro/persistence/testing";
-import { bindCells, consumeOn, contend, failures, nothingFor, observeBlocked, convertedFor, converting, deliveryOfCapture, itemOf, mustHaveSettled, open, rightsOf, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Converting, type Delivery } from "./b10-cells-support.js";
+import { bindCells, eventsOf, fundsReport, ledgerOfPurchase, stateOf, type LedgerView, consumeOn, contend, failures, nothingFor, observeBlocked, convertedFor, converting, deliveryOfCapture, itemOf, mustHaveSettled, open, rightsOf, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Converting, type Delivery } from "./b10-cells-support.js";
 import { acceptAttribution, approvedRefund, claimsOn, sellingAgency, deliveredByTheExecutionPackage, deliveryOf, linesOf, poolsOf, purchase, type Purchase } from "./commission-support.js";
 import type { ExecuteRefundView, SellerTerminationView, WebhookAck } from "@kauro/application";
 import type { SweepReport } from "../src/commissions/sweeps.js";
@@ -38,52 +38,6 @@ const LINES_LOCK: SqlStep = { label: "lines_lock", match: /FROM kauro\.commissio
 const ADJUSTMENT_INSERT: SqlStep = { label: "adjustment_insert", match: /INSERT INTO kauro\.commission_adjustments/ };
 const AGENCY_LOCK: SqlStep = { label: "agency_lock", match: /pg_advisory_xact_lock\(kauro\.transition_key\('kauro\.agency_commissions'/ };
 const LINE_LOCK = (lineId: string): SqlStep => ({ label: "line_lock", match: /WHERE l\.line_id = \$1 FOR UPDATE OF l/, when: (params) => params[0] === lineId });
-
-// --- the ledger of a purchase, read by the superuser ----------------------------------------------------------------------------------
-
-interface LineView {
-  readonly lineId: string;
-  readonly state: string;
-  readonly version: number;
-  readonly cumulative: string;
-  readonly holds: ReadonlyArray<readonly [string, string, string]>;
-}
-interface LedgerView {
-  readonly facts: ReadonlyArray<readonly [number, string]>;
-  readonly lines: ReadonlyArray<LineView>;
-}
-/** What the funds effect writes for a purchase: the funds facts of its capture, each line with its state, version, cumulative and holds (reason, state, cents). */
-async function ledgerOfPurchase(p: Purchase): Promise<LedgerView> {
-  const facts = await oracleRows<{ capture_version: number; funds_state: string }>(iw, "SELECT capture_version, funds_state FROM kauro.capture_funds_observations WHERE capture_id = $1 ORDER BY capture_version", [p.captureId]);
-  const lines = await oracleRows<{ line_id: string; state: string; version: string; cumulative: string }>(
-    iw,
-    "SELECT line_id, state, version::text, cumulative_entitlement_cents::text AS cumulative FROM kauro.commission_lines WHERE authorization_id = $1 ORDER BY seller_id, line_id",
-    [p.authorizationId],
-  );
-  const out: LineView[] = [];
-  for (const l of lines) {
-    const holds = await oracleRows<{ reason: string; state: string; amount_cents: string }>(iw, "SELECT reason, state, amount_cents::text FROM kauro.commission_holds WHERE line_id = $1 ORDER BY opened_at, hold_id", [l.line_id]);
-    out.push({ lineId: l.line_id, state: l.state, version: Number(l.version), cumulative: l.cumulative, holds: holds.map((h) => [h.reason, h.state, h.amount_cents] as const) });
-  }
-  return { facts: facts.map((f) => [Number(f.capture_version), f.funds_state] as const), lines: out };
-}
-const stateOf = (l: LineView): string => l.state;
-
-/** Every capture event of a type, oldest version first, as the dispatcher would hand them to COMMISSIONS. */
-async function eventsOf(captureId: string, eventType: string): Promise<Delivery[]> {
-  const rows = await oracleRows<{ event_id: string }>(iw, "SELECT event_id FROM kauro.domain_events WHERE event_type = $2 AND (aggregate_id = $1::uuid OR payload->>'captureId' = $1::text) ORDER BY aggregate_version, created_at", [captureId, eventType]);
-  return Promise.all(rows.map((r) => deliveryOf(iw, r.event_id)));
-}
-/** The provider changes the capture's disbursement and the payment service applies it (CMD034): the one new capture.funds_observed.v1, not delivered to COMMISSIONS. */
-async function fundsReport(p: Purchase, disbursement: "INSTANT" | "DELAYED"): Promise<Delivery> {
-  const before = (await eventsOf(p.captureId, "capture.funds_observed.v1")).length;
-  await providerReports(iw, p, { disbursement });
-  const events = await eventsOf(p.captureId, "capture.funds_observed.v1");
-  assert.equal(events.length, before + 1, "the provider's change published one funds observation");
-  const latest = events[events.length - 1]!;
-  assert.equal(latest.payload["fundsState"], disbursement === "INSTANT" ? "AVAILABLE" : "HELD");
-  return latest;
-}
 
 /** An agency whose claims are ACCEPTED, its first purchase confirmed and delivered to COMMISSIONS: converted, accrued, lines ACCRUED_PENDING. */
 async function accrued(label: string, shares: ReadonlyArray<number>): Promise<Converting> {
