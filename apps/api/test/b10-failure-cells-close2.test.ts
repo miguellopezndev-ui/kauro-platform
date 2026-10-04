@@ -116,7 +116,16 @@ interface Issued {
   readonly version: number;
   readonly lineId: string;
 }
+/** The three ISSUED statements of the correction cells, one month for all (the TEST CLOCK's offset reaches only so far into the year). */
+let pool: Promise<Issued[]> | undefined;
 async function takeIssued(count: number): Promise<Issued[]> {
+  pool ??= issueMonth(3);
+  const all = await pool;
+  const taken = all.splice(0, count);
+  if (taken.length < count) throw new Error("the shared ISSUED statements are used up");
+  return taken;
+}
+async function issueMonth(count: number): Promise<Issued[]> {
   const m = nextMonth();
   const sold: Array<{ s: Awaited<ReturnType<typeof seller>>; lineId: string }> = [];
   for (let i = 0; i < count; i++) {
