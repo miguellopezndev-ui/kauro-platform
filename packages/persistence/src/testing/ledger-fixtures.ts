@@ -200,6 +200,7 @@ export async function recordIssuedStatement(
         periodStart: period.startsAt,
         periodEnd: period.endsAt,
         lineIds: composed.lineIds,
+        inputLineIds: rows.lines.filter((l) => l.sellerId === seller).map((l) => l.lineId),
         accruedPendingCents: composed.accruedPendingCents,
         heldCents: composed.heldCents,
         payableCents: composed.payableCents,

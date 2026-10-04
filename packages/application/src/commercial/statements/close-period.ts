@@ -175,6 +175,8 @@ export function closeCommissionPeriod(rt: StatementServiceRuntime, request: Serv
             periodStart: period.startsAt,
             periodEnd: period.endsAt,
             lineIds: composed.lineIds,
+            // the seller's lines it is composed from: a correction recomposes over exactly these (D10-GAP-16)
+            inputLineIds: rows.lines.filter((l) => l.sellerId === sellerId).map((l) => l.lineId),
             accruedPendingCents: composed.accruedPendingCents,
             heldCents: composed.heldCents,
             payableCents: composed.payableCents,

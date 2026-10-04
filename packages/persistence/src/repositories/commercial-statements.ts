@@ -145,7 +145,7 @@ function periodRecord(r: PeriodRow): CommissionPeriodRecord {
 
 const STATEMENT = `s.statement_id, s.period_id, s.seller_id, ${canonical("s.period_starts_at", "period_starts_at")}, ${canonical("s.period_ends_at", "period_ends_at")}, s.calendar_id, s.calendar_source,
   ${calendarDate("s.statement_date", "statement_date")}, ${calendarDate("s.pay_date", "pay_date")}, s.label, s.accrued_pending_cents, s.held_cents, s.payable_cents, s.paid_to_date_cents,
-  s.negative_balance_cents, s.cutoff_hash, s.corrects_statement_id, s.state, s.version, ${canonical("s.issued_at", "issued_at")}, s.payout_evidence_hash,
+  s.negative_balance_cents, s.cutoff_hash, s.corrects_statement_id, (SELECT coalesce(array_agg(x::text ORDER BY x), ARRAY[]::text[]) FROM unnest(s.input_line_ids) AS x) AS input_line_ids, s.state, s.version, ${canonical("s.issued_at", "issued_at")}, s.payout_evidence_hash,
   (SELECT coalesce(array_agg(i.line_id::text ORDER BY i.item_no), ARRAY[]::text[]) FROM kauro.statement_items i WHERE i.statement_id = s.statement_id AND i.item_kind = 'LINE') AS line_ids`;
 interface StatementRow {
   statement_id: string;
@@ -170,6 +170,7 @@ interface StatementRow {
   issued_at: string | null;
   payout_evidence_hash: string | null;
   line_ids: string[];
+  input_line_ids: string[];
 }
 function statementRecord(r: StatementRow): CommissionStatementRecord {
   return defined<CommissionStatementRecord>(
@@ -180,6 +181,7 @@ function statementRecord(r: StatementRow): CommissionStatementRecord {
       periodStart: instantOf(r.period_starts_at),
       periodEnd: instantOf(r.period_ends_at),
       lineIds: r.line_ids as CommissionLineId[],
+      inputLineIds: r.input_line_ids as CommissionLineId[],
       accruedPendingCents: money(r.accrued_pending_cents),
       heldCents: money(r.held_cents),
       payableCents: money(r.payable_cents),
@@ -740,8 +742,8 @@ export class PgStatementRepository implements StatementRepository {
     const inserted = await execute<{ statement_id: string }>(
       this.db,
       `INSERT INTO kauro.commission_statements (statement_id, period_id, seller_id, period_starts_at, period_ends_at, calendar_id, calendar_source, statement_date, pay_date, label, accrued_pending_cents,
-         held_cents, payable_cents, paid_to_date_cents, negative_balance_cents, cutoff_hash, corrects_statement_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7, $8::date, $9::date, $10, $11, $12, $13, $14, $15, $16, $17, now(), now())
+         held_cents, payable_cents, paid_to_date_cents, negative_balance_cents, cutoff_hash, corrects_statement_id, input_line_ids, created_at, updated_at)
+       VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7, $8::date, $9::date, $10, $11, $12, $13, $14, $15, $16, $17, $18::uuid[], now(), now())
        ON CONFLICT DO NOTHING RETURNING statement_id`,
       [
         s.statementId,
@@ -761,6 +763,7 @@ export class PgStatementRepository implements StatementRepository {
         s.negativeBalanceCents,
         s.cutoffHash,
         s.correctsStatementId ?? null,
+        [...s.inputLineIds],
       ],
     );
     if (inserted.rows[0] === undefined) {

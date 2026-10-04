@@ -9,9 +9,10 @@
  *     of one statement serialize on its row, the second finding the first's version); then ISSUED or DISPUTED (UNLISTED_TRANSITION: an
  *     APPROVED, PAID or CORRECTED statement has no edge to CORRECTED, so a CORRECTED one is never corrected twice and no live payout
  *     intent names a CORRECTED statement; a FAILED or RETURNED one keeps naming the statement CMD053 supersedes, D10-GAP-12);
- *  2. the lines of the predecessor (every line any of its items names, D10-GAP-15) locked in ascending id, then the statement recomposed
- *     over exactly those lines from the ledger as it stands now (composeStatement), its own reported adjustments carried and its negative
- *     balance with them: a line PAYABLE through the predecessor (its payable owner, 0037) stays payable through the successor's
+ *  2. the lines of the predecessor (the input set it was composed from, recorded at its close and carried by every correction, and every
+ *     line any of its items names; D10-GAP-15, D10-GAP-16) locked in ascending id, then the statement recomposed over exactly those lines
+ *     from the ledger as it stands now (composeStatement), its own reported adjustments carried and its whole negative balance with them,
+ *     a debt line no item names included (an input line no item names enters only PAID or ADJUSTED, for what it reports): a line PAYABLE through the predecessor (its payable owner, 0037) stays payable through the successor's
  *     item and the successor takes it over, a line owned by another statement (a pending or held line a later period made payable, PAID or
  *     not) is that statement's: recomposed in its own state, never payable through the successor (B10G-R1: one live payable item per line), a line released since
  *     that is ELIGIBLE again becomes PAYABLE (statement_closed), anything else is itemized by its state; a PAYABLE line that the
@@ -76,12 +77,14 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
   const ledger = rt.ledger(uow);
   const period = await statements.getPeriod(predecessor.periodId);
   if (period === null) throw new DomainFailure("INTEGRITY_FAILURE", "a statement's period is readable");
-  // 2. its lines, locked in ascending id, and the statement recomposed over exactly them: every line ANY item of the predecessor names
-  // (LINE, HOLD, ADJUSTMENT, OFFSET, RECOVERY), not only its LINE items, so a paid line it reports (an adjustment, an offset, a recovery)
-  // is reported again by the successor with its negative balance (B10G-R9, D10-GAP-15)
+  // 2. its lines, locked in ascending id, and the statement recomposed over exactly them: the input set the predecessor was composed from
+  // (its close's lines of the seller, carried unchanged by each correction, D10-GAP-16) and every line ANY item of it names (LINE, HOLD,
+  // ADJUSTMENT, OFFSET, RECOVERY; D10-GAP-15), so a paid line it reports, or counts in its negative balance with no item naming it
+  // (SIGNED_FUTURE_OFFSET terms, its adjustment reported earlier), is reported again by the successor with that balance (B10G-R9)
   const predecessorItems = await statements.itemsOf(predecessor.statementId);
-  const named = new Set<string>(predecessor.lineIds);
-  for (const i of predecessorItems) if (i.lineId !== undefined && i.lineId !== null) named.add(i.lineId);
+  const itemized = new Set<string>(predecessor.lineIds);
+  for (const i of predecessorItems) if (i.lineId !== undefined && i.lineId !== null) itemized.add(i.lineId);
+  const named = new Set<string>([...itemized, ...predecessor.inputLineIds]);
   const locked = new Map<string, CommissionLineRecord>();
   for (const lineId of [...named].sort()) {
     const line = await ledger.lockLine(lineId as CommissionLineId);
@@ -95,7 +98,11 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
     return l !== undefined && l.payableStatementId !== undefined && l.payableStatementId !== null && l.payableStatementId !== predecessor.statementId;
   };
   const inputs = await statements.periodInputs(period.periodId, now);
-  const lines = inputs.lines.filter((l) => named.has(l.lineId));
+  // an input line no item of the predecessor names was not open at its close (an open line is always itemized): it enters only PAID or
+  // ADJUSTED, for the balance and the adjustments it reports; one released or held since belongs to the statement that itemizes it or to
+  // the next close, never to this successor
+  const lines = inputs.lines.filter((l) => itemized.has(l.lineId) || (named.has(l.lineId) && (l.state === "PAID" || l.state === "ADJUSTED")));
+  const included = new Set<string>(lines.map((l) => l.lineId as string));
   const payableBefore = new Set(lines.filter((l) => l.state === "PAYABLE" && !ownedElsewhere(l.lineId)).map((l) => l.lineId as string));
   // the adjustments live statements report (a CORRECTED statement's are its successor's): the predecessor's own are among them until it is
   // CORRECTED below, and are the successor's again; every other reported one stays with its statement
@@ -105,7 +112,7 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
     ...inputs,
     // a line PAYABLE through the predecessor awaits this very payout: itemized again, as the ELIGIBLE line it was composed from
     lines: lines.map((l) => (payableBefore.has(l.lineId) ? { ...l, state: "ELIGIBLE" as const } : l)),
-    adjustments: inputs.adjustments.filter((a) => named.has(a.commissionLineId) && (!reported.has(a.adjustmentId) || own.has(a.adjustmentId))),
+    adjustments: inputs.adjustments.filter((a) => included.has(a.commissionLineId) && (!reported.has(a.adjustmentId) || own.has(a.adjustmentId))),
   };
   const composed = composeStatement({ sellerId: predecessor.sellerId, periodStartsAt: BEGINNING, cutoffAt: now, rows });
   // every line of the predecessor may have gone on to another statement, or ended (PAID, ADJUSTED or VOID with nothing to report): the
@@ -128,6 +135,8 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
       periodStart: predecessor.periodStart,
       periodEnd: predecessor.periodEnd,
       lineIds: composed.lineIds,
+      // the same input set as the predecessor's: a later correction recomposes over it again (D10-GAP-16)
+      inputLineIds: predecessor.inputLineIds,
       accruedPendingCents: composed.accruedPendingCents,
       heldCents: composed.heldCents,
       payableCents: composed.payableCents,
@@ -138,7 +147,7 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
       label: predecessor.label,
       statementDate: predecessor.statementDate,
       payDueOn: predecessor.payDueOn,
-      cutoffHash: commissionCutoffHash({ periodId: period.periodId, cutoffAt: now, lines, adjustments: rows.adjustments, holds: inputs.holds.filter((h) => named.has(h.lineId)) }),
+      cutoffHash: commissionCutoffHash({ periodId: period.periodId, cutoffAt: now, lines, adjustments: rows.adjustments, holds: inputs.holds.filter((h) => included.has(h.lineId)) }),
       correctsStatementId: predecessor.statementId,
     },
     items: composed.items.map((item) => ({ ...item, itemId: uow.ids.next() as StatementItemId, statementId: successorId })),

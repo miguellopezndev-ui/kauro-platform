@@ -890,6 +890,12 @@ export interface CommissionStatementRecord {
   readonly periodEnd: UtcInstant;
   /** The lines its LINE items name. */
   readonly lineIds: ReadonlyArray<CommissionLineId>;
+  /**
+   * The seller's lines of the ledger it was composed from (migration 0041, D10-GAP-16): the close's input set, carried unchanged by a
+   * correcting statement, so a correction recomposes over the same lines, a debt line no item names included. Empty for a statement
+   * issued before 0041.
+   */
+  readonly inputLineIds: ReadonlyArray<CommissionLineId>;
   readonly accruedPendingCents: bigint;
   readonly heldCents: bigint;
   readonly payableCents: bigint;
