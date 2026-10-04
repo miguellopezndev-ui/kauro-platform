@@ -6,10 +6,10 @@
 // PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { PayoutIntentView, PeriodCloseView, StatementCorrectionView } from "@kauro/application";
+import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView, StatementCorrectionView } from "@kauro/application";
 import type { CommandResult } from "@kauro/application";
 import { connectionPid, faultCell, makeLineEligible, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { approvePayout, bankCash, claimedCents, closeMonth, correctStatement, eligibleLines, itemsOf, resultOf, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { approvePayout, bankCash, claimedCents, closeMonth, commissionContext, correctStatement, StandingUnits, eligibleLines, intentOf, itemsOf, ledgerOf, reconcilePayout, resultOf, rows, scriptEvidence, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { completed, freshKey, outcome, type Reply } from "./support.js";
 
@@ -266,4 +266,48 @@ test("CORR_DUP [deny] CMD051 correcting statement, a pending line another period
   assert.equal(outcome(sw.w, await approvePayout(sw, c!.statement_id, { expectedVersion: cVersion, payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) })), "409 PRECONDITION_FAILED NOTHING_PAYABLE");
   const authorized = await rows<{ cents: string }>(sw, "SELECT coalesce(sum(p.amount_cents), 0)::text AS cents FROM kauro.payout_intents p WHERE p.statement_id = ANY ($1::uuid[])", [[a.statement_id, b.statement_id, c!.statement_id]]);
   assert.equal(authorized[0]!.cents, String(PAYABLE), "the line's cents are authorized once");
+});
+
+// --- CORR_DUP: a FAILED payout, the hold released, a later period's close (Codex r2 B10G-R1, D10-GAP-12) -----------------------------------
+
+/** The PAYOUT_FAILED hold of a line released and the line ELIGIBLE again (hold_resolved_and_eligible), as the commission service. */
+async function releasePayoutFailed(lineId: string): Promise<void> {
+  // standing past the line's eligibility instant (720 hours after its purchase's FINAL completion, KC007)
+  await new StandingUnits(sw.pools.pools, () => ({ seconds: 721 * 3600 })).run(commissionContext(), async (uow) => {
+    const ledger = ledgerOf(uow);
+    const now = `${(await uow.serverInstant()).slice(0, 23)}Z` as never;
+    for (const h of await ledger.holdsOfLine(lineId as never)) if (h.state === "OPEN") await ledger.resolveHold(h.holdId, h.version, "RELEASED", now);
+    const line = (await ledger.lockLine(lineId as never))!;
+    const moved = await ledger.transitionLine(line.lineId, line.version, { state: "ELIGIBLE" } as never, now);
+    assert.equal(moved.kind, "APPLIED");
+  });
+}
+
+test("CORR_DUP [deny] a FAILED payout, its hold released and a later period's close -> DENY: the statement whose payout FAILED is superseded in the reconciliation's COMMIT, so the later statement is the line's one live payable item and its cents are authorized once", async () => {
+  const [x] = await takeIssued(1);
+  await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
+  completed<PayoutIntentView>(await approvePayout(sw, x!.statementId, await approveBody(x!)), 200);
+  const intent = await intentOf(sw, x!.statementId);
+  const ref = scriptEvidence(sw, sw.payouts.matching({ reference: intent.reference, destinationDigest: intent.destinationDigest, amountCents: intent.amount, currency: intent.currency }, "FAILED"));
+  const failed = completed<PayoutReconciliationView>(await reconcilePayout(sw, x!.statementId, { providerPayoutEvidenceRef: ref }), 200);
+  // the failed statement is CORRECTED in the same COMMIT; its successor itemizes the line HELD, nothing payable
+  assert.equal(failed.data.statementState, "CORRECTED");
+  assert.equal((await stateOf(x!.statementId)).state, "CORRECTED");
+  const [succ] = await successorsOf(x!.statementId);
+  assert.deepEqual([succ!.state, succ!.payable_cents], ["ISSUED", "0"]);
+  assert.deepEqual((await itemsOf(sw, succ!.statement_id)).map((i) => [i.line_id, i.disposition, i.held_cents]), [[x!.lineId, "HELD", String(PAYABLE)]]);
+  assert.equal(await lineState(x!.lineId), "HELD");
+  assert.equal(await liveItems(x!.lineId), 0, "a held line is payable through no live item");
+  // the hold released and the line ELIGIBLE: a later period's close makes it payable through its own statement only
+  await releasePayoutFailed(x!.lineId);
+  const later = await closeMonth(sw, nextMonth());
+  completed<PeriodCloseView>(later.reply, 200);
+  const b = (await statementsOfSeller(sw, x!.s.sellerId)).find((st) => st.period_id === later.periodId)!;
+  assert.deepEqual([b.state, b.payable_cents, await lineState(x!.lineId)], ["ISSUED", String(PAYABLE), "PAYABLE"]);
+  assert.equal(await liveItems(x!.lineId), 1, "the line is payable through exactly one live statement item");
+  // the cents are authorized once: the later statement pays them, the successor has nothing payable
+  await bankCash(sw, (await claimedCents(sw)) + PAYABLE + PAYABLE);
+  completed<PayoutIntentView>(await approvePayout(sw, b.statement_id, { expectedVersion: Number(b.version), payeeRef: x!.s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) }), 200);
+  const sv = (await stateOf(succ!.statement_id)).version;
+  assert.equal(outcome(sw.w, await approvePayout(sw, succ!.statement_id, { expectedVersion: sv, payeeRef: x!.s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) })), "409 PRECONDITION_FAILED NOTHING_PAYABLE");
 });

@@ -14,7 +14,9 @@
  *  4. SETTLED: the evidence recorded once, the intent SETTLED with it, the statement PAID with its hash and each PAYABLE item's line PAID
  *     at that item's cents (settled_payout_evidence); evidence already applied to a SETTLED intent changes nothing and answers its state;
  *     FAILED or RETURNED: the evidence recorded, the intent kept FAILED or RETURNED, the statement APPROVED → ISSUED, and each PAYABLE line
- *     HELD PAYOUT_FAILED under a hold of its unpaid cents reviewed 168 hours later (payout_blocked) — the earned amount is preserved.
+ *     HELD PAYOUT_FAILED under a hold of its unpaid cents reviewed 168 hours later (payout_blocked) — the earned amount is preserved —
+ *     then the statement superseded by its correcting statement in the same COMMIT (ISSUED → CORRECTED, correction_issued, D10-GAP-12):
+ *     the successor itemizes the held lines, so a later statement that makes them payable is their one live payable item.
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, CommissionLineId, CommissionStatementId, PayoutEvidenceFacts, PayoutIntentId, PayoutIntentRecord, PayoutReconciliationId } from "@kauro/domain";
@@ -25,6 +27,7 @@ import type { ReconcileCommissionPayoutBody } from "../contracts.js";
 import type { PayoutEvidenceAnswer } from "../ports.js";
 import type { PayoutReconciliationView } from "../views.js";
 import { calendarDateIn } from "./close-period.js";
+import { supersedeStatement } from "./correct-statement.js";
 import type { StatementServiceRuntime } from "./runtime.js";
 import { runServiceCommand, type ServiceCommandRequest } from "./service.js";
 
@@ -134,7 +137,7 @@ export function reconcileCommissionPayout(rt: StatementServiceRuntime, request: 
         }
         return { view: view(moved, paid.state, facts.evidenceHash, { paid: items.length, held: 0 }), version: moved.version, resourceKind: "payout_intent", resourceId: moved.intentId };
       }
-      // FAILED or RETURNED: the intent is kept, the statement payable again, its lines held for review (payout_blocked)
+      // FAILED or RETURNED: the intent is kept, the statement ISSUED again and then CORRECTED, its lines held for review (payout_blocked)
       const reissued = applied(await statements.transitionStatement(statementId, statement.version, { state: "ISSUED" }, now));
       const reviewAt = addHours(now, PAYOUT_FAILED_REVIEW_HOURS);
       for (const item of items) {
@@ -142,8 +145,12 @@ export function reconcileCommissionPayout(rt: StatementServiceRuntime, request: 
         if (line === null || line.state !== "PAYABLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable item's line is not PAYABLE under its statement's lock");
         applied(await ledger.transitionLine(line.lineId, line.version, { state: "HELD", heldReason: "PAYOUT_FAILED", reviewAt }, now));
       }
+      // the ISSUED statement is never approvable again (its lines left it, D10-GAP-8): a correcting statement supersedes it in the same
+      // COMMIT, itemizing the lines as they now stand (HELD PAYOUT_FAILED), so a later statement that makes them payable is their one live
+      // payable item (D10-GAP-12, B10G-R1)
+      const { corrected } = await supersedeStatement(rt, uow, reissued, now);
       return {
-        view: view(moved, reissued.state, undefined, { paid: 0, held: items.length }, calendarDateIn(reviewAt, rt.policy.operationalTimeZone)),
+        view: view(moved, corrected.state, undefined, { paid: 0, held: items.length }, calendarDateIn(reviewAt, rt.policy.operationalTimeZone)),
         version: moved.version,
         resourceKind: "payout_intent",
         resourceId: moved.intentId,

@@ -123,7 +123,7 @@ export const COMMERCIAL_PLATFORM_MACHINES: ReadonlyArray<StateMachine> = Object.
       { from: "DRAFT", event: "statement_issued", to: "ISSUED", guard: "The same transaction as its items (CMD051).", effect: "An immutable itemized statement with its pay date." },
       { from: "ISSUED", event: "payout_approved", to: "APPROVED", guard: "One live intent to a VERIFIED payee (CMD052; KC009).", effect: "An authorized payout intent of exactly the payable." },
       { from: "APPROVED", event: "payout_settled", to: "PAID", guard: "Settled evidence of its intent (CMD053; KC010).", effect: "The statement is paid with its evidence hash." },
-      { from: "APPROVED", event: "payout_not_settled", to: "ISSUED", guard: "The intent FAILED or RETURNED (CMD053).", effect: "The statement is payable again; its lines are held." },
+      { from: "APPROVED", event: "payout_not_settled", to: "ISSUED", guard: "The intent FAILED or RETURNED (CMD053).", effect: "Its lines are held; the statement is then superseded by its correcting statement in the same transaction (D10-GAP-12)." },
       { from: "ISSUED", event: "statement_disputed", to: "DISPUTED", guard: "The seller's dispute of the whole statement (B12).", effect: "Payout waits for the dispute." },
       { from: "DISPUTED", event: "dispute_scoped", to: "ISSUED", guard: "The dispute became line holds (B12).", effect: "The undisputed payable proceeds." },
       { from: "DISPUTED", event: "correction_issued", to: "CORRECTED", guard: "A correcting statement supersedes it (CMD051).", effect: "The corrected statement is history." },

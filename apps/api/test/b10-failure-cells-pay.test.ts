@@ -360,7 +360,7 @@ faultCell(
     const returnedFirst = await holdAndWait(ctx, "the SETTLED evidence while the RETURNED evidence is held", commission((conn) => reconcileOn(ctx, conn, y!, "RETURNED")), commission((conn) => reconcileOn(ctx, conn, y!, "SETTLED")));
     completed<PayoutReconciliationView>(value(returnedFirst.held), 200);
     assert.equal(outcome(sw.w, value(returnedFirst.waited)), "409 PRECONDITION_FAILED UNLISTED_TRANSITION");
-    assert.deepEqual([await intentState(y!.intent.intentId), await statementState(y!.statementId), await lineStatesOf(y!), await reconciliationsOf(y!)], ["RETURNED", "ISSUED", ["HELD"], 1], "the returned payout stays held for review");
+    assert.deepEqual([await intentState(y!.intent.intentId), await statementState(y!.statementId), await lineStatesOf(y!), await reconciliationsOf(y!)], ["RETURNED", "CORRECTED", ["HELD"], 1], "the returned payout stays held for review, its statement superseded (D10-GAP-12)");
   },
 );
 
@@ -388,11 +388,11 @@ faultCell(
     completed<PayoutReconciliationView>(value(failedFirst.held), 200);
     assert.equal(outcome(sw.w, value(failedFirst.waited)), "409 STALE_VERSION -");
     assert.equal(await liveIntents(x!.statementId), 0, "the failed intent is not live and the stale approval wrote none");
-    // the statement is ISSUED again at its new version, but its lines are HELD under OPEN PAYOUT_FAILED holds (B10G-R2): no approval
-    // authorizes held cents until the hold is resolved
+    // the statement is superseded by its correcting statement in the same COMMIT (D10-GAP-12) and its lines are HELD under OPEN
+    // PAYOUT_FAILED holds (B10G-R2): no approval authorizes held cents, the CORRECTED statement has no edge to APPROVED
     await bankCash(sw, (await claimedCents(sw)) + x!.payable);
     assert.deepEqual(await lineStatesOf(x!), ["HELD"]);
-    assert.equal(outcome(sw.w, await approvePayout(sw, x!.statementId, await approveBody(await racing(x!)))), "409 STALE_VERSION LEDGER_CHANGED");
+    assert.equal(outcome(sw.w, await approvePayout(sw, x!.statementId, await approveBody(await racing(x!)))), "409 PRECONDITION_FAILED UNLISTED_TRANSITION");
     assert.equal(await liveIntents(x!.statementId), 0, "the held cents of the failed payout are not authorized again");
 
     // the second approval first (held right after it locked the statement): it finds the statement APPROVED; the FAILED reconciliation waits, then lands
@@ -407,7 +407,7 @@ faultCell(
     assert.equal(outcome(sw.w, value(approvalFirst.held)), "409 PRECONDITION_FAILED UNLISTED_TRANSITION");
     completed<PayoutReconciliationView>(value(approvalFirst.waited), 200);
     assert.equal(await liveIntents(y!.statementId), 0);
-    assert.equal(await statementState(y!.statementId), "ISSUED");
+    assert.equal(await statementState(y!.statementId), "CORRECTED");
   },
 );
 

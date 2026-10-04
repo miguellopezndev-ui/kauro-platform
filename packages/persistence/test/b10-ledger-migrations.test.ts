@@ -609,7 +609,8 @@ test("B10G-R1 at the database: a PAYABLE line is payable through one live statem
   const a = await issueStatement(w, october, s, [lineId]);
   const owner = async (): Promise<string | null> => (await w.h.oracle.query<{ id: string | null }>("SELECT payable_statement_id AS id FROM kauro.commission_lines WHERE line_id = $1", [lineId])).rows[0]!.id;
   assert.equal(await owner(), a.statementId, "the line is payable through the statement whose PAYABLE item made it PAYABLE");
-  const later = await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01");
+  const november = (await w.h.oracle.query<{ id: string }>("SELECT period_id AS id FROM kauro.commission_periods WHERE period_month = '2026-11-01'")).rows[0]?.id;
+  const later = november ?? (await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01"));
   await assert.rejects(within(w.commission, corporate, (c) => statementFor(c, later, s, [lineId], { payLines: false })), refusedWith("KC019"), "a second live statement itemizing the PAYABLE line");
   await assert.rejects(
     within(w.commission, corporate, async (c) => {
@@ -620,6 +621,22 @@ test("B10G-R1 at the database: a PAYABLE line is payable through one live statem
     "a take-over by a statement that does not correct the owner",
   );
   assert.equal(await owner(), a.statementId);
+});
+
+test("B10G-R1 r2 at the database: one live PAYABLE item per line is the statement's invariant, not the line's state (0039, KC019): while a statement that is not CORRECTED itemizes the line PAYABLE, no other statement itemizes it PAYABLE, even with the line no longer PAYABLE", async () => {
+  const s = await activeSeller(w, "live-s");
+  const { ag, first, lineId } = await firstLine("LIVE", s);
+  await completion(w, ag, first, "FINAL");
+  await funds(w, ag, first, "AVAILABLE", 2);
+  await makeEligible(w, lineId);
+  await issueStatement(w, october, s, [lineId]);
+  // the line forced out of PAYABLE behind the machine's back (the superuser, triggers off): the old statement still itemizes it PAYABLE
+  assert.match(lineId, /^[0-9a-f-]{36}$/);
+  await w.h.oracle.query(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE kauro.commission_lines SET state = 'ELIGIBLE', payable_statement_id = NULL WHERE line_id = '${lineId}'; COMMIT;`);
+  // November's period (the B10G-R1 test above records it when it runs first)
+  const november = (await w.h.oracle.query<{ id: string }>("SELECT period_id AS id FROM kauro.commission_periods WHERE period_month = '2026-11-01'")).rows[0]?.id;
+  const later = november ?? (await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01"));
+  await assert.rejects(within(w.commission, corporate, (c) => statementFor(c, later, s, [lineId], { payLines: false })), refusedWith("KC019"), "a second live statement itemizing the line PAYABLE");
 });
 
 test("B10G-R7 at the database: a step-up proof that expires during the approving transaction refuses the intent at its write (the expiry is compared with the statement's clock, not the transaction's start)", async () => {

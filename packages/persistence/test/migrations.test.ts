@@ -82,6 +82,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0037_line_payable_owner.sql",
     // package B10 (Codex r1 B10G-R7, D10-GAP-11): a payout's step-up expiry compared with the statement's instant (kauro.effect_now)
     "0038_step_up_effect_clock.sql",
+    // package B10 (Codex r2 B10G-R1, D10-GAP-12): one live payable item per line, keyed on the statement's liveness
+    "0039_live_payable_item.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
