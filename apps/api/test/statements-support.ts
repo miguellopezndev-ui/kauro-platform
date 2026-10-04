@@ -17,14 +17,14 @@
 import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { BANKING_CALENDAR_FIXTURE_NONBANKING, ContractFakeBankingCalendar, ContractFakePayoutEvidence, ContractFakePreparationCompletion } from "@kauro/application/testing";
-import type { StatementServiceHold } from "@kauro/application";
+import { correctCommissionStatement, type CommandResult, type StatementCorrectionView, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CorrelationId, ExecutionContext, SettlementId, UserId } from "@kauro/domain";
 import { registryCommissionPolicy, registryPricePolicy } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory, ledgerOf, statementsOf } from "@kauro/persistence";
 import { ROLES, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller, recordClaim, recordConversion, recordEligibleLine, recordProspect, type RecordedSeller, type SellerTerms } from "@kauro/persistence/testing";
 import { proposeCommissionClose } from "@kauro/application";
-import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, type CommissionPools, type CommissionService } from "../src/index.js";
+import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, statementServiceRuntime, type CommissionPools, type CommissionService } from "../src/index.js";
 import { CommissionHolds, approvedPlan, captureOf, checkoutOf, purchase, recordSyntheticSchedule, sellingAgency, statedQuote, type CommissionWorld, type Purchase, type Selling } from "./commission-support.js";
 import { FaultRouting } from "./fault-support.js";
 import { paymentWorld, serviceToken, type PaymentWorld } from "./payment-support.js";
@@ -126,6 +126,8 @@ export interface StatementsWorld extends CommissionWorld {
   readonly serviceHolds: ServiceHolds;
   /** Routes a command's real unit of work over a connection of the common fault harness (the B10 failure cells; test/fault-support.ts). */
   readonly faults: FaultRouting;
+  /** The commission group's service runtime over the fault-routed, test-clock units: how a correction (CMD051, no route) runs (D10-GAP-7). */
+  readonly statementRuntime: StatementServiceRuntime;
   /** A corporate person with an ACTIVE KAURO_OWNER grant and a bearer token (CMD052, the reads). */
   readonly owner: Person;
   /** Stands the service routes' units of work at `at` on the TEST CLOCK (never behind the real clock); null: the real clock. */
@@ -158,6 +160,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
   faults.stand = () => (standing === null ? null : { at: standing });
   const pools = opened.pools;
   if (pools === null) throw new Error("the commission pools were not opened by the api's assembly");
+  const statementRuntime = statementServiceRuntime({ units: faults.wrap(new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }))), calendar }, "LOCAL", clock);
   const { w } = pw;
   const h = w.h;
   const dispatcherClock = movableClock();
@@ -186,6 +189,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     payouts,
     serviceHolds,
     faults,
+    statementRuntime,
     standAt(at) {
       standing = at;
     },
@@ -215,6 +219,24 @@ export function commissionToken(sw: StatementsWorld, serviceId: "commission-serv
 
 export function closePeriod(sw: StatementsWorld, periodId: string, body: unknown, options: { readonly token?: string | null; readonly key?: string } = {}): Promise<Reply> {
   return call(sw.w, { url: routes.close(periodId), agency: null, token: options.token === undefined ? commissionToken(sw) : options.token, key: options.key ?? freshKey("cmd051"), body });
+}
+
+/** CMD051's correction of a statement as the commission service (no route: D10-GAP-7), journaled under `key`. */
+export function correctStatement(sw: StatementsWorld, statementId: string, body: { readonly expectedVersion: number }, options: { readonly key?: string } = {}): Promise<CommandResult<StatementCorrectionView>> {
+  return correctCommissionStatement(sw.statementRuntime, {
+    correlationId: ids.next() as CorrelationId,
+    idempotencyKey: options.key ?? freshKey("cmd051-correct"),
+    identity: { serviceId: "commission-service", audience: "kauro-api", environment: "LOCAL" },
+    path: { statementId },
+    body,
+  });
+}
+
+/** The outcome of a service command as the cells assert it: "200", or "<status> <code> <reason>". */
+export function resultOf(r: CommandResult<unknown>): string {
+  if (r.kind === "COMPLETED") return String(r.status);
+  if (r.kind === "ACCEPTED") return "202";
+  return `${r.problem.status} ${r.problem.code} ${r.problem.reason ?? "-"}`;
 }
 
 export function approvePayout(sw: StatementsWorld, statementId: string, body: unknown, options: { readonly token?: string; readonly key?: string } = {}): Promise<Reply> {

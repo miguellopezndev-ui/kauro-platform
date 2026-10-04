@@ -3,10 +3,10 @@
 // work over a connection the harness opened (test/fault-support.ts), so a race cell observes the close itself waiting on the holder's lock or
 // holding it until its COMMIT. PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
+import { after, before, test } from "node:test";
 import type { PeriodCloseView } from "@kauro/application";
 import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { closePeriod, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { closeMonth, closePeriod, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
@@ -129,3 +129,28 @@ faultCell(
     }
   },
 );
+
+// --- 2. CLOSE_VS_DELIVERY (ruling R-GAP-2: the input is the COMMISSIONS records CREATED before the close, never occurred_at) -----------
+
+test("CLOSE_VS_DELIVERY [deny] CMD051 CloseCommissionPeriod, a COMMISSIONS record created after the close -> DENY: a line whose record occurred inside the period but was created after the period's close is absent from the closed statement and present in the next one", async () => {
+  const first = await seller(sw, "late-delivery-first", WHOLE);
+  await eligibleLines(sw, "late delivery first", first, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
+  const m1 = nextMonth();
+  const closed = await closeMonth(sw, m1);
+  completed<PeriodCloseView>(closed.reply, 200);
+  const st1 = (await statementOf(first.sellerId, closed.periodId))!;
+  assert.deepEqual([st1.payable_cents, st1.held_cents], ["10000", "0"]);
+
+  // the late delivery: its line is created now, after m1's close COMMIT, whatever instant its capture occurred at
+  const late = await seller(sw, "late-delivery-second", WHOLE);
+  const sold = await eligibleLines(sw, "late delivery second", late, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
+  const lateLine = sold.lines[0]!.lineId;
+  assert.equal(await statementOf(late.sellerId, closed.periodId), undefined, "the closed statement set has nobody's late line");
+  assert.ok(!(await itemsOf(sw, st1.statement_id)).some((i) => i.line_id === lateLine), "the closed statement itemizes only what was created before it");
+
+  const m2 = nextMonth();
+  const next = await closeMonth(sw, m2);
+  completed<PeriodCloseView>(next.reply, 200);
+  const st2 = (await statementOf(late.sellerId, next.periodId))!;
+  assert.deepEqual((await itemsOf(sw, st2.statement_id)).map((i) => [i.line_id, i.disposition, i.payable_cents]), [[lateLine, "PAYABLE", "10000"]], "the next statement carries it");
+});
