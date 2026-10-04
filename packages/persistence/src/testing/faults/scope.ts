@@ -2,13 +2,15 @@
  * Evidence ownership of the common fault harness (docs/design/FAULT-HARNESS.md, "Evidence ownership"): the operation under test
  * runs inside an operation scope (AsyncLocalStorage, node:async_hooks) with a unique id, and every evidence source records into
  * the scope current where the evidence happened — a fault point passed, crashed or completed (instrumentPort, crashableFactory), a
- * call of an instrumented port with the instants its arguments carried at the call, a read of the controlled clock, an onServer application and the statements run
- * after it on that session, a statement issued through a harness connection. Evidence recorded outside any scope, in another scope
+ * call of an instrumented port with the instants its arguments carried at the call, a read of the controlled clock, an onServer application (proven
+ * consumed only by server probes around a statement of the operation, never by parsing SQL), a statement issued through a harness connection. Evidence recorded outside any scope, in another scope
  * or after its scope closed is in no scope's log, so it never counts: a check reads only the log of the operation it judges.
  * A scope's log also receives what its nested scopes recorded (a nested operation is part of the enclosing one); a sibling's never.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
+import { Client } from "pg";
+import { TEST_CLOCK_OFFSET_SETTING } from "../temporary-postgres.js";
 
 /** One piece of evidence, recorded by the harness only (module-private writers), with a global sequence for ordering. */
 export type ScopeEvent =
@@ -19,8 +21,8 @@ export type ScopeEvent =
   /** A call of an instrumented port: the instants its arguments carried AT the call (a frozen snapshot, never the live objects). */
   | { readonly kind: "CALL"; readonly name: string; readonly instants: ReadonlyArray<number>; readonly seq: number }
   | { readonly kind: "CLOCK_READ"; readonly at: number; readonly seq: number }
-  /** onServer put `at` on the session's open transaction; `txn` is that transaction (TransactionTrack epoch), undefined if not tracked. */
-  | { readonly kind: "SERVER_APPLIED"; readonly at: number; readonly session: object; readonly txn: number | undefined; readonly seq: number }
+  /** onServer put `at` on the session's open transaction, with a unique token; consumed only once `application.proven` (server probes). */
+  | { readonly kind: "SERVER_APPLIED"; readonly at: number; readonly session: object; readonly application: ServerApplication; readonly seq: number }
   | StatementEvent;
 
 /** A statement issued on a session inside a scope: dispatched once the driver sent it, settled once its answer arrived. */
@@ -35,11 +37,6 @@ export interface StatementEvent {
   /** Settled while its scope was still open (the statement executed as part of the operation). */
   executed: boolean;
   settled: boolean;
-  /**
-   * The transaction the statement ran in (the session's TransactionTrack epoch when the driver sent it, inside an open transaction
-   * that had not failed); undefined when not known, outside a transaction, or when the transaction ended before it settled.
-   */
-  txn: number | undefined;
 }
 
 let sequence = 0;
@@ -52,6 +49,7 @@ export class OperationScope {
   readonly #onClose: Array<() => void> = [];
   #open = true;
   #tags = 0;
+  readonly #pending: Array<Promise<void>> = [];
 
   constructor(name: string, parent: OperationScope | undefined) {
     this.name = name;
@@ -77,6 +75,22 @@ export class OperationScope {
   encloses(other: OperationScope | undefined): boolean {
     for (let s = other; s !== undefined; s = s.parent) if (s === this) return true;
     return false;
+  }
+
+  /** @internal a verdict the harness is still waiting for (server probes in flight), recorded by bracketStatement only. */
+  pending(verdict: Promise<void>): void {
+    this.#pending.push(verdict);
+  }
+
+  /** Waits until every verdict pending in this scope (and its nested scopes) landed, at most `limitMs`; one not landed proves nothing. */
+  async settled(limitMs = 10_000): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const limit = new Promise<void>((resolve) => (timer = setTimeout(resolve, limitMs)));
+    try {
+      await Promise.race([Promise.allSettled([...this.#pending]).then(() => undefined), limit]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   onClose(fn: () => void): void {
@@ -163,7 +177,7 @@ export interface IssuedStatement {
 /** Records a statement issued on `session` in the current scope (none outside one); the caller marks it dispatched and settled. */
 export function recordStatement(session: object, text: string | undefined, tag: string | undefined): IssuedStatement | undefined {
   let event: StatementEvent | undefined;
-  const scope = record((seq) => (event = { kind: "STATEMENT", session: sessionKey(session), text, tag, seq, dispatched: false, executed: false, settled: false, txn: undefined }));
+  const scope = record((seq) => (event = { kind: "STATEMENT", session: sessionKey(session), text, tag, seq, dispatched: false, executed: false, settled: false }));
   return scope === undefined || event === undefined ? undefined : { event, scope };
 }
 
@@ -171,9 +185,6 @@ export function recordStatement(session: object, text: string | undefined, tag: 
 export function settleStatement(issued: IssuedStatement | undefined): void {
   if (issued === undefined) return;
   issued.event.settled = true;
-  // the transaction ended (the connection died, a ROLLBACK went by) before the answer came: it did not run to its end in it
-  const track = trackOf.get(issued.event);
-  if (issued.event.txn !== undefined && (track === undefined || track.epoch !== issued.event.txn)) issued.event.txn = undefined;
   if (issued.scope.open) issued.event.executed = true;
 }
 
@@ -186,128 +197,145 @@ export function trackSettlement(issued: IssuedStatement | undefined, out: unknow
   }
 }
 
-const TRANSACTION_CONTROL = /^\s*(?:(?:\/\*[\s\S]*?\*\/|--[^\n]*(?:\n|$))\s*)*(BEGIN|START|COMMIT|ROLLBACK|END|ABORT|SAVEPOINT|RELEASE|PREPARE\s+TRANSACTION)\b/i;
-const TRANSACTION_END = /^\s*(?:(?:\/\*[\s\S]*?\*\/|--[^\n]*(?:\n|$))\s*)*(COMMIT|ROLLBACK|END|ABORT|PREPARE\s+TRANSACTION)\b/i;
-
-/** The statements of a (possibly multi-statement) text, split at every `;` (conservative: a `;` in a literal only splits more). */
-function piecesOf(text: string | undefined): string[] {
-  return text === undefined ? [] : text.split(";");
-}
-
-/** Whether any statement of `text` is transaction control (BEGIN, COMMIT, ROLLBACK [TO], SAVEPOINT, RELEASE, ...). */
-export function touchesTransaction(text: string | undefined): boolean {
-  return piecesOf(text).some((p) => TRANSACTION_CONTROL.test(p));
-}
+/** The custom setting onServer puts on the transaction, next to the clock override, with a unique token per call. */
+export const CLOCK_TOKEN_SETTING = "fault.clock_token";
 
 /**
- * Whether any statement of `text` ends the transaction or undoes part of it: COMMIT, ROLLBACK, END, ABORT, PREPARE TRANSACTION,
- * and ROLLBACK TO a savepoint (it discards a transaction-local setting made after the savepoint).
+ * One onServer call: the server put the clock override (`offset`, as the server stored it) and the unique `token` on the
+ * transaction `txid` of the backend `pid`, both with set_config(..., true) (transaction-local: undone by ROLLBACK, ROLLBACK TO a
+ * savepoint taken before it, COMMIT, a lost connection, or any statement that changes either setting). `proven` is set by the
+ * harness only, once a statement of the operation was bracketed by two server probes that both read this token, this offset and
+ * this txid (bracketStatement).
  */
-export function breaksTransaction(text: string | undefined): boolean {
-  return piecesOf(text).some((p) => TRANSACTION_END.test(p));
+export interface ServerApplication {
+  readonly at: number;
+  readonly token: string;
+  readonly offset: string;
+  readonly txid: string;
+  readonly pid: number | undefined;
+  readonly scope: OperationScope;
+  proven: boolean;
 }
 
-/**
- * The transaction boundaries of one connection, from EVERY statement sent on it (any scope or none) and from the server itself:
- * `epoch` moves whenever the server reports the session out of a transaction (ReadyForQuery status I), whenever a statement that
- * ends or partly undoes the transaction is sent, and when the connection ends or fails. Two statements ran in the same transaction,
- * with nothing undone between them, only if both were sent inside a live transaction (status T) at the same epoch.
- */
-export interface TransactionTrack {
-  epoch: number;
-  /** The server's transaction status after the last statement: I idle, T in a transaction, E in a failed one. */
-  status: string | undefined;
+/** The applications whose operation is still open, per raw session. */
+const applications = new WeakMap<object, ServerApplication[]>();
+
+/** Registers an onServer application on the raw session for statements of its scope (and nested ones) until the scope closes. */
+export function registerApplication(raw: object, application: ServerApplication): void {
+  const list = applications.get(raw) ?? [];
+  list.push(application);
+  applications.set(raw, list);
+  application.scope.onClose(() => {
+    const live = applications.get(raw);
+    if (live === undefined) return;
+    const i = live.indexOf(application);
+    if (i >= 0) live.splice(i, 1);
+  });
 }
 
 interface DriverInternals {
-  connection?: { prependListener?: (event: string, fn: (...a: unknown[]) => void) => unknown };
-  _txStatus?: unknown;
   _activeQuery?: object | null;
   _queryQueue?: Array<{ submit: (...a: unknown[]) => unknown }>;
   pipeline?: unknown;
 }
 
-const tracks = new WeakMap<object, TransactionTrack>();
-const trackOf = new WeakMap<StatementEvent, TransactionTrack>();
-
-/** The transaction track of a raw driver client (installed on first use; undefined for a session without a pg connection). */
-export function trackTransactions(raw: object): TransactionTrack | undefined {
-  const known = tracks.get(raw);
-  if (known !== undefined) return known;
+/** The driver query object a send just created on `raw` (it became the active one, or it was queued last), if any. */
+function created(raw: object, activeBefore: object | null, queuedBefore: number): object | undefined {
   const internals = raw as DriverInternals;
-  const con = internals.connection;
-  if (con === undefined || typeof con.prependListener !== "function") return undefined;
-  const status = internals._txStatus;
-  const track: TransactionTrack = { epoch: 0, status: typeof status === "string" ? status : undefined };
-  // prepended: the track is current before the driver hands the answer over or sends the next queued statement
-  con.prependListener("readyForQuery", (msg: unknown) => {
-    const s = (msg as { status?: unknown } | undefined)?.status;
-    track.status = typeof s === "string" ? s : undefined;
-    if (track.status !== "T" && track.status !== "E") track.epoch += 1;
-  });
-  const gone = () => {
-    track.epoch += 1;
-    track.status = undefined;
-  };
-  con.prependListener("end", gone);
-  con.prependListener("error", gone);
-  tracks.set(raw, track);
-  return track;
-}
-
-/** The transaction a statement is sent in now on `raw`, or undefined when not tracked, pipelined, or outside a live transaction. */
-export function currentTransaction(raw: object): number | undefined {
-  const track = tracks.get(raw);
-  if (track === undefined || (raw as DriverInternals).pipeline === true || track.status !== "T") return undefined;
-  return track.epoch;
+  const active = internals._activeQuery ?? null;
+  const queue = internals._queryQueue ?? [];
+  if (active !== null && active !== activeBefore) return active;
+  if (queue.length > queuedBefore) return queue[queue.length - 1];
+  return undefined;
 }
 
 /**
  * Sends a statement through `send` on the raw client and calls `onSent` once the driver actually sends it (at once when the
- * connection was free, or when the driver submits it from its queue) with the driver's query object. First, the statement's
- * transaction is stamped on `issued` and, if its text ends or undoes the transaction, the track's epoch moves. A statement whose
- * sending cannot be observed (pipeline mode) is stamped with no transaction and moves the epoch at once if it ends one.
+ * connection was free, or when the driver submits it from its queue) with the driver's query object. Returns the call's result
+ * and the driver query object it created (undefined when that cannot be observed: pipeline mode, an unqueued failure).
  */
-export function sendTracked(raw: object, text: string | undefined, issued: IssuedStatement | undefined, send: () => unknown, onSent?: (driverQuery: object) => void): unknown {
+export function sendObserved(raw: object, send: () => unknown, onSent?: (driverQuery: object) => void): { out: unknown; entry: object | undefined } {
   const internals = raw as DriverInternals;
-  const breaks = breaksTransaction(text);
-  const moveEpoch = (): void => {
-    const track = tracks.get(raw);
-    if (track !== undefined) track.epoch += 1;
-  };
-  const sent = (q: object): void => {
-    if (issued !== undefined) {
-      issued.event.txn = currentTransaction(raw);
-      const track = tracks.get(raw);
-      if (track !== undefined) trackOf.set(issued.event, track);
-    }
-    if (breaks) moveEpoch();
-    onSent?.(q);
-  };
   const pipelined = internals.pipeline === true;
   const activeBefore = internals._activeQuery ?? null;
   const queuedBefore = internals._queryQueue?.length ?? 0;
   const out = send();
-  const active = internals._activeQuery ?? null;
-  const queue = internals._queryQueue ?? [];
-  if (!pipelined && active !== null && active !== activeBefore) sent(active);
-  else if (!pipelined && queue.length > queuedBefore) {
-    const q = queue[queue.length - 1]!;
-    const submit = q.submit;
-    q.submit = function (this: unknown, ...a: unknown[]) {
-      sent(q);
-      return submit.apply(this, a);
-    };
-  } else if (breaks) moveEpoch();
-  return out;
+  const entry = pipelined ? undefined : created(raw, activeBefore, queuedBefore);
+  if (entry !== undefined && onSent !== undefined) {
+    if (entry === internals._activeQuery) onSent(entry);
+    else {
+      const q = entry as { submit: (...a: unknown[]) => unknown };
+      const submit = q.submit;
+      q.submit = function (this: unknown, ...a: unknown[]) {
+        onSent(q);
+        return submit.apply(this, a);
+      };
+    }
+  }
+  return { out, entry };
+}
+
+interface ProbeRow {
+  token: string | null;
+  offset: string | null;
+  txid: string;
+}
+
+/**
+ * Sends the operation's statement (`send`) on the raw pg client, bracketed — when an onServer application of an enclosing open
+ * scope is live on that session — by two probes the harness sends itself (Client.prototype.query, no wrapper) in the same
+ * synchronous turn, so the driver's FIFO queue holds probe, statement, probe with nothing between them (checked on the queue
+ * itself). Each probe reads, on the server, the clock token, the clock override and txid_current(). The application is proven
+ * consumed only if both probes read exactly its token, offset and txid, and the statement executed while its scope was open.
+ * No SQL text is parsed: whatever the statement or anything before it did (a ROLLBACK TO behind a comment, a DO block, a function,
+ * a multi-statement string, a cached query method), only what the server reports decides. The verdict lands asynchronously; the
+ * scope keeps it pending until the probes answered (settleProofs).
+ */
+export function bracketStatement(raw: object, issued: IssuedStatement | undefined, send: () => unknown, onSent?: (driverQuery: object) => void): unknown {
+  const scope = issued?.scope;
+  const live = scope === undefined ? [] : (applications.get(raw) ?? []).filter((app) => app.scope.open && app.scope.encloses(scope));
+  const internals = raw as DriverInternals;
+  if (issued === undefined || scope === undefined || live.length === 0 || !(raw instanceof Client) || !Array.isArray(internals._queryQueue) || internals.pipeline === true) {
+    return sendObserved(raw, send, onSent).out;
+  }
+  const label = issued.event.tag ?? `fault-op:${scope.id}:untagged`;
+  const probe = (where: string): { out: Promise<{ rows: ProbeRow[] }>; entry: object | undefined } => {
+    const r = sendObserved(raw, () =>
+      (Client.prototype.query as (this: unknown, text: string) => Promise<unknown>).call(raw, `/* fault-probe:${label}:${where} */ SELECT current_setting('${CLOCK_TOKEN_SETTING}', true) AS token, current_setting('${TEST_CLOCK_OFFSET_SETTING}', true) AS offset, txid_current()::text AS txid`),
+    );
+    return { out: r.out as Promise<{ rows: ProbeRow[] }>, entry: r.entry };
+  };
+  // the three are queued in one synchronous turn: no other statement can be queued between them on this client
+  const first = probe("before");
+  const statement = sendObserved(raw, send, onSent);
+  const last = probe("after");
+  const order = [internals._activeQuery ?? null, ...(internals._queryQueue ?? [])];
+  const i = first.entry === undefined ? -1 : order.indexOf(first.entry);
+  const adjacent = i >= 0 && statement.entry !== undefined && last.entry !== undefined && order[i + 1] === statement.entry && order[i + 2] === last.entry;
+  const verdict = Promise.all([first.out, last.out]).then(
+    ([b, a]) => {
+      if (!adjacent || !issued.event.executed) return;
+      const pb = b.rows[0];
+      const pa = a.rows[0];
+      if (pb === undefined || pa === undefined) return;
+      for (const app of live) {
+        const holds = (p: ProbeRow) => p.token === app.token && p.offset === app.offset && p.txid === app.txid;
+        if (holds(pb) && holds(pa)) app.proven = true;
+      }
+    },
+    () => undefined,
+  );
+  for (let s: OperationScope | undefined = scope; s !== undefined; s = s.parent) s.pending(verdict);
+  return statement.out;
 }
 
 /** Sessions whose statements are tapped (an onServer application in a scope), with the number of scopes tapping each. */
 const taps = new WeakMap<object, { count: number; restore: () => void }>();
 
 /**
- * Records every statement issued on a plain session (not a harness connection, which records its own) while `scope` is open, so a
- * clock application can be shown consumed by a statement run after it in the same transaction. The tap ends when the scope closes.
+ * Records every statement issued on a plain session (not a harness connection, which records its own) while `scope` is open and
+ * sends it through bracketStatement, so a clock application can be proven consumed by the server. The tap ends when the scope
+ * closes. A query method cached before the tap bypasses it: its statements are never bracketed, so they never prove anything.
  */
 export function tapSession(session: object, scope: OperationScope): void {
   if (isHarnessSession(session)) return;
@@ -323,9 +351,8 @@ export function tapSession(session: object, scope: OperationScope): void {
       writable: true,
       value: (...args: unknown[]) => {
         const text = statementText(args[0]);
-        // recorded only inside a scope; every statement, from anywhere, moves the session's transaction track
         const issued = recordStatement(session, text, undefined);
-        const out = sendTracked(session, text, issued, () => previous.apply(session, args), () => {
+        const out = bracketStatement(session, issued, () => previous.apply(session, args), () => {
           if (issued !== undefined) issued.event.dispatched = true;
         });
         trackSettlement(issued, out);
@@ -387,27 +414,16 @@ export function instantsAtCall(args: ReadonlyArray<unknown>): ReadonlyArray<numb
 
 /**
  * The instants an operation CONSUMED, from its scope's log: a clock read whose instant a later instrumented call of the same scope
- * received as an argument at the call (the CALL's instants, a snapshot taken then), or an onServer application followed, on the
- * same session, by a statement of the scope that executed in the very transaction onServer positioned: sent inside it at the same
- * transaction epoch, with no end, rollback (to a savepoint) or lost connection on that session in between, whoever caused it
- * (transaction control excluded). A read whose value reached no sink is not among them.
+ * received as an argument at the call (the CALL's instants, a snapshot taken then), or an onServer application the server proved
+ * consumed (bracketStatement: probes immediately before and after a statement of the operation, on that connection, both read the
+ * call's token, clock override and txid). No SQL text is parsed. A read whose value reached no sink is not among them.
  */
 export function consumedInstants(events: ReadonlyArray<ScopeEvent>): number[] {
   const out: number[] = [];
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i]!;
+  for (const e of events) {
     if (e.kind === "CLOCK_READ") {
       if (events.some((c) => c.kind === "CALL" && c.seq > e.seq && c.instants.includes(e.at))) out.push(e.at);
-    } else if (e.kind === "SERVER_APPLIED") {
-      const later = events.filter((s): s is StatementEvent => s.kind === "STATEMENT" && s.session === e.session && s.seq > e.seq).sort((x, y) => x.seq - y.seq);
-      for (const s of later) {
-        if (breaksTransaction(s.text)) break;
-        if (!touchesTransaction(s.text) && s.executed && e.txn !== undefined && s.txn === e.txn) {
-          out.push(e.at);
-          break;
-        }
-      }
-    }
+    } else if (e.kind === "SERVER_APPLIED" && e.application.proven) out.push(e.at);
   }
   return out;
 }

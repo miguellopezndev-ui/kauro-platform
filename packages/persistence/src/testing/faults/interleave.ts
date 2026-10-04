@@ -8,7 +8,7 @@
  */
 import { Client, type ClientConfig } from "pg";
 import { connectionPid } from "./points.js";
-import { currentScope, inScope, recordStatement, registerSession, sendTracked, settleStatement, statementText, trackSettlement, trackTransactions, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
+import { bracketStatement, currentScope, inScope, recordStatement, registerSession, settleStatement, statementText, trackSettlement, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
 
 export class InterleavingNotObserved extends Error {
   constructor(message: string) {
@@ -86,10 +86,9 @@ export async function openConnection(config: ClientConfig): Promise<HarnessConne
         };
       }
     }
-    // every statement on the connection, in a scope or not, is sent through the transaction track (an outside ROLLBACK ends the
-    // transaction an onServer positioned); the operation's own statement is dispatched only once the driver sends it, not while
-    // it is queued behind another statement
-    const out = sendTracked(raw, statementText(args[0]), issued, () => realQuery.apply(raw, args), (q) => {
+    // the operation's own statement is dispatched only once the driver sends it, not while it is queued behind another statement;
+    // under a live onServer application of its operation it is bracketed by the server probes that alone prove consumption
+    const out = bracketStatement(raw, issued, () => realQuery.apply(raw, args), (q) => {
       if (issued === undefined) return;
       // the driver's query object behind the statement (to tell the one it is running from one still queued)
       driverQuery.set(issued.event, q);
@@ -116,8 +115,6 @@ export async function openConnection(config: ClientConfig): Promise<HarnessConne
   holder.proxy = proxy;
   connections.set(proxy, conn);
   registerSession(proxy, raw);
-  // the connection's transaction boundaries, from every statement sent on it and from the server, from its first statement on
-  trackTransactions(raw);
   return proxy;
 }
 

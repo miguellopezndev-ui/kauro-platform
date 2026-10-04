@@ -1174,3 +1174,100 @@ test("FH-R6 (r4) a lock wait is credited only to the operation's own statement â
   assert.deepEqual(await item(x), { n: 2, writers: ["w", "w"] });
   assert.deepEqual(await item(y), { n: 0, writers: [] }, "every UPDATE of Y was rolled back");
 });
+
+// --- FH-R2 (Codex re-check 5 of 2238273): consumption of an onServer instant is proven by the server, never by parsing SQL -------
+// On 2238273 the client-side SQL-text tracker credited the instant in every rejection below except the two DO blocks (refused there
+// only because a fragment of them starts with END), and refused both positive cases (their text names ROLLBACK TO).
+
+test("FH-R2 (r6) an onServer instant is consumed only when probes the harness runs immediately before and after the operation's statement, on that connection, read the call's clock token and the same txid: a comment-split, cached-method, DO-block, function-body or multi-statement undo FAILS whatever its SQL text; an untouched transaction passes", async () => {
+  const unused = (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message);
+  const cell = { step: "server-clock step", fault: "timeout", expect: "past deadline" } as const;
+  const options = { clockStart: "2100-01-01T00:00:00.000Z" } as const;
+  /** onServer in the operation; `outside` runs from a callback registered in the body; then the operation's `statement`. */
+  const undone = async (label: string, c: Client, outside: (() => Promise<unknown>) | undefined, statement: (deadline: string) => Promise<unknown>, prepare?: () => Promise<unknown>) =>
+    assert.rejects(
+      runCell(
+        cell,
+        async (ctx) => {
+          const d = ctx.deadline(ctx.clock.at(1000));
+          ctx.clock.past(d);
+          const { gate, open } = gated();
+          const late = gate.then(() => outside?.());
+          await c.query("BEGIN");
+          await c.query("SAVEPOINT before_clock");
+          try {
+            await prepare?.();
+            await ctx.withClock("server-clock step", async (clock) => {
+              await clock.onServer(c);
+              open();
+              await late;
+              await statement(d);
+            });
+          } finally {
+            await c.query("ROLLBACK");
+          }
+        },
+        options,
+      ),
+      unused,
+      label,
+    );
+  const before = (c: Client) => async (d: string) => {
+    const r = await c.query<{ before: boolean }>("SELECT kauro.server_now() < $1::timestamptz AS before", [d]);
+    assert.equal(r.rows[0]!.before, true, "the instant is gone: the statement ran before the deadline");
+  };
+  // Codex's counterexample 1, exactly: a ROLLBACK TO behind a comment holding a `;`
+  await undone("an outside '/* ; */ ROLLBACK TO SAVEPOINT' (comment-split)", a, () => a.query("/* ; */ ROLLBACK TO SAVEPOINT before_clock"), before(a));
+  // Codex's counterexample 2: a plain client's query method cached before the tap
+  {
+    const c = h.oracle;
+    const q = c.query.bind(c);
+    await undone("an outside ROLLBACK TO through a query method cached before onServer", c, () => q("ROLLBACK TO SAVEPOINT before_clock"), before(c));
+  }
+  // dollar quoting, a DO block: no transaction control in the text, the clock override is undone all the same
+  await undone("an outside DO block (dollar-quoted) resetting the transaction's clock", a, () => a.query("DO $body$ BEGIN PERFORM set_config('kauro_test.clock_offset_seconds', '0', true); END $body$"), before(a));
+  // a function body: the reset is hidden in a function called by a plain SELECT
+  await undone(
+    "an outside SELECT of a function whose body resets the transaction's clock",
+    a,
+    () => a.query("SELECT pg_temp.fault_undo_clock()"),
+    before(a),
+    () => a.query("CREATE FUNCTION pg_temp.fault_undo_clock() RETURNS text LANGUAGE sql AS $f$ SELECT set_config('kauro_test.clock_offset_seconds', '0', true) $f$"),
+  );
+  // the operation's own multi-statement string: a comment-split ROLLBACK TO, then its read of the server clock
+  await undone("the operation's own multi-statement string undoing the instant before its read", a, undefined, async (d) => {
+    const r = (await a.query(`/* ; */ ROLLBACK TO SAVEPOINT before_clock; SELECT kauro.server_now() < '${d}'::timestamptz AS before`)) as unknown as Array<{ rows: Array<{ before: boolean }> }>;
+    assert.equal(r[1]!.rows[0]!.before, true);
+  });
+  // the operation's own DO block resetting the clock before its read
+  await undone("the operation's own DO block resetting the clock", a, undefined, async (d) => {
+    await a.query("DO $$ BEGIN PERFORM set_config('kauro_test.clock_offset_seconds', '0', true); END $$");
+    await before(a)(d);
+  });
+  // passes: a multi-statement string with transaction control that leaves the instant in place (a savepoint taken and rolled back
+  // to AFTER onServer) â€” the SQL text names ROLLBACK TO, the server proves the instant stood before and after it
+  for (const [label, session] of [
+    ["harness connection", () => a],
+    ["plain client", () => h.oracle],
+  ] as const) {
+    await runCell(
+      cell,
+      async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        const c = session();
+        await c.query("BEGIN");
+        try {
+          await ctx.withClock(`server-clock step (${label})`, async (clock) => {
+            await clock.onServer(c);
+            const r = (await c.query(`SAVEPOINT inner_step; ROLLBACK TO SAVEPOINT inner_step; SELECT kauro.server_now() < '${d}'::timestamptz AS before`)) as unknown as Array<{ rows: Array<{ before: boolean }> }>;
+            assert.equal(r[2]!.rows[0]!.before, false, "the statement ran past the deadline");
+          });
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      },
+      options,
+    );
+  }
+});

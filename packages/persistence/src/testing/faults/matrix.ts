@@ -317,7 +317,7 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
  * Why every declared deadline is proven crossed and consumed, or the first one that is not. The clock never moves backwards, so an
  * instant at or past the deadline was read after the move that crossed it; it counts only once an operation of this cell
  * consumed it within its own scope (scope.ts consumedInstants: it reached an instrumented call's arguments, or a statement of the
- * operation ran after onServer put it on the transaction).
+ * operation was bracketed by server probes that read the onServer call's token, clock override and txid).
  */
 function deadlineGap(ctx: FaultContext, evidence: Evidence): string | undefined {
   const moves = ctx.clock.moveLog;
@@ -325,7 +325,7 @@ function deadlineGap(ctx: FaultContext, evidence: Evidence): string | undefined 
   for (const d of evidence.deadlines) {
     const crossing = moves.find((m) => m.from < d.at && d.at <= m.to);
     if (crossing === undefined) return `the clock never crossed the ${d.what} ${toUtcInstant(d.at)} (no move from before it to at or past it)`;
-    if (!consumed.some((at) => at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no operation consumed an instant at or past it: a read must reach an instrumented call's arguments, or onServer a transaction in which the operation then ran a statement; a discarded read or anything outside an operation is no use)`;
+    if (!consumed.some((at) => at >= d.at)) return `nothing used the clock after it crossed the ${d.what} ${toUtcInstant(d.at)} (no operation consumed an instant at or past it: a read must reach an instrumented call's arguments, or onServer a transaction in which server probes around a statement of the operation read its token and txid; a discarded read or anything outside an operation is no use)`;
   }
   return undefined;
 }
@@ -364,6 +364,8 @@ export async function runCell(cell: MatrixCell, body: CellBody, options: CellOpt
   validCell(cell);
   const ctx = contextOf(cell, options);
   await body(ctx);
+  // the server probes still in flight for this cell's operations land first (a verdict that never lands proves nothing)
+  for (const scope of evidenceOf.get(ctx)?.scopes ?? []) await scope.settled();
   ctx.points.assertAllReached();
   assertInjected(ctx);
   return ctx;
