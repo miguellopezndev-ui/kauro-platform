@@ -242,6 +242,12 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0] ? claimRecord(r.rows[0]) : null;
   }
 
+  async lockAgencies(agencyIds: ReadonlyArray<AgencyId>): Promise<void> {
+    // ascending, one statement each: the lock order is the id order. The owner's session cannot lock an agency row (its update policy is the
+    // tenant's), so the agency's commission work serializes on a transition subject of its own, held to COMMIT.
+    for (const agencyId of [...new Set(agencyIds)].sort()) await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agency_commissions', $1))", [agencyId]);
+  }
+
   /** The claim FOR UPDATE, after the writer's half of its prospect's claims lock (CMD047, CMD050, the conversion). */
   async lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null> {
     const prospect = (await execute<{ prospect_id: string }>(this.db, "SELECT prospect_id FROM kauro.attribution_claims WHERE claim_id = $1", [claimId])).rows[0];
@@ -249,6 +255,26 @@ export class PgAttributionRepository implements AttributionRepository {
     await holdSalesTransition(this.db, "kauro.attribution_claims", prospect.prospect_id);
     const r = await execute<ClaimRow>(this.db, `SELECT ${CLAIM} FROM kauro.attribution_claims WHERE claim_id = $1 FOR UPDATE`, [claimId]);
     return r.rows[0] ? claimRecord(r.rows[0]) : null;
+  }
+
+  /**
+   * Whether the claim's agency's first designation admits its conversion, by the database's own comparison and at its own grain (the
+   * microsecond; the conversion guard `attribution_claims_ending` is the same condition): the first purchase confirmed before the claim's end
+   * (its termination tail's end when a termination enumerated it, else its acceptance window's) and the claim submitted before that purchase's
+   * order. Never decided in JavaScript milliseconds: a confirmation inside the millisecond before the end is before it (D10-GAP-18).
+   */
+  async convertibleAtFirstPurchase(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ ok: boolean }>(
+      this.db,
+      `SELECT (r.first_confirmed_at < coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at)
+                AND c.submitted_at < q.order_created_at) AS ok
+         FROM kauro.attribution_claims c
+         JOIN kauro.agency_recurrence r ON r.agency_id = c.agency_id
+         JOIN kauro.qualifying_purchases q ON q.agency_id = r.agency_id AND q.authorization_id = r.first_authorization_id
+        WHERE c.claim_id = $1`,
+      [claimId],
+    );
+    return r.rows[0]?.ok === true;
   }
 
   async claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>> {

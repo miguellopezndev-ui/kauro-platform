@@ -91,15 +91,16 @@ export async function convertAcceptedClaims(rt: CommissionRuntime, uow: PgCommer
   if (recurrence === null) return 0;
   const allocation = await attributionOf(uow).frozenAllocationOf(agencyId);
   if (allocation === null) return 0;
+  // the agency row before any claim: §10's global order, the consumer's (D10-GAP-17, D10-GAP-20)
+  await attributionOf(uow).lockAgencies([agencyId]);
   const first = await recurrenceOf(uow).getPurchase(recurrence.firstPurchaseId);
   if (first === null) throw new DomainFailure("INTEGRITY_FAILURE", "the agency's first designation names no qualifying purchase");
   let converted = 0;
   for (const share of allocation.shares) {
     const claim = await attributionOf(uow).lockClaim(share.claimId);
     if (claim === null || claim.state !== "ACCEPTED") continue;
-    const tail = await salesOf(uow).tailEntryOfClaim(share.claimId);
-    const end = tail?.endsAt ?? claim.expiresAt;
-    if (!(Date.parse(first.confirmedAt) < Date.parse(end)) || !(Date.parse(claim.submittedAt) < Date.parse(first.orderCreatedAt))) continue;
+    // the first purchase's confirmation against the claim's end (its tail's end, else its acceptance window's), at the database's microsecond
+    if (!(await attributionOf(uow).convertibleAtFirstPurchase(share.claimId))) continue;
     stale("claim", await attributionOf(uow).transitionClaim(share.claimId, claim.version, { state: "CONVERTED" }, now));
     await attributionOf(uow).createEntitlement({
       entitlementId: uow.ids.next() as CommissionEntitlementId,

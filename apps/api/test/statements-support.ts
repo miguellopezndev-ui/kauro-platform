@@ -148,6 +148,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
   const pw: PaymentWorld = await paymentWorld({
     requestSide: true,
     wrapUnitOfWork: (inner) => faults.wrap(inner),
+    wrapCommerce: (inner) => faults.wrapCommerce(inner),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;

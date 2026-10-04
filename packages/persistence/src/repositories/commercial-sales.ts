@@ -345,9 +345,26 @@ export class PgSalesRepository implements SalesRepository {
     return r.rows[0] ? sellerRecord(r.rows[0]) : null;
   }
 
-  /** The seller row FOR UPDATE, then the writer's half of kauro.sellers (CMD049, CMD050): the owner's session only (sellers_owner_update). */
+  /**
+   * The agencies the seller's open claims and current operational assignments name, ascending (D10-GAP-20): what CMD050 locks, with
+   * `lockAgencies`, before its first claim lock, so the agency comes before the claim in every writer.
+   */
+  async agenciesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<AgencyId>> {
+    const r = await execute<{ agency_id: string }>(
+      this.db,
+      `SELECT agency_id FROM (
+         SELECT c.agency_id FROM kauro.attribution_claims c WHERE c.seller_id = $1 AND c.state IN ('SUBMITTED', 'DISPUTED', 'ACCEPTED') AND c.agency_id IS NOT NULL
+         UNION
+         SELECT s.agency_id FROM kauro.sales_accounts s JOIN kauro.account_assignments l ON l.agency_id = s.agency_id AND l.assignment_id = s.current_assignment_id WHERE l.seller_id = $1) x
+        ORDER BY agency_id`,
+      [sellerId],
+    );
+    return r.rows.map((x) => x.agency_id as AgencyId);
+  }
+
+  /** The seller row FOR NO KEY UPDATE (the foreign keys of claims, entitlements and links take KEY SHARE on it, D10-GAP-20), then the writer's half of kauro.sellers (CMD049, CMD050): the owner's session only (sellers_owner_update). */
   async lockSeller(sellerId: SellerId): Promise<SellerRecord | null> {
-    const r = await execute<SellerRow>(this.db, `SELECT ${SELLER} FROM kauro.sellers WHERE seller_id = $1 FOR UPDATE`, [sellerId]);
+    const r = await execute<SellerRow>(this.db, `SELECT ${SELLER} FROM kauro.sellers WHERE seller_id = $1 FOR NO KEY UPDATE`, [sellerId]);
     const row = r.rows[0];
     if (row === undefined) return null;
     await holdSalesTransition(this.db, "kauro.sellers", sellerId);
