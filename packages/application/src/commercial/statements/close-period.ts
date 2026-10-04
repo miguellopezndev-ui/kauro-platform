@@ -138,7 +138,11 @@ export function closeCommissionPeriod(rt: StatementServiceRuntime, request: Serv
       if (before.undeliveredBeforeCutoff === null || before.undeliveredBeforeCutoff > 0) {
         throw new DomainFailure("PRECONDITION_FAILED", "a COMMISSIONS input of the period is not yet delivered", { reason: "INPUTS_UNRECONCILED", currentVersion: period.version, currentState: period.state });
       }
-      // 4. the proposed ledger
+      // 4. the proposed ledger, read under the row locks of its lines (D10-GAP-4): a hold, an eligibility or a payout move that is in flight
+      //    on one of them is waited for and read, so the hash is of the ledger the statements are composed from and no hold committed after
+      //    the reads can reach a line this close then makes PAYABLE (a hold insert takes the line's key-share lock and waits for the close)
+      const read = await proposeCommissionClose(statements, period, now);
+      for (const lineId of read.inputs.lines.map((l) => l.lineId).sort()) await ledger.lockLine(lineId);
       const proposal = await proposeCommissionClose(statements, period, now);
       if (proposal.ledgerCutoffHash !== request.body.ledgerCutoffHash) {
         throw new DomainFailure("STALE_VERSION", "the ledger changed since the close was proposed", { reason: "LEDGER_CHANGED", currentVersion: period.version, currentState: period.state });

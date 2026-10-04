@@ -259,10 +259,7 @@ export async function periodIdOf(sw: StatementsWorld, month: string): Promise<st
 export async function closeMonth(sw: StatementsWorld, month: string): Promise<{ readonly periodId: string; readonly reply: Reply }> {
   const periodId = await openMonth(sw, month);
   const ledgerCutoffHash = await proposal(sw, periodId);
-  // 2026's months are all due by 2026-10-07; a later month (the failure cells use many) is closed on the 20th of the month after it
-  const [y, m] = month.split("-").map(Number) as [number, number];
-  const standing = month <= "2026-09" ? "2026-10-07T17:00:00Z" : `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-20T17:00:00Z`;
-  sw.standAt(standing);
+  sw.standAt("2026-10-07T17:00:00Z");
   try {
     return { periodId, reply: await closePeriod(sw, periodId, { ledgerCutoffHash }) };
   } finally {
