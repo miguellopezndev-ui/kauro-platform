@@ -205,6 +205,15 @@ export function composeStatement(input: {
           lineIds.push(line.lineId);
           break;
         }
+        // the funds fence (D10-GAP-23): a line eligible under funds AVAILABLE is paid only while the capture's latest funds are AVAILABLE still; the
+        // provider can hold them afterwards and no line edge goes back to HELD, so the statement itemizes it as the ACCRUED_PENDING branch does and
+        // makes nothing of it PAYABLE (it stays ELIGIBLE and is itemized again at the next close)
+        if (funds.get(line.captureId) !== "AVAILABLE") {
+          push({ ...context, kind: "LINE", disposition: "AWAITING_FUNDS", heldCents: 0n, offsetCents: 0n, payableCents: 0n });
+          lineIds.push(line.lineId);
+          accruedPending += unpaid;
+          break;
+        }
         const offsetIn = sum(rows.offsets.filter((o) => o.againstLineId === line.lineId).map((o) => o.amountCents));
         const remaining = unpaid - heldOpen;
         const offset = offsetIn < remaining ? offsetIn : remaining;
