@@ -822,8 +822,16 @@ const agencyLockOf = (agencyId: string): SqlStep => ({ ...AGENCY_LOCK, when: (pa
 const entitlementsOf = async (agencyId: string): Promise<ReadonlyArray<readonly [string, string, number]>> =>
   (await oracleRows<{ seller_id: string; state: string; share_bps: number }>(iw, "SELECT seller_id, state, share_bps FROM kauro.commission_entitlements WHERE agency_id = $1 ORDER BY share_bps DESC, seller_id", [agencyId])).map((e) => [e.seller_id, e.state, e.share_bps] as const);
 const sellerState = async (sellerId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [sellerId]))[0]!.state;
+type Variant = "UNASSIGNED" | "ASSIGNED";
+/** Every CMD050 cell runs the common case (CONVERTED claims, a live entitlement, NO current assignment: only the entitlement names the agency to lock, D10-GAP-22) and the assigned one. */
+const variantsOf = <T extends string>(orders: ReadonlyArray<T>): ReadonlyArray<readonly [Variant, T]> => (["UNASSIGNED", "ASSIGNED"] as const).flatMap((v) => orders.map((o) => [v, o] as const));
 /** The claimant holds the agency's OPERATIONAL ASSIGNMENT (the account link CMD050 appends, SELLER_TERMINATED, is a foreign key on the agency: the lock-order family of D10-GAP-20). */
-async function holdsAssignment(c: Converting): Promise<void> {
+async function holdsAssignment(c: Converting, variant: Variant): Promise<void> {
+  if (variant === "UNASSIGNED") {
+    const current = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.sales_accounts s WHERE s.agency_id = $1 AND s.current_assignment_id IS NOT NULL", [c.agencyId]);
+    assert.deepEqual([current[0]!.n, (await entitlementsOf(c.agencyId)).map((e) => e[1]), (await rightsOf(c)).claims], [0, ["ACTIVE"], ["CONVERTED"]], "the claimant has no assignment on the agency: CONVERTED claim, a live entitlement");
+    return;
+  }
   iw.buyers.set(c.agencyId as never, "AGENCY");
   const sellerId = c.att.sellers[0]!.sellerId;
   const assigned = await assignedThrough(iw, c.agencyId, { expectedVersion: 0, sellerId, serviceAssignmentRef: await recordServiceAssignment(iw.h, { ownerUserId: iw.owner.userId as never, agencyId: c.agencyId as never, sellerId }) });
@@ -832,22 +840,22 @@ async function holdsAssignment(c: Converting): Promise<void> {
 const assignmentEnded = async (agencyId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.account_assignments WHERE agency_id = $1 AND reason = 'SELLER_TERMINATED'", [agencyId]))[0]!.n;
 
 /** The first purchase accrued, a second purchase captured and not yet delivered, the seller's termination prepared. */
-async function secondToAccrue(label: string): Promise<{ readonly c: Converting; readonly second: Purchase; readonly delivery: Delivery; readonly sellerId: string; readonly body: Awaited<ReturnType<typeof terminationBody>> }> {
+async function secondToAccrue(label: string, variant: Variant): Promise<{ readonly c: Converting; readonly second: Purchase; readonly delivery: Delivery; readonly sellerId: string; readonly body: Awaited<ReturnType<typeof terminationBody>> }> {
   const c = await accrued(label, [10_000]);
-  await holdsAssignment(c);
+  await holdsAssignment(c, variant);
   const second = await purchase(iw, c.s, `${label}-second`);
   const sellerId = c.att.sellers[0]!.sellerId;
   return { c, second, delivery: await deliveryOfCapture(second), sellerId, body: await terminationBody(iw, sellerId, []) };
 }
 
 /** What a second purchase accrued for a terminated seller leaves: one REPEAT pool, one line at the seller's whole share, the entitlement TERMINATED_WITH_RESIDUAL. */
-async function assertResidualAccrued(what: string, f: { readonly c: Converting; readonly second: Purchase; readonly sellerId: string }): Promise<void> {
+async function assertResidualAccrued(what: string, f: { readonly c: Converting; readonly second: Purchase; readonly sellerId: string }, variant: Variant): Promise<void> {
   assert.deepEqual(await poolKinds(f.second), ["ACQUISITION REPEAT 400"], `${what}: one pool at the repeat rate`);
   const ledger = await ledgerOfPurchase(f.second);
   assert.deepEqual(ledger.lines.map((l) => [l.state, l.cumulative]), [["ACCRUED_PENDING", await poolCentsOf(f.second)]], `${what}: one line at the seller's whole share of the pool`);
   assert.deepEqual(await entitlementsOf(f.c.agencyId), [[f.sellerId, "TERMINATED_WITH_RESIDUAL", 10_000]], `${what}: the entitlement keeps its share, TERMINATED_WITH_RESIDUAL`);
   assert.equal(await sellerState(f.sellerId), "TERMINATED", `${what}: the seller is TERMINATED`);
-  assert.equal(await assignmentEnded(f.c.agencyId), 1, `${what}: the operational assignment ended`);
+  assert.equal(await assignmentEnded(f.c.agencyId), variant === "ASSIGNED" ? 1 : 0, `${what}: the operational assignment ended (only an assigned claimant had one)`);
   assert.equal((await linesOf(iw, f.c.first.authorizationId)).length, 1, `${what}: the first purchase's line is untouched`);
 }
 
@@ -857,18 +865,18 @@ faultCell(
     step: "COMMISSIONS consumer capture.completed.v1 (the second purchase's pool and line, its transaction paused before COMMIT) and TerminateSeller (CMD050, paused before COMMIT) of the seller who holds the entitlement",
     fault: "race",
     expect:
-      "RACE: the accrual of a second purchase racing the seller's termination, in both orders with the lock wait observed: one pool and one line at the seller's whole share (the repeat rate, inside the window nothing lost), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200 and the consumer APPLIED whichever committed first",
+      "RACE: the accrual of a second purchase racing the seller's termination, in both orders, for a claimant with CONVERTED claims and a live entitlement and no assignment on the agency and for one holding its operational assignment, with the lock wait observed: one pool and one line at the seller's whole share (the repeat rate, inside the window nothing lost), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200 and the consumer APPLIED whichever committed first",
   },
   async (ctx) => {
-    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
-      const what = `accrual and termination, ${order}`;
-      const f = await secondToAccrue(`term-accrual-${order === "CONSUMER_FIRST" ? "c" : "t"}`);
+    for (const [variant, order] of variantsOf(["CONSUMER_FIRST", "TERMINATION_FIRST"] as const)) {
+      const what = `accrual and termination, ${variant}, ${order}`;
+      const f = await secondToAccrue(`term-accrual-${variant === "ASSIGNED" ? "a" : "u"}-${order === "CONSUMER_FIRST" ? "c" : "t"}`, variant);
       const consumer = consumerOf(ctx, f.delivery, "the accruing consumer", "uow.before-commit", []);
       const terminate = terminateActor(ctx, f.sellerId, f.body, "uow.before-commit", []);
       const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what) : await contend(ctx, terminate, consumer, what);
       completed<SellerTerminationView>(mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply, 200);
       assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer accrued`);
-      await assertResidualAccrued(what, f);
+      await assertResidualAccrued(what, f, variant);
     }
   },
 );
@@ -879,12 +887,12 @@ faultCell(
     step: "COMMISSIONS consumer capture.completed.v1 (stopped right after the agency's commission subject) and TerminateSeller (stopped right after the same subject): the seller terminated between the delivery and the accrual",
     fault: "race",
     expect:
-      "RACE: the seller's termination landing between a capture.completed.v1 and its accrual, at the intermediate lock point after the agency's commission subject, in both orders with the lock wait observed: the accrual reads the entitlement as the first committed it (ACTIVE when it went first, TERMINATED_WITH_RESIDUAL when the termination did) and in both orders accrues one line at the seller's whole share: a termination alone does not forfeit earned rights",
+      "RACE: the seller's termination landing between a capture.completed.v1 and its accrual, at the intermediate lock point after the agency's commission subject, in both orders, for a claimant with CONVERTED claims and a live entitlement and no assignment on the agency and for one holding its operational assignment, with the lock wait observed: the accrual reads the entitlement as the first committed it (ACTIVE when it went first, TERMINATED_WITH_RESIDUAL when the termination did) and in both orders accrues one line at the seller's whole share: a termination alone does not forfeit earned rights",
   },
   async (ctx) => {
-    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
-      const what = `termination between the delivery and the accrual, ${order}`;
-      const f = await secondToAccrue(`cons-rev-term-${order === "CONSUMER_FIRST" ? "c" : "t"}`);
+    for (const [variant, order] of variantsOf(["CONSUMER_FIRST", "TERMINATION_FIRST"] as const)) {
+      const what = `termination between the delivery and the accrual, ${variant}, ${order}`;
+      const f = await secondToAccrue(`cons-rev-term-${variant === "ASSIGNED" ? "a" : "u"}-${order === "CONSUMER_FIRST" ? "c" : "t"}`, variant);
       const steps = [agencyLockOf(f.c.agencyId)];
       const consumer = consumerOf(ctx, f.delivery, "the accruing consumer", "db.agency_lock.after", steps);
       const terminate = terminateActor(ctx, f.sellerId, f.body, "db.agency_lock.after", steps);
@@ -894,7 +902,7 @@ faultCell(
       const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what, during) : await contend(ctx, terminate, consumer, what, during);
       completed<SellerTerminationView>(mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply, 200);
       assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer accrued`);
-      await assertResidualAccrued(what, f);
+      await assertResidualAccrued(what, f, variant);
     }
   },
 );
@@ -905,13 +913,13 @@ faultCell(
     step: "COMMISSIONS consumer capture.reversed.v1 (the adjustment, its transaction paused right after the adjustment insert) and TerminateSeller (stopped right after the agency's commission subject): the seller terminated mid-way through a basis change",
     fault: "race",
     expect:
-      "RACE: a reversal applied while the seller of its lines is terminated, in both orders with the lock wait observed: the adjustments are made whichever committed first (one per line and event, the lines VOID at zero, the pool at zero), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200",
+      "RACE: a reversal applied while the seller of its lines is terminated, in both orders, for a claimant with CONVERTED claims and a live entitlement and no assignment on the agency and for one holding its operational assignment, with the lock wait observed: the adjustments are made whichever committed first (one per line and event, the lines VOID at zero, the pool at zero), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200",
   },
   async (ctx) => {
-    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
-      const what = `reversal and termination, ${order}`;
-      const c = await accrued(`cons-rev-reversal-term-${order === "CONSUMER_FIRST" ? "c" : "t"}`, [10_000]);
-      await holdsAssignment(c);
+    for (const [variant, order] of variantsOf(["CONSUMER_FIRST", "TERMINATION_FIRST"] as const)) {
+      const what = `reversal and termination, ${variant}, ${order}`;
+      const c = await accrued(`cons-rev-reversal-term-${variant === "ASSIGNED" ? "a" : "u"}-${order === "CONSUMER_FIRST" ? "c" : "t"}`, [10_000]);
+      await holdsAssignment(c, variant);
       const sellerId = c.att.sellers[0]!.sellerId;
       const reversal = await reversalEventOf(c.first);
       const body = await terminationBody(iw, sellerId, []);
@@ -926,7 +934,7 @@ faultCell(
       assert.equal(await poolCentsOf(c.first), "0");
       assert.deepEqual(await entitlementsOf(c.agencyId), [[sellerId, "TERMINATED_WITH_RESIDUAL", 10_000]], `${what}: the entitlement kept`);
       assert.equal(await sellerState(sellerId), "TERMINATED");
-      assert.equal(await assignmentEnded(c.agencyId), 1, `${what}: the operational assignment ended`);
+      assert.equal(await assignmentEnded(c.agencyId), variant === "ASSIGNED" ? 1 : 0, `${what}: the operational assignment ended (only an assigned claimant had one)`);
     }
   },
 );
@@ -1026,13 +1034,13 @@ faultCell(
     step: "Sweep ENTITLEMENT_WINDOWS (stopped right after the agency's commission subject, standing after the window) and TerminateSeller (stopped right after the same subject) of the entitlement's seller",
     fault: "race",
     expect:
-      "RACE: an entitlement reaching its window's end while its seller is terminated, in both orders with the lock wait observed: no unit fails (the termination answers 200, the pass reports no failed item), the seller is TERMINATED and the entitlement ends EXPIRED whichever committed first (TERMINATED_WITH_RESIDUAL then EXPIRED, or EXPIRED left as it is by the termination); its earned line is untouched",
+      "RACE: an entitlement reaching its window's end while its seller is terminated, in both orders, for a claimant with CONVERTED claims and a live entitlement and no assignment on the agency and for one holding its operational assignment, with the lock wait observed: no unit fails (the termination answers 200, the pass reports no failed item), the seller is TERMINATED and the entitlement ends EXPIRED whichever committed first (TERMINATED_WITH_RESIDUAL then EXPIRED, or EXPIRED left as it is by the termination); its earned line is untouched",
   },
   async (ctx) => {
-    for (const order of ["TERMINATION_FIRST", "SWEEP_FIRST"] as const) {
-      const what = `window end and termination, ${order}`;
-      const c = await windowed(`term-window-${order === "TERMINATION_FIRST" ? "t" : "s"}`);
-      await holdsAssignment(c);
+    for (const [variant, order] of variantsOf(["TERMINATION_FIRST", "SWEEP_FIRST"] as const)) {
+      const what = `window end and termination, ${variant}, ${order}`;
+      const c = await windowed(`term-window-${variant === "ASSIGNED" ? "a" : "u"}-${order === "TERMINATION_FIRST" ? "t" : "s"}`);
+      await holdsAssignment(c, variant);
       const sellerId = c.att.sellers[0]!.sellerId;
       const body = await terminationBody(iw, sellerId, []);
       const terminate = terminateActor(ctx, sellerId, body, "db.agency_lock.after", [agencyLockOf(c.agencyId)]);
@@ -1045,7 +1053,7 @@ faultCell(
       assert.equal(view.entitlementsResidual, order === "TERMINATION_FIRST" ? 1 : 0, `${what}: the termination ${order === "TERMINATION_FIRST" ? "made it TERMINATED_WITH_RESIDUAL first" : "found it already EXPIRED and left it"}`);
       assert.deepEqual(await entitlementsOf(c.agencyId), [[sellerId, "EXPIRED", 10_000]], `${what}: EXPIRED at its share`);
       assert.equal(await sellerState(sellerId), "TERMINATED");
-      assert.equal(await assignmentEnded(c.agencyId), 1, `${what}: the operational assignment ended`);
+      assert.equal(await assignmentEnded(c.agencyId), variant === "ASSIGNED" ? 1 : 0, `${what}: the operational assignment ended (only an assigned claimant had one)`);
       assert.equal((await linesOf(iw, c.first.authorizationId)).length, 1, `${what}: the earned line is untouched`);
     }
   },
