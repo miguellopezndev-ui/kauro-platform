@@ -252,7 +252,8 @@ test("RACE: an identical retry replays the 200, the same key with another shareA
   await hold.reached;
   const requestB = accept(pw.kora, two.claimId, bodyOf(allocationTwo));
   try {
-    await waitForApiLockWait(w(), "UPDATE kauro.attribution_allocations SET frozen_at");
+    // the second acceptance waits for the first on the agency's commission subject, which every writer of its claims takes first (D10-GAP-20)
+    await waitForApiLockWait(w(), "pg_advisory_xact_lock(kauro.transition_key('kauro.agency_commissions'");
   } finally {
     hold.release();
   }

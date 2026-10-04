@@ -65,6 +65,8 @@ export function terminateSellerHandler(runtime: CommerceRequestRuntime, co: Sell
           if (!TERMINABLE.has(seller.state)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the seller is not ACTIVE or SUSPENDED: a termination is requested from those states only", { reason: "UNLISTED_TRANSITION", currentVersion: seller.version, currentState: seller.state });
           }
+          // the global order (D10-GAP-20): seller, then the agencies of its claims and assignments, then the claims
+          await attribution.lockAgencies(await sales.agenciesOfSeller(sellerId));
           const terms = await sales.getTerminationTerms(body.terminationTermsRef as TerminationTermsRef);
           if (terms === null || terms.sellerId !== sellerId || terms.effectiveAt !== undefined) {
             throw new DomainFailure("PRECONDITION_FAILED", "no termination terms prepared for this seller are waiting to take effect", { reason: "TERMINATION_TERMS_UNPREPARED" });
@@ -101,6 +103,9 @@ export function terminateSellerHandler(runtime: CommerceRequestRuntime, co: Sell
           for (const claim of open.filter((c) => !handedOver.has(c.claimId as string)).sort((a, b) => (a.claimId < b.claimId ? -1 : a.claimId > b.claimId ? 1 : 0))) {
             const current = await attribution.lockClaim(claim.claimId);
             if (current === null || !LIVE_CLAIM.has(current.state)) continue;
+            // a claim whose agency's first purchase was confirmed before its end has accrued its rights: a termination alone does not cancel
+            // them (registry 17), so it is left ACCEPTED for the commission service's conversion, a moment behind the capture (D10-GAP-19)
+            if (current.state === "ACCEPTED" && (await attribution.convertibleAtFirstPurchase(current.claimId))) continue;
             applied(await attribution.transitionClaim(current.claimId, current.version, { state: "EXPIRED" }, now));
             claimsExpired += 1;
           }

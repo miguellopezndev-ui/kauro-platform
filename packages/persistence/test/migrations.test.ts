@@ -97,6 +97,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0040_step_up_at_commit.sql",
     // package B10 (Codex r4 B10G-R9, D10-GAP-16): a statement records the lines it was composed from (input_line_ids)
     "0041_statement_input_lines.sql",
+    // package B10 (lane 4 of the failure-matrix GAPs, D10-GAP-19): the corporate owner reads an agency's first designation (CMD050 leaves a claim whose agency already bought for its conversion)
+    "0042_owner_reads_first_designation.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

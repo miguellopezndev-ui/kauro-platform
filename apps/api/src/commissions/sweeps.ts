@@ -120,6 +120,7 @@ async function accrualReconciliation(rt: CommissionRuntime, limit: number): Prom
     for (const purchase of lacking) {
       await item(rt, items, purchase.purchaseId, () =>
         inAgency(rt, agencyId, null, async (uow) => {
+          await attributionOf(uow).lockAgencies([agencyId]);
           const current = await recurrenceOf(uow).getPurchase(purchase.purchaseId);
           if (current === null) return "NOT_FOUND";
           const accrual = await accruePurchase(rt, uow, current, await serverNow(uow), "CURRENT");

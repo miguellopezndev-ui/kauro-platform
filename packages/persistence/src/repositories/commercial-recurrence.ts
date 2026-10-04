@@ -365,7 +365,7 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
 
   async mirrorFirstDesignation(agencyId: AgencyId, _now: UtcInstant): Promise<{ readonly mirrored: boolean; readonly agency: AgencyDesignation }> {
     // the agency row first (its lock), then the set-once mirror of the capture of sequence 1
-    const locked = await execute<{ first_qualifying_capture_id: string | null }>(this.db, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE", [agencyId]);
+    const locked = await execute<{ first_qualifying_capture_id: string | null }>(this.db, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1 FOR NO KEY UPDATE", [agencyId]);
     if (locked.rows[0] === undefined) throw new DomainFailure("NOT_FOUND", "the agency is not visible in this context");
     let mirrored = false;
     if (locked.rows[0].first_qualifying_capture_id === null) {

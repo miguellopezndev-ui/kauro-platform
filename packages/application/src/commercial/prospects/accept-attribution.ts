@@ -54,6 +54,9 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
         async body(uow, _causationId, now: UtcInstant) {
           const body = envelope.body;
           const attribution = co.attribution(uow);
+          // the global order (D10-GAP-20): the allocation's agency before the claims (a claim's acceptance takes the agency's foreign-key lock)
+          const prepared = await attribution.getAllocation(body.shareAllocationRef as AttributionAllocationId);
+          if (prepared !== null) await attribution.lockAgencies([prepared.agencyId]);
           const claim = await attribution.lockClaim(claimId);
           if (claim === null) throw new NotFoundFailure("claim");
           checkExpectedVersion(claim, body.expectedVersion);
