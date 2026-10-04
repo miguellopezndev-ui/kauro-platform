@@ -214,7 +214,7 @@ const intentState = async (intentId: string): Promise<string> => (await rows<{ s
 
 // --- 3. PAY_INTENT_BASIS ------------------------------------------------------------------------------------------------------------
 
-const INTENTS_READ: SqlStep = { label: "intents", match: /coalesce\(sum\(amount_cents\)/ };
+const INTENTS_READ: SqlStep = { label: "intents", match: /coalesce\(sum\(p\.amount_cents\)/ };
 
 faultCell(
   {
@@ -251,6 +251,20 @@ faultCell(
     completed<PayoutReconciliationView>(value(beforeReconcile.waited), 200);
     assert.equal(await intentCount(s2.statementId), 0);
     assert.equal(await intentState(e2.intent.intentId), "FAILED");
+
+    // SETTLED (B10G-R3): the paid transfer keeps claiming its cash until a bank observation strictly newer than its settlement shows the
+    // debit. Reconciliation first (held at its COMMIT), the approval observed waiting: no newer observation, so the settled intent still
+    // counts and the approval of another 5,000 on the same snapshot is refused; then a newer observation lands and the approval passes.
+    const [e3] = await takeApproved(1);
+    const [s3] = await takeIssued(1);
+    const settled = await holdAndWait(ctx, "the approval while the SETTLED reconciliation of the earlier intent is held", commission((conn) => reconcileOn(ctx, conn, e3!, "SETTLED")), asApp((conn) => approveOn(ctx, conn, s3!)));
+    completed<PayoutReconciliationView>(value(settled.held), 200);
+    assert.equal(await intentState(e3!.intent.intentId), "SETTLED");
+    assert.equal(outcome(sw.w, value(settled.waited)), "409 PRECONDITION_FAILED FUNDS_UNAVAILABLE", "the bank snapshot predates the settlement: the paid cents are not available twice");
+    assert.equal(await intentCount(s3!.statementId), 0);
+    await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
+    completed<PayoutIntentView>(await approvePayout(sw, s3!.statementId, await approveBody(s3!)), 200);
+    assert.equal(await intentCount(s3!.statementId), 1, "a newer observation shows the debit; the settled intent no longer claims");
   },
 );
 

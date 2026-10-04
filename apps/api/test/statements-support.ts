@@ -444,11 +444,18 @@ export async function eligibleLines(
 // --- payouts -------------------------------------------------------------------------------------------------------------------------
 
 let observed = 0;
+let lastObservedAt = 0;
 
-/** A settlement observation of the payment service with bank evidence: the bank-available cash CMD052 reads (B09 settlements). */
+/**
+ * A settlement observation of the payment service with bank evidence: the bank-available cash CMD052 reads (B09 settlements). It is
+ * observed at the database's own clock (strictly after the previous one), never in the future: a SETTLED intent keeps claiming its cash
+ * until an observation strictly newer than its settlement is recorded (B10G-R3), so a future-dated observation would release it early.
+ */
 export async function bankCash(sw: StatementsWorld, bankAvailableCents: bigint, units: { run: typeof sw.pw.pools.commerce.run } = sw.pw.pools.commerce): Promise<void> {
   observed += 1;
-  const at = new Date(Date.UTC(2026, 0, 1) + observed * 60_000 + (Date.now() - Date.UTC(2026, 0, 1))).toISOString() as UtcInstant;
+  const dbNow = (await sw.h.oracle.query<{ at: Date }>("SELECT clock_timestamp() AS at")).rows[0]!.at.getTime();
+  lastObservedAt = Math.max(dbNow, lastObservedAt + 1);
+  const at = new Date(lastObservedAt).toISOString() as UtcInstant;
   await units.run({ kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId }, (uow) =>
     uow.commerce.settlements.record({
       settlementId: uow.ids.next() as SettlementId,
@@ -469,7 +476,7 @@ export async function bankCash(sw: StatementsWorld, bankAvailableCents: bigint, 
   );
 }
 
-/** The cents unsettled authorized intents already claim (the superuser oracle). */
+/** The cents unsettled authorized intents already claim once a newer bank observation lands (the superuser oracle): a SETTLED intent is then shown by the bank cash itself. */
 export async function claimedCents(sw: StatementsWorld): Promise<bigint> {
   const r = await sw.h.oracle.query<{ cents: string }>("SELECT coalesce(sum(amount_cents), 0)::text AS cents FROM kauro.payout_intents WHERE state IN ('AUTHORIZED', 'SUBMITTED', 'UNCERTAIN')");
   return BigInt(r.rows[0]!.cents);

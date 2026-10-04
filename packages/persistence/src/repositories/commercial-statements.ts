@@ -879,7 +879,14 @@ export class PgStatementRepository implements StatementRepository {
       this.db,
       "SELECT bank_available_cents FROM kauro.settlements WHERE bank_evidence_hash IS NOT NULL ORDER BY observed_at DESC, settlement_id DESC LIMIT 1",
     );
-    const claimed = await execute<{ cents: string }>(this.db, "SELECT coalesce(sum(amount_cents), 0)::text AS cents FROM kauro.payout_intents WHERE state IN ('AUTHORIZED', 'SUBMITTED', 'UNCERTAIN')");
+    // unsettled: AUTHORIZED, SUBMITTED, UNCERTAIN; and a SETTLED intent until a bank-evidenced observation strictly newer than its
+    // settlement is recorded: the paid transfer's debit is not in an older snapshot, so its cents stay claimed (B10G-R3)
+    const claimed = await execute<{ cents: string }>(
+      this.db,
+      `SELECT coalesce(sum(p.amount_cents), 0)::text AS cents FROM kauro.payout_intents p
+        WHERE p.state IN ('AUTHORIZED', 'SUBMITTED', 'UNCERTAIN')
+           OR (p.state = 'SETTLED' AND NOT EXISTS (SELECT 1 FROM kauro.settlements s WHERE s.bank_evidence_hash IS NOT NULL AND s.observed_at > p.settled_at))`,
+    );
     return { bankAvailableCents: bank.rows[0] === undefined ? 0n : money(bank.rows[0].bank_available_cents), unsettledAuthorizedCents: money(claimed.rows[0]?.cents ?? "0") };
   }
 

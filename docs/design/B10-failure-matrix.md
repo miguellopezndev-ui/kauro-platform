@@ -280,7 +280,7 @@ Tier 1 = money or authority: a wrong outcome pays, withholds, forfeits or attrib
 3. `PAY_INTENT_BASIS` (1 cell): CMD052 against CMD053: a reconciliation (SETTLED, FAILED or RETURNED) changing which authorized intents remain unsettled while the approval reads cash and intents.  
    Proposed test: `RACE: ReconcileCommissionPayout of an earlier intent committing while ApproveCommissionPayout is held after its cash and intents reads, in both orders: coverage is computed on one consistent cash and unsettled-intent basis, never double counting a settled intent nor freeing cash a returned one does not`  
    Cells: CMD052 ApproveCommissionPayout / RACE
-   Status: covered `[gintentbasis]`; product fix D10-GAP-1.
+   Status: covered `[gintentbasis]`; product fix D10-GAP-1. The SETTLED branch (B10G-R3): a SETTLED reconciliation committing first leaves the approval refused FUNDS_UNAVAILABLE while no bank observation newer than the settlement exists, and admitted once one does.
 
 4. `PAY_REV` (1 cell): CMD052: KAURO_OWNER grant revoked or step-up expiring between guard and COMMIT.  
    Proposed test: `RACE: a KAURO_OWNER grant revoked while ApproveCommissionPayout waits on the statement row refuses with NOT_AUTHORIZED and writes no intent; a step-up older than its window at the database instant is ASSURANCE_REQUIRED`  
