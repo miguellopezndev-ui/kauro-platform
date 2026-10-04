@@ -311,3 +311,37 @@ test("CORR_DUP [deny] a FAILED payout, its hold released and a later period's cl
   const sv = (await stateOf(succ!.statement_id)).version;
   assert.equal(outcome(sw.w, await approvePayout(sw, succ!.statement_id, { expectedVersion: sv, payeeRef: x!.s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) })), "409 PRECONDITION_FAILED NOTHING_PAYABLE");
 });
+
+// --- CORR_DUP: the other statement settles before the correction (Codex r2 B10G-R8, D10-GAP-13) ---------------------------------------
+
+test("CORR_DUP [deny] CMD051 correcting statement, a pending line another period made payable and PAID -> DENY: correcting the statement after the other statement settled leaves the line out as well (owned elsewhere, PAID), the successor supersedes it with nothing to pay and no cent is authorized twice", async () => {
+  const s = await seller(sw, "corr-paid", WHOLE);
+  const sold = await eligibleLines(sw, "corr paid", s, WHOLE, [{ basisCents: PAYABLE, poolCents: PAYABLE, state: "ACCRUED" }]);
+  const lineId = sold.lines[0]!.lineId;
+  const jan = await closeMonth(sw, nextMonth());
+  completed<PeriodCloseView>(jan.reply, 200);
+  const a = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === jan.periodId)!;
+  await makeLineEligible(sw.h, { agencyId: sold.selling.agency.agencyId, lineId, authorizationId: sold.lines[0]!.purchase.authorizationId, captureId: sold.lines[0]!.purchase.captureId, captureVersion: 2 });
+  const feb = await closeMonth(sw, nextMonth());
+  completed<PeriodCloseView>(feb.reply, 200);
+  const b = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === feb.periodId)!;
+  // B is approved and SETTLED: the line is PAID through B (its owner kept)
+  await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
+  completed<PayoutIntentView>(await approvePayout(sw, b.statement_id, { expectedVersion: Number(b.version), payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) }), 200);
+  const intent = await intentOf(sw, b.statement_id);
+  const ref = scriptEvidence(sw, sw.payouts.matching({ reference: intent.reference, destinationDigest: intent.destinationDigest, amountCents: intent.amount, currency: intent.currency }, "SETTLED"));
+  completed<PayoutReconciliationView>(await reconcilePayout(sw, b.statement_id, { providerPayoutEvidenceRef: ref }), 200);
+  assert.equal(await lineState(lineId), "PAID");
+  // A is still ISSUED at the version it was issued with: its correction succeeds with a successor that carries none of the line's cents
+  assert.deepEqual(await stateOf(a.statement_id), { state: "ISSUED", version: Number(a.version) });
+  const corrected = await correctStatement(sw, a.statement_id, { expectedVersion: Number(a.version) });
+  assert.equal(resultOf(corrected), "200");
+  assert.equal((await stateOf(a.statement_id)).state, "CORRECTED");
+  const [c] = await successorsOf(a.statement_id);
+  assert.deepEqual([c!.state, c!.payable_cents], ["ISSUED", "0"]);
+  assert.deepEqual(await itemsOf(sw, c!.statement_id), [], "every line of A is owned elsewhere: the successor itemizes none");
+  assert.equal(await lineState(lineId), "PAID");
+  assert.equal(await liveItems(lineId), 1, "the line's one live payable item is B's");
+  const authorized = await rows<{ cents: string }>(sw, "SELECT coalesce(sum(p.amount_cents), 0)::text AS cents FROM kauro.payout_intents p WHERE p.statement_id = ANY ($1::uuid[])", [[a.statement_id, b.statement_id, c!.statement_id]]);
+  assert.equal(authorized[0]!.cents, String(PAYABLE), "the line's cents are authorized once");
+});

@@ -81,10 +81,11 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
     const line = await ledger.lockLine(lineId as CommissionLineId);
     if (line !== null) locked.set(lineId, line);
   }
-  // a PAYABLE line owned by another statement is payable through that statement only: not the successor's (B10G-R1)
+  // a line owned by another statement (PAYABLE through it, or PAID through it: 0037 keeps the owner) is that statement's only, not the
+  // successor's (B10G-R1, B10G-R8, D10-GAP-13)
   const ownedElsewhere = (id: string): boolean => {
     const l = locked.get(id);
-    return l !== undefined && l.state === "PAYABLE" && l.payableStatementId !== predecessor.statementId;
+    return l !== undefined && l.payableStatementId !== undefined && l.payableStatementId !== null && l.payableStatementId !== predecessor.statementId;
   };
   const predecessorLines = new Set<string>(predecessor.lineIds.filter((id) => !ownedElsewhere(id)));
   const inputs = await statements.periodInputs(period.periodId, now);
@@ -100,8 +101,10 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
     adjustments: inputs.adjustments.filter((a) => predecessorLines.has(a.commissionLineId) && (!reported.has(a.adjustmentId) || own.has(a.adjustmentId))),
   };
   const composed = composeStatement({ sellerId: predecessor.sellerId, periodStartsAt: BEGINNING, cutoffAt: now, rows });
-  // every line of the predecessor may have gone on to another statement: the successor then supersedes it with nothing to pay
-  if (composed.items.length === 0 && predecessorLines.size > 0) throw new DomainFailure("INTEGRITY_FAILURE", "a statement that was issued with lines itemizes none of them again");
+  // every line of the predecessor may have gone on to another statement, or ended (PAID, ADJUSTED or VOID with nothing to report): the
+  // successor then supersedes it with nothing to pay (D10-GAP-13); open lines that the recomposition drops entirely are an integrity fault
+  const open = lines.filter((l) => l.state === "ACCRUED_PENDING" || l.state === "ELIGIBLE" || l.state === "HELD" || l.state === "PAYABLE");
+  if (composed.items.length === 0 && open.length > 0) throw new DomainFailure("INTEGRITY_FAILURE", "a statement that was issued with open lines itemizes none of them again");
   for (const lineId of payableBefore) {
     const item = composed.items.find((i) => i.kind === "LINE" && i.lineId === lineId);
     if (item === undefined || item.disposition !== "PAYABLE") {
