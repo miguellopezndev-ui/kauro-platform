@@ -382,6 +382,8 @@ export interface LineSpec {
   readonly serviceCents?: bigint;
   /** ELIGIBLE (FINAL completion 720 hours ago, funds AVAILABLE), ACCRUED (no FINAL completion) or AWAITING_FUNDS (FINAL, no funds observed). */
   readonly state?: "ELIGIBLE" | "ACCRUED" | "AWAITING_FUNDS";
+  /** An ELIGIBLE line's FINAL completion instant, when the occurrence of the record matters (default: a minute ago). */
+  readonly completedAt?: UtcInstant;
 }
 
 const SYNTHETIC = "STATEMENTS-SYNTHETIC";
@@ -430,6 +432,7 @@ export async function eligibleLines(
       rateBps: i === 0 ? rates.firstBps : rates.repeatBps,
       basisCents: line.basisCents,
       poolCents: line.poolCents,
+      ...(line.completedAt === undefined ? {} : { completedAt: line.completedAt }),
     };
     const state = line.state ?? "ELIGIBLE";
     const recorded = state === "ELIGIBLE" ? await recordEligibleLine(sw.h, input) : await recordAccruedLine(sw.h, input);

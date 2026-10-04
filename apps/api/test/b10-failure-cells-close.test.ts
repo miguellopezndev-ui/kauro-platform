@@ -4,9 +4,10 @@
 // holding it until its COMMIT. PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import type { UtcInstant } from "@kauro/contracts";
 import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
 import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { acquired, approvePayout, bankCash, claimedCents, closeMonth, closePeriod, drainCommissions, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { acquired, approvePayout, bankCash, claimedCents, closeMonth, closePeriod, drainCommissions, eligibleLines, itemsOf, openMonth, proposal, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { purchase } from "./commission-support.js";
 import { createCommissionService } from "../src/index.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
@@ -311,10 +312,25 @@ test("CLOSE_VS_DELIVERY [deny] CMD051 CloseCommissionPeriod, a COMMISSIONS recor
   const st1 = (await statementOf(first.sellerId, closed.periodId))!;
   assert.deepEqual([st1.payable_cents, st1.held_cents], ["10000", "0"]);
 
-  // the late delivery: its line is created now, after m1's close COMMIT, whatever instant its capture occurred at
+  // the late delivery: its purchase COMPLETED inside m1 (its FINAL completion, the record's occurrence, is stated at m1's second day) but its
+  // line is created now, after m1's close COMMIT (R-GAP-2: created-before-close is the input, never occurred_at)
+  const period = (await rows<{ starts_at: Date; ends_at: Date }>(sw, "SELECT starts_at, ends_at FROM kauro.commission_periods WHERE period_id = $1", [closed.periodId]))[0]!;
+  const occurredAt = `${m1}-02T12:00:00.000Z` as UtcInstant;
   const late = await seller(sw, "late-delivery-second", WHOLE);
-  const sold = await eligibleLines(sw, "late delivery second", late, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
+  const sold = await eligibleLines(sw, "late delivery second", late, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n, completedAt: occurredAt }]);
   const lateLine = sold.lines[0]!.lineId;
+  // relation 1: the record OCCURRED inside m1 [starts_at, ends_at): an occurred-at rule would have put the line in m1's statement
+  const facts = (await rows<{ completed_at: Date; created_at: Date; line_xmin: string; statement_xmin: string }>(
+    sw,
+    `SELECT c.completed_at, l.created_at, l.xmin::text AS line_xmin, (SELECT s.xmin::text FROM kauro.commission_statements s WHERE s.statement_id = $2) AS statement_xmin
+       FROM kauro.commission_lines l JOIN kauro.purchase_completions c ON c.completion_id = l.final_completion_id WHERE l.line_id = $1`,
+    [lateLine, st1.statement_id],
+  ))[0]!;
+  assert.ok(facts.completed_at >= period.starts_at && facts.completed_at < period.ends_at, "the late record's occurrence (its FINAL completion) lies inside m1's [starts_at, ends_at)");
+  assert.ok(facts.completed_at.getTime() < Date.now(), "and it is a past occurrence, so occurred-at would have qualified the line for m1");
+  // relation 2: the line was created after m1's close. The close reads `created_at < its cutoff` over the rows its own transaction can see; the
+  // line's row was written by a transaction that began after the close's COMMIT, so the statement's transaction id precedes the line's
+  assert.ok(Number(facts.statement_xmin) < Number(facts.line_xmin), "the late line's row was written after the closed statement's COMMIT");
   assert.equal(await statementOf(late.sellerId, closed.periodId), undefined, "the closed statement set has nobody's late line");
   assert.ok(!(await itemsOf(sw, st1.statement_id)).some((i) => i.line_id === lateLine), "the closed statement itemizes only what was created before it");
 

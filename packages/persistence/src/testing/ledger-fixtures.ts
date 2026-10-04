@@ -81,6 +81,8 @@ export interface LedgerLineInput {
   /** round_half_up_bps(basis, rate), stated by the caller as the worked example's integer cents. */
   readonly poolCents: bigint;
   readonly shareBps?: number;
+  /** An ELIGIBLE line's FINAL completion instant (the occurrence of the record); absent: a minute ago. */
+  readonly completedAt?: UtcInstant;
 }
 
 export interface RecordedLine {
@@ -133,7 +135,7 @@ export async function recordEligibleLine(h: Harness, input: LedgerLineInput): Pr
       purchaseId: input.authorizationId as NewCommissionPool["purchaseId"],
       agencyId: input.agencyId as NewCommissionPool["agencyId"],
       kind: "FINAL",
-      completedAt: new Date(Date.now() - 60_000).toISOString() as UtcInstant,
+      completedAt: input.completedAt ?? (new Date(Date.now() - 60_000).toISOString() as UtcInstant),
       evidenceHash: sha(`completion-${input.authorizationId}`) as never,
       source: "AUTHORIZATION_DELIVERY",
       recordedAt: now,
