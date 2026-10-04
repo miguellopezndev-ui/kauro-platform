@@ -217,7 +217,7 @@ export async function recordIssuedStatement(
     for (const item of composed.items) {
       if (item.kind !== "LINE" || item.disposition !== "PAYABLE" || item.lineId === undefined) continue;
       const line = (await ledger.lockLine(item.lineId))!;
-      const done = await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE" }, clock.now());
+      const done = await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE", payableStatementId: statementId as never }, clock.now());
       if (done.kind !== "APPLIED") throw new Error("the line did not become PAYABLE");
     }
     return { statementId: issued.record.statementId, payableCents: issued.record.payableCents, heldCents: issued.record.heldCents };

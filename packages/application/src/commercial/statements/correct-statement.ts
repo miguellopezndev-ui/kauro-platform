@@ -10,7 +10,9 @@
  *     APPROVED, PAID or CORRECTED statement has no edge to CORRECTED, so a CORRECTED one is never corrected twice and no payout intent
  *     ever names a CORRECTED statement);
  *  2. the lines of the predecessor locked in ascending id, then the statement recomposed over exactly those lines from the ledger as it
- *     stands now (composeStatement): a line the predecessor made PAYABLE stays payable through the successor's item, a line released since
+ *     stands now (composeStatement): a line PAYABLE through the predecessor (its payable owner, 0037) stays payable through the successor's
+ *     item and the successor takes it over, a PAYABLE line owned by another statement (a pending or held line a later period made payable)
+ *     is that statement's and is left out of the successor (B10G-R1: one live payable item per line, never two), a line released since
  *     that is ELIGIBLE again becomes PAYABLE (statement_closed), anything else is itemized by its state; a PAYABLE line that the
  *     recomposition would not keep payable (a covering hold opened since) refuses the correction (STALE_VERSION LEDGER_CHANGED) rather than
  *     leave a payable line outside every live statement item;
@@ -20,7 +22,7 @@
  * period's (one per period and seller) and is not repeated.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { CommissionLineId, CommissionStatementId, StatementItemId } from "@kauro/domain";
+import type { CommissionLineId, CommissionLineRecord, CommissionStatementId, StatementItemId } from "@kauro/domain";
 import { DomainFailure, NotFoundFailure, StaleVersionFailure, commissionCutoffHash, composeStatement } from "@kauro/domain";
 import type { CommandResult } from "../../api/envelope.js";
 import { applied } from "../agency/shared.js";
@@ -56,8 +58,17 @@ export function correctCommissionStatement(rt: StatementServiceRuntime, request:
       const period = await statements.getPeriod(predecessor.periodId);
       if (period === null) throw new DomainFailure("INTEGRITY_FAILURE", "a statement's period is readable");
       // 2. its lines, locked in ascending id, and the statement recomposed over exactly them
-      const predecessorLines = new Set<string>(predecessor.lineIds);
-      for (const lineId of [...predecessorLines].sort()) await ledger.lockLine(lineId as CommissionLineId);
+      const locked = new Map<string, CommissionLineRecord>();
+      for (const lineId of [...new Set<string>(predecessor.lineIds)].sort()) {
+        const line = await ledger.lockLine(lineId as CommissionLineId);
+        if (line !== null) locked.set(lineId, line);
+      }
+      // a PAYABLE line owned by another statement is payable through that statement only: not the successor's (B10G-R1)
+      const ownedElsewhere = (id: string): boolean => {
+        const l = locked.get(id);
+        return l !== undefined && l.state === "PAYABLE" && l.payableStatementId !== predecessor.statementId;
+      };
+      const predecessorLines = new Set<string>(predecessor.lineIds.filter((id) => !ownedElsewhere(id)));
       const inputs = await statements.periodInputs(period.periodId, now);
       const lines = inputs.lines.filter((l) => predecessorLines.has(l.lineId));
       const payableBefore = new Set(lines.filter((l) => l.state === "PAYABLE").map((l) => l.lineId as string));
@@ -71,7 +82,8 @@ export function correctCommissionStatement(rt: StatementServiceRuntime, request:
         adjustments: inputs.adjustments.filter((a) => predecessorLines.has(a.commissionLineId) && (!reported.has(a.adjustmentId) || own.has(a.adjustmentId))),
       };
       const composed = composeStatement({ sellerId: predecessor.sellerId, periodStartsAt: BEGINNING, cutoffAt: now, rows });
-      if (composed.items.length === 0) throw new DomainFailure("INTEGRITY_FAILURE", "a statement that was issued with lines itemizes none of them again");
+      // every line of the predecessor may have gone on to another statement: the successor then supersedes it with nothing to pay
+      if (composed.items.length === 0 && predecessorLines.size > 0) throw new DomainFailure("INTEGRITY_FAILURE", "a statement that was issued with lines itemizes none of them again");
       for (const lineId of payableBefore) {
         const item = composed.items.find((i) => i.kind === "LINE" && i.lineId === lineId);
         if (item === undefined || item.disposition !== "PAYABLE") {
@@ -104,12 +116,18 @@ export function correctCommissionStatement(rt: StatementServiceRuntime, request:
         items: composed.items.map((item) => ({ ...item, itemId: uow.ids.next() as StatementItemId, statementId: successorId })),
       });
       if (!issued.issued) throw new DomainFailure("INTEGRITY_FAILURE", "a correction of a locked ISSUED or DISPUTED statement already exists");
-      // statement_closed for each line released since: ELIGIBLE to PAYABLE (the database checks the issued item names it)
+      // the successor takes over each line payable through the predecessor (the database allows only the correcting statement, KC019),
+      // and statement_closed for each line released since: ELIGIBLE to PAYABLE through the successor (the database checks its item)
       for (const item of composed.items) {
-        if (item.kind !== "LINE" || item.disposition !== "PAYABLE" || item.lineId === undefined || payableBefore.has(item.lineId)) continue;
+        if (item.kind !== "LINE" || item.disposition !== "PAYABLE" || item.lineId === undefined) continue;
         const line = await ledger.lockLine(item.lineId);
+        if (payableBefore.has(item.lineId)) {
+          if (line === null || line.state !== "PAYABLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable line of the predecessor moved under the statement's lock");
+          applied(await ledger.movePayableOwner(item.lineId, line.version, predecessor.statementId, successorId));
+          continue;
+        }
         if (line === null || line.state !== "ELIGIBLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable item's line is no longer ELIGIBLE under the statement's lock");
-        applied(await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE" }, now));
+        applied(await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE", payableStatementId: successorId }, now));
       }
       const corrected = applied(await statements.transitionStatement(predecessor.statementId, predecessor.version, { state: "CORRECTED" }, now));
       const calendar = await statements.getCalendar(issued.record.calendarVersionId);

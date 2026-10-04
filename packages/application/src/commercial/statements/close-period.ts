@@ -192,7 +192,7 @@ export function closeCommissionPeriod(rt: StatementServiceRuntime, request: Serv
           if (item.kind !== "LINE" || item.disposition !== "PAYABLE" || item.lineId === undefined) continue;
           const line = await ledger.lockLine(item.lineId);
           if (line === null || line.state !== "ELIGIBLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable item's line is no longer ELIGIBLE under the period's lock");
-          applied(await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE" }, now));
+          applied(await ledger.transitionLine(item.lineId, line.version, { state: "PAYABLE", payableStatementId: statementId }, now));
         }
         // the owner's compensation-guard review of the seller: recorded, never a refusal (D10-GUARD-1)
         const itemized = composed.lineIds.map((id) => lines.get(id)).filter((l): l is CommissionLineRecord => l !== undefined);

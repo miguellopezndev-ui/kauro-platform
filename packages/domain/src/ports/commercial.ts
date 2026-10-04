@@ -545,6 +545,8 @@ export interface CommissionLineChange {
   readonly heldReason?: HoldReason;
   readonly reviewAt?: UtcInstant;
   readonly paidCents?: bigint;
+  /** PAYABLE (statement_closed): the statement whose PAYABLE item the line becomes payable through (0037; B10G-R1). */
+  readonly payableStatementId?: CommissionStatementId;
 }
 
 export interface NewCommissionHold {
@@ -580,6 +582,11 @@ export interface CommissionLedgerRepository {
   linesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionLineRecord>>;
   transitionLine(lineId: CommissionLineId, expectedVersion: number, change: CommissionLineChange, now: UtcInstant): Promise<VersionedWrite<CommissionLineRecord>>;
   adjustmentsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionAdjustmentRecord>>;
+  /**
+   * A PAYABLE line's owner handed from `fromStatementId` to the statement correcting it (`toStatementId`), which itemizes it PAYABLE: the
+   * database refuses any other move (KC019, 0037). STALE when the line moved or is no longer owned by `fromStatementId`.
+   */
+  movePayableOwner(lineId: CommissionLineId, expectedVersion: number, fromStatementId: CommissionStatementId, toStatementId: CommissionStatementId): Promise<VersionedWrite<CommissionLineRecord>>;
   /** Opens a hold of at most the line's unpaid cents with its reason and review date (D10-HOLD-1). */
   openHold(hold: NewCommissionHold): Promise<CommissionHoldRecord>;
   resolveHold(holdId: CommissionHoldId, expectedVersion: number, state: Exclude<CommissionHoldState, "OPEN">, now: UtcInstant): Promise<VersionedWrite<CommissionHoldRecord>>;

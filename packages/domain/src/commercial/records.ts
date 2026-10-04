@@ -781,6 +781,8 @@ export interface CommissionLineRecord {
   /** The reason and review date of the OPEN hold covering a HELD line (commission_holds; the line row carries neither). */
   readonly heldReason?: HoldReason;
   readonly reviewAt?: UtcInstant;
+  /** The statement through whose PAYABLE item the line is payable (or was paid): one live payable item per line (0037; B10G-R1). */
+  readonly payableStatementId?: CommissionStatementId;
   readonly policyVersion: string;
   readonly createdAt: UtcInstant;
 }

@@ -600,6 +600,28 @@ test("CMD052 at the database: an intent's amount equals its statement's payable,
   await oracleProbe(w, "UPDATE kauro.payout_intents SET destination_digest = $2, version = version + 1 WHERE intent_id = $1", [again, sha("another account")], refusedWith("KA004"), "the intent keeps its destination");
 });
 
+test("B10G-R1 at the database: a PAYABLE line is payable through one live statement item (KC019): another statement cannot itemize it PAYABLE nor take it over unless it corrects the line's owner", async () => {
+  const s = await activeSeller(w, "owner-s");
+  const { ag, first, lineId } = await firstLine("OWNER", s);
+  await completion(w, ag, first, "FINAL");
+  await funds(w, ag, first, "AVAILABLE", 2);
+  await makeEligible(w, lineId);
+  const a = await issueStatement(w, october, s, [lineId]);
+  const owner = async (): Promise<string | null> => (await w.h.oracle.query<{ id: string | null }>("SELECT payable_statement_id AS id FROM kauro.commission_lines WHERE line_id = $1", [lineId])).rows[0]!.id;
+  assert.equal(await owner(), a.statementId, "the line is payable through the statement whose PAYABLE item made it PAYABLE");
+  const later = await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01");
+  await assert.rejects(within(w.commission, corporate, (c) => statementFor(c, later, s, [lineId], { payLines: false })), refusedWith("KC019"), "a second live statement itemizing the PAYABLE line");
+  await assert.rejects(
+    within(w.commission, corporate, async (c) => {
+      const other = await statementFor(c, later, s, [], { issue: false });
+      await c.query("UPDATE kauro.commission_lines SET payable_statement_id = $2, version = version + 1 WHERE line_id = $1", [lineId, other.statementId]);
+    }),
+    refusedWith("KC019"),
+    "a take-over by a statement that does not correct the owner",
+  );
+  assert.equal(await owner(), a.statementId);
+});
+
 // --- CMD053 ------------------------------------------------------------------------------------------------------------------------------
 
 test("CMD053 at the database: a line becomes PAID only when its statement's intent is SETTLED with an evidence hash (KC010), and a FAILED or RETURNED intent is kept with its evidence", async () => {

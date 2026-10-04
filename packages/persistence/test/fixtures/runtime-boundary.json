@@ -469,6 +469,7 @@
           "net_service_basis_cents",
           "paid_at",
           "paid_cents",
+          "payable_statement_id",
           "state",
           "updated_at",
           "version"

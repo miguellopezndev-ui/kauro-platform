@@ -5,10 +5,10 @@
 // statement of the unit completed. A correction has no route (D10-GAP-7): it is called as the commission service over its runtime.
 // PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
+import { after, before, test } from "node:test";
 import type { PayoutIntentView, PeriodCloseView, StatementCorrectionView } from "@kauro/application";
 import type { CommandResult } from "@kauro/application";
-import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { connectionPid, faultCell, makeLineEligible, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { approvePayout, bankCash, claimedCents, closeMonth, correctStatement, eligibleLines, itemsOf, resultOf, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { completed, freshKey, outcome, type Reply } from "./support.js";
@@ -235,3 +235,35 @@ faultCell(
     }
   },
 );
+
+// --- CORR_DUP: a line another period made payable (Codex r1 B10G-R1) ------------------------------------------------------------------
+
+test("CORR_DUP [deny] CMD051 correcting statement, a pending line another period made payable -> DENY: correcting a statement whose pending line a later period made PAYABLE leaves the line payable through that later statement only, and approving both never authorizes its cents twice", async () => {
+  const s = await seller(sw, "corr-owner", WHOLE);
+  const sold = await eligibleLines(sw, "corr owner", s, WHOLE, [{ basisCents: PAYABLE, poolCents: PAYABLE, state: "ACCRUED" }]);
+  const lineId = sold.lines[0]!.lineId;
+  // January: the line is pending, itemized AWAITING in statement A
+  const jan = await closeMonth(sw, nextMonth());
+  completed<PeriodCloseView>(jan.reply, 200);
+  const a = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === jan.periodId)!;
+  assert.deepEqual((await itemsOf(sw, a.statement_id)).map((i) => [i.line_id, i.disposition, i.payable_cents]), [[lineId, "AWAITING_FINAL_COMPLETION", "0"]]);
+  // the line becomes ELIGIBLE; February makes it PAYABLE through statement B
+  await makeLineEligible(sw.h, { agencyId: sold.selling.agency.agencyId, lineId, authorizationId: sold.lines[0]!.purchase.authorizationId, captureId: sold.lines[0]!.purchase.captureId, captureVersion: 2 });
+  const feb = await closeMonth(sw, nextMonth());
+  completed<PeriodCloseView>(feb.reply, 200);
+  const b = (await statementsOfSeller(sw, s.sellerId)).find((x) => x.period_id === feb.periodId)!;
+  assert.deepEqual([b.payable_cents, await lineState(lineId)], [String(PAYABLE), "PAYABLE"]);
+  // correcting A: the line is B's payable, not A's; the successor carries none of its cents
+  const corrected = await correctStatement(sw, a.statement_id, { expectedVersion: Number(a.version) });
+  assert.equal(resultOf(corrected), "200");
+  const [c] = await successorsOf(a.statement_id);
+  assert.equal(c!.payable_cents, "0", "the successor does not re-itemize a line another statement made payable");
+  assert.equal(await liveItems(lineId), 1, "the line is payable through exactly one live statement item");
+  // approving both: B authorizes the 5,000 once, the successor has nothing payable
+  await bankCash(sw, (await claimedCents(sw)) + PAYABLE + PAYABLE);
+  completed<PayoutIntentView>(await approvePayout(sw, b.statement_id, { expectedVersion: Number(b.version), payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) }), 200);
+  const cVersion = (await stateOf(c!.statement_id)).version;
+  assert.equal(outcome(sw.w, await approvePayout(sw, c!.statement_id, { expectedVersion: cVersion, payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) })), "409 PRECONDITION_FAILED NOTHING_PAYABLE");
+  const authorized = await rows<{ cents: string }>(sw, "SELECT coalesce(sum(p.amount_cents), 0)::text AS cents FROM kauro.payout_intents p WHERE p.statement_id = ANY ($1::uuid[])", [[a.statement_id, b.statement_id, c!.statement_id]]);
+  assert.equal(authorized[0]!.cents, String(PAYABLE), "the line's cents are authorized once");
+});

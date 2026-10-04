@@ -42,6 +42,7 @@ import {
   type CommissionPoolRecord,
   type CommissionRateKind,
   type CommissionSource,
+  type CommissionStatementId,
   type CompletionKind,
   type CompletionSource,
   type EventId,
@@ -175,7 +176,7 @@ function poolRecord(r: PoolRow): CommissionPoolRecord {
 /** A line with the reason and review date of the OPEN hold covering it while it is HELD (the line row carries neither). */
 const LINE = `l.line_id, l.agency_id, l.pool_id, l.authorization_id, l.entitlement_id, l.seller_id, l.capture_id, l.share_bps, l.rate_bps, l.net_service_basis_cents, l.cumulative_entitlement_cents,
   l.previous_posted_cents, l.paid_cents, ${canonical("l.paid_at", "paid_at")}, l.state, l.version, ${canonical("l.eligible_at", "eligible_at")}, l.final_completion_id, l.policy_version,
-  ${canonical("l.created_at", "created_at")}, h.reason AS held_reason, ${canonical("h.review_at", "review_at")}`;
+  ${canonical("l.created_at", "created_at")}, h.reason AS held_reason, ${canonical("h.review_at", "review_at")}, l.payable_statement_id`;
 const LINE_FROM = `kauro.commission_lines l LEFT JOIN LATERAL (
     SELECT x.reason, x.review_at FROM kauro.commission_holds x WHERE x.line_id = l.line_id AND x.state = 'OPEN' ORDER BY x.opened_at DESC, x.hold_id DESC LIMIT 1
   ) h ON l.state = 'HELD'`;
@@ -202,6 +203,7 @@ interface LineRow {
   created_at: string;
   held_reason: HoldReason | null;
   review_at: string | null;
+  payable_statement_id: string | null;
 }
 function lineRecord(r: LineRow): CommissionLineRecord {
   return defined<CommissionLineRecord>(
@@ -230,6 +232,7 @@ function lineRecord(r: LineRow): CommissionLineRecord {
       finalCompletionId: optionalString<PurchaseCompletionId>(r.final_completion_id),
       heldReason: optionalString<HoldReason>(r.held_reason),
       reviewAt: optionalInstantOf(r.review_at),
+      payableStatementId: optionalString<CommissionStatementId>(r.payable_statement_id),
     },
   );
 }
@@ -576,6 +579,11 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
       const final = "FROM kauro.purchase_completions c WHERE c.agency_id = l.agency_id AND c.authorization_id = l.authorization_id AND c.kind = 'FINAL'";
       sets.push(`eligible_at = (SELECT c.completed_at + interval '720 hours' ${final})`, `final_completion_id = (SELECT c.completion_id ${final})`);
     }
+    if (change.state === "PAYABLE" && change.payableStatementId !== undefined) {
+      // the statement the line is payable through (0037: an ISSUED statement with the line's PAYABLE item, checked at COMMIT)
+      params.push(change.payableStatementId);
+      sets.push(`payable_statement_id = $${params.length}::uuid`);
+    }
     if (change.state === "PAID") {
       if (change.paidCents !== undefined) {
         params.push(change.paidCents);
@@ -626,6 +634,18 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
     );
     if (r.rows[0] === undefined) return staleRow(this.db, "SELECT version, state FROM kauro.commission_holds WHERE hold_id = $1", holdId, "hold");
     return { kind: "APPLIED", record: holdRecord(r.rows[0]) };
+  }
+
+  async movePayableOwner(lineId: CommissionLineId, expectedVersion: number, fromStatementId: CommissionStatementId, toStatementId: CommissionStatementId): Promise<VersionedWrite<CommissionLineRecord>> {
+    const r = await execute<{ line_id: string }>(
+      this.db,
+      "UPDATE kauro.commission_lines l SET payable_statement_id = $4, version = l.version + 1 WHERE l.line_id = $1 AND l.version = $2 AND l.state = 'PAYABLE' AND l.payable_statement_id = $3 RETURNING l.line_id",
+      [lineId, expectedVersion, fromStatementId, toStatementId],
+    );
+    if (r.rows[0] === undefined) return staleRow(this.db, "SELECT version, state FROM kauro.commission_lines WHERE line_id = $1", lineId, "line");
+    const record = await this.getLine(lineId);
+    if (record === null) throw new DomainFailure("INTEGRITY_FAILURE", "a line just handed over is not readable by its writer");
+    return { kind: "APPLIED", record };
   }
 
   async holdsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionHoldRecord>> {
