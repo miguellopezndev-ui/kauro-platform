@@ -9,8 +9,10 @@
  *  2. its dates: an undated period is dated now from the calendar version BankingCalendarSource answers for the server's instant
  *     (CALENDAR_UNAVAILABLE when none, or when it does not cover the 10th banking day), recorded in banking_calendars and stored with its
  *     source (D10-CAL-1); then the period due — its close date reached on the server's clock in America/Bogota (PERIOD_NOT_DUE);
- *  3. its inputs reconciled: no COMMISSIONS outbox record created before the period's end still undelivered (INPUTS_UNRECONCILED; an
- *     unobservable count is unreconciled, never zero);
+ *  3. its inputs reconciled: no COMMISSIONS outbox record created before the close's cutoff instant (the unit's server instant, not the
+ *     period's end: B10G-R5) still undelivered (INPUTS_UNRECONCILED; an unobservable count is unreconciled, never zero), checked again on
+ *     the proposal recomputed under the line locks; every COMMISSIONS delivery takes the open periods FOR SHARE, so none commits between
+ *     this check and the COMMIT, and a record committed after it is delivered after the close (its line is the next statement's);
  *  4. the ledger it proposes to close: KAURO_COMMISSION_CUTOFF_V1 over every line existing at the close, with its adjustments and holds,
  *     for the period's end, equal to ledgerCutoffHash (STALE_VERSION LEDGER_CHANGED otherwise: the proposal is recomputed, never re-cut);
  *  5. one immutable ISSUED statement per seller with items (composeStatement: ELIGIBLE lines PAYABLE net of their partial holds, lines
@@ -133,17 +135,21 @@ export function closeCommissionPeriod(rt: StatementServiceRuntime, request: Serv
       if (period.closeDueOn === undefined || today < period.closeDueOn) {
         throw new DomainFailure("PRECONDITION_FAILED", `the period's close is due on ${String(period.closeDueOn)}`, { reason: "PERIOD_NOT_DUE", currentVersion: period.version, currentState: period.state });
       }
-      // 3. its inputs reconciled: every COMMISSIONS record of the period delivered
-      const before = await statements.periodInputs(period.periodId, period.endsAt);
-      if (before.undeliveredBeforeCutoff === null || before.undeliveredBeforeCutoff > 0) {
-        throw new DomainFailure("PRECONDITION_FAILED", "a COMMISSIONS input of the period is not yet delivered", { reason: "INPUTS_UNRECONCILED", currentVersion: period.version, currentState: period.state });
-      }
+      // 3. its inputs reconciled: every COMMISSIONS record created before the close's cutoff instant delivered (B10G-R5)
+      const unreconciled = (undelivered: number | null): DomainFailure | null =>
+        undelivered === null || undelivered > 0 ? new DomainFailure("PRECONDITION_FAILED", "a COMMISSIONS input created before the close is not yet delivered", { reason: "INPUTS_UNRECONCILED", currentVersion: period.version, currentState: period.state }) : null;
+      const before = await statements.periodInputs(period.periodId, now);
+      const undeliveredBefore = unreconciled(before.undeliveredBeforeCutoff);
+      if (undeliveredBefore !== null) throw undeliveredBefore;
       // 4. the proposed ledger, read under the row locks of its lines (D10-GAP-4): a hold, an eligibility or a payout move that is in flight
       //    on one of them is waited for and read, so the hash is of the ledger the statements are composed from and no hold committed after
       //    the reads can reach a line this close then makes PAYABLE (a hold insert takes the line's key-share lock and waits for the close)
       const read = await proposeCommissionClose(statements, period, now);
       for (const lineId of read.inputs.lines.map((l) => l.lineId).sort()) await ledger.lockLine(lineId);
       const proposal = await proposeCommissionClose(statements, period, now);
+      // the recomputed proposal's own count of undelivered inputs is enforced too, never only computed
+      const undeliveredProposed = unreconciled(proposal.inputs.undeliveredBeforeCutoff);
+      if (undeliveredProposed !== null) throw undeliveredProposed;
       if (proposal.ledgerCutoffHash !== request.body.ledgerCutoffHash) {
         throw new DomainFailure("STALE_VERSION", "the ledger changed since the close was proposed", { reason: "LEDGER_CHANGED", currentVersion: period.version, currentState: period.state });
       }

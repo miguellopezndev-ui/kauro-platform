@@ -19237,7 +19237,7 @@
                 "reason": "INPUTS_UNRECONCILED",
                 "current": "ALWAYS",
                 "layer": "COMMAND",
-                "meaning": "a COMMISSIONS record that occurred before the period's end is not yet delivered, or cannot be observed"
+                "meaning": "a COMMISSIONS record created before the close's cutoff instant is not yet delivered, or cannot be observed (B10G-R5)"
               },
               {
                 "code": "STALE_VERSION",

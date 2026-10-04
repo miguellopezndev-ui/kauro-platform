@@ -63,6 +63,10 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
     handle(delivery) {
       return inAgency(rt, delivery.agencyId, delivery.eventId, async (uow): Promise<ConsumerOutcome> => {
         const agencyId = delivery.agencyId;
+        // every COMMISSIONS delivery takes the open periods first (design 10; D10-STMT-4, B10G-R5): a close holds its period FOR UPDATE, so
+        // a delivery commits before the close reads (and its record is delivered, or the close refuses INPUTS_UNRECONCILED) or after the
+        // close commits (its line, created after the close, is the next statement's input); never between the close's guard and its COMMIT
+        await commissionWorkOf(uow).shareOpenPeriods();
         switch (delivery.eventType) {
           case "capture.completed.v1": {
             const accrued = await accrueOnEvent(rt, uow, agencyId, text(delivery, "captureId") as CaptureId);
@@ -72,8 +76,7 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
           case "refund.completed.v1":
           case "capture.reversed.v1": {
             const captureId = text(delivery, "captureId") as CaptureId;
-            // a basis change takes the open periods first, before any pool or line of the purchase (D10-STMT-4): it serializes with a close
-            await commissionWorkOf(uow).shareOpenPeriods();
+            // a basis change took the open periods first, before any pool or line of the purchase (D10-STMT-4): it serializes with a close
             const accrued = await accrueOnEvent(rt, uow, agencyId, captureId);
             if (!accrued.found) return "NOT_APPLICABLE";
             const change = delivery.eventType === "capture.reversed.v1" ? ({ kind: "CAPTURE_REVERSED" } as const) : ({ kind: "REFUND_COMPLETED", serviceBasisAfterCents: cents(delivery, "serviceBasisAfterCents") } as const);

@@ -33,6 +33,7 @@ import {
   statementsOfSeller,
   statementsWorld,
   type StatementsWorld,
+  drainCommissions,
 } from "./statements-support.js";
 import { asProblem, completed, freshKey, ids, outcome, replayTextOf, sha } from "./support.js";
 
@@ -49,8 +50,9 @@ const SERVICE_POOL = `${COMMISSION_APPLICATION_NAME}-service`;
 /** Rates of 100% of the basis, so a line's cents are the round numbers of the case (the allocation's and the agreement's). */
 const WHOLE = { firstBps: 10_000, repeatBps: 10_000 } as const;
 
-/** Closes a month's period with the proposal of the ledger as it stands. */
+/** Closes a month's period with the proposal of the ledger as it stands, every COMMISSIONS record delivered first (B10G-R5). */
 async function closeNow(periodId: string, options: { readonly key?: string } = {}) {
+  await drainCommissions(sw);
   return closePeriod(sw, periodId, { ledgerCutoffHash: await proposal(sw, periodId) }, options);
 }
 
@@ -226,7 +228,8 @@ test("DENY: a user token or the finance service is a wrong service identity (403
   }
   await unchanged(current, "unreconciled inputs");
 
-  // a ledger that moved after the proposal: the close is refused, never re-cut over another ledger
+  // a ledger that moved after the proposal: the close is refused, never re-cut over another ledger (its inputs delivered first)
+  await drainCommissions(sw);
   const may = await openMonth(sw, "2026-05");
   const stale = await proposal(sw, may);
   await recordHold(sw.h, { ownerUserId: sw.owner.userId as UserId, lineId: eligible, amountCents: 500n, reason: "SELLER_DISPUTE" });
@@ -263,6 +266,7 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
   const r = await seller(sw, "cmd051-race-replay", WHOLE);
   await eligibleLines(sw, "CMD051 RACE replay", r, WHOLE, [{ basisCents: 6_000n, poolCents: 6_000n }]);
   const june = await openMonth(sw, "2026-06");
+  await drainCommissions(sw);
   const key = freshKey("cmd051-race");
   const hash = await proposal(sw, june);
   const first = await closePeriod(sw, june, { ledgerCutoffHash: hash }, { key });
@@ -344,7 +348,9 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
       await pool.query("ROLLBACK");
     }
     await adjusting;
-    assert.equal(outcome(sw.w, (await racing) as never), "409 STALE_VERSION LEDGER_CHANGED");
+    // refused either way, never cut over the changed ledger: the delivery's record not yet settled DELIVERED when the close reads
+    // (INPUTS_UNRECONCILED, B10G-R5), or settled and the hash moved (LEDGER_CHANGED)
+    assert.match(outcome(sw.w, (await racing) as never), /^409 (STALE_VERSION LEDGER_CHANGED|PRECONDITION_FAILED INPUTS_UNRECONCILED)$/);
   } finally {
     await pool.end();
   }
@@ -365,6 +371,7 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
   const v = await seller(sw, "cmd051-race-crash", WHOLE);
   await eligibleLines(sw, "CMD051 RACE crash", v, WHOLE, [{ basisCents: 8_000n, poolCents: 8_000n }]);
   const january = await openMonth(sw, "2026-01");
+  await drainCommissions(sw);
   const crashKey = freshKey("cmd051-crash");
   const crashBody = { ledgerCutoffHash: await proposal(sw, january) };
   sw.serviceHolds.arm("CMD051", { fail: new ServiceCrash("before COMMIT") });

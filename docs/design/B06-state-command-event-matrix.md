@@ -1924,7 +1924,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | UNLISTED_TRANSITION | — | always | COMMAND | the period is already CLOSED |
 | 409 | PRECONDITION_FAILED | CALENDAR_UNAVAILABLE | — | — | COMMAND | no recorded banking calendar version covers the period's close and pay dates |
 | 409 | PRECONDITION_FAILED | PERIOD_NOT_DUE | — | always | COMMAND | the period's close date (the 5th banking day after its end) has not come on the server's clock |
-| 409 | PRECONDITION_FAILED | INPUTS_UNRECONCILED | — | always | COMMAND | a COMMISSIONS record that occurred before the period's end is not yet delivered, or cannot be observed |
+| 409 | PRECONDITION_FAILED | INPUTS_UNRECONCILED | — | always | COMMAND | a COMMISSIONS record created before the close's cutoff instant is not yet delivered, or cannot be observed (B10G-R5) |
 | 409 | STALE_VERSION | LEDGER_CHANGED | — | always | COMMAND | ledgerCutoffHash is not KAURO_COMMISSION_CUTOFF_V1 of the ledger as it stands: the close is proposed again, never re-cut |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |

@@ -280,12 +280,24 @@ export async function periodIdOf(sw: StatementsWorld, month: string): Promise<st
  */
 export async function closeMonth(sw: StatementsWorld, month: string): Promise<{ readonly periodId: string; readonly reply: Reply }> {
   const periodId = await openMonth(sw, month);
+  await drainCommissions(sw);
   const ledgerCutoffHash = await proposal(sw, periodId);
   sw.standAt("2026-10-07T17:00:00Z");
   try {
     return { periodId, reply: await closePeriod(sw, periodId, { ledgerCutoffHash }) };
   } finally {
     sw.standAt(null);
+  }
+}
+
+/**
+ * Every COMMISSIONS record recorded so far delivered by the service's own dispatcher: a close refuses while a record created before it is
+ * undelivered (INPUTS_UNRECONCILED, B10G-R5), and the fixtures' purchases record theirs.
+ */
+export async function drainCommissions(sw: StatementsWorld): Promise<void> {
+  for (;;) {
+    const pass = await sw.service.dispatcher.runOnce({ limit: 100 });
+    if (pass.deliveries.length < 100) return;
   }
 }
 

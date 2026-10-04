@@ -6,7 +6,9 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
 import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { approvePayout, bankCash, claimedCents, closeMonth, closePeriod, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { acquired, approvePayout, bankCash, claimedCents, closeMonth, closePeriod, drainCommissions, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { purchase } from "./commission-support.js";
+import { createCommissionService } from "../src/index.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
@@ -80,6 +82,7 @@ faultCell(
         const s = await seller(sw, `hold-race-${kind}-first`, WHOLE);
         const sold = await eligibleLines(sw, `hold race ${kind} first`, s, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
         const periodId = await openMonth(sw, nextMonth());
+        await drainCommissions(sw);
         const proposed = await proposal(sw, periodId);
         const holding = await open("kauro_app_test");
         const closing = await open("kauro_commission_test");
@@ -120,6 +123,7 @@ faultCell(
         const s = await seller(sw, `hold-race-${kind}-second`, WHOLE);
         const sold = await eligibleLines(sw, `hold race ${kind} second`, s, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
         const periodId = await openMonth(sw, nextMonth());
+        await drainCommissions(sw);
         const proposed = await proposal(sw, periodId);
         const closing = await open("kauro_commission_test");
         const holding = await open("kauro_app_test");
@@ -147,11 +151,15 @@ faultCell(
     // B10G-R2: CMD052 racing a hold on a payable line of its statement, both orders. The approval takes the shared half of each payable
     // line's transition subject and a hold insert its exclusive half: a hold in flight is waited for and refuses the approval
     // (STALE_VERSION LEDGER_CHANGED); an approval in flight is waited for by the hold, which lands after the intent (the dispute path, B12).
-    for (const order of ["hold-first", "approval-first"] as const) {
+    const orders = ["hold-first", "approval-first"] as const;
+    const racers = [];
+    for (const order of orders) {
       const s = await seller(sw, `approve-hold-${order}`, WHOLE);
-      const sold = await eligibleLines(sw, `approve hold ${order}`, s, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
-      const closed = await closeMonth(sw, nextMonth());
-      completed<PeriodCloseView>(closed.reply, 200);
+      racers.push({ order, s, sold: await eligibleLines(sw, `approve hold ${order}`, s, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]) });
+    }
+    const closed = await closeMonth(sw, nextMonth());
+    completed<PeriodCloseView>(closed.reply, 200);
+    for (const { order, s, sold } of racers) {
       const st = (await statementOf(s.sellerId, closed.periodId))!;
       await bankCash(sw, (await claimedCents(sw)) + BigInt(st.payable_cents));
       const body = { expectedVersion: Number(st.version), payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) };
@@ -179,6 +187,115 @@ faultCell(
         await holding.end();
         await approving.end();
       }
+    }
+  },
+);
+
+// --- 2a. CLOSE_VS_DELIVERY, the race (Codex r1 B10G-R5) ------------------------------------------------------------------------------
+
+/** Every COMMISSIONS record recorded so far delivered (the service's own dispatcher), so the cell's record is the only one in flight. */
+const drain = (): Promise<void> => drainCommissions(sw);
+
+/** The capture.completed.v1 delivery of a purchase to COMMISSIONS, as the dispatcher hands it to the consumer. */
+async function deliveryOf(captureId: string): Promise<never> {
+  const r = await sw.h.oracle.query<{ event_id: string; event_type: string; agency_id: string; aggregate_id: string; aggregate_version: number; payload: Record<string, unknown> }>(
+    `SELECT e.event_id, e.event_type, e.agency_id, e.aggregate_id, e.aggregate_version, e.payload FROM kauro.outbox_records o JOIN kauro.domain_events e ON e.event_id = o.event_id
+      WHERE o.consumer = 'COMMISSIONS' AND o.state <> 'DELIVERED' AND e.event_type = 'capture.completed.v1' AND e.aggregate_id = $1`,
+    [captureId],
+  );
+  const e = r.rows[0];
+  assert.ok(e !== undefined, "the purchase's capture.completed.v1 waits for COMMISSIONS, undelivered");
+  return { eventId: e.event_id, eventType: e.event_type, agencyId: e.agency_id, aggregateId: e.aggregate_id, aggregateVersion: e.aggregate_version, payload: e.payload } as never;
+}
+
+faultCell(
+  {
+    id: "CLOSE_VS_DELIVERY",
+    step: "CMD051 CloseCommissionPeriod, a COMMISSIONS delivery of a record created after the period's end racing the close",
+    fault: "race",
+    expect:
+      "RACE: a COMMISSIONS record created after the period's end and before the close (endsAt < created_at < close) delivered while the close runs, in both orders: the delivery first makes the close wait, then refuse INPUTS_UNRECONCILED until the record is delivered, and the close proposed again carries the line; the close first makes the delivery wait, and the line it creates after the close is the next statement's; never a line omitted from both",
+  },
+  async (ctx) => {
+    // the consumer whose units run on the cell's harness connections (faults.on): the real COMMISSIONS effect
+    const routed = createCommissionService({ assembly: { units: sw.faults.wrap(sw.pools.units), completions: sw.completions }, environment: "LOCAL", clock: sw.clock, ids });
+    const deliver = (conn: HarnessConnection, delivery: never): Promise<unknown> => sw.faults.on(conn, "kauro_commission", ctx.points, [], () => routed.consumer.handle(delivery));
+    const lineOf = async (captureId: string): Promise<string | undefined> => (await sw.h.oracle.query<{ line_id: string }>("SELECT line_id FROM kauro.commission_lines WHERE capture_id = $1", [captureId])).rows[0]?.line_id;
+    const statementLines = async (periodId: string, sellerId: string): Promise<string[]> => {
+      const st = await statementOf(sellerId, periodId);
+      return st === undefined ? [] : (await itemsOf(sw, st.statement_id)).flatMap((i) => (i.line_id === null ? [] : [i.line_id]));
+    };
+
+    // the close first (held at its COMMIT, the period locked): the record is created and delivered while it holds; the delivery waits, and
+    // its line, created after the close, is the next statement's (the next close below)
+    let late: { readonly sellerId: string; readonly lineId: string };
+    {
+      const s = await seller(sw, "delivery-race-second", WHOLE);
+      const { selling } = await acquired(sw, "delivery race second", s, WHOLE);
+      const periodId = await openMonth(sw, nextMonth());
+      await drain();
+      const proposed = await proposal(sw, periodId);
+      const closing = await open("kauro_commission_test");
+      const delivering = await open("kauro_commission_test");
+      let captureId = "";
+      try {
+        const pause = ctx.points.pause("uow.before-commit");
+        const running = ctx.operation("the close (holder)", () => closeOn(ctx, closing, periodId, proposed));
+        await pause.reachedBy(running);
+        const p = await purchase(sw, selling, "delivery-race-second");
+        captureId = p.captureId;
+        const delivery = await deliveryOf(p.captureId);
+        const waiting = await ctx.mustWait(sw.h.oracle, { waiter: delivering, holder: connectionPid(closing) }, (conn) => deliver(conn, delivery), "the delivery while the close holds the period");
+        pause.release();
+        completed<PeriodCloseView>(await running, 200);
+        value(await waiting.pending);
+      } finally {
+        await closing.end();
+        await delivering.end();
+      }
+      const lineId = await lineOf(captureId);
+      assert.ok(lineId !== undefined, "the delivery accrued the purchase's line after the close");
+      assert.deepEqual(await statementLines(periodId, s.sellerId), [], "the closed period's statement set has no line created after it");
+      late = { sellerId: s.sellerId, lineId: lineId! };
+    }
+
+    // the delivery first (held at its COMMIT, holding the open periods FOR SHARE): the close waits for it, then finds the record undelivered
+    {
+      const s = await seller(sw, "delivery-race-first", WHOLE);
+      const { selling } = await acquired(sw, "delivery race first", s, WHOLE);
+      const periodId = await openMonth(sw, nextMonth());
+      const period = (await sw.h.oracle.query<{ ends_at: Date }>("SELECT ends_at FROM kauro.commission_periods WHERE period_id = $1", [periodId])).rows[0]!;
+      await drain();
+      const p = await purchase(sw, selling, "delivery-race-first");
+      const record = (await sw.h.oracle.query<{ created_at: Date }>("SELECT o.created_at FROM kauro.outbox_records o JOIN kauro.domain_events e ON e.event_id = o.event_id WHERE o.consumer = 'COMMISSIONS' AND e.aggregate_id = $1 AND e.event_type = 'capture.completed.v1'", [p.captureId])).rows[0]!;
+      assert.ok(record.created_at > period.ends_at && record.created_at < new Date(CLOSE_AT), "the record is created after the period's end and before the close");
+      const proposed = await proposal(sw, periodId);
+      const delivery = await deliveryOf(p.captureId);
+      const delivering = await open("kauro_commission_test");
+      const closing = await open("kauro_commission_test");
+      try {
+        const pause = ctx.points.pause("uow.before-commit");
+        const running = ctx.operation("the delivery (holder)", () => deliver(delivering, delivery));
+        await pause.reachedBy(running);
+        const waiting = await ctx.mustWait(sw.h.oracle, { waiter: closing, holder: connectionPid(delivering) }, (conn) => closeOn(ctx, conn, periodId, proposed), "the close while the delivery holds the open periods");
+        pause.release();
+        await running;
+        assert.equal(outcome(sw.w, value(await waiting.pending)), "409 PRECONDITION_FAILED INPUTS_UNRECONCILED", "the record created before the close is not yet delivered");
+      } finally {
+        await delivering.end();
+        await closing.end();
+      }
+      const lineId = await lineOf(p.captureId);
+      assert.ok(lineId !== undefined, "the delivery accrued the purchase's line");
+      await drain();
+      sw.standAt(CLOSE_AT);
+      try {
+        completed<PeriodCloseView>(await closePeriod(sw, periodId, { ledgerCutoffHash: await proposal(sw, periodId) }), 200);
+      } finally {
+        sw.standAt(null);
+      }
+      assert.deepEqual(await statementLines(periodId, s.sellerId), [lineId], "the close proposed again carries the delivered line");
+      assert.deepEqual(await statementLines(periodId, late.sellerId), [late.lineId], "the line created after the earlier close is this next statement's: never omitted from both");
     }
   },
 );

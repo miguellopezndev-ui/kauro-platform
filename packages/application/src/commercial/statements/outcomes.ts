@@ -30,7 +30,7 @@ export const CLOSE_COMMISSION_PERIOD_OUTCOMES: ReadonlyArray<ProblemOutcome> = O
   outcome("COMMAND", "PRECONDITION_FAILED", "UNLISTED_TRANSITION", "the period is already CLOSED", { current: "ALWAYS" }),
   outcome("COMMAND", "PRECONDITION_FAILED", "CALENDAR_UNAVAILABLE", "no recorded banking calendar version covers the period's close and pay dates"),
   outcome("COMMAND", "PRECONDITION_FAILED", "PERIOD_NOT_DUE", "the period's close date (the 5th banking day after its end) has not come on the server's clock", { current: "ALWAYS" }),
-  outcome("COMMAND", "PRECONDITION_FAILED", "INPUTS_UNRECONCILED", "a COMMISSIONS record that occurred before the period's end is not yet delivered, or cannot be observed", { current: "ALWAYS" }),
+  outcome("COMMAND", "PRECONDITION_FAILED", "INPUTS_UNRECONCILED", "a COMMISSIONS record created before the close's cutoff instant is not yet delivered, or cannot be observed (B10G-R5)", { current: "ALWAYS" }),
   outcome("COMMAND", "STALE_VERSION", "LEDGER_CHANGED", "ledgerCutoffHash is not KAURO_COMMISSION_CUTOFF_V1 of the ledger as it stands: the close is proposed again, never re-cut", { current: "ALWAYS" }),
 ]);
 
