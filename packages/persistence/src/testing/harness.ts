@@ -94,6 +94,12 @@ export interface Harness {
    */
   readonly commerce: PgCommerceUnitOfWorkFactory;
   /**
+   * Commission-service pool (login role in kauro_commission; package B10, D10-CTX-1): the verified group of the COMMISSIONS consumer,
+   * the sweeps and CMD051/CMD053, which acts on one adopted agency per transaction or on corporate records. Its unit of work is the
+   * commercial unit-of-work factory of the stage-2 lanes; the schema tests use the pool's login directly.
+   */
+  readonly commissionPool: KauroPool;
+  /**
    * The execution unit-of-work factory of package B08 (ExecutionUnitOfWorkFactory; D8-XPKG-10): the commerce factory's routing with
    * the control plane's pool too — TENANT on the request handlers', SYSTEM on the control plane's, SERVICE on the payment service's
    * — each unit of work with the execution store (execution-fixtures.ts).
@@ -150,7 +156,7 @@ export interface Harness {
    * the retention its seal left, B09 quotes_source_binding; the B07+B09 merge). The manifest hash is the revision's source hash
    * (plans_source_fk).
    */
-  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
+  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date; readonly billableSourceUnits?: number }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
   /**
    * The retention sweeper's retention_expires of a SEALED revision (source-lifecycle.ts expireSealedRevision: its governing records
    * past their effective deadline expire, then SEALED -> EXPIRED), in one control-plane transaction bound to the agency whose labelled
@@ -211,6 +217,7 @@ export async function start(): Promise<Harness> {
   const validatorPool = createPool({ ...base, max: 2, user: ROLES.validatorLogin, applicationName: "kauro-test-validator" });
   const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
   const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
+  const commissionPool = createPool({ ...base, max: 2, user: ROLES.commissionLogin, applicationName: "kauro-test-commission" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
@@ -280,6 +287,7 @@ export async function start(): Promise<Harness> {
     paymentPool,
     payment,
     commerce,
+    commissionPool,
     execution,
     audit,
     oracle,
@@ -369,7 +377,7 @@ export async function start(): Promise<Harness> {
           control: (fn) => asControlFor(agency.agencyId, fn),
         },
         { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId },
-        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}) },
+        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}), ...(options.billableSourceUnits !== undefined ? { billableSourceUnits: options.billableSourceUnits } : {}) },
       );
       return { revisionId: sealed.revisionId as RevisionId, revisionHash: sealed.manifestHash as Sha256Hex, version: sealed.version };
     },
@@ -457,6 +465,7 @@ export async function start(): Promise<Harness> {
       await validatorPool.end();
       await ingressPool.end();
       await paymentPool.end();
+      await commissionPool.end();
       await pg.stop();
     },
   };

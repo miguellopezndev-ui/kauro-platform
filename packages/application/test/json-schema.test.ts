@@ -6,8 +6,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
-import type { CommerceReadOperationId, CommerceServedCommandId, ContractSchemaBundle } from "../src/index.js";
-import { ACCEPTED_RESPONSE_SCHEMA_ID, AUDIT_REQUEST_SCHEMA_IDS, COMMAND_RESPONSES, COMMERCE_COMMAND_RESPONSES, COMMERCE_READ_ROUTES, COMMERCE_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA_ID, EXECUTION_REQUEST_SCHEMA_IDS, INTAKE_OPERATION_IDS, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SELECTION_MANIFEST_SCHEMA_ID, SERVED_COMMAND_IDS, SOURCE_REQUEST_SCHEMA_IDS, commerceCommandResponseSchemaId, commerceReadResponseSchemaId, intakeResponseSchemaId, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
+import type { CommerceReadOperationId, CommerceServedCommandId, CommercialReadOperationId, CommercialServedCommandId, ContractSchemaBundle } from "../src/index.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID, AUDIT_REQUEST_SCHEMA_IDS, COMMAND_RESPONSES, COMMERCE_COMMAND_RESPONSES, COMMERCE_READ_ROUTES, COMMERCE_REQUEST_SCHEMAS, COMMERCIAL_COMMAND_RESPONSES, COMMERCIAL_READ_ROUTES, COMMERCIAL_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA_ID, EXECUTION_REQUEST_SCHEMA_IDS, INTAKE_OPERATION_IDS, OPERATIONAL_ROUTES, PROBLEM_SCHEMA, READ_OPERATION_IDS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SELECTION_MANIFEST_SCHEMA_ID, SERVED_COMMAND_IDS, SOURCE_REQUEST_SCHEMA_IDS, commerceCommandResponseSchemaId, commerceReadResponseSchemaId, commercialCommandResponseSchemaId, commercialReadResponseSchemaId, intakeResponseSchemaId, readResponseSchemaId, SchemaCompileError, commandResponseSchemaId, compileSchemaBundle, createSchemaValidator, isCalendarDateTime, operationalResponseSchemaId, problemOf } from "../src/index.js";
 
 const bundle = JSON.parse(readFileSync(new URL(import.meta.resolve("@kauro/contracts/schemas.json")), "utf8")) as ContractSchemaBundle;
 const validator = createSchemaValidator(bundle);
@@ -25,9 +25,13 @@ test("the validator compiles exactly the 73 contracts, the 15 request schemas an
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const commerceResponseIds = [...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId), ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId)];
   assert.deepEqual([commerceRequestIds.length, commerceResponseIds.length], [7, 11]);
-  const responseIds = [...completedIds, ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...intakeIds, ...commerceResponseIds];
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, DECISION_ARTIFACT_SCHEMA_ID, ...commerceRequestIds];
-  assert.equal(requestIds.length, 28, "seven B06, six B07 and six B08 request schemas, the selection manifest and decision artifact documents and seven B09 request schemas");
+  // package B10 (design §13): the twelve commercial commands' request schemas and replies and the statement read's reply
+  const commercialRequestIds = Object.keys(COMMERCIAL_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
+  const commercialResponseIds = [...(Object.keys(COMMERCIAL_COMMAND_RESPONSES) as CommercialServedCommandId[]).map(commercialCommandResponseSchemaId), ...(Object.keys(COMMERCIAL_READ_ROUTES) as CommercialReadOperationId[]).map(commercialReadResponseSchemaId)];
+  assert.deepEqual([commercialRequestIds.length, commercialResponseIds.length], [12, 13]);
+  const responseIds = [...completedIds, ACCEPTED_RESPONSE_SCHEMA_ID, ...operationalIds, ...readIds, ...intakeIds, ...commerceResponseIds, ...commercialResponseIds];
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, DECISION_ARTIFACT_SCHEMA_ID, ...commerceRequestIds, ...commercialRequestIds];
+  assert.equal(requestIds.length, 40, "seven B06, six B07 and six B08 request schemas, the selection manifest and decision artifact documents, seven B09 and twelve B10 request schemas");
   assert.equal(validator.knownSchemaIds.length, CONTRACT_NAMES.length + requestIds.length + responseIds.length + 1);
   for (const n of CONTRACT_NAMES) assert.ok(validator.knownSchemaIds.includes(n), n);
   for (const id of requestIds) assert.ok((validator.knownSchemaIds as ReadonlyArray<string>).includes(id), id);

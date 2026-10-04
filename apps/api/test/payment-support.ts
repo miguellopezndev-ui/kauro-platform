@@ -45,7 +45,7 @@ import type { AgencyId, CapabilityId, CausationId, CommerceUnitOfWork, Correlati
 import { DomainFailure, NotFoundFailure, deliveryPhaseOf, toUtcInstant } from "@kauro/domain";
 import { ROLES, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
 import { assembleApi, createBearerTokenAuthenticator, createPaymentService, loadContractSchemas, openPaymentPools, storeProviderQuery, type DispatchPass, type PaymentConsumerName, type PaymentHoldCommand, type PaymentHoldPoint, type PaymentPools, type PaymentService } from "../src/index.js";
-import { approveThroughRoute, call, clock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, world } from "./support.js";
+import { approveThroughRoute, call, clock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, type WorldOptions, world } from "./support.js";
 
 // --- hold points of the payment service ------------------------------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(options: { readonly requestSide?: boolean } = {}): Promise<PaymentWorld> {
+export async function paymentWorld(options: { readonly requestSide?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"] } = {}): Promise<PaymentWorld> {
   const providerClock = movableClock();
   const paypal = createPayPalContractFake({ clock: providerClock });
   const verifier = createWebhookVerifierFake({ clock });
@@ -169,6 +169,9 @@ export async function paymentWorld(options: { readonly requestSide?: boolean } =
             holder.bound = opened;
             return { service: opened.service, close: () => opened.pools.close() };
           },
+          ...(options.commissions !== undefined ? { commissions: options.commissions } : {}),
+          ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+          ...(options.wrapUnitOfWork !== undefined ? { wrapUnitOfWork: options.wrapUnitOfWork } : {}),
         }
       : {},
   );

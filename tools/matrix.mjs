@@ -55,7 +55,7 @@ export const EDGE_OWNERS = {
     restriction_remedied: { owner: "B16", why: "the reviewed remedy of the same incident; no registry command names it", event: "agency.restriction_remedied.v1" },
     owner_requests_closure: { command: "CMD043", event: "agency.closing.v1" },
     owner_abandons_setup: { command: "CMD043", event: "agency.closing.v1" },
-    closure_obligations_completed: { owner: "B10", why: "the closure workflow of CMD043 once jobs, access, data and financial residuals are accounted for", event: "agency.closed.v1" },
+    closure_obligations_completed: { owner: "B16", why: "the verified managed deletion once jobs, access, data and financial residuals are accounted for (D10-AGY-2; B10's agencies_closure_residuals refuses the edge, KC006, while a payment, refund, live authorization, tax document or reconciliation case of the agency is open)", event: "agency.closed.v1" },
   },
   Membership: {
     "(initial INVITED)": { command: "CMD003", event: "membership.invited.v1", note: "CMD001 creates the founding OWNER ACTIVE (membership.created.v1; decision D-CTX-2)" },
@@ -495,6 +495,150 @@ export const APPLICABILITY = {
     "lost response": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "external uncertainty": "NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service)",
   },
+  // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
+  CMD002: {
+    "legitimate state": [["cmd002-activate-agency.test.ts", "OK: the agency's OWNER activates its DRAFT agency"]],
+    "wrong role": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404) and a BILLING member a wrong role (403 ROLE_INSUFFICIENT)"]],
+    "wrong agency": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404)"]],
+    "stale version": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "duplicate request": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "changed-body same key": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance, the same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the acceptance, the agency's move and the journal entry are rows of one database transaction, and the capabilities offered are answered, never written",
+  },
+  // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE; docs/design/B10-case-map.md CMD027): no provider is reached; the included replacement's
+  // re-binding is the payment service's database act, resumable from the journal entry
+  CMD027: {
+    "legitimate state": [["cmd027-create-quote.test.ts", "OK: an AGENCY_BILLING member's CreateQuote"], ["cmd027-create-quote.test.ts", "R2-092 (example 18)"]],
+    "wrong role": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404) and a VIEWER or APPROVER a wrong role (403)"]],
+    "wrong agency": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404)"]],
+    "stale version": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote"]],
+    "duplicate request": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote, the same key with another planId is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+    "external uncertainty": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+  },
+  CMD043: {
+    "legitimate state": [["cmd043-close-agency.test.ts", "OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency with nothing in flight"], ["cmd043-close-agency.test.ts", "OK (new work stops): after CloseAgency"]],
+    "wrong role": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403)"]],
+    "wrong agency": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404)"]],
+    "stale version": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403); then one missing prerequisite at a time — no fresh step-up ASSURANCE_REQUIRED, a stale version STALE_VERSION"]],
+    "duplicate request": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200, the same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: a closure reaches no provider; a payment order or refund in flight or uncertain refuses it (CLOSURE_OBLIGATIONS_UNRECONCILED) and an open reconciliation case is inventoried for its own reviewed resolution (D10-AGY-4)",
+  },
+  // package B10's prospects and attribution (mandate B10-COMMANDS-PROSPECTS; docs/design/B10-case-map.md CMD045..CMD047): corporate commands in the
+  // caller's own OPERATOR context, none of which reaches a provider
+  CMD045: {
+    "legitimate state": [["cmd045-register-prospect.test.ts", "OK: an ACTIVE seller registers a prospect from its own AGENCY-segment source evidence"]],
+    "wrong role": [["cmd045-register-prospect.test.ts", "DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: RegisterProspect is corporate-scoped (no agency selector, no agency in its path or journal); an agency member's tenant session holds neither the seller row nor the owner grant and is refused as a wrong role",
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: organizationLabel, businessContactRef, sourceEvidenceHash, jurisdiction); the live prospect of the organization key is read before the insert and the unique index answers for a prospect the caller cannot read (PROSPECT_EXISTS)",
+    "duplicate request": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a registration reaches no provider; the prospect and its journal entry are rows of one database transaction",
+  },
+  CMD046: {
+    "legitimate state": [["cmd046-claim-prospect.test.ts", "OK: an ACTIVE seller claims a prospect it owns with substantive evidence"]],
+    "wrong role": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404) and the owner or an agency member a wrong role (403)"]],
+    "wrong agency": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404)"]],
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: evidenceHash, agreementVersion); the seller's agreement version in force is compared (AGREEMENT_VERSION_MISMATCH) and the prospect's claims are read after their lock",
+    "duplicate request": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a claim reaches no provider; the claim, its conflict review and its journal entry are rows of one database transaction",
+  },
+  CMD047: {
+    "legitimate state": [["cmd047-accept-attribution.test.ts", "OK: the owner accepts a SUBMITTED claim with a prepared allocation"], ["cmd047-accept-attribution.test.ts", "OK (split): an allocation of two sellers' claims at 6000/4000"]],
+    "wrong role": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: AcceptAttribution is corporate-scoped (the claim is the aggregate; no agency selector, no agency in its path or journal); an agency member's tenant session holds no owner grant and is refused as a wrong role",
+    "stale version": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version"]],
+    "duplicate request": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: an acceptance reaches no provider; the buyer type is read through a platform port that is itself never a provider effect (D58), and the ruling, the frozen allocation and the journal entry are rows of one database transaction",
+  },
+  // package B10's seller commands (mandate B10-COMMANDS-SELLERS; docs/design/B10-case-map.md CMD048..CMD050): the corporate owner's, none reaches a provider
+  CMD048: {
+    "legitimate state": [["cmd048-assign-account.test.ts", "OK: the owner assigns an agency to an ACTIVE seller with a prepared service assignment — 200 with one current account assignment and the previous one ended, the agency's allocation, entitlements, window and first designation unchanged row for row"]],
+    "wrong role": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"]],
+    "wrong agency": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"]],
+    "stale version": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"], ["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "duplicate request": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "changed-body same key": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "external uncertainty": "NOT_APPLICABLE: an assignment reaches no provider; the new link, the account's move and the journal entry are rows of one database transaction",
+  },
+  CMD049: {
+    "legitimate state": [["cmd049-activate-seller.test.ts", "OK: the owner with a fresh step-up activates a CANDIDATE seller whose agreement is signed and whose legal review, assessment, confidentiality acceptance, VERIFIED destination, tax documentation and MFA identity are recorded — 200 with the seller ACTIVE on that agreement's compensation version, able to register prospects and read only its own statements"]],
+    "wrong role": [["cmd049-activate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE"]],
+    "wrong agency": [["cmd049-activate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE"]],
+    "stale version": "NOT_APPLICABLE: CMD049 carries no expectedVersion (registry fields: agreementId, assessmentEvidenceRef, assuranceProofRef); the seller row is locked and must be a CANDIDATE, and a seller already activated answers SELLER_NOT_ACTIVATABLE with its current version and state",
+    "duplicate request": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "changed-body same key": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the transition, the owner's step-up fact and the journal entry are rows of one database transaction",
+  },
+  CMD050: {
+    "legitimate state": [["cmd050-terminate-seller.test.ts", "OK: the owner terminates an ACTIVE seller with prepared terms and an enumerated manifest — 200 with the seller TERMINATED at the effective instant, its assignments ended, its prospects unassigned, its entitlements TERMINATED_WITH_RESIDUAL, its unlisted open claims EXPIRED and one tail entry per listed opportunity"]],
+    "wrong role": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"]],
+    "wrong agency": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"]],
+    "stale version": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"], ["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "duplicate request": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "changed-body same key": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "external uncertainty": "NOT_APPLICABLE: a termination reaches no provider; the termination, the tail, the lapsed claims and the journal entry are rows of one database transaction",
+  },
+};
+
+// package B10's statement and payout commands (mandate B10-STATEMENTS-PAYOUTS; docs/design/B10-case-map.md CMD051..CMD053): the commission
+// group's service commands and the owner's approval; none reaches a provider (the payout evidence is read before the transaction)
+const CLOSE = "cmd051-close-commission-period.test.ts";
+const APPROVE_PAYOUT = "cmd052-approve-commission-payout.test.ts";
+const RECONCILE_PAYOUT = "cmd053-reconcile-commission-payout.test.ts";
+APPLICABILITY.CMD051 = {
+  "legitimate state": [[CLOSE, "OK: the commission service closes a due September 2026 period on the test calendar"]],
+  "wrong role": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403)"]],
+  "wrong agency": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404)"]],
+  "stale version": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404); then one missing prerequisite at a time — an undelivered COMMISSIONS record before the cutoff INPUTS_UNRECONCILED, a changed ledger LEDGER_CHANGED"]],
+  "duplicate request": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements"]],
+  "changed-body same key": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT, a close racing a refund adjustment serializes on the period in both orders"]],
+  "external uncertainty": "NOT_APPLICABLE: a close reaches no provider; the banking calendar is a recorded platform version read in the transaction (D10-BIND-1), and the statements, items, line edges, guard reviews and journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD052 = {
+  "legitimate state": [[APPROVE_PAYOUT, "OK: the owner with a fresh step-up approves an ISSUED statement's payable"]],
+  "wrong role": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope and the seller a wrong role (403)"]],
+  "wrong agency": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope"]],
+  "stale version": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION"]],
+  "duplicate request": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": "NOT_APPLICABLE: an approval makes no transfer (the payout adapter is B15's); the intent, the statement's edge, the step-up fact and the journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD053 = {
+  "legitimate state": [[RECONCILE_PAYOUT, "OK: the finance service reconciles an intent with SETTLED evidence"]],
+  "wrong role": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403)"]],
+  "wrong agency": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404)"]],
+  "stale version": "NOT_APPLICABLE: ReconcileCommissionPayout carries no expectedVersion (registry fields: providerPayoutEvidenceRef); the statement is locked and the evidence must match its intent, and an intent already ended under other evidence answers UNLISTED_TRANSITION with its current state",
+  "duplicate request": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED"]],
 };
 
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
@@ -701,6 +845,13 @@ export async function loadMatrixSources() {
     outcomes[id] = application.COMMERCE_COMMAND_OUTCOMES[id];
     published[id] = [...application.COMMERCE_COMMAND_EVENTS[id]];
   }
+  // package B10's served commands (docs/design/B10-commercial-domain.md §13): their specs, catalogues and published events from the application's served lists
+  for (const id of application.COMMERCIAL_SERVED_COMMAND_IDS) {
+    const c = application.COMMERCIAL_COMMANDS[id];
+    specs[id] = { name: c.name, method: c.method, path: c.path, role: c.role, scope: c.scope, stepUpRequired: c.stepUp, stepUp: c.stepUp ? "REQUIRED" : "NEVER" };
+    outcomes[id] = application.COMMERCIAL_COMMAND_OUTCOMES[id];
+    published[id] = [...application.COMMERCIAL_COMMAND_EVENTS[id]];
+  }
   const reads = { ...application.READ_ROUTES };
   const readOutcomes = { ...application.READ_OUTCOMES };
   const readViews = { ...application.READ_RESPONSES };
@@ -737,7 +888,7 @@ export async function loadMatrixSources() {
     intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
-    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS]),
+    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS, ...application.COMMERCIAL_SERVED_COMMAND_IDS]),
     seeded,
     published,
     tests,
@@ -803,7 +954,7 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06, B07, B08 and B09 served)");
+  line("# State, command and event matrix (B06, B07, B08, B09 and B10 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
@@ -817,7 +968,8 @@ export function generateMatrix(s) {
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
   line("commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision");
   line("D-REQ-B7): their specs, catalogues (`COMMERCE_COMMAND_OUTCOMES`, `COMMERCE_READ_OUTCOMES`) and published events");
-  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Authority:");
+  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Package B10's served commands join them from");
+  line("`COMMERCIAL_SERVED_COMMAND_IDS` (specs `COMMERCIAL_COMMANDS`, catalogues `COMMERCIAL_COMMAND_OUTCOMES`, events `COMMERCIAL_COMMAND_EVENTS`). Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
   line("obligations\". Re-check finding N13.");
   line();

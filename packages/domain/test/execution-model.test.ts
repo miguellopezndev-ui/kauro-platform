@@ -196,7 +196,9 @@ test("the execution events are registered with allowlists and routed as design s
   assert.deepEqual(routed("processing_job.verifying.v1"), ["JOB_EXECUTION"]);
   assert.deepEqual(routed("package_version.verified_private.v1"), ["JOB_EXECUTION"]);
   assert.deepEqual(routed("processing_job.cancel_requested.v1"), ["EXECUTION_CONTROL"]);
-  for (const type of ["processing_job.ready.v1", "processing_job.failed.v1", "processing_job.cancelled.v1", "processing_job.expired.v1", "package_version.available.v1", "commercial_authorization.delivered.v1"] as const) assert.deepEqual(routed(type), ["NOTIFICATIONS"], type);
+  for (const type of ["processing_job.ready.v1", "processing_job.failed.v1", "processing_job.cancelled.v1", "processing_job.expired.v1", "package_version.available.v1"] as const) assert.deepEqual(routed(type), ["NOTIFICATIONS"], type);
+  // the delivery also reaches package B10's COMMISSIONS (its FINAL completion source; B10 D10-SYNC-3)
+  assert.deepEqual(routed("commercial_authorization.delivered.v1"), ["COMMISSIONS", "NOTIFICATIONS"]);
   assert.deepEqual(routed("processing_job.running.v1"), []);
   assert.ok(EVENT_SUBSCRIPTIONS.every((s) => (EVENT_TYPES as ReadonlyArray<string>).includes(s.eventType)));
   // the request handlers' own execution types (CMD036, CMD037) are not control-plane types

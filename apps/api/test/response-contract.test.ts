@@ -203,11 +203,30 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/payment-orders/:orderId", "GetPaymentOrder", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetPaymentOrder" } }],
       ["GET", "/api/v1/refunds/:refundId", "GetRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefund" } }],
       ["GET", "/api/v1/operations/refunds/:refundId", "GetRefundReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRefundReview" } }],
+      // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE): both complete synchronously, no 202
+      ["POST", "/api/v1/agencies/:agencyId/activate", "ActivateAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD002" } }],
+      ["POST", "/api/v1/agencies/:agencyId/closure-requests", "CloseAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD043" } }],
+      // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE): synchronous, 201 with its view, no 202
+      ["POST", "/api/v1/projects/:projectId/quotes", "CreateQuote", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD027" } }],
+      // package B10's prospects and attribution (mandate B10-COMMANDS-PROSPECTS): a registration and a claim create (201), an acceptance edits (200)
+      ["POST", "/api/v1/sales/prospects", "RegisterProspect", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD045" } }],
+      ["POST", "/api/v1/sales/prospects/:prospectId/claims", "ClaimProspect", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD046" } }],
+      ["POST", "/api/v1/sales/claims/:claimId/accept", "AcceptAttribution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD047" } }],
+      // package B10's seller commands (mandate B10-COMMANDS-SELLERS): the corporate owner's, synchronous, no 202
+      ["POST", "/api/v1/sales/agencies/:agencyId/assignment", "AssignAccount", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD048" } }],
+      ["POST", "/api/v1/sales/sellers/:sellerId/activate", "ActivateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD049" } }],
+      ["POST", "/api/v1/sales/sellers/:sellerId/terminate", "TerminateSeller", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD050" } }],
+      // package B10's statement and payout operations (mandate B10-STATEMENTS-PAYOUTS): the owner's approval and the statement read
+      ["POST", "/api/v1/sales/statements/:statementId/approve-payout", "ApproveCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD052" } }],
+      ["GET", "/api/v1/sales/statements/:statementId", "GetCommissionStatement", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetCommissionStatement" } }],
       // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
       // where a provider effect may stay unknown (CMD033)
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],
       ["POST", "/api/v1/refunds/:refundId/execute", "ExecuteRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD033" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/payment-orders/:orderId/reconcile", "ReconcilePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD034" } }],
+      // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
+      ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],
+      ["POST", "/api/v1/sales/statements/:statementId/reconcile-payout", "ReconcileCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD053" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request

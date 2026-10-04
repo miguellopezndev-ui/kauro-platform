@@ -116,6 +116,8 @@ export interface QuoteInput {
   readonly profileId: FiscalProfileId;
   readonly treatment?: ReviewedTreatment;
   readonly billableUnits?: number;
+  /** The founding reservation the quote's eligibility snapshot names (B10; reserveFoundingSlot records it): absent, the snapshot names an unbacked reference. */
+  readonly foundingReservationId?: string;
 }
 
 export interface PurchaseInput extends QuoteInput {
@@ -256,7 +258,7 @@ export async function issueQuote(h: Harness, input: QuoteInput): Promise<IssuedQ
         qualifyingProjectIds: [],
         qualifyingCount: 0,
         repeatDiscountBps: 0,
-        foundingSlotRef: uow.ids.next(),
+        foundingSlotRef: input.foundingReservationId ?? uow.ids.next(),
         foundingDiscountBps: amounts.discountBps,
         appliedDiscountBps: amounts.discountBps,
         policyVersion: "R2-INITIAL",

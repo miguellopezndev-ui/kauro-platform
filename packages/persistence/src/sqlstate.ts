@@ -5,7 +5,7 @@
  * the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
  * the SQL message never leaves the server (10 "Responses and safe errors").
  */
-import { DomainFailure, type FailureCode, type FailureReason } from "@kauro/domain";
+import { DomainFailure, StaleVersionFailure, type FailureCode, type FailureReason } from "@kauro/domain";
 
 export const SQLSTATE = Object.freeze({
   LAST_OWNER: "KA001",
@@ -45,6 +45,31 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
+  // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)
+  DESIGNATION_REWRITE: "KC001",
+  RESERVATION_RELEASE_REFUSED: "KC014",
+  // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): the sales and attribution backstops (0029) the
+  // sales adapters surface
+  SHARES_NOT_WHOLE: "KC003",
+  SELLER_NOT_ACTIVATABLE: "KC005",
+  TAIL_NOT_ENUMERATED: "KC011",
+  PROSPECT_SUPPRESSED: "KC016",
+  // package B10 (migrations 0030 and 0031): the ledger and statement backstops (B10-ADAPTERS-LEDGER)
+  COMMISSION_POOL_MISMATCH: "KC002",
+  ELIGIBILITY_WITHOUT_FINAL_COMPLETION: "KC007",
+  PAYEE_UNVERIFIED: "KC009",
+  PAYOUT_NOT_SETTLED: "KC010",
+  ADJUSTMENT_NOT_CUMULATIVE: "KC015",
+  OFFSET_NOT_AUTHORIZED: "KC017",
+  // package B10 (migration 0036, B10G-R2): an intent whose statement's payable lines cannot pay
+  PAYOUT_LINES_NOT_PAYABLE: "KC018",
+  // package B10 (migration 0037, B10G-R1): a line payable through a second live statement
+  PAYABLE_OWNER: "KC019",
+  // package B10 (migration 0040, B10G-R7 r2): a payout's step-up expired before its COMMIT
+  STEP_UP_EXPIRED: "KC020",
+  // package B10 (migration 0028): the agency closure residuals the lifecycle adapter surfaces (docs/design/B10-commercial-domain.md §12)
+  CLOSURE_RESIDUALS_OPEN: "KC006",
   // package B08 (migrations 0021..0023; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1): the fence of an attempt or a step, the
   // authority an execution edge relies on, the capacity ledgers, the funded grant and the publication evidence
   EXECUTION_FENCE: "KA080",
@@ -97,6 +122,37 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // package B10 (D10-ERR-1): a designation or a qualifying purchase is written by the designation trigger alone and never rewritten;
+  // a founding reservation is released only once its quote ended, naming how, with its slot freed (a race with a checkout meets it)
+  KC001: { code: "INTEGRITY_FAILURE", reason: "DESIGNATION_REWRITE" },
+  KC014: { code: "PRECONDITION_FAILED", reason: "RESERVATION_RELEASE_REFUSED" },
+  // B10's sales backstops answer as the commands would (design §12): an allocation whose shares are not exactly 10000 bps of accepted
+  // claims under signed agreements, an activation missing a fact, a tail entry for an opportunity the termination could not
+  // enumerate, a prospect whose organization or contact is suppressed
+  KC003: { code: "PRECONDITION_FAILED", reason: "SHARES_NOT_WHOLE" },
+  KC005: { code: "PRECONDITION_FAILED", reason: "SELLER_NOT_ACTIVATABLE" },
+  KC011: { code: "PRECONDITION_FAILED", reason: "TAIL_NOT_ENUMERATED" },
+  KC016: { code: "PRECONDITION_FAILED", reason: "PROSPECT_SUPPRESSED" },
+  // B10's ledger backstops answer as the commands would (design 12): a pool that is not round(basis x rate) once and the exact sum of its
+  // lines, an eligibility without a FINAL completion 720 hours old with funds available and no covering hold, and an adjustment that is not
+  // the cumulative difference or a basis that rises are the database refusing what the adapter never writes (INTEGRITY_FAILURE); a payee
+  // that is not a verified destination version, a payout without its settled evidence and an offset without signed terms are the caller's
+  KC002: { code: "INTEGRITY_FAILURE", reason: "COMMISSION_POOL_MISMATCH" },
+  KC007: { code: "INTEGRITY_FAILURE", reason: "ELIGIBILITY_WITHOUT_FINAL_COMPLETION" },
+  KC015: { code: "INTEGRITY_FAILURE", reason: "ADJUSTMENT_NOT_CUMULATIVE" },
+  KC009: { code: "PRECONDITION_FAILED", reason: "PAYEE_UNVERIFIED" },
+  KC010: { code: "PRECONDITION_FAILED", reason: "PAYOUT_NOT_SETTLED" },
+  KC017: { code: "PRECONDITION_FAILED", reason: "OFFSET_NOT_AUTHORIZED" },
+  // an intent born while a payable line of its statement is not PAYABLE or carries a hold the statement does not withhold (0036): CMD052
+  // refuses it first (STALE_VERSION LEDGER_CHANGED), so the database refusing it is an integrity failure
+  KC018: { code: "INTEGRITY_FAILURE" },
+  // a PAYABLE line itemized payable, or taken over, by a statement other than its owner's correcting one (0037): never written by the
+  // commands, so the database refusing it is an integrity failure
+  KC019: { code: "INTEGRITY_FAILURE" },
+  // a payout whose step-up expired between its writes and its COMMIT (0040, D10-GAP-14): the approval's own outcome for a stale proof
+  KC020: { code: "ASSURANCE_REQUIRED", reason: "STEP_UP_STALE" },
+  // CLOSING -> CLOSED while a payment, refund, authorization, tax document or reconciliation case of the agency is open (D10-AGY-4)
+  KC006: { code: "PRECONDITION_FAILED", reason: "CLOSURE_RESIDUALS_OPEN" },
   // package B08 (D8-SQL-1): the control plane treats a lost fence as "the attempt or step lost" (DONE); a lost authority refuses the
   // edge; a ledger edited around its jobs and a publication without its evidence are integrity failures; an unfunded dispatch is
   // BUDGET_EXHAUSTED
@@ -187,6 +243,19 @@ const COMMERCE_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = 
 });
 
 /**
+ * B10's sales unique indexes decided by their name (design §12): a second live prospect of a normalized organization key is
+ * PROSPECT_EXISTS, a seller's second live claim on a prospect CLAIM_EXISTS, and a second frozen allocation of an agency
+ * ATTRIBUTION_EXISTS ("the pool does not become 10% for each seller").
+ */
+export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = Object.freeze({
+  prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
+  attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
+  attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
+  // CMD048: two first assignments of one agency race to open its sales account; the loser finds it opened at version 1 (D10-ASSIGN-3)
+  sales_accounts_pkey: () => new StaleVersionFailure(1, "ASSIGNED"),
+});
+
+/**
  * Commerce unique indexes the handler decides (it re-reads the current row, B06 practice): the replayed or current entitlement
  * (commercial_authorizations_one_*), and the capture identity already recorded (capture_facts_provider_identity: the observation is a
  * DUPLICATE). They surface as ConstraintViolation carrying the constraint name; `commerceReplayOf` names what the handler answers.
@@ -230,6 +299,19 @@ export const COMMERCE_INTEGRITY_CONSTRAINTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * B10's named checks of the recurrence and founding cohort (migration 0028), decided by their name: a reservation held for
+ * reconciliation only after its end with its quote still in checkout is the edge's guard, which a sweep racing a checkout can meet
+ * (PRECONDITION_FAILED, as B09's KA008 answers a quote that cannot leave checkout); the reservation's and the issuance's bindings are
+ * written by the issuance core alone, so only a writer bypassing it meets them (INTEGRITY_FAILURE).
+ */
+const COMMERCIAL_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlState: string; readonly code: FailureCode; readonly reason?: FailureReason }>> = Object.freeze({
+  founding_slot_reservations_hold_guard: { sqlState: "23514", code: "PRECONDITION_FAILED", reason: "UNLISTED_TRANSITION" },
+  founding_slot_reservations_snapshot_binding: { sqlState: "23514", code: "INTEGRITY_FAILURE" },
+  quote_issuances_binding: { sqlState: "23514", code: "INTEGRITY_FAILURE" },
+  founding_slots_live_reservation_fk: { sqlState: "23503", code: "INTEGRITY_FAILURE" },
+});
+
+/**
  * Translates a database error code into a DomainFailure, or null when the adapter must decide by context (a unique violation
  * is IDEMPOTENCY replay, LAST-approval race or DRAFT_AGENCY_EXISTS depending on the constraint name it carries).
  */
@@ -239,6 +321,10 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
   if (source !== undefined && source.sqlState === sqlState) {
     return new DomainFailure(source.code, `database refused the write (${sqlState} ${constraint ?? ""})`, { reason: source.reason }, source.retryable ?? false);
   }
+  const commercial = constraint === undefined ? undefined : COMMERCIAL_CONSTRAINT_FAILURES[constraint];
+  if (commercial !== undefined && commercial.sqlState === sqlState) {
+    return new DomainFailure(commercial.code, `database refused the write (${sqlState} ${constraint ?? ""})`, commercial.reason === undefined ? {} : { reason: commercial.reason });
+  }
   if (constraint !== undefined && COMMERCE_INTEGRITY_CONSTRAINTS.has(constraint) && (sqlState === SQLSTATE.CHECK_VIOLATION || sqlState === SQLSTATE.FOREIGN_KEY_VIOLATION || sqlState === SQLSTATE.UNIQUE_VIOLATION)) {
     return new DomainFailure("INTEGRITY_FAILURE", `database refused the write (${sqlState} ${constraint})`);
   }
@@ -246,6 +332,8 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
     if (constraint === "agencies_one_draft_per_creator") return new DomainFailure("ADMISSION_LIMITED", "one draft agency per identity", { reason: "DRAFT_AGENCY_EXISTS" });
     const commerce = constraint === undefined ? undefined : COMMERCE_UNIQUE_FAILURES[constraint];
     if (commerce !== undefined) return commerce();
+    const commercial = constraint === undefined ? undefined : COMMERCIAL_UNIQUE_FAILURES[constraint];
+    if (commercial !== undefined) return commercial();
     // command_journal_identity (concurrent duplicate), approvals_one_live_per_plan (lost approval race) and
     // plans_supersedes_once (lost revision race) are decided by the handler, which re-reads the current row and answers
     // with the replayed result or STALE_VERSION carrying the current safe version; so are the commerce replay constraints
@@ -254,6 +342,10 @@ export function failureOfSqlState(sqlState: string | undefined, constraint?: str
   }
   if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint !== undefined && LABEL_CONSTRAINT_FIELDS[constraint] !== undefined) {
     return new DomainFailure("INVALID_REQUEST", `database refused the write (${sqlState} ${constraint})`, { reason: "SCHEMA_VIOLATION", fields: [{ field: LABEL_CONSTRAINT_FIELDS[constraint] as string, code: "FORMAT" }] });
+  }
+  // B10: an acceptance of a version retired between the read and the write (the guard of 0028 reads it after its transition lock)
+  if (sqlState === SQLSTATE.CHECK_VIOLATION && constraint === "agency_agreement_acceptances_published") {
+    return new DomainFailure("PRECONDITION_FAILED", "database refused the write (23514 agency_agreement_acceptances_published)", { reason: "AGREEMENT_VERSION_NOT_PUBLISHED" });
   }
   const m = MAP[sqlState];
   if (!m) return null;

@@ -14,6 +14,7 @@
  * not inferred solely from status code" — the status is a projection of the code, never the other way round.
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
+import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 
@@ -272,6 +273,8 @@ export const FAILURE_REASONS = [
   ...EXECUTION_FAILURE_REASONS,
   // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; the audit keys of migration 0023)
   ...AUDIT_FAILURE_REASONS,
+  // agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md §12)
+  ...COMMERCIAL_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

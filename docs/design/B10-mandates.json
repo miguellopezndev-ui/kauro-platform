@@ -1,0 +1,227 @@
+{
+  "package": "B10",
+  "design": "docs/design/B10-commercial-domain.md",
+  "caseMap": "docs/design/B10-case-map.md",
+  "bases": {
+    "b10/design": "the documents as first written, on integration/b07-b09 (0f15636, migrations 0001-0018): superseded by b10/base.",
+    "b10/base": "b10/design merged into main f87a4cb (B06, the foundation, B07, B09 and CI; B06, B07 and B09 REVIEW_ACCEPTED; migrations 0001-0020), with B10's migrations renumbered to 0028-0031 (B08 owns 0021-0023, B11 0024-0027) and the checks against main of design section 19; every stage-1 mandate starts from it.",
+    "b10/stage-1": "from b10/base: merge B10-MODEL, B10-PORTS-FAKES, then B10-SCHEMA-COMMISSION (which carries B10-SCHEMA-RECURRENCE); the only expected textual conflict is the export lines of packages/domain/src/index.ts (keep all); pnpm install --frozen-lockfile; pnpm run verify on Windows.",
+    "b10/stage-2": "from b10/stage-1: merge B10-ADAPTERS-RECURRENCE, B10-ADAPTERS-SALES, B10-ADAPTERS-LEDGER, B10-AGENCY-LIFECYCLE; keep every KC translation of packages/persistence/src/sqlstate.ts in code order; bind the accessors agencyLifecycleOf, salesOf, attributionOf, ledgerOf and statementsOf into the PgCommercialUnitOfWork of B10-ADAPTERS-RECURRENCE so CommercialUnitOfWork is one factory (D10-STAGE-1); regenerate OpenAPI and the matrix; pnpm run verify on Windows.",
+    "b10/stage-3": "from b10/stage-2: merge B10-COMMANDS-QUOTE, B10-COMMANDS-PROSPECTS, B10-COMMANDS-SELLERS, B10-COMMISSION-SERVICE, B10-STATEMENTS-PAYOUTS; union the served inventory, the route registrations and the outcome catalogues; regenerate OpenAPI and the matrix; pnpm run verify on Windows.",
+    "b10/integration": "from b10/stage-3: the B10-INTEGRATION mandate."
+  },
+  "commonRules": [
+    "Write the case-map tests of the mandate FIRST, under exactly the titles docs/design/B10-case-map.md cites, and see them fail before building.",
+    "Real PostgreSQL 17 for every database claim, through the runtime login roles (kauro_app, kauro_payment, kauro_commission, kauro_control); the superuser only as oracle; never a database fake.",
+    "Interleavings by hold points and lock waits observed in pg_stat_activity; never a sleep as synchronization.",
+    "Every instant is kauro.server_now(); durations are exact hours; calendar months only through America/Bogota; tests stand at another instant only through the labelled TEST CLOCK (D10-CLOCK-1).",
+    "Money is integer cents (bigint in TypeScript, BIGINT within kauro.is_money in SQL), rounded half-up once through B09's kernel (roundHalfUpBps, allocateLargestRemainder, cumulativeEntitlement, entitlementAdjustment) or kauro.round_half_up_bps; never a float, never a second rounding. The worked examples' integer cents are the oracle, written in the test, never read back from the function under test.",
+    "A fake has exactly one owner (D10-FAKE-1): integrationClass CONTRACT_FAKE, evidenceClass SIMULATED, a call log, contract-fake-* tokens, on a test-only testing subpath, bound by no composition root. B09's and B07's fakes are reused, never copied.",
+    "Own only the files the task names. Repositories are reached through accessor functions over the unit of work (B09's purchasedSubjectsOf pattern), so no parallel lane edits a shared factory; shared expectation lists (migrations list, machine seeds, event types, subscriptions, runtime-boundary.json, served inventory, matrix rows) change additively and are reviewed entry by entry.",
+    "Focused tests while working; one full pnpm run verify at the end on Windows (the integrators also on Linux). Stop every PostgreSQL cluster you start.",
+    "A deviation from the design is one or two sentences with its citation in the decisions register of docs/design/B10-commercial-domain.md, with the case map updated in the same commit.",
+    "When the mandate lands, its case-map rows lose PLANNED and gain the commit; the status table follows. Records stay short: case | test file :: exact title | status | commit.",
+    "No deferred-work markers (to-do or fix-me tags) in code or documents. A new dependency is pinned, justified in the design and committed with the lockfile.",
+    "Commit early with the owner's identity and the session's attribution lines; never push; never write the product's earlier brand name (the registry's owner role is written KAURO_OWNER)."
+  ],
+  "mandates": [
+    {
+      "key": "B10-MODEL",
+      "stage": 1,
+      "starts_from": "b10/base",
+      "depends_on": [],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "packages/domain/test/commercial-money.test.ts",
+        "packages/domain/test/commercial-rules.test.ts",
+        "packages/domain/test/commercial-time.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/domain/test/commercial-money.test.ts (R2-079, R2-080, R2-097, R2-104, R2-105, R2-136), packages/domain/test/commercial-rules.test.ts (R2-086, R2-087, R2-088, R2-098, the CMD045 organization key, the failure reasons) and packages/domain/test/commercial-time.test.ts (R2-094, R2-101, R2-138, R2-139) under their exact titles; see them fail. Then build in @kauro/domain, under src/commercial/ (its index.ts is yours) and src/ports/commercial.ts: the ids and records of design sections 3 to 7 (qualifying purchase, recurrence, founding slot and reservation, agreement acceptance, closure, relationship decision, seller, agreement, legal review, payout destination, prospect, source evidence, suppression, claim, allocation and shares, entitlement, sales account and assignments, assistance agreement, termination and tail entry, completion, pool, line, adjustment, hold, calendar version, period, statement and items, payout intent, guard review). The pure rules: the mirror of kauro.qualifying_projects_at (D10-REC-1: [as_of - 8760 h, as_of), another project of the agency, remaining service basis positive, one count per project), the tier from policy pricing.repeatTiers and the non-stacked maximum with the founding rate, founding eligibility (D10-FOUND-3), the buyer-discount and seller-residual decisions kept apart (example 3), the organization key KAURO_PROSPECT_ORGANIZATION_V1 (lower case, IDNA ASCII through node:url domainToASCII, no leading www., no trailing dot; D10-PROS-1). The ledger functions over B09's src/commerce/money.ts, never forked: pool = roundHalfUpBps(basis, rate) once, allocations by allocateLargestRemainder over shares with ties by beneficiary id, cumulative recomputation and one signed adjustment per changed line after each basis change, zero at a zero basis (D10-POOL-1, D10-ADJ-1); the statement position (accrual, payout, adjustment, balance) and the offset rule (D10-NEG-1); the compensation guard by exact integer comparison against 1500 bps, labelled a business planning guard (D10-GUARD-1). The time rules: the window end at twelve calendar months at the same America/Bogota wall time with the day clamped (no new dependency; checked at 2028-02-29T15:00:00Z and 2026-09-12T14:00:00Z), the rate decision (1000 bps for sequence 1, 400 iff the verified provider completion precedes the exclusive window end, an implausible provider time HELD PROVIDER_TIME_UNVERIFIED; D10-RATE-1), the eligibility decision (FINAL + 720 h, funds AVAILABLE, no covering hold; D10-ELIG-1), the ordinal banking day after month-end over an explicit calendar input (D10-CAL-1). COMMERCIAL_FAILURE_REASONS of design section 12 appended once each to FAILURE_REASONS (src/model/errors.ts). The domain repository ports of design section 11 (RecurrenceRepository, FoundingRepository, AgencyLifecycleRepository, SalesRepository, AttributionRepository, CommissionLedgerRepository, StatementRepository) and CommercialUnitOfWork extends CommerceUnitOfWork with adoptAgency. Not yours: src/commercial/machines.ts and events.ts (B10-SCHEMA-RECURRENCE), src/commerce/principals.ts (B10-PORTS-FAKES), any application or persistence file. Done: the cited titles pass; every B06, B07 and B09 domain test unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B10-PORTS-FAKES",
+      "stage": 1,
+      "starts_from": "b10/base",
+      "depends_on": [],
+      "owns_fakes": [
+        "ContractFakeBuyerTypeReader",
+        "ContractFakePreparationCompletion",
+        "ContractFakeBankingCalendar",
+        "ContractFakePayoutEvidence"
+      ],
+      "migrations": [],
+      "tests": [
+        "packages/application/test/commercial-contracts.test.ts",
+        "packages/application/test/commercial-fakes.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/application/test/commercial-contracts.test.ts (the commercial contracts and the authorizer, cited by CMD045-OK and CMD049-OK) and packages/application/test/commercial-fakes.test.ts (the banking-calendar fake of R2-139, the buyer-type, preparation-completion and payout-evidence fakes) under their exact titles; see them fail. Then build in @kauro/application, under src/commercial/: ports.ts with the six ports of design section 11 — BuyerTypeReader (AGENCY, IN_HOUSE or null, read in the caller's unit of work; A3 3.7), PreparationCompletionSource (STAGE or FINAL with instant, evidence and source), BankingCalendarSource (a calendar version: jurisdiction CO, source VERIFIED_FEED or TEST_FIXTURE, nonbanking dates, evidence), PayoutEvidenceVerifier (SUBMITTED, SETTLED, FAILED or RETURNED with reference, destination digest, amount, currency and evidence hash), CommercialPrincipalReader and FoundingOfferReader — their types self-contained, because this lane runs beside B10-MODEL and imports none of its modules; the platform bindings of D10-BIND-1 that need no database: UnrecordedBuyerTypeReader (always null, so every quote is refused BUYER_TYPE_UNSET until B11 binds W6) and UnavailablePayoutEvidenceVerifier (PAYOUT_EVIDENCE_UNAVAILABLE); the command contracts of the twelve commands and GetCommissionStatement of design section 13 (route, principal, scope, closed request schema with exactly the registry field names of commands.json and money as MoneyMinorUnits strings, closed views withholding contact details, destination digests and another seller's rows; D10-API-1); CommercialAuthorizer (authorizeSeller: an OPERATOR identity whose seller row is ACTIVE after its transition lock; authorizeCorporateOwner: an ACTIVE KAURO_OWNER grant, B09 D-CORP-B1; authorizeCommercialService: commission-service -> COMMISSION_SERVICE and finance-service -> FINANCE_SERVICE, which this lane adds to SERVICE_ROLE_TABLE in @kauro/domain src/commerce/principals.ts, its only domain file; D10-CTX-1), answering only B06's and B09's existing refusal reasons. Then the four labelled fakes on @kauro/application/testing, their single owner: ContractFakeBuyerTypeReader, ContractFakePreparationCompletion, ContractFakeBankingCalendar (the example 21 fixture: weekends and 2026-10-12 nonbanking, TEST_FIXTURE, never VERIFIED_FEED) and ContractFakePayoutEvidence (scripted SUBMITTED, SETTLED, FAILED, RETURNED and a mismatching reference, destination or amount), each CONTRACT_FAKE and SIMULATED with a call log, hold points and contract-fake-* tokens; no composition root binds them (architecture rule testOnlySubpaths). The outcome catalogues are composed by the lanes that serve each command, since they need B10-MODEL's reasons. Done: the cited titles pass; pnpm run verify green."
+    },
+    {
+      "key": "B10-SCHEMA-RECURRENCE",
+      "stage": 1,
+      "starts_from": "b10/base",
+      "depends_on": [],
+      "owns_fakes": [],
+      "migrations": [
+        "0025_reserved_b11.sql",
+        "0026_reserved_b11.sql",
+        "0027_reserved_b11.sql",
+        "0028_recurrence_founding_agency.sql"
+      ],
+      "tests": [
+        "packages/persistence/test/b10-recurrence-migrations.test.ts",
+        "packages/domain/test/commercial-machines.test.ts"
+      ],
+      "estimate": "1 agent-day (the first half of the stage-1 critical path)",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/b10-recurrence-migrations.test.ts (R2-086, R2-089, R2-090, R2-137 and R2-141 at the database; CMD002, CMD027 and CMD043 at the database) and packages/domain/test/commercial-machines.test.ts (the platform machines of design section 8.2) under their exact titles; see them fail. Then build the seven reservation files 0021_reserved_b08.sql to 0027_reserved_b11.sql (a header naming the owning package and D10-BASE-1, then SELECT 1; nothing created) and 0028_recurrence_founding_agency.sql exactly as design sections 3, 4, 9 and 10: the group kauro_commission (NOSUPERUSER, NOBYPASSRLS, one login per group) with its adopted-agency context; agency_recurrence and qualifying_purchases with the AFTER INSERT designation trigger on commercial_authorizations (original authorizations only, the recurrence lock's exclusive half, the next confirmation sequence, confirmed_at and provider_completed_at recorded apart, the quote's founding reservation consumed, founding_basis NONE, RESERVED_SLOT or UNBACKED; KC001 on any rewrite; D10-FIRST-1), the recurrence-lock triggers on COMPLETED refunds and REVERSED captures, kauro.qualifying_projects_at and kauro.eligibility_findings (D10-REC-1..3); founding_slots seeded 1..3 for R2-INITIAL, founding_slot_reservations with UNIQUE (policy_version, agency_id), the live-reservation link on the slot, the deferred reservation/quote/snapshot cross-check and KC014 (D10-FOUND-1..4); quote_issuances; service_agreement_versions, the append-only agency_agreement_acceptances, agency_closures, the append-only agency_relationship_decisions, the CLOSING -> CLOSED residual guard KC006 (payments, refunds, live authorizations, tax documents and OPEN reconciliation cases of the agency, D10-AGY-4) and the set-once first designation on agencies (D10-AGY-1..3, D10-FIRST-2); the event type agency.first_purchase_designated.v1 and the COMMISSIONS subscriptions to capture.funds_observed.v1 and commercial_authorization.delivered.v1; the quote-expiry grants of kauro_commission; the FoundingReservation seed and commercial_transitions; FORCE RLS, tenant policies on agency-scoped rows, no DELETE grant. In @kauro/domain: src/commercial/machines.ts (COMMERCIAL_PLATFORM_MACHINES: the ten platform machines of design section 8.2 with their edges, and CommissionLine taken unchanged from the registry) and src/commercial/events.ts (the event type, its ids-only payload, the two subscriptions), exported through lines of their own in src/index.ts and appended to EVENT_TYPES and the subscription list, so each seed and its declaration land in one commit. The test harness's kauro_commission login (packages/persistence/src/testing/harness.ts). Update additively, entry by entry: packages/persistence/test/migrations.test.ts (0021..0028 and the R20 machine list), the B09 seed test's event types and subscriptions, packages/persistence/test/fixtures/runtime-boundary.json. The tests assert the raw KC SQLSTATEs; their translation is the stage-2 lanes' (design section 12). Done: the cited titles pass on PostgreSQL 17 with the lock waits observed; every B06, B07 and B09 suite unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B10-SCHEMA-COMMISSION",
+      "stage": 1,
+      "starts_from": "the head of B10-SCHEMA-RECURRENCE (branch b10/schema-recurrence), itself from b10/base: the migration runner is contiguous",
+      "depends_on": ["B10-SCHEMA-RECURRENCE"],
+      "owns_fakes": [],
+      "migrations": [
+        "0029_sales_attribution.sql",
+        "0030_commission_ledger.sql",
+        "0031_statements_payouts.sql"
+      ],
+      "tests": [
+        "packages/persistence/test/b10-sales-migrations.test.ts",
+        "packages/persistence/test/b10-ledger-migrations.test.ts"
+      ],
+      "estimate": "1.5 agent-days (the second half of the stage-1 critical path)",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/b10-sales-migrations.test.ts (R2-094, R2-100 and R2-103 at the database; CMD045, CMD046, CMD047, CMD048 and CMD049 at the database) and packages/persistence/test/b10-ledger-migrations.test.ts (R2-097, R2-101, R2-104 and R2-139 at the database; CMD050, CMD051, CMD052 and CMD053 at the database) under their exact titles; see them fail. Then build 0029_sales_attribution.sql, 0030_commission_ledger.sql and 0031_statements_payouts.sql exactly as design sections 5, 6, 7 and 9: sellers, seller_agreements (with offset_terms, retainer and compensation policy version), seller_legal_reviews, seller_payout_destinations (VERIFIED only with the seller's own step-up proof at the change and an owner verification at least 172800 s later; D10-SELL-2), seller tax and assessment records, prospect_source_evidence (segment AGENCY only; A3 3.7, D58), prospect_contacts, prospects (one live per organization key), prospect_suppressions (KC016), claim_evidence, attribution_claims (one live per seller and prospect), attribution_allocations (one per agency) and allocation_shares (10000 bps at COMMIT, KC003), commission_entitlements (window CHECK: twelve calendar months at the America/Bogota wall time with the day clamped; first capture, window, share and agreement immutable), sales_accounts, service_assignments, account_assignments (append-only, one current), assistance_agreements, termination_manifests, seller_terminations, termination_tail_entries (KC011, 2160 h), kauro.current_seller_id(); purchase_completions, commission_pools and commission_lines (pool = round(basis x rate) and allocations summing to it at COMMIT, KC002; ELIGIBLE only with a FINAL completion at least 720 h old and AVAILABLE funds, KC007; PAYABLE only through an ISSUED statement item; PAID only with a SETTLED intent and evidence hash, KC010), commission_adjustments (the cumulative difference, UNIQUE (line, source event), KC015), commission_holds, capture_funds_observations, the offset guard KC017; banking_calendars, commission_periods (close and pay dates with their calendar version), commission_statements (one per period and seller; SIMULATED when closed on a TEST_FIXTURE calendar) and statement_items, payout_intents (amount = the statement's payable, payee a VERIFIED destination version of its seller, KC009; one live per statement), payout_reconciliations, compensation_guard_reviews. Corporate policies only — the owner, the own seller, kauro_commission — and no tenant policy (D10-CTX-3); FORCE RLS; no DELETE grant on any B10 table. Seeds: Seller, Prospect, AttributionClaim, CommissionEntitlement and PayoutDestination (0029), CommissionLine and CommissionHold (0030), CommissionPeriod, CommissionStatement and PayoutIntent (0031), equal to COMMERCIAL_PLATFORM_MACHINES and the registry. Update additively: migrations.test.ts (0029..0031 and the R20 machine list) and runtime-boundary.json, reviewed entry by entry. The tests assert the raw KC SQLSTATEs. Done: the cited titles pass on PostgreSQL 17; every other suite unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B10-ADAPTERS-RECURRENCE",
+      "stage": 2,
+      "starts_from": "b10/stage-1",
+      "depends_on": ["B10-MODEL", "B10-PORTS-FAKES", "B10-SCHEMA-RECURRENCE"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": ["packages/persistence/test/b10-recurrence-adapters.test.ts"],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/b10-recurrence-adapters.test.ts (R2-090 the slot race in both orders, R2-091 the offer reader, R2-127 the reservation lifetime, R2-136 the issuance core's rounding, the CMD027 issuance core) under their exact titles; see them fail. Then build in @kauro/persistence: RecurrenceRepository (the recurrence lock's shared half, the eligibility set read) and FoundingRepository (the ascending slot take UPDATE ... WHERE NOT held that waits, re-checks and moves on; release on supersession, withdrawal and expiry; RECONCILIATION_HOLD; a consumed slot never freed; D10-FOUND-2..4); the CMD027 issuance core as one adapter call in the lock order of design sections 3.4 and 10 (the snapshot's INSERT ... SELECT from kauro.qualifying_projects_at under the shared half, tier, founding offer, the price over B09's quote model and money kernel, the quote DRAFT -> ISSUED with its KAURO_QUOTE_TERMS_V1 terms hash and source availability, the previous unpaid quote SUPERSEDED with its reservation released, quote_issuances naming the journal entry, quote and reservation); FoundingOfferReader (the reservable slots of the cohort, no agency data, reserving nothing); PgCommercialUnitOfWork and its factory over B09's commerce factory with the kauro_commission pool and adoptAgency (SERVICE only, from a durable work item; D10-CTX-1), with the accessors recurrenceOf and foundingOf, so the other stage-2 lanes never edit the factory; the translations of KC001 and KC014 in sqlstate.ts; @kauro/persistence/testing fixtures: a qualifying purchase through B09's paidPurchase, an agency history of N qualifying projects, a founding quote with its reservation. Done: the cited titles pass on PostgreSQL 17 with the waits observed; pnpm run verify green."
+    },
+    {
+      "key": "B10-ADAPTERS-SALES",
+      "stage": 2,
+      "starts_from": "b10/stage-1",
+      "depends_on": ["B10-MODEL", "B10-PORTS-FAKES", "B10-SCHEMA-COMMISSION"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": ["packages/persistence/test/b10-sales-adapters.test.ts"],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/b10-sales-adapters.test.ts (R2-095 reassignment leaves A's rows unchanged, R2-099 the prospective assistance agreement) under their exact titles; see them fail. Then build in @kauro/persistence: SalesRepository (sellers and their agreements, legal reviews, payout destinations, tax and assessment records; prospects with source evidence, contacts and suppressions by organization and contact key; sales accounts, service and account assignments; assistance agreements with the applicability query by order creation; termination manifests, terminations and tail entries), AttributionRepository (claims with evidence under the prospect's claims lock, conflict detection for DISPUTED, allocations and shares, entitlements created at conversion with the window of D10-ATTR-2), CommercialPrincipalReader (the seller row and the corporate grant after their transition locks), the accessors salesOf and attributionOf; the translations of KC003, KC005, KC011 and KC016 in sqlstate.ts; @kauro/persistence/testing fixtures, each row written by its owning role: an ACTIVE seller with a signed agreement, a confirming legal review, assessment and confidentiality records, a VERIFIED destination and tax documentation; a prospect with its evidence; a claim; a frozen allocation; an entitlement. Done: the cited titles pass on PostgreSQL 17; pnpm run verify green."
+    },
+    {
+      "key": "B10-ADAPTERS-LEDGER",
+      "stage": 2,
+      "starts_from": "b10/stage-1",
+      "depends_on": ["B10-MODEL", "B10-PORTS-FAKES", "B10-SCHEMA-COMMISSION"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": ["packages/persistence/test/b10-ledger-adapters.test.ts"],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing packages/persistence/test/b10-ledger-adapters.test.ts (R2-079 and R2-080 at the ledger, R2-096 the VOID first line, R2-102 the partial hold, R2-081 cumulative to exactly zero, B09-R2 a basis never rises, the CMD051 cutoff hash, the CMD053 settlement serialization) under their exact titles; see them fail. Then build in @kauro/persistence: CommissionLedgerRepository (completions, pools and lines per purchase and source with B10-MODEL's ledger functions, cumulative adjustments idempotent by (line, source event) over a basis that only falls (D10-ADJ-2: a refund after the reversal, or one naming a basis above the line's, appends nothing), VOID and ADJUSTED, holds of exact amounts with reason and review date, funds observations, the line transitions of design section 8.1) and StatementRepository (banking calendar versions, periods, the statement composition with items, exact held cents and separate accrued, eligible, held, paid and negative totals, the cutoff hash KAURO_COMMISSION_CUTOFF_V1 recomputed from rows, payout intents under the statement's row lock, reconciliations, compensation guard reviews), the platform bindings RecordedBankingCalendarSource (the latest VERIFIED_FEED version; none: CALENDAR_UNAVAILABLE) and AuthorizationDeliveryCompletionSource (FINAL at B09's delivered authorization of a single-stage purchase) of D10-BIND-1, the accessors ledgerOf and statementsOf; the translations of KC002, KC007, KC009, KC010, KC015 and KC017 in sqlstate.ts; @kauro/persistence/testing fixtures: an accrued line on a paid purchase, an eligible line, a hold, an issued statement. Done: the cited titles pass on PostgreSQL 17 with the waits observed; pnpm run verify green."
+    },
+    {
+      "key": "B10-AGENCY-LIFECYCLE",
+      "stage": 2,
+      "starts_from": "b10/stage-1",
+      "depends_on": ["B10-MODEL", "B10-PORTS-FAKES", "B10-SCHEMA-RECURRENCE"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/api/test/cmd002-activate-agency.test.ts",
+        "apps/api/test/cmd043-close-agency.test.ts",
+        "packages/persistence/test/b10-agency-adapters.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd002-activate-agency.test.ts (CMD002-OK, -DENY, -RACE), apps/api/test/cmd043-close-agency.test.ts (CMD043-OK both rows, -DENY, -RACE against B09's CreatePaymentOrder) and packages/persistence/test/b10-agency-adapters.test.ts (CMD002 through the adapters, R2-141 rename and consolidation) under their exact titles; see them fail. Then build: in @kauro/persistence the AgencyLifecycleRepository (published agreement versions read after their shared locks, the append-only acceptance, the closure with its obligations inventory through B06's ActiveWorkInspector and B09's commerce reads (payments, refunds, live authorizations, tax documents and the agency's OPEN reconciliation cases with kind, amount and age, D10-AGY-4), open quotes WITHDRAWN with their founding reservations RELEASED, the append-only relationship decisions) and the accessor agencyLifecycleOf, the translation of KC006 in sqlstate.ts; in @kauro/application the handlers CMD002 ActivateAgency and CMD043 CloseAgency on B06's pipeline (authenticate -> access decision -> journal -> execute; D10-AGY-1, D10-AGY-2, D10-AGY-4) with their closed outcome catalogues of design sections 12 and 13 and the views of B10-PORTS-FAKES, agency.activated.v1 and agency.closing.v1; in apps/api the two routes served (inventory, response schemas, OpenAPI paths, the role matrix, the matrix rows of the Agency edges of design section 8.1, and closure_obligations_completed re-owned to B16 in tools/matrix.mjs per D10-AGY-2). The closure race uses B09's CreatePaymentOrder and quote fixtures; the closing agency's commission lines are written by fixtures as kauro_commission. Done: the cited titles pass through the real routes on PostgreSQL 17; pnpm run verify green."
+    },
+    {
+      "key": "B10-COMMANDS-QUOTE",
+      "stage": 3,
+      "starts_from": "b10/stage-2",
+      "depends_on": ["B10-ADAPTERS-RECURRENCE", "B10-PORTS-FAKES", "B10-MODEL"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": ["apps/api/test/cmd027-create-quote.test.ts"],
+      "estimate": "1.5 agent-days (the replacement protocol included)",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd027-create-quote.test.ts (R2-086, R2-087, R2-088, R2-089, R2-090, R2-091, R2-092 both rows, R2-093, R2-127, S060, CMD027-OK both rows, -DENY both rows, -RACE all three rows) under their exact titles; see them fail. Then build in @kauro/application the handler CMD027 CreateQuote on B06's pipeline with the lock order and first-failure preconditions of design sections 3.4 and 10 (project, approved plan with its live approval, agency ACTIVE with accepted terms, billable units > 0, the launch envelope, mode, the buyer type through BuyerTypeReader, the source through B07's SourceAvailabilityReader, the billing profile and its reviewed treatment), the issuance core of B10-ADAPTERS-RECURRENCE, CreateQuoteView with its eligibility (count, tier, founding offer, applied rate, lookback start); the included replacement through B09's PurchaseRebinder as intent (tenant), settle (payment service), complete (tenant), resumable from its journal entry, withdrawn with its reason when the re-binding is refused, REPLACEMENT_SCOPE_CHANGED with the band comparison, REPLACEMENT_ALLOWANCE_SPENT and EXECUTION_STARTED writing nothing (D10-QUOTE-1..4); the closed outcome catalogue; in apps/api the route served (inventory, response schema, OpenAPI paths, the role matrix, the matrix rows of B09's Quote edges B10 performs). The composition binds UnrecordedBuyerTypeReader; the tests inject ContractFakeBuyerTypeReader and B09's provider fakes, owning none. Done: the cited titles pass through the real route on PostgreSQL 17 with the waits observed; B09's quote, order and re-binding suites unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B10-COMMANDS-PROSPECTS",
+      "stage": 3,
+      "starts_from": "b10/stage-2",
+      "depends_on": ["B10-ADAPTERS-SALES", "B10-PORTS-FAKES", "B10-MODEL"],
+      "owns_fakes": [],
+      "migrations": ["0032_claim_conflict_review.sql"],
+      "tests": [
+        "apps/api/test/cmd045-register-prospect.test.ts",
+        "apps/api/test/cmd046-claim-prospect.test.ts",
+        "apps/api/test/cmd047-accept-attribution.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd045-register-prospect.test.ts (CMD045-OK, -DENY, -RACE), apps/api/test/cmd046-claim-prospect.test.ts (CMD046-OK, -DENY both rows, -RACE) and apps/api/test/cmd047-accept-attribution.test.ts (CMD047-OK both rows, -DENY both rows, -RACE) under their exact titles; see them fail. Then build in @kauro/application, on B06's pipeline with CommercialAuthorizer: CMD045 RegisterProspect (ACTIVE seller or owner; the caller's AGENCY-segment source evidence, the organization key, suppression by organization and contact key, born RESEARCHED and minimized; D10-PROS-1), CMD046 ClaimProspect (ACTIVE seller under its active agreement version, substantive evidence, the prospect's claims lock, conflicts written DISPUTED in the same transaction, a 2160-hour review deadline; D10-CLAIM-1) and CMD047 AcceptAttribution (owner, CAS on the claim, the prepared allocation frozen once per agency with 10000 bps and the ruling reason, competing claims REJECTED, the buyer type through BuyerTypeReader: unset BUYER_TYPE_UNSET, IN_HOUSE IN_HOUSE_NOT_ATTRIBUTABLE, a claim after the agency's first payment order CLAIM_AFTER_FIRST_ORDER; D10-ATTR-1, D58); their closed outcome catalogues and views; in apps/api the three routes served (inventory, response schemas, OpenAPI paths, the role matrix). The tests inject ContractFakeBuyerTypeReader and use B10-ADAPTERS-SALES' fixtures, owning no fake. Done: the cited titles pass through the real routes on PostgreSQL 17 with the waits observed; pnpm run verify green."
+    },
+    {
+      "key": "B10-COMMANDS-SELLERS",
+      "stage": 3,
+      "starts_from": "b10/stage-2",
+      "depends_on": ["B10-ADAPTERS-SALES", "B10-ADAPTERS-LEDGER", "B10-PORTS-FAKES", "B10-MODEL"],
+      "owns_fakes": [],
+      "migrations": [],
+      "tests": [
+        "apps/api/test/cmd048-assign-account.test.ts",
+        "apps/api/test/cmd049-activate-seller.test.ts",
+        "apps/api/test/cmd050-terminate-seller.test.ts"
+      ],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd048-assign-account.test.ts (R2-095, CMD048-OK, -DENY, -RACE), apps/api/test/cmd049-activate-seller.test.ts (CMD049-OK, -DENY, -RACE) and apps/api/test/cmd050-terminate-seller.test.ts (R2-100, CMD050-OK, -DENY, -RACE) under their exact titles; see them fail. Then build in @kauro/application, on B06's pipeline with CommercialAuthorizer: CMD048 AssignAccount (owner, CAS on the sales account, an ACTIVE seller and a prepared service assignment; only the current operational owner changes; D10-ASSIGN-1), CMD049 ActivateSeller (owner with a fresh step-up through B06's assurance; the activation facts of D10-SELL-1, repeated by KC005) and CMD050 TerminateSeller (owner, CAS on the seller: TERMINATED at the effective instant, assignments ended, prospects unassigned, entitlements TERMINATED_WITH_RESIDUAL, unlisted open claims EXPIRED, one tail entry per enumerated accepted opportunity of an agency without a purchase, 2160 h, nothing of the ledger touched; D10-TERM-1); their closed outcome catalogues and views; in apps/api the three routes served (inventory, response schemas, OpenAPI paths, the role matrix). The race of CMD050 against CMD047 is B10-INTEGRATION's (the two commands are built in parallel lanes). Tests use the stage-2 fixtures, owning no fake. Done: the cited titles pass through the real routes on PostgreSQL 17 with the waits observed; pnpm run verify green."
+    },
+    {
+      "key": "B10-COMMISSION-SERVICE",
+      "stage": 3,
+      "starts_from": "b10/stage-2",
+      "depends_on": ["B10-ADAPTERS-RECURRENCE", "B10-ADAPTERS-SALES", "B10-ADAPTERS-LEDGER", "B10-PORTS-FAKES", "B10-MODEL"],
+      "owns_fakes": [],
+      "migrations": ["0033_commission_due_reservations.sql"],
+      "tests": ["apps/api/test/b10-commission-service.test.ts"],
+      "estimate": "1.5 agent-days",
+      "task": "Tests first: write the case-map rows citing apps/api/test/b10-commission-service.test.ts (R2-094, R2-098, R2-099, R2-101 through the preparation-completion fake, R2-127 the QUOTE_EXPIRY sweep, R2-137, R2-138, and the rows beyond the sixty-four cases: R2-140, the COMMISSIONS consumer, B09-R2 the delivery orders, D-LEASE-3 the dispatcher's lease, example 14 funds holds, example 19 service-only basis, the window sweeps) under their exact titles; see them fail. Then build in apps/api/src/commissions/ the commission service of design section 14: its runtime (the kauro_commission pool, the commission-service identity, one COMMISSIONS lease of kind OUTBOX_DISPATCH through B06's PgLeaseStore and PgOutboxDispatchStore under kauro_control as D10-CONS-2 says (no checkpoint, the fence read from each claim and heartbeat, its own resume after expiry under the next fence), each effect in its own SERVICE unit of work that adopts the event's agency, idempotent by durable identity), the COMMISSIONS consumer (capture.completed.v1: one pool per purchase and applicable source with the rate decision of D10-RATE-1, accepted claims converted into entitlements at the first purchase, the first designation mirrored once into agencies.first_qualifying_capture_id with agency.first_purchase_designated.v1; refund.completed.v1 by serviceBasisAfterCents and capture.reversed.v1: cumulative adjustments over a basis that only falls (D10-ADJ-2), VOID and ADJUSTED; capture.funds_observed.v1: funds facts and holds; commercial_authorization.delivered.v1: PreparationCompletionSource), the sweeps QUOTE_EXPIRY (B09's price_expiry_reached, reservation release or RECONCILIATION_HOLD), CLAIM_WINDOWS, ENTITLEMENT_WINDOWS, ACCRUAL_RECONCILIATION and ELIGIBILITY, and a runCycle that PERIODS joins in B10-INTEGRATION. The composition binds AuthorizationDeliveryCompletionSource; the tests inject ContractFakePreparationCompletion and B09's provider fakes, owning none. Done: the cited titles pass on PostgreSQL 17 with both interleavings of R2-137 held and observed; B09's payment-service suites unchanged and green; pnpm run verify green."
+    },
+    {
+      "key": "B10-STATEMENTS-PAYOUTS",
+      "stage": 3,
+      "starts_from": "b10/stage-2",
+      "depends_on": ["B10-ADAPTERS-LEDGER", "B10-ADAPTERS-SALES", "B10-PORTS-FAKES", "B10-MODEL"],
+      "owns_fakes": [],
+      "migrations": ["0034_commission_service_commands.sql"],
+      "tests": [
+        "apps/api/test/cmd051-close-commission-period.test.ts",
+        "apps/api/test/cmd052-approve-commission-payout.test.ts",
+        "apps/api/test/cmd053-reconcile-commission-payout.test.ts",
+        "apps/api/test/commission-statement-reads.test.ts"
+      ],
+      "estimate": "1.5 agent-days",
+      "task": "Tests first: write the case-map rows citing apps/api/test/cmd051-close-commission-period.test.ts (R2-102, R2-105, R2-139 through the calendar fake, CMD051-OK, -DENY, -RACE), apps/api/test/cmd052-approve-commission-payout.test.ts (R2-102, R2-103, CMD052-OK, -DENY, -RACE), apps/api/test/cmd053-reconcile-commission-payout.test.ts (R2-103 and CMD053-OK, -DENY, -RACE through the payout-evidence fake) and apps/api/test/commission-statement-reads.test.ts (GetCommissionStatement) under their exact titles; see them fail. Then build in @kauro/application: CMD051 CloseCommissionPeriod (commission service; the period OPEN and due, no undelivered COMMISSIONS record before the cutoff, the recomputed KAURO_COMMISSION_CUTOFF_V1 equal to the request; one immutable ISSUED statement per seller with reasoned hold items, ELIGIBLE lines PAYABLE, negative balances per D10-NEG-1, the compensation-guard review that refuses nothing; D10-STMT-1, D10-GUARD-1, D10-CAL-1), CMD052 ApproveCommissionPayout (owner with a fresh step-up, CAS on an ISSUED statement: a VERIFIED payee, payable > 0 as the only floor, bank-available cash of the latest settlement with bank evidence covering it and every unsettled intent; one AUTHORIZED intent with fee bearer KAURO, the destination version and digest and reference kauro-payout-<intentId>; no transfer; D10-PAY-1), CMD053 ReconcileCommissionPayout (finance service; PayoutEvidenceVerifier; mismatch changes nothing, SUBMITTED-only is PAYOUT_NOT_SETTLED, SETTLED pays, FAILED or RETURNED keeps the intent and holds the lines PAYOUT_FAILED; D10-PAY-2), GetCommissionStatement (the statement's seller or the owner; D10-API-1); their closed outcome catalogues and views; the PERIODS sweep as a function of apps/api/src/commissions/periods.ts (open the month; close a due period through CMD051 under journal key period-close-<periodId>), tested directly and entered into the service's cycle by B10-INTEGRATION; in apps/api the four routes served (inventory, response schemas, OpenAPI paths, the role matrix, the CommissionLine matrix rows statement_closed, settled_payout_evidence and payout_blocked). The composition binds RecordedBankingCalendarSource and UnavailablePayoutEvidenceVerifier; the tests inject ContractFakeBankingCalendar and ContractFakePayoutEvidence, owning none. Done: the cited titles pass through the real routes on PostgreSQL 17 with the waits observed; pnpm run verify green."
+    },
+    {
+      "key": "B10-INTEGRATION",
+      "stage": 4,
+      "starts_from": "b10/stage-3",
+      "depends_on": ["B10-COMMANDS-QUOTE", "B10-COMMANDS-PROSPECTS", "B10-COMMANDS-SELLERS", "B10-COMMISSION-SERVICE", "B10-STATEMENTS-PAYOUTS", "B10-AGENCY-LIFECYCLE"],
+      "owns_fakes": [],
+      "migrations": ["0035_destination_change_lock.sql", "0036_payout_line_fence.sql", "0037_line_payable_owner.sql", "0038_step_up_effect_clock.sql", "0039_live_payable_item.sql", "0040_step_up_at_commit.sql", "0041_statement_input_lines.sql"],
+      "tests": ["apps/api/test/b10-scenarios.test.ts"],
+      "estimate": "1 agent-day",
+      "task": "Tests first: write the case-map rows citing apps/api/test/b10-scenarios.test.ts (R2-079, R2-080, R2-092, R2-093, R2-095, R2-096, R2-097, R2-098, R2-100, R2-104, R2-137 and CMD050-RACE end to end) under their exact titles; see them fail. Then enter the PERIODS sweep of B10-STATEMENTS-PAYOUTS into the commission service's runCycle and compose the application's own handlers (as apps/api binds them, each answer checked against its route contract) with the payment service, the commission service and their dispatchers over one cluster and one set of labelled fakes: the worked examples 1, 2, 3, 5, 6, 7, 9, 12, 18 and 25 through CreateQuote, CreatePaymentOrder, CapturePayment, the refund commands, AcceptAttribution, AssignAccount, TerminateSeller, CloseCommissionPeriod, ApproveCommissionPayout and GetCommissionStatement, with the example's hand-calculated integer cents as the oracle and a nearby valid control kept; the race of TerminateSeller against AcceptAttribution held at the seller row in both orders; one whole runCycle that then finds nothing to repair. Move every case-map row from PLANNED to its class with its commit, recompute the status table, run pnpm run verify on Windows and on Linux (fresh clone under WSL) and record both in the design's verification section. Done: every cited title exists and passes on both hosts; the case-map check green with no PLANNED row left."
+    }
+  ]
+}

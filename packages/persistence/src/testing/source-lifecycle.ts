@@ -156,6 +156,8 @@ export interface SealSourceOptions {
    * design D-RET-2).
    */
   readonly base?: Date;
+  /** The billable source units the evaluation freezes (default 120): what CMD027 prices the sealed revision by. */
+  readonly billableSourceUnits?: number;
 }
 
 /** The fixture's service identity on control-plane events and objects (a SERVICE actor, never a person). */
@@ -496,8 +498,11 @@ export async function bindSourceSelection(sessions: SourceFixtureSessions, scope
  * SELECTION_EVALUATION's counting pass as statements inside the caller's open control-plane transaction bound to the scope's
  * agency: the complete evaluation of the bound selection is recorded; the revision is not moved.
  */
-export async function countSourceSelection(c: SqlSession, scope: SourceFixtureScope, bound: BoundSourceFixture): Promise<CountedSourceSelection> {
-  const counts: SourceCounts = { physicalSourceRows: 120, logicalSourceRecords: 120, billableSourceUnits: 120, associationEdges: 0 };
+export async function countSourceSelection(c: SqlSession, scope: SourceFixtureScope, bound: BoundSourceFixture, options: { readonly billableSourceUnits?: number } = {}): Promise<CountedSourceSelection> {
+  // the fixture's population is 120 records; a test that prices a bigger or an empty source names the billable units it froze (the
+  // logical records are never fewer than the billable ones: selection_evaluations_complete)
+  const billable = options.billableSourceUnits ?? 120;
+  const counts: SourceCounts = { physicalSourceRows: 120, logicalSourceRecords: Math.max(120, billable), billableSourceUnits: billable, associationEdges: 0 };
   const evaluationId = ids.next();
   const evaluationHash = textDigest(`evaluation-${evaluationId}`);
   await c.query(
@@ -516,12 +521,12 @@ export async function countSourceSelection(c: SqlSession, scope: SourceFixtureSc
 }
 
 /** The selection manifest intake and CMD016 (request handler), then SELECTION_EVALUATION (control plane): READY_TO_SEAL. */
-export async function readySourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, admitted: AdmittedSourceFixture): Promise<ReadySourceFixture> {
+export async function readySourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, admitted: AdmittedSourceFixture, options: { readonly billableSourceUnits?: number } = {}): Promise<ReadySourceFixture> {
   const bound = await bindSourceSelection(sessions, scope, admitted);
   const { counted, revisionVersion } = await sessions.control(async (c) => {
     await clockAt(c, at(admitted.initiatedAt, 6 * 60_000));
     await c.query("SELECT 1 FROM kauro.dataset_revisions WHERE agency_id = $1 AND revision_id = $2 FOR NO KEY UPDATE", [scope.agencyId, bound.revisionId]);
-    const evaluation = await countSourceSelection(c, scope, bound);
+    const evaluation = await countSourceSelection(c, scope, bound, options);
     const { counts } = evaluation;
     const ready = await one<{ version: string }>(
       c,
@@ -642,7 +647,7 @@ export async function sealReadyRevision(sessions: SourceFixtureSessions, scope: 
  */
 export async function sealSourceRevision(sessions: SourceFixtureSessions, scope: SourceFixtureScope, options: SealSourceOptions): Promise<SealedSourceFixture> {
   const admitted = await admitSourceFile(sessions, scope, { seed: options.seed, ...(options.base !== undefined ? { base: options.base } : {}) });
-  const ready = await readySourceRevision(sessions, scope, admitted);
+  const ready = await readySourceRevision(sessions, scope, admitted, options.billableSourceUnits === undefined ? {} : { billableSourceUnits: options.billableSourceUnits });
   const sealed = await sealReadyRevision(sessions, scope, ready);
   if (options.state !== "EXPIRED") return sealed;
   const version = await sessions.control((c) => expireSealedRevision(c, scope, sealed.revisionId));

@@ -11,6 +11,7 @@
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
+import { COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_TYPES } from "../commercial/events.js";
 import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD_ALLOWLIST, EXECUTION_EVENT_SUBSCRIPTIONS, EXECUTION_EVENT_TYPES } from "./execution/events.js";
 import { AUDIT_AGGREGATE_KINDS, AUDIT_AUTHORITY_EVENT_TYPES, AUDIT_CONSUMERS, AUDIT_EVENT_PAYLOAD_ALLOWLIST, AUDIT_EVENT_SUBSCRIPTIONS } from "./audit/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
@@ -92,6 +93,8 @@ export const EVENT_TYPES = [
   ...EXECUTION_EVENT_TYPES,
   // Audit authority (package B08, model/audit/events.ts; migration 0023)
   ...AUDIT_AUTHORITY_EVENT_TYPES,
+  // Agency recurrence and commission domain (package B10, commercial/events.ts; migration 0028)
+  ...COMMERCIAL_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -174,6 +177,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...EXECUTION_EVENT_PAYLOAD_ALLOWLIST,
   // audit authority (package B08, model/audit/events.ts)
   ...AUDIT_EVENT_PAYLOAD_ALLOWLIST,
+  // agency recurrence and commission domain (package B10, commercial/events.ts): ids only
+  ...COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -236,6 +241,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   // audit authority (package B08 §11): the audit's live phases to AUDIT_ORCHESTRATION, its outcomes to the agency, a plan's validation
   // intent to PLAN_VALIDATION
   ...AUDIT_EVENT_SUBSCRIPTIONS,
+  // B10 (commercial/events.ts): COMMISSIONS learns the funds' availability and the authorization's delivery
+  ...COMMERCIAL_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

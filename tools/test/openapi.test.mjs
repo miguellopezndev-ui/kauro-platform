@@ -27,7 +27,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(check(), []);
   // the seven registry commands B06 serves and the six of B07, under their registry paths and names, the five manual-10 reads
   // (N16), the seven source reads and the selection manifest intake (B07), the two operational probes, and every payment route of
-  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), and the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CMA-7)
+  // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CMA-7) and the served commands of package
+  // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -47,12 +48,15 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId} GetSelectionManifest",
       "GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview PreviewTable",
       "GET /api/v1/revisions/{revisionId}/uploads ListUploads",
+      "GET /api/v1/sales/statements/{statementId} GetCommissionStatement",
       "GET /api/v1/uploads/{uploadId} GetUpload",
       "GET /api/v1/uploads/{uploadId}/session GetUploadSession",
       "GET /livez getLiveness",
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
+      "POST /api/v1/agencies/{agencyId}/activate ActivateAgency",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
+      "POST /api/v1/agencies/{agencyId}/closure-requests CloseAgency",
       "POST /api/v1/audits/{auditId}/cancel CancelAudit",
       "POST /api/v1/audits/{auditId}/decision-artifacts SubmitDecisionArtifact",
       "POST /api/v1/audits/{auditId}/plans CreatePlan",
@@ -67,6 +71,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/validate ValidatePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
       "POST /api/v1/projects/{projectId}/execute ExecuteProject",
+      "POST /api/v1/projects/{projectId}/quotes CreateQuote",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
@@ -77,6 +82,15 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/revisions/{revisionId}/selection SelectInputTables",
       "POST /api/v1/revisions/{revisionId}/selection-manifests SubmitSelectionManifest",
       "POST /api/v1/revisions/{revisionId}/uploads ReserveUpload",
+      "POST /api/v1/sales/agencies/{agencyId}/assignment AssignAccount",
+      "POST /api/v1/sales/claims/{claimId}/accept AcceptAttribution",
+      "POST /api/v1/sales/commission-periods/{periodId}/close CloseCommissionPeriod",
+      "POST /api/v1/sales/prospects RegisterProspect",
+      "POST /api/v1/sales/prospects/{prospectId}/claims ClaimProspect",
+      "POST /api/v1/sales/sellers/{sellerId}/activate ActivateSeller",
+      "POST /api/v1/sales/sellers/{sellerId}/terminate TerminateSeller",
+      "POST /api/v1/sales/statements/{statementId}/approve-payout ApproveCommissionPayout",
+      "POST /api/v1/sales/statements/{statementId}/reconcile-payout ReconcileCommissionPayout",
       "POST /api/v1/uploads/{uploadId}/cancel CancelUpload",
       "POST /api/v1/uploads/{uploadId}/complete CompleteUpload",
     ],

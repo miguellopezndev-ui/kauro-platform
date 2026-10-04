@@ -75,8 +75,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   cost_grant: ["cost_grants", "grant_id"],
 });
 
-// every runtime login of this branch: B06 five and package B09 payment service
-const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin, ROLES.paymentLogin] as const;
+// every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service
+const RUNTIME_LOGINS = [ROLES.appLogin, ROLES.controlLogin, ROLES.assuranceLogin, ROLES.validatorLogin, ROLES.ingressLogin, ROLES.paymentLogin, ROLES.commissionLogin] as const;
 
 const refusedWith = (code: string, constraint?: string) => (e: unknown): boolean => sqlState(e) === code && (constraint === undefined || constraintOf(e) === constraint);
 
@@ -276,10 +276,11 @@ test("only the migration owner writes the registry: every runtime login is refus
       await assert.rejects(c.query("UPDATE kauro.aggregate_kinds SET table_name = 'plans', id_column = 'plan_id' WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} UPDATE`);
       await assert.rejects(c.query("DELETE FROM kauro.aggregate_kinds WHERE aggregate_kind = 'end_client'"), refusedWith("42501"), `${login} DELETE`);
       await assert.rejects(c.query("TRUNCATE kauro.aggregate_kinds"), refusedWith("42501"), `${login} TRUNCATE`);
-      if (login === ROLES.appLogin || login === ROLES.controlLogin || login === ROLES.paymentLogin) {
+      if (login === ROLES.appLogin || login === ROLES.controlLogin || login === ROLES.paymentLogin || login === ROLES.commissionLogin) {
         // the request handlers insert domain events, since B07 the control plane appends the source-lifecycle events it owns
         // (B07 D-CTRL-2), and so does package B09's payment service (its read policy aggregate_kinds_read_b09_payment,
-        // FOUNDATION §4), so the binding (SECURITY INVOKER) reads the registry as any of them
+        // FOUNDATION §4) and package B10's commission service (aggregate_kinds_read_b10_commission: a quote's expiry and the agency's
+        // first designation), so the binding (SECURITY INVOKER) reads the registry as any of them
         const seen = await c.query("SELECT aggregate_kind, table_name, id_column, owner_package FROM kauro.aggregate_kinds ORDER BY aggregate_kind");
         assert.deepEqual(seen.rows, registry);
       } else {
@@ -297,7 +298,7 @@ test("only the migration owner writes the registry: every runtime login is refus
       WHERE c.oid = 'kauro.aggregate_kinds'::regclass AND r.rolname = ANY($1::text[]) ORDER BY 1, 2`,
     [[...RUNTIME_ROLES]],
   );
-  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }, { role: "kauro_control", privilege: "SELECT" }, { role: "kauro_payment", privilege: "SELECT" }]);
+  assert.deepEqual(grants.rows, [{ role: "kauro_app", privilege: "SELECT" }, { role: "kauro_commission", privilege: "SELECT" }, { role: "kauro_control", privilege: "SELECT" }, { role: "kauro_payment", privilege: "SELECT" }]);
   // the rule behind that one grant, stated over the catalog so that a later package that lets a runtime group append events cannot
   // forget the registry the binding reads as that group: the groups that may read the registry (a grant and a SELECT policy) are
   // exactly the groups that may insert domain events — on main the request handlers alone, with B07 also the control plane
@@ -314,8 +315,9 @@ test("only the migration owner writes the registry: every runtime login is refus
   );
   assert.deepEqual(readers.rows, inserters.rows, "registry readers are exactly the event inserters");
   // B07 extends the foundation's list (FOUNDATION-aggregate-kinds.md §4): the control plane appends the events of its edges; and
-  // package B09 extends it: its payment service appends the commerce events of the agency it adopted
-  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }, { role: "kauro_control" }, { role: "kauro_payment" }]);
+  // package B09 extends it: its payment service appends the commerce events of the agency it adopted; and package B10: its commission
+  // service appends a quote's expiry and the agency's first designation
+  assert.deepEqual(inserters.rows, [{ role: "kauro_app" }, { role: "kauro_commission" }, { role: "kauro_control" }, { role: "kauro_payment" }]);
   const columnGrants = await h.oracle.query("SELECT attname FROM pg_attribute WHERE attrelid = 'kauro.aggregate_kinds'::regclass AND attacl IS NOT NULL");
   assert.deepEqual(columnGrants.rows, []);
   const policies = await h.oracle.query<{ policyname: string; cmd: string; roles: string[] }>(
@@ -325,6 +327,7 @@ test("only the migration owner writes the registry: every runtime login is refus
     { policyname: "aggregate_kinds_read", cmd: "SELECT", roles: ["kauro_app"] },
     { policyname: "aggregate_kinds_read_b07_control", cmd: "SELECT", roles: ["kauro_control"] },
     { policyname: "aggregate_kinds_read_b09_payment", cmd: "SELECT", roles: ["kauro_payment"] },
+    { policyname: "aggregate_kinds_read_b10_commission", cmd: "SELECT", roles: ["kauro_commission"] },
     { policyname: "aggregate_kinds_register", cmd: "INSERT", roles: [ROLES.owner] },
   ]);
   const rls = await h.oracle.query("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = 'kauro.aggregate_kinds'::regclass");

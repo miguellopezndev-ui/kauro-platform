@@ -22,6 +22,9 @@ import {
   COMMERCE_READ_ROUTES,
   COMMERCE_REQUEST_SCHEMAS,
   AUDIT_REQUEST_SCHEMA_IDS,
+  COMMERCIAL_COMMAND_RESPONSES,
+  COMMERCIAL_READ_ROUTES,
+  COMMERCIAL_REQUEST_SCHEMAS,
   DECISION_ARTIFACT_SCHEMA_ID,
   EXECUTION_REQUEST_SCHEMA_IDS,
   INTAKE_OPERATION_IDS,
@@ -35,12 +38,16 @@ import {
   commandResponseSchemaId,
   commerceCommandResponseSchemaId,
   commerceReadResponseSchemaId,
+  commercialCommandResponseSchemaId,
+  commercialReadResponseSchemaId,
   intakeResponseSchemaId,
   operationalResponseSchemaId,
   readResponseSchemaId,
   requestSchemaId,
   type CommerceReadOperationId,
   type CommerceServedCommandId,
+  type CommercialReadOperationId,
+  type CommercialServedCommandId,
 } from "@kauro/application";
 import { CONTRACT_NAMES } from "@kauro/contracts";
 import { DomainFailure } from "@kauro/domain";
@@ -122,11 +129,15 @@ test("the validator the api composes is closed: exactly the contract names, the 
     // under the same rules — compiled whole, so the routes of both B09 sides validate against one closed set
     ...(Object.keys(COMMERCE_COMMAND_RESPONSES) as CommerceServedCommandId[]).map(commerceCommandResponseSchemaId),
     ...(Object.keys(COMMERCE_READ_ROUTES) as CommerceReadOperationId[]).map(commerceReadResponseSchemaId),
+    // package B10 (design §13): the COMPLETED envelope of each of its twelve commands and the READ envelope of its read, compiled whole
+    ...(Object.keys(COMMERCIAL_COMMAND_RESPONSES) as CommercialServedCommandId[]).map(commercialCommandResponseSchemaId),
+    ...(Object.keys(COMMERCIAL_READ_ROUTES) as CommercialReadOperationId[]).map(commercialReadResponseSchemaId),
   ];
   // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits, B09's seven, B08's two job commands and
-  // four audit commands and the decision artifact document its intake admits
+  // four audit commands and the decision artifact document its intake admits, and B10's twelve
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID];
+  const commercialRequestIds = Object.keys(COMMERCIAL_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, ...commercialRequestIds];
   const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

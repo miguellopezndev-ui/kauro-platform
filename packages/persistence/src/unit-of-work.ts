@@ -107,16 +107,31 @@ const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
   SERIALIZABLE: "SERIALIZABLE",
 });
 
-/** SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1), every other context under the request handlers. */
-function roleFor(context: ExecutionContext): RuntimeRole {
+/**
+ * The service identities of the commission ledger's runtime group (package B10, D10-CTX-1): the commission service (the COMMISSIONS
+ * consumer, the sweeps, CMD051) and the finance service (CMD053) run under kauro_commission, never under the payment service's group.
+ */
+const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-service", "finance-service"]);
+
+/**
+ * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
+ * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
+ */
+export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
   switch (context.kind) {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
-      return "kauro_payment";
+      return COMMISSION_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     default:
       return "kauro_app";
   }
+}
+const roleFor = runtimeRoleOf;
+
+/** The commission and finance services' contexts: SERVICE contexts on kauro_commission (D10-CTX-1). */
+export function isCommissionServiceContext(context: ExecutionContext): boolean {
+  return context.kind === "SERVICE" && COMMISSION_GROUP_SERVICES.has(context.serviceId);
 }
 
 /** An id generator that remembers what it minted, so adoptTenant can prove the agency id was minted here. */
@@ -552,6 +567,16 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   }
 
   /**
+   * Binds the agency of a durable work item for a SERVICE context (kauro.agency_id), at most once and never beside adoptScope or the
+   * finance scope; the commercial unit of work's adoptAgency checks who may (D10-CTX-1).
+   */
+  protected async bindServiceAgency(agencyId: AgencyId): Promise<void> {
+    if (this.#scopeAgencyId !== null || this.#financeAgencyId !== null) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit of work adopts one scope at most once");
+    await execute(this.client, "SELECT set_config('kauro.agency_id', $1, true)", [agencyId]);
+    this.#scopeAgencyId = agencyId;
+  }
+
+  /**
    * OPERATOR contexts only, at most once and never after adoptScope: the finance scope of an agency the corporate owner names for a
    * review not keyed by a stored operation (a fiscal profile version, a case's resolution). Naming an agency grants nothing by
    * itself: the database admits the scope's rows only while the person's KAURO_OWNER grant is ACTIVE (kauro.in_finance_scope).
@@ -571,6 +596,8 @@ export interface CommercePools {
   readonly app?: KauroPool;
   /** kauro_payment: SERVICE contexts (the payment service; D-CTX-B1). */
   readonly payment?: KauroPool;
+  /** kauro_commission: the commission and finance services (package B10, D10-CTX-1). */
+  readonly commission?: KauroPool;
   /** kauro_control: SYSTEM contexts. */
   readonly control?: KauroPool;
 }
@@ -585,12 +612,13 @@ export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements 
   readonly #pools: Readonly<Partial<Record<RuntimeRole, KauroPool>>>;
 
   constructor(pools: CommercePools, deps: UnitOfWorkDependencies) {
-    const any = pools.app ?? pools.payment ?? pools.control;
+    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.control;
     if (any === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit-of-work factory needs at least one verified pool");
     super(any, deps);
     const routes: Partial<Record<RuntimeRole, KauroPool>> = {};
     if (pools.app !== undefined) routes.kauro_app = pools.app;
     if (pools.payment !== undefined) routes.kauro_payment = pools.payment;
+    if (pools.commission !== undefined) routes.kauro_commission = pools.commission;
     if (pools.control !== undefined) routes.kauro_control = pools.control;
     this.#pools = routes;
   }

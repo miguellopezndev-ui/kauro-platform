@@ -19,6 +19,8 @@ import { AUDIT_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA, DECISION_ARTIFACT_SCHE
 import { EXECUTION_REQUEST_SCHEMAS } from "../execution/request-schemas.js";
 import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
 import { buildCommerceResponseSchemas } from "../commerce/response-schemas.js";
+import { COMMERCIAL_REQUEST_SCHEMAS } from "../commercial/request-schemas.js";
+import { buildCommercialResponseSchemas } from "../commercial/response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -134,6 +136,22 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
   }
   for (const [name, schema] of Object.entries(commerce.defs)) {
     if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 view ${name} collides with a B06, B07 or registry definition`);
+    defs[name] = schema;
+  }
+  // package B10: the commercial commands' closed request schemas and the envelopes of their replies, derived under the same rules and
+  // referencing the B06 and B09 views they answer (AgencyView, QuoteView) without redeclaring them
+  for (const [command, schema] of Object.entries(COMMERCIAL_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 request schema ${id} collides with an earlier package's`);
+    roots[id] = schema;
+  }
+  const commercial = buildCommercialResponseSchemas(bundle, defs as Readonly<Record<string, Readonly<Record<string, unknown>>>>);
+  for (const [id, schema] of Object.entries(commercial.roots)) {
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 response schema ${id} collides with an earlier package's`);
+    roots[id] = schema;
+  }
+  for (const [name, schema] of Object.entries(commercial.defs)) {
+    if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 view ${name} collides with an earlier package's or a registry definition`);
     defs[name] = schema;
   }
   roots["Problem"] = PROBLEM_SCHEMA;

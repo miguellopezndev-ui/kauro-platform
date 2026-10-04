@@ -199,6 +199,15 @@ export * from "./ports/index.js";
 // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md)
 export * from "./commerce/index.js";
 
+// agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md)
+export * from "./commercial/index.js";
+// agency recurrence and commission domain (package B10; docs/design/B10-commercial-domain.md): the platform machines of §8.2 and the
+// event vocabulary of §9, each seeded by its migration in the commit that declares it
+export type { CommercialPlatformMachineName } from "./commercial/machines.js";
+export { COMMERCIAL_PLATFORM_MACHINES } from "./commercial/machines.js";
+export type { CommercialEventType } from "./commercial/events.js";
+export { COMMERCIAL_EVENT_TYPES, COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS } from "./commercial/events.js";
+
 // processing authority (package B08; docs/design/B08-audit-approval-jobs.md)
 export * from "./model/execution/index.js";
 
