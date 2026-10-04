@@ -167,13 +167,13 @@ export interface ReadyQuote extends IssuedQuote {
  */
 export type EditionCollaborator = "payment" | "provider" | "capacity";
 
-export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly commercial?: WorldOptions["commercial"]; readonly quotes?: (h: Harness) => Partial<QuoteCollaborators> } = {}): Promise<PaymentsWorld> {
+export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly withoutCapacity?: boolean; readonly commercial?: WorldOptions["commercial"]; readonly quotes?: (h: Harness) => Partial<QuoteCollaborators> } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
   const verifier = createWebhookVerifierFake({ clock });
   const holds = new ProtocolHolds();
-  // every collaborator the test binds replaces the edition's; one it leaves unbound stays the edition's (null)
+  // every collaborator the test binds replaces the edition's; one it leaves unbound stays the edition's (B08's own capacity, D8-XPKG-4; no payment service and no provider, null)
   const unbound = new Set(options.unbound ?? []);
   const w = await world({
     clock,
@@ -182,7 +182,8 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
     commerce: (h) => ({
       ...(unbound.has("payment") ? {} : { payment: h.commerce }),
       ...(unbound.has("provider") ? {} : { provider }),
-      ...(unbound.has("capacity") ? {} : { capacity }),
+      // the edition binds B08's own capacity (D8-XPKG-4); a world may also leave the binding out, as a deployment that supplies none of its own can (D-CAP-B1)
+      ...(options.withoutCapacity === true ? { capacity: null } : unbound.has("capacity") ? {} : { capacity }),
       protocolHold: holds.hook,
     }),
   });

@@ -36,8 +36,8 @@ test("an unowned edge, an owner of an edge the machine does not list, an unknown
   unknown.Agency.agreements_and_profile_accepted = { command: "CMD999", event: "agency.activated.v1" };
   assert.deepEqual(checkSources(sources, unknown), ["Agency: agreements_and_profile_accepted names CMD999, which the registry does not have"]);
   const unregistered = clone(EDGE_OWNERS);
-  unregistered.Job.cancel_command = { command: "CMD037", event: "job.cancel_requested.v1" };
-  assert.deepEqual(checkSources(sources, unregistered), ["Job: cancel_command names job.cancel_requested.v1, which EVENT_TYPES does not register"]);
+  unregistered.Job.provider_start_observed = { command: "CMD035", event: "job.cancel_requested.v1" };
+  assert.deepEqual(checkSources(sources, unregistered), ["Job: provider_start_observed names job.cancel_requested.v1, which EVENT_TYPES does not register"]);
   const unpublished = clone(EDGE_OWNERS);
   unpublished.EndClient.archive_client = { command: "CMD010", event: "end_client.created.v1" };
   assert.deepEqual(checkSources(sources, unpublished), ["EndClient: archive_client says CMD010 publishes end_client.created.v1, which its handler never publishes"]);
@@ -64,4 +64,20 @@ test("B07-COMMANDS: every specified source-lifecycle command is served with its 
   const absent = clone(APPLICABILITY);
   delete absent.CMD016;
   assert.deepEqual(checkSources(sources, EDGE_OWNERS, absent), ["CMD016 is served but has no applicability row"]);
+});
+
+test("B08-COMMANDS-AUDIT: the four audit commands are served, their events are read from the audit store and CMD022's handler, the decision artifact intake and GetAudit are served, and an edge naming an event the store never writes fails the check", () => {
+  for (const id of ["CMD020", "CMD021", "CMD022", "CMD024"]) assert.ok(sources.served.has(id), id);
+  assert.deepEqual([...sources.published.CMD020].sort(), ["audit.queued.v1", "cost_grant.authorized.v1", "cost_grant.prepared.v1"]);
+  assert.deepEqual(sources.published.CMD021, ["audit.cancelled.v1"]);
+  assert.deepEqual([...sources.published.CMD022].sort(), ["plan.created.v1", "plan.validation_required.v1"]);
+  assert.deepEqual(sources.published.CMD024, ["plan.validating.v1"]);
+  assert.ok("GetAudit" in sources.reads);
+  assert.ok("SubmitDecisionArtifact" in sources.intakes);
+  assert.equal(EDGE_OWNERS.Plan.valid_receipt.owner, "B08", "the receipt edges belong to PLAN_VALIDATION, not to the command that records the intent");
+  assert.equal(EDGE_OWNERS.CostGrant["(initial PREPARED)"].command, "CMD020");
+  const unpublished = clone(EDGE_OWNERS);
+  unpublished.Plan.validation_admitted = { command: "CMD024", event: "plan.validated.v1" };
+  assert.deepEqual(checkSources(sources, unpublished), ["Plan: validation_admitted says CMD024 publishes plan.validated.v1, which its handler never publishes"]);
+  assert.deepEqual(checkSources({ ...sources, intakes: {} }), ["the source intake SubmitSelectionManifest is not a served intake"]);
 });

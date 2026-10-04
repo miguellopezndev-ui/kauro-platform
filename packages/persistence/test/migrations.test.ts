@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { AGGREGATE_KINDS, COMMERCIAL_PLATFORM_MACHINES, EVENT_TYPES, PLATFORM_STATE_MACHINES, SOURCE_LIFECYCLE_STATE_MACHINES } from "@kauro/domain";
+import { AGGREGATE_KINDS, COMMERCIAL_PLATFORM_MACHINES, EVENT_TYPES, EXECUTION_PLATFORM_MACHINES, PLATFORM_STATE_MACHINES, SOURCE_LIFECYCLE_STATE_MACHINES } from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
@@ -51,12 +51,14 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0019_unknown_refund_cases.sql",
     // the B07 package-close re-check: the provider hold record of a seal's accepted generations (B07-R1)
     "0020_source_object_holds.sql",
-    // the contiguous runner's numbers of packages not on B10's base: B08 owns 0021..0023 and B11 0024..0027; each file reserves its
-    // number (a header and SELECT 1) until its owner's migration replaces it (docs/design/B10-commercial-domain.md D10-BASE-1)
-    "0021_reserved_b08.sql",
-    "0022_reserved_b08.sql",
-    "0023_reserved_b08.sql",
-    "0024_reserved_b11.sql",
+    // package B08 (docs/design/B08-audit-approval-jobs.md §9, D8-BASE-1): processing authority, landed after main's 0019 (B09)
+    // and 0020 (B07); numbered 0019..0021 on b08/integration
+    "0021_execution_jobs_capacity.sql",
+    "0022_staging_verification_packages.sql",
+    "0023_audits_cost_grants.sql",
+    "0024_execution_review_fixes.sql",
+    // the contiguous runner's numbers of package B11 not on B10's base: B11 owns 0025..0027 (B08 took 0024, D10-SYNC-1); each file
+    // reserves its number (a header and SELECT 1) until its owner's migration replaces it (docs/design/B10-commercial-domain.md D10-BASE-1)
     "0025_reserved_b11.sql",
     "0026_reserved_b11.sql",
     "0027_reserved_b11.sql",
@@ -173,6 +175,9 @@ test("state and enum CHECK constraints carry exactly the registry vocabularies",
       ["inbox_records", "state", "InboxRecord", "state"],
       ["inbox_records", "environment", "InboxRecord", "environment"],
       ["target_contracts", "mode", "TargetContract", "mode"],
+      // package B08 (0023): the registry Audit and CostGrant vocabularies
+      ["audits", "state", "Audit", "state"],
+      ["cost_grants", "state", "CostGrant", "state"],
       // package B10 (0029..0031)
       ["prospects", "state", "Prospect", "state"],
       ["attribution_claims", "state", "AttributionClaim", "state"],
@@ -201,7 +206,7 @@ test("state and enum CHECK constraints carry exactly the registry vocabularies",
 test("the listed-transition seed equals the registry machines for every machine the schema guards", async () => {
   const su = await pg.connect("postgres");
   try {
-    for (const name of ["Agency", "Membership", "DatasetRevision", "Plan", "Capability", "PaymentAttempt", "TaxDocument", "CommissionLine"]) {
+    for (const name of ["Agency", "Membership", "DatasetRevision", "Plan", "Capability", "PaymentAttempt", "TaxDocument", "Job", "Audit", "CostGrant", "CommissionLine"]) {
       const m = STATE_MACHINES.find((x) => x.contract === name)!;
       const expected = [...new Set(m.transitions.map((t) => `${t.from}>${t.to}`))].sort();
       const r = await su.query<{ edge: string }>("SELECT from_state || '>' || to_state AS edge FROM kauro.state_transitions WHERE machine = $1 ORDER BY 1", [name]);
@@ -211,11 +216,13 @@ test("the listed-transition seed equals the registry machines for every machine 
     // B06 seeds seven machines; B07 adds the platform machines RetentionRecord, SourceFile, StoredObject and UploadSession (their
     // edges equal the domain SOURCE_LIFECYCLE_STATE_MACHINES: source-migrations.test.ts); package B09 adds the registry machines
     // PaymentAttempt and TaxDocument and its ten platform machines (b09-migrations.test.ts compares those seeds with @kauro/domain
-    // COMMERCE_PLATFORM_MACHINES); package B10 adds the platform machine FoundingReservation (b10-recurrence-migrations.test.ts compares
+    // COMMERCE_PLATFORM_MACHINES); package B08 adds the registry machine Job and its platform machines PackageVersion and
+    // ProcessingAttempt (execution-migrations.test.ts compares those seeds with @kauro/domain EXECUTION_PLATFORM_MACHINES), and the
+    // registry machines Audit and CostGrant (0023); package B10 adds the platform machine FoundingReservation (b10-recurrence-migrations.test.ts compares
     // its seed with @kauro/domain COMMERCIAL_PLATFORM_MACHINES), then the registry machine CommissionLine (compared above) and the
     // platform machines Seller, Prospect, AttributionClaim, CommissionEntitlement, PayoutDestination, CommissionHold, CommissionPeriod,
     // CommissionStatement and PayoutIntent (b10-sales-migrations.test.ts and b10-ledger-migrations.test.ts compare those seeds)
-    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "AttributionClaim", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Membership", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "TaxDocument", "UploadSession"]);
+    assert.deepEqual(others.rows.map((x) => x.machine), ["Agency", "AttributionClaim", "Audit", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "CostGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Job", "Membership", "PackageVersion", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "ProcessingAttempt", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "TaxDocument", "UploadSession"]);
   } finally {
     await su.end();
   }
@@ -226,13 +233,15 @@ test("R20: the initial-state seed equals the registry machines (and the platform
   try {
     const seeded = await su.query<{ machine: string; initial_state: string }>("SELECT machine, initial_state FROM kauro.state_machines ORDER BY machine");
     // B07 adds the platform machines of the source lifecycle (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2), package B09 its commerce
-    // machines and package B10 its founding reservation (D10-FOUND-1), the registry's CommissionLine and its sales, ledger and payout
-    // machines (0029..0031), each born in its initial state
-    const expected = ["Agency", "AttributionClaim", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Membership", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "TaxDocument", "UploadSession"].map((name) => {
+    // machines, package B08 the registry machine Job and its platform machines of design 8.2, and the registry machines Audit and
+    // CostGrant (0023), and package B10 its founding reservation (D10-FOUND-1), the registry's CommissionLine and its sales, ledger and
+    // payout machines (0029..0031), each born in its initial state
+    const expected = ["Agency", "AttributionClaim", "Audit", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "CostGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Job", "Membership", "PackageVersion", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "ProcessingAttempt", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "TaxDocument", "UploadSession"].map((name) => {
       const m =
         STATE_MACHINES.find((x) => x.contract === name) ??
         PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ??
         SOURCE_LIFECYCLE_STATE_MACHINES.find((x) => x.contract === name) ??
+        EXECUTION_PLATFORM_MACHINES.find((x) => x.contract === name) ??
         COMMERCIAL_PLATFORM_MACHINES.find((x) => x.contract === name);
       assert.ok(m, `${name} is a registry or platform machine`);
       return { machine: name, initial_state: m.initial };
@@ -262,7 +271,7 @@ test("R20: the initial-state seed equals the registry machines (and the platform
     const births = machineOf(["enforce_initial_state", "enforce_initial_state_of", "enforce_observed_birth"]);
     for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
     assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
-    assert.equal(edges.size, 34, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B10 eleven)");
+    assert.equal(edges.size, 39, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven)");
     for (const d of defs.rows) {
       if (/enforce_initial_state|enforce_membership_initial_state|enforce_observed_birth/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
     }

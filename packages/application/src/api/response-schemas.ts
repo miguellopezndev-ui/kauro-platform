@@ -21,6 +21,10 @@
  * tools/openapi.mjs publishes them in the OpenAPI document. Nothing here is compiled from a runtime value (S093).
  */
 import { AGENCY_CAPABILITIES, DomainFailure, PROJECT_STATES, SERVICE_MODES } from "@kauro/domain";
+import { AUDIT_ROUTES, type AuditCommandId, type AuditIntakeId, type AuditRouteId } from "../audit/contracts.js";
+import { AUDIT_COMMAND_RESPONSES, AUDIT_VIEW_DEFINITIONS } from "../audit/response-views.js";
+import { EXECUTION_ROUTES, type ExecutionCommandId, type ExecutionRouteId } from "../execution/contracts.js";
+import { EXECUTION_COMMAND_RESPONSES, EXECUTION_VIEW_DEFINITIONS } from "../execution/response-views.js";
 import { SOURCE_ROUTES } from "../sources/contracts.js";
 import type { B07CommandId } from "../sources/contracts.js";
 import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
@@ -60,15 +64,15 @@ const DIALECT = "https://json-schema.org/draft/2020-12/schema";
  * The commands this edition serves, by registry id: the seven of B06 and, since mandate B07-COMMANDS, the six of the source
  * lifecycle (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths).
  */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId;
+export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId;
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
 /** The manual-10 reads this edition serves (re-check finding N16) and the reads of the source lifecycle (B07), by operation id. */
-export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId;
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId | ExecutionRouteId | AuditRouteId;
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
-/** The document intakes this edition serves (B07 D-SEL-2: the selection manifest), by operation id. */
-export type IntakeOperationId = SourceIntakeId;
+/** The document intakes this edition serves (B07 D-SEL-2: the selection manifest; B08 D8-PLAN-1: the decision artifact), by operation id. */
+export type IntakeOperationId = SourceIntakeId | AuditIntakeId;
 export type IntakeResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}intake:${IntakeOperationId}`;
 export type ResponseSchemaId = CommandResponseSchemaId | AcceptedResponseSchemaId | OperationalResponseSchemaId | ReadResponseSchemaId | IntakeResponseSchemaId;
 
@@ -386,7 +390,7 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
  * Every DTO definition of the served routes: B06's, then the source lifecycle's (sources/response-views, joined when mandate
  * B07-COMMANDS served its routes; design §9.5). A view is closed: a member not listed can never reach the wire.
  */
-export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([...B06_VIEW_DEFINITIONS, ...SOURCE_VIEW_DEFINITIONS]);
+export const VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([...B06_VIEW_DEFINITIONS, ...SOURCE_VIEW_DEFINITIONS, ...EXECUTION_VIEW_DEFINITIONS, ...AUDIT_VIEW_DEFINITIONS]);
 
 /**
  * The success reply of a served command: a COMPLETED envelope carrying a view at 200 or 201, or — CompleteUpload (CMD014), whose
@@ -404,6 +408,8 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD025: { status: 201, view: "ApprovePlanView" },
   CMD026: { status: 200, view: "WithdrawApprovalView" },
   ...SOURCE_COMMAND_RESPONSES,
+  ...EXECUTION_COMMAND_RESPONSES,
+  ...AUDIT_COMMAND_RESPONSES,
 });
 
 export const SERVED_COMMAND_IDS = Object.freeze(Object.keys(COMMAND_RESPONSES) as ServedCommandId[]);
@@ -429,6 +435,8 @@ export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: s
   GetUpload: { view: SOURCE_ROUTES.GetUpload.view },
   GetUploadSession: { view: SOURCE_ROUTES.GetUploadSession.view },
   PreviewTable: { view: SOURCE_ROUTES.PreviewTable.view },
+  GetJob: { view: EXECUTION_ROUTES.GetJob.view },
+  GetAudit: { view: AUDIT_ROUTES.GetAudit.view },
 });
 
 export const READ_OPERATION_IDS = Object.freeze(Object.keys(READ_RESPONSES) as ReadOperationId[]);
@@ -437,9 +445,10 @@ export function readResponseSchemaId(operationId: ReadOperationId): ReadResponse
   return `${RESPONSE_SCHEMA_PREFIX}read:${operationId}`;
 }
 
-/** The reply of every served document intake (B07 D-SEL-2): 201 when stored, 200 when the same document was already stored. */
+/** The reply of every served document intake (B07 D-SEL-2, B08 D8-PLAN-1): 201 when stored, 200 when the same document was already stored. */
 export const INTAKE_RESPONSES: Readonly<Record<IntakeOperationId, { readonly view: string }>> = Object.freeze({
   SubmitSelectionManifest: { view: SOURCE_ROUTES.SubmitSelectionManifest.view },
+  SubmitDecisionArtifact: { view: "DecisionArtifactIntakeView" },
 });
 
 export const INTAKE_OPERATION_IDS = Object.freeze(Object.keys(INTAKE_RESPONSES) as IntakeOperationId[]);
@@ -454,7 +463,7 @@ function intakeEnvelope(operationId: IntakeOperationId): JsonSchema {
     $id: intakeResponseSchemaId(operationId),
     title: `${operationId} STORED`,
     description:
-      "A document intake (B07 D-SEL-2): the stored document's identity; created false (200) when the same body was already stored for this revision (content-idempotent, no journal entry, no aggregate version), created true (201) when this request stored it.",
+      "A document intake (B07 D-SEL-2, B08 D8-PLAN-1): the stored document's identity; created false (200) when the same body was already stored for this revision or audit (content-idempotent, no journal entry, no aggregate version), created true (201) when this request stored it.",
     type: "object",
     additionalProperties: false,
     required: ["kind", "data"],

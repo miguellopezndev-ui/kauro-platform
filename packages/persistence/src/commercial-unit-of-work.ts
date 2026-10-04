@@ -1,6 +1,6 @@
 /**
  * The commercial unit of work of package B10 (@kauro/domain CommercialUnitOfWork; docs/design/B10-commercial-domain.md §11; D10-CTX-1):
- * B09's commerce unit of work — the same transaction on the same connection, context binding, publisher, journal and security
+ * B09's commerce unit of work (through B08's audit unit of work, D10-SYNC-2) — the same transaction on the same connection, context binding, publisher, journal and security
  * events — with the recurrence and founding repositories on that connection and the adoption of the agency of a durable work item
  * (`adoptAgency`, the commission and finance services only). Its factory routes the commission and finance services to the verified
  * kauro_commission pool beside B09's groups.
@@ -24,8 +24,8 @@ import type { PoolClient } from "pg";
 import { PgFoundingRepository } from "./repositories/commercial-founding.js";
 import { PgRecurrenceRepository } from "./repositories/commercial-recurrence.js";
 import {
-  PgCommerceUnitOfWork,
-  PgCommerceUnitOfWorkFactory,
+  PgAuditUnitOfWork,
+  PgAuditUnitOfWorkFactory,
   isCommissionServiceContext,
   type CommercePools,
   type TrackingIdGenerator,
@@ -38,7 +38,9 @@ export interface CommercialDependencies extends UnitOfWorkDependencies {
   readonly pricePolicies?: ReadonlyArray<PricePolicy>;
 }
 
-export class PgCommercialUnitOfWork extends PgCommerceUnitOfWork {
+// D10-SYNC-2: the commercial unit of work extends B08's audit unit of work (itself the execution unit of work over B09's commerce unit
+// of work), so the api's one routed request factory serves the commercial, execution and audit stores on the same connection.
+export class PgCommercialUnitOfWork extends PgAuditUnitOfWork {
   readonly recurrence: PgRecurrenceRepository;
   readonly founding: PgFoundingRepository;
 
@@ -65,7 +67,7 @@ export class PgCommercialUnitOfWork extends PgCommerceUnitOfWork {
   }
 }
 
-export class PgCommercialUnitOfWorkFactory extends PgCommerceUnitOfWorkFactory {
+export class PgCommercialUnitOfWorkFactory extends PgAuditUnitOfWorkFactory {
   readonly #pricePolicies: ReadonlyArray<PricePolicy>;
 
   constructor(pools: CommercePools, deps: CommercialDependencies) {

@@ -4,7 +4,9 @@
  * kauro_app, kauro_control, kauro_assurance, kauro_validator, kauro_ingress and kauro_payment), the harness of verified pools and
  * fixtures written through the adapters and the evidence recorders (with the commerce unit-of-work factory of package B09 and the
  * control plane's commerce configuration), the B07 source-lifecycle fixture (a revision sealed through the real upload,
- * inspection, selection, evaluation and seal path), the B09 purchase fixtures and the deterministic interleaving helpers
+ * inspection, selection, evaluation and seal path), the B09 purchase fixtures, the B08 execution fixtures (a job queued from a paid
+ * purchase, admitted, launched, staged, verified and published), the B08 audit fixture (the platform's funded model pool) and the
+ * deterministic interleaving helpers
  * (lock-wait observation, barrier).
  *
  * It is a separate export subpath so that no production import graph carries process-spawning test code: the package's
@@ -66,3 +68,24 @@ export type { LedgerLineInput, RecordedLine } from "./ledger-fixtures.js";
 // reservation of a quote and the commission lines of a closing agency
 export { publishAgreementVersions, reserveFoundingSlot, recordAcquisition, recordFirstPurchaseLine, makeLineEligible } from "./agency-fixtures.js";
 export type { PublishedAgreement, PublishedAgreements, AcquiredAgency, RecordedLine as AgencyRecordedLine } from "./agency-fixtures.js";
+// processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION): a job walked from a paid purchase along its edges
+export {
+  EXECUTION_FIXTURE_SERVICE,
+  EXECUTION_STAGING_LOCATION,
+  EXECUTION_DELIVERY_LOCATION,
+  EXECUTION_FIXTURE_CORE_VERSION,
+  controlOf,
+  queueJob,
+  admitJob,
+  launchJob,
+  fixtureGeneration,
+  fixtureArtifacts,
+  stageJob,
+  verifyJob,
+  publishJob,
+  endJob,
+} from "./execution-fixtures.js";
+export type { FixtureArtifact } from "./execution-fixtures.js";
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT): the owner's funding act of the platform's model pool (Q8-1)
+export { fundPlatformPool } from "./audit-fixtures.js";
+export type { FundedPoolOptions } from "./audit-fixtures.js";

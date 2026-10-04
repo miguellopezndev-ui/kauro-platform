@@ -7,6 +7,8 @@ import { test } from "node:test";
 import {
   acquisitionRate,
   COMMERCE_FAILURE_REASONS,
+  EXECUTION_FAILURE_REASONS,
+  AUDIT_FAILURE_REASONS,
   COMMERCIAL_FAILURE_REASONS,
   FAILURE_REASONS,
   foundingEligibility,
@@ -199,10 +201,13 @@ test("every B10 failure reason of design section 12 is registered once in FAILUR
     assert.equal(all.filter((x) => x === r).length, 1, `${r} is registered exactly once`);
     assert.match(r, /^[A-Z][A-Z0-9_]{2,63}$/);
   }
-  // appended after every earlier reason: the B06 and B07 reasons and B09's list keep their positions and none is a B10 reason
+  // appended after every earlier reason: the B06 and B07 reasons, B09's list and B08's lists (on main before B10, D10-SYNC-3) keep
+  // their positions and none is a B10 reason
   assert.deepEqual(all.slice(all.length - section12.length), section12, "appended at the end, once");
   const earlier = all.slice(0, all.length - section12.length);
-  assert.deepEqual(earlier.slice(earlier.length - COMMERCE_FAILURE_REASONS.length), [...COMMERCE_FAILURE_REASONS], "B09's reasons stand where they stood");
+  const b08 = [...EXECUTION_FAILURE_REASONS, ...AUDIT_FAILURE_REASONS];
+  assert.deepEqual(earlier.slice(earlier.length - b08.length), b08, "B08's reasons stand where they stood, after B09's");
+  assert.deepEqual(earlier.slice(earlier.length - b08.length - COMMERCE_FAILURE_REASONS.length, earlier.length - b08.length), [...COMMERCE_FAILURE_REASONS], "B09's reasons stand where they stood");
   for (const r of earlier) assert.ok(!section12.includes(r), `${r} is not redefined by B10`);
   assert.equal(new Set(all).size, all.length);
   // the ledger's hold reasons are not failure reasons: a held line is a state, never a refused request

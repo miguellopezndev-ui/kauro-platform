@@ -159,22 +159,24 @@ test("B10 mandates: tests first, one owner per test file, migration and fake, ev
   assert.match(design, new RegExp(`\\b${["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen"][mandates.length - 1]} mandates\\b`), "section 1 states the number of mandates");
 });
 
-test("B10 migrations: 0021..0027 are reservation files of B08's and B11's numbers, B10's own numbers start at 0028 without a gap, and the design's migration table is the mandates' migrations with their owners (D10-BASE-1)", () => {
+test("B10 migrations: 0025..0027 are reservation files of B11's numbers (B08 landed 0021..0024), B10's own numbers start at 0028 without a gap, and the design's migration table is the mandates' migrations with their owners (D10-BASE-1, D10-SYNC-1)", () => {
   const all = mandates.flatMap((m) => m.migrations.map((file) => ({ file, owner: m.key })));
   const numbers = all.map((x) => Number(/^(\d{4})_[a-z0-9_]+\.sql$/.exec(x.file)?.[1])).sort((a, b) => a - b);
-  assert.deepEqual(numbers, numbers.map((_, i) => 21 + i), "0021 upward without a gap");
+  assert.deepEqual(numbers, numbers.map((_, i) => 25 + i), "0025 upward without a gap");
   for (const { file } of all) {
     const n = Number(file.slice(0, 4));
-    if (n <= 23) assert.match(file, /^00(21|22|23)_reserved_b08\.sql$/, `${file}: B08 owns 0021..0023`);
-    else if (n <= 27) assert.match(file, /^00(24|25|26|27)_reserved_b11\.sql$/, `${file}: B11 owns 0024..0027`);
+    if (n <= 24) assert.fail(`${file}: 0021..0024 are B08's own files on main (D10-SYNC-1)`);
+    else if (n <= 27) assert.match(file, /^00(25|26|27)_reserved_b11\.sql$/, `${file}: B11 owns 0025..0027`);
     else assert.doesNotMatch(file, /reserved/, `${file}: B10's own number`);
   }
   assert.ok(numbers.includes(28), "B10 starts at 0028");
   const listed = design.split("\n").map((l) => /^\| (\d{4}_[a-z0-9_]+\.sql) \| .* \| (B10-[A-Z]+(?:-[A-Z]+)*) \|$/.exec(l)).filter((m) => m !== null);
   assert.deepEqual(listed.map((m) => `${m[1]} ${m[2]}`).sort(), all.map((x) => `${x.file} ${x.owner}`).sort(), "the design lists every mandate migration with its owner");
-  // main holds 0001..0020 (0019 B09's unknown_refund_cases, 0020 B07's source_object_holds) and nothing of B08, B10 or B11 yet
+  // main holds 0001..0024 (0019 B09's unknown_refund_cases, 0020 B07's source_object_holds, 0021..0024 B08's) and nothing of B10 or B11 yet
   const base = read("packages", "persistence", "test", "migrations.test.ts");
-  assert.match(base, /"0020_source_object_holds\.sql"/, "the base ends at 0020");
+  assert.match(base, /"0020_source_object_holds\.sql"/, "B07's 0020 is on the base");
+  assert.match(base, /"0024_execution_review_fixes\.sql"/, "the base ends at B08's 0024 (D10-SYNC-1)");
+  assert.equal(existsSync(join(root, "packages", "persistence", "migrations", "0024_reserved_b11.sql")), false, "no reservation shadows B08's 0024");
 });
 
 const STATUS_ROW = /^\| ([A-Z0-9-]+) \| (EXECUTED_LOCAL|PARTIAL) \| (\d+) EXECUTED_LOCAL, (\d+) SIMULATED — [^|]+ \| ([^|]+) \|$/;

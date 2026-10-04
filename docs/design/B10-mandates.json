@@ -66,10 +66,6 @@
       "depends_on": [],
       "owns_fakes": [],
       "migrations": [
-        "0021_reserved_b08.sql",
-        "0022_reserved_b08.sql",
-        "0023_reserved_b08.sql",
-        "0024_reserved_b11.sql",
         "0025_reserved_b11.sql",
         "0026_reserved_b11.sql",
         "0027_reserved_b11.sql",

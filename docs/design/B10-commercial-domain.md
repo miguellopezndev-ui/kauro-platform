@@ -387,15 +387,11 @@ ACCRUED_PENDING → HELD in one transaction). B09's Quote machine: B10 performs 
 | CommissionHold | OPEN | hold_upheld | UPHELD | B12 | reviewed decision; an AGREED_ERROR_CORRECTION adjustment |
 | CommissionPeriod | OPEN | period_closed | CLOSED | CMD051 | inputs reconciled; cutoff hash equal |
 
-## 9. Migrations 0021–0034
+## 9. Migrations 0025–0034
 
 | file | content | mandate |
 |---|---|---|
-| 0021_reserved_b08.sql | reservation of B08's number: a header and `SELECT 1;` (D10-BASE-1) | B10-SCHEMA-RECURRENCE |
-| 0022_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
-| 0023_reserved_b08.sql | reservation of B08's number | B10-SCHEMA-RECURRENCE |
-| 0024_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
-| 0025_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
+| 0025_reserved_b11.sql | reservation of B11's number: a header and `SELECT 1;` (D10-BASE-1; B08 landed 0021–0024, D10-SYNC-1) | B10-SCHEMA-RECURRENCE |
 | 0026_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
 | 0027_reserved_b11.sql | reservation of B11's number | B10-SCHEMA-RECURRENCE |
 | 0028_recurrence_founding_agency.sql | group `kauro_commission`; `agency_recurrence`, `qualifying_purchases`, the designation trigger on `commercial_authorizations`, the recurrence-lock triggers on `refunds` and `capture_facts`, `kauro.qualifying_projects_at`, `kauro.eligibility_findings`; `founding_slots` (seeded 1..3 for R2-INITIAL), `founding_slot_reservations`, `quote_issuances`; `service_agreement_versions`, `agency_agreement_acceptances`, `agency_closures`, `agency_relationship_decisions`, `agencies_closure_residuals`, the set-once first designation on `agencies`; `agency.first_purchase_designated.v1`; subscriptions `capture.funds_observed.v1` and `commercial_authorization.delivered.v1` → COMMISSIONS; quote expiry grants for `kauro_commission`; machine FoundingReservation; `commercial_transitions` history | B10-SCHEMA-RECURRENCE |
@@ -522,10 +518,10 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 ## 15. Integration obligations
 
 1. **B08**: perform the DELIVERED edge that `AuthorizationDeliveryCompletionSource` reads as the FINAL completion of a single-stage
-   purchase (0028 routes `commercial_authorization.delivered.v1` to COMMISSIONS); renumber nothing (B08 owns 0021–0023): the integrator deletes `0021_reserved_b08.sql` …
-   `0023_reserved_b08.sql` when B08's files land (the runner's "duplicate migration version" makes a miss loud).
+   purchase (0028 routes `commercial_authorization.delivered.v1` to COMMISSIONS); renumber nothing: B08's 0021–0024 landed on main (4b086c3) and the trunk sync deleted `0021_reserved_b08.sql` …
+   `0024_reserved_b11.sql` (D10-SYNC-1).
 2. **B11**: bind BuyerTypeReader to W6's `agency_buyer_types` (CMD027 refuses a quote while it is unset; CMD047 refuses an unset or IN_HOUSE agency);
-   bind FoundingOfferReader to the pricing page's founding line; delete `0024_reserved_b11.sql` … `0027_reserved_b11.sql` (B11 owns 0024–0027).
+   bind FoundingOfferReader to the pricing page's founding line; delete `0025_reserved_b11.sql` … `0027_reserved_b11.sql` (B11 owns 0025–0027 and its fourth file takes a number after B10's; D10-SYNC-1).
 3. **B12**: the prospect-stage, seller suspension, destination, dispute and hold edges of §8 marked B12; the seller and owner screens
    read B10's views; outreach (CMD061–CMD064) respects `prospect_suppressions`.
 4. **B13**: the FINAL completion of a staged purchase through PreparationCompletionSource.
@@ -624,6 +620,9 @@ B10-INTEGRATION). Events B10 publishes: `agency.activated.v1`, `agency.closing.v
 | D10-INT-1 | The loser of CMD050 against CMD047 waits on the claim's transition lock (the shared row both commands contest: the seller row is only read by AcceptAttribution), and when TerminateSeller wins its AcceptAttribution on the version the owner had read is 409 STALE_VERSION naming the claim EXPIRED (B06's version check precedes the state check); the owner's retry on that version is the 409 CLAIM_NOT_REVIEWABLE | CMD050-RACE; D10-TERM-1; B06 compare-and-set; example 13 |
 | D10-INT-2 | PERIODS joins the commission service's cycle: `runCycle` runs the five sweeps and then PERIODS (open the month the server stands in, close each due period through CMD051 under `period-close-<periodId>`) with the banking calendar and hold `createCommissionService({ periods })` is given (the platform's recorded calendar when absent); `also` still adds sweeps after it | §14; D10-CAL-1, D10-STMT-1, D10-BIND-1 |
 | D10-INT-3 | The end-to-end scenarios run the public commands at the database's own instant; a leg that must stand at another instant (a capture confirmed after a window's or a tail's end) is confirmed by the payment service on the labelled TEST CLOCK over an order CreatePaymentOrder created, and a leg that needs a statement closes its period with the service route standing on the TEST CLOCK | D10-CLOCK-1; examples 3 and 13 |
+| D10-SYNC-1 | The trunk sync with main `4b086c3` (B08 landed: 0021–0023 and its review migration `0024_execution_review_fixes.sql`, D8-REV-1) deletes the reservations 0021–0023 of B08 and also `0024_reserved_b11.sql`, whose number B08's review migration took; B11 keeps 0025–0027 reserved and its fourth migration takes the first number after B10's last (0035 today). B10's own numbers 0028–0034 are unchanged, so no B10 lane commit the case map cites is renumbered; `migrations.test.ts`, the mandates' migration lists, §9 and the case-map test's reservation rule follow | runner.ts "duplicate migration version"; D10-BASE-1; B08 D8-REV-1 |
+| D10-SYNC-2 | The api's one routed request factory serves B08 and B10 at once: `PgCommercialUnitOfWork` now extends B08's `PgAuditUnitOfWork` (execution and audit stores on the same connection) instead of B09's commerce unit of work, and `PgCommercialUnitOfWorkFactory` extends `PgAuditUnitOfWorkFactory`, so `createCommercialUnitOfWorkFactory` satisfies the composition's `RequestUnitOfWorkFactory` (an `AuditUnitOfWorkFactory`) and `recurrenceOf`/`executionReadsOf`/`auditReadsOf` all accept the same unit of work. The routing (B09's groups and the kauro_commission pool) is unchanged; no B08 or B10 member was dropped | B08 D8-XPKG-10 ("the one routed factory … never a fork"); D10-CTX-1 |
+| D10-SYNC-3 | B08 reached main first, so B10's members of the shared registries stand after B08's: `FAILURE_REASONS`, `EVENT_TYPES`, `EVENT_PAYLOAD_ALLOWLIST` and `EVENT_SUBSCRIPTIONS` list B06/B07, B09, B08 (execution, audit) and then B10. Both packages subscribe to `commercial_authorization.delivered.v1` (B08 NOTIFICATIONS, B10 COMMISSIONS), so it now has both consumers; the B10 and B08 domain tests state the union instead of a single consumer, and the B10 failure-reason test checks that B09's and B08's lists keep their places before B10's | §9 (events), §12; B08 §11 |
 
 ## 17. Open questions for the authority
 

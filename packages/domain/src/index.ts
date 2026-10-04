@@ -207,3 +207,9 @@ export type { CommercialPlatformMachineName } from "./commercial/machines.js";
 export { COMMERCIAL_PLATFORM_MACHINES } from "./commercial/machines.js";
 export type { CommercialEventType } from "./commercial/events.js";
 export { COMMERCIAL_EVENT_TYPES, COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS } from "./commercial/events.js";
+
+// processing authority (package B08; docs/design/B08-audit-approval-jobs.md)
+export * from "./model/execution/index.js";
+
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md)
+export * from "./model/audit/index.js";

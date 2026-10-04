@@ -276,5 +276,6 @@ test("B10 events: agency.first_purchase_designated.v1 is registered once with an
   );
   for (const s of COMMERCIAL_EVENT_SUBSCRIPTIONS) assert.equal(EVENT_SUBSCRIPTIONS.filter((x) => x.eventType === s.eventType && x.consumer === s.consumer).length, 1, `${s.eventType} -> ${s.consumer} once`);
   assert.deepEqual(consumersOf("capture.funds_observed.v1"), ["FINANCE", "COMMISSIONS"]);
-  assert.deepEqual(consumersOf("commercial_authorization.delivered.v1"), ["COMMISSIONS"]);
+  // B08 (on main before B10) routes the delivery to NOTIFICATIONS; B10 appends COMMISSIONS after it (D10-SYNC-3)
+  assert.deepEqual(consumersOf("commercial_authorization.delivered.v1"), ["NOTIFICATIONS", "COMMISSIONS"]);
 });

@@ -103,6 +103,21 @@ const NEXT_ACTIONS: Readonly<Record<FailureCode, ReadonlyArray<NextAction>>> = O
   INTERNAL_ERROR: [{ action: "RETRY_SAME_KEY" }],
 });
 
+/**
+ * Reasons whose next step is not the code's: a job that already ended or was delivered is final, so reloading it or retrying changes nothing
+ * and the answer offers no action (CancelJob, D8-CMD-2). Every other reason keeps the code's actions.
+ */
+const REASON_NEXT_ACTIONS: Readonly<Record<string, ReadonlyArray<NextAction>>> = Object.freeze({
+  JOB_TERMINAL: [],
+  AUDIT_TERMINAL: [],
+  JOB_ALREADY_READY: [],
+});
+
+function nextActionsOf(failure: DomainFailure): ReadonlyArray<NextAction> {
+  const reason = failure.details.reason;
+  return (reason === undefined ? undefined : REASON_NEXT_ACTIONS[reason]) ?? NEXT_ACTIONS[failure.code];
+}
+
 /** Builds the wire problem for a domain failure; the message of the failure never leaves the server. */
 export function problemOf(failure: DomainFailure, correlationId: string): Problem {
   const d = failure.details;
@@ -113,7 +128,7 @@ export function problemOf(failure: DomainFailure, correlationId: string): Proble
     code: failure.code,
     correlationId,
     retryable: failure.retryable || RETRYABLE_CODES.has(failure.code),
-    nextActions: NEXT_ACTIONS[failure.code],
+    nextActions: nextActionsOf(failure),
   };
   return {
     ...base,

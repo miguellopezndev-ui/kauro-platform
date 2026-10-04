@@ -1,7 +1,7 @@
 {
   "name": "@kauro/control",
   "version": "0.1.0",
-  "description": "Kauro control plane: the outbox dispatcher over the B06 dispatch store and leases, the source-lifecycle consumers (UPLOAD_INSPECTION, SELECTION_EVALUATION, STORAGE_LIFECYCLE, AUTHORITY_JOURNAL) and the source sweepers (upload deadlines, provider session reconciliation, retention, object inventory, deletion retries, location policy), each in SYSTEM units of work bound to the work item's agency, revision row first.",
+  "description": "Kauro control plane: the outbox dispatcher over the B06 dispatch store and leases, the source-lifecycle consumers (UPLOAD_INSPECTION, SELECTION_EVALUATION, STORAGE_LIFECYCLE, AUTHORITY_JOURNAL) the source sweepers (upload deadlines, provider session reconciliation, retention, object inventory, deletion retries, location policy), and — where the execution providers are bound — processing and audit authority's consumers (JOB_EXECUTION, EXECUTION_CONTROL, AUDIT_ORCHESTRATION, PLAN_VALIDATION) and sweepers (JOB_ADMISSION, ATTEMPT_MONITOR, JOB_DEADLINES, STAGING_JANITOR, AUDIT_DEADLINES, GRANT_RECONCILIATION), each in SYSTEM units of work bound to the work item's agency.",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
