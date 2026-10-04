@@ -53,6 +53,9 @@ function routedClient(route: Route): PoolClient {
         return (...args: unknown[]) => {
           const first = args[0];
           const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
+          // every step counts the statements it matches (its regex and its `when`), whichever step instruments the statement, so two steps of one
+          // statement text with their own `nth` (the first and the second line insert of a unit) each count from the unit's first
+          let hit: SqlStep | null = null;
           for (const step of route.steps) {
             if (!step.match.test(text)) continue;
             if (step.when !== undefined && !step.when((args[1] as ReadonlyArray<unknown> | undefined) ?? [])) continue;
@@ -61,8 +64,9 @@ function routedClient(route: Route): PoolClient {
               route.seen!.set(step.label, n);
               if (n !== step.nth) continue;
             }
-            return instrumented.get(step.label)!(...args);
+            hit ??= step;
           }
+          if (hit !== null) return instrumented.get(hit.label)!(...args);
           return (target.query as (...x: unknown[]) => unknown)(...args);
         };
       }

@@ -198,6 +198,7 @@ export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (
   const settled = (o: PromiseSettledResult<T>) => new InterleavingNotObserved(`${what} ${o.status === "fulfilled" ? "finished" : `failed (${o.reason instanceof Error ? o.reason.message : String(o.reason)})`} without waiting on ${probe.holder}'s lock`);
   const deadline = Date.now() + limitMs;
   let seen = "never waited on a lock";
+  let lag = 0;
   try {
     for (;;) {
       if (outcome) throw settled(outcome);
@@ -210,12 +211,23 @@ export async function mustWait<T>(oracle: Client, probe: WaitProbe, operation: (
       const row = r.rows[0];
       if (row?.waiting === true) {
         const statement = row.query ?? "";
-        // the operation's own statement: its unique tag, issued in its scope on this connection, and the one the driver is running
-        const mine = own.events.find((e): e is StatementEvent => e.kind === "STATEMENT" && e.session === raw && e.tag !== undefined && statement.startsWith(`/* ${e.tag} */`));
-        if (mine === undefined) throw new InterleavingNotObserved(`${what}: the connection waits in a statement the operation did not issue (${statement.slice(0, 120)})`);
-        if (!mine.dispatched || mine.settled || internals._activeQuery !== driverQuery.get(mine)) throw new InterleavingNotObserved(`${what}: the waiting statement is not the one the driver is running for the operation`);
-        if (row.blockers.map(Number).includes(probe.holder)) return { pending };
-        seen = `waited on ${row.blockers.join(", ") || "nobody"}, never on the holder ${probe.holder}`;
+        if (!row.blockers.map(Number).includes(probe.holder)) {
+          // a lock wait on someone else (a short-lived writer of another unit): not the observation, looked at again until the deadline
+          seen = `waited on ${row.blockers.join(", ") || "nobody"}, never on the holder ${probe.holder}`;
+        } else {
+          // the wait on the holder: its own statement is the operation's (its unique tag, issued in its scope on this connection) and the one the driver is running
+          const mine = own.events.find((e): e is StatementEvent => e.kind === "STATEMENT" && e.session === raw && e.tag !== undefined && statement.startsWith(`/* ${e.tag} */`));
+          if (mine === undefined) throw new InterleavingNotObserved(`${what}: the connection waits in a statement the operation did not issue (${statement.slice(0, 120)})`);
+          if (!mine.dispatched || mine.settled || internals._activeQuery !== driverQuery.get(mine)) {
+            // the driver's bookkeeping can trail the server by a tick (a statement just dispatched or just answered): looked at again a few times,
+            // a wait that is still not the driver's running statement is refused
+            if (++lag > 25) throw new InterleavingNotObserved(`${what}: the waiting statement is not the one the driver is running for the operation`);
+            seen = "waited on the holder in a statement the driver was not yet running";
+            await new Promise((res) => setTimeout(res, 10));
+            continue;
+          }
+          return { pending };
+        }
       }
       if (Date.now() > deadline) throw new InterleavingNotObserved(`${what} neither finished nor waited on ${probe.holder}'s lock within ${limitMs} ms (it ${seen})`);
       await new Promise((res) => setTimeout(res, 10));

@@ -335,7 +335,7 @@ export interface SalesRepository {
   getSeller(sellerId: SellerId): Promise<SellerRecord | null>;
   /** The seller row FOR UPDATE with the exclusive half of `kauro.sellers` (CMD049, CMD050). */
   lockSeller(sellerId: SellerId): Promise<SellerRecord | null>;
-  /** The agencies the seller's open claims and current operational assignments name, ascending: what CMD050 locks before its first claim (D10-GAP-20). */
+  /** The agencies the seller's open claims, current operational assignments and live (ACTIVE, DISPUTED) entitlements name, ascending: what CMD050 locks before its first claim (D10-GAP-20, D10-GAP-22). */
   agenciesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<AgencyId>>;
   transitionSeller(sellerId: SellerId, expectedVersion: number, change: SellerChange, now: UtcInstant): Promise<VersionedWrite<SellerRecord>>;
   getAgreement(agreementId: SellerAgreementId): Promise<SellerAgreementRecord | null>;
@@ -605,8 +605,21 @@ export interface CommissionLedgerRepository {
   openHold(hold: NewCommissionHold): Promise<CommissionHoldRecord>;
   resolveHold(holdId: CommissionHoldId, expectedVersion: number, state: Exclude<CommissionHoldState, "OPEN">, now: UtcInstant): Promise<VersionedWrite<CommissionHoldRecord>>;
   holdsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionHoldRecord>>;
+  /**
+   * The exclusive half of the transition subject of every line of the capture, ascending, held to COMMIT, after the caller took the pools' and
+   * lines' row locks (lockPoolsOfCapture): what every writer of a funds fact takes before it inserts the fact, so that CMD052's funds read
+   * (kauro.payout_lines_unpayable, the shared half of the same subjects) is ordered against it (D10-GAP-24).
+   */
+  fenceLinesOfCapture(captureId: CaptureId): Promise<void>;
   /** The ELIGIBILITY sweep's work: ACCRUED_PENDING and HELD lines whose purchase has a FINAL completion due at `now`. */
   linesDueForEligibility(now: UtcInstant, limit: number): Promise<ReadonlyArray<CommissionLineRecord>>;
+  /**
+   * Whether the line is due for ELIGIBLE at `now`, read with the line's row locked by the caller: the same conditions as
+   * linesDueForEligibility (FINAL completion 720 hours old, the capture's latest funds observation AVAILABLE, no OPEN hold covering the
+   * unpaid amount), asked again after the lock, so a funds fact, a hold or an adjustment that committed while the caller waited is seen
+   * (D10-GAP-21).
+   */
+  lineDueForEligibility(lineId: CommissionLineId, now: UtcInstant): Promise<boolean>;
   /** The ACCRUAL_RECONCILIATION sweep's work: purchases lacking the pool of an applicable entitlement. */
   purchasesLackingPools(limit: number): Promise<ReadonlyArray<QualifyingPurchaseRecord>>;
   /**
