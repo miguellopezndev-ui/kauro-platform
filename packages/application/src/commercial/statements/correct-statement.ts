@@ -1,6 +1,6 @@
 /**
- * CMD051 correcting statement (registry CommissionStatement ISSUED or DISPUTED to CORRECTED on correction_issued, "a correcting statement
- * supersedes it"; design section 7 CMD051, section 8.1; ruling R-GAP-3; decision D10-GAP-7) — COMMISSION_SERVICE — no route and no provider
+ * CMD051 correcting statement (design platform machine CommissionStatement ISSUED or DISPUTED to CORRECTED on correction_issued, "a correcting statement
+ * supersedes it"; design section 7 CMD051, section 8.2, not the registry; ruling R-GAP-3; decision D10-GAP-7) — COMMISSION_SERVICE — no route and no provider
  * effect.
  *
  * One SERVICE unit of work of the commission group with no agency, after the service's access decision and its journal reservation (the
