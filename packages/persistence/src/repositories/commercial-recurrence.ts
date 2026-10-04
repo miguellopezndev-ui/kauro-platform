@@ -363,6 +363,16 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
     return { ...issuance, issuedAt: instant(stored.rows[0]!.issued_at) };
   }
 
+  /**
+   * The agency row FOR UPDATE: §10's global order puts the agency before the prospect, claim and entitlement, and the COMMISSIONS consumer
+   * takes it first (mirrorFirstDesignation). The conversion of the sweeps takes it before its first claim lock, so a conversion and the
+   * consumer's cannot each hold what the other waits for (D10-GAP-17).
+   */
+  async lockAgency(agencyId: AgencyId): Promise<void> {
+    const locked = await execute(this.db, "SELECT 1 FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE", [agencyId]);
+    if (locked.rows[0] === undefined) throw new DomainFailure("NOT_FOUND", "the agency is not visible in this context");
+  }
+
   async mirrorFirstDesignation(agencyId: AgencyId, _now: UtcInstant): Promise<{ readonly mirrored: boolean; readonly agency: AgencyDesignation }> {
     // the agency row first (its lock), then the set-once mirror of the capture of sequence 1
     const locked = await execute<{ first_qualifying_capture_id: string | null }>(this.db, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE", [agencyId]);

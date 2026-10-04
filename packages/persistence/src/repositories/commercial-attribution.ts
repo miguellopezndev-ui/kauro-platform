@@ -251,6 +251,26 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0] ? claimRecord(r.rows[0]) : null;
   }
 
+  /**
+   * Whether the claim's agency's first designation admits its conversion, by the database's own comparison and at its own grain (the
+   * microsecond; the conversion guard `attribution_claims_ending` is the same condition): the first purchase confirmed before the claim's end
+   * (its termination tail's end when a termination enumerated it, else its acceptance window's) and the claim submitted before that purchase's
+   * order. Never decided in JavaScript milliseconds: a confirmation inside the millisecond before the end is before it (D10-GAP-18).
+   */
+  async convertibleAtFirstPurchase(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ ok: boolean }>(
+      this.db,
+      `SELECT (r.first_confirmed_at < coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at)
+                AND c.submitted_at < q.order_created_at) AS ok
+         FROM kauro.attribution_claims c
+         JOIN kauro.agency_recurrence r ON r.agency_id = c.agency_id
+         JOIN kauro.qualifying_purchases q ON q.agency_id = r.agency_id AND q.authorization_id = r.first_authorization_id
+        WHERE c.claim_id = $1`,
+      [claimId],
+    );
+    return r.rows[0]?.ok === true;
+  }
+
   async claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>> {
     const r = await execute<ClaimRow>(this.db, `SELECT ${CLAIM} FROM kauro.attribution_claims WHERE prospect_id = $1 ORDER BY submitted_at, claim_id`, [prospectId]);
     return r.rows.map(claimRecord);

@@ -10,16 +10,19 @@
 // The founding cohort's three slots serve this whole file: the cells that need a live reservation run first (TRG_PAR T2 and T3, TRG_CRASH
 // RETRY), the others run without one and assert that they have none.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
-import { crashedAt, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import type { WebhookAck } from "@kauro/application";
+import { after, before, test } from "node:test";
+import { connectionPid, crashedAt, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import type { AttributionView, SellerTerminationView, WebhookAck } from "@kauro/application";
 import { deliver } from "./payment-support.js";
-import { agentOf, integrationWorld, oracleRows, orderedThrough, planOf, quoted, type IntegrationWorld } from "./integration-support.js";
+import { agentOf, integrationWorld, opportunityOf, oracleRows, orderedThrough, planOf, quoted, terminatedThrough, terminationBody, webhookPurchase, type Agent, type IntegrationWorld } from "./integration-support.js";
+import { seller } from "./statements-support.js";
+import type { RecordedSeller } from "@kauro/persistence/testing";
 import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { createCommissionService, type CommissionService } from "../src/index.js";
 import type { CommissionSweepName } from "../src/commissions/sweeps.js";
-import { completed, ids } from "./support.js";
+import { prepareAllocation } from "./sales-support.js";
+import { call, completed, freshKey, ids, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -393,14 +396,14 @@ function convertedFor(c: { readonly att: Attribution }, shares: ReadonlyArray<nu
 }
 
 /** The consumer's delivery on `conn` (the unit routed over it), the service's units standing at `at` on the TEST CLOCK when given. */
-function consumeOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, delivery: Delivery, steps: ReadonlyArray<SqlStep> = [], at: string | null = null): Promise<string> {
-  iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.consumer.handle(delivery as never)).finally(() => iw.standAt(null));
+function consumeOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, delivery: Delivery, steps: ReadonlyArray<SqlStep> = [], at?: string): Promise<string> {
+  if (at !== undefined) iw.standAt(at);
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.consumer.handle(delivery as never)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
 }
 /** One pass of a sweep on `conn`. */
-function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at: string | null = null) {
-  iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.runSweep(sweep)).finally(() => iw.standAt(null));
+function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at?: string) {
+  if (at !== undefined) iw.standAt(at);
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.runSweep(sweep)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
 }
 const itemOf = (report: { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> }, subject: string): string | undefined => report.items.find((i) => i.subject === subject)?.outcome;
 
@@ -651,5 +654,419 @@ faultCell(
     assert.deepEqual(await rightsOf(c), nothingFor(c), "the whole conversion rolled back");
     assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 2");
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares));
+  },
+);
+
+// =====================================================================================================================================
+// 26. CLAIM_TAIL: an ACCEPTED claim a termination listed ends at its TAIL's end, not at its acceptance window's (D10-TERM-1, D10-TERM-2)
+// =====================================================================================================================================
+// A claim accepted through CMD047, then its seller terminated through the real CMD050 with the claim listed: the claim keeps running 2160
+// hours from the termination, a few hundred milliseconds beyond its own acceptance window. Every instant a cell uses is read from the
+// database (whole milliseconds, like the tail end itself), and the expiry cells put it on the transaction of the operation that consumes it
+// through the controlled clock (op.clock.onServer: the first purchase's reconciliation, the CLAIM_WINDOWS sweep's units), so "after the
+// original expires_at and before the tail end" and "at the exact tail end" are exact, and the harness proves each was crossed and consumed.
+
+interface Tail {
+  readonly label: string;
+  readonly D: Awaited<ReturnType<typeof seller>>;
+  readonly a: Agent;
+  readonly agencyId: string;
+  readonly claimId: string;
+  readonly att: { readonly claimIds: ReadonlyArray<string>; readonly sellers: ReadonlyArray<RecordedSeller> };
+  /**
+   * The claim's own acceptance window's end, an instant between it and the tail's end, the whole millisecond before the one in which the tail
+   * ends, and the first whole millisecond not before the tail's end (UTC; the controlled clock's grain); and the tail's end itself as the
+   * database holds it, with its microseconds.
+   */
+  readonly expiresAt: string;
+  readonly afterExpiry: string;
+  readonly beforeEnd: string;
+  readonly tailEnd: string;
+  readonly exactEnd: string;
+}
+
+const ISO = (expr: string): string => `to_char((${expr}) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+
+async function tailed(label: string): Promise<Tail> {
+  const D = await seller(iw, label);
+  const op = await opportunityOf(iw, D, label);
+  const done = await terminatedThrough(iw, D.sellerId, await terminationBody(iw, D.sellerId, [op.claimId]));
+  assert.equal(done.tailEntries, 1);
+  const [t] = await oracleRows<{ expires_at: string; after_expiry: string; before_end: string; tail_end: string; exact_end: string; gap_ms: number }>(
+    iw,
+    `SELECT ${ISO("date_trunc('milliseconds', c.expires_at)")} AS expires_at, ${ISO("date_trunc('milliseconds', c.expires_at + (e.tail_end - c.expires_at) / 2)")} AS after_expiry,
+            ${ISO("date_trunc('milliseconds', e.tail_end) - interval '1 millisecond'")} AS before_end,
+            ${ISO("date_trunc('milliseconds', e.tail_end) + CASE WHEN date_trunc('milliseconds', e.tail_end) = e.tail_end THEN interval '0' ELSE interval '1 millisecond' END")} AS tail_end,
+            e.tail_end::text AS exact_end, (extract(epoch FROM e.tail_end - c.expires_at) * 1000)::float AS gap_ms
+       FROM kauro.attribution_claims c, LATERAL (SELECT max(t.ends_at) AS tail_end FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id) e WHERE c.claim_id = $1`,
+    [op.claimId],
+  );
+  assert.ok(t!.gap_ms > 10, `the tail ends ${t!.gap_ms} ms after the claim's own acceptance window: room for an instant between them`);
+  return { label, D, a: op.a, agencyId: op.a.s.agency.agencyId, claimId: op.claimId, att: { claimIds: [op.claimId], sellers: [D] }, expiresAt: t!.expires_at, afterExpiry: t!.after_expiry, beforeEnd: t!.before_end, tailEnd: t!.tail_end, exactEnd: t!.exact_end };
+}
+
+/**
+ * The agency's first purchase through the REAL webhook (CMD030, the real reconciler): the quote, the order and the provider's capture are made
+ * now; the reconciliation's transaction is positioned on the cell's controlled clock (`ctx.clock`, already moved to `confirmedAt`) so the
+ * confirmation instant is the one the cell chose, consumed by this operation.
+ */
+async function firstPurchaseAt(ctx: FaultContext, t: Tail, confirmedAt: string): Promise<Purchase & { readonly delivery: Delivery }> {
+  const quote = await quoted(iw, t.a, await planOf(iw, t.a, t.label, { units: 50_000 }));
+  const order = await orderedThrough(iw, t.a, quote);
+  iw.pw.paypal.approve(order.order.providerOrderId!);
+  const providerCaptureId = iw.pw.paypal.captureAtProvider(order.order.providerOrderId!);
+  const seen = iw.pw.backgroundFailures.length;
+  ctx.clock.set(confirmedAt);
+  const delivery = await ctx.operation("the reconciler confirming the first purchase on the controlled clock", async (op) => {
+    iw.faults.clock = op.clock;
+    try {
+      return await iw.faults.onPayment(ctx.points, () => deliver(iw.pw, "PAYMENT.CAPTURE.COMPLETED", providerCaptureId));
+    } finally {
+      iw.faults.clock = null;
+    }
+  });
+  assert.equal(completed<WebhookAck>(delivery.reply, 200).data.inboxState, "APPLIED", `the reconciliation applied (${String((iw.pw.backgroundFailures[seen] as { error?: unknown } | undefined)?.error)})`);
+  const p = await webhookPurchase(iw, quote, order, providerCaptureId);
+  const [row] = await oracleRows<{ same: boolean }>(iw, "SELECT confirmed_at = $2::timestamptz AS same FROM kauro.qualifying_purchases WHERE authorization_id = $1", [p.authorizationId, confirmedAt]);
+  assert.equal(row!.same, true, "the purchase is confirmed at the instant the cell chose");
+  return { ...p, delivery: await deliveryOfCapture(p) };
+}
+const claimStateOf = async (claimId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]))[0]!.state;
+const entitlementsOfAgency = async (agencyId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.commission_entitlements WHERE agency_id = $1", [agencyId]))[0]!.n;
+
+for (const via of ["consumer", "sweep"] as const) {
+  faultCell(
+    {
+      id: "CLAIM_TAIL",
+      step: `Claim conversion and entitlement creation (${via === "consumer" ? "COMMISSIONS consumer" : "ACCRUAL_RECONCILIATION"}), the first purchase's confirmation against the tail end of a listed claim`,
+      fault: "expiry",
+      expect:
+        "EXPIRY: a first purchase confirmed after the claim's own expires_at and before its termination tail's end still converts it (one entitlement for the departed seller, the claim CONVERTED); confirmed in the millisecond before the one the tail ends in it converts; confirmed at the first millisecond not before the tail end it does not: the claim stays ACCEPTED and nothing accrues (the purchase's own confirmation instant decides)",
+    },
+    async (ctx) => {
+      // three tails, made in this order, so that every instant below is after the previous one (the controlled clock never moves back)
+      const tails = [await tailed(`tail-${via}-a`), await tailed(`tail-${via}-b`), await tailed(`tail-${via}-c`)] as const;
+      const cases = [
+        { which: "after the claim's own expires_at, inside the tail", t: tails[0], at: tails[0].afterExpiry, deadline: tails[0].expiresAt, what: "the claim's own acceptance window's end", claim: "CONVERTED" },
+        { which: "the millisecond before the one the tail ends in", t: tails[1], at: tails[1].beforeEnd, deadline: tails[1].expiresAt, what: "the claim's own acceptance window's end", claim: "CONVERTED" },
+        { which: "the first millisecond not before the tail end", t: tails[2], at: tails[2].tailEnd, deadline: tails[2].tailEnd, what: "the termination tail's end", claim: "ACCEPTED" },
+      ] as const;
+      assert.ok(cases.every((c, i) => i === 0 || Date.parse(c.at) > Date.parse(cases[i - 1]!.at)), "the instants increase");
+      for (const c of cases) ctx.deadline(c.deadline, c.what);
+      for (const { which, t, at, claim } of cases) {
+        const p = await firstPurchaseAt(ctx, t, at);
+        assert.equal(await claimStateOf(t.claimId), "ACCEPTED", `${which}: the listed claim is still ACCEPTED when the purchase confirms`);
+        if (via === "consumer") await svc.consumer.handle(p.delivery as never);
+        else assert.match(itemOf(await svc.runSweep(RECONCILIATION), t.agencyId) ?? "", /^(CONVERTED \d|NOTHING_TO_CONVERT)$/);
+        assert.equal(await claimStateOf(t.claimId), claim, `${which}: the claim`);
+        if (claim === "CONVERTED") {
+          const rights = await rightsOf({ att: t.att as Attribution, agencyId: t.agencyId, first: p });
+          assert.deepEqual([rights.entitlements.map((e) => e[0]), rights.pools, rights.lines], [[t.D.sellerId], 1, 1], `${which}: one entitlement for the departed seller, and the purchase accrued for it`);
+        } else {
+          assert.equal(await entitlementsOfAgency(t.agencyId), 0, `${which}: no entitlement`);
+          assert.deepEqual([(await poolsOf(iw, p.authorizationId)).length, (await linesOf(iw, p.authorizationId)).length], [0, 0], `${which}: nothing accrues`);
+        }
+      }
+    },
+  );
+}
+
+// --- W2: the CLAIM_WINDOWS sweep and a claim in its tail --------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "CLAIM_TAIL",
+    step: "Sweep CLAIM_WINDOWS, an ACCEPTED claim a termination listed, run after its own expires_at, just before and at its tail's end",
+    fault: "expiry",
+    expect:
+      "EXPIRY: the sweep run after the claim's own expires_at and before its termination tail's end leaves the claim ACCEPTED (applying the acceptance deadline here would forfeit earned acquisition rights); run at the first millisecond not before the tail end it lapses the claim EXPIRED at that instant",
+  },
+  async (ctx) => {
+    const t = await tailed("tail-w2-expiry");
+    ctx.deadline(t.expiresAt, "the claim's own acceptance window's end");
+    ctx.deadline(t.tailEnd, "the termination tail's end");
+    assert.ok(Date.parse(t.afterExpiry) > Date.parse(t.expiresAt) && Date.parse(t.beforeEnd) < Date.parse(t.tailEnd));
+    const conn = await open("kauro_commission_test");
+    /** One pass of CLAIM_WINDOWS whose every unit of work is positioned on the controlled clock at `at`, the pass being the operation that consumes it. */
+    const passAt = async (at: string) => {
+      ctx.clock.set(at);
+      return ctx.operation(`the CLAIM_WINDOWS pass standing at ${at}`, async (op) => {
+        iw.faults.clock = op.clock;
+        try {
+          return await sweepOn(ctx, conn, "CLAIM_WINDOWS");
+        } finally {
+          iw.faults.clock = null;
+        }
+      });
+    };
+    try {
+      assert.equal(itemOf(await passAt(t.afterExpiry), t.claimId), undefined, "after the claim's own expires_at the sweep finds it not due: it runs on for its tail");
+      assert.equal(await claimStateOf(t.claimId), "ACCEPTED", "not lapsed early");
+      assert.equal(itemOf(await passAt(t.beforeEnd), t.claimId), undefined, "a whole millisecond before the tail's end it is still not due");
+      assert.equal(await claimStateOf(t.claimId), "ACCEPTED");
+      assert.equal(itemOf(await passAt(t.tailEnd), t.claimId), "EXPIRED", "at the first millisecond not before the tail's end it lapses");
+    } finally {
+      await conn.end();
+    }
+    const [lapsed] = await oracleRows<{ state: string; at_end: boolean }>(iw, "SELECT state, lapsed_at = $2::timestamptz AS at_end FROM kauro.attribution_claims WHERE claim_id = $1", [t.claimId, t.tailEnd]);
+    assert.deepEqual([lapsed!.state, lapsed!.at_end], ["EXPIRED", true], "EXPIRED at the instant the pass stood at");
+    assert.equal(await entitlementsOfAgency(t.agencyId), 0, "no purchase ever converted it");
+  },
+);
+
+
+faultCell(
+  {
+    id: "CLAIM_TAIL",
+    step: "Sweep CLAIM_WINDOWS racing the claim conversion at a listed claim's tail end",
+    fault: "race",
+    expect:
+      "RACE: a conversion (the COMMISSIONS consumer) and a CLAIM_WINDOWS pass standing at the tail's end contending for the claim, in both orders with the lock wait observed: when the first purchase was confirmed in the millisecond before the one the tail ends in the claim is CONVERTED once (one entitlement, never EXPIRED); when it was confirmed at the first millisecond not before the tail end the claim is EXPIRED at the tail's end, never converted (no entitlement, pool or line)",
+  },
+  async (ctx) => {
+    for (const convertible of [true, false]) {
+      for (const order of ["CONSUMER_FIRST", "SWEEP_FIRST"] as const) {
+        const what = `${convertible ? "convertible" : "at-end"} ${order}`;
+        const t = await tailed(`tail-race-${convertible ? "c" : "n"}-${order === "CONSUMER_FIRST" ? "1" : "2"}`);
+        const p = await purchase(iw, t.a.s, t.label, { confirmedAt: convertible ? t.beforeEnd : t.tailEnd });
+        const delivery = await deliveryOfCapture(p);
+        assert.equal(await claimStateOf(t.claimId), "ACCEPTED");
+        const consuming = await open("kauro_commission_test");
+        const sweeping = await open("kauro_commission_test");
+        iw.standAt(t.tailEnd);
+        try {
+          const consumer = (conn: HarnessConnection): Promise<unknown> => consumeOn(ctx, conn, delivery, [CLAIM_UPDATE]);
+          const sweep = (conn: HarnessConnection): Promise<unknown> => sweepOn(ctx, conn, "CLAIM_WINDOWS", [CLAIM_UPDATE]);
+          const [first, second, holderConn, waiterConn] = order === "CONSUMER_FIRST" ? [consumer, sweep, consuming, sweeping] : [sweep, consumer, sweeping, consuming];
+          // the holder stops with the claim locked: the consumer at its COMMIT, the sweep right after its claim update
+          const pause = ctx.points.pause(order === "CONSUMER_FIRST" ? "uow.before-commit" : "db.claim_update.after");
+          const holding = ctx.operation(`${order === "CONSUMER_FIRST" ? "the conversion" : "the CLAIM_WINDOWS pass"} (holder)`, () => first(holderConn));
+          await pause.reachedBy(holding);
+          const waiting = await ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(holderConn) }, second, `${order === "CONSUMER_FIRST" ? "the CLAIM_WINDOWS pass" : "the conversion"} while the claim is locked (${what})`);
+          pause.release();
+          await holding;
+          const result = await waiting.pending;
+          if (result.status === "rejected") throw result.reason;
+        } finally {
+          iw.standAt(null);
+          await consuming.end();
+          await sweeping.end();
+        }
+        const rights = await rightsOf({ att: t.att as Attribution, agencyId: t.agencyId, first: p });
+        if (convertible) {
+          assert.deepEqual([rights.claims, rights.entitlements.map((e) => e[0]), rights.pools, rights.lines], [["CONVERTED"], [t.D.sellerId], 1, 1], `${what}: converted once, never expired`);
+        } else {
+          assert.deepEqual([rights.claims, rights.entitlements, rights.pools, rights.lines], [["EXPIRED"], [], 0, 0], `${what}: expired, never converted`);
+          const [lapsed] = await oracleRows<{ at_end: boolean }>(iw, "SELECT lapsed_at = $2::timestamptz AS at_end FROM kauro.attribution_claims WHERE claim_id = $1", [t.claimId, t.tailEnd]);
+          assert.equal(lapsed!.at_end, true, `${what}: lapsed at the instant the pass stood at, the tail's end`);
+        }
+      }
+    }
+  },
+);
+
+// The controlled clock's grain is the millisecond; the database's instants carry microseconds. A first purchase confirmed less than a
+// millisecond before the tail's end is before it for the database (the claim converts: KC011's own comparison), and one confirmed at the
+// exact end is not. State-based DENY test (no injected fault): the instants come from the database as text and are put on the payment
+// service's reconciliation by the capture fixture, which positions its transaction exactly there.
+test("CLAIM_TAIL (microseconds): a first purchase confirmed one microsecond before a listed claim's tail end converts it, one confirmed at the exact tail end does not", async () => {
+  for (const [which, minus, claim] of [
+    ["one microsecond before the tail end", " - interval '1 microsecond'", "CONVERTED"],
+    ["at the exact tail end", "", "ACCEPTED"],
+  ] as const) {
+    const t = await tailed(`tail-micro-${claim.toLowerCase()}`);
+    const at = (await oracleRows<{ at: string }>(iw, `SELECT ('${t.exactEnd}'::timestamptz${minus})::text AS at`))[0]!.at;
+    const p = await purchase(iw, t.a.s, t.label, { confirmedAt: at });
+    const [row] = await oracleRows<{ same: boolean }>(iw, "SELECT confirmed_at = $2::timestamptz AS same FROM kauro.qualifying_purchases WHERE authorization_id = $1", [p.authorizationId, at]);
+    assert.equal(row!.same, true, `${which}: the purchase is confirmed at the instant chosen, to the microsecond`);
+    await svc.consumer.handle((await deliveryOfCapture(p)) as never);
+    assert.equal(await claimStateOf(t.claimId), claim, which);
+    assert.equal(await entitlementsOfAgency(t.agencyId), claim === "CONVERTED" ? 1 : 0, which);
+  }
+});
+
+// =====================================================================================================================================
+// 25. CONV_RACE: the conversion racing the other writers of the claim and of the agency
+// =====================================================================================================================================
+// Two actors contend for the same rows, each in its real unit of work over a connection the harness opened: the holder stops with its locks
+// taken (a pause at its COMMIT, or right after its claim update), the waiter is observed waiting on it in pg_stat_activity (mustWait), the
+// holder lets go, and the cell asserts the state and the rights, then runs the opposite order on a fresh agency.
+
+interface Actor {
+  readonly name: string;
+  readonly login: Login;
+  /** The point the holder stops at with its locks taken. */
+  readonly holdAt: string;
+  run(conn: HarnessConnection): Promise<unknown>;
+}
+/** Runs `holder` and `waiter` in that order over fresh connections: the waiter is observed waiting on the holder, then both settle. */
+async function contend(ctx: FaultContext, holder: Actor, waiter: Actor, what: string): Promise<{ readonly holder: PromiseSettledResult<unknown>; readonly waiter: PromiseSettledResult<unknown> }> {
+  const holderConn = await open(holder.login);
+  const waiterConn = await open(waiter.login);
+  try {
+    const pause = ctx.points.pause(holder.holdAt);
+    const holding = ctx.operation(`${holder.name} (holder)`, () => settled(holder.run(holderConn)));
+    await pause.reachedBy(holding).catch(async (e: unknown) => {
+      const outcome = await holding;
+      throw new Error(`${holder.name} did not reach ${holder.holdAt} (${what}): ${"failure" in outcome ? (outcome.failure instanceof Error ? outcome.failure.message + " / " + String((outcome.failure as { cause?: unknown }).cause) : String(outcome.failure)) : "it completed: " + JSON.stringify((outcome.answer as { status?: number; text?: string } | undefined)?.text ?? outcome.answer).slice(0, 600)}`, { cause: e });
+    });
+    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(holderConn) }, (conn) => waiter.run(conn), `${waiter.name} while ${holder.name} holds the rows (${what})`);
+    pause.release();
+    const held = await holding;
+    const waited = await waiting.pending;
+    return { holder: "failure" in held ? { status: "rejected", reason: held.failure } : { status: "fulfilled", value: held.answer }, waiter: waited };
+  } finally {
+    await holderConn.end();
+    await waiterConn.end();
+  }
+}
+const mustHaveSettled = (r: PromiseSettledResult<unknown>, what: string): unknown => {
+  if (r.status === "rejected") throw new Error(`${what} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`, { cause: r.reason });
+  return r.value;
+};
+
+const consumerActor = (ctx: FaultContext, delivery: Delivery, name = "the conversion"): Actor => ({ name, login: "kauro_commission_test", holdAt: "uow.before-commit", run: (conn) => consumeOn(ctx, conn, delivery, [CLAIM_UPDATE]) });
+const sweepActor = (ctx: FaultContext, sweep: CommissionSweepName, name: string): Actor => ({ name, login: "kauro_commission_test", holdAt: "db.claim_update.after", run: (conn) => sweepOn(ctx, conn, sweep, [CLAIM_UPDATE]) });
+
+const poolKinds = async (p: Purchase): Promise<ReadonlyArray<string>> => (await poolsOf(iw, p.authorizationId)).map((x) => `${x.source} ${x.rate_kind} ${x.rate_bps}`);
+
+faultCell(
+  {
+    id: "CONV_RACE",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), racing the CLAIM_WINDOWS lapse, another accrual of the same agency and a competing acceptance",
+    fault: "race",
+    expect:
+      "RACE: the consumer's conversion contending, in both orders with the lock wait observed, with (1) the CLAIM_WINDOWS lapse of claims past their acceptance window: converted once when the first purchase was confirmed inside the window, EXPIRED and never converted when it was confirmed after it; (2) another accrual of the same agency: one entitlement per beneficiary, each claim CONVERTED once, the first purchase's pool at the first rate and the second's at the repeat rate in both orders; (3) the acceptance of the claim (CMD047): converted once by the consumer when the acceptance committed first, and by the ACCRUAL_RECONCILIATION sweep when it committed after the consumer's pass: never lost",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+
+    // (1) the CLAIM_WINDOWS lapse: the sweep stands an hour after the claims' acceptance window
+    for (const convertible of [true, false]) {
+      for (const order of ["CONSUMER_FIRST", "SWEEP_FIRST"] as const) {
+        const what = `lapse, ${convertible ? "purchase inside the window" : "purchase after the window"}, ${order}`;
+        const a = await accepted(`conv-race-lapse-${convertible ? "in" : "out"}-${order === "CONSUMER_FIRST" ? "1" : "2"}`, shares);
+        const after = (await oracleRows<{ after: string }>(iw, "SELECT (max(expires_at) + interval '1 hour')::text AS after FROM kauro.attribution_claims WHERE claim_id = ANY ($1::uuid[])", [a.att.claimIds]))[0]!.after;
+        const first = await purchase(iw, a.s, `conv-race-lapse-${order}`, convertible ? {} : { confirmedAt: after });
+        const c = { ...a, first, delivery: await deliveryOfCapture(first) };
+        iw.standAt(after);
+        try {
+          const consumer = consumerActor(ctx, c.delivery);
+          const sweep = sweepActor(ctx, "CLAIM_WINDOWS", "the CLAIM_WINDOWS pass");
+          const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, sweep, what) : await contend(ctx, sweep, consumer, what);
+          mustHaveSettled(out.holder, "the holder");
+          mustHaveSettled(out.waiter, "the waiter");
+        } finally {
+          iw.standAt(null);
+        }
+        if (convertible) assert.deepEqual(await rightsOf(c), convertedFor(c, shares), `${what}: converted once, never expired`);
+        else assert.deepEqual(await rightsOf(c), { claims: c.att.claimIds.map(() => "EXPIRED"), entitlements: [], pools: 0, lines: 0 }, `${what}: expired, never converted`);
+      }
+    }
+
+    // (2) another accrual of the same agency: the first purchase's consumer and the second purchase's consumer
+    for (const order of ["FIRST_PURCHASE_FIRST", "SECOND_PURCHASE_FIRST"] as const) {
+      const what = `another accrual, ${order}`;
+      const c = await converting(`conv-race-accrual-${order === "FIRST_PURCHASE_FIRST" ? "1" : "2"}`, shares);
+      const second = await purchase(iw, c.s, `conv-race-accrual-second-${order}`);
+      const secondDelivery = await deliveryOfCapture(second);
+      const one = consumerActor(ctx, c.delivery, "the first purchase's consumer");
+      const two = consumerActor(ctx, secondDelivery, "the second purchase's consumer");
+      const out = order === "FIRST_PURCHASE_FIRST" ? await contend(ctx, one, two, what) : await contend(ctx, two, one, what);
+      mustHaveSettled(out.holder, "the holder");
+      mustHaveSettled(out.waiter, "the waiter");
+      const rights = await rightsOf(c);
+      assert.deepEqual([rights.claims, rights.entitlements], [convertedFor(c, shares).claims, convertedFor(c, shares).entitlements], `${what}: one entitlement per beneficiary, each claim CONVERTED once`);
+      assert.deepEqual(await poolKinds(c.first), ["ACQUISITION FIRST 1000"], `${what}: the first purchase's pool at the first rate`);
+      assert.deepEqual(await poolKinds(second), ["ACQUISITION REPEAT 400"], `${what}: the second purchase's pool at the repeat rate`);
+    }
+
+    // (3) a competing acceptance of the claim (CMD047) after the agency's first purchase
+    for (const order of ["ACCEPTANCE_FIRST", "CONSUMER_FIRST"] as const) {
+      const what = `acceptance, ${order}`;
+      const s = await sellingAgency(iw, `conv-race-accept-${order === "ACCEPTANCE_FIRST" ? "1" : "2"}`);
+      iw.buyers.set(s.agency.agencyId, "AGENCY");
+      const att = await claimsOn(iw, `conv-race-accept-${order === "ACCEPTANCE_FIRST" ? "1" : "2"}`, 1);
+      const first = await purchase(iw, s, `conv-race-accept-${order}`);
+      const delivery = await deliveryOfCapture(first);
+      const c = { s, att, agencyId: s.agency.agencyId, first, delivery };
+      const allocationId = await prepareAllocation(iw.h, { ownerUserId: iw.owner.userId, agencyId: c.agencyId, prospectId: att.prospectId, shares: [{ seller: att.sellers[0]!, claimId: att.claimIds[0]!, shareBps: 10_000 }] });
+      const accept: Actor = {
+        name: "AcceptAttribution",
+        login: "kauro_app_test",
+        holdAt: "uow.before-commit",
+        run: (conn) =>
+          iw.faults.on(conn, "kauro_app", ctx.points, [], () =>
+            call(iw.w, { url: `/api/v1/sales/claims/${att.claimIds[0]!}/accept`, token: iw.owner.token, agency: null, key: freshKey("conv-race-accept"), body: { expectedVersion: 1, shareAllocationRef: allocationId } }),
+          ),
+      };
+      const consumer = consumerActor(ctx, delivery);
+      const out = order === "ACCEPTANCE_FIRST" ? await contend(ctx, accept, consumer, what) : await contend(ctx, consumer, accept, what);
+      const reply = mustHaveSettled(order === "ACCEPTANCE_FIRST" ? out.holder : out.waiter, "the acceptance") as Reply;
+      assert.equal(completed<AttributionView>(reply, 200).data.claim.state, "ACCEPTED", `${what}: the acceptance`);
+      mustHaveSettled(order === "ACCEPTANCE_FIRST" ? out.waiter : out.holder, "the consumer");
+      if (order === "ACCEPTANCE_FIRST") assert.deepEqual((await rightsOf(c)).claims, ["CONVERTED"], `${what}: the consumer converts what the acceptance committed`);
+      else {
+        assert.deepEqual((await rightsOf(c)).claims, ["ACCEPTED"], `${what}: the consumer's pass found no allocation: the accepted claim waits for the reconciliation`);
+        assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 1", `${what}: the ACCRUAL_RECONCILIATION sweep converts it`);
+      }
+      assert.deepEqual(await rightsOf(c), convertedFor(c, [10_000]), `${what}: converted once, one entitlement for the beneficiary, never lost`);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_RACE",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), the claim's seller terminated through CMD050 after the agency's first purchase",
+    fault: "race",
+    expect:
+      "RACE: the consumer's conversion and TerminateSeller (the claim not listed: its agency already bought) contending, in both orders with the lock wait observed: the claim is CONVERTED once and the entitlement is kept — TERMINATED_WITH_RESIDUAL when the conversion committed first, created after the termination when the termination did — never lost, never EXPIRED by the termination",
+  },
+  async (ctx) => {
+    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
+      const what = `termination, ${order}`;
+      const c = await converting(`conv-race-term-${order === "CONSUMER_FIRST" ? "1" : "2"}`, [10_000]);
+      const sellerId = c.att.sellers[0]!.sellerId;
+      const body = await terminationBody(iw, sellerId, []);
+      const terminate: Actor = {
+        name: "TerminateSeller",
+        login: "kauro_app_test",
+        holdAt: "uow.before-commit",
+        run: (conn) => iw.faults.on(conn, "kauro_app", ctx.points, [], () => call(iw.w, { url: `/api/v1/sales/sellers/${sellerId}/terminate`, token: iw.owner.token, agency: null, key: freshKey("conv-race-term"), body })),
+      };
+      const consumer = consumerActor(ctx, c.delivery);
+      const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what) : await contend(ctx, terminate, consumer, what);
+      const reply = mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply;
+      completed<SellerTerminationView>(reply, 200);
+      mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer");
+      assert.deepEqual(await oracleRows(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [sellerId]), [{ state: "TERMINATED" }]);
+      const rights = await rightsOf(c);
+      assert.deepEqual([rights.claims, rights.entitlements.map((e) => [e[0], e[2]]), rights.pools, rights.lines], [["CONVERTED"], [[sellerId, 10_000]], 1, 1], `${what}: the claim converted once, its entitlement kept, the purchase accrued for it`);
+      assert.equal(rights.entitlements[0]![1], order === "CONSUMER_FIRST" ? "TERMINATED_WITH_RESIDUAL" : "ACTIVE", `${what}: the entitlement's state`);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_RACE",
+    step: "Claim conversion and entitlement creation (ACCRUAL_RECONCILIATION), racing the consumer's accrual of the same purchase",
+    fault: "race",
+    expect:
+      "RACE: the ACCRUAL_RECONCILIATION sweep and the COMMISSIONS consumer converting and accruing the same first purchase, in both orders with the lock wait observed: one entitlement per beneficiary, each claim CONVERTED once, one pool and one line per beneficiary, whichever commits first",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    for (const order of ["SWEEP_FIRST", "CONSUMER_FIRST"] as const) {
+      const what = `reconciliation, ${order}`;
+      const c = await converting(`conv-race-recon-${order === "SWEEP_FIRST" ? "1" : "2"}`, shares);
+      const sweep = sweepActor(ctx, RECONCILIATION, "the ACCRUAL_RECONCILIATION pass");
+      const consumer = consumerActor(ctx, c.delivery);
+      const out = order === "SWEEP_FIRST" ? await contend(ctx, sweep, consumer, what) : await contend(ctx, consumer, sweep, what);
+      mustHaveSettled(out.holder, "the holder");
+      mustHaveSettled(out.waiter, "the waiter");
+      assert.deepEqual(await rightsOf(c), convertedFor(c, shares), `${what}: one entitlement per beneficiary, each claim CONVERTED once, one pool and one line per beneficiary`);
+    }
   },
 );

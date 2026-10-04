@@ -13,7 +13,7 @@ import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ExecutionContext } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
-import { crashableFactory, instrumentPort, type FaultPoints, type HarnessConnection } from "@kauro/persistence/testing";
+import { crashableFactory, instrumentPort, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
 export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control";
@@ -79,7 +79,7 @@ function poolOf(route: Route, role: RouteRole): unknown {
 }
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
-  constructor(route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null) {
+  constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null) {
     super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), ...(statementTimeoutMs === null ? {} : { defaultStatementTimeoutMs: statementTimeoutMs }) });
   }
 
@@ -92,7 +92,10 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
       context,
       async (uow) => {
         const at = this.stand();
-        if (context.kind === "SERVICE" && at !== null) {
+        const clock = this.clockOf();
+        // a cell's step clock positions the unit's transaction itself (the harness proves the instant it carries was consumed: an expiry cell)
+        if (context.kind === "SERVICE" && clock !== null) await clock.onServer(this.route.conn);
+        else if (context.kind === "SERVICE" && at !== null) {
           await (uow as unknown as { client: PoolClient }).client.query(`SELECT set_config('kauro_test.clock_offset_seconds', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at.at]);
         }
         return work(uow);
@@ -103,6 +106,11 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
 }
 
 /** A fault the database itself raised inside a trigger (SQLSTATE KT001, message `KAURO_FAULT <step> <evidence>`): what a cell asserts about the step it fired at. */
+/** The step clock of the cell's operation (ctx.operation's `op.clock`): positions a transaction's server clock exactly at the controlled clock. */
+export interface StepClockOf {
+  onServer(session: SqlSession): Promise<unknown>;
+}
+
 export interface DbFault {
   readonly step: string;
   readonly message: string;
@@ -171,6 +179,12 @@ export class FaultRouting {
   timer: ((ms: number) => { readonly elapsed: Promise<void>; cancel(): void }) | null = null;
   /** The statement_timeout of the routed units of work (null: the factory's own default, 10 s): a cell that proves a lock wait ends in the database's own timeout shortens it. */
   statementTimeoutMs: number | null = null;
+  /**
+   * The step clock of the operation a cell runs: while set, every SERVICE unit of work the routed units and the payment service's traced units
+   * open positions its transaction on it (clock.onServer) before its work, instead of standing at `stand`. A cell sets it inside its operation
+   * (`ctx.operation(name, (op) => ...)`, `faults.clock = op.clock`) and clears it after.
+   */
+  clock: StepClockOf | null = null;
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 
@@ -184,7 +198,7 @@ export class FaultRouting {
    * `uow.before-commit` / `uow.after-commit` points: how a cell runs a service or a fixture write (a settlement) as the actor it races.
    */
   unit(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep> = []): AnyFactory {
-    return crashableFactory(new RoutedFactory({ conn, role, points, steps, seen: new Map() }, this.stand, this.statementTimeoutMs) as unknown as AnyFactory, points, "uow", ["run"]);
+    return crashableFactory(new RoutedFactory({ conn, role, points, steps, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock) as unknown as AnyFactory, points, "uow", ["run"]);
   }
 
   /**
@@ -205,7 +219,15 @@ export class FaultRouting {
         if (prop !== "run" || route === undefined) return (value as (...a: unknown[]) => unknown).bind(target);
         const traced = {
           run: (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
-            (value as (...a: unknown[]) => Promise<unknown>).call(target, context, (uow: object) => work(tracedUnit(uow, route.points, this.dbFaults)), ...rest),
+            (value as (...a: unknown[]) => Promise<unknown>).call(
+              target,
+              context,
+              async (uow: object) => {
+                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
+                return work(tracedUnit(uow, route.points, this.dbFaults));
+              },
+              ...rest,
+            ),
         };
         return (crashableFactory(traced, route.points, "uow", ["run"]) as { run: (...a: unknown[]) => unknown }).run;
       },
