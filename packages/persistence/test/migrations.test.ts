@@ -74,6 +74,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0033_commission_due_reservations.sql",
     // package B10 (mandate B10-STATEMENTS-PAYOUTS, D10-STMT-4): the commission group's journal, its COMMISSIONS inputs and a statement's calendar read
     "0034_commission_service_commands.sql",
+    // package B10 (gap closure PAY_DEST_RACE, D10-GAP-3): a payout destination change takes its seller's transition lock
+    "0035_destination_change_lock.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

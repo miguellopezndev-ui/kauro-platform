@@ -487,6 +487,9 @@ export class PgSalesRepository implements SalesRepository {
 
   /** The seller's latest destination version that is pending verification or verified (a rejected or superseded one never is). */
   async currentDestination(sellerId: SellerId): Promise<PayoutDestinationRecord | null> {
+    // read after the shared half of the seller's transition lock, held to COMMIT: a destination change or verification (0035) is ordered
+    // before this read, or after the unit that holds it (D10-GAP-3)
+    await awaitSalesTransition(this.db, "kauro.sellers", sellerId);
     const r = await execute<DestinationRow>(
       this.db,
       `SELECT ${DESTINATION} FROM kauro.seller_payout_destinations WHERE seller_id = $1 AND state IN ('PENDING_VERIFICATION', 'VERIFIED') ORDER BY destination_version DESC LIMIT 1`,

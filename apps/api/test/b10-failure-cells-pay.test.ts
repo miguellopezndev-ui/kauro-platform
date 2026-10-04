@@ -12,6 +12,7 @@ import { connectionPid, faultCell, instrumentPort, openConnection, type FaultCon
 import {
   approvePayout,
   bankCash,
+  changeDestination,
   claimedCents,
   closeMonth,
   eligibleLines,
@@ -25,7 +26,7 @@ import {
   type LineSpec,
   type StatementsWorld,
 } from "./statements-support.js";
-import { asProblem, completed, freshKey, outcome, type Person, type Reply } from "./support.js";
+import { asProblem, completed, freshKey, ids, outcome, sha, type Person, type Reply } from "./support.js";
 import type { SqlStep } from "./fault-support.js";
 
 let sw: StatementsWorld;
@@ -115,6 +116,27 @@ const value = <T>(r: PromiseSettledResult<T>): T => {
 let month = 0;
 const nextMonth = (): string => `2026-${String(++month).padStart(2, "0")}`;
 
+/** Every statement of the cells has the same payable: one 5,000-cent line of a seller of its own. Issued six to a month; a month is closed once. */
+const PAYABLE = 5_000n;
+const supply: Issued[] = [];
+async function takeIssued(count: number): Promise<Issued[]> {
+  while (supply.length < count) {
+    const m = nextMonth();
+    supply.push(...(await issued(m, Array.from({ length: 6 }, () => [{ basisCents: PAYABLE, poolCents: PAYABLE }]), `supply-${m}`)));
+  }
+  return supply.splice(0, count);
+}
+/** Statements taken from the supply and each approved through the real CMD052 route to its seller's VERIFIED destination (cash made to cover it). */
+async function takeApproved(count: number): Promise<Approved[]> {
+  const out: Approved[] = [];
+  for (const st of await takeIssued(count)) {
+    await bankCash(sw, (await claimedCents(sw)) + st.payable);
+    completed<PayoutIntentView>(await approvePayout(sw, st.statementId, await approveBody(st)), 200);
+    out.push({ ...st, intent: await intentOf(sw, st.statementId) });
+  }
+  return out;
+}
+
 faultCell(
   {
     id: "PAY_CASH_RACE",
@@ -123,10 +145,10 @@ faultCell(
     expect: "RACE: two ApproveCommissionPayout calls on two statements whose payables each fit the bank-available cash but not together admit one intent and refuse the other FUNDS_UNAVAILABLE, in both orders",
   },
   async (ctx) => {
-    const [a, b, c, d] = await issued(nextMonth(), [[{ basisCents: 6_000n, poolCents: 6_000n }], [{ basisCents: 6_000n, poolCents: 6_000n }], [{ basisCents: 6_000n, poolCents: 6_000n }], [{ basisCents: 6_000n, poolCents: 6_000n }]], "cash-race");
+    const [a, b, c, d] = await takeIssued(4);
     for (const [first, second] of [[a!, b!], [d!, c!]] as const) {
       // cash for one of the two payables and not for both
-      await bankCash(sw, (await claimedCents(sw)) + 6_000n + 5_999n);
+      await bankCash(sw, (await claimedCents(sw)) + PAYABLE + PAYABLE - 1n);
       const { held, waited } = await holdAndWait(
         ctx,
         `the approval of ${second.statementId} while the approval of ${first.statementId} holds the cash`,
@@ -153,11 +175,11 @@ faultCell(
       "RACE: a settlement that lowers the bank-available cash committing while ApproveCommissionPayout holds its cash read, in both orders: the approval uses one consistent cash basis and is FUNDS_UNAVAILABLE rather than spending cash shown only by the stale snapshot",
   },
   async (ctx) => {
-    const [a, b] = await issued(nextMonth(), [[{ basisCents: 7_000n, poolCents: 7_000n }], [{ basisCents: 7_000n, poolCents: 7_000n }]], "cash-basis");
+    const [a, b] = await takeIssued(2);
     const settle = (cents: bigint) => actor("kauro_payment_test", (conn) => bankCash(sw, cents, sw.faults.unit(conn, "kauro_payment", ctx.points) as never));
 
     // approval first (holding the cash it read), the lowering settlement observed waiting for it: the approval spent the basis it read, consistently
-    await bankCash(sw, (await claimedCents(sw)) + 7_000n);
+    await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
     const first = await holdAndWait(ctx, "the settlement lowering the cash while the approval holds its cash read", asApp((conn) => approveOn(ctx, conn, a!)), settle((await claimedCents(sw)) - 1n));
     completed<PayoutIntentView>(value(first.held), 200);
     value(first.waited);
@@ -165,7 +187,7 @@ faultCell(
 
     // settlement first (holding its lock), the approval observed waiting: it reads the lowered cash and is refused
     const claimed = await claimedCents(sw);
-    const second = await holdAndWait(ctx, "the approval while the settlement lowering the cash is held", settle(claimed + 6_999n), asApp((conn) => approveOn(ctx, conn, b!)));
+    const second = await holdAndWait(ctx, "the approval while the settlement lowering the cash is held", settle(claimed + PAYABLE - 1n), asApp((conn) => approveOn(ctx, conn, b!)));
     value(second.held);
     assert.equal(outcome(sw.w, value(second.waited)), "409 PRECONDITION_FAILED FUNDS_UNAVAILABLE", "the lowered cash is the basis: one cent short of the payable");
     assert.equal(await intentCount(b!.statementId), 0);
@@ -177,18 +199,6 @@ faultCell(
 
 interface Approved extends Issued {
   readonly intent: Awaited<ReturnType<typeof intentOf>>;
-}
-
-/** Statements of a month, each approved through the real CMD052 route to its seller's VERIFIED destination (cash made to cover it). */
-async function approvedMonth(month: string, label: string, cents: ReadonlyArray<bigint>): Promise<Approved[]> {
-  const all = await issued(month, cents.map((c) => [{ basisCents: c, poolCents: c }]), label);
-  const out: Approved[] = [];
-  for (const st of all) {
-    await bankCash(sw, (await claimedCents(sw)) + st.payable);
-    completed<PayoutIntentView>(await approvePayout(sw, st.statementId, await approveBody(st)), 200);
-    out.push({ ...st, intent: await intentOf(sw, st.statementId) });
-  }
-  return out;
 }
 
 const factsOf = (a: Approved) => ({ reference: a.intent.reference, destinationDigest: a.intent.destinationDigest, amountCents: a.intent.amount, currency: a.intent.currency });
@@ -215,13 +225,10 @@ faultCell(
       "RACE: ReconcileCommissionPayout of an earlier intent committing while ApproveCommissionPayout is held after its cash and intents reads, in both orders: coverage is computed on one consistent cash and unsettled-intent basis, never double counting a settled intent nor freeing cash a returned one does not",
   },
   async (ctx) => {
-    const [e1, e2, s1, s2] = await (async () => {
-      const month = nextMonth();
-      const all = await approvedMonth(month, "intent-basis", [5_000n, 5_000n]);
-      // the next month's statements stay ISSUED (a second close of another month, its own lines)
-      const later = await issued(nextMonth(), [[{ basisCents: 5_000n, poolCents: 5_000n }], [{ basisCents: 5_000n, poolCents: 5_000n }]], "intent-basis-next");
-      return [all[0]!, all[1]!, later[0]!, later[1]!] as const;
-    })();
+    const approved = await takeApproved(2);
+    const [e1, e2] = [approved[0]!, approved[1]!];
+    const later = await takeIssued(2);
+    const [s1, s2] = [later[0]!, later[1]!];
 
     // reconciliation first (held at its COMMIT), the approval observed waiting: the earlier intent is no longer unsettled, so the cash covers the approval
     await bankCash(sw, (await claimedCents(sw)) + 4_999n);
@@ -260,12 +267,12 @@ faultCell(
       "RACE: a KAURO_OWNER grant revoked while ApproveCommissionPayout waits on the grant's transition lock refuses with NOT_AUTHORIZED and writes no intent; an approval holding the grant commits first and the revocation lands after it, and every approval after the revocation is refused",
   },
   async (ctx) => {
-    const [a, b, c] = await issued(nextMonth(), [[{ basisCents: 3_000n, poolCents: 3_000n }], [{ basisCents: 3_000n, poolCents: 3_000n }], [{ basisCents: 3_000n, poolCents: 3_000n }]], "rev");
+    const [a, b, c] = await takeIssued(3);
     const ownerWithGrant = async (name: string) => {
       const person = await sw.w.person(name);
       return { person, grantId: await sw.h.grantKauroOwner(person.userId as UserId) };
     };
-    await bankCash(sw, (await claimedCents(sw)) + 9_000n);
+    await bankCash(sw, (await claimedCents(sw)) + 3n * PAYABLE);
 
     // revocation first, uncommitted: the approval waits on the grant's transition lock; the revocation commits; the approval finds the grant revoked
     const early = await ownerWithGrant("pay-rev-early");
@@ -327,7 +334,7 @@ faultCell(
       "RACE: SETTLED and RETURNED evidence for one intent delivered in both orders: the first terminal state stands, the second is refused 409 UNLISTED_TRANSITION naming the intent's state, no line leaves PAID and nothing of the second is recorded",
   },
   async (ctx) => {
-    const [x, y] = await approvedMonth(nextMonth(), "flip", [4_000n, 4_000n]);
+    const [x, y] = await takeApproved(2);
     // SETTLED first (held at its COMMIT), the RETURNED evidence observed waiting on the statement's lock
     const settledFirst = await holdAndWait(ctx, "the RETURNED evidence while the SETTLED evidence is held", commission((conn) => reconcileOn(ctx, conn, x!, "SETTLED")), commission((conn) => reconcileOn(ctx, conn, x!, "RETURNED")));
     completed<PayoutReconciliationView>(value(settledFirst.held), 200);
@@ -358,7 +365,7 @@ faultCell(
     expect: "RACE: ApproveCommissionPayout racing the FAILED reconciliation of the statement's earlier intent yields at most one live intent in both orders",
   },
   async (ctx) => {
-    const [x, y] = await approvedMonth(nextMonth(), "approve-vs-fail", [2_000n, 2_000n]);
+    const [x, y] = await takeApproved(2);
     const racing = async (a: Approved): Promise<Issued> => ({ ...a, version: await statementVersion(a.statementId) });
 
     // the FAILED reconciliation first (held at its COMMIT, the statement locked): the second approval, naming the APPROVED version it saw, finds the version moved
@@ -421,7 +428,7 @@ faultCell(
     expect: "RACE (partial): a failure injected after the payout_intents insert and before the statement APPROVED commits neither; the statement stays ISSUED and the same key approves once",
   },
   async (ctx) => {
-    const [st] = await issued(nextMonth(), [[{ basisCents: 8_100n, poolCents: 8_100n }]], "pay-par");
+    const [st] = await takeIssued(1);
     await bankCash(sw, (await claimedCents(sw)) + st!.payable);
     const key = freshKey("pay-par");
     const body = await approveBody(st!);
@@ -449,7 +456,7 @@ faultCell(
       "RACE (partial): a failure injected after the intent settles and before the statement PAID, after the statement and before one line update, and before the hold writes rolls the whole branch back; the same key then settles once",
   },
   async (ctx) => {
-    const [a, b, c] = await approvedMonth(nextMonth(), "settle-par", [3_100n, 3_200n, 3_300n]);
+    const [a, b, c] = await takeApproved(3);
     const holds = async (x: Approved): Promise<number> => Number((await rows<{ n: string }>(sw, "SELECT count(*)::text AS n FROM kauro.commission_holds WHERE line_id = ANY ($1::uuid[])", [x.lineIds]))[0]!.n);
     const untouched = async (x: Approved): Promise<void> => {
       assert.deepEqual([await intentState(x.intent.intentId), await statementState(x.statementId), await lineStatesOf(x), await reconciliationsOf(x), await holds(x)], ["AUTHORIZED", "APPROVED", ["PAYABLE"], 0, 0], "the whole branch rolled back");
@@ -487,7 +494,7 @@ faultCell(
     expect: "DENY: a PayoutEvidenceVerifier that times out answers the retriable 503 PAYOUT_EVIDENCE_UNAVAILABLE, nothing changes, and the same key then settles once",
   },
   async (ctx) => {
-    const [x] = await approvedMonth(nextMonth(), "verifier-tmo", [2_500n]);
+    const [x] = await takeApproved(1);
     const key = freshKey("verifier-tmo");
     const ref = scriptEvidence(sw, sw.payouts.matching(factsOf(x!), "SETTLED"));
     const before = [await intentState(x!.intent.intentId), await statementState(x!.statementId), await lineStatesOf(x!), await reconciliationsOf(x!)];
@@ -534,7 +541,7 @@ faultCell(
     expect: "RACE (crash after COMMIT): the response lost after the intent commits is recovered by the same key as the same answer, one intent",
   },
   async (ctx) => {
-    const [st] = await issued(nextMonth(), [[{ basisCents: 1_900n, poolCents: 1_900n }]], "pay-cra");
+    const [st] = await takeIssued(1);
     await bankCash(sw, (await claimedCents(sw)) + st!.payable);
     const key = freshKey("pay-cra");
     const body = await approveBody(st!);
@@ -564,7 +571,7 @@ faultCell(
     expect: "RACE (crash after COMMIT): the response lost after the settlement commits is recovered by the same key as the same answer, one settlement",
   },
   async (ctx) => {
-    const [x] = await approvedMonth(nextMonth(), "settle-cra", [1_800n]);
+    const [x] = await takeApproved(1);
     const key = freshKey("settle-cra");
     const ref = scriptEvidence(sw, sw.payouts.matching(factsOf(x!), "SETTLED"));
     const crash = ctx.points.crash("uow.after-commit");
@@ -581,5 +588,89 @@ faultCell(
     } finally {
       await conn.end();
     }
+  },
+);
+
+// --- 10. PAY_DEST_RACE --------------------------------------------------------------------------------------------------------------
+
+/** The seller's own destination change (a new version PENDING_VERIFICATION, its own step-up) as statements on `conn`, in the seller's session; `commit: false` leaves it open. */
+async function changeDestinationOn(conn: HarnessConnection, s: Seller, options: { readonly commit: boolean }): Promise<string> {
+  const proof = await sw.h.recordStepUp(s.userId as UserId);
+  const destinationId = ids.next();
+  await conn.query("BEGIN ISOLATION LEVEL READ COMMITTED");
+  await conn.query("SELECT set_config('kauro.agency_id', '', true), set_config('kauro.user_id', $1, true), set_config('kauro.finance_agency_id', '', true)", [s.userId]);
+  const version = (await conn.query<{ v: number }>("SELECT coalesce(max(destination_version), 0)::int + 1 AS v FROM kauro.seller_payout_destinations WHERE seller_id = $1", [s.sellerId])).rows[0]!.v;
+  await conn.query(
+    `INSERT INTO kauro.seller_payout_destinations (destination_id, seller_id, destination_version, masked_label, destination_digest, currency, changed_by_user_id, change_proof_ref, changed_at, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 'USD', $6, $7, kauro.server_now(), now(), now())`,
+    [destinationId, s.sellerId, version, `Bank ****${destinationId.slice(-4)}`, sha(`destination-${destinationId}`), s.userId, proof],
+  );
+  if (options.commit) await conn.query("COMMIT");
+  return destinationId;
+}
+
+faultCell(
+  {
+    id: "PAY_DEST_RACE",
+    step: "CMD052 ApproveCommissionPayout, a payout-destination change racing the payee check",
+    fault: "revocation",
+    expect:
+      "RACE: a payout-destination change racing ApproveCommissionPayout serializes in both orders: the intent binds the destination VERIFIED at its commit, or the approval is 409 PAYEE_UNVERIFIED, never a half-verified one",
+  },
+  async (ctx) => {
+    const [a, b, c] = await takeIssued(3);
+    await bankCash(sw, (await claimedCents(sw)) + 3n * PAYABLE);
+
+    // the change first, uncommitted: the approval waits on the seller's transition lock, then finds a version pending verification
+    const changing = await open("kauro_app_test");
+    const approving = await open("kauro_app_test");
+    try {
+      const pending = await changeDestinationOn(changing, a!.s, { commit: false });
+      const waiting = await ctx.mustWait(sw.h.oracle, { waiter: approving, holder: connectionPid(changing) }, (conn) => approveOn(ctx, conn, a!), "the approval while the seller's destination change is uncommitted");
+      await ctx.revoked("the seller's current destination", () => changing.query("COMMIT"));
+      assert.equal(outcome(sw.w, value(await waiting.pending)), "409 PRECONDITION_FAILED PAYEE_UNVERIFIED", "the version pending verification binds no payout, the old one included");
+      assert.equal(await intentCount(a!.statementId), 0);
+      assert.equal((await rows<{ state: string }>(sw, "SELECT state FROM kauro.seller_payout_destinations WHERE destination_id = $1", [pending]))[0]!.state, "PENDING_VERIFICATION");
+    } finally {
+      await changing.end();
+      await approving.end();
+    }
+
+    // the approval first (held at its COMMIT, holding the seller's shared half): the change waits, the intent binds the destination VERIFIED when it committed
+    const bound = await holdAndWait(
+      ctx,
+      "the seller's destination change while the approval is held",
+      asApp((conn) => approveOn(ctx, conn, b!)),
+      asApp(async (conn) => {
+        try {
+          return await changeDestinationOn(conn, b!.s, { commit: true });
+        } catch (e) {
+          await conn.query("ROLLBACK");
+          throw e;
+        }
+      }),
+    );
+    completed<PayoutIntentView>(value(bound.held), 200);
+    await ctx.revoked("the seller's current destination", async () => value(bound.waited));
+    const intent = await intentOf(sw, b!.statementId);
+    assert.deepEqual([intent.destinationId, intent.destinationVersion, intent.destinationDigest], [b!.s.destinationId, 1, b!.s.destinationDigest], "the intent keeps the destination VERIFIED when it committed");
+
+    // after the change, no approval of that seller binds anything
+    const fc = await open("kauro_app_test");
+    try {
+      await ctx.fenced(
+        "an approval after the seller's destination change",
+        async () => {
+          await changeDestination(sw, c!.s);
+          const reply = await approveOn(ctx, fc, c!);
+          if (reply.status === 409) throw new Refused(outcome(sw.w, reply));
+          throw new Error(`the approval was not refused: ${reply.status}`);
+        },
+        (e) => e instanceof Refused && e.message === "409 PRECONDITION_FAILED PAYEE_UNVERIFIED",
+      );
+    } finally {
+      await fc.end();
+    }
+    assert.equal(await intentCount(c!.statementId), 0);
   },
 );
