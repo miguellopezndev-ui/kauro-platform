@@ -461,6 +461,12 @@ export interface AttributionRepository {
   claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>>;
   /** The seller's open claims (SUBMITTED, DISPUTED, ACCEPTED): CMD050 expires the unlisted ones. */
   openClaimsOf(sellerId: SellerId): Promise<ReadonlyArray<AttributionClaimRecord>>;
+  /**
+   * Whether the claim's agency's first designation admits its conversion, by the database's own comparison at its own grain (the
+   * microsecond): the first purchase confirmed before the claim's end (its tail's end, else its acceptance window's) and the claim submitted
+   * before that purchase's order. A claim for which it holds has accrued its rights; the conversion is the commission service's (D10-GAP-18).
+   */
+  convertibleAtFirstPurchase(claimId: AttributionClaimId): Promise<boolean>;
   transitionClaim(claimId: AttributionClaimId, expectedVersion: number, change: ClaimChange, now: UtcInstant): Promise<VersionedWrite<AttributionClaimRecord>>;
   /** The CLAIM_WINDOWS sweep's work: live claims past their review deadline, acceptance window or tail. */
   lapsedClaims(now: UtcInstant, limit: number): Promise<ReadonlyArray<AttributionClaimRecord>>;
