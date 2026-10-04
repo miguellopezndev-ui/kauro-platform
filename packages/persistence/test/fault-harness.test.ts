@@ -1362,3 +1362,79 @@ test("FH-R2 (r7) the probes bracket exactly one server statement: an operation's
     );
   }
 });
+
+// --- FH-R2 (Codex re-check 7 of dce1cfc): the bracketed statement earns credit only if the SERVER executed it -------------------
+// On dce1cfc the extended-protocol check and the "sent" hook ran before the driver's submit(): a statement pg refuses before
+// writing anything (a prepared-statement name already used for another text, values that are not an array) errored locally, the
+// client went on with its queue, both probes matched and the instant was credited though no operation statement reached the
+// server. Now the statement must have been written by submit() without error AND the server must have answered it with a
+// CommandComplete.
+
+test("FH-R2 (r8) a statement the driver refuses before sending (prepared-statement name collision, values not an array) proves nothing, on a harness connection and on a tapped plain client; a statement the server executed passes", async () => {
+  const cell = { step: "server-clock step", fault: "timeout", expect: "past deadline" } as const;
+  const options = { clockStart: "2100-01-01T00:00:00.000Z" } as const;
+  const unused = (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message);
+  let n = 0;
+  for (const [label, session] of [
+    ["harness connection", () => a],
+    ["plain client", () => h.oracle],
+  ] as const) {
+    const cases: Array<[string, (c: Client, d: string) => Promise<() => Promise<unknown>>]> = [
+      [
+        "a prepared-statement name already used for another text",
+        async (c, d) => {
+          const name = `fh_r8_${n++}`;
+          await c.query({ name, text: "SELECT 1 AS one" });
+          return () => c.query({ name, text: `SELECT kauro.server_now() < '${d}'::timestamptz AS before` });
+        },
+      ],
+      ["values that are not an array", async (c, d) => () => c.query({ text: `SELECT kauro.server_now() < '${d}'::timestamptz AS before`, values: {} as unknown as unknown[] })],
+    ];
+    for (const [what, prepare] of cases) {
+      await assert.rejects(
+        runCell(
+          cell,
+          async (ctx) => {
+            const d = ctx.deadline(ctx.clock.at(1000));
+            ctx.clock.past(d);
+            const c = session();
+            await c.query("BEGIN");
+            try {
+              // the setup (a first use of the name) runs before the operation; only the refused statement is bracketed
+              const statement = await prepare(c, d);
+              await ctx.withClock(`server-clock step (${label}, ${what})`, async (clock) => {
+                await clock.onServer(c);
+                await statement().catch(() => undefined);
+              });
+            } finally {
+              await c.query("ROLLBACK");
+            }
+          },
+          options,
+        ),
+        unused,
+        `${label}: ${what} — refused by the driver before anything was sent, the instant must not be credited`,
+      );
+    }
+    // passes: a named prepared statement the server executes, past the deadline
+    await runCell(
+      cell,
+      async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        const c = session();
+        await c.query("BEGIN");
+        try {
+          await ctx.withClock(`server-clock step (${label}, executed)`, async (clock) => {
+            await clock.onServer(c);
+            const r = await c.query<{ before: boolean }>({ name: `fh_r8_ok_${n++}`, text: `SELECT kauro.server_now() < '${d}'::timestamptz AS before` });
+            assert.equal(r.rows[0]!.before, false, "the statement ran past the deadline");
+          });
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      },
+      options,
+    );
+  }
+});

@@ -183,6 +183,30 @@ export function extendedArgs(args: ReadonlyArray<unknown>): unknown[] {
   return [...args];
 }
 
+/**
+ * Watches a driver query object for the server's answer: `completed` once the server sent a CommandComplete naming a command for
+ * it, `failed` once the query errored (on the server, or refused by the driver before anything was sent). A statement that never
+ * reached the server can never complete.
+ */
+export function watchServerAnswer(driverQuery: object): { readonly completed: boolean; readonly failed: boolean } {
+  const state = { completed: false, failed: false };
+  const q = driverQuery as { handleCommandComplete?: (...a: unknown[]) => unknown; handleError?: (...a: unknown[]) => unknown };
+  const complete = q.handleCommandComplete;
+  const error = q.handleError;
+  if (typeof complete !== "function" || typeof error !== "function") return state;
+  q.handleCommandComplete = function (this: unknown, ...a: unknown[]) {
+    const msg = a[0] as { text?: unknown; command?: unknown } | undefined;
+    const tag = typeof msg?.text === "string" ? msg.text : typeof msg?.command === "string" ? msg.command : "";
+    if (/^[A-Za-z]+/.test(tag)) state.completed = true;
+    return complete.apply(this, a);
+  };
+  q.handleError = function (this: unknown, ...a: unknown[]) {
+    state.failed = true;
+    return error.apply(this, a);
+  };
+  return state;
+}
+
 /** Whether the driver sends (sent) this query object through the extended protocol: one server statement, never a multi-statement string. */
 export function sentExtended(driverQuery: object): boolean {
   if (!(driverQuery instanceof Query)) return false;
@@ -273,8 +297,10 @@ function created(raw: object, activeBefore: object | null, queuedBefore: number)
 
 /**
  * Sends a statement through `send` on the raw client and calls `onSent` once the driver actually sends it (at once when the
- * connection was free, or when the driver submits it from its queue) with the driver's query object. Returns the call's result
- * and the driver query object it created (undefined when that cannot be observed: pipeline mode, an unqueued failure).
+ * connection was free, or, when queued, only after the driver's submit() wrote it without error: pg refuses some statements in
+ * submit() before writing anything — a prepared-statement name used for another text, values that are not an array — and then
+ * goes on with its queue) with the driver's query object. Returns the call's result and the driver query object it created
+ * (undefined when that cannot be observed: pipeline mode, an unqueued failure).
  */
 export function sendObserved(raw: object, send: () => unknown, onSent?: (driverQuery: object) => void): { out: unknown; entry: object | undefined } {
   const internals = raw as DriverInternals;
@@ -289,8 +315,9 @@ export function sendObserved(raw: object, send: () => unknown, onSent?: (driverQ
       const q = entry as { submit: (...a: unknown[]) => unknown };
       const submit = q.submit;
       q.submit = function (this: unknown, ...a: unknown[]) {
-        onSent(q);
-        return submit.apply(this, a);
+        const refused = submit.apply(this, a);
+        if (refused === null || refused === undefined) onSent(q);
+        return refused;
       };
     }
   }
@@ -309,8 +336,9 @@ interface ProbeRow {
  * synchronous turn, so the driver's FIFO queue holds probe, statement, probe with nothing between them (checked on the queue
  * itself). Each probe reads, on the server, the clock token, the clock override and txid_current(). The application is proven
  * consumed only if both probes read exactly its token, offset and txid, the driver sent the statement through the extended
- * protocol (sentExtended: one server statement, the server refuses a multi-statement string) and it executed while its scope was
- * open. No SQL text is parsed: whatever the statement or anything before it did (a ROLLBACK TO behind a comment, a DO block, a
+ * protocol (sentExtended: one server statement, the server refuses a multi-statement string), judged only after submit() wrote it
+ * without error, the server answered it with a CommandComplete and no error (watchServerAnswer: a statement the driver refused
+ * before sending proves nothing), and it executed while its scope was open. No SQL text is parsed: whatever the statement or anything before it did (a ROLLBACK TO behind a comment, a DO block, a
  * function, a cached query method), only what the server reports decides. The verdict lands asynchronously; the
  * scope keeps it pending until the probes answered (settleProofs).
  */
@@ -336,13 +364,15 @@ export function bracketStatement(raw: object, issued: IssuedStatement | undefine
     extended = sentExtended(q);
     onSent?.(q);
   });
+  // the server's own answer to the statement: credit only for a statement the server executed (a CommandComplete, no error)
+  const answer = statement.entry === undefined ? undefined : watchServerAnswer(statement.entry);
   const last = probe("after");
   const order = [internals._activeQuery ?? null, ...(internals._queryQueue ?? [])];
   const i = first.entry === undefined ? -1 : order.indexOf(first.entry);
   const adjacent = i >= 0 && statement.entry !== undefined && last.entry !== undefined && order[i + 1] === statement.entry && order[i + 2] === last.entry;
   const verdict = Promise.all([first.out, last.out]).then(
     ([b, a]) => {
-      if (!adjacent || !extended || !issued.event.executed) return;
+      if (!adjacent || !extended || !issued.event.executed || answer === undefined || !answer.completed || answer.failed) return;
       const pb = b.rows[0];
       const pa = a.rows[0];
       if (pb === undefined || pa === undefined) return;
