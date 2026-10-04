@@ -111,7 +111,7 @@ faultCell(
         const waiting = await ctx.mustWait(sw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (conn) => approveOn(ctx, conn, st, body), "the approval while the correction holds the statement");
         pause.release();
         assert.equal(resultOf(await running), "200", "the correction committed");
-        assert.match(outcome(sw.w, await waiting.pending), /^409 STALE_VERSION /, "the approval that waited finds the statement CORRECTED and its version moved");
+        assert.match(outcome(sw.w, value(await waiting.pending)), /^409 STALE_VERSION /, "the approval that waited finds the statement CORRECTED and its version moved");
       } finally {
         await hc.end();
         await wc.end();
@@ -135,7 +135,7 @@ faultCell(
         const waiting = await ctx.mustWait(sw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (conn) => correctOn(ctx, conn, st.statementId, st.version), "the correction while the approval holds the statement");
         pause.release();
         completed<PayoutIntentView>(await running, 200);
-        assert.match(resultOf(await waiting.pending), /^409 STALE_VERSION /, "the correction read the version before the approval: stale, nothing written");
+        assert.match(resultOf(value(await waiting.pending)), /^409 STALE_VERSION /, "the correction read the version before the approval: stale, nothing written");
       } finally {
         await hc.end();
         await wc.end();

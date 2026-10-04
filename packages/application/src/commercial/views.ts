@@ -260,3 +260,12 @@ export interface PayoutReconciliationView {
   readonly reviewOn?: CalendarDate;
   readonly version: number;
 }
+
+// --- CMD051 correcting statement (no route: D10-GAP-7) --------------------------------------------------------------------------------
+
+/** A correction: the predecessor now CORRECTED (its new version) and the correcting statement that supersedes it. */
+export interface StatementCorrectionView {
+  readonly correctedStatementId: string;
+  readonly correctedVersion: number;
+  readonly statement: CommissionStatementView;
+}

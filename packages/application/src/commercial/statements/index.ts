@@ -26,6 +26,7 @@ export type { ServiceCommandRequest } from "./service.js";
 export type { CommercialReadHandler } from "./get-statement.js";
 export type { CloseProposal } from "./close-period.js";
 export { closeCommissionPeriod, proposeCommissionClose, periodView, calendarDateIn } from "./close-period.js";
+export { correctCommissionStatement, type CorrectCommissionStatementBody } from "./correct-statement.js";
 export { reconcileCommissionPayout, PAYOUT_FAILED_REVIEW_HOURS } from "./reconcile-payout.js";
 export { approveCommissionPayoutHandler, payoutIntentView } from "./approve-payout.js";
 export { getCommissionStatementHandler, statementView } from "./get-statement.js";
