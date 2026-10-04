@@ -355,7 +355,9 @@ export class PgSalesRepository implements SalesRepository {
       `SELECT agency_id FROM (
          SELECT c.agency_id FROM kauro.attribution_claims c WHERE c.seller_id = $1 AND c.state IN ('SUBMITTED', 'DISPUTED', 'ACCEPTED') AND c.agency_id IS NOT NULL
          UNION
-         SELECT s.agency_id FROM kauro.sales_accounts s JOIN kauro.account_assignments l ON l.agency_id = s.agency_id AND l.assignment_id = s.current_assignment_id WHERE l.seller_id = $1) x
+         SELECT s.agency_id FROM kauro.sales_accounts s JOIN kauro.account_assignments l ON l.agency_id = s.agency_id AND l.assignment_id = s.current_assignment_id WHERE l.seller_id = $1
+         UNION
+         SELECT e.agency_id FROM kauro.commission_entitlements e WHERE e.seller_id = $1 AND e.state IN ('ACTIVE', 'DISPUTED')) x
         ORDER BY agency_id`,
       [sellerId],
     );

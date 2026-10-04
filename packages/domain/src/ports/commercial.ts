@@ -335,7 +335,7 @@ export interface SalesRepository {
   getSeller(sellerId: SellerId): Promise<SellerRecord | null>;
   /** The seller row FOR UPDATE with the exclusive half of `kauro.sellers` (CMD049, CMD050). */
   lockSeller(sellerId: SellerId): Promise<SellerRecord | null>;
-  /** The agencies the seller's open claims and current operational assignments name, ascending: what CMD050 locks before its first claim (D10-GAP-20). */
+  /** The agencies the seller's open claims, current operational assignments and live (ACTIVE, DISPUTED) entitlements name, ascending: what CMD050 locks before its first claim (D10-GAP-20, D10-GAP-22). */
   agenciesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<AgencyId>>;
   transitionSeller(sellerId: SellerId, expectedVersion: number, change: SellerChange, now: UtcInstant): Promise<VersionedWrite<SellerRecord>>;
   getAgreement(agreementId: SellerAgreementId): Promise<SellerAgreementRecord | null>;

@@ -163,6 +163,9 @@ async function entitlementWindows(rt: CommissionRuntime, limit: number): Promise
   for (const entitlement of await list(rt, async (uow) => attributionOf(uow).endedEntitlements(await serverNow(uow), limit))) {
     await item(rt, items, entitlement.entitlementId, () =>
       inAgency(rt, entitlement.agencyId, null, async (uow) => {
+        // the agency's commission subject before the entitlement (D10-GAP-22), as every writer of its rights takes it: the entitlement is read
+        // after the lock, so a termination or an accrual that committed while this pass waited is what it expires
+        await attributionOf(uow).lockAgencies([entitlement.agencyId]);
         const current = await attributionOf(uow).getEntitlement(entitlement.entitlementId);
         if (current === null || current.state === "EXPIRED") return "SETTLED";
         const written = await attributionOf(uow).transitionEntitlement(entitlement.entitlementId, current.version, "EXPIRED", await serverNow(uow));
