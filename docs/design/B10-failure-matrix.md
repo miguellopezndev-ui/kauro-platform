@@ -295,7 +295,7 @@ Tier 1 = money or authority: a wrong outcome pays, withholds, forfeits or attrib
 6. `PAY_SETTLE_FLIP` (1 cell): CMD053: SETTLED evidence applied, then FAILED or RETURNED evidence (or the reverse) for the same intent; the design has no SETTLED to RETURNED edge.  
    Proposed test: `RACE: SETTLED and RETURNED evidence for one intent delivered in both orders: the first terminal state stands, the second is refused PAYOUT_EVIDENCE_MISMATCH or INTENT_TERMINAL, no line leaves PAID and the contradiction is a visible case`  
    Cells: CMD053 ReconcileCommissionPayout / RACE
-   Status: covered `[gflip]` (D10-GAP-5); needs ruling R-GAP-1 for the visible case.
+   Status: covered `[gflip]` (D10-GAP-5); visible case settled by ruling R-GAP-1 (B15 adapter surfaces the 409; no B10 case kind).
 
 7. `PAY_APPROVE_VS_FAIL` (1 cell): CMD052 racing CMD053 FAILED or RETURNED of an earlier intent of the same statement (statement APPROVED to ISSUED while a second approval waits).  
    Proposed test: `RACE: ApproveCommissionPayout racing the FAILED reconciliation of the statement's earlier intent yields at most one live intent in both orders`  
@@ -330,17 +330,17 @@ Tier 1 = money or authority: a wrong outcome pays, withholds, forfeits or attrib
 13. `CLOSE_VS_DELIVERY` (1 cell): CMD051: a COMMISSIONS record with occurred_at before the cutoff delivered between the INPUTS_UNRECONCILED check and COMMIT (the existing race is a refund adjustment on the ledger, not a late delivery).  
    Proposed test: `RACE: a capture.completed.v1 delivery with occurred_at before the cutoff racing CloseCommissionPeriod: the close is INPUTS_UNRECONCILED or includes the line, never a statement that omits it, in both orders`  
    Cells: CMD051 CloseCommissionPeriod / REVOCATION
-   Status: needs ruling R-GAP-2: the check counts COMMISSIONS records created (not occurred) before the period end (statement adapter undeliveredBefore, section 7 CMD051, D10-STMT-4), and every such record exists before a close can start, so no record can be delivered between the check and COMMIT; a record created after the end is by design the next statement's input.
+   Status: ruled R-GAP-2 (created-at semantics adopted; N/A by design, one DENY test owed): the check counts COMMISSIONS records created (not occurred) before the period end (statement adapter undeliveredBefore, section 7 CMD051, D10-STMT-4), and every such record exists before a close can start, so no record can be delivered between the check and COMMIT; a record created after the end is by design the next statement's input.
 
 14. `CORR_APPROVE` (2 cells): CMD051 correction: a correcting statement racing CMD052 approval of the predecessor (or B12's dispute_scoped); APPROVED has no edge to CORRECTED.  
    Proposed test: `RACE: a correcting statement racing ApproveCommissionPayout of the same statement, in both orders: approval first refuses the correction, correction first makes the approval 409 STALE_VERSION, and no intent ever names a CORRECTED statement`  
    Cells: CMD051 correcting statement (correction_issued) / RACE; CMD051 correcting statement (correction_issued) / RACE
-   Status: needs ruling R-GAP-3: no code writes the ISSUED/DISPUTED to CORRECTED edge (section 8.1 lists it under CMD051; the section 7 text of CMD051 has no correction step), so there is no correcting statement to race.
+   Status: ruled R-GAP-3 (implement the registry edge in B10; GAP work for lane 2): no code writes the ISSUED/DISPUTED to CORRECTED edge (section 8.1 lists it under CMD051; the section 7 text of CMD051 has no correction step), so there is no correcting statement to race.
 
 15. `CORR_DUP` (2 cells): CMD051 correction: the same correction twice.  
    Proposed test: `RACE: two corrections of one ISSUED statement on two keys yield one successor and one STALE_VERSION; the same key replays; each line is payable through exactly one live statement item`  
    Cells: CMD051 correcting statement (correction_issued) / RETRY; CMD051 correcting statement (correction_issued) / RETRY
-   Status: needs ruling R-GAP-3 (same as CORR_APPROVE).
+   Status: ruled R-GAP-3 (same as CORR_APPROVE): GAP work for lane 2.
 
 16. `CORR_PAR` (2 cells): CMD051 correction: failure between issuing the successor and marking the predecessor CORRECTED.  
    Proposed test: `RACE (partial): a failure injected after the successor statement is inserted and before the predecessor is marked CORRECTED rolls both back`  
@@ -744,3 +744,9 @@ Verdict REJECT: 14 findings FIXED, three PARTIALLY_FIXED (B10-M9, M10, M14), cor
 | B10-M9 (r2) | S1 REVOCATION no longer requires the old entitlement ACTIVE: after an execution admission it stays CONSUMED, after a full service refund it stays REVOKED (B09 D-PROTO-B1); refusal withdraws the replacement, never revives the old authorization, spends no allowance. S2 REVOCATION and the REPL_REVOKE proposed test cover both cases. | CMD027 included-replacement protocol |
 | B10-M10 (r2) | CMD043 W1 PARTIAL from C to GAP CLOSE_PAR (now 2 cells): failure between a quote's withdrawal and its reservation/slot release, and between quotes; whole transaction rolls back. `[a43new]` and `[a43deny]` are cited as success and prerequisite guards only. | CMD043 CloseAgency |
 | B10-M14 (r2) | Row H and CLOSE_HOLD_RACE assert held cents, not whole-line exclusion: a partial hold withholds exactly its cents and pays the unheld net (1000 held of 10000 gives 9000 PAYABLE); only a covering hold excludes the line (D10-HOLD-1). | CMD051 CloseCommissionPeriod |
+
+## Rulings R-GAP-1 to R-GAP-3 (2026-10-04, under owner delegation; revocable)
+
+- **R-GAP-1** (`PAY_SETTLE_FLIP` visible case): B10 adds no payout-contradiction case kind; the registry has none and inventing one is a registry change. The contradiction is visible where the evidence comes from: the second evidence is refused 409 UNLISTED_TRANSITION naming the intent's state (D10-GAP-5), and the PayoutEvidenceVerifier/evidence adapter (B15) must turn that refusal into an operator alert. Recorded as a B15 contract requirement; the B10 cell stays covered by `[gflip]`.
+- **R-GAP-2** (`CLOSE_VS_DELIVERY`): the period input is defined by COMMISSIONS record creation time, not occurred_at (D10-STMT-4, adapter undeliveredBefore). A record created after the period end is the next statement's input even if it occurred inside the period, so the race the cell describes cannot happen. Cell becomes N/A by design; one DENY test is owed: a record that occurred inside the period but was created after its end is absent from the closed statement and present in the next one.
+- **R-GAP-3** (`CORR_APPROVE`, `CORR_DUP`, `CORR_PAR` and the K1/K2 rows): the ISSUED/DISPUTED to CORRECTED edge on correction_issued is in the authority registry (CommissionStatement machine, CMD051), so it is B10 scope and is missing in code, not a design choice. It is built in B10 GAP lane 2, tests first, with the cells' proposed tests as acceptance: one successor per predecessor, APPROVED never corrected, no intent against a CORRECTED statement, all-or-nothing successor plus predecessor transition.
