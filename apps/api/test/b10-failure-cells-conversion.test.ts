@@ -20,7 +20,7 @@ import { recordServiceAssignment } from "@kauro/persistence/testing";
 import type { RecordedSeller } from "@kauro/persistence/testing";
 import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { createCommissionService, type CommissionService } from "../src/index.js";
+import { accepted, bindCells, consumeOn, converting, convertedFor, deliveryOfCapture, nothingFor, rightsOf, type Converting, type Rights, contend, failureOf, failures, itemOf, mustHaveSettled, open, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Delivery, type Expecting } from "./b10-cells-support.js";
 import type { CommissionSweepName, SweepReport } from "../src/commissions/sweeps.js";
 import { prepareAllocation } from "./sales-support.js";
 import { call, completed, freshKey, ids, type Reply } from "./support.js";
@@ -29,7 +29,7 @@ let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   await installDbFaults();
-  rawSvc = createCommissionService({ assembly: { units: iw.faults.wrap(iw.pools.units), completions: iw.completions }, environment: "LOCAL", clock: iw.clock, ids, onBackgroundFailure: (subject, error) => void failures.push({ subject, error }) });
+  bindCells(iw);
 });
 after(async () => {
   await iw.stop();
@@ -338,99 +338,6 @@ faultCell(
 const CLAIM_UPDATE: SqlStep = { label: "claim_update", match: /UPDATE kauro\.attribution_claims/ };
 const ENTITLEMENT_INSERT: SqlStep = { label: "entitlement_insert", match: /INSERT INTO kauro\.commission_entitlements/ };
 
-type Login = "kauro_app_test" | "kauro_commission_test";
-const open = (login: Login): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
-
-/** The commission service whose units are the routed ones: real outside `faults.on`, the cell's connection inside it. */
-let rawSvc: CommissionService;
-/** The failures the commission service handed to its background sink (a sweep item's failure), by subject. */
-const failures: Array<{ readonly subject: string; readonly error: unknown }> = [];
-
-/** An agency whose seller(s)' claims are ACCEPTED under one frozen allocation (the shares in bps), before the agency's first purchase. */
-async function accepted(label: string, shares: ReadonlyArray<number>): Promise<{ readonly s: Selling; readonly att: Attribution; readonly allocationId: string; readonly agencyId: string }> {
-  const s = await sellingAgency(iw, label);
-  const att = await claimsOn(iw, label, shares.length);
-  const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, shares);
-  return { s, att, allocationId, agencyId: s.agency.agencyId };
-}
-type Delivery = Awaited<ReturnType<typeof deliveryOf>>;
-const deliveryOfCapture = async (p: Purchase): Promise<Delivery> => deliveryOf(iw, await eventOf(iw, p.captureId, "capture.completed.v1"));
-
-interface Converting {
-  readonly s: Selling;
-  readonly att: Attribution;
-  readonly allocationId: string;
-  readonly agencyId: string;
-  readonly first: Purchase;
-  readonly delivery: Delivery;
-}
-/** Claims accepted, then the agency's first purchase confirmed: the capture's delivery waits for COMMISSIONS (nothing is dispatched). */
-async function converting(label: string, shares: ReadonlyArray<number>): Promise<Converting> {
-  const a = await accepted(label, shares);
-  const first = await purchase(iw, a.s, label);
-  return { ...a, first, delivery: await deliveryOfCapture(first) };
-}
-
-interface Rights {
-  readonly claims: ReadonlyArray<string>;
-  readonly entitlements: ReadonlyArray<readonly [string, string, number]>;
-  readonly pools: number;
-  readonly lines: number;
-}
-/** The rights the conversion creates or leaves: each claim's state, each beneficiary's entitlement (largest share first), the purchase's pools and lines. */
-async function rightsOf(c: { readonly att: Attribution; readonly agencyId: string; readonly first: Purchase }): Promise<Rights> {
-  const claims = await oracleRows<{ claim_id: string; state: string }>(iw, "SELECT claim_id, state FROM kauro.attribution_claims WHERE claim_id = ANY ($1::uuid[])", [c.att.claimIds]);
-  const entitlements = await oracleRows<{ seller_id: string; state: string; share_bps: number }>(iw, "SELECT seller_id, state, share_bps FROM kauro.commission_entitlements WHERE agency_id = $1 ORDER BY share_bps DESC, seller_id", [c.agencyId]);
-  return {
-    claims: c.att.claimIds.map((id) => claims.find((x) => x.claim_id === id)!.state),
-    entitlements: entitlements.map((e) => [e.seller_id, e.state, e.share_bps] as const),
-    pools: (await poolsOf(iw, c.first.authorizationId)).length,
-    lines: (await linesOf(iw, c.first.authorizationId)).length,
-  };
-}
-const nothingFor = (c: { readonly att: Attribution }): Rights => ({ claims: c.att.claimIds.map(() => "ACCEPTED"), entitlements: [], pools: 0, lines: 0 });
-
-/** What one converted purchase leaves: every claim CONVERTED, one ACTIVE entitlement per beneficiary at its share, one acquisition pool and one line per beneficiary. */
-function convertedFor(c: { readonly att: Attribution }, shares: ReadonlyArray<number>): Rights {
-  const sellers = c.att.sellers.map((s, i) => [s.sellerId, shares[i]!] as const).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
-  return { claims: c.att.claimIds.map(() => "CONVERTED"), entitlements: sellers.map(([id, bps]) => [id, "ACTIVE", bps] as const), pools: 1, lines: shares.length };
-}
-
-/** The consumer's delivery on `conn` (the unit routed over it), the service's units standing at `at` on the TEST CLOCK when given. */
-function consumeOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, delivery: Delivery, steps: ReadonlyArray<SqlStep> = [], at?: string): Promise<string> {
-  if (at !== undefined) iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => runConsumer(delivery)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
-}
-/** One pass of a sweep on `conn`. */
-function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at?: string, expecting: Expecting = {}) {
-  if (at !== undefined) iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => runSweepPass(sweep, expecting)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
-}
-/**
- * THE way a cell runs a sweep pass or delivers an event to the consumer (the service itself, `rawSvc`, is touched nowhere else): the outcome
- * is asserted here, so no call site can forget it. A sweep catches the error of an item, hands it to the background sink and resolves a
- * report with a FAILED entry, so a settled promise proves nothing: a FAILED item or a new entry of the sink fails the call, unless the cell
- * names the variant that expects the failure (`expectFailure`: its fault is the point of the cell, and it asserts the failure itself).
- */
-interface Expecting {
-  readonly expectFailure?: true;
-}
-async function runSweepPass(sweep: CommissionSweepName, expecting: Expecting = {}): Promise<SweepReport> {
-  const seen = failures.length;
-  const report = await rawSvc.runSweep(sweep);
-  if (expecting.expectFailure !== true) {
-    assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], `the ${sweep} pass reports a failed item`);
-    assert.deepEqual(failures.slice(seen).map((f) => `${f.subject}: ${f.error instanceof Error ? f.error.message : String(f.error)}`), [], `the ${sweep} pass handed a failure to the background sink`);
-  }
-  return report;
-}
-async function runConsumer(delivery: Delivery, expecting: Expecting = {}): Promise<string> {
-  const seen = failures.length;
-  const outcome = await rawSvc.consumer.handle(delivery as never);
-  if (expecting.expectFailure !== true) assert.deepEqual(failures.slice(seen).map((f) => String(f.subject)), [], "the consumer handed a failure to the background sink");
-  return outcome;
-}
-const itemOf = (report: { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> }, subject: string): string | undefined => report.items.find((i) => i.subject === subject)?.outcome;
 
 /**
  * A pass of `sweep` on `conn` stopped at the first claim UPDATE of its first conversion, where `arm` arms the cell's fault: how a sweep, which
@@ -444,12 +351,6 @@ async function sweepFaultedInConversion(ctx: FaultContext, conn: HarnessConnecti
   pause.release();
   return running;
 }
-/** The last failure the commission service reported for the subject. */
-const failureOf = (subject: string): unknown => [...failures].reverse().find((f) => f.subject === subject)?.error;
-
-/** The settlement of an operation the cell expects to fail: its error, or the answer it got. */
-const settled = <T>(p: Promise<T>): Promise<{ readonly answer: T } | { readonly failure: unknown }> => p.then((answer) => ({ answer }), (failure: unknown) => ({ failure }));
-
 // --- 28. CONV_CRASH, C1 (consumer) -----------------------------------------------------------------------------------------------------
 
 faultCell(
@@ -908,49 +809,6 @@ test("CLAIM_TAIL (microseconds): a first purchase confirmed one microsecond befo
 // Two actors contend for the same rows, each in its real unit of work over a connection the harness opened: the holder stops with its locks
 // taken (a pause at its COMMIT, or right after its claim update), the waiter is observed waiting on it in pg_stat_activity (mustWait), the
 // holder lets go, and the cell asserts the state and the rights, then runs the opposite order on a fresh agency.
-
-interface Actor {
-  readonly name: string;
-  readonly login: Login;
-  /** The point the holder stops at with its locks taken. */
-  readonly holdAt: string;
-  run(conn: HarnessConnection): Promise<unknown>;
-}
-/** Runs `holder` and `waiter` in that order over fresh connections: the waiter is observed waiting on the holder, then both settle. */
-async function contend(ctx: FaultContext, holder: Actor, waiter: Actor, what: string): Promise<{ readonly holder: PromiseSettledResult<unknown>; readonly waiter: PromiseSettledResult<unknown> }> {
-  const holderConn = await open(holder.login);
-  const waiterConn = await open(waiter.login);
-  const seen = failures.length;
-  try {
-    const pause = ctx.points.pause(holder.holdAt);
-    const holding = ctx.operation(`${holder.name} (holder)`, () => settled(holder.run(holderConn)));
-    await pause.reachedBy(holding).catch(async (e: unknown) => {
-      const outcome = await holding;
-      throw new Error(`${holder.name} did not reach ${holder.holdAt} (${what}): ${"failure" in outcome ? (outcome.failure instanceof Error ? outcome.failure.message + " / " + String((outcome.failure as { cause?: unknown }).cause) : String(outcome.failure)) : "it completed: " + JSON.stringify((outcome.answer as { status?: number; text?: string } | undefined)?.text ?? outcome.answer).slice(0, 600)}`, { cause: e });
-    });
-    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(holderConn) }, (conn) => waiter.run(conn), `${waiter.name} while ${holder.name} holds the rows (${what})`);
-    pause.release();
-    const held = await holding;
-    const waited = await waiting.pending;
-    // before any recovery: no unit of the raced pair failed, whether it threw or only reported it to the sink
-    assert.deepEqual(failures.slice(seen).map((f) => `${f.subject}: ${f.error instanceof Error ? f.error.message : String(f.error)}`), [], `${what}: a raced unit failed and reported it to the background sink`);
-    return { holder: "failure" in held ? { status: "rejected", reason: held.failure } : { status: "fulfilled", value: held.answer }, waiter: waited };
-  } finally {
-    await holderConn.end();
-    await waiterConn.end();
-  }
-}
-/**
- * What a raced actor answered, refusing a failure it only reports: a sweep catches the error of an item, hands it to the background sink and
- * resolves a report with a FAILED entry (sweeps.ts item), so a settled promise is no proof; a report with a FAILED item fails here.
- */
-const mustHaveSettled = (r: PromiseSettledResult<unknown>, what: string): unknown => {
-  if (r.status === "rejected") throw new Error(`${what} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`, { cause: r.reason });
-  const items = (r.value as { readonly items?: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> } | null)?.items;
-  const failed = items?.filter((i) => i.outcome.startsWith("FAILED")) ?? [];
-  assert.deepEqual(failed, [], `${what} reports a failed item`);
-  return r.value;
-};
 
 const consumerActor = (ctx: FaultContext, delivery: Delivery, name = "the conversion"): Actor => ({ name, login: "kauro_commission_test", holdAt: "uow.before-commit", run: (conn) => consumeOn(ctx, conn, delivery, [CLAIM_UPDATE]) });
 const sweepActor = (ctx: FaultContext, sweep: CommissionSweepName, name: string): Actor => ({ name, login: "kauro_commission_test", holdAt: "db.claim_update.after", run: (conn) => sweepOn(ctx, conn, sweep, [CLAIM_UPDATE]) });
