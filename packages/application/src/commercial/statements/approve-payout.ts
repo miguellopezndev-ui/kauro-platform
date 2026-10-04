@@ -83,6 +83,11 @@ export function approveCommissionPayoutHandler(runtime: CommerceRequestRuntime, 
           if (cash.bankAvailableCents < cash.unsettledAuthorizedCents + statement.payableCents) {
             throw new DomainFailure("PRECONDITION_FAILED", "bank-available cash with bank evidence does not cover the payable and the unsettled intents", { reason: "FUNDS_UNAVAILABLE" });
           }
+          // the lines behind the payable (B10G-R2, migration 0036): each payable line PAYABLE with no OPEN hold the statement does not
+          // withhold, read after its shared half (a hold or a line change in flight is waited for); held cents are never authorized
+          if ((await statements.unpayableLine(statementId)) !== null) {
+            throw new DomainFailure("STALE_VERSION", "a payable line of the statement is held or no longer payable: the held cents are not authorized", { reason: "LEDGER_CHANGED", currentVersion: statement.version, currentState: statement.state });
+          }
           const intentId = uow.ids.next() as PayoutIntentId;
           const authorized = await statements.authorizeIntent({
             intent: {

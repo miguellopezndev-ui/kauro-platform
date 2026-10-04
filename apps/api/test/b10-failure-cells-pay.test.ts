@@ -388,10 +388,12 @@ faultCell(
     completed<PayoutReconciliationView>(value(failedFirst.held), 200);
     assert.equal(outcome(sw.w, value(failedFirst.waited)), "409 STALE_VERSION -");
     assert.equal(await liveIntents(x!.statementId), 0, "the failed intent is not live and the stale approval wrote none");
-    // the statement is ISSUED again at its new version: one fresh approval authorizes exactly one live intent
+    // the statement is ISSUED again at its new version, but its lines are HELD under OPEN PAYOUT_FAILED holds (B10G-R2): no approval
+    // authorizes held cents until the hold is resolved
     await bankCash(sw, (await claimedCents(sw)) + x!.payable);
-    completed<PayoutIntentView>(await approvePayout(sw, x!.statementId, await approveBody(await racing(x!))), 200);
-    assert.equal(await liveIntents(x!.statementId), 1);
+    assert.deepEqual(await lineStatesOf(x!), ["HELD"]);
+    assert.equal(outcome(sw.w, await approvePayout(sw, x!.statementId, await approveBody(await racing(x!)))), "409 STALE_VERSION LEDGER_CHANGED");
+    assert.equal(await liveIntents(x!.statementId), 0, "the held cents of the failed payout are not authorized again");
 
     // the second approval first (held right after it locked the statement): it finds the statement APPROVED; the FAILED reconciliation waits, then lands
     const seenY = await racing(y!);

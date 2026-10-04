@@ -1963,6 +1963,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | PAYEE_UNVERIFIED | — | — | COMMAND | payeeRef is not the seller's current VERIFIED destination: a change pending verification, a superseded or another seller's destination (KC009) |
 | 409 | PRECONDITION_FAILED | NOTHING_PAYABLE | — | — | COMMAND | the statement's payable is zero: the only floor (minimumPayoutCents 0) |
 | 409 | PRECONDITION_FAILED | FUNDS_UNAVAILABLE | — | — | COMMAND | bank-available cash of the latest settlement with bank evidence does not cover the payable and every unsettled authorized intent |
+| 409 | STALE_VERSION | LEDGER_CHANGED | — | always | COMMAND | a line the statement itemizes PAYABLE is no longer PAYABLE or carries an OPEN hold the statement does not withhold (a failed payout's hold, a dispute): nothing is authorized (D10-GAP-8) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |

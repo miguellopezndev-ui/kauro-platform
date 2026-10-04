@@ -890,6 +890,12 @@ export class PgStatementRepository implements StatementRepository {
     return { bankAvailableCents: bank.rows[0] === undefined ? 0n : money(bank.rows[0].bank_available_cents), unsettledAuthorizedCents: money(claimed.rows[0]?.cents ?? "0") };
   }
 
+  async unpayableLine(statementId: CommissionStatementId): Promise<CommissionLineId | null> {
+    const r = await execute<{ line_id: string | null }>(this.db, "SELECT kauro.payout_lines_unpayable($1) AS line_id", [statementId]);
+    const line = r.rows[0]?.line_id ?? null;
+    return line === null ? null : (line as CommissionLineId);
+  }
+
   /** The statement's row lock, taken before any intent of it is written or moved (design 10: statement, then payout intent, then line). */
   private async lockStatementRow(statementId: string): Promise<void> {
     await execute(this.db, "SELECT 1 FROM kauro.commission_statements WHERE statement_id = $1 FOR UPDATE", [statementId]);

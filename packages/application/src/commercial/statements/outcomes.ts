@@ -45,6 +45,7 @@ export const APPROVE_COMMISSION_PAYOUT_OUTCOMES: ReadonlyArray<ProblemOutcome> =
   outcome("COMMAND", "PRECONDITION_FAILED", "PAYEE_UNVERIFIED", "payeeRef is not the seller's current VERIFIED destination: a change pending verification, a superseded or another seller's destination (KC009)"),
   outcome("COMMAND", "PRECONDITION_FAILED", "NOTHING_PAYABLE", "the statement's payable is zero: the only floor (minimumPayoutCents 0)"),
   outcome("COMMAND", "PRECONDITION_FAILED", "FUNDS_UNAVAILABLE", "bank-available cash of the latest settlement with bank evidence does not cover the payable and every unsettled authorized intent"),
+  outcome("COMMAND", "STALE_VERSION", "LEDGER_CHANGED", "a line the statement itemizes PAYABLE is no longer PAYABLE or carries an OPEN hold the statement does not withhold (a failed payout's hold, a dispute): nothing is authorized (D10-GAP-8)", { current: "ALWAYS" }),
 ]);
 
 /** CMD053: the evidence verified, then the statement, the intent it names, the match and the settlement (D10-PAY-2). */

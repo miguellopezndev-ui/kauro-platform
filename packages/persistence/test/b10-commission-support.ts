@@ -642,6 +642,19 @@ export function makeEligible(w: World, lineId: string, afterSeconds = 720 * 3600
   });
 }
 
+/**
+ * A held line made payable again through its statement's item (0036, B10G-R2): its OPEN holds released (hold_resolved_and_eligible,
+ * HELD to ELIGIBLE), then ELIGIBLE to PAYABLE under the item that names it — the only way a statement's held cents become payable again.
+ */
+export function repayable(w: World, lineId: string): Promise<unknown> {
+  return within(w.commission, corporate, async (c) => {
+    await clockAfter(c, "SELECT pc.completed_at AS at FROM kauro.commission_lines l JOIN kauro.purchase_completions pc ON pc.agency_id = l.agency_id AND pc.authorization_id = l.authorization_id AND pc.kind = 'FINAL' WHERE l.line_id = $1", [lineId], 720 * 3600);
+    await c.query("UPDATE kauro.commission_holds SET state = 'RELEASED', released_at = kauro.server_now(), version = version + 1 WHERE line_id = $1 AND state = 'OPEN'", [lineId]);
+    await c.query("UPDATE kauro.commission_lines SET state = 'ELIGIBLE', version = version + 1 WHERE line_id = $1", [lineId]);
+    return c.query("UPDATE kauro.commission_lines SET state = 'PAYABLE', version = version + 1 WHERE line_id = $1", [lineId]);
+  });
+}
+
 // --- periods, statements and payouts (0031; D10-CAL-1, D10-STMT-1, D10-PAY-1, D10-PAY-2) ------------------------------------------------
 
 /** The example 21 fixture calendar (weekends and 2026-10-12 nonbanking), as BankingCalendarSource served it, recorded by the commission service. */

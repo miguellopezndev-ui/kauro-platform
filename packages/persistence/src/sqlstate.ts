@@ -62,6 +62,8 @@ export const SQLSTATE = Object.freeze({
   PAYOUT_NOT_SETTLED: "KC010",
   ADJUSTMENT_NOT_CUMULATIVE: "KC015",
   OFFSET_NOT_AUTHORIZED: "KC017",
+  // package B10 (migration 0036, B10G-R2): an intent whose statement's payable lines cannot pay
+  PAYOUT_LINES_NOT_PAYABLE: "KC018",
   // package B10 (migration 0028): the agency closure residuals the lifecycle adapter surfaces (docs/design/B10-commercial-domain.md §12)
   CLOSURE_RESIDUALS_OPEN: "KC006",
   // package B08 (migrations 0021..0023; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1): the fence of an attempt or a step, the
@@ -137,6 +139,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KC009: { code: "PRECONDITION_FAILED", reason: "PAYEE_UNVERIFIED" },
   KC010: { code: "PRECONDITION_FAILED", reason: "PAYOUT_NOT_SETTLED" },
   KC017: { code: "PRECONDITION_FAILED", reason: "OFFSET_NOT_AUTHORIZED" },
+  // an intent born while a payable line of its statement is not PAYABLE or carries a hold the statement does not withhold (0036): CMD052
+  // refuses it first (STALE_VERSION LEDGER_CHANGED), so the database refusing it is an integrity failure
+  KC018: { code: "INTEGRITY_FAILURE" },
   // CLOSING -> CLOSED while a payment, refund, authorization, tax document or reconciliation case of the agency is open (D10-AGY-4)
   KC006: { code: "PRECONDITION_FAILED", reason: "CLOSURE_RESIDUALS_OPEN" },
   // package B08 (D8-SQL-1): the control plane treats a lost fence as "the attempt or step lost" (DONE); a lost authority refuses the

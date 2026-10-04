@@ -40,6 +40,7 @@ import {
   reconcile,
   reconcileIn,
   refusedWith,
+  repayable,
   registerProspect,
   september,
   service,
@@ -575,7 +576,10 @@ test("CMD052 at the database: an intent's amount equals its statement's payable,
     );
     await c.query("UPDATE kauro.commission_lines SET state = 'HELD', version = version + 1 WHERE line_id = $1", [lineId]);
   });
-  // ... and a new intent of the same statement is live again beside it
+  // ... its held cents are never authorized again while the line is HELD under its OPEN hold (KC018, 0036, B10G-R2) ...
+  await assert.rejects(approvePayout(w, statement, s, s), refusedWith("KC018"), "a failed payout's held line");
+  // ... and once the hold is resolved and the line payable again, a new intent of the same statement is live again beside it
+  await repayable(w, lineId);
   const again = await approvePayout(w, statement, s, s);
   const intents = await w.h.oracle.query("SELECT intent_id, state FROM kauro.payout_intents WHERE statement_id = $1 ORDER BY created_at, intent_id", [statement.statementId]);
   assert.deepEqual(intents.rows, [{ intent_id: intentId, state: "FAILED" }, { intent_id: again, state: "AUTHORIZED" }]);
@@ -654,10 +658,16 @@ test("CMD053 at the database: a line becomes PAID only when its statement's inte
     );
     await c.query("UPDATE kauro.commission_lines SET state = 'HELD', version = version + 1 WHERE line_id = $1", [tLine]);
   });
+  await repayable(w, tLine);
   const tSecond = await approvePayout(w, tStatement, t, t);
   await within(w.commission, corporate, async (c) => {
     await reconcileIn(c, tSecond, "RETURNED");
     await c.query("UPDATE kauro.commission_statements SET state = 'ISSUED', version = version + 1 WHERE statement_id = $1", [tStatement.statementId]);
+    await c.query(
+      "INSERT INTO kauro.commission_holds (hold_id, agency_id, line_id, seller_id, amount_cents, reason, review_at, opened_at, created_at, updated_at) SELECT $1, agency_id, line_id, seller_id, cumulative_entitlement_cents, 'PAYOUT_FAILED', kauro.server_now() + interval '7 days', kauro.server_now(), now(), now() FROM kauro.commission_lines WHERE line_id = $2",
+      [ids.next(), tLine],
+    );
+    await c.query("UPDATE kauro.commission_lines SET state = 'HELD', version = version + 1 WHERE line_id = $1", [tLine]);
   });
   const kept = await w.h.oracle.query<{ intent_id: string; state: string; evidence: boolean; reconciled: boolean }>(
     `SELECT p.intent_id, p.state, p.evidence_hash IS NOT NULL AS evidence,

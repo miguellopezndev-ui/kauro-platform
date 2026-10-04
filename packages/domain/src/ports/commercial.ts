@@ -662,6 +662,11 @@ export interface StatementRepository {
   itemsOf(statementId: CommissionStatementId): Promise<ReadonlyArray<StatementItemRecord>>;
   transitionStatement(statementId: CommissionStatementId, expectedVersion: number, change: StatementChange, now: UtcInstant): Promise<VersionedWrite<CommissionStatementRecord>>;
   payoutCash(): Promise<PayoutCash>;
+  /**
+   * Takes the shared half of each line the statement itemizes PAYABLE (ascending id, held to COMMIT) and answers the first that cannot
+   * pay — not PAYABLE, or carrying an OPEN hold the statement does not withhold — or null (migration 0036; B10G-R2).
+   */
+  unpayableLine(statementId: CommissionStatementId): Promise<CommissionLineId | null>;
   /** Authorizes one intent of exactly the payable (payout_intents_one_live_per_statement; KC009 for an unverified payee). */
   authorizeIntent(intent: NewPayoutIntent): Promise<{ readonly authorized: boolean; readonly record: PayoutIntentRecord }>;
   getIntent(intentId: PayoutIntentId): Promise<PayoutIntentRecord | null>;

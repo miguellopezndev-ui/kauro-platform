@@ -4,9 +4,9 @@
 // holding it until its COMMIT. PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import type { PeriodCloseView } from "@kauro/application";
+import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
 import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { closeMonth, closePeriod, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { approvePayout, bankCash, claimedCents, closeMonth, closePeriod, eligibleLines, itemsOf, openMonth, proposal, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
@@ -56,6 +56,13 @@ async function holdOn(conn: HarnessConnection, lineId: string, cents: bigint, op
 
 const statementOf = async (sellerId: string, periodId: string) => (await statementsOfSeller(sw, sellerId)).find((x) => x.period_id === periodId);
 
+/** The owner's CMD052 of the statement at its current version to the seller's destination, the cash made to cover it (B10G-R2). */
+async function approveStatement(st: { readonly statement_id: string; readonly version: string; readonly payable_cents: string }, destinationId: string): Promise<Reply> {
+  await bankCash(sw, (await claimedCents(sw)) + BigInt(st.payable_cents));
+  return approvePayout(sw, st.statement_id, { expectedVersion: Number(st.version), payeeRef: destinationId, authorizationRef: await sw.w.stepUp(sw.owner) });
+}
+const intentsOf = async (statementId: string): Promise<number> => Number((await sw.h.oracle.query<{ n: string }>("SELECT count(*)::text AS n FROM kauro.payout_intents WHERE statement_id = $1", [statementId])).rows[0]!.n);
+
 // --- 1. CLOSE_HOLD_RACE -------------------------------------------------------------------------------------------------------------
 
 faultCell(
@@ -101,6 +108,11 @@ faultCell(
           kind === "full" ? [["HELD", "10000", "0"]] : [["PAYABLE", "0", "9000"], ["HELD", "1000", "0"]],
           "the whole line is excluded only by a covering hold; a partial hold withholds exactly its cents",
         );
+        // a nearby valid control (B10G-R2): the hold the statement itself withholds does not block paying the rest of the line
+        if (kind === "partial") {
+          completed<PayoutIntentView>(await approveStatement(st, s.destinationId), 200);
+          assert.equal(await intentsOf(st.statement_id), 1, "the 9000 payable cents are authorized; the withheld 1000 are not");
+        }
       }
 
       // the close first (held at its COMMIT, the lines locked): the hold waits for it and is ordered after the statement it did not change
@@ -121,10 +133,51 @@ faultCell(
           const settled = await waiting.pending;
           const st = (await statementOf(s.sellerId, periodId))!;
           assert.deepEqual([st.payable_cents, st.held_cents], ["10000", "0"], "the statement is the ledger the close read: the hold arrived after it");
+          value(settled);
+          // B10G-R2: the hold committed after the close now holds cents the statement calls payable; the payout of the old payable is refused
+          assert.equal(outcome(sw.w, await approveStatement(st, s.destinationId)), "409 STALE_VERSION LEDGER_CHANGED", `${kind}: held cents are never authorized`);
+          assert.equal(await intentsOf(st.statement_id), 0);
         } finally {
           await closing.end();
           await holding.end();
         }
+      }
+    }
+
+    // B10G-R2: CMD052 racing a hold on a payable line of its statement, both orders. The approval takes the shared half of each payable
+    // line's transition subject and a hold insert its exclusive half: a hold in flight is waited for and refuses the approval
+    // (STALE_VERSION LEDGER_CHANGED); an approval in flight is waited for by the hold, which lands after the intent (the dispute path, B12).
+    for (const order of ["hold-first", "approval-first"] as const) {
+      const s = await seller(sw, `approve-hold-${order}`, WHOLE);
+      const sold = await eligibleLines(sw, `approve hold ${order}`, s, WHOLE, [{ basisCents: 10_000n, poolCents: 10_000n }]);
+      const closed = await closeMonth(sw, nextMonth());
+      completed<PeriodCloseView>(closed.reply, 200);
+      const st = (await statementOf(s.sellerId, closed.periodId))!;
+      await bankCash(sw, (await claimedCents(sw)) + BigInt(st.payable_cents));
+      const body = { expectedVersion: Number(st.version), payeeRef: s.destinationId, authorizationRef: await sw.w.stepUp(sw.owner) };
+      const holding = await open("kauro_app_test");
+      const approving = await open("kauro_app_test");
+      const approve = (conn: HarnessConnection): Promise<Reply> => sw.faults.on(conn, "kauro_app", ctx.points, [], () => approvePayout(sw, st.statement_id, body));
+      try {
+        if (order === "hold-first") {
+          await holdOn(holding, sold.lines[0]!.lineId, 1_000n, { commit: false });
+          const waiting = await ctx.mustWait(sw.h.oracle, { waiter: approving, holder: connectionPid(holding) }, approve, "the approval while a hold on its payable line is uncommitted");
+          await holding.query("COMMIT");
+          assert.equal(outcome(sw.w, value(await waiting.pending)), "409 STALE_VERSION LEDGER_CHANGED", "the hold in flight is read: its cents are never authorized");
+          assert.equal(await intentsOf(st.statement_id), 0);
+        } else {
+          const pause = ctx.points.pause("uow.before-commit");
+          const running = ctx.operation("the approval (holder)", () => approve(approving));
+          await pause.reachedBy(running);
+          const waiting = await ctx.mustWait(sw.h.oracle, { waiter: holding, holder: connectionPid(approving) }, (conn) => holdOn(conn, sold.lines[0]!.lineId, 1_000n, { commit: true }), "a hold while the approval is held");
+          pause.release();
+          completed<PayoutIntentView>(await running, 200);
+          value(await waiting.pending);
+          assert.equal(await intentsOf(st.statement_id), 1, "the approval read the line before the hold; the hold is ordered after the intent");
+        }
+      } finally {
+        await holding.end();
+        await approving.end();
       }
     }
   },
