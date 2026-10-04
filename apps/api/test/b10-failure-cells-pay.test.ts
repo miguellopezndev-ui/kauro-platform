@@ -512,30 +512,52 @@ faultCell(
     const key = freshKey("verifier-tmo");
     const ref = scriptEvidence(sw, sw.payouts.matching(factsOf(x!), "SETTLED"));
     const before = [await intentState(x!.intent.intentId), await statementState(x!.statementId), await lineStatesOf(x!), await reconciliationsOf(x!)];
-    // the provider call's bound is the cell's deadline: the clock crosses it, the verifier's call is consumed at an instant past it and gives up
+    // the provider call's bound is the cell's deadline (B10G-R4): the verifier never answers, so only the application's own bound can end
+    // the wait. The application starts that bound on the injected timer; the cell moves the clock past the deadline and only then lets the
+    // bound elapse, the instant past it consumed by the timer's instrumented sink inside the reconciliation's own operation.
     const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), "the payout evidence verifier's call bound");
-    sw.faults.verifier = (request, real) =>
-      ctx.withClock("the verifier call", async (clock) => {
-        const at = clock.now();
-        const call = instrumentPort(
-          {
-            async verify(r: { readonly evidenceRef: string; readonly at: string }): Promise<unknown> {
-              if (Date.parse(r.at) >= Date.parse(deadline)) throw new Error("the verifier did not answer within its bound");
-              return real(r);
-            },
-          },
-          ctx.points,
-          "verifier",
-        );
-        return call.verify({ evidenceRef: request.evidenceRef, at });
-      });
+    let verifierCalled!: () => void;
+    const called = new Promise<void>((resolve) => (verifierCalled = resolve));
+    sw.faults.verifier = () => {
+      verifierCalled();
+      return new Promise<never>(() => undefined);
+    };
+    const bounds: Array<{ readonly ms: number; readonly startedAt: number; readonly elapse: () => void; cancelled: boolean }> = [];
     try {
-      ctx.clock.past(deadline);
-      const refused = await reconcilePayout(sw, x!.statementId, { providerPayoutEvidenceRef: ref }, { key });
+      const refused = await ctx.withClock("the reconciliation whose verifier never answers", async (clock) => {
+        const sink = instrumentPort({ async elapsed(r: { readonly at: string }): Promise<string> { return r.at; } }, ctx.points, "provider-timer");
+        sw.faults.timer = (ms) => {
+          const startedAt = clock.nowMs();
+          let elapse!: () => void;
+          const elapsed = new Promise<void>((resolve) => (elapse = resolve));
+          const bound = { ms, startedAt, elapse, cancelled: false };
+          bounds.push(bound);
+          return { elapsed, cancel: () => void (bound.cancelled = true) };
+        };
+        let settled = false;
+        const running = reconcilePayout(sw, x!.statementId, { providerPayoutEvidenceRef: ref }, { key }).finally(() => (settled = true));
+        await Promise.race([called, running]);
+        assert.equal(bounds.length, 1, "the application started its provider-call bound before the verifier stalled (none: a stalled verifier holds the request forever)");
+        assert.equal(bounds[0]!.ms, PROVIDER_CALL_TIMEOUT_MS);
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(settled, false, "the request waits on the stalled verifier until its bound elapses");
+        ctx.clock.past(deadline);
+        const at = clock.now();
+        assert.ok(Date.parse(await sink.elapsed({ at })) >= bounds[0]!.startedAt + PROVIDER_CALL_TIMEOUT_MS, "the bound elapses only at an instant past its deadline");
+        bounds[0]!.elapse();
+        // a watchdog of the test only: the request must end once its bound elapsed (an application that starts the bound and ignores it fails here, not hangs)
+        let watchdog: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([running, new Promise<never>((_resolve, reject) => (watchdog = setTimeout(() => reject(new Error("the request did not end when its provider-call bound elapsed")), 5_000)))]);
+        } finally {
+          clearTimeout(watchdog);
+        }
+      });
       assert.equal(outcome(sw.w, refused), "503 CAPACITY_UNAVAILABLE PAYOUT_EVIDENCE_UNAVAILABLE");
       assert.equal(asProblem(sw.w, refused).retryable, true);
     } finally {
       sw.faults.verifier = null;
+      sw.faults.timer = null;
     }
     assert.deepEqual([await intentState(x!.intent.intentId), await statementState(x!.statementId), await lineStatesOf(x!), await reconciliationsOf(x!)], before, "nothing changed");
     assert.equal(await journalState(key), null);

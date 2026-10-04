@@ -6,7 +6,7 @@
  * delivery completions) are adapters of B10-ADAPTERS-LEDGER.
  */
 import type { AgencyId, IntegrationClass, UnitOfWork } from "@kauro/domain";
-import type { BuyerType, BuyerTypeReader, PayoutEvidenceAnswer, PayoutEvidenceVerifier } from "./ports.js";
+import type { BuyerType, BuyerTypeReader, PayoutEvidenceAnswer, PayoutEvidenceVerifier, ProviderCallTimer } from "./ports.js";
 import type { PlatformBinding } from "../commerce/ports.js";
 
 /** The refusal reason CMD053 answers PRECONDITION_FAILED while no payout evidence can be verified. */
@@ -23,6 +23,17 @@ export class UnrecordedBuyerTypeReader implements BuyerTypeReader {
     return null;
   }
 }
+
+/** The provider-call bound of a deployment: the runtime's own timer. */
+export const realProviderCallTimer: ProviderCallTimer = {
+  start(ms: number) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const elapsed = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, ms);
+    });
+    return { elapsed, cancel: () => clearTimeout(timer) };
+  },
+};
 
 /** Never verifies: CMD053 is refused PAYOUT_EVIDENCE_UNAVAILABLE and no payout is reconciled from a claim nobody authenticated. B15 replaces it. */
 export class UnavailablePayoutEvidenceVerifier implements PayoutEvidenceVerifier {

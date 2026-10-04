@@ -17,13 +17,14 @@
  * B15). Without the commission service's units of work (an edition that binds none) the routes are served all the same and find no
  * verified service identity.
  */
-import type { BankingCalendarSource, CommandResult, CompletedResponse, CommandSpec, PayoutEvidenceVerifier, Problem, SchemaValidator, ServiceAuthenticator, StatementServiceHold, StatementServiceRuntime, UnauthenticatedRequest } from "@kauro/application";
+import type { BankingCalendarSource, CommandResult, CompletedResponse, CommandSpec, PayoutEvidenceVerifier, Problem, ProviderCallTimer, SchemaValidator, ServiceAuthenticator, StatementServiceHold, StatementServiceRuntime, UnauthenticatedRequest } from "@kauro/application";
 import {
   CLOSE_COMMISSION_PERIOD,
   HEADERS,
   RECONCILE_COMMISSION_PAYOUT,
   UnavailablePayoutEvidenceVerifier,
   admitHeaders,
+  realProviderCallTimer,
   admitStructure,
   closeCommissionPeriod,
   commercialCommandRouteResponses,
@@ -51,6 +52,8 @@ export interface CommissionRoutesBinding {
   readonly calendar?: BankingCalendarSource;
   /** PayoutEvidenceVerifier; UnavailablePayoutEvidenceVerifier when absent (D10-BIND-1). */
   readonly payoutEvidence?: PayoutEvidenceVerifier;
+  /** The provider-call bound's timer; realProviderCallTimer when absent (fault cells bind a clock-driven one). */
+  readonly providerTimer?: ProviderCallTimer;
   /** Interleavings of the service commands (tests only). */
   readonly hold?: StatementServiceHold;
 }
@@ -65,6 +68,7 @@ export function statementServiceRuntime(binding: CommissionRoutesBinding, enviro
     policy: registryCommissionPolicy(),
     calendar: binding.calendar ?? new RecordedBankingCalendarSource(),
     payoutEvidence: binding.payoutEvidence ?? new UnavailablePayoutEvidenceVerifier(),
+    providerTimer: binding.providerTimer ?? realProviderCallTimer,
     reads: { reportedAdjustments: (uow) => commissionWorkOf(uow).reportedAdjustments() },
     statements: statementsOf,
     ledger: ledgerOf,

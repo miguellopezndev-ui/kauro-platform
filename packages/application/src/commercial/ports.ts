@@ -117,6 +117,15 @@ export interface PayoutEvidenceVerifier {
   verify(request: { readonly evidenceRef: string }): Promise<PayoutEvidenceAnswer>;
 }
 
+/**
+ * The timer that bounds a provider call (D10-GAP-6, B10G-R4): `start(ms)` begins a bound that elapses `ms` later; `cancel` ends it
+ * once the call answered. A deployment binds `realProviderCallTimer` (setTimeout); a fault cell binds a timer its controlled clock
+ * drives, so a cell can prove the application's own bound ends a call that never answers.
+ */
+export interface ProviderCallTimer {
+  start(ms: number): { readonly elapsed: Promise<void>; cancel(): void };
+}
+
 // --- CommercialPrincipalReader (design §2, D10-CTX-1, D10-CTX-2) ---------------------------------------------------------------
 
 /** A seller's lifecycle state (design §4: CANDIDATE, ACTIVE, SUSPENDED, TERMINATED). Only ACTIVE may act. */

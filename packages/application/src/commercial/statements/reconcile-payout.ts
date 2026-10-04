@@ -36,18 +36,18 @@ const VERIFIER_RETRY_AFTER_SECONDS = 5;
  * times out, fails or answers nothing is no evidence, never an unhandled 500, and nothing has been written yet (no unit of work is open).
  */
 async function verifiedWithinBound(rt: StatementServiceRuntime, evidenceRef: string): Promise<PayoutEvidenceAnswer> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = rt.providerTimer.start(PROVIDER_CALL_TIMEOUT_MS);
   try {
-    const bound = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error("the payout evidence verifier did not answer within its bound")), PROVIDER_CALL_TIMEOUT_MS);
+    const elapsed = bound.elapsed.then((): never => {
+      throw new Error("the payout evidence verifier did not answer within its bound");
     });
-    return await Promise.race([rt.payoutEvidence.verify({ evidenceRef }), bound]);
+    return await Promise.race([rt.payoutEvidence.verify({ evidenceRef }), elapsed]);
   } catch (cause) {
     const failure = new DomainFailure("CAPACITY_UNAVAILABLE", "the payout evidence verifier did not answer; nothing changed, retry with the same key", { reason: "PAYOUT_EVIDENCE_UNAVAILABLE", retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS }, true);
     failure.cause = cause;
     throw failure;
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    bound.cancel();
   }
 }
 

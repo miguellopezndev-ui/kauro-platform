@@ -315,7 +315,7 @@ Tier 1 = money or authority: a wrong outcome pays, withholds, forfeits or attrib
 10. `PAY_VERIFIER_TMO` (1 cell): CMD053: PayoutEvidenceVerifier times out or answers ambiguously (PayoutEvidenceVerifier is a port to B15).  
    Proposed test: `DENY: a PayoutEvidenceVerifier that times out answers the retriable 503 PAYOUT_EVIDENCE_UNAVAILABLE, nothing changes, and the same key then settles once`  
    Cells: CMD053 ReconcileCommissionPayout / TIMEOUT
-   Status: covered `[gverifier]`; product fix D10-GAP-6.
+   Status: covered `[gverifier]`; product fix D10-GAP-6. Corrected after Codex r1 (B10G-R4): the verifier never answers and the bound is the application's own, started on the injected ProviderCallTimer and elapsed only after the controlled clock crossed PROVIDER_CALL_TIMEOUT_MS; with the bound removed the cell fails (mutation checked).
 
 11. `PAY_CRA` (2 cells): CMD052 and CMD053: response lost after COMMIT (retry replays; the injected loss is not tested).  
    Proposed test: `RACE (crash after COMMIT): the response lost after the intent (or settlement) commits is recovered by the same key as the same answer, one intent, one settlement`  

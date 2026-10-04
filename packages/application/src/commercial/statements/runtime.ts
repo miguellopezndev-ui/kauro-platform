@@ -26,7 +26,7 @@ import type {
 } from "@kauro/domain";
 import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { CommercialAuthorizer } from "../authorizer.js";
-import type { BankingCalendarSource, PayoutEvidenceVerifier } from "../ports.js";
+import type { BankingCalendarSource, PayoutEvidenceVerifier, ProviderCallTimer } from "../ports.js";
 
 /** The records every statement command reads, as accessors over the unit of work (@kauro/persistence statementsOf, ledgerOf, salesOf). */
 export interface StatementRecords {
@@ -69,6 +69,8 @@ export interface StatementServiceRuntime extends StatementRecords {
   readonly calendar: BankingCalendarSource;
   /** PayoutEvidenceVerifier: UnavailablePayoutEvidenceVerifier in a deployment (D10-BIND-1), the labelled fake in tests. */
   readonly payoutEvidence: PayoutEvidenceVerifier;
+  /** The bound of the verifier's call (PROVIDER_CALL_TIMEOUT_MS): realProviderCallTimer in a deployment, a clock-driven timer in fault cells. */
+  readonly providerTimer: ProviderCallTimer;
   readonly reads: CloseReads;
   readonly hold?: StatementServiceHold;
 }

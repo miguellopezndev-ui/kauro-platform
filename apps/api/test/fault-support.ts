@@ -94,6 +94,11 @@ export class FaultRouting {
   readonly #als = new AsyncLocalStorage<Route>();
   /** Wraps the payout evidence verifier's calls while a cell has armed it (null: the labelled fake answers as scripted). */
   verifier: ((request: { readonly evidenceRef: string }, real: (request: { readonly evidenceRef: string }) => Promise<unknown>) => Promise<unknown>) | null = null;
+  /**
+   * Starts the application's provider-call bound while a cell has armed it (null: the real timer of a deployment): the cell decides when
+   * the bound elapses, after moving its controlled clock past the bound's deadline (B10G-R4).
+   */
+  timer: ((ms: number) => { readonly elapsed: Promise<void>; cancel(): void }) | null = null;
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 

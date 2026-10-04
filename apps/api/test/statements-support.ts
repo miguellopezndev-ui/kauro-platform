@@ -17,7 +17,7 @@
 import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { BANKING_CALENDAR_FIXTURE_NONBANKING, ContractFakeBankingCalendar, ContractFakePayoutEvidence, ContractFakePreparationCompletion } from "@kauro/application/testing";
-import { correctCommissionStatement, type CommandResult, type StatementCorrectionView, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
+import { correctCommissionStatement, realProviderCallTimer, type CommandResult, type StatementCorrectionView, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CorrelationId, ExecutionContext, SettlementId, UserId } from "@kauro/domain";
 import { registryCommissionPolicy, registryPricePolicy } from "@kauro/domain";
@@ -154,7 +154,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
-      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, hold: serviceHolds.hook }, close: () => pools.close() };
+      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, providerTimer: { start: (ms) => (faults.timer === null ? realProviderCallTimer.start(ms) : faults.timer(ms)) }, hold: serviceHolds.hook }, close: () => pools.close() };
     },
   });
   faults.stand = () => (standing === null ? null : { at: standing });
