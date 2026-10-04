@@ -9,12 +9,14 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import { correctCommissionStatement, type CommandResult, type PeriodCloseView, type StatementCorrectionView } from "@kauro/application";
+import { closeCommissionPeriod, correctCommissionStatement, type CommandResult, type PeriodCloseView, type StatementCorrectionView } from "@kauro/application";
 import type { CorrelationId } from "@kauro/domain";
 import { connectionPid, crashedAt, faultCell, FaultPoints, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { FIXTURE_CALENDAR, closePeriod, correctStatement, drainCommissions, eligibleLines, itemsOf, openMonth, periodRow, proposal, resultOf, rows, seller, statementsOfSeller, statementsWorld, StandingUnits, type StatementsWorld } from "./statements-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { createCommissionService } from "../src/index.js";
+import { statementServiceRuntime } from "../src/commissions/routes.js";
+import { RecordedBankingCalendarSource } from "@kauro/persistence";
 import { createPeriodsSweep, periodCloseKey } from "../src/commissions/periods.js";
 import { asProblem, completed, freshKey, ids, outcome, sha, type Reply } from "./support.js";
 
@@ -453,8 +455,9 @@ faultCell(
 // The close's bounds are the database's own: every unit of work sets statement_timeout, and a lock wait that outlasts it is cancelled
 // (SQLSTATE 57014) and answered as the retriable CAPACITY_UNAVAILABLE. The cell proves the real thing: a lock wait of the close on the
 // holder's lock, OBSERVED, that ENDS in the database's timeout (shortened to TIMEOUT_MS on the routed units), not a deadline the test crosses.
-// The banking calendar the test world binds is a contract fake that answers in process; its step in the unit that can wait is the recording
-// of the version it read (banking_calendars), so the calendar cell holds that table and the recomputation cell holds the ledger lines.
+// The banking calendar the test world binds is a contract fake that answers in process, so the first calendar cell proves only the rollback
+// of the calendar's PERSISTENCE (recordCalendar, after the read answered); the SOURCE cell binds the real RecordedBankingCalendarSource,
+// whose read of banking_calendars is the step that waits. The recomputation cell holds the ledger lines.
 
 const TIMEOUT_MS = 1_500;
 
@@ -494,7 +497,7 @@ async function closesOnce(s: Awaited<ReturnType<typeof seller>>, periodId: strin
 }
 
 for (const [step, hold, what] of [
-  ["the banking calendar step (the recording of the version it read)", lockTable("kauro.banking_calendars"), "the close while the banking calendars table is held"],
+  ["the calendar PERSISTENCE (statements.recordCalendar, which runs after the contract fake's in-process read answered: this is not a source timeout)", lockTable("kauro.banking_calendars"), "the close while the banking calendars table is held"],
   ["the cutoff recomputation and input reads (the ledger lines)", lockTable("kauro.commission_lines"), "the close while the ledger lines are held"],
 ] as const) {
   faultCell(
@@ -556,6 +559,66 @@ faultCell(
     } finally {
       await conn.end();
     }
+    assert.equal((await statementsOfPeriod(periodId)).length, 1);
+    assert.equal((await statementOf(s.sellerId, periodId))?.state, "ISSUED");
+  },
+);
+
+faultCell(
+  {
+    id: "CLOSE_TMO",
+    step: "CMD051 CloseCommissionPeriod, the RecordedBankingCalendarSource READ of banking_calendars waiting past the database's statement timeout",
+    fault: "race",
+    expect: "DENY: the real RecordedBankingCalendarSource whose read of banking_calendars waits on a lock past the database's statement timeout fails at the source read (the read is cancelled, never answered), the close answers the retriable 503 CAPACITY_UNAVAILABLE, the period stays OPEN and undated, nothing is written, and the same journal key then closes once",
+  },
+  async (ctx) => {
+    const { s, periodId, proposed, lineIds } = await readyPeriod("close-tmo-source", 1);
+    // a recorded VERIFIED_FEED version for the source to read (the feed's writer is B15: the superuser stands for it)
+    await sw.h.oracle.query(
+      "INSERT INTO kauro.banking_calendars (calendar_id, jurisdiction, calendar_version, source, nonbanking_dates, covers_from, covers_to, evidence_hash, recorded_at, created_at) VALUES ($1, 'CO', $2, 'VERIFIED_FEED', '{}', $3, $4, $5, kauro.server_now(), now())",
+      [ids.next(), `feed-tmo-${ids.next()}`, FIXTURE_CALENDAR.coversFrom, FIXTURE_CALENDAR.coversTo, sha("feed-tmo")],
+    );
+    const real = new RecordedBankingCalendarSource();
+    const reads: string[] = [];
+    const source = {
+      binding: real.binding,
+      async currentCalendar(uow: Parameters<typeof real.currentCalendar>[0], request: Parameters<typeof real.currentCalendar>[1]) {
+        reads.push("started");
+        try {
+          const answer = await real.currentCalendar(uow, request);
+          reads.push("answered");
+          return answer;
+        } catch (e) {
+          reads.push("rejected");
+          throw e;
+        }
+      },
+    };
+    const runtime = statementServiceRuntime({ units: sw.faults.wrap(new StandingUnits(sw.pools.pools, () => ({ at: LATER }))), calendar: source as never }, "LOCAL", sw.clock);
+    const key = freshKey("close-tmo-source");
+    const before = await periodRow(sw, periodId);
+    const refused = await waitsOutTimeout(
+      ctx,
+      "postgres",
+      lockTable("kauro.banking_calendars"),
+      (conn) => {
+        sw.standAt(LATER);
+        return sw.faults.on(conn, "kauro_commission", ctx.points, [], () => closeCommissionPeriod(runtime, { correlationId: ids.next() as CorrelationId, idempotencyKey: key, identity: { serviceId: "commission-service", audience: "kauro-api", environment: "LOCAL" }, path: { periodId }, body: { ledgerCutoffHash: proposed } })).finally(() => sw.standAt(null));
+      },
+      "the close whose calendar source reads banking_calendars while the table is held",
+    );
+    assert.deepEqual(reads, ["started", "rejected"], "the timeout happened AT the source read: it was called, never answered, and failed");
+    assert.match(resultOf(refused), /^503 CAPACITY_UNAVAILABLE/);
+    assert.equal(refused.kind === "UNAVAILABLE" && refused.problem.retryable, true);
+    assert.deepEqual(await periodRow(sw, periodId), before, "the period stays OPEN and undated");
+    assert.deepEqual(await statementsOfPeriod(periodId), [], "nothing written");
+    assert.deepEqual(await lineStates(lineIds), ["ELIGIBLE"]);
+    assert.equal(await journalState(key), null, "no journal entry");
+    reads.length = 0;
+    sw.standAt(LATER);
+    const again = await closeCommissionPeriod(runtime, { correlationId: ids.next() as CorrelationId, idempotencyKey: key, identity: { serviceId: "commission-service", audience: "kauro-api", environment: "LOCAL" }, path: { periodId }, body: { ledgerCutoffHash: proposed } }).finally(() => sw.standAt(null));
+    assert.equal(resultOf(again), "200", "the same key then closes once");
+    assert.deepEqual(reads, ["started", "answered"]);
     assert.equal((await statementsOfPeriod(periodId)).length, 1);
     assert.equal((await statementOf(s.sellerId, periodId))?.state, "ISSUED");
   },
