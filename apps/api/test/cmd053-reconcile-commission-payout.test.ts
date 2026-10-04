@@ -88,7 +88,7 @@ const dateIn = (instant: string): string => new Intl.DateTimeFormat("en-CA", { t
 
 // --- CMD053-OK ------------------------------------------------------------------------------------------------------------------------------
 
-test("OK: the finance service reconciles an intent with SETTLED evidence from the payout-evidence fake matching reference, destination digest, amount and currency — 200 with the intent SETTLED, the statement PAID with the evidence hash and its lines PAID; FAILED or RETURNED evidence keeps the intent FAILED or RETURNED, the statement ISSUED and the lines HELD PAYOUT_FAILED with a review date", async () => {
+test("OK: the finance service reconciles an intent with SETTLED evidence from the payout-evidence fake matching reference, destination digest, amount and currency — 200 with the intent SETTLED, the statement PAID with the evidence hash and its lines PAID; FAILED or RETURNED evidence keeps the intent FAILED or RETURNED, the lines HELD PAYOUT_FAILED with a review date and the statement superseded by its correcting statement (CORRECTED, D10-GAP-12)", async () => {
   const settled = await seller(sw, "cmd053-ok-settled", WHOLE);
   const failed = await seller(sw, "cmd053-ok-failed", WHOLE);
   const returned = await seller(sw, "cmd053-ok-returned", WHOLE);
@@ -115,9 +115,9 @@ test("OK: the finance service reconciles an intent with SETTLED evidence from th
     const x = all.get(s.sellerId)!;
     const e = sw.payouts.matching(facts(x), status);
     const r = completed<PayoutReconciliationView>(await reconcilePayout(sw, x.statementId, { providerPayoutEvidenceRef: scriptEvidence(sw, e) }), 200);
-    assert.deepEqual([r.data.intentState, r.data.statementState, r.data.linesPaid, r.data.linesHeld, r.data.payoutEvidenceHash], [status, "ISSUED", 0, 1, undefined]);
+    assert.deepEqual([r.data.intentState, r.data.statementState, r.data.linesPaid, r.data.linesHeld, r.data.payoutEvidenceHash], [status, "CORRECTED", 0, 1, undefined]);
     assert.match(r.data.reviewOn ?? "", /^\d{4}-\d{2}-\d{2}$/);
-    assert.deepEqual(await state(x), { intent: status, evidence: e.evidenceHash, statement: "ISSUED", paidHash: null, lines: ["HELD:-"], reconciliations: 1 });
+    assert.deepEqual(await state(x), { intent: status, evidence: e.evidenceHash, statement: "CORRECTED", paidHash: null, lines: ["HELD:-"], reconciliations: 1 });
     const holds = await rows<{ reason: string; amount_cents: string; review_at: Date; state: string }>(sw, "SELECT reason, amount_cents::text, review_at, state FROM kauro.commission_holds WHERE line_id = $1", [x.lineIds[0]]);
     assert.deepEqual(holds.map((h) => [h.reason, h.amount_cents, h.state, dateIn(h.review_at.toISOString())]), [["PAYOUT_FAILED", String(x.payable), "OPEN", r.data.reviewOn]]);
     const line = await rows<{ held_reason: string | null }>(sw, "SELECT h.reason AS held_reason FROM kauro.commission_holds h WHERE h.line_id = $1 AND h.state = 'OPEN'", [x.lineIds[0]]);
