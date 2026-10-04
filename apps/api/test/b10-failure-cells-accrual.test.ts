@@ -7,13 +7,13 @@
 // login roles; the superuser only reads. Nothing sleeps.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
-import { crashedAt, faultCell, type FaultContext } from "@kauro/persistence/testing";
-import { agentOf, integrationWorld, oracleRows, providerReports, type IntegrationWorld } from "./integration-support.js";
-import { accepted, bindCells, consumeOn, contend, failures, observeBlocked, convertedFor, converting, deliveryOfCapture, itemOf, mustHaveSettled, open, rightsOf, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Converting, type Delivery } from "./b10-cells-support.js";
-import { approvedRefund, deliveredByTheExecutionPackage, deliveryOf, linesOf, poolsOf, purchase, type Purchase } from "./commission-support.js";
-import type { ExecuteRefundView, WebhookAck } from "@kauro/application";
+import { assignedThrough, integrationWorld, oracleRows, providerReports, terminationBody, type IntegrationWorld } from "./integration-support.js";
+import { faultCell, recordServiceAssignment, type FaultContext } from "@kauro/persistence/testing";
+import { bindCells, consumeOn, contend, failures, nothingFor, observeBlocked, convertedFor, converting, deliveryOfCapture, itemOf, mustHaveSettled, open, rightsOf, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Converting, type Delivery } from "./b10-cells-support.js";
+import { acceptAttribution, approvedRefund, claimsOn, sellingAgency, deliveredByTheExecutionPackage, deliveryOf, linesOf, poolsOf, purchase, type Purchase } from "./commission-support.js";
+import type { ExecuteRefundView, SellerTerminationView, WebhookAck } from "@kauro/application";
 import type { SweepReport } from "../src/commissions/sweeps.js";
-import { completed } from "./support.js";
+import { call, completed, freshKey, type Reply } from "./support.js";
 import type { SqlStep } from "./fault-support.js";
 import { deliver, execute as paymentExecute } from "./payment-support.js";
 
@@ -25,11 +25,6 @@ before(async () => {
 after(async () => {
   await iw.stop();
 });
-void agentOf;
-void accepted;
-void deliveryOfCapture;
-void crashedAt;
-void mustHaveSettled;
 
 const HOUR_MS = 3_600_000;
 
@@ -579,10 +574,10 @@ faultCell(
 faultCell(
   {
     id: "ACCRUAL_REC_RACE",
-    step: "ACCRUAL_RECONCILIATION (the pool and lines of a late purchase, its unit paused right after its pool insert) and the COMMISSIONS consumer's accrual of the same purchase (paused right after its pool insert)",
+    step: "ACCRUAL_RECONCILIATION (the pool and lines of a late purchase: its accrual unit stopped right after its pool insert, or standing at its agency lock with the purchase already listed) and the COMMISSIONS consumer's accrual of the same purchase (stopped right after its pool insert, or contending)",
     fault: "race",
     expect:
-      "RACE: the sweep's accrual unit and the consumer accruing the same second purchase of an agency, in both orders with the lock wait observed (the first stopped with its pool inserted and uncommitted, the second waiting on the agency's commission subject): one pool and one line per beneficiary at the repeat rate, the second unit finding it made (NOTHING_TO_ACCRUE, DUPLICATE); with the purchase's refund already completed at the provider the sweep's current basis and the consumer's allocated basis end, once the refund event is delivered, at the same cumulative entitlements",
+      "RACE: the sweep's accrual unit and the consumer accruing the same second purchase of an agency, in both orders with the lock wait observed (the first stopped with its pool inserted and uncommitted, the second waiting on the agency's commission subject; in the consumer-first order the sweep has already listed the purchase as lacking its pool and is let go from its accrual unit's start once the consumer holds the agency, its wait on the consumer observed in pg_blocking_pids): one pool and one line per beneficiary at the repeat rate, the second unit finding it made (NOTHING_TO_ACCRUE, DUPLICATE); with the purchase's refund already completed at the provider the sweep's current basis and the consumer's allocated basis end, once the refund event is delivered, at the same cumulative entitlements",
   },
   async (ctx) => {
     const shares = [6_000, 4_000];
@@ -658,10 +653,447 @@ faultCell(
   },
 );
 
-void sweepOn;
-void contend;
-void poolsOf;
-void linesOf;
-void deliveryOf;
-void ({} as FaultContext);
-void ({} as Actor);
+// =====================================================================================================================================
+// 36. CONS_PAR: failure between the writes of one COMMISSIONS effect
+// =====================================================================================================================================
+
+const POOL_INSERT: SqlStep = { label: "pool_insert", match: /INSERT INTO kauro\.commission_pools/ };
+const LINE_INSERT: SqlStep = { label: "line_insert", match: /INSERT INTO kauro\.commission_lines/ };
+const MIRROR_UPDATE: SqlStep = { label: "mirror_update", match: /UPDATE kauro\.agencies a SET first_qualifying_capture_id/ };
+const CLAIM_UPDATE: SqlStep = { label: "claim_update", match: /UPDATE kauro\.attribution_claims/ };
+const POOL_UPDATE: SqlStep = { label: "pool_update", match: /UPDATE kauro\.commission_pools SET basis_cents/ };
+/** The line's STATE transition (transitionLine: `UPDATE kauro.commission_lines l SET state = ...`), not the cumulative or basis update of an adjustment. */
+const LINE_STATE: SqlStep = { label: "line_state", match: /UPDATE kauro\.commission_lines l SET state = / };
+
+/** A cell's failure of a consumer delivery: runs it routed over `conn` and throws what it raised (the operation `ctx.partial` requires to fail). */
+async function failing(ctx: FaultContext, conn: Awaited<ReturnType<typeof open>>, delivery: Delivery, steps: ReadonlyArray<SqlStep>): Promise<unknown> {
+  const outcome = await settled(consumeOn(ctx, conn, delivery, steps));
+  if ("failure" in outcome) throw outcome.failure;
+  return outcome.answer;
+}
+
+interface FirstAccrual {
+  readonly rights: Awaited<ReturnType<typeof rightsOf>>;
+  readonly mirror: string | null;
+  readonly designated: number;
+}
+const firstAccrualOf = async (c: Converting): Promise<FirstAccrual> => ({
+  rights: await rightsOf(c),
+  mirror: (await oracleRows<{ first_qualifying_capture_id: string | null }>(iw, "SELECT first_qualifying_capture_id FROM kauro.agencies WHERE agency_id = $1", [c.agencyId]))[0]!.first_qualifying_capture_id,
+  designated: (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.domain_events WHERE agency_id = $1 AND event_type = 'agency.first_purchase_designated.v1'", [c.agencyId]))[0]!.n,
+}) ;
+
+faultCell(
+  {
+    id: "CONS_PAR",
+    step: "COMMISSIONS consumer capture.completed.v1 (the first designation mirror, the claim conversion, the pool, a line, a hold and the line's HELD update of one unit): a failure after the mirror, after the pool, after the first line, and after a hold",
+    fault: "partial",
+    expect:
+      "RACE (partial): a failure injected after the designation mirror's update, after the pool insert, after the first beneficiary's line insert (the second's not yet written) and, for a purchase whose provider time is unverified, after a line's hold insert, rolls the whole effect back (no mirror and no designation event, no entitlement, claim conversion, pool, line or hold); the redelivery then produces the effect once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const cases: ReadonlyArray<{ readonly label: string; readonly at: string; readonly steps: ReadonlyArray<SqlStep>; readonly completedSteps: ReadonlyArray<string> }> = [
+      { label: "after-mirror", at: "db.claim_update.before", steps: [MIRROR_UPDATE, CLAIM_UPDATE], completedSteps: ["db.mirror_update.after"] },
+      { label: "after-pool", at: "db.line_insert.before", steps: [POOL_INSERT, LINE_INSERT], completedSteps: ["db.pool_insert.after"] },
+      { label: "after-first-line", at: "db.line2_insert.before", steps: [{ ...LINE_INSERT, label: "line1_insert", nth: 1 }, { ...LINE_INSERT, label: "line2_insert", nth: 2 }], completedSteps: ["db.line1_insert.after"] },
+    ];
+    for (const { label, at, steps, completedSteps } of cases) {
+      const c = await converting(`cons-par-completed-${label}`, shares);
+      const before = await firstAccrualOf(c);
+      assert.deepEqual([before.rights, before.mirror, before.designated], [nothingFor(c), null, 0]);
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial(`the consumer failing ${label}`, at, () => failing(ctx, conn, c.delivery, steps));
+        for (const point of completedSteps) assert.ok(ctx.points.passed.includes(point), `${label}: ${point} was passed before the failure`);
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await firstAccrualOf(c), before, `${label}: no mirror, no designation event, no conversion, pool or line remains`);
+      assert.equal(await runConsumer(c.delivery), "APPLIED", `${label}: the redelivery applies the effect`);
+      const done = await firstAccrualOf(c);
+      assert.deepEqual([done.rights, done.mirror, done.designated], [convertedFor(c, shares), c.first.captureId, 1], `${label}: converted once, one pool and one line per beneficiary, the mirror and its event once`);
+    }
+
+    // a later purchase whose provider completion is after its own confirmation: each line is born HELD under a hold of its whole amount
+    {
+      const c = await accrued("cons-par-completed-hold", shares);
+      const unverified = await purchase(iw, c.s, "cons-par-completed-hold-R", { providerCompletedAt: new Date(Date.now() + HOUR_MS).toISOString() });
+      const delivery = await deliveryOfCapture(unverified);
+      const census = async (): Promise<ReadonlyArray<number>> => [(await poolsOf(iw, unverified.authorizationId)).length, (await linesOf(iw, unverified.authorizationId)).length, (await ledgerOfPurchase(unverified)).lines.reduce((n, l) => n + l.holds.length, 0)];
+      assert.deepEqual(await census(), [0, 0, 0]);
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial("the consumer failing after a born-HELD line's hold insert and before its HELD update", "db.line_update.before", () => failing(ctx, conn, delivery, [HOLD_INSERT, LINE_UPDATE]));
+        assert.ok(ctx.points.passed.includes("db.hold_insert.after"), "after-hold: the hold insert answered before the failure");
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await census(), [0, 0, 0], "after-hold: no pool, line or hold remains");
+      assert.equal(await runConsumer(delivery), "APPLIED", "after-hold: the redelivery applies the effect");
+      const ledger = await ledgerOfPurchase(unverified);
+      assert.deepEqual(await poolKinds(unverified), ["ACQUISITION REPEAT 400"]);
+      assert.deepEqual(
+        ledger.lines.map((l) => [l.state, l.holds.map((h) => [h[0], h[1], h[2] === l.cumulative])]),
+        [["HELD", [["PROVIDER_TIME_UNVERIFIED", "OPEN", true]]], ["HELD", [["PROVIDER_TIME_UNVERIFIED", "OPEN", true]]]],
+        "after-hold: each line HELD under one OPEN hold of its whole amount, once",
+      );
+    }
+  },
+);
+
+/** The pool, each line and every adjustment of a purchase: what a basis change writes. */
+async function basisLedgerOf(p: Purchase): Promise<{ readonly pool: ReadonlyArray<string>; readonly lines: ReadonlyArray<readonly [string, number, string]>; readonly adjustments: number }> {
+  const [pool] = await oracleRows<{ basis_cents: string; pool_cents: string; version: string }>(iw, "SELECT basis_cents::text, pool_cents::text, version::text FROM kauro.commission_pools WHERE authorization_id = $1", [p.authorizationId]);
+  const ledger = await ledgerOfPurchase(p);
+  return { pool: [pool!.basis_cents, pool!.pool_cents, pool!.version], lines: ledger.lines.map((l) => [l.state, l.version, l.cumulative] as const), adjustments: (await adjustmentsOfPurchase(p)).length };
+}
+
+faultCell(
+  {
+    id: "CONS_PAR",
+    step: "COMMISSIONS consumer refund.completed.v1 and capture.reversed.v1 (the pool's basis, each line's adjustment and cumulative, each line's state): a failure after the pool update, after the first line's adjustment, between the adjustments and the line states, and between two line states",
+    fault: "partial",
+    expect:
+      "RACE (partial): a failure injected after the pool's basis update (a partial refund), after one line's adjustment and cumulative update and before the other's, after the adjustments and before the first line's VOID transition, and between the two lines' VOID transitions (the reversal) rolls the whole effect back (the pool, every line and every adjustment as before); the redelivery then applies it once: one adjustment per changed line and event",
+  },
+  async (ctx) => {
+    const cases: ReadonlyArray<{ readonly label: string; readonly change: "REFUND" | "REVERSAL"; readonly at: string; readonly steps: ReadonlyArray<SqlStep>; readonly completedSteps: ReadonlyArray<string> }> = [
+      { label: "after-pool-update", change: "REFUND", at: "db.adjustment_insert.before", steps: [POOL_UPDATE, ADJUSTMENT_INSERT], completedSteps: ["db.pool_update.after"] },
+      { label: "between-adjustments", change: "REVERSAL", at: "db.adjustment2_insert.before", steps: [{ ...LINE_UPDATE, label: "line1_update", nth: 1 }, { ...ADJUSTMENT_INSERT, label: "adjustment2_insert", nth: 2 }], completedSteps: ["db.line1_update.after"] },
+      { label: "adjustments-then-state", change: "REVERSAL", at: "db.line_state.before", steps: [ADJUSTMENT_INSERT, LINE_STATE], completedSteps: ["db.adjustment_insert.after"] },
+      { label: "between-states", change: "REVERSAL", at: "db.line_state2.before", steps: [{ ...LINE_STATE, label: "line_state1", nth: 1 }, { ...LINE_STATE, label: "line_state2", nth: 2 }], completedSteps: ["db.line_state1.after"] },
+    ];
+    for (const { label, change, at, steps, completedSteps } of cases) {
+      const c = await accrued(`cons-par-basis-${label}`, [6_000, 4_000]);
+      const event = change === "REFUND" ? await refundEventOf(c, 10_000n) : await reversalEventOf(c.first);
+      const before = await basisLedgerOf(c.first);
+      assert.equal(before.adjustments, 0);
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial(`the ${change.toLowerCase()} consumer failing ${label}`, at, () => failing(ctx, conn, event, steps));
+        for (const point of completedSteps) assert.ok(ctx.points.passed.includes(point), `${label}: ${point} was passed before the failure`);
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await basisLedgerOf(c.first), before, `${label}: the pool, every line and every adjustment as before`);
+      assert.equal(await runConsumer(event), "APPLIED", `${label}: the redelivery applies the effect`);
+      const done = await basisLedgerOf(c.first);
+      assert.equal(done.adjustments, 2, `${label}: one adjustment per changed line`);
+      assert.deepEqual([...new Set((await adjustmentsOfPurchase(c.first)).map((a) => a[3]))], [event.eventId], `${label}: all of this event`);
+      if (change === "REVERSAL") assert.deepEqual([done.pool[0], done.lines.map((l) => [l[0], l[2]])], ["0", [["VOID", "0"], ["VOID", "0"]]], `${label}: the pool at zero basis, both lines VOID`);
+      else assert.equal((await ledgerOfPurchase(c.first)).lines.map((l) => BigInt(l.cumulative)).reduce((x, y) => x + y, 0n).toString(), await poolCentsOf(c.first), `${label}: the lines sum to the refunded pool`);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONS_PAR",
+    step: "COMMISSIONS consumer commercial_authorization.delivered.v1 (W2: the completion records) and the ELIGIBILITY pass (the completion's unit, then the line's ELIGIBLE unit): a failure after the STAGE record and before the FINAL record, and after the completion committed and before the line's ELIGIBLE write",
+    fault: "partial",
+    expect:
+      "RACE (partial): a failure after the STAGE completion insert and before the FINAL's rolls the consumer's unit back (no completion); the redelivery records both once. A failure of the ELIGIBILITY pass after its completion unit committed and before the line's ELIGIBLE UPDATE leaves the FINAL completion recorded and the line ACCRUED_PENDING (the line transition is a unit of its own, not half of the completion's: no half-state); the next pass makes it ELIGIBLE once",
+  },
+  async (ctx) => {
+    const kind = (k: string) => (params: ReadonlyArray<unknown>): boolean => params[3] === k;
+    const STAGE_INSERT: SqlStep = { label: "stage_insert", match: /INSERT INTO kauro\.purchase_completions/, when: kind("STAGE") };
+    const FINAL_INSERT: SqlStep = { label: "final_insert", match: /INSERT INTO kauro\.purchase_completions/, when: kind("FINAL") };
+    const completionsOfPurchase = async (p: Purchase): Promise<ReadonlyArray<string>> => (await oracleRows<{ kind: string }>(iw, "SELECT kind FROM kauro.purchase_completions WHERE authorization_id = $1 ORDER BY kind", [p.authorizationId])).map((r) => r.kind);
+
+    // the consumer's unit: STAGE inserted, FINAL not yet
+    {
+      const c = await accrued("cons-par-completion-unit", [10_000]);
+      iw.completions.record({ agencyId: c.agencyId as never, captureId: c.first.captureId, kind: "STAGE", stageRef: "parent-stage", completedAt: new Date(Date.now() - 800 * HOUR_MS).toISOString() as never, source: "STAGED_PREPARATION" });
+      iw.completions.record({ agencyId: c.agencyId as never, captureId: c.first.captureId, kind: "FINAL", completedAt: new Date(Date.now() - 721 * HOUR_MS).toISOString() as never, source: "STAGED_PREPARATION" });
+      const delivery = await deliveryOf(iw, await deliveredByTheExecutionPackage(iw, c.first.authorizationId, c.agencyId));
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial("the consumer failing after the STAGE record and before the FINAL record", "db.final_insert.before", () => failing(ctx, conn, delivery, [STAGE_INSERT, FINAL_INSERT]));
+        assert.ok(ctx.points.passed.includes("db.stage_insert.after"), "the STAGE insert answered before the failure");
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await completionsOfPurchase(c.first), [], "no completion remains");
+      assert.equal(await runConsumer(delivery), "APPLIED");
+      assert.deepEqual(await completionsOfPurchase(c.first), ["FINAL", "STAGE"], "the redelivery recorded both once");
+      assert.equal(await runConsumer(delivery), "DUPLICATE");
+    }
+
+    // the sweep: the completion's unit committed, the line's ELIGIBLE unit fails
+    {
+      const c = await accrued("cons-par-completion-line", [10_000]);
+      assert.equal(await runConsumer(await fundsReport(c.first, "INSTANT")), "APPLIED");
+      iw.completions.record({ agencyId: c.agencyId as never, captureId: c.first.captureId, kind: "FINAL", completedAt: new Date(Date.now() - 721 * HOUR_MS).toISOString() as never, source: "AUTHORIZATION_DELIVERY" });
+      const lineId = (await ledgerOfPurchase(c.first)).lines[0]!.lineId;
+      const completionInsert: SqlStep = { label: "completion_insert", match: /INSERT INTO kauro\.purchase_completions/, when: (params) => params[2] === c.first.authorizationId };
+      const eligibleUpdate: SqlStep = { label: "eligible_update", match: /UPDATE kauro\.commission_lines l SET state = /, when: (params) => params[0] === lineId };
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial("the ELIGIBILITY pass failing after the completion unit committed and before the line's ELIGIBLE write", "db.eligible_update.before", async () => {
+          const seen = failures.length;
+          const report = await sweepOn(ctx, conn, "ELIGIBILITY", [completionInsert, eligibleUpdate], undefined, { expectFailure: true });
+          const failure = failures.slice(seen).find((f) => f.subject === lineId);
+          assert.match(itemOf(report, lineId) ?? "", /^FAILED /, "the pass reports the line's unit failed");
+          assert.equal(itemOf(report, c.first.authorizationId), "COMPLETIONS 1", "the completion's own unit had committed");
+          if (failure === undefined) throw new Error("the pass recorded no failure of the line");
+          throw failure.error;
+        });
+        assert.ok(ctx.points.passed.includes("db.completion_insert.after"), "the completion insert answered before the failure");
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await completionsOfPurchase(c.first), ["FINAL"], "the FINAL completion is recorded");
+      assert.deepEqual((await ledgerOfPurchase(c.first)).lines.map(stateOf), ["ACCRUED_PENDING"], "and the line is not ELIGIBLE: no half-state");
+      assert.equal(itemOf(await runSweepPass("ELIGIBILITY"), lineId), "ELIGIBLE", "the next pass makes it ELIGIBLE");
+      assert.deepEqual((await ledgerOfPurchase(c.first)).lines.map(stateOf), ["ELIGIBLE"]);
+      assert.equal(itemOf(await runSweepPass("ELIGIBILITY"), lineId), undefined, "and a third pass finds nothing to do");
+    }
+  },
+);
+
+// =====================================================================================================================================
+// 35. TERM_ACCRUAL and 34. CONS_REV: the accrual, the basis changes and the entitlement's window against TerminateSeller and the window sweep
+// =====================================================================================================================================
+// Every writer of an agency's commercial rights takes the agency's commission subject first (D10-GAP-20; the ENTITLEMENT_WINDOWS pass since
+// D10-GAP-22), so the second of any two waits for the first, observed, and decides on what the first committed.
+
+const terminateActor = (ctx: FaultContext, sellerId: string, body: Awaited<ReturnType<typeof terminationBody>>, holdAt: string, steps: ReadonlyArray<SqlStep>): Actor => ({
+  name: "TerminateSeller",
+  login: "kauro_app_test",
+  holdAt,
+  run: (conn) => iw.faults.on(conn, "kauro_app", ctx.points, steps, () => call(iw.w, { url: `/api/v1/sales/sellers/${sellerId}/terminate`, token: iw.owner.token, agency: null, key: freshKey("accrual-term"), body })),
+});
+const agencyLockOf = (agencyId: string): SqlStep => ({ ...AGENCY_LOCK, when: (params) => params[0] === agencyId });
+const entitlementsOf = async (agencyId: string): Promise<ReadonlyArray<readonly [string, string, number]>> =>
+  (await oracleRows<{ seller_id: string; state: string; share_bps: number }>(iw, "SELECT seller_id, state, share_bps FROM kauro.commission_entitlements WHERE agency_id = $1 ORDER BY share_bps DESC, seller_id", [agencyId])).map((e) => [e.seller_id, e.state, e.share_bps] as const);
+const sellerState = async (sellerId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [sellerId]))[0]!.state;
+/** The claimant holds the agency's OPERATIONAL ASSIGNMENT (the account link CMD050 appends, SELLER_TERMINATED, is a foreign key on the agency: the lock-order family of D10-GAP-20). */
+async function holdsAssignment(c: Converting): Promise<void> {
+  iw.buyers.set(c.agencyId as never, "AGENCY");
+  const sellerId = c.att.sellers[0]!.sellerId;
+  const assigned = await assignedThrough(iw, c.agencyId, { expectedVersion: 0, sellerId, serviceAssignmentRef: await recordServiceAssignment(iw.h, { ownerUserId: iw.owner.userId as never, agencyId: c.agencyId as never, sellerId }) });
+  assert.equal(assigned.sellerId, sellerId, "the claimant holds the agency's operational assignment");
+}
+const assignmentEnded = async (agencyId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.account_assignments WHERE agency_id = $1 AND reason = 'SELLER_TERMINATED'", [agencyId]))[0]!.n;
+
+/** The first purchase accrued, a second purchase captured and not yet delivered, the seller's termination prepared. */
+async function secondToAccrue(label: string): Promise<{ readonly c: Converting; readonly second: Purchase; readonly delivery: Delivery; readonly sellerId: string; readonly body: Awaited<ReturnType<typeof terminationBody>> }> {
+  const c = await accrued(label, [10_000]);
+  await holdsAssignment(c);
+  const second = await purchase(iw, c.s, `${label}-second`);
+  const sellerId = c.att.sellers[0]!.sellerId;
+  return { c, second, delivery: await deliveryOfCapture(second), sellerId, body: await terminationBody(iw, sellerId, []) };
+}
+
+/** What a second purchase accrued for a terminated seller leaves: one REPEAT pool, one line at the seller's whole share, the entitlement TERMINATED_WITH_RESIDUAL. */
+async function assertResidualAccrued(what: string, f: { readonly c: Converting; readonly second: Purchase; readonly sellerId: string }): Promise<void> {
+  assert.deepEqual(await poolKinds(f.second), ["ACQUISITION REPEAT 400"], `${what}: one pool at the repeat rate`);
+  const ledger = await ledgerOfPurchase(f.second);
+  assert.deepEqual(ledger.lines.map((l) => [l.state, l.cumulative]), [["ACCRUED_PENDING", await poolCentsOf(f.second)]], `${what}: one line at the seller's whole share of the pool`);
+  assert.deepEqual(await entitlementsOf(f.c.agencyId), [[f.sellerId, "TERMINATED_WITH_RESIDUAL", 10_000]], `${what}: the entitlement keeps its share, TERMINATED_WITH_RESIDUAL`);
+  assert.equal(await sellerState(f.sellerId), "TERMINATED", `${what}: the seller is TERMINATED`);
+  assert.equal(await assignmentEnded(f.c.agencyId), 1, `${what}: the operational assignment ended`);
+  assert.equal((await linesOf(iw, f.c.first.authorizationId)).length, 1, `${what}: the first purchase's line is untouched`);
+}
+
+faultCell(
+  {
+    id: "TERM_ACCRUAL",
+    step: "COMMISSIONS consumer capture.completed.v1 (the second purchase's pool and line, its transaction paused before COMMIT) and TerminateSeller (CMD050, paused before COMMIT) of the seller who holds the entitlement",
+    fault: "race",
+    expect:
+      "RACE: the accrual of a second purchase racing the seller's termination, in both orders with the lock wait observed: one pool and one line at the seller's whole share (the repeat rate, inside the window nothing lost), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200 and the consumer APPLIED whichever committed first",
+  },
+  async (ctx) => {
+    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
+      const what = `accrual and termination, ${order}`;
+      const f = await secondToAccrue(`term-accrual-${order === "CONSUMER_FIRST" ? "c" : "t"}`);
+      const consumer = consumerOf(ctx, f.delivery, "the accruing consumer", "uow.before-commit", []);
+      const terminate = terminateActor(ctx, f.sellerId, f.body, "uow.before-commit", []);
+      const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what) : await contend(ctx, terminate, consumer, what);
+      completed<SellerTerminationView>(mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply, 200);
+      assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer accrued`);
+      await assertResidualAccrued(what, f);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONS_REV",
+    step: "COMMISSIONS consumer capture.completed.v1 (stopped right after the agency's commission subject) and TerminateSeller (stopped right after the same subject): the seller terminated between the delivery and the accrual",
+    fault: "race",
+    expect:
+      "RACE: the seller's termination landing between a capture.completed.v1 and its accrual, at the intermediate lock point after the agency's commission subject, in both orders with the lock wait observed: the accrual reads the entitlement as the first committed it (ACTIVE when it went first, TERMINATED_WITH_RESIDUAL when the termination did) and in both orders accrues one line at the seller's whole share: a termination alone does not forfeit earned rights",
+  },
+  async (ctx) => {
+    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
+      const what = `termination between the delivery and the accrual, ${order}`;
+      const f = await secondToAccrue(`cons-rev-term-${order === "CONSUMER_FIRST" ? "c" : "t"}`);
+      const steps = [agencyLockOf(f.c.agencyId)];
+      const consumer = consumerOf(ctx, f.delivery, "the accruing consumer", "db.agency_lock.after", steps);
+      const terminate = terminateActor(ctx, f.sellerId, f.body, "db.agency_lock.after", steps);
+      const during = async (): Promise<void> => {
+        assert.deepEqual((await entitlementsOf(f.c.agencyId)).map((e) => e[1]), ["ACTIVE"], `${what}: nothing of the other committed while it waited`);
+      };
+      const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what, during) : await contend(ctx, terminate, consumer, what, during);
+      completed<SellerTerminationView>(mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply, 200);
+      assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer accrued`);
+      await assertResidualAccrued(what, f);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONS_REV",
+    step: "COMMISSIONS consumer capture.reversed.v1 (the adjustment, its transaction paused right after the adjustment insert) and TerminateSeller (stopped right after the agency's commission subject): the seller terminated mid-way through a basis change",
+    fault: "race",
+    expect:
+      "RACE: a reversal applied while the seller of its lines is terminated, in both orders with the lock wait observed: the adjustments are made whichever committed first (one per line and event, the lines VOID at zero, the pool at zero), the entitlement TERMINATED_WITH_RESIDUAL, the seller TERMINATED, the termination answering 200",
+  },
+  async (ctx) => {
+    for (const order of ["CONSUMER_FIRST", "TERMINATION_FIRST"] as const) {
+      const what = `reversal and termination, ${order}`;
+      const c = await accrued(`cons-rev-reversal-term-${order === "CONSUMER_FIRST" ? "c" : "t"}`, [10_000]);
+      await holdsAssignment(c);
+      const sellerId = c.att.sellers[0]!.sellerId;
+      const reversal = await reversalEventOf(c.first);
+      const body = await terminationBody(iw, sellerId, []);
+      const consumer = consumerOf(ctx, reversal, "the reversal consumer", "db.adjustment_insert.after", [ADJUSTMENT_INSERT]);
+      const terminate = terminateActor(ctx, sellerId, body, "db.agency_lock.after", [agencyLockOf(c.agencyId)]);
+      const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, terminate, what) : await contend(ctx, terminate, consumer, what);
+      completed<SellerTerminationView>(mustHaveSettled(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the termination") as Reply, 200);
+      assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer applied the reversal`);
+      const ledger = await ledgerOfPurchase(c.first);
+      assert.deepEqual(ledger.lines.map((l) => [l.state, l.cumulative]), [["VOID", "0"]], `${what}: the line VOID at zero`);
+      assert.deepEqual((await adjustmentsOfPurchase(c.first)).map((a) => [a[0], a[2], a[3]]), [["DECREASE", "0", reversal.eventId]], `${what}: the reversal's one adjustment`);
+      assert.equal(await poolCentsOf(c.first), "0");
+      assert.deepEqual(await entitlementsOf(c.agencyId), [[sellerId, "TERMINATED_WITH_RESIDUAL", 10_000]], `${what}: the entitlement kept`);
+      assert.equal(await sellerState(sellerId), "TERMINATED");
+      assert.equal(await assignmentEnded(c.agencyId), 1, `${what}: the operational assignment ended`);
+    }
+  },
+);
+
+// --- the window sweep: fixed instants (R2-138), run last because a pass standing after the window expires every window that ended ---------
+
+/** The agency's window: first confirmed 2027-09-12T14:00Z, so it ends 2028-09-12T14:00:00Z at America/Bogota wall time (R2-138's). */
+const WINDOW_END = "2028-09-12T14:00:00Z";
+const AFTER_WINDOW = "2028-09-13T15:00:00Z";
+/** An agency whose single claimant's claim was accepted 2027-09-01 and whose first purchase (confirmed 2027-09-12) is accrued: ACTIVE entitlement ending at WINDOW_END. */
+async function windowed(label: string): Promise<Converting> {
+  const s = await sellingAgency(iw, label);
+  const att = await claimsOn(iw, label, 1);
+  const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, [10_000], "2027-09-01T12:00:00Z");
+  const first = await purchase(iw, s, `${label}-first`, { confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
+  const c = { s, att, allocationId, agencyId: s.agency.agencyId, first, delivery: await deliveryOfCapture(first) };
+  assert.equal(await runConsumer(c.delivery), "APPLIED", `${label}: the first purchase converts and accrues`);
+  const [window] = await oracleRows<{ ends: string }>(iw, "SELECT to_char(window_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS ends FROM kauro.commission_entitlements WHERE agency_id = $1", [c.agencyId]);
+  assert.equal(window!.ends, WINDOW_END, `${label}: the window ends at twelve calendar months`);
+  return c;
+}
+/** A pass of ENTITLEMENT_WINDOWS or an accrual standing after the window: every unit of the commission service on the TEST CLOCK at that instant. */
+async function standingAfterWindow<T>(work: () => Promise<T>): Promise<T> {
+  iw.standAt(AFTER_WINDOW);
+  try {
+    return await work();
+  } finally {
+    iw.standAt(null);
+  }
+}
+const windowSweepActor = (ctx: FaultContext, agencyId: string, holdAt: string): Actor => ({ name: "the ENTITLEMENT_WINDOWS pass", login: "kauro_commission_test", holdAt, run: (conn) => sweepOn(ctx, conn, "ENTITLEMENT_WINDOWS", [agencyLockOf(agencyId)]) });
+
+faultCell(
+  {
+    id: "CONS_REV",
+    step: "Sweep ENTITLEMENT_WINDOWS (stopped right after the agency's commission subject, standing after the window) and the COMMISSIONS consumer's accrual of a purchase the provider completed one second before, and exactly at, the window's end (stopped before COMMIT)",
+    fault: "race",
+    expect:
+      "RACE: the window sweep expiring an entitlement at the instant of a capture.completed.v1 for a purchase completed at the provider one second before the window's end, in both orders with the lock wait observed: the line is accrued by the provider-completion instant, never by the processing instant or the entitlement's state (one REPEAT pool at 400 bps, one line, the entitlement EXPIRED); a purchase completed exactly at the end accrues no acquisition line",
+  },
+  async (ctx) => {
+    for (const completedAt of ["BEFORE_END", "AT_END"] as const) {
+      for (const order of ["CONSUMER_FIRST", "SWEEP_FIRST"] as const) {
+        const what = `purchase completed ${completedAt === "BEFORE_END" ? "one second before" : "exactly at"} the window's end, ${order}`;
+        const c = await windowed(`cons-rev-window-${completedAt === "BEFORE_END" ? "b" : "e"}-${order === "CONSUMER_FIRST" ? "c" : "s"}`);
+        const late = await purchase(iw, c.s, `cons-rev-window-late-${completedAt}-${order}`, completedAt === "BEFORE_END" ? { providerCompletedAt: "2028-09-12T13:59:59Z", confirmedAt: "2028-09-13T13:59:59Z" } : { providerCompletedAt: WINDOW_END, confirmedAt: "2028-09-13T14:00:00Z" });
+        const delivery = await deliveryOfCapture(late);
+        const consumer = consumerOf(ctx, delivery, "the accruing consumer", "uow.before-commit", []);
+        const sweep = windowSweepActor(ctx, c.agencyId, "db.agency_lock.after");
+        const out = await standingAfterWindow(() => (order === "CONSUMER_FIRST" ? contend(ctx, consumer, sweep, what) : contend(ctx, sweep, consumer, what)));
+        const sweepReport = swept(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the window sweep");
+        const entitlementId = (await oracleRows<{ entitlement_id: string }>(iw, "SELECT entitlement_id FROM kauro.commission_entitlements WHERE agency_id = $1", [c.agencyId]))[0]!.entitlement_id;
+        assert.equal(itemOf(sweepReport, entitlementId), "EXPIRED", `${what}: the pass expired the entitlement`);
+        assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), completedAt === "BEFORE_END" ? "APPLIED" : "NOT_APPLICABLE", `${what}: the consumer`);
+        assert.deepEqual((await entitlementsOf(c.agencyId)).map((e) => e[1]), ["EXPIRED"], `${what}: EXPIRED`);
+        if (completedAt === "BEFORE_END") {
+          assert.deepEqual(await poolKinds(late), ["ACQUISITION REPEAT 400"], `${what}: accrued at the repeat rate by the provider-completion instant`);
+          assert.equal((await linesOf(iw, late.authorizationId)).length, 1, `${what}: one line`);
+        } else {
+          assert.deepEqual([(await poolsOf(iw, late.authorizationId)).length, (await linesOf(iw, late.authorizationId)).length], [0, 0], `${what}: no acquisition line`);
+        }
+        assert.equal((await linesOf(iw, c.first.authorizationId)).length, 1, `${what}: the earned line of the first purchase is unaffected`);
+      }
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "CONS_REV",
+    step: "Sweep ENTITLEMENT_WINDOWS (stopped right after the agency's commission subject, standing after the window) and the COMMISSIONS consumer's reversal (stopped right after its adjustment insert): the entitlement expired mid-way through a basis change",
+    fault: "race",
+    expect:
+      "RACE: a reversal applied while the entitlement of its lines expires, in both orders with the lock wait observed: the adjustment is made whichever committed first (one per line and event, the line VOID at zero, the pool at zero) and the entitlement is EXPIRED: an expired entitlement still has its lines adjusted",
+  },
+  async (ctx) => {
+    for (const order of ["CONSUMER_FIRST", "SWEEP_FIRST"] as const) {
+      const what = `reversal and window expiry, ${order}`;
+      const c = await windowed(`cons-rev-window-reversal-${order === "CONSUMER_FIRST" ? "c" : "s"}`);
+      const reversal = await reversalEventOf(c.first);
+      const consumer = consumerOf(ctx, reversal, "the reversal consumer", "db.adjustment_insert.after", [ADJUSTMENT_INSERT]);
+      const sweep = windowSweepActor(ctx, c.agencyId, "db.agency_lock.after");
+      const out = await standingAfterWindow(() => (order === "CONSUMER_FIRST" ? contend(ctx, consumer, sweep, what) : contend(ctx, sweep, consumer, what)));
+      swept(order === "CONSUMER_FIRST" ? out.waiter : out.holder, "the window sweep");
+      assert.equal(mustHaveSettled(order === "CONSUMER_FIRST" ? out.holder : out.waiter, "the consumer"), "APPLIED", `${what}: the consumer applied the reversal`);
+      const ledger = await ledgerOfPurchase(c.first);
+      assert.deepEqual(ledger.lines.map((l) => [l.state, l.cumulative]), [["VOID", "0"]], `${what}: the line VOID at zero`);
+      assert.deepEqual((await adjustmentsOfPurchase(c.first)).map((a) => [a[0], a[2], a[3]]), [["DECREASE", "0", reversal.eventId]], `${what}: the reversal's one adjustment`);
+      assert.deepEqual((await entitlementsOf(c.agencyId)).map((e) => e[1]), ["EXPIRED"], `${what}: the entitlement EXPIRED`);
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "TERM_ACCRUAL",
+    step: "Sweep ENTITLEMENT_WINDOWS (stopped right after the agency's commission subject, standing after the window) and TerminateSeller (stopped right after the same subject) of the entitlement's seller",
+    fault: "race",
+    expect:
+      "RACE: an entitlement reaching its window's end while its seller is terminated, in both orders with the lock wait observed: no unit fails (the termination answers 200, the pass reports no failed item), the seller is TERMINATED and the entitlement ends EXPIRED whichever committed first (TERMINATED_WITH_RESIDUAL then EXPIRED, or EXPIRED left as it is by the termination); its earned line is untouched",
+  },
+  async (ctx) => {
+    for (const order of ["TERMINATION_FIRST", "SWEEP_FIRST"] as const) {
+      const what = `window end and termination, ${order}`;
+      const c = await windowed(`term-window-${order === "TERMINATION_FIRST" ? "t" : "s"}`);
+      await holdsAssignment(c);
+      const sellerId = c.att.sellers[0]!.sellerId;
+      const body = await terminationBody(iw, sellerId, []);
+      const terminate = terminateActor(ctx, sellerId, body, "db.agency_lock.after", [agencyLockOf(c.agencyId)]);
+      const sweep = windowSweepActor(ctx, c.agencyId, "db.agency_lock.after");
+      const out = await standingAfterWindow(() => (order === "TERMINATION_FIRST" ? contend(ctx, terminate, sweep, what) : contend(ctx, sweep, terminate, what)));
+      const view = completed<SellerTerminationView>(mustHaveSettled(order === "TERMINATION_FIRST" ? out.holder : out.waiter, "the termination") as Reply, 200).data;
+      const sweepReport = swept(order === "TERMINATION_FIRST" ? out.waiter : out.holder, "the window sweep");
+      const entitlementId = (await oracleRows<{ entitlement_id: string }>(iw, "SELECT entitlement_id FROM kauro.commission_entitlements WHERE agency_id = $1", [c.agencyId]))[0]!.entitlement_id;
+      assert.equal(itemOf(sweepReport, entitlementId), "EXPIRED", `${what}: the pass expired the entitlement`);
+      assert.equal(view.entitlementsResidual, order === "TERMINATION_FIRST" ? 1 : 0, `${what}: the termination ${order === "TERMINATION_FIRST" ? "made it TERMINATED_WITH_RESIDUAL first" : "found it already EXPIRED and left it"}`);
+      assert.deepEqual(await entitlementsOf(c.agencyId), [[sellerId, "EXPIRED", 10_000]], `${what}: EXPIRED at its share`);
+      assert.equal(await sellerState(sellerId), "TERMINATED");
+      assert.equal(await assignmentEnded(c.agencyId), 1, `${what}: the operational assignment ended`);
+      assert.equal((await linesOf(iw, c.first.authorizationId)).length, 1, `${what}: the earned line is untouched`);
+    }
+  },
+);
+
