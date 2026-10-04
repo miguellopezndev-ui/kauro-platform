@@ -904,6 +904,7 @@ interface Actor {
 async function contend(ctx: FaultContext, holder: Actor, waiter: Actor, what: string): Promise<{ readonly holder: PromiseSettledResult<unknown>; readonly waiter: PromiseSettledResult<unknown> }> {
   const holderConn = await open(holder.login);
   const waiterConn = await open(waiter.login);
+  const seen = failures.length;
   try {
     const pause = ctx.points.pause(holder.holdAt);
     const holding = ctx.operation(`${holder.name} (holder)`, () => settled(holder.run(holderConn)));
@@ -915,14 +916,23 @@ async function contend(ctx: FaultContext, holder: Actor, waiter: Actor, what: st
     pause.release();
     const held = await holding;
     const waited = await waiting.pending;
+    // before any recovery: no unit of the raced pair failed, whether it threw or only reported it to the sink
+    assert.deepEqual(failures.slice(seen).map((f) => `${f.subject}: ${f.error instanceof Error ? f.error.message : String(f.error)}`), [], `${what}: a raced unit failed and reported it to the background sink`);
     return { holder: "failure" in held ? { status: "rejected", reason: held.failure } : { status: "fulfilled", value: held.answer }, waiter: waited };
   } finally {
     await holderConn.end();
     await waiterConn.end();
   }
 }
+/**
+ * What a raced actor answered, refusing a failure it only reports: a sweep catches the error of an item, hands it to the background sink and
+ * resolves a report with a FAILED entry (sweeps.ts item), so a settled promise is no proof; a report with a FAILED item fails here.
+ */
 const mustHaveSettled = (r: PromiseSettledResult<unknown>, what: string): unknown => {
   if (r.status === "rejected") throw new Error(`${what} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`, { cause: r.reason });
+  const items = (r.value as { readonly items?: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> } | null)?.items;
+  const failed = items?.filter((i) => i.outcome.startsWith("FAILED")) ?? [];
+  assert.deepEqual(failed, [], `${what} reports a failed item`);
   return r.value;
 };
 
