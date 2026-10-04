@@ -210,7 +210,11 @@ async function eligibility(rt: CommissionRuntime, limit: number): Promise<SweepR
       inAgency(rt, line.agencyId, null, async (uow) => {
         const locked: CommissionLineRecord | null = await ledgerOf(uow).lockLine(line.lineId as CommissionLineId);
         if (locked === null || (locked.state !== "ACCRUED_PENDING" && locked.state !== "HELD")) return "SETTLED";
-        const written = await ledgerOf(uow).transitionLine(locked.lineId, locked.version, { state: "ELIGIBLE" }, await serverNow(uow));
+        // the conditions again under the lock, at this unit's own instant (D10-GAP-21): a funds fact, a hold or an adjustment that committed while
+        // this pass waited for the line decides it, and a line that is no longer due is settled without a write (the database would refuse it KC007)
+        const now = await serverNow(uow);
+        if (!(await ledgerOf(uow).lineDueForEligibility(locked.lineId, now))) return "SETTLED";
+        const written = await ledgerOf(uow).transitionLine(locked.lineId, locked.version, { state: "ELIGIBLE" }, now);
         return written.kind === "APPLIED" ? "ELIGIBLE" : "SETTLED";
       }),
     );

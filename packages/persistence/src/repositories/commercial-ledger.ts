@@ -362,6 +362,12 @@ function purchaseRecord(r: PurchaseRow): QualifyingPurchaseRecord {
 
 /** What a line's holds may cover and a covering hold must reach: its unpaid entitlement. */
 const UNPAID = "(l.cumulative_entitlement_cents - coalesce(l.paid_cents, 0))";
+/** What makes a line due for ELIGIBLE (KC007's conditions); $1 is the instant. */
+const DUE_FOR_ELIGIBILITY = `l.state IN ('ACCRUED_PENDING', 'HELD')
+          AND EXISTS (SELECT 1 FROM kauro.purchase_completions c WHERE c.agency_id = l.agency_id AND c.authorization_id = l.authorization_id AND c.kind = 'FINAL'
+                       AND c.completed_at + interval '720 hours' <= $1::timestamptz)
+          AND (SELECT o.funds_state FROM kauro.capture_funds_observations o WHERE o.agency_id = l.agency_id AND o.capture_id = l.capture_id ORDER BY o.capture_version DESC LIMIT 1) = 'AVAILABLE'
+          AND NOT EXISTS (SELECT 1 FROM kauro.commission_holds x WHERE x.line_id = l.line_id AND x.state = 'OPEN' AND x.amount_cents >= ${UNPAID})`;
 
 export class PgCommissionLedgerRepository implements CommissionLedgerRepository {
   constructor(
@@ -655,18 +661,14 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
 
   async linesDueForEligibility(now: UtcInstant, limit: number): Promise<ReadonlyArray<CommissionLineRecord>> {
     // due: the purchase's FINAL completion is 720 hours old, its capture's latest funds observation is AVAILABLE and no OPEN hold covers the line
-    const r = await execute<LineRow>(
-      this.db,
-      `SELECT ${LINE} FROM ${LINE_FROM}
-        WHERE l.state IN ('ACCRUED_PENDING', 'HELD')
-          AND EXISTS (SELECT 1 FROM kauro.purchase_completions c WHERE c.agency_id = l.agency_id AND c.authorization_id = l.authorization_id AND c.kind = 'FINAL'
-                       AND c.completed_at + interval '720 hours' <= $1::timestamptz)
-          AND (SELECT o.funds_state FROM kauro.capture_funds_observations o WHERE o.agency_id = l.agency_id AND o.capture_id = l.capture_id ORDER BY o.capture_version DESC LIMIT 1) = 'AVAILABLE'
-          AND NOT EXISTS (SELECT 1 FROM kauro.commission_holds x WHERE x.line_id = l.line_id AND x.state = 'OPEN' AND x.amount_cents >= ${UNPAID})
-        ORDER BY l.created_at, l.line_id LIMIT $2`,
-      [now, limit],
-    );
+    const r = await execute<LineRow>(this.db, `SELECT ${LINE} FROM ${LINE_FROM} WHERE ${DUE_FOR_ELIGIBILITY} ORDER BY l.created_at, l.line_id LIMIT $2`, [now, limit]);
     return r.rows.map(lineRecord);
+  }
+
+  async lineDueForEligibility(lineId: CommissionLineId, now: UtcInstant): Promise<boolean> {
+    // the same conditions, one statement after the caller's lock on the line: it sees what committed while the caller waited (D10-GAP-21)
+    const r = await execute(this.db, `SELECT 1 FROM ${LINE_FROM} WHERE ${DUE_FOR_ELIGIBILITY} AND l.line_id = $2`, [now, lineId]);
+    return r.rows.length > 0;
   }
 
   async purchasesLackingPools(limit: number): Promise<ReadonlyArray<QualifyingPurchaseRecord>> {

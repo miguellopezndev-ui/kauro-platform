@@ -607,6 +607,13 @@ export interface CommissionLedgerRepository {
   holdsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionHoldRecord>>;
   /** The ELIGIBILITY sweep's work: ACCRUED_PENDING and HELD lines whose purchase has a FINAL completion due at `now`. */
   linesDueForEligibility(now: UtcInstant, limit: number): Promise<ReadonlyArray<CommissionLineRecord>>;
+  /**
+   * Whether the line is due for ELIGIBLE at `now`, read with the line's row locked by the caller: the same conditions as
+   * linesDueForEligibility (FINAL completion 720 hours old, the capture's latest funds observation AVAILABLE, no OPEN hold covering the
+   * unpaid amount), asked again after the lock, so a funds fact, a hold or an adjustment that committed while the caller waited is seen
+   * (D10-GAP-21).
+   */
+  lineDueForEligibility(lineId: CommissionLineId, now: UtcInstant): Promise<boolean>;
   /** The ACCRUAL_RECONCILIATION sweep's work: purchases lacking the pool of an applicable entitlement. */
   purchasesLackingPools(limit: number): Promise<ReadonlyArray<QualifyingPurchaseRecord>>;
   /**
