@@ -67,8 +67,8 @@ function poolOf(route: Route, role: RouteRole): unknown {
 }
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
-  constructor(route: Route, private readonly stand: () => { readonly at: string } | null) {
-    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
+  constructor(route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null) {
+    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), ...(statementTimeoutMs === null ? {} : { defaultStatementTimeoutMs: statementTimeoutMs }) });
   }
 
   protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, idsOf: never, clockOf: never): PgCommercialUnitOfWork {
@@ -99,6 +99,8 @@ export class FaultRouting {
    * the bound elapses, after moving its controlled clock past the bound's deadline (B10G-R4).
    */
   timer: ((ms: number) => { readonly elapsed: Promise<void>; cancel(): void }) | null = null;
+  /** The statement_timeout of the routed units of work (null: the factory's own default, 10 s): a cell that proves a lock wait ends in the database's own timeout shortens it. */
+  statementTimeoutMs: number | null = null;
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 
@@ -112,7 +114,7 @@ export class FaultRouting {
    * `uow.before-commit` / `uow.after-commit` points: how a cell runs a service or a fixture write (a settlement) as the actor it races.
    */
   unit(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep> = []): AnyFactory {
-    return crashableFactory(new RoutedFactory({ conn, role, points, steps }, this.stand) as unknown as AnyFactory, points, "uow", ["run"]);
+    return crashableFactory(new RoutedFactory({ conn, role, points, steps }, this.stand, this.statementTimeoutMs) as unknown as AnyFactory, points, "uow", ["run"]);
   }
 
   /** The api's request factory, or the routed one inside `on`. */
