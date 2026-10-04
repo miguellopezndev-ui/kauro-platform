@@ -134,7 +134,7 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(options: { readonly requestSide?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"] } = {}): Promise<PaymentWorld> {
+export async function paymentWorld(options: { readonly requestSide?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"]; readonly wrapCommerce?: <F extends object>(inner: F) => F } = {}): Promise<PaymentWorld> {
   const providerClock = movableClock();
   const paypal = createPayPalContractFake({ clock: providerClock });
   const verifier = createWebhookVerifierFake({ clock });
@@ -149,7 +149,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean; re
     const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
     const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
     const service = createPaymentService({
-      assembly: { commerce: pools.commerce, ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, hold: (command, point) => holds.pass(command, point) },
+      assembly: { commerce: options.wrapCommerce === undefined ? pools.commerce : options.wrapCommerce(pools.commerce), ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, hold: (command, point) => holds.pass(command, point) },
       environment: "LOCAL",
       clock,
       ids,

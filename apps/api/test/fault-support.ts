@@ -22,9 +22,13 @@ export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "ka
 export interface SqlStep {
   readonly label: string;
   readonly match: RegExp;
+  /** Only the nth (1-based) statement of the route that matches instruments the step (a unit that repeats one statement, once per beneficiary). */
+  readonly nth?: number;
 }
 
 interface Route {
+  /** How many statements of each step the route has seen (SqlStep.nth). */
+  readonly seen?: Map<string, number>;
   readonly conn: HarnessConnection;
   readonly role: RouteRole;
   readonly points: FaultPoints;
@@ -47,7 +51,15 @@ function routedClient(route: Route): PoolClient {
         return (...args: unknown[]) => {
           const first = args[0];
           const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
-          for (const step of route.steps) if (step.match.test(text)) return instrumented.get(step.label)!(...args);
+          for (const step of route.steps) {
+            if (!step.match.test(text)) continue;
+            if (step.nth !== undefined) {
+              const n = (route.seen!.get(step.label) ?? 0) + 1;
+              route.seen!.set(step.label, n);
+              if (n !== step.nth) continue;
+            }
+            return instrumented.get(step.label)!(...args);
+          }
           return (target.query as (...x: unknown[]) => unknown)(...args);
         };
       }
@@ -90,8 +102,66 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
   }
 }
 
+/** A fault the database itself raised inside a trigger (SQLSTATE KT001, message `KAURO_FAULT <step> <evidence>`): what a cell asserts about the step it fired at. */
+export interface DbFault {
+  readonly step: string;
+  readonly message: string;
+}
+
+type Instrumented = { [key: string]: unknown };
+
+/** The unit of work the payment service's reconciler runs, its repositories (uow.commerce.*) instrumented as `pay.<repository>.<method>` points; a KT001 database fault of one of their calls fires the point `db.fault.<step>`. */
+function tracedUnit(uow: object, points: FaultPoints, log: DbFault[]): object {
+  const converted = new Map<string, object>();
+  const repository = (name: string, repo: object): object => {
+    const cached = converted.get(name);
+    if (cached !== undefined) return cached;
+    const guarded = new Proxy(repo, {
+      get(target, prop) {
+        const value: unknown = Reflect.get(target, prop, target);
+        if (typeof value !== "function") return value;
+        return async (...args: unknown[]) => {
+          try {
+            return await (value as (...a: unknown[]) => unknown).apply(target, args);
+          } catch (e) {
+            const code = (e as { code?: unknown } | null)?.code;
+            const message = e instanceof Error ? e.message : "";
+            if (code === "KT001") {
+              const step = /KAURO_FAULT ([A-Z_]+)/.exec(message)?.[1] ?? "UNKNOWN";
+              log.push({ step, message });
+              await points.pass(`db.fault.${step}`);
+            }
+            throw e;
+          }
+        };
+      },
+    });
+    const traced = instrumentPort(guarded, points, `pay.${name}`);
+    converted.set(name, traced);
+    return traced;
+  };
+  const real = (uow as { commerce: object }).commerce;
+  // an empty target: the real repositories object is frozen, and a proxy may not answer differently for a frozen property
+  const commerce = new Proxy({}, {
+    get(_target, prop) {
+      const value: unknown = Reflect.get(real, prop, real);
+      return typeof prop === "string" && typeof value === "object" && value !== null ? repository(prop, value) : value;
+    },
+  }) as Instrumented;
+  return new Proxy(uow, {
+    get(target, prop) {
+      if (prop === "commerce") return commerce;
+      const value: unknown = Reflect.get(target, prop, target);
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+}
+
 export class FaultRouting {
   readonly #als = new AsyncLocalStorage<Route>();
+  readonly #pay = new AsyncLocalStorage<{ readonly points: FaultPoints }>();
+  /** The database faults the payment service's traced units met (see DbFault), in order. */
+  readonly dbFaults: DbFault[] = [];
   /** Wraps the payout evidence verifier's calls while a cell has armed it (null: the labelled fake answers as scripted). */
   verifier: ((request: { readonly evidenceRef: string }, real: (request: { readonly evidenceRef: string }) => Promise<unknown>) => Promise<unknown>) | null = null;
   /**
@@ -106,7 +176,7 @@ export class FaultRouting {
 
   /** Runs `fn` with every unit of work it opens routed over `conn` (a harness connection of the login of `role`), wrapped in crashable points named `uow`. */
   on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>): Promise<T> {
-    return this.#als.run({ conn, role, points, steps }, fn);
+    return this.#als.run({ conn, role, points, steps, seen: new Map() }, fn);
   }
 
   /**
@@ -114,7 +184,32 @@ export class FaultRouting {
    * `uow.before-commit` / `uow.after-commit` points: how a cell runs a service or a fixture write (a settlement) as the actor it races.
    */
   unit(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep> = []): AnyFactory {
-    return crashableFactory(new RoutedFactory({ conn, role, points, steps }, this.stand, this.statementTimeoutMs) as unknown as AnyFactory, points, "uow", ["run"]);
+    return crashableFactory(new RoutedFactory({ conn, role, points, steps, seen: new Map() }, this.stand, this.statementTimeoutMs) as unknown as AnyFactory, points, "uow", ["run"]);
+  }
+
+  /**
+   * Runs `fn` with the payment service's units of work (the reconciler of a webhook, M1's commerce factory) bounded by the cell's
+   * `uow.before-commit` / `uow.after-commit` points and their repositories traced (see tracedUnit); outside it they run unchanged.
+   */
+  onPayment<T>(points: FaultPoints, fn: () => Promise<T>): Promise<T> {
+    return this.#pay.run({ points }, fn);
+  }
+
+  /** The payment service's commerce unit-of-work factory (paymentWorld's wrapCommerce): traced and crashable inside `onPayment`. */
+  wrapCommerce<F extends object>(inner: F): F {
+    return new Proxy(inner, {
+      get: (target, prop) => {
+        const value: unknown = Reflect.get(target, prop, target);
+        if (typeof value !== "function") return value;
+        const route = this.#pay.getStore();
+        if (prop !== "run" || route === undefined) return (value as (...a: unknown[]) => unknown).bind(target);
+        const traced = {
+          run: (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
+            (value as (...a: unknown[]) => Promise<unknown>).call(target, context, (uow: object) => work(tracedUnit(uow, route.points, this.dbFaults)), ...rest),
+        };
+        return (crashableFactory(traced, route.points, "uow", ["run"]) as { run: (...a: unknown[]) => unknown }).run;
+      },
+    });
   }
 
   /** The api's request factory, or the routed one inside `on`. */
