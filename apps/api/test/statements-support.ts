@@ -152,7 +152,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
-      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: payouts, hold: serviceHolds.hook }, close: () => pools.close() };
+      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, hold: serviceHolds.hook }, close: () => pools.close() };
     },
   });
   faults.stand = () => (standing === null ? null : { at: standing });

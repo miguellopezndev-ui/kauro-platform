@@ -22035,7 +22035,7 @@
             ]
           },
           "503": {
-            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -22057,6 +22057,12 @@
                 "reason": null,
                 "layer": "PLATFORM",
                 "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "PAYOUT_EVIDENCE_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "the payout evidence verifier did not answer within its bound or failed: nothing changed and the same key retries (D10-GAP-6)"
               }
             ]
           }

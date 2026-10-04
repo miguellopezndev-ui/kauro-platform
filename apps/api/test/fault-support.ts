@@ -92,6 +92,8 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
 
 export class FaultRouting {
   readonly #als = new AsyncLocalStorage<Route>();
+  /** Wraps the payout evidence verifier's calls while a cell has armed it (null: the labelled fake answers as scripted). */
+  verifier: ((request: { readonly evidenceRef: string }, real: (request: { readonly evidenceRef: string }) => Promise<unknown>) => Promise<unknown>) | null = null;
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 

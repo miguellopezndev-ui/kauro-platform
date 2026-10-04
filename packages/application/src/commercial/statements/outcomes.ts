@@ -50,6 +50,7 @@ export const APPROVE_COMMISSION_PAYOUT_OUTCOMES: ReadonlyArray<ProblemOutcome> =
 /** CMD053: the evidence verified, then the statement, the intent it names, the match and the settlement (D10-PAY-2). */
 export const RECONCILE_COMMISSION_PAYOUT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("COMMAND", "PRECONDITION_FAILED", "PAYOUT_EVIDENCE_UNAVAILABLE", "no authenticated payout evidence under this reference (no verifier is bound before B15)"),
+  outcome("COMMAND", "CAPACITY_UNAVAILABLE", "PAYOUT_EVIDENCE_UNAVAILABLE", "the payout evidence verifier did not answer within its bound or failed: nothing changed and the same key retries (D10-GAP-6)"),
   outcome("COMMAND", "NOT_FOUND", null, "the statement is unknown, or the evidence names an intent of another statement"),
   outcome("COMMAND", "PRECONDITION_FAILED", "PAYOUT_EVIDENCE_MISMATCH", "the evidence differs from the statement's intent in reference, destination digest, amount or currency: nothing changes"),
   outcome("COMMAND", "PRECONDITION_FAILED", "PAYOUT_NOT_SETTLED", "the evidence shows a submitted transfer only: submission is not settlement, nothing changes", { current: "ALWAYS" }),

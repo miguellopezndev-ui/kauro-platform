@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
-import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import { connectionPid, faultCell, instrumentPort, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import {
   approvePayout,
   bankCash,
@@ -24,7 +25,7 @@ import {
   type LineSpec,
   type StatementsWorld,
 } from "./statements-support.js";
-import { completed, freshKey, outcome, type Person, type Reply } from "./support.js";
+import { asProblem, completed, freshKey, outcome, type Person, type Reply } from "./support.js";
 import type { SqlStep } from "./fault-support.js";
 
 let sw: StatementsWorld;
@@ -472,6 +473,113 @@ faultCell(
       }
       assert.equal(await reconciliationsOf(x), 1, "the same key settles once");
       assert.equal(await intentState(x.intent.intentId), status);
+    }
+  },
+);
+
+// --- 8. PAY_VERIFIER_TMO ------------------------------------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "PAY_VERIFIER_TMO",
+    step: "CMD053 ReconcileCommissionPayout, the PayoutEvidenceVerifier call-out",
+    fault: "timeout",
+    expect: "DENY: a PayoutEvidenceVerifier that times out answers the retriable 503 PAYOUT_EVIDENCE_UNAVAILABLE, nothing changes, and the same key then settles once",
+  },
+  async (ctx) => {
+    const [x] = await approvedMonth(nextMonth(), "verifier-tmo", [2_500n]);
+    const key = freshKey("verifier-tmo");
+    const ref = scriptEvidence(sw, sw.payouts.matching(factsOf(x!), "SETTLED"));
+    const before = [await intentState(x!.intent.intentId), await statementState(x!.statementId), await lineStatesOf(x!), await reconciliationsOf(x!)];
+    // the provider call's bound is the cell's deadline: the clock crosses it, the verifier's call is consumed at an instant past it and gives up
+    const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), "the payout evidence verifier's call bound");
+    sw.faults.verifier = (request, real) =>
+      ctx.withClock("the verifier call", async (clock) => {
+        const at = clock.now();
+        const call = instrumentPort(
+          {
+            async verify(r: { readonly evidenceRef: string; readonly at: string }): Promise<unknown> {
+              if (Date.parse(r.at) >= Date.parse(deadline)) throw new Error("the verifier did not answer within its bound");
+              return real(r);
+            },
+          },
+          ctx.points,
+          "verifier",
+        );
+        return call.verify({ evidenceRef: request.evidenceRef, at });
+      });
+    try {
+      ctx.clock.past(deadline);
+      const refused = await reconcilePayout(sw, x!.statementId, { providerPayoutEvidenceRef: ref }, { key });
+      assert.equal(outcome(sw.w, refused), "503 CAPACITY_UNAVAILABLE PAYOUT_EVIDENCE_UNAVAILABLE");
+      assert.equal(asProblem(sw.w, refused).retryable, true);
+    } finally {
+      sw.faults.verifier = null;
+    }
+    assert.deepEqual([await intentState(x!.intent.intentId), await statementState(x!.statementId), await lineStatesOf(x!), await reconciliationsOf(x!)], before, "nothing changed");
+    assert.equal(await journalState(key), null);
+    completed<PayoutReconciliationView>(await reconcilePayout(sw, x!.statementId, { providerPayoutEvidenceRef: ref }, { key }), 200);
+    assert.equal(await reconciliationsOf(x!), 1, "the same key settles once");
+  },
+);
+
+// --- 9. PAY_CRA: the response lost after COMMIT -------------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "PAY_CRA",
+    step: "CMD052 ApproveCommissionPayout, the answer lost after the intent COMMIT",
+    fault: "crash-after-commit",
+    at: "uow",
+    expect: "RACE (crash after COMMIT): the response lost after the intent commits is recovered by the same key as the same answer, one intent",
+  },
+  async (ctx) => {
+    const [st] = await issued(nextMonth(), [[{ basisCents: 1_900n, poolCents: 1_900n }]], "pay-cra");
+    await bankCash(sw, (await claimedCents(sw)) + st!.payable);
+    const key = freshKey("pay-cra");
+    const body = await approveBody(st!);
+    const crash = ctx.points.crash("uow.after-commit");
+    const conn = await open("kauro_app_test");
+    try {
+      const lost = await ctx.operation("the approval whose answer is lost", () => approveOn(ctx, conn, st!, { key, body }));
+      await crash.reached;
+      assert.equal(outcome(sw.w, lost), "500 INTERNAL_ERROR -", "the caller got no answer");
+      assert.deepEqual([await statementState(st!.statementId), await intentCount(st!.statementId), await journalState(key)], ["APPROVED", 1, "COMMITTED"], "the unit had committed");
+      const again = completed<PayoutIntentView>(await approveOn(ctx, conn, st!, { key, body }), 200);
+      assert.equal(again.replayed, true, "the same key recovers the committed answer");
+      assert.equal(again.data.intentId, (await intentOf(sw, st!.statementId)).intentId);
+      assert.equal(await intentCount(st!.statementId), 1, "one intent");
+    } finally {
+      await conn.end();
+    }
+  },
+);
+
+faultCell(
+  {
+    id: "PAY_CRA",
+    step: "CMD053 ReconcileCommissionPayout, the answer lost after the settlement COMMIT",
+    fault: "crash-after-commit",
+    at: "uow",
+    expect: "RACE (crash after COMMIT): the response lost after the settlement commits is recovered by the same key as the same answer, one settlement",
+  },
+  async (ctx) => {
+    const [x] = await approvedMonth(nextMonth(), "settle-cra", [1_800n]);
+    const key = freshKey("settle-cra");
+    const ref = scriptEvidence(sw, sw.payouts.matching(factsOf(x!), "SETTLED"));
+    const crash = ctx.points.crash("uow.after-commit");
+    const conn = await open("kauro_commission_test");
+    try {
+      const lost = await ctx.operation("the reconciliation whose answer is lost", () => reconcileOn(ctx, conn, x!, "SETTLED", { key, ref }));
+      await crash.reached;
+      assert.equal(outcome(sw.w, lost), "500 INTERNAL_ERROR -", "the caller got no answer");
+      assert.deepEqual([await intentState(x!.intent.intentId), await statementState(x!.statementId), await reconciliationsOf(x!), await journalState(key)], ["SETTLED", "PAID", 1, "COMMITTED"], "the unit had committed");
+      const again = completed<PayoutReconciliationView>(await reconcileOn(ctx, conn, x!, "SETTLED", { key, ref }), 200);
+      assert.equal(again.replayed, true, "the same key recovers the committed answer");
+      assert.deepEqual([again.data.intentState, again.data.statementState], ["SETTLED", "PAID"]);
+      assert.equal(await reconciliationsOf(x!), 1, "one settlement");
+    } finally {
+      await conn.end();
     }
   },
 );

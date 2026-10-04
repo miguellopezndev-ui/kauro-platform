@@ -18,14 +18,38 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, CommissionLineId, CommissionStatementId, PayoutEvidenceFacts, PayoutIntentId, PayoutIntentRecord, PayoutReconciliationId } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, addHours } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, addHours } from "@kauro/domain";
 import type { CommandResult } from "../../api/envelope.js";
 import { applied } from "../agency/shared.js";
 import type { ReconcileCommissionPayoutBody } from "../contracts.js";
+import type { PayoutEvidenceAnswer } from "../ports.js";
 import type { PayoutReconciliationView } from "../views.js";
 import { calendarDateIn } from "./close-period.js";
 import type { StatementServiceRuntime } from "./runtime.js";
 import { runServiceCommand, type ServiceCommandRequest } from "./service.js";
+
+/** The seconds a refused caller waits before it retries a verifier that did not answer. */
+const VERIFIER_RETRY_AFTER_SECONDS = 5;
+
+/**
+ * The verifier's answer within PROVIDER_CALL_TIMEOUT_MS, or the retriable 503 PAYOUT_EVIDENCE_UNAVAILABLE (D10-GAP-6): a verifier that
+ * times out, fails or answers nothing is no evidence, never an unhandled 500, and nothing has been written yet (no unit of work is open).
+ */
+async function verifiedWithinBound(rt: StatementServiceRuntime, evidenceRef: string): Promise<PayoutEvidenceAnswer> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const bound = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("the payout evidence verifier did not answer within its bound")), PROVIDER_CALL_TIMEOUT_MS);
+    });
+    return await Promise.race([rt.payoutEvidence.verify({ evidenceRef }), bound]);
+  } catch (cause) {
+    const failure = new DomainFailure("CAPACITY_UNAVAILABLE", "the payout evidence verifier did not answer; nothing changed, retry with the same key", { reason: "PAYOUT_EVIDENCE_UNAVAILABLE", retryAfterSeconds: VERIFIER_RETRY_AFTER_SECONDS }, true);
+    failure.cause = cause;
+    throw failure;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 /** How long a failed or returned payout waits for its review: one week, as the commission service's own holds (D10-SVC-3). */
 export const PAYOUT_FAILED_REVIEW_HOURS = 168;
@@ -64,7 +88,7 @@ export function reconcileCommissionPayout(rt: StatementServiceRuntime, request: 
     request,
     versionOf: (view) => view.version,
     async before() {
-      const answer = await rt.payoutEvidence.verify({ evidenceRef: request.body.providerPayoutEvidenceRef });
+      const answer = await verifiedWithinBound(rt, request.body.providerPayoutEvidenceRef);
       if (answer.kind !== "VERIFIED") throw new DomainFailure("PRECONDITION_FAILED", "no authenticated payout evidence under this reference", { reason: "PAYOUT_EVIDENCE_UNAVAILABLE" });
       evidence = answer.evidence;
     },
