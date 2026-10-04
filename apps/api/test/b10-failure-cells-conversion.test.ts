@@ -21,7 +21,7 @@ import type { RecordedSeller } from "@kauro/persistence/testing";
 import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { createCommissionService, type CommissionService } from "../src/index.js";
-import type { CommissionSweepName } from "../src/commissions/sweeps.js";
+import type { CommissionSweepName, SweepReport } from "../src/commissions/sweeps.js";
 import { prepareAllocation } from "./sales-support.js";
 import { call, completed, freshKey, ids, type Reply } from "./support.js";
 
@@ -29,7 +29,7 @@ let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   await installDbFaults();
-  svc = createCommissionService({ assembly: { units: iw.faults.wrap(iw.pools.units), completions: iw.completions }, environment: "LOCAL", clock: iw.clock, ids, onBackgroundFailure: (subject, error) => void failures.push({ subject, error }) });
+  rawSvc = createCommissionService({ assembly: { units: iw.faults.wrap(iw.pools.units), completions: iw.completions }, environment: "LOCAL", clock: iw.clock, ids, onBackgroundFailure: (subject, error) => void failures.push({ subject, error }) });
 });
 after(async () => {
   await iw.stop();
@@ -342,7 +342,7 @@ type Login = "kauro_app_test" | "kauro_commission_test";
 const open = (login: Login): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
 
 /** The commission service whose units are the routed ones: real outside `faults.on`, the cell's connection inside it. */
-let svc: CommissionService;
+let rawSvc: CommissionService;
 /** The failures the commission service handed to its background sink (a sweep item's failure), by subject. */
 const failures: Array<{ readonly subject: string; readonly error: unknown }> = [];
 
@@ -399,12 +399,36 @@ function convertedFor(c: { readonly att: Attribution }, shares: ReadonlyArray<nu
 /** The consumer's delivery on `conn` (the unit routed over it), the service's units standing at `at` on the TEST CLOCK when given. */
 function consumeOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, delivery: Delivery, steps: ReadonlyArray<SqlStep> = [], at?: string): Promise<string> {
   if (at !== undefined) iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.consumer.handle(delivery as never)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => runConsumer(delivery)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
 }
 /** One pass of a sweep on `conn`. */
-function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at?: string) {
+function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at?: string, expecting: Expecting = {}) {
   if (at !== undefined) iw.standAt(at);
-  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.runSweep(sweep)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => runSweepPass(sweep, expecting)).finally(() => (at !== undefined ? iw.standAt(null) : undefined));
+}
+/**
+ * THE way a cell runs a sweep pass or delivers an event to the consumer (the service itself, `rawSvc`, is touched nowhere else): the outcome
+ * is asserted here, so no call site can forget it. A sweep catches the error of an item, hands it to the background sink and resolves a
+ * report with a FAILED entry, so a settled promise proves nothing: a FAILED item or a new entry of the sink fails the call, unless the cell
+ * names the variant that expects the failure (`expectFailure`: its fault is the point of the cell, and it asserts the failure itself).
+ */
+interface Expecting {
+  readonly expectFailure?: true;
+}
+async function runSweepPass(sweep: CommissionSweepName, expecting: Expecting = {}): Promise<SweepReport> {
+  const seen = failures.length;
+  const report = await rawSvc.runSweep(sweep);
+  if (expecting.expectFailure !== true) {
+    assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], `the ${sweep} pass reports a failed item`);
+    assert.deepEqual(failures.slice(seen).map((f) => `${f.subject}: ${f.error instanceof Error ? f.error.message : String(f.error)}`), [], `the ${sweep} pass handed a failure to the background sink`);
+  }
+  return report;
+}
+async function runConsumer(delivery: Delivery, expecting: Expecting = {}): Promise<string> {
+  const seen = failures.length;
+  const outcome = await rawSvc.consumer.handle(delivery as never);
+  if (expecting.expectFailure !== true) assert.deepEqual(failures.slice(seen).map((f) => String(f.subject)), [], "the consumer handed a failure to the background sink");
+  return outcome;
 }
 const itemOf = (report: { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> }, subject: string): string | undefined => report.items.find((i) => i.subject === subject)?.outcome;
 
@@ -414,7 +438,7 @@ const itemOf = (report: { readonly items: ReadonlyArray<{ readonly subject: stri
  */
 async function sweepFaultedInConversion(ctx: FaultContext, conn: HarnessConnection, sweep: CommissionSweepName, arm: () => void, steps: ReadonlyArray<SqlStep>, what: string) {
   const pause = ctx.points.pause("db.claim_update.before");
-  const running = ctx.operation(what, () => sweepOn(ctx, conn, sweep, steps));
+  const running = ctx.operation(what, () => sweepOn(ctx, conn, sweep, steps, undefined, { expectFailure: true }));
   await pause.reachedBy(running);
   arm();
   pause.release();
@@ -455,7 +479,7 @@ faultCell(
       await conn.end();
     }
     assert.deepEqual(await rightsOf(c), nothingFor(c), "no entitlement, pool or line remains and both claims are still ACCEPTED");
-    assert.equal(await svc.consumer.handle(c.delivery as never), "APPLIED", "the redelivery converts");
+    assert.equal(await runConsumer(c.delivery), "APPLIED", "the redelivery converts");
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
   },
 );
@@ -483,7 +507,7 @@ faultCell(
     }
     const committed = await rightsOf(c);
     assert.deepEqual(committed, convertedFor(c, shares), "the unit had committed");
-    assert.equal(await svc.consumer.handle(c.delivery as never), "DUPLICATE", "the redelivery finds the conversion made");
+    assert.equal(await runConsumer(c.delivery), "DUPLICATE", "the redelivery finds the conversion made");
     assert.deepEqual(await rightsOf(c), committed, "no second entitlement per beneficiary, no second pool or line");
   },
 );
@@ -498,7 +522,7 @@ faultCell(
   async (ctx) => {
     const shares = [6_000, 4_000];
     const c = await converting("conv-retry", shares);
-    const answers = await ctx.sequentially(2, () => svc.consumer.handle(c.delivery as never));
+    const answers = await ctx.sequentially(2, () => runConsumer(c.delivery));
     assert.deepEqual(answers.map((r) => (r.status === "fulfilled" ? r.value : r.reason)), ["APPLIED", "DUPLICATE"]);
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
   },
@@ -533,7 +557,7 @@ faultCell(
         await conn.end();
       }
       assert.deepEqual(await rightsOf(c), nothingFor(c), `${label}: the whole conversion rolled back`);
-      assert.equal(await svc.consumer.handle(c.delivery as never), "APPLIED");
+      assert.equal(await runConsumer(c.delivery), "APPLIED");
       assert.deepEqual(await rightsOf(c), convertedFor(c, shares), `${label}: the redelivery converts once`);
     }
   },
@@ -547,7 +571,7 @@ async function acceptedLater(label: string, shares: ReadonlyArray<number>): Prom
   const att = await claimsOn(iw, label, shares.length);
   const first = await purchase(iw, s, label);
   const delivery = await deliveryOfCapture(first);
-  assert.equal(await svc.consumer.handle(delivery as never), "APPLIED", "the first purchase is mirrored and consumed with no claim to convert");
+  assert.equal(await runConsumer(delivery), "APPLIED", "the first purchase is mirrored and consumed with no claim to convert");
   const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, shares);
   const c = { s, att, allocationId, agencyId: s.agency.agencyId, first, delivery };
   assert.deepEqual(await rightsOf(c), nothingFor(c));
@@ -579,7 +603,7 @@ faultCell(
       await conn.end();
     }
     assert.deepEqual(await rightsOf(c), nothingFor(c), "no entitlement remains, both claims are still ACCEPTED");
-    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 2", "the next pass converts");
+    assert.equal(itemOf(await runSweepPass(RECONCILIATION), c.agencyId), "CONVERTED 2", "the next pass converts");
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
   },
 );
@@ -605,7 +629,7 @@ faultCell(
     }
     const committed = await rightsOf(c);
     assert.deepEqual([committed.claims, committed.entitlements], [convertedFor(c, shares).claims, convertedFor(c, shares).entitlements], "the unit had committed: one entitlement per beneficiary, each claim CONVERTED");
-    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "NOTHING_TO_CONVERT", "the next pass converts nothing again");
+    assert.equal(itemOf(await runSweepPass(RECONCILIATION), c.agencyId), "NOTHING_TO_CONVERT", "the next pass converts nothing again");
     const after = await rightsOf(c);
     assert.deepEqual([after.claims, after.entitlements], [committed.claims, committed.entitlements], "no second entitlement per beneficiary");
     assert.deepEqual([after.pools, after.lines], [1, 2], "the purchase accrued once, for both beneficiaries");
@@ -622,7 +646,7 @@ faultCell(
   async (ctx) => {
     const shares = [6_000, 4_000];
     const c = await acceptedLater("conv2-retry", shares);
-    const passes = await ctx.sequentially(2, () => svc.runSweep(RECONCILIATION));
+    const passes = await ctx.sequentially(2, () => runSweepPass(RECONCILIATION));
     assert.deepEqual(passes.map((r) => (r.status === "fulfilled" ? itemOf(r.value, c.agencyId) : r.reason)), ["CONVERTED 2", "NOTHING_TO_CONVERT"]);
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
   },
@@ -643,7 +667,7 @@ faultCell(
     try {
       await ctx.partial("the sweep's conversion failing after the first beneficiary's entitlement insert and before the second claim's update", "db.claim_update.before", async () => {
         const seen = failures.length;
-        const report = await sweepOn(ctx, conn, RECONCILIATION, [{ ...CLAIM_UPDATE, nth: 2 }, ENTITLEMENT_INSERT]);
+        const report = await sweepOn(ctx, conn, RECONCILIATION, [{ ...CLAIM_UPDATE, nth: 2 }, ENTITLEMENT_INSERT], undefined, { expectFailure: true });
         const failure = failures.slice(seen).find((f) => f.subject === c.agencyId);
         assert.match(itemOf(report, c.agencyId) ?? "", /^FAILED /);
         if (failure === undefined) throw new Error("the sweep recorded no failure of the agency");
@@ -653,7 +677,7 @@ faultCell(
       await conn.end();
     }
     assert.deepEqual(await rightsOf(c), nothingFor(c), "the whole conversion rolled back");
-    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 2");
+    assert.equal(itemOf(await runSweepPass(RECONCILIATION), c.agencyId), "CONVERTED 2");
     assert.deepEqual(await rightsOf(c), convertedFor(c, shares));
   },
 );
@@ -757,8 +781,8 @@ for (const via of ["consumer", "sweep"] as const) {
       for (const { which, t, at, claim } of cases) {
         const p = await firstPurchaseAt(ctx, t, at);
         assert.equal(await claimStateOf(t.claimId), "ACCEPTED", `${which}: the listed claim is still ACCEPTED when the purchase confirms`);
-        if (via === "consumer") await svc.consumer.handle(p.delivery as never);
-        else assert.match(itemOf(await svc.runSweep(RECONCILIATION), t.agencyId) ?? "", /^(CONVERTED \d|NOTHING_TO_CONVERT)$/);
+        if (via === "consumer") await runConsumer(p.delivery);
+        else assert.match(itemOf(await runSweepPass(RECONCILIATION), t.agencyId) ?? "", /^(CONVERTED \d|NOTHING_TO_CONVERT)$/);
         assert.equal(await claimStateOf(t.claimId), claim, `${which}: the claim`);
         if (claim === "CONVERTED") {
           const rights = await rightsOf({ att: t.att as Attribution, agencyId: t.agencyId, first: p });
@@ -832,26 +856,18 @@ faultCell(
         const p = await purchase(iw, t.a.s, t.label, { confirmedAt: convertible ? t.beforeEnd : t.tailEnd });
         const delivery = await deliveryOfCapture(p);
         assert.equal(await claimStateOf(t.claimId), "ACCEPTED");
-        const consuming = await open("kauro_commission_test");
-        const sweeping = await open("kauro_commission_test");
         iw.standAt(t.tailEnd);
         try {
-          const consumer = (conn: HarnessConnection): Promise<unknown> => consumeOn(ctx, conn, delivery, [CLAIM_UPDATE]);
-          const sweep = (conn: HarnessConnection): Promise<unknown> => sweepOn(ctx, conn, "CLAIM_WINDOWS", [CLAIM_UPDATE]);
-          const [first, second, holderConn, waiterConn] = order === "CONSUMER_FIRST" ? [consumer, sweep, consuming, sweeping] : [sweep, consumer, sweeping, consuming];
-          // the holder stops with the claim locked: the consumer at its COMMIT, the sweep right after its claim update
-          const pause = ctx.points.pause(order === "CONSUMER_FIRST" ? "uow.before-commit" : "db.claim_update.after");
-          const holding = ctx.operation(`${order === "CONSUMER_FIRST" ? "the conversion" : "the CLAIM_WINDOWS pass"} (holder)`, () => first(holderConn));
-          await pause.reachedBy(holding);
-          const waiting = await ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(holderConn) }, second, `${order === "CONSUMER_FIRST" ? "the CLAIM_WINDOWS pass" : "the conversion"} while the claim is locked (${what})`);
-          pause.release();
-          await holding;
-          const result = await waiting.pending;
-          if (result.status === "rejected") throw result.reason;
+          // the same orchestration and checks as every raced pair: the holder stops with the claim locked (the consumer at its COMMIT, the
+          // sweep right after its claim update), the waiter is observed waiting, and neither a rejection, a FAILED item nor a failure
+          // handed to the background sink is accepted from either
+          const consumer = consumerActor(ctx, delivery);
+          const sweep = sweepActor(ctx, "CLAIM_WINDOWS", "the CLAIM_WINDOWS pass");
+          const out = order === "CONSUMER_FIRST" ? await contend(ctx, consumer, sweep, what) : await contend(ctx, sweep, consumer, what);
+          mustHaveSettled(out.holder, "the holder");
+          mustHaveSettled(out.waiter, "the waiter");
         } finally {
           iw.standAt(null);
-          await consuming.end();
-          await sweeping.end();
         }
         const rights = await rightsOf({ att: t.att as Attribution, agencyId: t.agencyId, first: p });
         if (convertible) {
@@ -880,7 +896,7 @@ test("CLAIM_TAIL (microseconds): a first purchase confirmed one microsecond befo
     const p = await purchase(iw, t.a.s, t.label, { confirmedAt: at });
     const [row] = await oracleRows<{ same: boolean }>(iw, "SELECT confirmed_at = $2::timestamptz AS same FROM kauro.qualifying_purchases WHERE authorization_id = $1", [p.authorizationId, at]);
     assert.equal(row!.same, true, `${which}: the purchase is confirmed at the instant chosen, to the microsecond`);
-    await svc.consumer.handle((await deliveryOfCapture(p)) as never);
+    await runConsumer(await deliveryOfCapture(p));
     assert.equal(await claimStateOf(t.claimId), claim, which);
     assert.equal(await entitlementsOfAgency(t.agencyId), claim === "CONVERTED" ? 1 : 0, which);
   }
@@ -1019,7 +1035,7 @@ faultCell(
       if (order === "ACCEPTANCE_FIRST") assert.deepEqual((await rightsOf(c)).claims, ["CONVERTED"], `${what}: the consumer converts what the acceptance committed`);
       else {
         assert.deepEqual((await rightsOf(c)).claims, ["ACCEPTED"], `${what}: the consumer's pass found no allocation: the accepted claim waits for the reconciliation`);
-        assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 1", `${what}: the ACCRUAL_RECONCILIATION sweep converts it`);
+        assert.equal(itemOf(await runSweepPass(RECONCILIATION), c.agencyId), "CONVERTED 1", `${what}: the ACCRUAL_RECONCILIATION sweep converts it`);
       }
       assert.deepEqual(await rightsOf(c), convertedFor(c, [10_000]), `${what}: converted once, one entitlement for the beneficiary, never lost`);
     }
@@ -1130,8 +1146,8 @@ faultCell(
       completed<SellerTerminationView>(mustHaveSettled(termination, "TerminateSeller") as Reply, 200);
       mustHaveSettled(other, "the conversion");
       // a sweep that was only the waiter may have found nothing left to convert: the next pass settles what remains
-      await svc.runSweep(RECONCILIATION);
-      await svc.consumer.handle(c.delivery as never);
+      await runSweepPass(RECONCILIATION);
+      await runConsumer(c.delivery);
       const rights = await rightsOf(c);
       assert.deepEqual([rights.claims, rights.entitlements.map((e) => e[0]), rights.pools, rights.lines], [["CONVERTED"], [sellerId], 1, 1], `${sc.name}: converted once, the entitlement kept`);
       assert.deepEqual(await oracleRows(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [sellerId]), [{ state: "TERMINATED" }]);
