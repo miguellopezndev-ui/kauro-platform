@@ -116,7 +116,7 @@ export const SUPPORT_SEVERITIES: ReadonlyArray<SupportSeverity> = ["S1", "S2", "
 export const SUPPORT_CASE_STATES: ReadonlyArray<SupportCaseState> = ["OPEN", "TRIAGED", "WAITING_KAURO", "WAITING_AGENCY", "RESOLVED", "CLOSED"];
 
 /**
- * A support case: the registry SupportCase contract with the platform columns (migration 0023, D-SUP-6). The case always names a
+ * A support case: the registry SupportCase contract with the platform columns (migration 0026, D-SUP-6). The case always names a
  * project of its agency (the registry field is optional; agency-level cases have no catalogue command, Q-B11-1) and is born OPEN.
  */
 export interface SupportCaseRecord extends Omit<SupportCase, "caseId" | "agencyId" | "projectId" | "evidenceRefs"> {

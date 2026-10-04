@@ -17,6 +17,7 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
   movableBalanceOf,
+  returnedCentsOf,
   type AgencyId,
   type ApprovalId,
   type AuthorizationChange,
@@ -332,7 +333,7 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
     if (!row) return staleOf(this.ctx.db, "capture_facts", "capture_id", "status", captureId, "capture fact");
     const record = captureRecord(row);
     const returned = await refundSums(this.ctx.db, record.captureId, ["COMPLETED"]);
-    const movable = movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: record.providerFeeCents ?? 0n, returnedCents: returned.serviceCents + returned.taxCents + returned.excessCents });
+    const movable = movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: record.providerFeeCents ?? 0n, returnedCents: returnedCentsOf(record, returned.serviceCents + returned.taxCents + returned.excessCents) });
     await publishVersion(
       this.ctx,
       "capture",
@@ -344,9 +345,10 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
   }
 
   /**
-   * The fee the provider reported after the completion, learned once at expectedVersion + 1 (capture.fee_observed.v1, FINANCE only;
-   * never a second capture.completed.v1). Read under the capture's row lock, the event names the funds state the fee is taken from
-   * and the capture's movable balance before the fee — its amount less the money completed refunds returned (D-LEDGER-B6).
+   * The fee the provider reported after the completion — with or after a reversal too (B09-R4) — learned once at expectedVersion + 1
+   * (capture.fee_observed.v1, FINANCE only; never a second capture.completed.v1). Read under the capture's row lock, the event names
+   * the funds state the fee is taken from and the capture's movable balance before the fee — its amount less the money completed
+   * refunds returned, or nothing once the capture is reversed (D-LEDGER-B6, D-LEDGER-B7).
    * The fee already recorded answers the current record unchanged; another fee is refused (KA004: learned once) — a contradiction
    * the reconciler records as a case.
    */
@@ -365,7 +367,9 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
     if (!row) return staleOf(this.ctx.db, "capture_facts", "capture_id", "status", captureId, "capture fact");
     const record = captureRecord(row);
     const returned = await refundSums(this.ctx.db, record.captureId, ["COMPLETED"]);
-    const movable = movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: current.providerFeeCents ?? 0n, returnedCents: returned.serviceCents + returned.taxCents + returned.excessCents });
+    // a reversed capture returned all its money: a fee learned with or after the reversal is the kept fee, taken whole from the
+    // merchant's available balance (movable 0; D-LEDGER-B6, D-LEDGER-B7; B09-R4)
+    const movable = movableBalanceOf({ amountCents: record.amountCents, providerFeeCents: current.providerFeeCents ?? 0n, returnedCents: returnedCentsOf(record, returned.serviceCents + returned.taxCents + returned.excessCents) });
     await publishVersion(
       this.ctx,
       "capture",

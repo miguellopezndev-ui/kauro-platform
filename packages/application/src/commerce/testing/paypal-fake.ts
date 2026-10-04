@@ -131,8 +131,12 @@ export interface PayPalContractFake extends PaymentProviderAdapter {
   captureAtProvider(providerOrderId: string, overrides?: CaptureOverrides): string;
   /** Provider-side change of a capture: a reversal (chargeback), a fee report, a disbursement change, a completion instant. */
   updateCapture(providerCaptureId: string, change: { readonly status?: CaptureStatus; readonly feeCents?: bigint | null; readonly disbursement?: "INSTANT" | "DELAYED" | null; readonly completedAt?: UtcInstant | null }): void;
-  /** A refund made at the provider without a dispatch of the platform. */
-  refundAtProvider(providerCaptureId: string, amountCents: bigint, status?: "COMPLETED" | "PENDING" | "FAILED"): string;
+  /**
+   * A refund made at the provider without a dispatch of the platform. `invoiceId` models a refund made outside the platform that
+   * nevertheless carries a reference (the merchant typed one in the provider's dashboard): the provider's resource names it as its
+   * invoice_id, exactly as it names the platform's refund id on a refund the platform requested.
+   */
+  refundAtProvider(providerCaptureId: string, amountCents: bigint, status?: "COMPLETED" | "PENDING" | "FAILED", options?: { readonly invoiceId?: string }): string;
   /** A dispute opened (or resolved) on a capture at the provider. */
   dispute(providerCaptureId: string, change: { readonly status: "OPEN" | "RESOLVED"; readonly amountCents?: bigint; readonly reason?: string; readonly outcome?: string }): void;
   /** The raw webhook body the provider would deliver about one of its objects (exact bytes; the verifier fake signs them). */
@@ -249,6 +253,8 @@ export function createPayPalContractFake(options: PayPalContractFakeOptions): Pa
       environment: c?.environment ?? environment,
       providerCaptureId: r.captureId,
       providerRefundId: r.id,
+      // the refund resource names the invoice_id its request carried (the platform's refund id), or none
+      platformRefundRef: r.invoiceId,
       status: r.status,
       amountCents: r.amountCents,
       currency: r.currency,
@@ -517,10 +523,10 @@ export function createPayPalContractFake(options: PayPalContractFakeOptions): Pa
       capture.updateTime = clock.now();
     },
 
-    refundAtProvider(providerCaptureId, amountCents, status = "COMPLETED") {
+    refundAtProvider(providerCaptureId, amountCents, status = "COMPLETED", refundOptions = {}) {
       const capture = captures.get(providerCaptureId);
       if (capture === undefined) throw new RangeError("unknown provider capture");
-      const refund: FakeRefund = { id: nextRefund(), captureId: capture.id, requestId: null, invoiceId: null, status, amountCents, currency: capture.currency, createTime: clock.now() };
+      const refund: FakeRefund = { id: nextRefund(), captureId: capture.id, requestId: null, invoiceId: refundOptions.invoiceId ?? null, status, amountCents, currency: capture.currency, createTime: clock.now() };
       refunds.set(refund.id, refund);
       capture.refundIds.push(refund.id);
       effects.refunds += 1;

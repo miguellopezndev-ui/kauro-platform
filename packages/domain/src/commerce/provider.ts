@@ -104,6 +104,13 @@ export interface ObservedRefund {
   readonly environment: PaymentEnvironment;
   readonly providerCaptureId: string;
   readonly providerRefundId: string;
+  /**
+   * The platform's own refund reference the provider's refund resource names — the refund id the platform's refund request carried
+   * (PayPal `invoice_id`), part of the exact request whose digest is the attempt's request hash — or null for a refund whose resource
+   * names none (one made outside the platform). With the provider refund id and the attempt's own dispatch response it is the only
+   * evidence that binds a provider refund to a local refund: an amount is never an identity (B09-R1).
+   */
+  readonly platformRefundRef: string | null;
   readonly status: "COMPLETED" | "PENDING" | "FAILED";
   readonly amountCents: bigint;
   readonly currency: string;

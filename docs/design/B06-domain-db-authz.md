@@ -106,6 +106,13 @@ Decisions added by the re-check of the integration (§12d.5; re-check findings N
 | D-EVIDENCE-1 | The evidence of a candidate commit is a bundle per platform (`tools/evidence.mjs`, `pnpm run evidence`, `docs/evidence/b06/<commit>-<platform>/`): subject, environment, input manifest, the case map's truth sealed before the run, every suite's JUnit report, command, exit status and times, every cited test of every case with its outcome, and the SHA-256 of every file; it is committed after the commit it names. The case map's citations are proven to exist on every verify. | prompts/B06 "Deliverables" (durable artifacts rather than narrative confidence); registry requiredEvidence; 21 "Evidence classes"; CMD011 verification. Re-check N14. |
 | D-GATE-1 | One PARTIAL criterion for every case (a clause shown only through a test-bound port is SIMULATED; a clause of another package's command or aggregate is not demonstrated in B06 and names its owner); G-DOMAIN and G-TENANT have gate records in the case map (R2-044 deferred to B08; what B06 contributes to each G-TENANT case of B16); the registry verification clauses of other packages' domains are answered NOT_APPLICABLE with their reason. | 21 "Gate registry"; 21 "Evidence classes"; 21 "Gate aliases and scoped closures". Re-checks N12, N18. |
 
+Decisions added by the package-close review of `main` at `a7203f0` (§12d.7; review findings B06-R1–B06-R3):
+
+| id | decision | why (authority) |
+|---|---|---|
+| D-LEASE-3 | The expiry decides what a lease claim is. A live lease is HELD for another owner and renewed under the same fence for its holder, who names exactly the checkpoint stored. An expired lease is resumed by whoever claims it — its former owner included — as a new attempt: the fence advances by one (fencing out the attempt that expired, whoever ran it) and the claim names exactly the checkpoint stored. A spending operation (MODEL_TASK, JOB_ATTEMPT) that expired without storing a checkpoint is not resumed at all: rerunning it is a new attempt under a new lease, through its own admission. `leases_guard` carries the rule for every writer (the control plane holds UPDATE on `leases`): a change of owner or fence is a takeover, admitted only over a lease expired at the claim's instant and only with the stored checkpoint. Migration 0006 is corrected in place, not by a new migration number: nothing had been deployed anywhere, and the tests of §12d.7 fail on `a7203f0` and pass on the correction; the correction changes the checksum of 0006, which only a database that applied the earlier text could notice, and none exists. | S090 ("RESUME lacks a checkpoint → reject restart; preserve original subject, clock, cost and checkpoint identity"); R2-076 ("recover only from durable source/checkpoint contracts, or rerun under the same authorized job"); contract Lease; 07 "Job and attempt states" (a claim creates a monotonically increasing fence); 07 "Restoration and migration" (checksums and applied versions). Review finding B06-R1. |
+| D-SRC-1 | CMD025 approves only a current source: after the revision's transition lock (D-TX-2) `lockSealedByHash` answers the revision with `availableUntil`, the latest effective deadline of a governing retention record that is ACTIVE and ahead of `kauro.server_now()` — the rule of B07's `PgSourceAvailabilityReader` (D-RET-2) — and the handler refuses SOURCE_EXPIRED when the revision is not SEALED or nothing lies ahead. A SEALED revision whose retention lapsed is an expired source whether or not the sweeper has taken retention_expires; the command does not expire it (that edge stays the sweeper's). The deadline is judged on the database's clock, which the fixtures move only through the labelled TEST CLOCK. The acceptance fixtures of `apps/api` seal a SEALED source an hour ago (its retention ahead) and an EXPIRED one fifteen days ago; a sweeper racing an approval stands on the TEST CLOCK past the deadline. | CMD025 failure ("Any changed effect, expired source or stale receipt requires new review"); 09 "Quotes, reuploads and retention" (availability is the retention deadline); B07 D-RET-2, D-CLOCK-1. Review finding B06-R2. |
+
 ## 2. Topology and packages (07 "Platform topology")
 
 Dependencies flow contracts → domain ports → application → adapters; `architecture.rules.json` and `tools/architecture-gate.mjs`
@@ -541,7 +548,8 @@ Body `{expectedVersion, planHash, validationReceiptHash, disclosuresHash, assura
    body.validationReceiptHash`, `receipts.findByHash` exists, `result = VALID`, no blocking codes, receipt hashes equal the
    plan's body/revision/target — else PLAN_NOT_VALIDATED / RECEIPT_NOT_CURRENT or RECEIPT_BLOCKING; 8. source:
    `revisions.lockSealedByHash(plan.revisionHash)` SEALED (not EXPIRED/DELETED/SUPERSEDED), read FOR SHARE and held to COMMIT
-   (D-TX-1), else SOURCE_EXPIRED; 9. target: `targetContracts.lockCurrentByHash(plan.targetContractHash)` confirmed and
+   (D-TX-1), else SOURCE_EXPIRED; since the package-close review also available — a governing retention record ACTIVE with its
+   effective deadline ahead of `kauro.server_now()` — else SOURCE_EXPIRED (finding B06-R2, D-SRC-1); 9. target: `targetContracts.lockCurrentByHash(plan.targetContractHash)` confirmed and
    unsuperseded, FOR SHARE, else TARGET_STALE;
 10. `DisclosureComposer.compose(plan, body, receipt)` → `disclosuresHash` must equal the body value else STALE_VERSION
     `mismatch: [disclosuresHash]` (an approval displayed without the CLEAR set cannot authorize it, D-PLAN-3);
@@ -555,8 +563,8 @@ The database enforces 6–7 again as foreign keys, binds the actor to its own me
 insert to the acting session, and refuses a second live approval (tests `discipline`, `integrity-guards`). The wire names
 `planHash`, not the source and target hashes manual 10 lists for approval commands: open question Q9 and its interim binding.
 DENY: OPERATOR → NOT_AUTHORIZED; foreign → NOT_FOUND; missing/stale step-up → ASSURANCE_REQUIRED; stale receipt →
-PLAN_NOT_VALIDATED; disclosures without CLEAR → STALE_VERSION; expired source → SOURCE_EXPIRED; superseded target →
-TARGET_STALE; nothing committed.
+PLAN_NOT_VALIDATED; disclosures without CLEAR → STALE_VERSION; expired source (EXPIRED, or SEALED with its retention lapsed
+before the sweeper ran) → SOURCE_EXPIRED; superseded target → TARGET_STALE; nothing committed.
 RACE: two approvers, same expected version → one APPROVED, one STALE_VERSION; identical retry → replay; conflicting → 409; a
 crash before COMMIT leaves the plan VALIDATED; a source expiry or target supersession racing the approval waits for it or,
 committed first, refuses it (D-TX-1).
@@ -617,7 +625,10 @@ it nor `plan.withdrawn.v1` carries the withdrawal reason, which is a label (D-AP
   (RESUME_WITHOUT_CHECKPOINT) or names another one (CHECKPOINT_MISMATCH), refuses a changed `deadline_at` (clock),
   `subject_hash` or `cost_authority_id` (IMMUTABLE_COLUMN; the adapter answers DEADLINE_IMMUTABLE, SUBJECT_IMMUTABLE,
   COST_IMMUTABLE), never extends a lease past the deadline, refuses claims after the deadline, advances the fence by exactly one
-  per takeover and fences out the previous owner's heartbeats and checkpoints. The cost identity is the funding authority the
+  per takeover and fences out the previous owner's heartbeats and checkpoints. Since the package-close review (finding B06-R1,
+  D-LEASE-3) the expiry is decided before the owner: an expired lease is resumed only as a takeover under the next fence, by
+  another owner or its former one, with exactly the stored checkpoint, and a MODEL_TASK or JOB_ATTEMPT that expired without a
+  checkpoint is not resumed at all (RESUME_WITHOUT_CHECKPOINT). The cost identity is the funding authority the
   leased operation spends against (D-LEASE-1), so a takeover continues under the same grant or entitlement and cannot reset what
   the operation already spent. No command of the catalogue performs a resume (a takeover is a worker's claim); the `LeaseStore`
   port is the boundary. Tests `journals-leases` and `adapters-leases` walk the full interleaving.
@@ -699,7 +710,7 @@ where noted; §12d):
 | id | decision | why (authority) |
 |---|---|---|
 | I-INT-1 | The composition root runs in two steps. `openDatabase(config)`: pending migrations as the owner role over a dedicated connection (`applyMigrationsAs`, which refuses a SUPERUSER or BYPASSRLS migrator every time), then the runtime pool with the configured ceiling, one connection verified at once — a privileged login or a member of `kauro_control` refuses the start instead of the first request. `assembleApi(assembly)`: the authorizer, the admission limiter, the seven handlers over the edition's collaborators and the Fastify server. Configuration comes from the environment only (`loadConfig`): every variable is validated, a refusal names the variable and never its value, `KAURO_DB_POOL_MAX` has no default, the migrator must differ from the runtime login. Amended by the review: the api pool is 1..4 and the request, socket, shutdown and migrator limits are configuration (E-OPS-1); runners serialize on an advisory lock (E-MIG-1); the migrator password is consumed at start and never retained (E-SEC-1); shutdown drains within a deadline (E-OPS-2); outages and pool errors reach safe sinks (E-OPS-3); `/livez` and `/readyz` report the schema's compatibility (E-OPS-4). | 14 "Deployment and rollback" (explicit environment configuration; refuse to start when an input is missing); 07 "Restoration and migration" (migration roles are separate from runtime); 08 "Database isolation"; 07 "Connection budget and operating limits". |
-| I-INT-2 | The plan-side collaborators are not bound in this edition: in a deployment CMD023 and CMD025 answer INTEGRITY_FAILURE / PLAN_SERVICES_UNAVAILABLE inside the unit of work (rolled back, no journal row). The retained-work inspector counts open projects; the external-action inspector reports none, because no ImportStage or PackageVersion aggregate exists yet. The acceptance tests bind deterministic implementations of ArtifactResolver, PlanPatchCompiler and DisclosureComposer, and for CMD026 an ExternalActionInspector that adds the completed stages a test registers — ports of `@kauro/application`, never fakes of the database. | 07 "Command outcomes and error taxonomy" (integrity failure is distinct and nonretryable until the implementation changes); 07 "Acceptance obligations" ("a downstream team must not fill a missing domain rule with a local guess"); 21 "Gate aliases and scoped closures". |
+| I-INT-2 | The plan-side collaborators were not bound by B06; since B08 (D8-CMA-5, D8-CMA-6) the edition binds the decision artifacts, the patch compiler over the Intelligence core's plan compiler and the real disclosure composer, so ApprovePlan has no unavailable outcome and in a deployment with no core adapter CMD022 and CMD023 answer INTEGRITY_FAILURE / CORE_SERVICES_UNAVAILABLE inside the unit of work (rolled back, no journal row). The retained-work inspector counts open projects; the external-action inspector reports none, because no ImportStage or PackageVersion aggregate exists yet. The acceptance tests bind deterministic implementations of ArtifactResolver, PlanPatchCompiler and DisclosureComposer, and for CMD026 an ExternalActionInspector that adds the completed stages a test registers — ports of `@kauro/application`, never fakes of the database. | 07 "Command outcomes and error taxonomy" (integrity failure is distinct and nonretryable until the implementation changes); 07 "Acceptance obligations" ("a downstream team must not fill a missing domain rule with a local guess"); 21 "Gate aliases and scoped closures". |
 | I-INT-3 | Authentication of this edition: LOCAL reads a closed bearer-token file (provider facts per token; its instants must be real calendar instants — the contract validator's `isCalendarDateTime`, because `Date.parse` rolls 2026-02-30 into March); SANDBOX and LIVE refuse to start, since the Identity Platform verifier is not bound. | 08 "Authentication and assurance"; 10 "Schema format execution" (2026-02-30 is the rejection control); 14 "Deployment and rollback". |
 | I-INT-4 (superseded by E-CORR-1, review R28: a malformed value is now ignored and replaced by a minted id, never refused) | A client-supplied correlation id is echoed only when it is an `id` (lowercase RFC 9562 UUID, the request-schema id shape); anything else is INVALID_REQUEST / CORRELATION_ID_INVALID and an absent one is minted. Before, any `[A-Za-z0-9._:-]{1,128}` token was admitted and every command carrying one failed with 500 at its first insert, since the journal, the events and the security events store a uuid — found when the in-memory api tests were ported to the real database. | Registry contract DomainEvent `correlationId: id` ("Safe operation trace"); reference/FIELD_CONTRACTS "Application IDs are opaque server identities"; 10 "Every request receives an opaque correlation ID". |
 | I-INT-5 | The header-only head of the admission — the correlation id, then the content type (`admitHeaders`); since the review a repeated single-valued envelope header, then the content type, the correlation id being resolved by the transport (E-HTTP-1, E-CORR-1) — runs in a route `onRequest` hook before the body is read; `admitStructure` repeats it. Before, an oversized body of an unsupported type was answered BODY_TOO_LARGE by the parser's body limit instead of CONTENT_TYPE_UNSUPPORTED. | 10 "Request envelope" (content type, byte size, JSON syntax, duplicate keys, schema, authenticated subject, authorization); §7 validation order. |
@@ -737,7 +748,8 @@ FIXED; none is DEFERRED or NOT_A_DEFECT. What stays open is listed in §12d.4.
 Independent re-checkers then examined the integrated branch at `e05d47a`: fifteen resolutions were not confirmed and twenty new
 findings (N1–N20) were reported. Their record — each item's outcome, decision, authority, regression tests and revert proof —
 is §12d.5. An independent residual re-check of `055d317` reported one new minor finding in the N2 guard and did not confirm the
-N20-skip revert proof; both are resolved in §12d.6.
+N20-skip revert proof; both are resolved in §12d.6. The package-close review of `main` at `a7203f0` reported B06-R1–B06-R3;
+they are resolved in §12d.7.
 
 ### 12d.1 Findings
 
@@ -1025,6 +1037,49 @@ killed runs of the `055d317` test were stopped with `pg_ctl stop -m immediate` a
 | N2-race-delivery | the conflicting delivery takes no shared lock | `packages/persistence/migrations/0005_events_outbox_inbox.sql` | 1/4 failed: the same message | 4/4 passed |
 | N2-race-isolation | no READ COMMITTED requirement on the move to APPLIED | `packages/persistence/migrations/0005_events_outbox_inbox.sql` | 1/4 failed: "a REPEATABLE READ settlement was not refused: the record ends APPLIED with 1 body conflict(s)" | 4/4 passed |
 | N20-skip | the dispatcher claim locks `FOR UPDATE` without SKIP LOCKED | `packages/persistence/src/inbox-outbox.ts` | with the test of `055d317`: the file never finished — the first test passed, the second never reported, and the run was killed at an external 60 s bound (exit 124); with the new test: 1/4 failed in 110 ms, "the second dispatcher waited on the records the first one holds instead of skipping them: a concurrent claim must lock FOR UPDATE SKIP LOCKED", the other three passed and the file finished in 6 s | 4/4 passed |
+
+### 12d.7 Package-close review record — `main` at `a7203f0`
+
+The independent reviewer's package-close review of `main` at `a7203f0` (all 29 cases; verdict REJECT, with that commit's
+`pnpm run verify` green) agreed with 24 case statuses and disagreed with five — S090, CMD025-DENY, CMD023-RACE, CMD025-RACE and
+CMD026-RACE — through three findings. They were resolved on `fix/b06-review`, branched from `a7203f0`. Each defect was first
+shown by a test under a precise title that fails on `a7203f0` (a clean checkout of `a7203f0` with only the new or changed tests
+applied; every persistence and api test on its own PostgreSQL 17 cluster, instants as the lease functions' clock parameter or
+the labelled TEST CLOCK, no sleep), then fixed, and the same test passes on the fix. Migration 0006 is corrected in place, not
+by a new migration number: nothing is deployed anywhere (D-LEASE-3). Decisions: D-LEASE-3 and D-SRC-1 (§1). Outcome: 3 FIXED,
+0 DEFERRED, 0 NOT_A_DEFECT.
+
+**Review findings**
+
+| id | severity | status | test | commit |
+|---|---|---|---|---|
+| B06-R1 | BLOCKING | FIXED — D-LEASE-3: the expiry decides a claim before the owner; an expired lease is resumed, by anyone, only under the next fence with exactly the stored checkpoint; a MODEL_TASK or JOB_ATTEMPT that expired without one is not resumed; `leases_guard` holds the rule for every writer | `packages/persistence/test/adapters-leases.test.ts` :: "B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — …" and :: "B06-R1: an expired owner re-claiming its own lease is a resume, not a renewal — …"; `packages/persistence/test/journals-leases.test.ts` :: "B06-R1 (database): the guard beneath claim_lease refuses the control plane's own UPDATE …" | `34edc13` |
+| B06-R2 | BLOCKING | FIXED — D-SRC-1: CMD025 requires, after the revision's transition lock, a governing retention record ACTIVE with its effective deadline ahead of `kauro.server_now()`, else SOURCE_EXPIRED | `apps/api/test/cmd025-approve-plan.test.ts` :: "B06-R2 DENY: a source still SEALED whose governing retention deadline has passed on the server clock — …"; the OK test :: "OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; …" now asserts through the oracle that its source's retention lies ahead | `706403d` |
+| B06-R3 | MAJOR | FIXED — CMD023-RACE, CMD025-RACE and CMD026-RACE are PARTIAL exactly like their OK rows (SIMULATED ports and owning packages named); every row quotes its registry outcome verbatim; no product change | `tools/test/case-map.test.mjs` :: "B06-R3: every case row quotes its registry expected outcome verbatim, and a RACE row claims no more than its command's OK row — …" and :: "N12: one PARTIAL criterion — …" | `80eb30b` |
+
+What the tests observed on `a7203f0`, and on the fix:
+
+- **B06-R1** — 3 of the 11 tests of the two lease files failed. Another owner's takeover of an expired JOB_ATTEMPT that never
+  checkpointed, with no checkpoint, returned CLAIMED under fence 2 ("JOB_ATTEMPT without a checkpoint"); the original owner's
+  claim after expiry, without the checkpoint it had stored, returned CLAIMED keeping fence 1 ("expired re-claim without the
+  checkpoint"); the control plane's raw takeover UPDATE of that JOB_ATTEMPT committed ("Missing expected rejection: another
+  owner's takeover without a checkpoint"). On the fix 11/11 pass. The live holder's re-claim now names the stored checkpoint
+  too (a re-claim without it is a restart). The two OUTBOX_DISPATCH dispatchers of `main` (`apps/control`, the payments
+  dispatcher of `apps/api`) claim with no checkpoint and read the fence from the claim: an OUTBOX_DISPATCH lease spends
+  nothing, so they are unaffected, except that a dispatcher's own re-claim after expiry now advances the fence.
+- **B06-R2** — 2 of the 12 tests of `cmd025-approve-plan` failed. The SEALED source whose UNPAID retention had lapsed a day
+  earlier (sealed fifteen days ago on the TEST CLOCK, no sweeper run) was approved: "… was answered 201" with the plan
+  APPROVED; and with the fixture of `a7203f0` the OK test's own source had its retention behind ("the approved source's
+  retention lies ahead"). On the fix 12/12 pass; the fixtures seal a SEALED source an hour ago, and the sweeper racing an
+  approval stands on the TEST CLOCK fifteen days ahead.
+- **B06-R3** — 2 of the 4 tests of `case-map.test.mjs` failed on the case map of `a7203f0`: N12's reviewed PARTIAL set lacked
+  CMD023-RACE, CMD025-RACE and CMD026-RACE, and B06-R3 listed 28 violations — each of the three RACE rows claimed
+  EXECUTED_LOCAL while its OK row is PARTIAL and named neither the OK row's SIMULATED clause nor its owners (B03 and B08, B08,
+  B08 and B17); 13 rows did not quote their registry outcome; the RACE rows of CMD001, CMD009, CMD010 and CMD011 cited no test
+  of the effect their race commits. On the fix 4/4 pass; the case map counts 18 EXECUTED_LOCAL and 11 PARTIAL cases.
+
+The durable evidence bundles (D-EVIDENCE-1) were not regenerated in this round: `docs/evidence/b06/` still holds those of
+`0cce2f02f8b0`, which predate these tests.
 
 ## 13. Verification performed on `b06/integration`
 

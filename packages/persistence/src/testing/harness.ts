@@ -47,7 +47,7 @@ import { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "../eviden
 import { PgInboxIngress } from "../inbox-outbox.js";
 import { PgEventPublisher } from "../event-publisher.js";
 import { createPool, type KauroPool } from "../pool.js";
-import { createCommerceUnitOfWorkFactory, createUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
+import { createAuditUnitOfWorkFactory, createCommerceUnitOfWorkFactory, createExecutionUnitOfWorkFactory, createUnitOfWorkFactory, type PgAuditUnitOfWorkFactory, type PgCommerceUnitOfWorkFactory, type PgExecutionUnitOfWorkFactory, type PgUnitOfWorkFactory } from "../unit-of-work.js";
 import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
 import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
@@ -93,6 +93,23 @@ export interface Harness {
    * pool, SERVICE contexts on the payment-service pool, each unit of work with the commerce repositories and scope adoption.
    */
   readonly commerce: PgCommerceUnitOfWorkFactory;
+  /**
+   * Commission-service pool (login role in kauro_commission; package B10, D10-CTX-1): the verified group of the COMMISSIONS consumer,
+   * the sweeps and CMD051/CMD053, which acts on one adopted agency per transaction or on corporate records. Its unit of work is the
+   * commercial unit-of-work factory of the stage-2 lanes; the schema tests use the pool's login directly.
+   */
+  readonly commissionPool: KauroPool;
+  /**
+   * The execution unit-of-work factory of package B08 (ExecutionUnitOfWorkFactory; D8-XPKG-10): the commerce factory's routing with
+   * the control plane's pool too — TENANT on the request handlers', SYSTEM on the control plane's, SERVICE on the payment service's
+   * — each unit of work with the execution store (execution-fixtures.ts).
+   */
+  readonly execution: PgExecutionUnitOfWorkFactory;
+  /**
+   * The audit unit-of-work factory of package B08 (AuditUnitOfWorkFactory; mandate B08-PERSISTENCE-AUDIT): the execution factory's
+   * routing, each unit of work with the audit store as well (audit-fixtures.ts).
+   */
+  readonly audit: PgAuditUnitOfWorkFactory;
   /** Superuser connection: bypasses RLS, sees every tenant; assertions only, never a write path under test. */
   readonly oracle: Client;
   tenant(agencyId: AgencyId, userId: UserId): TenantContext;
@@ -139,7 +156,7 @@ export interface Harness {
    * the retention its seal left, B09 quotes_source_binding; the B07+B09 merge). The manifest hash is the revision's source hash
    * (plans_source_fk).
    */
-  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
+  sealedRevision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly base?: Date; readonly billableSourceUnits?: number }): Promise<{ readonly revisionId: RevisionId; readonly revisionHash: Sha256Hex; readonly version: number }>;
   /**
    * The retention sweeper's retention_expires of a SEALED revision (source-lifecycle.ts expireSealedRevision: its governing records
    * past their effective deadline expire, then SEALED -> EXPIRED), in one control-plane transaction bound to the agency whose labelled
@@ -200,11 +217,14 @@ export async function start(): Promise<Harness> {
   const validatorPool = createPool({ ...base, max: 2, user: ROLES.validatorLogin, applicationName: "kauro-test-validator" });
   const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
   const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
+  const commissionPool = createPool({ ...base, max: 2, user: ROLES.commissionLogin, applicationName: "kauro-test-commission" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const app = createUnitOfWorkFactory(appPool, { clock });
   const control = createUnitOfWorkFactory(controlPool, { clock });
   const payment = createUnitOfWorkFactory(paymentPool, { clock });
   const commerce = createCommerceUnitOfWorkFactory({ app: appPool, payment: paymentPool }, { clock });
+  const execution = createExecutionUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
+  const audit = createAuditUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
   const proofs = new PgAssuranceProofRecorder(assurancePool);
   const receipts = new PgValidationReceiptRecorder(validatorPool);
   const oracle = await pg.connect("postgres");
@@ -267,6 +287,9 @@ export async function start(): Promise<Harness> {
     paymentPool,
     payment,
     commerce,
+    commissionPool,
+    execution,
+    audit,
     oracle,
     tenant: (agencyId, userId) => ({ kind: "TENANT", agencyId, userId, correlationId: correlation() }),
     identity: (userId) => ({ kind: "IDENTITY", userId, correlationId: correlation() }),
@@ -354,7 +377,7 @@ export async function start(): Promise<Harness> {
           control: (fn) => asControlFor(agency.agencyId, fn),
         },
         { agencyId: agency.agencyId, projectId, ownerUserId: agency.ownerUserId, ownerMembershipId: agency.ownerMembershipId },
-        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}) },
+        { seed: `harness-${projectId}`, state, ...(options.base !== undefined ? { base: options.base } : {}), ...(options.billableSourceUnits !== undefined ? { billableSourceUnits: options.billableSourceUnits } : {}) },
       );
       return { revisionId: sealed.revisionId as RevisionId, revisionHash: sealed.manifestHash as Sha256Hex, version: sealed.version };
     },
@@ -442,6 +465,7 @@ export async function start(): Promise<Harness> {
       await validatorPool.end();
       await ingressPool.end();
       await paymentPool.end();
+      await commissionPool.end();
       await pg.stop();
     },
   };
@@ -518,4 +542,16 @@ export function barrier(): { readonly wait: Promise<void>; open(): void } {
     open = resolve;
   });
   return { wait, open: () => open() };
+}
+
+/**
+ * Marks a promise a test starts now and settles later as observed from its creation. A race test starts one side, drives the
+ * other side and the lock holder, and only then awaits (or asserts the refusal of) the first; the first side can fail the moment
+ * the holder ends, before the test attaches its handler, and node:test fails the running test on that "unhandled rejection"
+ * although the refusal is exactly what the test expects. The returned promise is the same one: `await` and `assert.rejects` see
+ * the outcome unchanged.
+ */
+export function handled<T>(promise: Promise<T>): Promise<T> {
+  promise.catch(() => undefined);
+  return promise;
 }

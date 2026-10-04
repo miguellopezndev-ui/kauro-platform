@@ -1,0 +1,213 @@
+{
+  "verdict": "REJECT",
+  "summary": "Reviewed all 29 B06 cases at a7203f0a59d0b737b46a099887878297adeaa775. All 87 distinct cited tests pass, but checkpoint-free restarts and approval of expired sources violate registry outcomes. Three RACE rows also overclaim complete execution evidence.",
+  "verify_observed": "verify.log ends with 'verify exit 0'. Nine suites report 764 tests and 764 passes, with zero failures, cancellations, skips or todos. All 87 distinct tests cited by the B06 case map have PASS entries. Architecture, OpenAPI, matrix and clean-consumer checks also pass. No tests were rerun during this read-only review.",
+  "cases": [
+    {
+      "id": "S051",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "3/3 cited tests pass. Real PostgreSQL compare-and-swap and command races demonstrate one successor, stale-version conflicts and refusal to approve superseded content."
+    },
+    {
+      "id": "S052",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "9/9 cited tests pass. Real journals demonstrate conflicting payload rejection, identical replay, concurrent duplicates, rollback recovery, response-loss recovery and current authorization before replay."
+    },
+    {
+      "id": "S089",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "3/3 cited tests pass. Structural reservation and upstream admission use real PostgreSQL with positive controls. Actual funded-grant admission and public dispatch are explicitly deferred to B03/B08."
+    },
+    {
+      "id": "S090",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": false,
+      "note": "2/2 cited tests pass, but both establish a checkpoint before testing another owner's takeover. Checkpoint-free expired leases and expired same-owner claims bypass the required denial; see B06-R1."
+    },
+    {
+      "id": "S093",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "5/5 cited tests pass. Closed application-owned schemas, adversarial metadata and route-level negative controls are demonstrated. Public target-metadata intake through CMD018 is explicitly deferred to B17."
+    },
+    {
+      "id": "R2-043",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "7/7 cited tests pass. Observed PostgreSQL lock waits, last-owner refusals, explicit closure and protected owner counters demonstrate the database invariant. Public membership commands are explicitly deferred to B16."
+    },
+    {
+      "id": "R2-058",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Invalid boolean types and missing approval members reject without coercion or defaults."
+    },
+    {
+      "id": "R2-059",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Unknown privileged members reject before a transaction; a valid neighboring request creates its project."
+    },
+    {
+      "id": "CMD001-OK",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. The real route atomically creates a DRAFT agency and ACTIVE OWNER membership, with independent row and security-event assertions."
+    },
+    {
+      "id": "CMD001-DENY",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Identity/admission denials, identical replay and conflicting-key rejection leave no second tenant."
+    },
+    {
+      "id": "CMD001-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. Concurrent duplicates and failures before and after commit preserve one agency and its durable answer."
+    },
+    {
+      "id": "CMD009-OK",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Duplicate labels retain distinct stable IDs; processing authority is recorded and bound in the client transaction."
+    },
+    {
+      "id": "CMD009-DENY",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Foreign authority references and unauthorized actors reject without effects; a direct runtime-role insert also fails the composite foreign key."
+    },
+    {
+      "id": "CMD009-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. Observed journal contention, replay, conflicting payloads and precommit failure preserve one scoped client."
+    },
+    {
+      "id": "CMD010-OK",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. Archiving blocks new projects while preserving existing projects, revisions, approvals and receipts."
+    },
+    {
+      "id": "CMD010-DENY",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "2/2 cited tests pass. Role, tenant and stale-version denials have no effects; archival retains history and introduces no refund or deletion."
+    },
+    {
+      "id": "CMD010-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. Competing versions produce one archive and one conflict; path/body digest conflicts and crash recovery are exercised."
+    },
+    {
+      "id": "CMD011-OK",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. The real route creates a project/draft-revision pair and exposes readiness blockers."
+    },
+    {
+      "id": "CMD011-DENY",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "5/5 cited tests pass. Unavailable modes, archived clients and unauthorized actors reject. Deterministic capability/agency transition races include queued-writer negative controls."
+    },
+    {
+      "id": "CMD011-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "1/1 cited test passes. Replay and interrupted project/revision writes preserve atomicity; the deferred foreign key independently prevents an incomplete pair."
+    },
+    {
+      "id": "CMD023-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "6/6 cited tests pass. Real supersession, approval withdrawal, digest checks and events are demonstrated. Patch resolution/compilation is explicitly SIMULATED and owned by B03/B08."
+    },
+    {
+      "id": "CMD023-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "5/5 cited tests pass. Authorization and stale-plan denials are real. Compiler rejection and commercial-consequence facts are explicitly simulated, with B03/B08/B09 ownership named."
+    },
+    {
+      "id": "CMD023-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": false,
+      "note": "2/2 cited tests pass and demonstrate real transaction races. The full registry outcome still depends on the simulated compiler identified in CMD023-OK; see B06-R3."
+    },
+    {
+      "id": "CMD025-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "11/11 cited tests pass. Hash, actor and immutable subject bindings have independent checks; the B08 disclosure composer is explicitly simulated. The claimed current-source positive fixture nevertheless has expired retention; see B06-R2."
+    },
+    {
+      "id": "CMD025-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "6/6 cited tests pass. Disclosure simulation is honestly identified, but the claimed expired-source denial only covers an explicit state transition, not a passed retention deadline; see B06-R2."
+    },
+    {
+      "id": "CMD025-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": false,
+      "note": "1/1 cited test passes and demonstrates one approval under real PostgreSQL contention. Exact disclosure composition remains simulated, so the complete registry expectation is unsupported; see B06-R3."
+    },
+    {
+      "id": "CMD026-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "5/5 cited tests pass. Atomic withdrawal, preserved history and durable outbox routing are real. Completed external actions are simulated; B08 cancellation/reconciliation and B17 import-stage ownership are named."
+    },
+    {
+      "id": "CMD026-DENY",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "3/3 cited tests pass. Unauthorized withdrawal rejects; immutable history remains and the response does not promise external rollback."
+    },
+    {
+      "id": "CMD026-RACE",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": false,
+      "note": "1/1 cited test passes and demonstrates atomic withdrawal, stale conflicts and replay. The registry's active-work cancellation/reconciliation clause remains deferred to B08; see B06-R3."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B06-R1",
+      "severity": "BLOCKING",
+      "title": "Expired spending leases can restart without the required checkpoint",
+      "file": "packages/persistence/migrations/0006_journals_leases.sql",
+      "line": 204,
+      "detail": "S090 requires rejecting RESUME without a checkpoint. The takeover guard rejects a missing checkpoint only when OLD.checkpoint_hash is non-null, so an expired JOB_ATTEMPT or MODEL_TASK that never checkpointed can be claimed by another owner with null and receive a new fence. Additionally, claim_lease's same-owner branch at line 243 executes before the expiry check and ignores p_checkpoint entirely: an expired owner can restart with a missing or incorrect checkpoint while retaining its old fence. The two cited S090 tests exercise only different-owner takeovers after storing a checkpoint, leaving both paths untested.",
+      "reproduction": "Using PgLeaseStore under kauro_control, claim a new JOB_ATTEMPT at t0 with ttlSeconds=120, deadlineAt=t0+3600s, a valid subject hash, a costAuthorityId and checkpointHash=null. Commit without checkpointing. Claim the same resource at t0+130s with another owner and identical immutable fields, again checkpointHash=null: the SQL returns CLAIMED with fence 2 instead of refusing. Separately, store a checkpoint during the first live lease, then claim after expiry using the original owner and checkpointHash=null or a different hash: it returns CLAIMED with fence 1. These follow directly from lines 200-208 and 243-259; the read-only review did not rerun PostgreSQL.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B06-R2",
+      "severity": "BLOCKING",
+      "title": "ApprovePlan accepts sources whose retention has already expired",
+      "file": "packages/application/src/commands/handlers/approve-plan.ts",
+      "line": 91,
+      "detail": "CMD025-DENY requires an expired source to require new review. The handler checks only source.state === SEALED. PgDatasetRevisionRepository.lockSealedByHash (workspace.ts:309) reads no retention deadline, so approval remains possible after the governing retention deadline passes and before the sweeper changes the revision state. The existing product availability reader explicitly requires an ACTIVE retention record with effective_deadline > kauro.server_now() (packages/persistence/src/source/readers.ts:34). The passing CMD025 success test already exercises this defect: cmd025-approve-plan.test.ts:73 calls approvable without recent=true; support.ts:682 uses the default source fixture, whose seal is approximately fifteen days old and whose UNPAID retention expires fourteen days after sealing (source-lifecycle.ts:154,613). It nevertheless commits a live approval.",
+      "reproduction": "Follow the existing test titled 'OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; the approval hash binds the named preimage'. Keep its default approvable fixture, authorized approver, fresh proof and test-bound disclosure composer. Read the source's retention record: effective_deadline is already past, while dataset_revisions.state remains SEALED. POST the matching approval body. The recorded test returns 201 and asserts a live approval and APPROVED plan; the registry requires SOURCE_EXPIRED and no approval. Alternatively, let a current source's retention expire without running the sweeper and submit the same otherwise valid request.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B06-R3",
+      "severity": "MAJOR",
+      "title": "Three RACE rows narrow the registry outcome and overclaim complete execution",
+      "file": "docs/design/B06-case-map.md",
+      "line": 104,
+      "detail": "CMD023-RACE, CMD025-RACE (line 107) and CMD026-RACE (line 110) replace their registry expected outcomes with retry/conflict/crash descriptions and claim EXECUTED_LOCAL for the whole case. briefs.md retains each command's full successful effect plus concurrency requirements. The same map correctly marks CMD023-OK PARTIAL because patch resolution/compilation is test-bound and owned by B03/B08, CMD025-OK PARTIAL because exact disclosure composition is simulated and owned by B08, and CMD026-OK PARTIAL because active-work cancellation/reconciliation is not demonstrated and belongs to B08. Their race tests prove the real PostgreSQL transaction protocol, but do not remove these dependencies or demonstrate those omitted clauses.",
+      "reproduction": "Compare the three RACE expectations in briefs.md with case-map lines 104, 107 and 110, then read their exact cited tests: cmd023-revise-plan.test.ts :: 'RACE: two revisions on one version → one successor; identical retry replays; the same key with another patch → 409 IDEMPOTENCY_CONFLICT; crash leaves the predecessor unsuperseded and the same key then revises it once'; cmd025-approve-plan.test.ts :: 'RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the plan VALIDATED with no approval and the same key then approves it once'; cmd026-withdraw-approval.test.ts :: 'RACE: two withdrawals → one 200, one 409; identical retry replays; a withdrawal cannot be undone (KA004)'. The first two run with world()'s test plan services; the third asserts withdrawal rows/events without executing the B08 cancellation/reconciliation consumer. Retain EXECUTED_LOCAL for the demonstrated protocol clauses, mark the complete cases PARTIAL, and name the simulated/deferred clauses.",
+      "status": "OPEN"
+    }
+  ]
+}

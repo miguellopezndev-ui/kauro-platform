@@ -8,6 +8,10 @@
  * port's documented contract, reports `evidenceClass: "SIMULATED"` and names a `contract-fake-*` provider token in every record it
  * produces (21 "Evidence classes": a contract fake is never EXECUTED_PROVIDER). The malware scanner's fake is B07-DATA-PLANE's
  * (`@kauro/data-plane/testing`); B06's in-memory ports stay where they are (the main entry, pure orchestration tests).
+ *
+ * The two cores' labelled fakes (B08 mandate B08-CORE-PORTS) are the separate test-only subpath `@kauro/application/testing/cores`
+ * (`./cores.ts`), not this one: this barrel and its closed inventory (`tools/test/b07-stage-one.test.mjs`) are B07-PROVIDER-FAKES'
+ * own invariant, fixed at three fakes, and are never extended by a later package.
  */
 import type { ProviderEvidenceClass } from "../ports/source-providers.js";
 import { CONTRACT_FAKE_JOURNAL_PROVIDER } from "./contract-fake-authority-journal.js";
@@ -81,3 +85,6 @@ export * from "../commerce/testing/index.js";
 // every fake of this subpath, the package's main entry exports none of it and no composition root binds it.
 export { ContractFakeIdentityIssuer, testClock, totpCode, CONTRACT_FAKE_LABEL, SIMULATED_EVIDENCE } from "./identity-issuer.js";
 export type { TestClock, FakeAccount, FakeAccountSpec, FakeSignIn, FakeRefusal, FakeTotpEnrollment, MintOptions } from "./identity-issuer.js";
+
+// B10 (agency recurrence and commission domain) adds its four fakes beside them; same rules: one owner per fake, labelled, never bound.
+export * from "../commercial/testing/index.js";

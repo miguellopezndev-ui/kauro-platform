@@ -11,10 +11,14 @@ import type { PartCoverage, ScanPartKind } from "./scan-coverage.js";
 import type { SelectionManifestDocument } from "./selection.js";
 import type {
   EvaluationId,
+  HoldReassertionId,
+  HoldReleaseId,
   InspectionReceiptId,
+  ObjectHoldId,
   ProjectionId,
   RetentionAnchorId,
   RetentionId,
+  SealAttemptId,
   SelectionManifestId,
   SourceFileId,
   SourceTableId,
@@ -167,6 +171,107 @@ export interface StorageLocationPolicyRecord {
   /** 21 "Evidence classes": a contract fake's read-back is SIMULATED, never EXECUTED_PROVIDER. */
   readonly evidenceClass: "EXECUTED_PROVIDER" | "SIMULATED";
   readonly observedAt: UtcInstant;
+}
+
+/**
+ * A provider hold of an accepted generation (B07-R1; decisions D-HOLD-1..D-HOLD-3; table kauro.object_holds, migration 0020):
+ * INTENDED before the provider placement, SEALED by the seal that commits with it, CLOSED when its attempt ended without sealing
+ * (REFUSED by the request handler that placed it, ABANDONED by the control plane past its bound), RELEASING once nothing needs it,
+ * RELEASED with the provider's answer. Not an aggregate: no version, no event (like the object registry, D-OBJ-3).
+ */
+export type ObjectHoldState = "INTENDED" | "SEALED" | "CLOSED" | "RELEASING" | "RELEASED";
+export type ObjectHoldCloseReason = "REFUSED" | "ABANDONED";
+
+export interface ObjectHoldRecord {
+  readonly holdId: ObjectHoldId;
+  readonly attemptId: SealAttemptId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly revisionId: RevisionId;
+  readonly fileId: SourceFileId;
+  readonly objectId: StoredObjectId;
+  /** The exact accepted generation held (the file's provider generation). */
+  readonly generation: string;
+  readonly holdKind: "TEMPORARY";
+  readonly reason: "SEAL_INTEGRITY";
+  readonly placedByUserId: UserId;
+  readonly state: ObjectHoldState;
+  readonly intendedAt: UtcInstant;
+  /** The attempt's bound: intendedAt + SEAL_HOLD_ATTEMPT_SECONDS. */
+  readonly attemptExpiresAt: UtcInstant;
+  readonly sealedAt?: UtcInstant;
+  readonly closedAt?: UtcInstant;
+  readonly closeReason?: ObjectHoldCloseReason;
+  readonly releaseRequestedAt?: UtcInstant;
+  readonly releasedAt?: UtcInstant;
+  readonly releaseResult?: HoldReleaseAnswer;
+  /** The release claim whose claimant recorded the provider's answer (RELEASED rows only; D-HOLD-3). */
+  readonly releasedBy?: HoldReleaseId;
+  /**
+   * The provider's metageneration of the generation right after this hold's placement (Cloud Storage `metageneration`, a decimal
+   * string: the incarnation of the generation's metadata, which every hold placement and release increments; D-HOLD-4) — recorded by
+   * the seal's own transaction (SEALED) or when its attempt closes (REFUSED), set once; absent while no placement answer was recorded.
+   * A later re-assertion's is on its re-assertion record.
+   */
+  readonly metageneration?: string;
+}
+
+/**
+ * What a claimed release of an object's seal holds came to at the provider (D-HOLD-3, D-HOLD-4): RELEASED — the release under the
+ * claim's metageneration cleared the hold; ABSENT — the generation is not the live one (another is, or none); NOT_HELD — the live
+ * generation carries no hold any more (the release's metageneration precondition failed, 412, and the re-observation found the hold
+ * already released by an earlier call), so this release cleared nothing.
+ */
+export type HoldReleaseAnswer = "RELEASED" | "ABSENT" | "NOT_HELD";
+
+/**
+ * One release claim of an object's seal holds (B07-R1, second re-check; decision D-HOLD-3; table kauro.object_hold_releases,
+ * migration 0020): the fence token of the one caller that carries a decided release out. The object's claims are numbered in order;
+ * only the latest may be answered, once, by its claimant. A claim may still land at the provider until `inFlightUntil`
+ * (= claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS) unless answered, and no hold of the object is intended before then.
+ */
+export interface ObjectHoldReleaseRecord {
+  readonly releaseId: HoldReleaseId;
+  readonly agencyId: AgencyId;
+  readonly objectId: StoredObjectId;
+  readonly generation: string;
+  /** 1, 2, … per object, in claim order. */
+  readonly sequence: number;
+  readonly claimedAt: UtcInstant;
+  /** claimedAt + HOLD_RELEASE_CLAIM_SECONDS: the claimant issues its provider call before it; another caller may claim after it. */
+  readonly claimExpiresAt: UtcInstant;
+  /** claimExpiresAt + PROVIDER_CALL_TIMEOUT_MS: a call of this claim is not expected to land after it (defense in depth, D-HOLD-4). */
+  readonly inFlightUntil: UtcInstant;
+  /**
+   * The metageneration the claim's release names (ifMetagenerationMatch, D-HOLD-4): at the claim, the greatest recorded for the
+   * releasing holds (their placements' and re-assertions'); raised only by its claimant, after a re-observation found the hold live at a
+   * newer one, while the claim is the object's latest, unanswered and live (`rebaseRelease`); absent while none was recorded (the
+   * claimant observes first).
+   */
+  readonly metageneration?: string;
+  readonly answeredAt?: UtcInstant;
+  readonly releaseResult?: HoldReleaseAnswer;
+}
+
+/** What a re-assertion of a sealed hold found (D-HOLD-2): the generation live and held, or not the live generation any more. */
+export type HoldReassertionResult = "HELD" | "GENERATION_NOT_LIVE";
+
+/**
+ * One re-assertion of a sealed hold at the provider (B07-R1, second re-check; decision D-HOLD-2; table kauro.object_hold_reassertions,
+ * migration 0020): by the seal after its commit, or by OBJECT_INVENTORY for a hold whose re-assertion was never recorded or found the
+ * generation not live. Append-only evidence; a GENERATION_NOT_LIVE finding is handed to OBJECT_INVENTORY's revocation.
+ */
+export interface ObjectHoldReassertionRecord {
+  readonly reassertionId: HoldReassertionId;
+  readonly holdId: ObjectHoldId;
+  readonly agencyId: AgencyId;
+  readonly objectId: StoredObjectId;
+  readonly generation: string;
+  readonly result: HoldReassertionResult;
+  readonly reassertedBy: "SEAL" | "OBJECT_INVENTORY";
+  readonly observedAt: UtcInstant;
+  /** HELD only: the metageneration the re-observation reported with the hold (the hold's latest recorded incarnation, D-HOLD-4). */
+  readonly metageneration?: string;
 }
 
 // --- inspection -----------------------------------------------------------------------------------------------------------
@@ -342,6 +447,12 @@ export interface EvaluatedTable {
   readonly columnCount: number;
   readonly excludedHiddenRows: number;
   readonly issues: ReadonlyArray<string>;
+  /**
+   * The measured edges of each association the selection declares on this table, in declaration order (present only on a table
+   * that has one): what the sealed subject's per-association counts are taken from (D-CMD-8; B07-R2). The SELECTION_EVALUATION
+   * consumer records them with the table, under the evaluation hash.
+   */
+  readonly associations?: ReadonlyArray<{ readonly associationKey: string; readonly edges: number }>;
 }
 
 export interface EvaluatedProjection {

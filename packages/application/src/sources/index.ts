@@ -101,3 +101,5 @@ export {
   REPLACED_BY_NEW_REVISION,
   uploadStatusPath,
 } from "./handlers/index.js";
+export type { BoundedAnswer, HoldReassertion, ReleaseClaim, ReleaseTarget } from "./provider-holds.js";
+export { boundedProviderCall, claimStillHeld, monotonicMs, reassertHold, releaseUnderClaim } from "./provider-holds.js";

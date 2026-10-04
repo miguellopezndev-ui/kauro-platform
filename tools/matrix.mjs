@@ -15,7 +15,10 @@
 // platform machines of @kauro/domain (EndClient, Project; since B07 the source-lifecycle machines UploadSession, StoredObject,
 // SourceFile, RetentionRecord; package B09's ten, D-MACH-B1..B10), EVENT_TYPES and EVENT_SUBSCRIPTIONS, the served command specs
 // and their outcome catalogues of @kauro/application — B06's seven and, since mandate B07-COMMANDS served them, B07's six with the
-// source reads and the selection manifest intake — the transition seeds of the migrations, the events each handler publishes (read
+// source reads and the selection manifest intake, and since mandate B08-COMMANDS-EXECUTION B08's two execution commands (CMD036 ExecuteProject,
+// CMD037 CancelJob) with the GetJob read and since mandate B08-COMMANDS-AUDIT its four audit commands (CMD020 StartAudit, CMD021 CancelAudit, CMD022
+// CreatePlan, CMD024 ValidatePlan) with the GetAudit read and the decision artifact intake, whose events are read from the execution and audit stores' methods
+// and CMD022's handler — the transition seeds of the migrations, the events each handler publishes (read
 // from its source), and the api test sources the applicability rows cite. Requires the workspace to be built.
 //
 // Package B09's served commands and reads (decision D-REQ-B7) join the served sections from the application's served lists
@@ -52,7 +55,7 @@ export const EDGE_OWNERS = {
     restriction_remedied: { owner: "B16", why: "the reviewed remedy of the same incident; no registry command names it", event: "agency.restriction_remedied.v1" },
     owner_requests_closure: { command: "CMD043", event: "agency.closing.v1" },
     owner_abandons_setup: { command: "CMD043", event: "agency.closing.v1" },
-    closure_obligations_completed: { owner: "B10", why: "the closure workflow of CMD043 once jobs, access, data and financial residuals are accounted for", event: "agency.closed.v1" },
+    closure_obligations_completed: { owner: "B16", why: "the verified managed deletion once jobs, access, data and financial residuals are accounted for (D10-AGY-2; B10's agencies_closure_residuals refuses the edge, KC006, while a payment, refund, live authorization, tax document or reconciliation case of the agency is open)", event: "agency.closed.v1" },
   },
   Membership: {
     "(initial INVITED)": { command: "CMD003", event: "membership.invited.v1", note: "CMD001 creates the founding OWNER ACTIVE (membership.created.v1; decision D-CTX-2)" },
@@ -111,43 +114,43 @@ export const EDGE_OWNERS = {
     cleanup_verified_with_residuals: { owner: "B16", why: "verified managed deletion with recorded provider residuals", event: null },
   },
   Audit: {
-    "(initial QUEUED)": { command: "CMD020", event: null },
-    profile_worker_claims: { owner: "B08", why: "durable profile/interpret/validate orchestration", event: null },
-    profile_and_candidates_complete: { owner: "B08", why: "durable orchestration", event: null },
-    compiled_decisions_ready: { owner: "B08", why: "durable orchestration", event: null },
-    unresolved_material_choice: { owner: "B08", why: "durable orchestration", event: null },
-    capability_not_supported: { owner: "B08", why: "durable orchestration", event: null },
-    complete_valid_receipt_and_current_authority: { owner: "B08", why: "durable orchestration", event: null },
-    validatable_issue_needs_agency_choice: { owner: "B08", why: "durable orchestration", event: null },
-    cancellation_wins: { command: "CMD021", event: null },
-    absolute_deadline: { owner: "B08", why: "the audit's absolute deadline", event: null },
-    fatal_integrity_error: { owner: "B08", why: "durable orchestration", event: null },
-    fatal_contract_or_provider_error: { owner: "B08", why: "durable orchestration", event: null },
-    fatal_contract_error: { owner: "B08", why: "durable orchestration", event: null },
+    "(initial QUEUED)": { command: "CMD020", event: "audit.queued.v1" },
+    profile_worker_claims: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane) on audit.queued.v1: the PROFILE step claims the audit's fence + 1 over a SEALED source and an AUTHORIZED grant (D8-AUD-2)", event: "audit.profiling.v1" },
+    profile_and_candidates_complete: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the PROFILE step records the profile evidence and the complete candidate manifest under its fence (D8-AUD-2, D8-CAU-9)", event: "audit.interpreting.v1" },
+    compiled_decisions_ready: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane) on audit.interpreting.v1: the INTERPRET step's compiled decisions, the system draft plan VALIDATING in the same unit (D8-AUD-3, D8-CAU-4, D8-CAU-5)", event: "audit.validating.v1" },
+    unresolved_material_choice: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's NEEDS_DECISION answer, no plan (D8-CAU-11)", event: "audit.needs_decision.v1" },
+    capability_not_supported: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's UNSUPPORTED answer; GRANT_RECONCILIATION closes the unused grant (D8-CAU-10, D8-CAU-11)", event: "audit.unsupported.v1" },
+    complete_valid_receipt_and_current_authority: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane) on audit.validating.v1: the VALIDATE step's VALID receipt under the fence and cancel version before the absolute deadline, the system draft VALIDATED (deferred guard, D8-AUD-4)", event: "audit.draft_ready.v1" },
+    validatable_issue_needs_agency_choice: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the VALIDATE step's INVALID receipt, its blocking issues the findings (D8-CAU-11)", event: "audit.needs_decision.v1" },
+    cancellation_wins: { command: "CMD021", event: "audit.cancelled.v1", note: "EXECUTION_CONTROL (control plane) cancels too, as a SERVICE actor with its reason, the live audits of a superseded or expired revision or of a revoked source admission (D8-CANCEL-2)" },
+    absolute_deadline: { owner: "B08", why: "the AUDIT_DEADLINES sweeper (control plane) on the server clock, never early, settling the system draft's open intent CANCELLED (D8-DL-1, D8-CAU-8)", event: "audit.expired.v1" },
+    fatal_integrity_error: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the PROFILE step meets a sealed generation that fails its integrity or a rejected profile (D8-CAU-9)", event: "audit.failed.v1" },
+    fatal_contract_or_provider_error: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the INTERPRET step's FAILED answer, a compiler refusal or a candidate manifest that changed (D8-CAU-4, D8-CAU-5)", event: "audit.failed.v1" },
+    fatal_contract_error: { owner: "B08", why: "the AUDIT_ORCHESTRATION consumer (control plane): the VALIDATE step's null, incomplete or foreign receipt (D8-CAU-7)", event: "audit.failed.v1" },
   },
   Plan: {
     "(initial DRAFT)": { command: "CMD022", event: "plan.created.v1", note: "CMD023 RevisePlan (B06) creates the successor DRAFT of a revision" },
-    compiled_or_edited: { command: "CMD023", event: "plan.validation_required.v1", note: "the successor of a revision; CMD022 CreatePlan (B03) compiles a first plan" },
-    validation_admitted: { command: "CMD024", event: "plan.validating.v1" },
-    valid_receipt: { command: "CMD024", event: "plan.validated.v1" },
-    invalid_receipt_result: { command: "CMD024", event: "plan.validation_required.v1" },
+    compiled_or_edited: { command: "CMD023", event: "plan.validation_required.v1", note: "the successor of a revision; CMD022 CreatePlan (B08) takes a first plan out of DRAFT the same way, in the unit of work that inserts it, and AUDIT_ORCHESTRATION (control plane) so takes the system draft it inserts (D8-CAU-4)" },
+    validation_admitted: { command: "CMD024", event: "plan.validating.v1", note: "AUDIT_ORCHESTRATION (control plane) admits a system draft's first validation intent with the INTERPRET step's VALIDATING edge (D8-AUD-4)" },
+    valid_receipt: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane) on plan.validating.v1 for CMD024's current intent, and AUDIT_ORCHESTRATION's VALIDATE step for a system draft: ValidatePort over the exact subjects, the receipt written by kauro_validator, and only the current intent moves the plan (D8-PLAN-2, D8-CAU-7, D8-CMA-10); CMD024 records the intent and answers 202", event: "plan.validated.v1" },
+    invalid_receipt_result: { owner: "B08", why: "the PLAN_VALIDATION consumer (control plane) or AUDIT_ORCHESTRATION's VALIDATE step: an INVALID receipt of the current intent keeps its findings and returns the plan to VALIDATION_REQUIRED; also when an audit's cancellation or deadline settles its draft's open intent CANCELLED (D8-PLAN-2, D8-CAU-8, D8-CMA-10)", event: "plan.validation_required.v1" },
     agency_approval: { command: "CMD025", event: "plan.approved.v1" },
     new_plan_revision: { command: "CMD023", event: "plan.superseded.v1" },
     withdraw_approval: { command: "CMD026", event: "plan.withdrawn.v1" },
     withdraw_plan: { owner: "B08", why: "an authorized project actor withdraws a VALIDATED plan (typed plan editing and exact approval); no registry command names it", event: "plan.withdrawn.v1" },
   },
   Job: {
-    "(initial QUEUED)": { command: "CMD036", event: null },
-    capacity_reserved: { owner: "B08", why: "job admission", event: null },
-    provider_start_observed: { owner: "B08", why: "fenced execution", event: null },
-    complete_staging_submitted: { owner: "B08", why: "fenced staging", event: null },
-    atomic_publication_accepted: { owner: "B08", why: "verification and publication", event: null },
-    cancel_command: { command: "CMD037", event: null },
-    provider_and_artifacts_reconciled: { owner: "B08", why: "cancellation reconciliation", event: null },
-    deadline_reached: { owner: "B08", why: "the job's deadline", event: null },
-    unrecoverable_start_error: { owner: "B08", why: "fenced execution", event: null },
-    fatal_resource_or_integrity_error: { owner: "B08", why: "fenced execution", event: null },
-    verification_failure: { owner: "B08", why: "verification", event: null },
+    "(initial QUEUED)": { command: "CMD036", event: "processing_job.queued.v1" },
+    capacity_reserved: { owner: "B08", why: "JOB_ADMISSION (control plane): the fair round under the global ledger admits the next QUEUED job and consumes its authorization in the same unit (D8-SCHED-1, D8-AUTH-1), run by JOB_EXECUTION on processing_job.queued.v1 and by the JOB_ADMISSION sweeper", event: "processing_job.admitted.v1" },
+    provider_start_observed: { owner: "B08", why: "the ATTEMPT_MONITOR sweeper (control plane) observes the attempt's provider job by its deterministic identity (D8-ATT-2)", event: "processing_job.running.v1" },
+    complete_staging_submitted: { owner: "B08", why: "the ATTEMPT_MONITOR sweeper (control plane) reads the finished attempt's manifest from its staging prefix itself and records it under the attempt's fence (D8-STG-3)", event: "processing_job.verifying.v1" },
+    atomic_publication_accepted: { owner: "B08", why: "the JOB_EXECUTION consumer (control plane) on package_version.verified_private.v1: the authority re-read after its locks, the delivery copies read back, then the publication transaction (D8-PUB-1, D8-PUB-2, D8-CEX-5)", event: "processing_job.ready.v1" },
+    cancel_command: { command: "CMD037", event: "processing_job.cancel_requested.v1", note: "the control plane requests it too, with a SERVICE actor and its reason, when a fact the job relies on is lost (JOB_ADMISSION at its re-read, EXECUTION_CONTROL on the loss event, JOB_EXECUTION at the publication's re-read; D8-CEX-5, D8-CEX-6)" },
+    provider_and_artifacts_reconciled: { owner: "B08", why: "the EXECUTION_CONTROL consumer (control plane) terminates the attempt's provider job by identity, observes it terminal, revokes the private package and releases the job's slots once (D8-CANCEL-1, D8-CEX-6)", event: "processing_job.cancelled.v1" },
+    deadline_reached: { owner: "B08", why: "the JOB_DEADLINES sweeper (control plane) on the server clock, never early, after the exact provider job is terminated (D8-DL-1)", event: "processing_job.expired.v1" },
+    unrecoverable_start_error: { owner: "B08", why: "the control plane's launch (ATTEMPT_MONITOR, or JOB_EXECUTION handing on the ACTIVE slot) records the host's refusal, or ATTEMPT_MONITOR finds the attempts exhausted (D8-CEX-8)", event: "processing_job.failed.v1" },
+    fatal_resource_or_integrity_error: { owner: "B08", why: "the ATTEMPT_MONITOR sweeper (control plane) ends the job with the worker's classified cause (S035) or with its attempts exhausted (D8-CEX-8)", event: "processing_job.failed.v1" },
+    verification_failure: { owner: "B08", why: "the JOB_EXECUTION consumer (control plane) on processing_job.verifying.v1: a read-back that differs or an INVALID verifier verdict (D8-CEX-4)", event: "processing_job.failed.v1" },
   },
   // package B09 (docs/design/B09-payments-fiscal.md §4): the provider-effect protocol of CMD028 (CREATE_ORDER), CMD029 (CAPTURE)
   // and CMD033 (REFUND) — intent, dispatch, settle — and the reconciliation of CMD030/CMD034
@@ -186,14 +189,14 @@ export const EDGE_OWNERS = {
     material_counterexample: { command: "CMD059", event: null },
   },
   CostGrant: {
-    "(initial PREPARED)": { owner: "B03", why: "the durable audit request reserves a grant (CMD020 StartAudit)", event: null },
+    "(initial PREPARED)": { command: "CMD020", event: "cost_grant.prepared.v1", note: "the AUDIT grant is born PREPARED and authorized from its funded pool in the same unit of work (cost_grant.authorized.v1, D8-GRANT-1)" },
     // B09 funds no cost grant: the grant's own package records the owner's funding evidence (B09 open question Q-B09-9; B09-F17)
-    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9)", event: null },
-    remaining_budget_unavailable: { owner: "B03", why: "bounded reservations", event: null },
-    reconciliation_releases_unused_reserve: { owner: "B03", why: "reconciled reservations", event: null },
-    expiry_reached: { owner: "B03", why: "the grant's expiry", event: null },
-    all_effects_reconciled_and_scope_closed: { owner: "B03", why: "grant closure", event: null },
-    all_effects_reconciled: { owner: "B03", why: "grant closure", event: null },
+    actual_authorization_and_funding: { owner: "B03", why: "the grant package records the owner's funding evidence (the funding decision is the owner application's, B12); B09 funds no cost grant (Q-B09-9); an AUDIT grant is authorized by CMD020 from its pool (D8-GRANT-1)", event: "cost_grant.authorized.v1" },
+    remaining_budget_unavailable: { owner: "B08", why: "the GRANT_RECONCILIATION sweeper (control plane) once known spend plus reserved reaches the ceiling (D8-GRANT-2, D8-CAU-10)", event: "cost_grant.exhausted.v1" },
+    reconciliation_releases_unused_reserve: { owner: "B08", why: "the GRANT_RECONCILIATION sweeper (control plane) once a dispatch intent the database can no longer send is released unused and the grant is unexpired (D8-CAU-10)", event: "cost_grant.authorized.v1" },
+    expiry_reached: { owner: "B08", why: "the GRANT_RECONCILIATION sweeper (control plane) at the grant's expiry on the server clock, never early, its uncertain usage still reserved (D8-DL-1, D8-CAU-10)", event: "cost_grant.expired.v1" },
+    all_effects_reconciled_and_scope_closed: { owner: "B08", why: "the GRANT_RECONCILIATION sweeper (control plane) once the grant's audit ended and no usage is uncertain; an AUDIT grant's close releases its pool's hold (D8-PAU-4, D8-CAU-10)", event: "cost_grant.closed.v1" },
+    all_effects_reconciled: { owner: "B08", why: "the GRANT_RECONCILIATION sweeper (control plane) once an expired grant has no uncertain usage and no live carve left (D8-CAU-10)", event: "cost_grant.closed.v1" },
   },
   TaxDocument: {
     "(initial DRAFT)": { owner: "B09", why: "the fiscal consumer drafts the invoice of a completed capture and the credit note of a completed refund, blocked when the treatment is not reviewed (D-FISC-B1)", event: "tax_document.drafted.v1" },
@@ -263,7 +266,7 @@ export const EDGE_OWNERS = {
   },
   CommercialAuthorization: {
     "(initial ACTIVE)": { command: "CMD029", event: "commercial_authorization.issued.v1", note: "or the application of the capture's webhook (CMD030) or reconciliation (CMD034), in the capture's transaction" },
-    execution_admitted: { command: "CMD036", event: "commercial_authorization.consumed.v1" },
+    execution_admitted: { owner: "B08", why: "JOB_ADMISSION (control plane) consumes the authorization in the transaction that admits its job, bound at COMMIT to that job edge (KA081; D8-AUTH-1: CMD036 binds and does not consume)", event: "commercial_authorization.consumed.v1" },
     package_published: { owner: "B08", why: "atomic publication of the purchased package", event: "commercial_authorization.delivered.v1" },
     authority_revoked: { command: "CMD030", event: "commercial_authorization.revoked.v1", note: "a reversal; CMD033 revokes it when a completed refund leaves no service basis" },
   },
@@ -487,8 +490,8 @@ export const APPLICABILITY = {
   },
   CMD032: {
     "legitimate state": [["cmd032-approve-refund.test.ts", "OK: a KAURO_OWNER with a fresh step-up approves the remaining service"], ["cmd032-approve-refund.test.ts", "D-REF-B4: a standing policy that covers the refund as it stands authorizes the approval without a step-up"]],
-    "wrong role": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED"]],
-    "wrong agency": [["cmd032-approve-refund.test.ts", "DENY: a refund of a foreign tenant outside the grant is NOT_FOUND"]],
+    "wrong role": [["cmd032-approve-refund.test.ts", "DENY: a foreign tenant's real refund is never revealed — outside the grant (agency A's owner, a revoked corporate owner) it is NOT_AUTHORIZED CORPORATE_ROLE_MISSING exactly like an id nobody holds, within the grant agency B's capture is NOT_FOUND like one, and the finance scope adopted through agency A's refund neither sees, approves nor adopts agency B's —, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd032-approve-refund.test.ts", "DENY: a foreign tenant's real refund is never revealed"]],
     "stale version": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION"]],
     "duplicate request": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "changed-body same key": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT"]],
@@ -507,6 +510,150 @@ export const APPLICABILITY = {
     "invalid schema": [...common["invalid schema"], ["request-validation.test.ts", "CMD044 closed request"]],
     "lost response": [...common["lost response"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
   },
+  // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
+  CMD002: {
+    "legitimate state": [["cmd002-activate-agency.test.ts", "OK: the agency's OWNER activates its DRAFT agency"]],
+    "wrong role": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404) and a BILLING member a wrong role (403 ROLE_INSUFFICIENT)"]],
+    "wrong agency": [["cmd002-activate-agency.test.ts", "DENY: another agency's OWNER is a foreign tenant (404)"]],
+    "stale version": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "duplicate request": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "changed-body same key": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance, the same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd002-activate-agency.test.ts", "RACE: an identical retry replays the 200 without a second acceptance"]],
+    "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the acceptance, the agency's move and the journal entry are rows of one database transaction, and the capabilities offered are answered, never written",
+  },
+  // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE; docs/design/B10-case-map.md CMD027): no provider is reached; the included replacement's
+  // re-binding is the payment service's database act, resumable from the journal entry
+  CMD027: {
+    "legitimate state": [["cmd027-create-quote.test.ts", "OK: an AGENCY_BILLING member's CreateQuote"], ["cmd027-create-quote.test.ts", "R2-092 (example 18)"]],
+    "wrong role": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404) and a VIEWER or APPROVER a wrong role (403)"]],
+    "wrong agency": [["cmd027-create-quote.test.ts", "DENY: another agency's project is a foreign tenant (404)"]],
+    "stale version": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote"]],
+    "duplicate request": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd027-create-quote.test.ts", "RACE: an identical retry replays the 201 with the same quote, the same key with another planId is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+    "external uncertainty": [["cmd027-create-quote.test.ts", "RACE (replacement): a crash before the replacement's intent commits"]],
+  },
+  CMD043: {
+    "legitimate state": [["cmd043-close-agency.test.ts", "OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency with nothing in flight"], ["cmd043-close-agency.test.ts", "OK (new work stops): after CloseAgency"]],
+    "wrong role": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403)"]],
+    "wrong agency": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404)"]],
+    "stale version": [["cmd043-close-agency.test.ts", "DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403); then one missing prerequisite at a time — no fresh step-up ASSURANCE_REQUIRED, a stale version STALE_VERSION"]],
+    "duplicate request": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200, the same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd043-close-agency.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: a closure reaches no provider; a payment order or refund in flight or uncertain refuses it (CLOSURE_OBLIGATIONS_UNRECONCILED) and an open reconciliation case is inventoried for its own reviewed resolution (D10-AGY-4)",
+  },
+  // package B10's prospects and attribution (mandate B10-COMMANDS-PROSPECTS; docs/design/B10-case-map.md CMD045..CMD047): corporate commands in the
+  // caller's own OPERATOR context, none of which reaches a provider
+  CMD045: {
+    "legitimate state": [["cmd045-register-prospect.test.ts", "OK: an ACTIVE seller registers a prospect from its own AGENCY-segment source evidence"]],
+    "wrong role": [["cmd045-register-prospect.test.ts", "DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: RegisterProspect is corporate-scoped (no agency selector, no agency in its path or journal); an agency member's tenant session holds neither the seller row nor the owner grant and is refused as a wrong role",
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: organizationLabel, businessContactRef, sourceEvidenceHash, jurisdiction); the live prospect of the organization key is read before the insert and the unique index answers for a prospect the caller cannot read (PROSPECT_EXISTS)",
+    "duplicate request": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd045-register-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a registration reaches no provider; the prospect and its journal entry are rows of one database transaction",
+  },
+  CMD046: {
+    "legitimate state": [["cmd046-claim-prospect.test.ts", "OK: an ACTIVE seller claims a prospect it owns with substantive evidence"]],
+    "wrong role": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404) and the owner or an agency member a wrong role (403)"]],
+    "wrong agency": [["cmd046-claim-prospect.test.ts", "DENY: another seller's prospect is a foreign scope (404)"]],
+    "stale version": "NOT_APPLICABLE: a creation command carries no expectedVersion (registry fields: evidenceHash, agreementVersion); the seller's agreement version in force is compared (AGREEMENT_VERSION_MISMATCH) and the prospect's claims are read after their lock",
+    "duplicate request": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "changed-body same key": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201, the same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd046-claim-prospect.test.ts", "RACE: an identical retry replays the 201"]],
+    "external uncertainty": "NOT_APPLICABLE: a claim reaches no provider; the claim, its conflict review and its journal entry are rows of one database transaction",
+  },
+  CMD047: {
+    "legitimate state": [["cmd047-accept-attribution.test.ts", "OK: the owner accepts a SUBMITTED claim with a prepared allocation"], ["cmd047-accept-attribution.test.ts", "OK (split): an allocation of two sellers' claims at 6000/4000"]],
+    "wrong role": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403)"]],
+    "wrong agency": "NOT_APPLICABLE: AcceptAttribution is corporate-scoped (the claim is the aggregate; no agency selector, no agency in its path or journal); an agency member's tenant session holds no owner grant and is refused as a wrong role",
+    "stale version": [["cmd047-accept-attribution.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version"]],
+    "duplicate request": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "changed-body same key": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd047-accept-attribution.test.ts", "RACE: an identical retry replays the 200"]],
+    "external uncertainty": "NOT_APPLICABLE: an acceptance reaches no provider; the buyer type is read through a platform port that is itself never a provider effect (D58), and the ruling, the frozen allocation and the journal entry are rows of one database transaction",
+  },
+  // package B10's seller commands (mandate B10-COMMANDS-SELLERS; docs/design/B10-case-map.md CMD048..CMD050): the corporate owner's, none reaches a provider
+  CMD048: {
+    "legitimate state": [["cmd048-assign-account.test.ts", "OK: the owner assigns an agency to an ACTIVE seller with a prepared service assignment — 200 with one current account assignment and the previous one ended, the agency's allocation, entitlements, window and first designation unchanged row for row"]],
+    "wrong role": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"]],
+    "wrong agency": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"]],
+    "stale version": [["cmd048-assign-account.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation"], ["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "duplicate request": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "changed-body same key": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd048-assign-account.test.ts", "RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"]],
+    "external uncertainty": "NOT_APPLICABLE: an assignment reaches no provider; the new link, the account's move and the journal entry are rows of one database transaction",
+  },
+  CMD049: {
+    "legitimate state": [["cmd049-activate-seller.test.ts", "OK: the owner with a fresh step-up activates a CANDIDATE seller whose agreement is signed and whose legal review, assessment, confidentiality acceptance, VERIFIED destination, tax documentation and MFA identity are recorded — 200 with the seller ACTIVE on that agreement's compensation version, able to register prospects and read only its own statements"]],
+    "wrong role": [["cmd049-activate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE"]],
+    "wrong agency": [["cmd049-activate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE"]],
+    "stale version": "NOT_APPLICABLE: CMD049 carries no expectedVersion (registry fields: agreementId, assessmentEvidenceRef, assuranceProofRef); the seller row is locked and must be a CANDIDATE, and a seller already activated answers SELLER_NOT_ACTIVATABLE with its current version and state",
+    "duplicate request": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "changed-body same key": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd049-activate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"]],
+    "external uncertainty": "NOT_APPLICABLE: an activation reaches no provider; the transition, the owner's step-up fact and the journal entry are rows of one database transaction",
+  },
+  CMD050: {
+    "legitimate state": [["cmd050-terminate-seller.test.ts", "OK: the owner terminates an ACTIVE seller with prepared terms and an enumerated manifest — 200 with the seller TERMINATED at the effective instant, its assignments ended, its prospects unassigned, its entitlements TERMINATED_WITH_RESIDUAL, its unlisted open claims EXPIRED and one tail entry per listed opportunity"]],
+    "wrong role": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"]],
+    "wrong agency": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"]],
+    "stale version": [["cmd050-terminate-seller.test.ts", "DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written"], ["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "duplicate request": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "changed-body same key": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [["cmd050-terminate-seller.test.ts", "RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged"]],
+    "external uncertainty": "NOT_APPLICABLE: a termination reaches no provider; the termination, the tail, the lapsed claims and the journal entry are rows of one database transaction",
+  },
+};
+
+// package B10's statement and payout commands (mandate B10-STATEMENTS-PAYOUTS; docs/design/B10-case-map.md CMD051..CMD053): the commission
+// group's service commands and the owner's approval; none reaches a provider (the payout evidence is read before the transaction)
+const CLOSE = "cmd051-close-commission-period.test.ts";
+const APPROVE_PAYOUT = "cmd052-approve-commission-payout.test.ts";
+const RECONCILE_PAYOUT = "cmd053-reconcile-commission-payout.test.ts";
+APPLICABILITY.CMD051 = {
+  "legitimate state": [[CLOSE, "OK: the commission service closes a due September 2026 period on the test calendar"]],
+  "wrong role": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403)"]],
+  "wrong agency": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404)"]],
+  "stale version": [[CLOSE, "DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404); then one missing prerequisite at a time — an undelivered COMMISSIONS record before the cutoff INPUTS_UNRECONCILED, a changed ledger LEDGER_CHANGED"]],
+  "duplicate request": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements"]],
+  "changed-body same key": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CLOSE, "RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT, a close racing a refund adjustment serializes on the period in both orders"]],
+  "external uncertainty": "NOT_APPLICABLE: a close reaches no provider; the banking calendar is a recorded platform version read in the transaction (D10-BIND-1), and the statements, items, line edges, guard reviews and journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD052 = {
+  "legitimate state": [[APPROVE_PAYOUT, "OK: the owner with a fresh step-up approves an ISSUED statement's payable"]],
+  "wrong role": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope and the seller a wrong role (403)"]],
+  "wrong agency": [[APPROVE_PAYOUT, "DENY: an agency member's tenant session is a foreign scope"]],
+  "stale version": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION"]],
+  "duplicate request": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[APPROVE_PAYOUT, "RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": "NOT_APPLICABLE: an approval makes no transfer (the payout adapter is B15's); the intent, the statement's edge, the step-up fact and the journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD053 = {
+  "legitimate state": [[RECONCILE_PAYOUT, "OK: the finance service reconciles an intent with SETTLED evidence"]],
+  "wrong role": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403)"]],
+  "wrong agency": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404)"]],
+  "stale version": "NOT_APPLICABLE: ReconcileCommissionPayout carries no expectedVersion (registry fields: providerPayoutEvidenceRef); the statement is locked and the evidence must match its intent, and an intent already ended under other evidence answers UNLISTED_TRANSITION with its current state",
+  "duplicate request": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[RECONCILE_PAYOUT, "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT"]],
+  "external uncertainty": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED"]],
 };
 
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
@@ -527,25 +674,109 @@ APPLICABILITY.CMD030 = {
 };
 APPLICABILITY.CMD033 = {
   "legitimate state": [[EXECUTE, "OK: the payment service executes an approved refund once"]],
-  "wrong role": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
-  "wrong agency": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND"]],
-  "stale version": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
+  "wrong role": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach"]],
+  "stale version": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite"]],
   "duplicate request": [[EXECUTE, "RACE: an identical retry resumes the one operation"]],
   "changed-body same key": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT"]],
   "invalid schema": [SERVICE_ADMISSION],
   "lost response": [[EXECUTE, "RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing"]],
-  "external uncertainty": [[EXECUTE, "DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
+  "external uncertainty": [[EXECUTE, "DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202)"]],
 };
 APPLICABILITY.CMD034 = {
   "legitimate state": [[RECONCILE, "OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization"]],
-  "wrong role": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED"]],
-  "wrong agency": [[RECONCILE, "DENY: an order of a foreign tenant is NOT_FOUND"]],
+  "wrong role": [[RECONCILE, "DENY: a foreign tenant's real order is out of reach — agency B's quote and capture at the order route are NOT_FOUND exactly like an id nobody holds, agency B's stored provider query applied to agency A's order is refused OBSERVATION_SUBJECT_MISMATCH naming nothing of B's, and the payment service's scope adopted through agency A's order neither sees agency B's order nor lets the reconciler apply B's query to it —, a wrong service identity is NOT_AUTHORIZED"]],
+  "wrong agency": [[RECONCILE, "DENY: a foreign tenant's real order is out of reach"]],
   "stale version": "NOT_APPLICABLE: ReconcilePayment carries no expectedVersion (registry fields: observationRef); observations are ordered by provider chronology and applied once per stored artifact and subject",
   "duplicate request": [[RECONCILE, "RACE: an identical retry replays"]],
   "changed-body same key": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT"]],
   "invalid schema": [SERVICE_ADMISSION],
   "lost response": [[RECONCILE, "RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry"]],
   "external uncertainty": "NOT_APPLICABLE: the command applies a stored, authenticated provider query and calls no provider; the uncertainty it settles is the dispatching command's (the watchdog stores the query, D-PROTO-B4)",
+};
+
+// package B08's execution commands (mandate B08-COMMANDS-EXECUTION; docs/design/B08-case-map.md CMD036 and CMD037): each command's
+// own OK / DENY / RACE tests, the role matrix of the two commands and the GetJob read, and the shared schema admission of every served route
+const EXECUTE_PROJECT = "cmd036-execute-project.test.ts";
+const CANCEL_JOB = "cmd037-cancel-job.test.ts";
+const EXECUTION_ROLE_MATRIX = ["execution-role-matrix.test.ts", "every execution command and the job read against every role"];
+APPLICABILITY.CMD036 = {
+  "legitimate state": [[EXECUTE_PROJECT, "OK: ExecuteProject with a live commercial authorization"]],
+  "wrong role": [[EXECUTE_PROJECT, "DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT"], EXECUTION_ROLE_MATRIX],
+  "wrong agency": [[EXECUTE_PROJECT, "DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency's project 404"], EXECUTION_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: ExecuteProject carries no expectedVersion (registry fields: commercialAuthorizationId); the authorization, approval, source, target and capability are read after their transition locks (D-TX-2) and a fact that changed is refused with its own reason (AUTHORIZATION_REVOKED, PLAN_NOT_APPROVED, SOURCE_EXPIRED, TARGET_STALE, MODE_NOT_OFFERED), never with STALE_VERSION",
+  "duplicate request": [[EXECUTE_PROJECT, "RACE: an identical retry replays the 202"], [EXECUTE_PROJECT, "DENY: ExecuteProject for an authorization that already has a job answers that same job"]],
+  "changed-body same key": [[EXECUTE_PROJECT, "RACE: an identical retry replays the 202, the same key with another authorization is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[EXECUTE_PROJECT, "S055: the process dies after ExecuteProject commits"], [EXECUTE_PROJECT, "RACE: an identical retry replays the 202"]],
+  "external uncertainty": "NOT_APPLICABLE: ExecuteProject reaches no provider — it queues one job and its outbox record, and the control plane's JOB_EXECUTION launches the worker after COMMIT; the launch uncertainty is that consumer's (mandate B08-CONTROL-EXECUTION), and S055 proves the undelivered record stays due",
+};
+APPLICABILITY.CMD037 = {
+  "legitimate state": [[CANCEL_JOB, "OK: CancelJob on a RUNNING job answers 200"]],
+  "wrong role": [[CANCEL_JOB, "DENY: a VIEWER is 403"], EXECUTION_ROLE_MATRIX],
+  "wrong agency": [[CANCEL_JOB, "DENY: a VIEWER is 403, another agency's job 404"], EXECUTION_ROLE_MATRIX],
+  "stale version": [[CANCEL_JOB, "DENY: a VIEWER is 403, another agency's job 404, a stale version 409 STALE_VERSION"], [CANCEL_JOB, "RACE: an identical retry replays the 200"]],
+  "duplicate request": [[CANCEL_JOB, "RACE: an identical retry replays the 200"]],
+  "changed-body same key": [[CANCEL_JOB, "RACE: an identical retry replays the 200, the same key with another reason is 409 IDEMPOTENCY_CONFLICT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CANCEL_JOB, "RACE: an identical retry replays the 200"], [CANCEL_JOB, "RACE (S062): CancelJob through the route racing the publication"]],
+  "external uncertainty": "NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062)",
+};
+
+// package B08's audit commands (mandate B08-COMMANDS-AUDIT; docs/design/B08-case-map.md CMD020, CMD021, CMD022, CMD024 and R2-044): each
+// command's own OK / DENY / RACE tests and the role matrix of the four commands, the decision artifact intake and the GetAudit read
+const START_AUDIT = "cmd020-start-audit.test.ts";
+const CANCEL_AUDIT = "cmd021-cancel-audit.test.ts";
+const CREATE_PLAN = "cmd022-create-plan.test.ts";
+const VALIDATE_PLAN = "cmd024-validate-plan.test.ts";
+const AUDIT_ROLE_MATRIX = ["audit-role-matrix.test.ts", "every audit command, the decision-artifact intake and the audit read against every role"];
+const START_DENY = "DENY and RACE: a VIEWER is 403, another agency's revision 404";
+const CANCEL_OK = "OK, DENY and RACE: CancelAudit advances the cancellation version";
+const CREATE_OK = "OK, DENY and RACE: CreatePlan compiles the agency's candidate decision artifact";
+const VALIDATE_OK = "OK, DENY and RACE: ValidatePlan moves a VALIDATION_REQUIRED plan to VALIDATING";
+APPLICABILITY.CMD020 = {
+  "legitimate state": [[START_AUDIT, "OK: StartAudit on a sealed, available revision"], [START_AUDIT, "R2-044: a revision sealed through SealRevision with no funded grant"]],
+  "wrong role": [[START_AUDIT, START_DENY], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[START_AUDIT, START_DENY], AUDIT_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: StartAudit carries no expectedVersion (registry fields: targetContractId, auditPolicyVersion) — it creates the audit; the revision's seal, the source's availability and the target's currency are read after their locks (D-TX-2) and a fact that changed is refused with its own reason (REVISION_NOT_SEALED, SOURCE_EXPIRED, TARGET_STALE, AUDIT_EXISTS), never with STALE_VERSION",
+  "duplicate request": [[START_AUDIT, START_DENY]],
+  "changed-body same key": [[START_AUDIT, START_DENY]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[START_AUDIT, START_DENY], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: StartAudit reaches no provider — it queues one audit and carves its grant from the pool in one database transaction (R2-044 proves the core fakes recorded no call); AUDIT_ORCHESTRATION runs the model tasks after COMMIT (mandate B08-CONTROL-AUDIT), and the uncertainty of a task is that consumer's",
+};
+APPLICABILITY.CMD021 = {
+  "legitimate state": [[CANCEL_AUDIT, CANCEL_OK]],
+  "wrong role": [[CANCEL_AUDIT, CANCEL_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[CANCEL_AUDIT, CANCEL_OK], AUDIT_ROLE_MATRIX],
+  "stale version": [[CANCEL_AUDIT, CANCEL_OK]],
+  "duplicate request": [[CANCEL_AUDIT, CANCEL_OK]],
+  "changed-body same key": [[CANCEL_AUDIT, CANCEL_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CANCEL_AUDIT, CANCEL_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: CancelAudit records the cancellation on the audit row and calls no provider; the control plane's AUDIT_ORCHESTRATION stops the audit's work by its fence (mandate B08-CONTROL-AUDIT), and a cancellation wins over a step that finishes later",
+};
+APPLICABILITY.CMD022 = {
+  "legitimate state": [[CREATE_PLAN, CREATE_OK]],
+  "wrong role": [[CREATE_PLAN, CREATE_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[CREATE_PLAN, CREATE_OK], AUDIT_ROLE_MATRIX],
+  "stale version": "NOT_APPLICABLE: CreatePlan carries no expectedVersion (registry fields: candidateDecisionArtifactRef) — it creates a plan and writes no audit row; the audit's state is read under its row lock and a fact that changed is refused with its own reason (AUDIT_NOT_DECIDABLE), an artifact of another audit, agency or kind as UNKNOWN_REFERENCE, never with STALE_VERSION",
+  "duplicate request": [[CREATE_PLAN, CREATE_OK]],
+  "changed-body same key": [[CREATE_PLAN, CREATE_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CREATE_PLAN, CREATE_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: CreatePlan reaches the Intelligence core only through PlanCompilerPort — a deterministic, local compile over the stored artifact that writes nothing outside the unit of work, so a failure rolls back with no journal row and a retry recompiles; a deployment without the core answers CORE_SERVICES_UNAVAILABLE (D8-PORT-1), and the core the test binds is a labelled contract fake (SIMULATED, B08 case map)",
+};
+APPLICABILITY.CMD024 = {
+  "legitimate state": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "wrong role": [[VALIDATE_PLAN, VALIDATE_OK], AUDIT_ROLE_MATRIX],
+  "wrong agency": [[VALIDATE_PLAN, VALIDATE_OK], AUDIT_ROLE_MATRIX],
+  "stale version": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "duplicate request": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "changed-body same key": [[VALIDATE_PLAN, VALIDATE_OK]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[VALIDATE_PLAN, VALIDATE_OK], ...common["lost response"]],
+  "external uncertainty": "NOT_APPLICABLE: ValidatePlan records one validation intent and calls no provider or core — the deterministic validation runs after COMMIT in the control plane's PLAN_VALIDATION (mandate B08-CONTROL-AUDIT), whose receipt settles the intent; a lost delivery leaves the intent due (D8-PLAN-2)",
 };
 
 // --- sources --------------------------------------------------------------------------------------------------------------------
@@ -580,20 +811,62 @@ export async function loadMatrixSources() {
     CMD016: "sources/handlers/select-input-tables.ts",
     CMD017: "sources/handlers/seal-revision.ts",
     CMD044: "commands/handlers/create-support-case.ts",
+    CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};
   for (const [id, file] of Object.entries(HANDLER_FILES)) {
     const text = readFileSync(join(root, "packages", "application", "src", ...file.split("/")), "utf8");
     published[id] = [...new Set([...text.matchAll(/eventType: "([a-z_.0-9]+)"/g)].map((m) => m[1]))];
   }
+  // package B08's two commands (D8-API-1): the execution store writes each event in the statement that changes the job, so the events
+  // are read from the store method the handler calls (queueJob for CMD036, requestCancellation for CMD037)
+  const executionStore = readFileSync(join(root, "packages", "persistence", "src", "execution", "store.ts"), "utf8");
+  const storeEvents = (method) => {
+    const start = executionStore.indexOf(`  async ${method}(`);
+    if (start < 0) throw new Error(`the execution store has no method ${method}`);
+    const end = executionStore.indexOf("\n  }\n", start);
+    return [...new Set([...executionStore.slice(start, end).matchAll(/"(processing_job\.[a-z_.0-9]+)"/g)].map((m) => m[1]))];
+  };
+  published.CMD036 = storeEvents("queueJob");
+  published.CMD037 = storeEvents("requestCancellation");
+  // package B08's audit commands (D8-API-1): the audit store writes each event in the statement that changes the aggregate, so the events are
+  // read from the store methods the handlers call - startAudit (the audit's literal event and the grant's events by the states the grant
+  // reaches), cancelAudit (a literal) and requestValidation (the plan edge through movePlan's state-to-event table)
+  const auditStore = readFileSync(join(root, "packages", "persistence", "src", "audit", "store.ts"), "utf8");
+  const auditMethod = (method) => {
+    const start = auditStore.search(new RegExp(`^  (?:private )?async ${method}\\(`, "m"));
+    if (start < 0) throw new Error(`the audit store has no method ${method}`);
+    return auditStore.slice(start, auditStore.indexOf("\n  }\n", start));
+  };
+  const planEdge = auditMethod("movePlan");
+  const planEventOf = new Map([...planEdge.matchAll(/to === "([A-Z_]+)" \? "(plan\.[a-z_.0-9]+)"/g)].map((m) => [m[1], m[2]]));
+  const planElse = planEdge.match(/: "(plan\.[a-z_.0-9]+)";/);
+  if (planEventOf.size === 0 || planElse === null) throw new Error("the audit store's movePlan no longer maps a state to its event");
+  const literalEvents = (text) => [...text.matchAll(/"(audit\.[a-z_.0-9]+)"/g)].map((m) => m[1]);
+  const grantEvents = (text) => {
+    const states = ["PREPARED", ...[...text.matchAll(/UPDATE kauro\.cost_grants SET[^`]*?state = '([A-Z_]+)'/g)].map((m) => m[1])];
+    return states.map((state) => domain.costGrantEventTypeOf(state));
+  };
+  const planEvents = (text) => [...text.matchAll(/this\.movePlan\([^,]+,[^,]+,[^,]+, "([A-Z_]+)"/g)].map((m) => planEventOf.get(m[1]) ?? planElse[1]);
+  const startAudit = auditMethod("startAudit");
+  published.CMD020 = [...new Set([...grantEvents(startAudit), ...literalEvents(startAudit)])];
+  published.CMD021 = [...new Set(literalEvents(auditMethod("cancelAudit")))];
+  published.CMD024 = [...new Set(planEvents(auditMethod("requestValidation")))];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.SUPPORT_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];
     specs[id] = { name: c.name, method: c.method, path: c.path, role: c.role, scope: c.scope, stepUpRequired: c.stepUp !== "NEVER", stepUp: c.stepUp };
     outcomes[id] = application.COMMERCE_COMMAND_OUTCOMES[id];
     published[id] = [...application.COMMERCE_COMMAND_EVENTS[id]];
+  }
+  // package B10's served commands (docs/design/B10-commercial-domain.md §13): their specs, catalogues and published events from the application's served lists
+  for (const id of application.COMMERCIAL_SERVED_COMMAND_IDS) {
+    const c = application.COMMERCIAL_COMMANDS[id];
+    specs[id] = { name: c.name, method: c.method, path: c.path, role: c.role, scope: c.scope, stepUpRequired: c.stepUp, stepUp: c.stepUp ? "REQUIRED" : "NEVER" };
+    outcomes[id] = application.COMMERCIAL_COMMAND_OUTCOMES[id];
+    published[id] = [...application.COMMERCIAL_COMMAND_EVENTS[id]];
   }
   const reads = { ...application.READ_ROUTES };
   const readOutcomes = { ...application.READ_OUTCOMES };
@@ -626,12 +899,12 @@ export async function loadMatrixSources() {
     reads,
     readOutcomes,
     readViews,
-    intakes: application.SOURCE_INTAKE_ROUTES,
+    intakes: application.INTAKE_ROUTES,
     intakeOutcomes: application.INTAKE_OUTCOMES,
     intakeViews: application.INTAKE_RESPONSES,
     outcomesByStatus: application.outcomesByStatus,
     problemStatus: application.PROBLEM_STATUS,
-    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS]),
+    served: new Set([...application.SERVED_COMMAND_IDS, ...application.COMMERCE_SERVED_COMMAND_IDS, ...application.COMMERCIAL_SERVED_COMMAND_IDS]),
     seeded,
     published,
     tests,
@@ -697,7 +970,7 @@ const cell = (v) => String(v).replace(/\|/g, "\\|").replace(/\n/g, " ");
 export function generateMatrix(s) {
   const out = [];
   const line = (text = "") => out.push(text);
-  line("# State, command and event matrix (B06, B07 and B09 served)");
+  line("# State, command and event matrix (B06, B07, B08, B09 and B10 served)");
   line();
   line("Generated by `tools/matrix.mjs` — do not edit; `pnpm run matrix` (part of `pnpm run verify`) fails when this file is not the");
   line("generated one or when a source it is generated from changed without it. Sources: the registry's `state_transitions.json`,");
@@ -705,13 +978,14 @@ export function generateMatrix(s) {
   line("and Project; UploadSession, StoredObject, SourceFile and RetentionRecord of the source lifecycle, B07; the commerce machines of B09;");
   line("SupportCase of B11) and its event registry");
   line("(`EVENT_TYPES`, `EVENT_SUBSCRIPTIONS`), the served command specs and their outcome catalogues of `@kauro/application`");
-  line("(`B06_COMMANDS`, `B07_COMMANDS` and `SUPPORT_COMMANDS`, `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the selection manifest");
-  line("intake with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `SOURCE_INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS), the transition");
+  line("(`B06_COMMANDS`, `B07_COMMANDS` and, since mandate B08-COMMANDS-EXECUTION, `EXECUTION_COMMANDS` and, since mandate B08-COMMANDS-AUDIT, `AUDIT_COMMANDS`, and B11's `SUPPORT_COMMANDS`; `COMMAND_OUTCOMES`, enforced by the api's send guard), the reads and the document");
+  line("intakes with theirs (`READ_ROUTES`, `READ_OUTCOMES`, `INTAKE_ROUTES`, `INTAKE_OUTCOMES`; B07's served by mandate B07-COMMANDS, B08's decision artifact intake by B08-COMMANDS-AUDIT), the transition");
   line("seeds of the migrations (`kauro.state_transitions`), the events each handler publishes (read from its source) and the");
   line("owner table and applicability record of `tools/matrix.mjs`, whose every citation the check resolves. Package B09's served");
   line("commands and reads join the served sections from `COMMERCE_SERVED_COMMAND_IDS` and `COMMERCE_SERVED_READ_IDS` (decision");
   line("D-REQ-B7): their specs, catalogues (`COMMERCE_COMMAND_OUTCOMES`, `COMMERCE_READ_OUTCOMES`) and published events");
-  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Authority:");
+  line("(`COMMERCE_COMMAND_EVENTS`, which the route tests prove complete). Package B10's served commands join them from");
+  line("`COMMERCIAL_SERVED_COMMAND_IDS` (specs `COMMERCIAL_COMMANDS`, catalogues `COMMERCIAL_COMMAND_OUTCOMES`, events `COMMERCIAL_COMMAND_EVENTS`). Authority:");
   line("prompts/B06 \"Provide a complete state/command/event matrix\"; 10 \"Contract tests and compatibility\"; 07 \"Acceptance");
   line("obligations\". Re-check finding N13.");
   line();
@@ -721,7 +995,7 @@ export function generateMatrix(s) {
   line();
   line("`Performed by` names the registry command (and the package its cases belong to) or, where no registry command names the");
   line("edge, the owning package and why. `Stored` says what the platform holds today: **route** — a served command performs it;");
-  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge) stores the aggregate and seeds the edge in");
+  line("**database** — the schema (migrations 0001–0007 of B06, 0008 the shared aggregate-kind registry, 0009–0012 of B07, 0013–0017 of B09, 0018 of their merge, 0019 of B09's package-close review, 0020 of B07's, 0021–0024 of B08, 0025–0027 of B11) stores the aggregate and seeds the edge in");
   line("`kauro.state_transitions` (every other edge is refused, SQLSTATE KA008), so the owning package's writer is admitted and");
   line("checked; **—** — the aggregate is not stored yet.");
   line();
@@ -826,7 +1100,10 @@ export function generateMatrix(s) {
   line("(MANAGE_TEAM) sees every membership with its lifecycle times, any other member the ACTIVE team's roles; every resource view");
   line("carries the caller's permitted actions (`api/permitted-actions`). Package B09's reads (D-REQ-B7) follow the same rules: the agency");
   line("reads its quote, order and refund under the agency selector (a resource outside its scope answers NOT_FOUND like a nonexistent one),");
-  line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER).");
+  line("and the corporate owner reads a refund's review through its stored operation (STORED_OPERATION; KAURO_OWNER). Package B08's GetJob");
+  line("(D8-API-1) is the status path of CMD036's 202: every member reads the job of the agency, a job of another agency answers NOT_FOUND,");
+  line("and the view is the job's safe progress, never a provider identity, a fence or a lease; its GetAudit is the status path of CMD020's 202 under the");
+  line("same rules (the view: phase, deadlines, grant classification and pending decisions, never a model task, a prompt or the pool).");
   line();
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");
@@ -844,7 +1121,7 @@ export function generateMatrix(s) {
     }
     line();
   }
-  line("## 5a. The document intakes (B07 D-SEL-2)");
+  line("## 5a. The document intakes (B07 D-SEL-2; B08 D8-CMA-7)");
   line();
   line("A POST that stores a closed document once per content: 201 when stored, 200 with `created: false` when the same document was");
   line("already stored; no idempotency key and no journal entry (it changes no aggregate). The access decision is a read's (an ACTIVE live");
@@ -900,7 +1177,7 @@ async function main() {
     return;
   }
   const edges = s.machines.reduce((n, m) => n + m.transitions.length + 1, 0);
-  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands, ${Object.keys(s.reads).length} reads and ${Object.keys(s.intakes).length} intake with their catalogues, every applicability citation resolved)\n`);
+  process.stdout.write(`matrix: the document is the generated one (${s.machines.length} machines, ${edges} edges and initial states each owned, ${s.served.size} commands, ${Object.keys(s.reads).length} reads and ${Object.keys(s.intakes).length} intakes with their catalogues, every applicability citation resolved)\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

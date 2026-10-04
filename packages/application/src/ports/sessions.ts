@@ -7,7 +7,7 @@
  *    POST /api/v1/assurance/step-ups exactly once; the verifier decides. Its defects are named for the server's log and tests
  *    only: on the wire every defect is the one 401 IDENTITY_TOKEN_INVALID (no account enumeration, D-AUTH-4). A key source that
  *    cannot be read is UNAVAILABLE — the caller's credentials were not judged, so the answer is a retryable 503, never a 401.
- *  - WebSessionStore: the sessions of the authentication boundary group (kauro_assurance, migration 0022 web_sessions). The store
+ *  - WebSessionStore: the sessions of the authentication boundary group (kauro_assurance, migration 0025 web_sessions). The store
  *    keeps only the SHA-256 of a session secret; a transaction sees exactly the session whose secret hash it presents. It also
  *    records a step-up proof (the B06 assurance_proofs row, D-EVID-1) and, for a cookie session, the session's latest step-up,
  *    in one transaction of the same group.

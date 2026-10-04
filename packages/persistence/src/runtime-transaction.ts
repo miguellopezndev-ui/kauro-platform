@@ -1,7 +1,7 @@
 /**
  * One short runtime transaction outside any tenant context (B11 W5b: the two public routes). A visitor without a session has no
  * agency and no user, so the unit of work of manual 07 (which binds one) does not apply; these stores run under the runtime role
- * kauro_app with no tenant setting bound, and the policies of their tables (0024) say exactly what that role may touch.
+ * kauro_app with no tenant setting bound, and the policies of their tables (0027) say exactly what that role may touch.
  *
  * The shape is the unit of work's: a verified connection, BEGIN at READ COMMITTED (the invariants here are enforced by
  * transaction-scoped advisory locks), SET LOCAL statement_timeout, the work, a COMMIT whose command tag is checked (a COMMIT inside

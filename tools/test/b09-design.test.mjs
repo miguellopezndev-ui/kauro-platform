@@ -76,9 +76,10 @@ test("B09-N8: the implementation mandates are staged and self-contained — stag
       assert.ok(names.has(port), `${m.id} names ${port}, which this branch does not define`);
     }
   }
-  // the case map's planned citations name the mandate §14 gives their file
+  // the case map's planned citations name the mandate §14 gives their file; the package-close review's tests (design §17, "Review
+  // findings") are owned by that review's fix, never planned
   const ownerOf = (file) =>
-    /cmd0(28|29|31|32)-/.test(file) ? "M4" : /cmd0(30|33|34)-|b09-(ledger|fiscal)\.test/.test(file) ? "M3" : /b09-scenarios\.test/.test(file) ? "INT-2" : null;
+    /cmd0(28|29|31|32)-/.test(file) ? "M4" : /cmd0(30|33|34)-|b09-(ledger|fiscal)\.test/.test(file) ? "M3" : /b09-scenarios\.test/.test(file) ? "INT-2" : /b09-review\.test/.test(file) ? "REVIEW" : null;
   let planned = 0;
   for (const line of caseMap.split(/\r?\n/)) {
     if (!/^\| (S\d{3}|R2-\d{3}|CMD\d{3}-(OK|DENY|RACE)) \|/.test(line)) continue;

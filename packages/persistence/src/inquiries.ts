@@ -1,5 +1,5 @@
 /**
- * The inquiry store over `pg` (B11 D-PUB-3..D-PUB-6; tables of migration 0024). One `admit` is one short transaction under the
+ * The inquiry store over `pg` (B11 D-PUB-3..D-PUB-6; tables of migration 0027). One `admit` is one short transaction under the
  * runtime role with no tenant bound:
  *
  *   1. the three admission keys are serialized with transaction-scoped advisory locks, taken one statement each in ascending

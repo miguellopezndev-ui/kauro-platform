@@ -43,6 +43,9 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type {
   AcceptedResponse,
+  AuditHandlers,
+  AuditIntakeHandlers,
+  AuditReadHandlers,
   B06Handlers,
   B07Handlers,
   CommandEnvelope,
@@ -51,7 +54,11 @@ import type {
   CommandSpec,
   CommerceCommandHandler,
   CommerceReadHandler,
+  CommercialCommandHandler,
+  CommercialReadHandler,
   CompletedResponse,
+  ExecutionHandlers,
+  ExecutionReadHandlers,
   IntakeHandler,
   IntakeResult,
   Problem,
@@ -82,6 +89,8 @@ import {
   commandRouteResponses,
   commerceCommandRouteResponses,
   commerceReadRouteResponses,
+  commercialCommandRouteResponses,
+  commercialReadRouteResponses,
   correlationIdOf,
   envelopeOf,
   internalProblem,
@@ -89,6 +98,8 @@ import {
   isServedCommand,
   isServedCommerceCommand,
   isServedCommerceRead,
+  isServedCommercialCommand,
+  isServedCommercialRead,
   problemOf,
   readRouteResponses,
   repeatedHeaderNames,
@@ -141,12 +152,18 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) and the support package's CMD044 (B11 W4). */
-  readonly handlers: B06Handlers & B07Handlers & SupportHandlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4) and the source reads (B07 design §9.1). */
-  readonly reads: ReadHandlers & SourceReadHandlers;
-  /** The document intakes: the selection manifest (B07 D-SEL-2). */
-  readonly intakes: SourceIntakeHandlers;
+  /**
+   * The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11), the two B08 execution commands and the four B08
+   * audit commands (B08 design §12), and the support package's CMD044 (B11 W4).
+   */
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers;
+  /**
+   * The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4), the source reads
+   * (B07 design §9.1), GetJob and GetAudit (B08 design §12).
+   */
+  readonly reads: ReadHandlers & SourceReadHandlers & ExecutionReadHandlers & AuditReadHandlers;
+  /** The document intakes: the selection manifest (B07 D-SEL-2) and the decision artifact (B08 D8-PLAN-1). */
+  readonly intakes: SourceIntakeHandlers & AuditIntakeHandlers;
   /**
    * The served routes of the payments workflow (package B09; docs/design/B09-payments-fiscal.md §10, D-REQ-B7): its commands and its
    * reads, each registered with its own admission spec and its declared replies (the 202 ACCEPTED envelope of a provider effect
@@ -155,6 +172,16 @@ export interface ApiServerOptions {
   readonly commerce?: {
     readonly commands: ReadonlyArray<CommerceCommandHandler<unknown, unknown>>;
     readonly reads: ReadonlyArray<CommerceReadHandler<unknown>>;
+  };
+  /**
+   * The served routes of the agency recurrence and commission domain (package B10; docs/design/B10-commercial-domain.md §13): each
+   * command registered with its own admission spec and its declared replies, under the same admission pipeline, send guard and route
+   * inventory as the B06 and B09 routes. The command lanes of B10 each add the commands they serve (COMMERCIAL_SERVED_COMMAND_IDS).
+   */
+  readonly commercial?: {
+    readonly commands: ReadonlyArray<CommercialCommandHandler<unknown, unknown>>;
+    /** The served B10 reads (GetCommissionStatement; COMMERCIAL_SERVED_READ_IDS), each with its admission spec and declared replies. */
+    readonly reads?: ReadonlyArray<CommercialReadHandler<unknown>>;
   };
   readonly authenticator: Authenticator;
   /**
@@ -199,6 +226,11 @@ export interface ApiServerOptions {
    * internal-error sink and the framework-error answer). Every route declares its replies and passes the send guard.
    */
   readonly paymentRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
+  /**
+   * Registers the commission group's service routes (package B10, mandate B10-STATEMENTS-PAYOUTS: CMD051, CMD053; commissions/routes.ts)
+   * with the same transport pieces as the payment routes. Every route declares its replies and passes the send guard.
+   */
+  readonly commissionRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
 }
 
 /** The transport pieces a route registered outside this module answers with (package B09's payment routes). */
@@ -482,7 +514,18 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     if (!isServedCommerceRead(spec.operationId)) throw new Error(`${spec.operationId} has a handler but is not a served B09 read (COMMERCE_SERVED_READ_IDS of @kauro/application)`);
     registerRead(app, options, handler.admission, commerceReadRouteResponses(spec.operationId), (request) => handler.execute(request), sink);
   }
+  // package B10: each served commercial command with the spec its admission reads and the replies its closed catalogue declares
+  for (const handler of options.commercial?.commands ?? []) {
+    const spec = handler.spec;
+    if (!isServedCommercialCommand(spec.id)) throw new Error(`${spec.id} has a handler but is not a served B10 command (COMMERCIAL_SERVED_COMMAND_IDS of @kauro/application)`);
+    registerCommand(app, options, handler.admission, commercialCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress);
+  }
+  for (const handler of options.commercial?.reads ?? []) {
+    if (!isServedCommercialRead(handler.operationId)) throw new Error(`${handler.operationId} has a handler but is not a served B10 read (COMMERCIAL_SERVED_READ_IDS of @kauro/application)`);
+    registerRead(app, options, handler.admission, commercialReadRouteResponses(handler.operationId), (request) => handler.execute(request), sink);
+  }
   options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
+  options.commissionRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   if (options.sessions !== undefined) {
     registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
   }

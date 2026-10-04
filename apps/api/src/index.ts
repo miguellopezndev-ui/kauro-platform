@@ -42,7 +42,7 @@ export {
 export type { ApiConfig, PublicApiConfig, DatabaseConnectionConfig, HttpConfig, MigratorConfig, MigrationJobConfig, IdentityConfig } from "./config.js";
 export { runMigrationJob } from "./migration-job.js";
 export type { MigrationJobOutcome } from "./migration-job.js";
-export { activeWorkInspector, noExternalActionsInThisEdition, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, unavailablePlanServices, commerceEdition, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
+export { activeWorkInspector, externalActionInspector, commercialConsequencesInspector, commercialScopeInspector, sourceAvailabilityReader, sourceLineageReader, planServices, commerceEdition, deliveryCapacity, purchasedSubjectReader, commerceRequestQueries } from "./edition.js";
 export type { PlanServices } from "./edition.js";
 export {
   openDatabase,
@@ -67,3 +67,5 @@ export * from "./payments/index.js";
 export { registerPaymentRoutes } from "./payments/routes.js";
 export type { PaymentRouteDependencies } from "./payments/routes.js";
 export type { RouteKit } from "./server.js";
+// the commission service of package B10 (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14)
+export * from "./commissions/index.js";

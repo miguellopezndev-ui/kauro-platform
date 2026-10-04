@@ -11,7 +11,7 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { commandRequestDigest, type AgencyId, type IdempotencyIdentity, type UserId } from "@kauro/domain";
 import { PgCommandJournal } from "../src/index.js";
-import { startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/testing/index.js";
+import { fundPlatformPool, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, clock, constraintOf, ids, person, sha, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
 
 let pg: TemporaryPostgres;
@@ -20,6 +20,8 @@ let control: Client;
 let oracle: Client;
 let owner: Person;
 let A: AgencyFixture;
+// the platform's funded model pool every dispatch intent below reserves on (migration 0023, D8-GRANT-2: a request names a funded grant)
+let pool: string;
 
 before(async () => {
   pg = await startTemporaryPostgres();
@@ -28,6 +30,7 @@ before(async () => {
   oracle = await pg.connect("postgres");
   owner = await person(app, "owner-journal");
   A = await agency(app, owner, "Journal Agency");
+  pool = await fundPlatformPool(control, { ceilingCents: 100_000n });
 });
 after(async () => {
   await app.end();
@@ -163,27 +166,27 @@ test("S089: a request journal entry cannot be materialized with a short SHA, wit
       [requestId, task, agencyId, hash, fence, reserved, grant, [...upstream]],
     );
   const unresolved = (e: unknown) => sqlState(e) === "KA009";
-  await assert.rejects(insert("abc1234", 150, ids.next()), (e: unknown) => sqlState(e) === "23514", "short SHA");
-  await assert.rejects(insert(sha("request"), 0, ids.next()), (e: unknown) => sqlState(e) === "23514", "no reserved ceiling");
+  await assert.rejects(insert("abc1234", 150, pool), (e: unknown) => sqlState(e) === "23514", "short SHA");
+  await assert.rejects(insert(sha("request"), 0, pool), (e: unknown) => sqlState(e) === "23514", "no reserved ceiling");
   await assert.rejects(insert(sha("request"), 150, null), (e: unknown) => sqlState(e) === "23502", "no grant");
   await assert.rejects(
     control.query(
       `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, reserved_at, updated_at)
        VALUES ($1, $2, $3, $4, 1, 150, $5, now(), now())`,
-      [ids.next(), taskId, A.agencyId, sha("request"), ids.next()],
+      [ids.next(), taskId, A.agencyId, sha("request"), pool],
     ),
     (e: unknown) => sqlState(e) === "23502",
     "the upstream list is declared, never defaulted",
   );
-  await insert(sha("request"), 150, ids.next());
-  await assert.rejects(insert(sha("request-2"), 150, ids.next(), 1), (e: unknown) => sqlState(e) === "23505", "one attempt per fence");
-  await insert(sha("request-2"), 150, ids.next(), 2);
+  await insert(sha("request"), 150, pool);
+  await assert.rejects(insert(sha("request-2"), 150, pool, 1), (e: unknown) => sqlState(e) === "23505", "one attempt per fence");
+  await insert(sha("request-2"), 150, pool, 2);
   const req = (await oracle.query("SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = 1", [taskId])).rows[0].request_id as string;
   const pending = (await oracle.query("SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = 2", [taskId])).rows[0].request_id as string;
   // failed upstream: a downstream task is not materialized on this attempt while it is RESERVED, DISPATCHING or RESPONSE_STORED;
   // meanwhile the lifecycle rules hold (response before consume; terminal states stay terminal; the reservation is immutable)
   const downstreamTask = ids.next();
-  const downstream = (upstream: ReadonlyArray<string>, requestId = ids.next()) => insert(sha("downstream"), 90, ids.next(), 1, upstream, requestId, A.agencyId, downstreamTask);
+  const downstream = (upstream: ReadonlyArray<string>, requestId = ids.next()) => insert(sha("downstream"), 90, pool, 1, upstream, requestId, A.agencyId, downstreamTask);
   await assert.rejects(downstream([req]), unresolved, "upstream RESERVED");
   await assert.rejects(control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = $1", [req]), (e: unknown) => sqlState(e) === "KA007");
   await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [req]);
@@ -196,18 +199,18 @@ test("S089: a request journal entry cannot be materialized with a short SHA, wit
   // upstream attempts that failed, were cancelled or are uncertain never resolve
   const otherTask = ids.next();
   const failed = ids.next();
-  await insert(sha("failed"), 50, ids.next(), 1, [], failed, A.agencyId, otherTask);
+  await insert(sha("failed"), 50, pool, 1, [], failed, A.agencyId, otherTask);
   await control.query("UPDATE kauro.request_journal SET state = 'FAILED' WHERE request_id = $1", [failed]);
   const cancelled = ids.next();
-  await insert(sha("cancelled"), 50, ids.next(), 2, [], cancelled, A.agencyId, otherTask);
+  await insert(sha("cancelled"), 50, pool, 2, [], cancelled, A.agencyId, otherTask);
   await control.query("UPDATE kauro.request_journal SET state = 'CANCELLED' WHERE request_id = $1", [cancelled]);
   const uncertain = ids.next();
-  await insert(sha("uncertain"), 50, ids.next(), 3, [], uncertain, A.agencyId, otherTask);
+  await insert(sha("uncertain"), 50, pool, 3, [], uncertain, A.agencyId, otherTask);
   await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [uncertain]);
   await control.query("UPDATE kauro.request_journal SET state = 'UNCERTAIN' WHERE request_id = $1", [uncertain]);
   // a consumed attempt outside the tenant scope (a tenant-less control-plane attempt) is not a dependency of agency A
   const outside = ids.next();
-  await insert(sha("outside"), 50, ids.next(), 1, [], outside, null, ids.next());
+  await insert(sha("outside"), 50, pool, 1, [], outside, null, ids.next());
   await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [outside]);
   await control.query("UPDATE kauro.request_journal SET state = 'RESPONSE_STORED', response_artifact_hash = $2, usage_state = 'KNOWN', actual_cents = 10 WHERE request_id = $1", [outside, sha("outside response")]);
   await control.query("UPDATE kauro.request_journal SET state = 'CONSUMED' WHERE request_id = $1", [outside]);
@@ -228,7 +231,7 @@ test("S089: a request journal entry cannot be materialized with a short SHA, wit
   await control.query(
     `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
      SELECT u, u, $2, encode(sha256(convert_to(u::text, 'UTF8')), 'hex'), 1, 10, $3, ARRAY[]::uuid[], now(), now() FROM unnest($1::uuid[]) AS u`,
-    [many, A.agencyId, ids.next()],
+    [many, A.agencyId, pool],
   );
   await control.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = ANY ($1::uuid[])", [many]);
   await control.query("UPDATE kauro.request_journal SET state = 'RESPONSE_STORED', response_artifact_hash = encode(sha256(convert_to(request_id::text || ':r', 'UTF8')), 'hex'), usage_state = 'KNOWN', actual_cents = 1 WHERE request_id = ANY ($1::uuid[])", [many]);
@@ -238,7 +241,7 @@ test("S089: a request journal entry cannot be materialized with a short SHA, wit
     control.query(
       `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
        VALUES ($1, $2, $3, $4, 1, 90, $5, ARRAY[$6::uuid, NULL], now(), now())`,
-      [ids.next(), downstreamTask, A.agencyId, sha("downstream"), ids.next(), req],
+      [ids.next(), downstreamTask, A.agencyId, sha("downstream"), pool, req],
     ),
     unresolved,
     "a NULL element is not an upstream",
@@ -248,7 +251,7 @@ test("S089: a request journal entry cannot be materialized with a short SHA, wit
   // valid controls: a downstream naming only the consumed upstream, and one naming none, are materialized; the list is immutable
   const materialized = ids.next();
   await downstream([req], materialized);
-  await insert(sha("independent"), 40, ids.next(), 1, [], ids.next(), A.agencyId, ids.next());
+  await insert(sha("independent"), 40, pool, 1, [], ids.next(), A.agencyId, ids.next());
   const stored = await oracle.query("SELECT upstream_request_ids FROM kauro.request_journal WHERE request_id = $1", [materialized]);
   assert.deepEqual(stored.rows[0].upstream_request_ids, [req]);
   await assert.rejects(control.query("UPDATE kauro.request_journal SET upstream_request_ids = ARRAY[]::uuid[] WHERE request_id = $1", [materialized]), (e: unknown) => sqlState(e) === "KA004");
@@ -327,4 +330,46 @@ test("S090: a lease preserves subject, deadline, cost and checkpoint identity ac
   await tx(app, { agencyId: A.agencyId, userId: owner.userId }, async (c) => {
     await assert.rejects(c.query("SELECT * FROM kauro.leases"), (e: unknown) => sqlState(e) === "42501");
   });
+});
+
+test("B06-R1 (database): the guard beneath claim_lease refuses the control plane's own UPDATE that takes over a live lease, advances a live holder's fence, resumes a spending lease that stored no checkpoint or names a checkpoint other than the stored one; the takeover of an expired OUTBOX_DISPATCH lease without a checkpoint commits", async () => {
+  // Review finding B06-R1: leases_guard refused a missing checkpoint only when one had been stored. kauro_control holds UPDATE
+  // on kauro.leases, so the rule is the trigger's, not only claim_lease's. Instants are explicit (the lease's own clock columns).
+  const t0 = new Date();
+  const later = (ms: number) => new Date(t0.getTime() + ms);
+  const deadline = later(3_600_000);
+  const owner1 = ids.next();
+  const owner2 = ids.next();
+  const claim = (kind: string, resource: string, cost: string | null) =>
+    control.query("SELECT * FROM kauro.claim_lease($1, $2, $3, 120, $4, $5, $6, NULL, $7)", [kind, resource, owner1, deadline, sha("subject"), cost, t0]);
+  const takeover = (resource: string, who: string, at: Date, checkpoint: string | null) =>
+    control.query("UPDATE kauro.leases SET owner_id = $2, fence = fence + 1, heartbeat_at = $3, expires_at = LEAST($3::timestamptz + interval '120 seconds', deadline_at), checkpoint_hash = $4 WHERE resource_id = $1", [resource, who, at, checkpoint]);
+  const refused = (fragment: string) => (e: unknown): boolean => sqlState(e) === "KA005" && String((e as Error).message).includes(fragment);
+  const job = ids.next();
+  await claim("JOB_ATTEMPT", job, ids.next());
+  // expired (t0 + 120 s), never checkpointed: a spending operation is not resumed, with nothing or with an invented checkpoint
+  await assert.rejects(takeover(job, owner2, later(130_000), null), refused("RESUME_WITHOUT_CHECKPOINT"), "another owner's takeover without a checkpoint");
+  await assert.rejects(takeover(job, owner2, later(130_000), sha("invented")), refused("RESUME_WITHOUT_CHECKPOINT"), "another owner's takeover with an invented checkpoint");
+  await assert.rejects(takeover(job, owner1, later(130_000), null), refused("RESUME_WITHOUT_CHECKPOINT"), "nor by its own owner");
+  const row = await oracle.query("SELECT owner_id, fence::int AS fence, checkpoint_hash FROM kauro.leases WHERE resource_id = $1", [job]);
+  assert.deepEqual(row.rows, [{ owner_id: owner1, fence: 1, checkpoint_hash: null }]);
+  // live (a claim instant before t0 + 120 s): no takeover, and the holder cannot move its own fence
+  await assert.rejects(takeover(job, owner2, later(60_000), null), refused("only an expired lease is taken over"), "a takeover of a live lease");
+  await assert.rejects(control.query("UPDATE kauro.leases SET fence = fence + 1 WHERE resource_id = $1", [job]), refused("only an expired lease is taken over"), "a live holder advancing its own fence");
+  // a stored checkpoint: only exactly that one resumes
+  const cp = sha("checkpoint");
+  const stored = await control.query("SELECT (kauro.checkpoint_lease('JOB_ATTEMPT', $1, $2, 1, $3, $4)).checkpoint_hash AS c", [job, owner1, cp, later(10_000)]);
+  assert.equal(stored.rows[0].c, cp);
+  await assert.rejects(takeover(job, owner2, later(130_000), sha("another")), refused("CHECKPOINT_MISMATCH"));
+  await takeover(job, owner2, later(130_000), cp);
+  const resumed = await oracle.query("SELECT owner_id, fence::int AS fence, checkpoint_hash FROM kauro.leases WHERE resource_id = $1", [job]);
+  assert.deepEqual(resumed.rows, [{ owner_id: owner2, fence: 2, checkpoint_hash: cp }]);
+  // positive control: an OUTBOX_DISPATCH lease spends nothing — its expired lease is taken over without a checkpoint, but not
+  // with one it never stored
+  const dispatch = ids.next();
+  await claim("OUTBOX_DISPATCH", dispatch, null);
+  await assert.rejects(takeover(dispatch, owner2, later(130_000), sha("invented")), refused("CHECKPOINT_MISMATCH"));
+  await takeover(dispatch, owner2, later(130_000), null);
+  const taken = await oracle.query("SELECT owner_id, fence::int AS fence FROM kauro.leases WHERE resource_id = $1", [dispatch]);
+  assert.deepEqual(taken.rows, [{ owner_id: owner2, fence: 2 }]);
 });

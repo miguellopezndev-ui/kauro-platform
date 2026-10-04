@@ -46,6 +46,11 @@ import {
   type CommerceUnitOfWork,
   type CommerceUnitOfWorkFactory,
   type EventProvenance,
+  type ExecutionUnitOfWork,
+  type ExecutionUnitOfWorkFactory,
+  type AuditUnitOfWork,
+  type AuditUnitOfWorkFactory,
+  type ArtifactRef,
   type ExecutionContext,
   type IdGenerator,
   type IsolationLevel,
@@ -62,6 +67,12 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgExecutionReads } from "./execution/reads.js";
+import { PgExecutionStore } from "./execution/store.js";
+import { PgExecutionDiscovery } from "./execution/discovery.js";
+import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
+import { PgAuditDiscovery } from "./audit/discovery.js";
+import { PgAuditStore } from "./audit/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
 import { PgCommandJournal } from "./command-journal.js";
@@ -97,16 +108,31 @@ const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
   SERIALIZABLE: "SERIALIZABLE",
 });
 
-/** SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1), every other context under the request handlers. */
-function roleFor(context: ExecutionContext): RuntimeRole {
+/**
+ * The service identities of the commission ledger's runtime group (package B10, D10-CTX-1): the commission service (the COMMISSIONS
+ * consumer, the sweeps, CMD051) and the finance service (CMD053) run under kauro_commission, never under the payment service's group.
+ */
+const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-service", "finance-service"]);
+
+/**
+ * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
+ * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
+ */
+export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
   switch (context.kind) {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
-      return "kauro_payment";
+      return COMMISSION_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     default:
       return "kauro_app";
   }
+}
+const roleFor = runtimeRoleOf;
+
+/** The commission and finance services' contexts: SERVICE contexts on kauro_commission (D10-CTX-1). */
+export function isCommissionServiceContext(context: ExecutionContext): boolean {
+  return context.kind === "SERVICE" && COMMISSION_GROUP_SERVICES.has(context.serviceId);
 }
 
 /** An id generator that remembers what it minted, so adoptTenant can prove the agency id was minted here. */
@@ -150,6 +176,16 @@ export class PgUnitOfWork implements UnitOfWork {
    * commercialInspectionsOf(uow) by the api composition.
    */
   readonly commercialInspections: PgCommercialInspections;
+  /**
+   * The readings of execution other packages' ports bind (package B08; D8-XPKG-3, D8-XPKG-4): B09's DeliveryCapacityPort over the
+   * capacity ledgers and the job and package halves of the inspectors, read through executionReadsOf(uow) by the api composition.
+   */
+  readonly executionReads: PgExecutionReads;
+  /**
+   * The readings of audit authority B06's ports bind (package B08, mandate B08-PERSISTENCE-AUDIT; D8-PLAN-1): CMD023's ArtifactResolver
+   * over the decision artifacts, read through decisionArtifactResolver by the api composition.
+   */
+  readonly auditReads: PgAuditReads;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
 
@@ -183,6 +219,8 @@ export class PgUnitOfWork implements UnitOfWork {
     this.outboxDispatch = new PgOutboxDispatchStore(client);
     this.inbox = new PgInboxConsumerStore(client);
     this.commercialInspections = new PgCommercialInspections(client);
+    this.executionReads = new PgExecutionReads(client);
+    this.auditReads = new PgAuditReads(client);
     this.#ids = ids;
     this.#clock = clock;
   }
@@ -532,6 +570,16 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   }
 
   /**
+   * Binds the agency of a durable work item for a SERVICE context (kauro.agency_id), at most once and never beside adoptScope or the
+   * finance scope; the commercial unit of work's adoptAgency checks who may (D10-CTX-1).
+   */
+  protected async bindServiceAgency(agencyId: AgencyId): Promise<void> {
+    if (this.#scopeAgencyId !== null || this.#financeAgencyId !== null) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit of work adopts one scope at most once");
+    await execute(this.client, "SELECT set_config('kauro.agency_id', $1, true)", [agencyId]);
+    this.#scopeAgencyId = agencyId;
+  }
+
+  /**
    * OPERATOR contexts only, at most once and never after adoptScope: the finance scope of an agency the corporate owner names for a
    * review not keyed by a stored operation (a fiscal profile version, a case's resolution). Naming an agency grants nothing by
    * itself: the database admits the scope's rows only while the person's KAURO_OWNER grant is ACTIVE (kauro.in_finance_scope).
@@ -551,6 +599,8 @@ export interface CommercePools {
   readonly app?: KauroPool;
   /** kauro_payment: SERVICE contexts (the payment service; D-CTX-B1). */
   readonly payment?: KauroPool;
+  /** kauro_commission: the commission and finance services (package B10, D10-CTX-1). */
+  readonly commission?: KauroPool;
   /** kauro_control: SYSTEM contexts. */
   readonly control?: KauroPool;
 }
@@ -565,12 +615,13 @@ export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements 
   readonly #pools: Readonly<Partial<Record<RuntimeRole, KauroPool>>>;
 
   constructor(pools: CommercePools, deps: UnitOfWorkDependencies) {
-    const any = pools.app ?? pools.payment ?? pools.control;
+    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.control;
     if (any === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit-of-work factory needs at least one verified pool");
     super(any, deps);
     const routes: Partial<Record<RuntimeRole, KauroPool>> = {};
     if (pools.app !== undefined) routes.kauro_app = pools.app;
     if (pools.payment !== undefined) routes.kauro_payment = pools.payment;
+    if (pools.commission !== undefined) routes.kauro_commission = pools.commission;
     if (pools.control !== undefined) routes.kauro_control = pools.control;
     this.#pools = routes;
   }
@@ -635,4 +686,111 @@ export function commercialAuthorizationsOf(uow: UnitOfWork): Pick<CommercialAuth
   if (uow instanceof PgCommerceUnitOfWork) return uow.commerce.authorizations;
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the commercial authorizations are read in a unit of work of @kauro/persistence");
   return uow.commercialAuthorizationReads;
+}
+
+// --- processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION) ------------------------------------------------------------
+
+/**
+ * The readings of execution in any unit of work of this package (docs/design/B08-audit-approval-jobs.md §10): the api binds B09's
+ * DeliveryCapacityPort to executionReadsOf(uow).checkoutCapacity (D8-XPKG-4) and extends the inspectors B09 bound with its job and
+ * package readings, by composition (D8-XPKG-3). A unit of work of another adapter is refused (INTEGRITY_FAILURE).
+ */
+export function executionReadsOf(uow: UnitOfWork): PgExecutionReads {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the execution readings need a unit of work of @kauro/persistence");
+  return uow.executionReads;
+}
+
+/**
+ * A unit of work of processing authority (@kauro/domain ExecutionUnitOfWork; D8-XPKG-10): the commerce unit of work — B06's unit of
+ * work, B07's source store, B09's commerce repositories and scope adoption — with the execution store on the same connection. Its
+ * events carry the unit of work's provenance: the person of a TENANT context (CMD036, CMD037), the control plane's service identity
+ * of a SYSTEM context bound to the agency of its work item (B07 D-CTRL-1).
+ */
+export class PgExecutionUnitOfWork extends PgCommerceUnitOfWork implements ExecutionUnitOfWork {
+  readonly execution: PgExecutionStore;
+  /** The control plane's discovery reads of execution work (mandate B08-CONTROL-EXECUTION, D8-CEX-1). */
+  readonly executionDiscovery: PgExecutionDiscovery;
+
+  constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
+    super(client, context, ids, clock);
+    this.execution = new PgExecutionStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
+    this.executionDiscovery = new PgExecutionDiscovery(client);
+  }
+}
+
+/**
+ * Runs execution units of work (@kauro/domain ExecutionUnitOfWorkFactory): the commerce factory's routing — TENANT on the request
+ * handlers' pool, SYSTEM on the control plane's, SERVICE on the payment service's — handing each an execution unit of work. The
+ * one routed factory that serves `run`, `runSource` and the commerce contexts (B07-B09 D-MERGE-1), never a fork of B06's.
+ */
+export class PgExecutionUnitOfWorkFactory extends PgCommerceUnitOfWorkFactory implements ExecutionUnitOfWorkFactory {
+  protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock): PgExecutionUnitOfWork {
+    return new PgExecutionUnitOfWork(client, context, ids, clock);
+  }
+
+  override run<T>(context: ExecutionContext, work: (uow: ExecutionUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    return super.run(context, (uow) => work(uow as PgExecutionUnitOfWork), options);
+  }
+}
+
+export function createExecutionUnitOfWorkFactory(pools: CommercePools, deps: UnitOfWorkDependencies): PgExecutionUnitOfWorkFactory {
+  return new PgExecutionUnitOfWorkFactory(pools, deps);
+}
+
+// --- audit authority (package B08, mandate B08-PERSISTENCE-AUDIT) ------------------------------------------------------------------
+
+/**
+ * The readings of audit authority in any unit of work of this package (docs/design/B08-audit-approval-jobs.md §10). A unit of work of
+ * another adapter is refused (INTEGRITY_FAILURE).
+ */
+export function auditReadsOf(uow: UnitOfWork): PgAuditReads {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the audit readings need a unit of work of @kauro/persistence");
+  return uow.auditReads;
+}
+
+/**
+ * B06's ArtifactResolver over migration 0023's decision artifacts (D8-PLAN-1), in the caller's unit of work: the api binds CMD023's
+ * `artifacts` collaborator to it (B08-COMMANDS-AUDIT). The shape is @kauro/application's ArtifactResolver, written structurally.
+ */
+export const decisionArtifactResolver = Object.freeze({
+  resolveDecisionPatch(uow: UnitOfWork, agencyId: AgencyId, artifactRef: ArtifactRef): Promise<ResolvedDecisionPatch | null> {
+    return auditReadsOf(uow).resolveDecisionPatch(agencyId, artifactRef);
+  },
+});
+
+/**
+ * A unit of work of audit authority (@kauro/domain AuditUnitOfWork; D8-XPKG-10): the execution unit of work — B06's unit of work,
+ * B07's source store, B09's commerce repositories and scope adoption, B08's execution store — with the audit store on the same
+ * connection. Its events carry the unit of work's provenance: the person of a TENANT context (CMD020, CMD021, CMD024, the intake), the
+ * control plane's service identity of a SYSTEM context bound to the agency of its work item (B07 D-CTRL-1).
+ */
+export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUnitOfWork {
+  readonly audits: PgAuditStore;
+  /** The control plane's discovery reads of audit work (mandate B08-CONTROL-AUDIT, D8-CAU-1). */
+  readonly auditDiscovery: PgAuditDiscovery;
+
+  constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
+    super(client, context, ids, clock);
+    this.audits = new PgAuditStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
+    this.auditDiscovery = new PgAuditDiscovery(client);
+  }
+}
+
+/**
+ * Runs audit units of work (@kauro/domain AuditUnitOfWorkFactory): the execution factory's routing — TENANT on the request handlers'
+ * pool, SYSTEM on the control plane's, SERVICE on the payment service's — handing each an audit unit of work. The one routed factory
+ * that serves `run`, `runSource`, the commerce contexts and execution (B07-B09 D-MERGE-1, D8-XPKG-10), never a fork of B06's.
+ */
+export class PgAuditUnitOfWorkFactory extends PgExecutionUnitOfWorkFactory implements AuditUnitOfWorkFactory {
+  protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock): PgAuditUnitOfWork {
+    return new PgAuditUnitOfWork(client, context, ids, clock);
+  }
+
+  override run<T>(context: ExecutionContext, work: (uow: AuditUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    return super.run(context, (uow) => work(uow as PgAuditUnitOfWork), options);
+  }
+}
+
+export function createAuditUnitOfWorkFactory(pools: CommercePools, deps: UnitOfWorkDependencies): PgAuditUnitOfWorkFactory {
+  return new PgAuditUnitOfWorkFactory(pools, deps);
 }

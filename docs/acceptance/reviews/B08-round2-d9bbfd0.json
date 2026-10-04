@@ -1,0 +1,139 @@
+{
+  "verdict": "ACCEPT",
+  "summary": "All four prior findings are FIXED at d9bbfd0f4b85020224910ef03861326bf5a8847f. Code inspection and passing regression entries support the fixes. The case map retains seven EXECUTED_LOCAL and eight PARTIAL cases with explicit later-package dependencies.",
+  "verify_observed": "verify.log ends with 'verify exit 0'. Nine test summaries total 867 tests, 867 passes, zero failures and zero skipped tests. All six new B08-R1–R4 regression tests pass. Architecture, OpenAPI, matrix and clean-consume checks succeed. No tests were rerun.",
+  "cases": [
+    {
+      "id": "S035",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B08-R2 regression demonstrates recovery from transient scratch-removal failure. B01/B14 dependencies remain explicit."
+    },
+    {
+      "id": "S055",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing atomic job/outbox creation and lost-answer recovery evidence remains unchanged."
+    },
+    {
+      "id": "S056",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B08-R1 database regression verifies source-admission locking and publication refusal. Real provider reconciliation remains B14-owned."
+    },
+    {
+      "id": "S061",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B08-R3 regression verifies classified failure, package revocation and capacity release after interrupted negative delivery read-back. Core/provider dependencies remain explicit."
+    },
+    {
+      "id": "S062",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B08-R1 now synchronously fences publication after source-admission revocation. Existing race evidence remains; B16 deletion-command integration is deferred."
+    },
+    {
+      "id": "S075",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B08-R2/R4 regressions demonstrate bounded cleanup retries and recovered cost reporting. B14/B16 dependencies remain explicit."
+    },
+    {
+      "id": "R2-044",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing evidence blocks unfunded StartAudit dispatch and admits a funded neighbour."
+    },
+    {
+      "id": "R2-045",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Existing passing evidence denies publication under revoked commercial authority while retaining private evidence; provider refund handling remains B15-owned."
+    },
+    {
+      "id": "R2-046",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing scheduler, ledger and concurrent-admission evidence remains unchanged."
+    },
+    {
+      "id": "CMD036-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing API/PostgreSQL evidence demonstrates atomic logical-job and outbox creation."
+    },
+    {
+      "id": "CMD036-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "B08-R1 API regression now refuses revoked included-source admission with 422 SOURCE_EXPIRED and no writes, while an admitted neighbour executes."
+    },
+    {
+      "id": "CMD036-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing journal, serialization and commercial-revocation race evidence remains unchanged."
+    },
+    {
+      "id": "CMD037-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Existing passing cancellation-fence and simulated exact-provider-identity reconciliation evidence remains; actual termination remains B14-owned."
+    },
+    {
+      "id": "CMD037-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Existing passing evidence fences old-worker submission and publication after committed cancellation."
+    },
+    {
+      "id": "CMD037-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Existing passing cancellation races and labelled provider-uncertainty simulation remain; actual provider ambiguity remains B14-owned."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B08-R1",
+      "severity": "BLOCKING",
+      "title": "Revoked source-file admission does not fence execution or publication",
+      "file": "packages/persistence/src/execution/store.ts",
+      "line": 308,
+      "detail": "FIXED: readAuthority checks INCLUDED sealed files for ADMITTED state. Revision transition locks also acquire file transition locks at store.ts:265 and :274. ExecuteProject checks sourceFilesAdmitted at packages/application/src/execution/handlers/execute-project.ts:124; lostAuthority checks it at apps/control/src/execution/authority.ts:43. The database publication guard locks the files and checks their admission at packages/persistence/migrations/0024_execution_review_fixes.sql:45 and :61.",
+      "reproduction": "Inspected passing regressions at packages/persistence/test/execution-migrations.test.ts:822, apps/control/test/job-execution.test.ts:281 and apps/api/test/cmd036-execute-project.test.ts:327. They delay EXECUTION_CONTROL, revoke included-file admission and verify blocked database publication, cancelled admission and ExecuteProject refusal, including an admitted positive neighbour. Passing entries appear at verify.log:492, :769 and :880.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B08-R2",
+      "severity": "BLOCKING",
+      "title": "A PARTIAL cleanup permanently prevents further scratch cleanup",
+      "file": "packages/persistence/src/execution/discovery.ts",
+      "line": 72,
+      "detail": "FIXED: discovery permits PARTIAL cleanup retries after backoff, stopping after CLEANED or five passes. apps/control/src/execution/janitor.ts:73 applies the same completion/pass checks. Migration 0024 replaces one-record uniqueness with numbered append-only passes at packages/persistence/migrations/0024_execution_review_fixes.sql:94 and :105.",
+      "reproduction": "Inspected apps/control/test/staging-janitor.test.ts:176: one injected EIO records PARTIAL, the next due sweep removes scratch and appends CLEANED, and subsequent cleanup is refused. The bound test at :199 verifies five PARTIAL passes and no sixth; exhausted failures remain recorded for operator action. Both pass at verify.log:811 and :812.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B08-R3",
+      "severity": "MAJOR",
+      "title": "Delivery read-back failure is forgotten after a crash",
+      "file": "apps/control/src/execution/pipeline.ts",
+      "line": 755,
+      "detail": "FIXED: publication replay reads persisted read-backs and derives the classified failure from a negative DELIVERY record before skipping existing copies. It invokes failFor at :758; failFor at :476 atomically fails the attempt/job and revokes the private package.",
+      "reproduction": "Inspected apps/control/test/job-execution.test.ts:431 and its crash injection at :386. The negative read-back commits while the job remains VERIFYING; event replay then produces FAILED/DELIVERY_READBACK_PARTIAL_BLOB, REVOKED package, no AVAILABLE event and released ACTIVE capacity at :453–457. The test passes at verify.log:774.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B08-R4",
+      "severity": "MAJOR",
+      "title": "Transient host-report failure permanently discards cleanup cost evidence",
+      "file": "apps/control/src/execution/janitor.ts",
+      "line": 94,
+      "detail": "FIXED: a resources() exception marks the report UNAVAILABLE and forces PARTIAL at :165–176, preserving retry eligibility. packages/persistence/src/execution/store.ts:1043 persists report status; packages/persistence/migrations/0024_execution_review_fixes.sql:103 prevents CLEANED with an UNAVAILABLE report. A subsequent pass can append recovered resource and cost evidence.",
+      "reproduction": "Inspected apps/control/test/staging-janitor.test.ts:213. An injected report timeout leaves the first cleanup PARTIAL despite successful deletion; after host recovery, the next due sweep records CLEANED with the reported machine, runtime, cost and currency at :236–239. The test passes at verify.log:813.",
+      "status": "FIXED"
+    }
+  ]
+}

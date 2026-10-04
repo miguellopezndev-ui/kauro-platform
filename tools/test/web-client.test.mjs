@@ -30,11 +30,12 @@ test("every served operation of the document is a descriptor with its method, pa
     for (const method of ["get", "post", "put", "patch", "delete"]) if (item[method] !== undefined) served.push({ method, path, operation: item[method] });
   }
   assert.ok(served.length >= 14, "the document serves the fourteen operations of B06");
-  // package B09's provider webhook and payment service routes are no call of the browser: left out, and named in the header
-  const service = served.filter(({ operation }) => ["PROVIDER", "PAYMENT_SERVICE"].includes(operation["x-kauro-principal"]));
-  assert.deepEqual(service.map(({ operation }) => operation.operationId).sort(), ["ExecuteRefund", "ReceivePaymentWebhook", "ReconcilePayment"]);
+  // package B09's provider webhook and payment service routes, and package B10's commission service routes (D11-SYNC-1), are no call
+  // of the browser: left out, and named in the header
+  const service = served.filter(({ operation }) => ["PROVIDER", "PAYMENT_SERVICE", "COMMERCIAL_SERVICE"].includes(operation["x-kauro-principal"]));
+  assert.deepEqual(service.map(({ operation }) => operation.operationId).sort(), ["CloseCommissionPeriod", "ExecuteRefund", "ReceivePaymentWebhook", "ReconcileCommissionPayout", "ReconcilePayment"]);
   for (const { operation } of service) assert.equal(text.split("\n").some((l) => l.startsWith(`  ${operation.operationId}: {`)), false, `${operation.operationId} has no descriptor`);
-  assert.ok(text.includes("// Left out, no browser calls them (a provider's or a service's principal): ExecuteRefund, ReceivePaymentWebhook, ReconcilePayment."));
+  assert.ok(text.includes("// Left out, no browser calls them (a provider's or a service's principal): CloseCommissionPeriod, ExecuteRefund, ReceivePaymentWebhook, ReconcileCommissionPayout, ReconcilePayment."));
   served.splice(0, served.length, ...served.filter((entry) => !service.includes(entry)));
   for (const { method, path, operation } of served) {
     assert.ok(text.includes(`export type OperationId = `) && text.includes(JSON.stringify(operation.operationId)), operation.operationId);
@@ -55,8 +56,9 @@ test("every served operation of the document is a descriptor with its method, pa
 test("a planned operation (x-kauro-planned) is generated beside the served ones, marked planned, and its id must be unique", () => {
   const planned = clone();
   planned["x-kauro-planned"] = {
+    // an operation id no served route holds (B10 serves CreateQuote since the trunk sync, D11-SYNC-1)
     "POST /api/v1/agencies/{agencyId}/quotes": {
-      operationId: "CreateQuote",
+      operationId: "PlannedQuoteProbe",
       "x-kauro-command": "CMD028",
       "x-kauro-idempotency": "REQUIRED",
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/CorrelationId" }],
@@ -69,7 +71,7 @@ test("a planned operation (x-kauro-planned) is generated beside the served ones,
   };
   const { text, failures } = renderClient(planned, "0".repeat(64));
   assert.deepEqual(failures, []);
-  const line = text.split("\n").find((l) => l.startsWith("  CreateQuote: "));
+  const line = text.split("\n").find((l) => l.startsWith("  PlannedQuoteProbe: "));
   assert.ok(line);
   const descriptor = JSON.parse(line.slice(line.indexOf("{"), line.lastIndexOf("}") + 1));
   assert.equal(descriptor.planned, true);

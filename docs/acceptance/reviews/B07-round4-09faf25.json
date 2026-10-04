@@ -1,0 +1,187 @@
+{
+  "verdict": "REJECT",
+  "summary": "B07-R2, B07-R3 and B07-R4 remain fixed. B07-R1 is partially fixed: release claims prevent overlapping live retries, but timed-out provider releases can outlive their claims and clear a subsequent seal's hold. No new findings.",
+  "verify_observed": "verify.log:1001 reports 'verify exit 0'. All 761 tests passed: contracts 12, domain 107, application 128, persistence 220, authorization 11, data-plane 13, control 21, API 208 and tools 41. Zero failures, cancellations or skips. The new release-claim regressions passed. No builds, databases or test suites were started during review. A read-only in-memory probe using existing compiled modules confirmed that the default provider timeout leaves the release pending; it subsequently clears a newly placed hold and permits overwrite.",
+  "cases": [
+    {
+      "id": "S024",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Previously accepted local evidence remains passing; production isolation remains deferred to B15."
+    },
+    {
+      "id": "S053",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "The claim that delayed releases cannot invalidate the sealed generation remains unsupported; see B07-R1."
+    },
+    {
+      "id": "S054",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Coverage refusals and positive controls remain passing; real scanner evidence remains deferred."
+    },
+    {
+      "id": "R2-051",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "B07-R4 remains fixed; provider cancellation and deletion-receipt evidence remain deferred."
+    },
+    {
+      "id": "R2-052",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed reservation and serialization evidence remains passing."
+    },
+    {
+      "id": "CMD012-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Lineage and predecessor-preservation evidence remains passing; replacement quoting remains deferred."
+    },
+    {
+      "id": "CMD012-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Authority-invalidation evidence remains passing; execution revocation remains B08-owned."
+    },
+    {
+      "id": "CMD012-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed serialization, replay, conflict and rollback evidence remains passing."
+    },
+    {
+      "id": "CMD013-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Reservation and deadline evidence remains passing; provider session delivery remains simulated."
+    },
+    {
+      "id": "CMD013-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Previously reviewed authorization and quota refusals remain passing."
+    },
+    {
+      "id": "CMD013-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Serialization and issuance-fence evidence remains passing, with provider-dependent evidence explicitly simulated."
+    },
+    {
+      "id": "CMD014-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Asynchronous inspection and admission evidence remains passing; provider continuations remain simulated."
+    },
+    {
+      "id": "CMD014-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Admission-evidence, deadline and authorization refusals remain passing."
+    },
+    {
+      "id": "CMD014-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Stale-attempt, duplicate-completion and cancellation serialization evidence remains passing."
+    },
+    {
+      "id": "CMD015-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Post-horizon secret cleanup remains fixed; B15/B16 evidence remains deferred."
+    },
+    {
+      "id": "CMD015-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Terminal cancellation and single quota-release evidence remains passing."
+    },
+    {
+      "id": "CMD015-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Cancellation versus inspection serialization evidence remains passing."
+    },
+    {
+      "id": "CMD016-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "B07-R2 preserves association counts through the real consumer; B07-R3 excludes hidden-column values."
+    },
+    {
+      "id": "CMD016-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "The B07-R3 hidden-column and formula-policy regression remains passing."
+    },
+    {
+      "id": "CMD016-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": true,
+      "note": "Selection locking and post-lock checks remain passing."
+    },
+    {
+      "id": "CMD017-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The multi-association happy path remains fixed and passing. Concurrent generation protection is assessed under CMD017-DENY/RACE."
+    },
+    {
+      "id": "CMD017-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "An expired claim's pending provider release can clear the new hold and permit replacement before seal commit. Post-commit detection still returns 200; see B07-R1."
+    },
+    {
+      "id": "CMD017-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Live release claims serialize correctly, but the assumed provider-effect deadline is unenforced. The delayed-release race remains within B07."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B07-R1",
+      "severity": "BLOCKING",
+      "title": "Timed-out releases can outlive their claims and invalidate a subsequent seal",
+      "file": "packages/application/src/sources/provider-holds.ts",
+      "line": 42,
+      "detail": "PARTIALLY_FIXED. The new claims and claimant-specific recording at packages/persistence/src/source/holds.ts:203 and :240 prevent the previously tested overlapping live retries. However, boundedProviderCall only races the existing provider promise against a timer; it neither cancels nor fences the provider effect. apps/control/src/storage-work.ts:104 uses this wrapper for releaseHold. Once an unanswered claim's 910-second in-flight bound passes, holds.ts:143 and :157 ignore it, allowing a new hold after another retry records RELEASED. The old provider call can still execute: packages/application/src/testing/contract-fake-object-storage.ts:832 waits before applying the effect, and :533 clears the generation's current hold without an incarnation check. A read-only probe confirmed TIMEOUT, pending release, successful retry, new HELD, delayed RELEASED, and successful overwrite. Post-commit reassertion does not prevent the invalid seal: seal-revision.ts:351 and :505 record the observation while returning the committed result. apps/control/test/seal-holds.test.ts:488 explicitly tests replacement before commit followed by a 200 at :502 and later inventory revocation. The passing retry regression at :238 (verify.log:658) resumes the delayed call while its claim is live; it does not cover a call surviving its in-flight bound. The full expired-claim database interleaving was established by code inspection, not executed.",
+      "reproduction": "Fail a seal before commit and pause its cleanup release with storage.holdNext('releaseHold'). Let boundedProviderCall return TIMEOUT while the underlying release remains pending. Advance the application/control test clocks beyond that claim's 910-second in-flight bound. Run a release retry to completion and record RELEASED. Start SealRevision and pause at journal.commit after its new provider hold. Resume the original timed-out release, overwrite the accepted object, then resume the seal. The old release clears the new hold; the seal commits and returns 200, recording GENERATION_NOT_LIVE for later inventory revocation. The database's admission after the expired bound is explicitly asserted at packages/persistence/test/source-adapters.test.ts:1973.",
+      "status": "PARTIALLY_FIXED"
+    },
+    {
+      "id": "B07-R2",
+      "severity": "MAJOR",
+      "title": "Per-association counts remain preserved through evaluation and sealing",
+      "file": "apps/control/src/consumers/selection-evaluation.ts",
+      "line": 97,
+      "detail": "FIXED. tablesWithAssociations validates and attaches measured association counts; lines 120 and 144 persist and hash them. packages/application/src/sources/handlers/seal-revision.ts:529 validates the measured split when constructing the sealed subject. The integrated regression at apps/control/test/end-to-end.test.ts:199 checks independently calculated persisted and sealed counts at lines 260–264. verify.log:642 records its pass.",
+      "reproduction": "A two-association selection passes through SelectInputTables, the real evaluation consumer and SealRevision, preserving distinct WORKS_AT and OWNED_BY counts and their sum.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B07-R3",
+      "severity": "MAJOR",
+      "title": "Excluded hidden columns remain excluded from projection counts",
+      "file": "packages/data-plane/src/evaluator/evaluate-task.ts",
+      "line": 195,
+      "detail": "FIXED. Only counted cells enter the projection lookup; lines 215–217 reject projection references to excluded hidden columns. packages/data-plane/test/selection-evaluation.test.ts:371 retains hidden-key, hidden-field, formula-policy and visible-column controls. verify.log:618 records its pass.",
+      "reproduction": "Projecting an excluded hidden column fails PROJECTION_COLUMN_HIDDEN. Including it applies the formula policy, while the visible-column positive control succeeds.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B07-R4",
+      "severity": "MINOR",
+      "title": "Lapsed unresolved cancellation secrets remain discoverable and purged",
+      "file": "apps/control/src/sweepers/provider-session-reconciliation.ts",
+      "line": 48,
+      "detail": "FIXED. Agency-paged discovery finds lapsed cancellation secrets and invokes cleanup at line 66. apps/control/src/storage-work.ts:222–224 purges the secret after its horizon without claiming cancellation confirmation or calling the provider. apps/control/test/storage-lifecycle.test.ts:295 checks retained UNCERTAIN status, secret removal, no additional provider call and pagination past cleaned agencies. verify.log:669 records its pass.",
+      "reproduction": "An unresolved cancellation retains its secret before expiry, loses it on the post-horizon sweep, and does not prevent discovery of a later agency's remaining secret.",
+      "status": "FIXED"
+    }
+  ]
+}

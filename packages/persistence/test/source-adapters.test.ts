@@ -15,6 +15,8 @@ import { after, before, test } from "node:test";
 import type { Client, PoolClient } from "pg";
 import type { Sha256Hex } from "@kauro/contracts";
 import {
+  HOLD_RELEASE_CLAIM_SECONDS,
+  PROVIDER_CALL_TIMEOUT_MS,
   PROVIDER_SESSION_LIFETIME_SECONDS,
   RETENTION_POLICY_VERSION,
   PRICING_DEFINITION,
@@ -41,14 +43,18 @@ import {
   type EventPayload,
   type EventPublisher,
   type EventType,
+  type HoldReassertionId,
+  type HoldReleaseId,
   type InspectionReceiptId,
   type MembershipId,
+  type ObjectHoldId,
   type PlanId,
   type ProjectId,
   type ProjectionId,
   type RetentionAnchorId,
   type RetentionId,
   type RevisionId,
+  type SealAttemptId,
   type SelectionManifestDocument,
   type SelectionManifestId,
   type SourceFileId,
@@ -64,12 +70,13 @@ import {
   type VersionedWrite,
 } from "@kauro/domain";
 import { PgEventPublisher, PgSourceStore, SOURCE_CONSTRAINT_FAILURES, failureOfSqlState, type KauroPool, type SourceAudience } from "../src/index.js";
-import { barrier, clock, correlation, ids, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { barrier, clock, handled, correlation, ids, start, waitForLockWait, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import {
   admitSourceFile,
   bindSourceSelection,
   clockAt,
   fixtureSelection,
+  readySourceRevision,
   sealSourceRevision,
   sealedManifestOf,
   type AdmittedSourceFixture,
@@ -950,10 +957,10 @@ test("R2-052 through UploadSessionRepository.insert: two reservations that each 
   });
   await firstIn.wait;
   // the second reservation, checked alone, fits (0 + 2e9 <= 5e9 in its snapshot)
-  const b = h.app.runSource(asOwner(t), async (uow) => {
+  const b = handled(h.app.runSource(asOwner(t), async (uow) => {
     assert.equal((await uow.sources.uploads.quota(p.revisionId)).reservedBytes, 0, "the second writer's own read cannot see the first reservation");
     return reserveVia(uow.sources, emitOf(uow, t), t, p, 2 * GB, { lockRevision: false });
-  });
+  }));
   try {
     const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
     // the second reservation's insert takes the revision row in its trigger (FOR NO KEY UPDATE, D-LOCK-1), which the first holds
@@ -997,10 +1004,10 @@ test("the capacity race through UploadSessionRepository.insert: two reservations
     await release.wait;
   });
   await holding.wait;
-  const b = h.app.runSource(asOwner(t), async (uow) => {
+  const b = handled(h.app.runSource(asOwner(t), async (uow) => {
     assert.deepEqual(await uow.sources.uploads.capacity(t.ag.agencyId), { agencyId: t.ag.agencyId, activeSessions: 1, sessionLimit: 2 }, "the loser read a free slot");
     return reserveVia(uow.sources, emitOf(uow, t), t, p3, 10, { first: true });
-  });
+  }));
   try {
     const pid = await waitForLockWait(h.oracle, API, "INSERT INTO kauro.upload_sessions");
     // different revisions: the only row both reservations update is the agency's capacity ledger
@@ -1749,4 +1756,330 @@ test("tenant isolation of runSource: a request handler finds, locks and moves no
   // bound to A it sees A's rows (and could move them)
   assert.equal((await h.control.runSource(asControl(a), (uow) => uow.sources.files.get(admitted.fileId)))?.state, "ADMITTED");
   assert.deepEqual(await oracle("SELECT state, version::int AS version FROM kauro.upload_sessions WHERE upload_id = $1", [admitted.uploadId]), { state: "ADMITTED", version: 5 });
+});
+
+test("B07-R1: the provider hold record of a seal (migration 0020, D-HOLD-1..D-HOLD-3) — a request handler intends a hold only as the acting person, at the server's instant with its 900-second bound, never for a revoked file; the control plane intends none; a release is refused while an attempt is INTENDED or a seal retains the generation, and no hold is intended while a release is being carried out; a hold is abandoned only past its bound, sealed only with a sealed file set, closed REFUSED only by a request handler and ABANDONED only by the control plane; its facts are set once, and another agency sees none of it", async () => {
+  const t = await tenant("holds");
+  const other = await tenant("holds-other");
+  const p = await project(t);
+  const admitted = await admitSourceFile(sessionsOf(t), scopeOf(t, p.projectId), { seed: "holds" });
+  const ready = await readySourceRevision(sessionsOf(t), scopeOf(t, p.projectId), admitted);
+  const objectId = admitted.acceptedObjectId as StoredObjectId;
+  const hold = (attempt: string, placedBy: string = t.ag.ownerUserId) => ({
+    holdId: ids.next() as ObjectHoldId,
+    attemptId: attempt as SealAttemptId,
+    agencyId: t.ag.agencyId,
+    projectId: p.projectId,
+    revisionId: ready.revisionId as RevisionId,
+    fileId: admitted.fileId as SourceFileId,
+    objectId,
+    generation: admitted.acceptedGeneration,
+    placedByUserId: placedBy as UserId,
+  });
+
+  // the intent: INTENDED at the server's instant, bound = + 900 s; only as the acting person; never by the control plane
+  const first = hold(ids.next());
+  const intended = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(first));
+  assert.equal(intended.kind, "INTENDED");
+  if (intended.kind !== "INTENDED") throw new Error("unreachable");
+  assert.match(intended.record.intendedAt, EXACT);
+  assert.equal(intended.record.attemptExpiresAt, await plusSeconds(intended.record.intendedAt, 900));
+  assert.deepEqual([intended.record.state, intended.record.holdKind, intended.record.reason, intended.record.generation], ["INTENDED", "TEMPORARY", "SEAL_INTEGRITY", admitted.acceptedGeneration]);
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(hold(ids.next(), other.ag.ownerUserId))), (e: unknown) => sqlStateOf(e) === "42501", "a hold placed in another person's name");
+  await assert.rejects(h.control.runSource(asControl(t), (uow) => uow.sources.holds.intend(hold(ids.next()))), (e: unknown) => sqlStateOf(e) === "42501", "the control plane places no hold");
+
+  // a second attempt, closed by its request handler: the first is still INTENDED, so nothing is released — the adapter answers
+  // NEEDED, and the database refuses the release itself (KA071)
+  const second = hold(ids.next());
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(second));
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(second.attemptId))).map((x) => [x.state, x.closeReason]), [["CLOSED", "REFUSED"]]);
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId)), { kind: "NEEDED" });
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (c) => c.query("UPDATE kauro.object_holds SET state = 'RELEASING', release_requested_at = kauro.server_now() WHERE hold_id = $1", [second.holdId])),
+    (e: { code?: string }) => e.code === "KA071",
+  );
+  // an attempt is abandoned only past its bound (the adapter answers false; the database refuses the write, KA072), and only by the
+  // control plane (a request handler's ABANDONED and a control plane's REFUSED are refused by row security)
+  assert.equal(await h.control.runSource(asControl(t), (uow) => uow.sources.holds.abandon(first.holdId)), false);
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.object_holds SET state = 'CLOSED', closed_at = kauro.server_now(), close_reason = 'ABANDONED' WHERE hold_id = $1", [first.holdId])),
+    (e: { code?: string }) => e.code === "KA072",
+  );
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.object_holds SET state = 'CLOSED', closed_at = kauro.server_now(), close_reason = 'REFUSED' WHERE hold_id = $1", [first.holdId])),
+    (e: { code?: string }) => e.code === "42501",
+  );
+  await assert.rejects(
+    // even past the bound (a transaction whose labelled TEST CLOCK stands there): abandoning is the control plane's
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, async (c) => {
+      await clockAt(c, new Date(Date.now() + 901_000));
+      return c.query("UPDATE kauro.object_holds SET state = 'CLOSED', closed_at = kauro.server_now(), close_reason = 'ABANDONED' WHERE hold_id = $1", [first.holdId]);
+    }),
+    (e: { code?: string }) => e.code === "42501",
+  );
+  // a hold seals only with a sealed file set that includes its generation (none here: the revision was never sealed)
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (c) => c.query("UPDATE kauro.object_holds SET state = 'SEALED', sealed_at = kauro.server_now() WHERE hold_id = $1", [first.holdId])),
+    (e: { code?: string }) => e.code === "KA072",
+  );
+
+  // once no attempt is INTENDED and no seal retains it, the release is decided: both holds RELEASING; while it is carried out no
+  // hold is intended (the adapter answers RELEASE_PENDING, the database refuses the row, KA071)
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(first.attemptId));
+  const claim = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+  assert.equal(claim.kind, "RELEASE");
+  if (claim.kind !== "RELEASE") throw new Error("unreachable");
+  assert.deepEqual([claim.generation, claim.holds], [admitted.acceptedGeneration, 2]);
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId)), { kind: "IN_FLIGHT" }, "a second releaser leaves it to the claimant");
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(hold(ids.next()))), { kind: "RELEASE_PENDING" });
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (c) =>
+      c.query(
+        `INSERT INTO kauro.object_holds (hold_id, attempt_id, agency_id, project_id, revision_id, file_id, object_id, generation, hold_kind, reason, placed_by_user_id, state, intended_at, attempt_expires_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'TEMPORARY', 'SEAL_INTEGRITY', $9, 'INTENDED', kauro.server_now(), kauro.server_now() + interval '900 seconds', now(), now())`,
+        [ids.next(), ids.next(), t.ag.agencyId, p.projectId, ready.revisionId, admitted.fileId, objectId, admitted.acceptedGeneration, t.ag.ownerUserId],
+      ),
+    ),
+    (e: { code?: string }) => e.code === "KA071",
+  );
+  assert.deepEqual(await h.control.runSource(asControl(t), (uow) => uow.sources.holds.recordRelease(claim.releaseId, "RELEASED")), { kind: "RECORDED", holds: 2 });
+  const released = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.forObject(objectId));
+  assert.deepEqual(released.map((x) => [x.state, x.closeReason, x.releaseResult, x.releasedBy]), [["RELEASED", "REFUSED", "RELEASED", claim.releaseId], ["RELEASED", "REFUSED", "RELEASED", claim.releaseId]]);
+  // a released hold's facts are set once; a new attempt starts a new cycle
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.object_holds SET release_result = 'ABSENT' WHERE hold_id = $1", [first.holdId])),
+    (e: { code?: string }) => e.code === "KA004",
+  );
+  assert.equal((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(hold(ids.next())))).kind, "INTENDED");
+
+  // another agency sees none of it, bound or through its request handlers
+  assert.deepEqual(await h.app.runSource(asOwner(other), (uow) => uow.sources.holds.forObject(objectId)), []);
+  assert.deepEqual(await h.control.runSource(asControl(other), (uow) => uow.sources.holds.forObject(objectId)), []);
+
+  // no hold of a file whose admission ended
+  await h.control.runSource(asControl(t), async (uow) => {
+    await uow.sources.revisions.lock(ready.revisionId as RevisionId);
+    const file = await uow.sources.files.get(admitted.fileId as SourceFileId);
+    const revoked = applied(await uow.sources.files.revokeAdmission(admitted.fileId as SourceFileId, file?.version ?? 0, "GENERATION_MISSING"), "revocation");
+    await emitOf(uow, t)("source_file", admitted.fileId, revoked.version, "source_file.admission_revoked.v1", { fileId: admitted.fileId, agencyId: t.ag.agencyId, projectId: p.projectId, revocationReason: "GENERATION_MISSING", selectedByRevisionIds: [ready.revisionId], sealedByRevisionIds: [] });
+  });
+  await assert.rejects(h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(hold(ids.next()))), refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"));
+});
+
+test("B07-R1 (second re-check), the release claim and its in-flight bound (migration 0020, D-HOLD-3) — a decided release is claimed by exactly one caller: its claim carries a fence token, a 900-second bound and an in-flight bound 10 seconds (PROVIDER_CALL_TIMEOUT_MS) past it; a second caller within the bound is left out (IN_FLIGHT) and the database refuses a second live claim; an answer of a caller that holds no claim, or of a claimant another caller superseded once its claim lapsed, is refused and records nothing (the adapter answers STALE, the database KA071), and no hold is released but under the claim answered in that very transaction; the claimant's own answer records; a new hold is refused while any claim may still land at the provider — until it is answered or its in-flight bound passed (the TEST CLOCK) — and admitted after it", async () => {
+  const t = await tenant("hold-claims");
+  const p = await project(t);
+  const admitted = await admitSourceFile(sessionsOf(t), scopeOf(t, p.projectId), { seed: "hold-claims" });
+  const ready = await readySourceRevision(sessionsOf(t), scopeOf(t, p.projectId), admitted);
+  const objectId = admitted.acceptedObjectId as StoredObjectId;
+  const hold = () => ({
+    holdId: ids.next() as ObjectHoldId,
+    attemptId: ids.next() as SealAttemptId,
+    agencyId: t.ag.agencyId,
+    projectId: p.projectId,
+    revisionId: ready.revisionId as RevisionId,
+    fileId: admitted.fileId as SourceFileId,
+    objectId,
+    generation: admitted.acceptedGeneration,
+    placedByUserId: t.ag.ownerUserId as UserId,
+  });
+  const at = (instant: string, seconds: number): Date => new Date(Date.parse(instant) + seconds * 1000);
+  const insertHold = (c: PoolClient) =>
+    c.query(
+      `INSERT INTO kauro.object_holds (hold_id, attempt_id, agency_id, project_id, revision_id, file_id, object_id, generation, hold_kind, reason, placed_by_user_id, state, intended_at, attempt_expires_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'TEMPORARY', 'SEAL_INTEGRITY', $9, 'INTENDED', kauro.server_now(), kauro.server_now() + interval '900 seconds', now(), now())`,
+      [ids.next(), ids.next(), t.ag.agencyId, p.projectId, ready.revisionId, admitted.fileId, objectId, admitted.acceptedGeneration, t.ag.ownerUserId],
+    );
+  const insertClaim = (c: PoolClient, sequence: number) =>
+    c.query(
+      `INSERT INTO kauro.object_hold_releases (release_id, agency_id, object_id, generation, sequence, claimed_at, claim_expires_at, in_flight_until, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, kauro.server_now(), kauro.server_now() + interval '900 seconds', kauro.server_now() + interval '910 seconds', now(), now())`,
+      [ids.next(), t.ag.agencyId, objectId, admitted.acceptedGeneration, sequence],
+    );
+
+  // an attempt that did not seal: closed, so its release is decided and claimed by the first caller
+  const attempt = hold();
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(attempt));
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(attempt.attemptId));
+  const first = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+  assert.equal(first.kind, "RELEASE");
+  if (first.kind !== "RELEASE") throw new Error("unreachable");
+  const [c1] = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.releasesOf(objectId));
+  assert.ok(c1);
+  assert.deepEqual([c1.releaseId, c1.sequence, c1.generation, c1.answeredAt, c1.claimedAt, c1.claimExpiresAt], [first.releaseId, 1, admitted.acceptedGeneration, undefined, first.claimedAt, first.claimExpiresAt]);
+  assert.match(c1.claimedAt, EXACT);
+  assert.equal(c1.claimExpiresAt, await plusSeconds(c1.claimedAt, HOLD_RELEASE_CLAIM_SECONDS), "the claim's bound");
+  assert.equal(c1.inFlightUntil, await plusSeconds(c1.claimExpiresAt, PROVIDER_CALL_TIMEOUT_MS / 1000), "the in-flight bound: the claim's bound plus the provider call timeout");
+
+  // exactly one caller: a second one within the claim's bound is left out, and the database refuses a second live claim
+  assert.deepEqual(await h.control.runSource(asControl(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId)), { kind: "IN_FLIGHT" });
+  await assert.rejects(rawTx(h.controlPool, t.ag.agencyId, "", (c) => insertClaim(c, 2)), (e: { code?: string }) => e.code === "KA071", "a second live claim");
+  // a caller that holds no claim records nothing: the adapter answers STALE, and the database releases no hold but under the claim
+  // answered in that very transaction
+  assert.deepEqual(await h.control.runSource(asControl(t), (uow) => uow.sources.holds.recordRelease(ids.next() as HoldReleaseId, "RELEASED")), { kind: "STALE" });
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.object_holds SET state = 'RELEASED', released_at = kauro.server_now(), release_result = 'RELEASED', released_by = $2 WHERE hold_id = $1", [attempt.holdId, first.releaseId])),
+    (e: { code?: string }) => e.code === "KA071",
+    "a hold released under a claim nobody answered",
+  );
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.forObject(objectId))).map((x) => x.state), ["RELEASING"]);
+
+  // past the claim's bound the release is claimed again (a new token); the first claimant's late answer is refused
+  const second = await storeAt("CONTROL", t, at(c1.claimExpiresAt, 1), (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+  assert.equal(second.kind, "RELEASE");
+  if (second.kind !== "RELEASE") throw new Error("unreachable");
+  assert.notEqual(second.releaseId, first.releaseId);
+  assert.deepEqual(await storeAt("REQUEST", t, at(c1.claimExpiresAt, 2), (s) => s.holds.recordRelease(first.releaseId, "RELEASED")), { kind: "STALE" }, "a superseded claimant records nothing");
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, async (c) => {
+      await clockAt(c, at(c1.claimExpiresAt, 2));
+      return c.query("UPDATE kauro.object_hold_releases SET answered_at = kauro.server_now(), release_result = 'RELEASED' WHERE release_id = $1", [first.releaseId]);
+    }),
+    (e: { code?: string }) => e.code === "KA071",
+    "the database refuses the answer of a superseded claim",
+  );
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.forObject(objectId))).map((x) => x.state), ["RELEASING"]);
+
+  // the claimant's own answer records: the claim answered, the hold RELEASED naming it; the first claim stays unanswered (evidence)
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 3), (s) => s.holds.recordRelease(second.releaseId, "RELEASED")), { kind: "RECORDED", holds: 1 });
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 3), (s) => s.holds.recordRelease(second.releaseId, "RELEASED")), { kind: "STALE" }, "an answer is recorded once");
+  const claims = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.releasesOf(objectId));
+  assert.deepEqual(claims.map((x) => [x.sequence, x.releaseId, x.releaseResult ?? null]), [[1, first.releaseId, null], [2, second.releaseId, "RELEASED"]]);
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.forObject(objectId))).map((x) => [x.state, x.releaseResult, x.releasedBy]), [["RELEASED", "RELEASED", second.releaseId]]);
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", (c) => c.query("UPDATE kauro.object_hold_releases SET release_result = 'ABSENT' WHERE release_id = $1", [second.releaseId])),
+    (e: { code?: string }) => e.code === "KA004",
+    "an answer is set once",
+  );
+  // a claim is taken only for a decided release (no hold of the object RELEASING any more)
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", async (c) => {
+      await clockAt(c, at(c1.inFlightUntil, 5));
+      return insertClaim(c, 3);
+    }),
+    (e: { code?: string }) => e.code === "KA072",
+  );
+
+  // nothing is RELEASING, yet the first claim may still land at the provider until its in-flight bound: no hold is intended before it
+  // (RELEASE_PENDING; the database refuses the row, KA071) — and one is intended after it
+  assert.deepEqual(await storeAt("REQUEST", t, at(c1.inFlightUntil, -2), (s) => s.holds.intend(hold())), { kind: "RELEASE_PENDING" });
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, async (c) => {
+      await clockAt(c, at(c1.inFlightUntil, -2));
+      return insertHold(c);
+    }),
+    (e: { code?: string }) => e.code === "KA071",
+  );
+  const admittedAfter = await storeAt("REQUEST", t, at(c1.inFlightUntil, 2), (s) => s.holds.intend(hold()));
+  assert.equal(admittedAfter.kind, "INTENDED", "past the in-flight bound no earlier release can land: the hold is intended");
+
+  // a re-assertion names a SEALED hold: the database refuses one of a hold that is only INTENDED (KA072)
+  if (admittedAfter.kind !== "INTENDED") throw new Error("unreachable");
+  await assert.rejects(
+    storeAt("REQUEST", t, at(c1.inFlightUntil, 3), (s) => s.holds.recordReassertion({ reassertionId: ids.next() as HoldReassertionId, holdId: admittedAfter.record.holdId, result: "HELD", reassertedBy: "SEAL" })),
+    refused("INTEGRITY_FAILURE", "LIFECYCLE_BINDING_MISSING", "KA072"),
+  );
+});
+
+test("B07-R1 (third re-check), the recorded hold incarnation (migration 0020, D-HOLD-4) — a hold records the metageneration its placement answered once, by the edge that ends its attempt (never again, never on another edge, never by the control plane), and seals only with it; a release claim names the greatest metageneration recorded for the holds it releases (the database refuses a claim naming another); the claimant may name a newer, re-observed one only while its claim is the object's latest, unanswered and live — an older or equal one, a lapsed, superseded or answered claim record nothing (the adapter answers STALE, the database KA071/KA072); a NOT_HELD answer (412, the generation live without a hold) releases the holds, having cleared nothing", async () => {
+  const t = await tenant("hold-incarnations");
+  const p = await project(t);
+  const admitted = await admitSourceFile(sessionsOf(t), scopeOf(t, p.projectId), { seed: "hold-incarnations" });
+  const ready = await readySourceRevision(sessionsOf(t), scopeOf(t, p.projectId), admitted);
+  const objectId = admitted.acceptedObjectId as StoredObjectId;
+  const hold = () => ({
+    holdId: ids.next() as ObjectHoldId,
+    attemptId: ids.next() as SealAttemptId,
+    agencyId: t.ag.agencyId,
+    projectId: p.projectId,
+    revisionId: ready.revisionId as RevisionId,
+    fileId: admitted.fileId as SourceFileId,
+    objectId,
+    generation: admitted.acceptedGeneration,
+    placedByUserId: t.ag.ownerUserId as UserId,
+  });
+  const at = (instant: string, seconds: number): Date => new Date(Date.parse(instant) + seconds * 1000);
+  const code = (expected: string) => (e: { code?: string }) => e.code === expected;
+
+  // attempts that did not seal: two closed with the metageneration their placements answered (5 and 7), one whose placement was never
+  // answered (none recorded)
+  const a = hold();
+  const b = hold();
+  const c = hold();
+  for (const x of [a, b, c]) await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(x));
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(a.attemptId, [{ holdId: a.holdId, metageneration: "5" }]))).map((x) => [x.state, x.metageneration]), [["CLOSED", "5"]]);
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(b.attemptId, [{ holdId: b.holdId, metageneration: "7" }]));
+  assert.deepEqual((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(c.attemptId))).map((x) => [x.state, x.metageneration ?? null]), [["CLOSED", null]]);
+  // set once, and only by the edge that ends the attempt; the control plane records no placement's (it places none)
+  await assert.rejects(rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (q) => q.query("UPDATE kauro.object_holds SET metageneration = 6 WHERE hold_id = $1", [a.holdId])), code("KA004"), "a recorded metageneration is set once");
+  await assert.rejects(rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (q) => q.query("UPDATE kauro.object_holds SET metageneration = 9 WHERE hold_id = $1", [c.holdId])), code("KA072"), "never after the edge that ended the attempt");
+  await assert.rejects(rawTx(h.controlPool, t.ag.agencyId, "", (q) => q.query("UPDATE kauro.object_holds SET metageneration = 9 WHERE hold_id = $1", [c.holdId])), code("42501"));
+  // a hold seals only with the metageneration its placement answered
+  const d = hold();
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.intend(d));
+  await assert.rejects(
+    rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (q) => q.query("UPDATE kauro.object_holds SET state = 'SEALED', sealed_at = kauro.server_now() WHERE hold_id = $1", [d.holdId])),
+    (e: { code?: string; message?: string }) => e.code === "KA072" && /metageneration/.test(e.message ?? ""),
+  );
+  await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.closeAttempt(d.attemptId));
+
+  // the claim names the greatest recorded (7); the database refuses a claim naming another
+  const first = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+  assert.equal(first.kind, "RELEASE");
+  if (first.kind !== "RELEASE") throw new Error("unreachable");
+  assert.deepEqual([first.metageneration, first.holds], ["7", 4]);
+  const [c1] = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.releasesOf(objectId));
+  if (c1 === undefined) throw new Error("unreachable");
+  assert.equal(c1.metageneration, "7");
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", async (q) => {
+      await clockAt(q, at(c1.claimExpiresAt, 1));
+      return q.query(
+        `INSERT INTO kauro.object_hold_releases (release_id, agency_id, object_id, generation, sequence, claimed_at, claim_expires_at, in_flight_until, metageneration, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 2, kauro.server_now(), kauro.server_now() + interval '900 seconds', kauro.server_now() + interval '910 seconds', 5, now(), now())`,
+        [ids.next(), t.ag.agencyId, objectId, admitted.acceptedGeneration],
+      );
+    }),
+    code("KA072"),
+    "a claim names the greatest metageneration recorded",
+  );
+
+  // the claimant re-observed the hold at a newer metageneration: recorded under its live claim; an older or equal one is not
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.rebaseRelease(first.releaseId, "6")), { kind: "STALE" });
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.rebaseRelease(first.releaseId, "7")), { kind: "STALE" });
+  assert.deepEqual(await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.rebaseRelease(first.releaseId, "9")), { kind: "REBASED" });
+  assert.equal((await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.releasesOf(objectId)))[0]?.metageneration, "9");
+  await assert.rejects(rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (q) => q.query("UPDATE kauro.object_hold_releases SET metageneration = 8 WHERE release_id = $1", [first.releaseId])), code("KA072"), "only a newer one");
+  // a lapsed claim names none: the adapter answers STALE and the database refuses it (KA071)
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 1), (s) => s.holds.rebaseRelease(first.releaseId, "10")), { kind: "STALE" });
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", async (q) => {
+      await clockAt(q, at(c1.claimExpiresAt, 1));
+      return q.query("UPDATE kauro.object_hold_releases SET metageneration = 10 WHERE release_id = $1", [first.releaseId]);
+    }),
+    code("KA071"),
+  );
+
+  // claimed again past its bound: the new claim names the greatest recorded for the holds (7: a claim's re-observation is its own)
+  const second = await storeAt("CONTROL", t, at(c1.claimExpiresAt, 2), (s) => s.holds.requestRelease(objectId, ids.next() as HoldReleaseId));
+  assert.equal(second.kind, "RELEASE");
+  if (second.kind !== "RELEASE") throw new Error("unreachable");
+  assert.equal(second.metageneration, "7");
+  // the superseded claim names nothing new, even on the real clock (within what was its bound)
+  await assert.rejects(rawTx(h.appPool, t.ag.agencyId, t.ag.ownerUserId, (q) => q.query("UPDATE kauro.object_hold_releases SET metageneration = 11 WHERE release_id = $1", [first.releaseId])), code("KA071"));
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 3), (s) => s.holds.rebaseRelease(second.releaseId, "10")), { kind: "REBASED" });
+  // 412 and the generation live without a hold: NOT_HELD releases the holds, having cleared nothing; answered, the claim names nothing new
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 4), (s) => s.holds.recordRelease(second.releaseId, "NOT_HELD")), { kind: "RECORDED", holds: 4 });
+  assert.deepEqual(await storeAt("CONTROL", t, at(c1.claimExpiresAt, 5), (s) => s.holds.rebaseRelease(second.releaseId, "12")), { kind: "STALE" });
+  await assert.rejects(
+    rawTx(h.controlPool, t.ag.agencyId, "", async (q) => {
+      await clockAt(q, at(c1.claimExpiresAt, 5));
+      return q.query("UPDATE kauro.object_hold_releases SET metageneration = 12 WHERE release_id = $1", [second.releaseId]);
+    }),
+    code("KA071"),
+  );
+  const claims = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.releasesOf(objectId));
+  assert.deepEqual(claims.map((x) => [x.sequence, x.metageneration, x.releaseResult ?? null]), [[1, "9", null], [2, "10", "NOT_HELD"]]);
+  const holds = await h.app.runSource(asOwner(t), (uow) => uow.sources.holds.forObject(objectId));
+  assert.deepEqual(holds.map((x) => `${x.state} ${x.releaseResult ?? "-"} ${x.metageneration ?? "-"}`).sort(), ["RELEASED NOT_HELD -", "RELEASED NOT_HELD -", "RELEASED NOT_HELD 5", "RELEASED NOT_HELD 7"]);
 });

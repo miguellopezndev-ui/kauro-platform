@@ -155,8 +155,17 @@ export function operatorContextOf(envelope: Pick<CommandEnvelope<unknown>, "user
   return { kind: "OPERATOR", userId: envelope.userId, correlationId: envelope.correlationId };
 }
 
+/**
+ * What the runner and the identity helpers read of a command: its id and where its journal row lives. A B09 command spec fits it, and
+ * so does a B10 one (commercial/agency: the agency lifecycle runs on the same pipeline; package B10).
+ */
+export interface RunnableCommand {
+  readonly id: string;
+  readonly journalScope: "TENANT" | "OPERATOR_IDENTITY" | "NONE";
+}
+
 /** The idempotency identity of a command: the agency's row, or — for an operator — the operator's own identity-owned row (D-IDEM-B2). */
-export function commerceIdentityOf<Body>(spec: CommerceCommandSpec<Body>, envelope: CommandEnvelope<Body>): IdempotencyIdentity {
+export function commerceIdentityOf<Body>(spec: RunnableCommand, envelope: CommandEnvelope<Body>): IdempotencyIdentity {
   return {
     environment: envelope.environment,
     actor: { kind: "USER", userId: envelope.userId },
@@ -166,7 +175,7 @@ export function commerceIdentityOf<Body>(spec: CommerceCommandSpec<Body>, envelo
   };
 }
 
-export function commerceDigestOf<Body>(spec: CommerceCommandSpec<Body>, envelope: CommandEnvelope<Body>): Sha256Hex {
+export function commerceDigestOf<Body>(spec: Pick<RunnableCommand, "id">, envelope: CommandEnvelope<Body>): Sha256Hex {
   return commandRequestDigest({ operation: spec.id as CommandId, aggregate: envelope.path, body: envelope.body });
 }
 
@@ -235,21 +244,23 @@ export interface CommerceOutcome<View> {
 }
 
 export interface CommerceCommandRun<Body, View> {
-  readonly command: CommerceCommandSpec<Body>;
+  readonly command: RunnableCommand;
   readonly envelope: CommandEnvelope<Body>;
   readonly context: TenantContext | OperatorContext;
   /** The access decision, before the reservation (B06 D-PIPE-1); throws a DomainFailure to deny. */
   access(uow: CommerceUnitOfWork): Promise<void>;
   /** The locked preconditions, the assurance of a new execution and the writes, after the reservation. */
   body(uow: CommerceUnitOfWork, causationId: CausationId, now: UtcInstant): Promise<CommerceOutcome<View>>;
+  /** The version of the aggregate a journaled view names, for a view that carries none of its own (a replay answers it; CMD045). */
+  readonly replayVersion?: (view: View) => number;
 }
 
-/** The version a journaled view carries: at its top level or on the aggregate it names (refund, order, quote). */
+/** The version a journaled view carries: at its top level or on the aggregate it names (refund, order, quote; the agency of B10's lifecycle views). */
 export function versionOfView(view: unknown): number {
   if (typeof view === "object" && view !== null) {
     const v = view as Record<string, unknown>;
     if (typeof v["version"] === "number") return v["version"];
-    for (const key of ["refund", "order", "quote"]) {
+    for (const key of ["refund", "order", "quote", "agency", "claim"]) {
       const inner = v[key];
       if (typeof inner === "object" && inner !== null && typeof (inner as Record<string, unknown>)["version"] === "number") return (inner as Record<string, unknown>)["version"] as number;
     }
@@ -314,7 +325,7 @@ export async function runCommerceCommand<Body, View>(runtime: CommerceRequestRun
       if (committed.state !== "COMMITTED" || committed.responseStatus !== outcome.status || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
       return { outcome: { ...outcome, view: committed.responseBody as View } };
     });
-    if (out instanceof Replayed) return { kind: "COMPLETED", status: out.status, view: out.view as View, version: versionOfView(out.view), replayed: true };
+    if (out instanceof Replayed) return { kind: "COMPLETED", status: out.status, view: out.view as View, version: run.replayVersion !== undefined ? run.replayVersion(out.view as View) : versionOfView(out.view), replayed: true };
     return { kind: "COMPLETED", status: out.outcome.status, view: out.outcome.view, version: out.outcome.version, replayed: false };
   } catch (e) {
     if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;

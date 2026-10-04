@@ -20,7 +20,7 @@ export function createB07Handlers(runtime: SourceRuntime, collaborators: B07Coll
     CMD014: completeUploadHandler(runtime, collaborators),
     CMD015: cancelUploadHandler(runtime),
     CMD016: selectInputTablesHandler(runtime),
-    CMD017: sealRevisionHandler(runtime),
+    CMD017: sealRevisionHandler(runtime, collaborators),
   });
 }
 

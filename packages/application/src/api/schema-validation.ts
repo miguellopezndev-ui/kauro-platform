@@ -15,8 +15,12 @@ import { PROBLEM_TYPE_PREFIX } from "./problems.js";
 import { REQUEST_SCHEMAS, REQUEST_SCHEMA_PREFIX, type RequestSchemaCommand } from "./request-schemas.js";
 import { OPERATIONAL_ROUTES, buildResponseSchemas, operationalRequestSchemas, type OperationalRoute } from "./response-schemas.js";
 import { SELECTION_MANIFEST_SCHEMA, SELECTION_MANIFEST_SCHEMA_ID, SOURCE_REQUEST_SCHEMAS } from "../sources/request-schemas.js";
+import { AUDIT_REQUEST_SCHEMAS, DECISION_ARTIFACT_SCHEMA, DECISION_ARTIFACT_SCHEMA_ID } from "../audit/request-schemas.js";
+import { EXECUTION_REQUEST_SCHEMAS } from "../execution/request-schemas.js";
 import { COMMERCE_REQUEST_SCHEMAS } from "../commerce/request-schemas.js";
 import { buildCommerceResponseSchemas } from "../commerce/response-schemas.js";
+import { COMMERCIAL_REQUEST_SCHEMAS } from "../commercial/request-schemas.js";
+import { buildCommercialResponseSchemas } from "../commercial/response-schemas.js";
 
 /** The generated contract bundle as @kauro/contracts/schemas.json ships it. */
 export interface ContractSchemaBundle {
@@ -102,6 +106,19 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
     roots[id] = schema;
   }
   roots[SELECTION_MANIFEST_SCHEMA_ID] = SELECTION_MANIFEST_SCHEMA;
+  // package B08: the execution commands' closed request schemas (design §12); a collision would be an integrity failure
+  for (const [command, schema] of Object.entries(EXECUTION_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);
+    roots[id] = schema;
+  }
+  // package B08: the audit commands' closed request schemas and the envelope of the decision-artifact intake (design §12, D8-CMA-7)
+  for (const [command, schema] of Object.entries(AUDIT_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `request schema ${id} is declared twice`);
+    roots[id] = schema;
+  }
+  roots[DECISION_ARTIFACT_SCHEMA_ID] = DECISION_ARTIFACT_SCHEMA;
   // package B09: the payment commands' closed request schemas and the envelopes of their replies and reads (D-REQ-B7), derived
   // under the same rules; an id or a view that collided with a B06 or B07 one would be an integrity failure
   for (const [command, schema] of Object.entries(COMMERCE_REQUEST_SCHEMAS)) {
@@ -125,6 +142,22 @@ export function createSchemaValidator(bundle: ContractSchemaBundle, operational:
   }
   for (const [name, schema] of Object.entries(commerce.defs)) {
     if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B09 view ${name} collides with a B06, B07 or registry definition`);
+    defs[name] = schema;
+  }
+  // package B10: the commercial commands' closed request schemas and the envelopes of their replies, derived under the same rules and
+  // referencing the B06 and B09 views they answer (AgencyView, QuoteView) without redeclaring them
+  for (const [command, schema] of Object.entries(COMMERCIAL_REQUEST_SCHEMAS)) {
+    const id = `${REQUEST_SCHEMA_PREFIX}${command}`;
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 request schema ${id} collides with an earlier package's`);
+    roots[id] = schema;
+  }
+  const commercial = buildCommercialResponseSchemas(bundle, defs as Readonly<Record<string, Readonly<Record<string, unknown>>>>);
+  for (const [id, schema] of Object.entries(commercial.roots)) {
+    if (id in roots) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 response schema ${id} collides with an earlier package's`);
+    roots[id] = schema;
+  }
+  for (const [name, schema] of Object.entries(commercial.defs)) {
+    if (name in defs) throw new DomainFailure("INTEGRITY_FAILURE", `the B10 view ${name} collides with an earlier package's or a registry definition`);
     defs[name] = schema;
   }
   roots["Problem"] = PROBLEM_SCHEMA;

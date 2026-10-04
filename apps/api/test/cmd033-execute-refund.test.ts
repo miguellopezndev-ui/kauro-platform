@@ -7,8 +7,9 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AcceptedResponse, ExecuteRefundView } from "@kauro/application";
-import { approvedRefund, deliver, dispatch, execute, paid, paymentWorld, requestedRefund, rows, serviceToken, type PaymentWorld } from "./payment-support.js";
-import { asProblem, completed, freshKey, outcome } from "./support.js";
+import { DomainFailure } from "@kauro/domain";
+import { approvedRefund, deliver, dispatch, execute, inServiceScope, paid, paymentWorld, requestedRefund, rows, serviceToken, type PaymentWorld } from "./payment-support.js";
+import { asProblem, clock, completed, freshKey, outcome } from "./support.js";
 
 let pw: PaymentWorld;
 before(async () => {
@@ -84,18 +85,39 @@ test("OK: the payment service executes an approved refund once — SUBMITTING, t
   assert.equal((await refundAttempts(refundId)).length, 1);
 });
 
-test("DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202) and a second execute is refused until reconciled — one provider refund call", async () => {
+test("DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202) and a second execute is refused until reconciled — one provider refund call", async () => {
   const purchase = await paid(pw, "execute-deny");
   const refundId = await approvedRefund(pw, purchase, 1_000n);
   const serviceFacts = (correlationId: unknown) =>
     rows<{ actor_kind: string; actor_id: string; outcome: string; reason_code: string; agency_id: string | null }>(pw, "SELECT actor_kind, actor_id, outcome, reason_code, agency_id FROM kauro.security_events WHERE action = 'CMD033' AND correlation_id = $1", [correlationId]);
 
-  // a foreign tenant of the payment service is a stored operation the scope index does not hold as a refund: another kind, or none
-  for (const foreign of [purchase.orderId, "0190d9a1-0000-7000-8000-000000000001"]) {
+  // a foreign tenant: agency B's own purchase and approved refund, real rows of another agency (B09-R5)
+  const foreignSale = await paid(pw, "execute-deny-foreign", { agency: pw.w.B });
+  const foreignRefund = await approvedRefund(pw, foreignSale, 1_000n, pw.w.B);
+  const foreignBefore = await refundRow(foreignRefund);
+  assert.deepEqual(foreignBefore, { state: "APPROVED", version: "2", provider_refund_id: null, failure_code: null });
+  // the payment service's stored operation is the refund the path names: agency B's order and capture are no refund, and answer
+  // exactly as an id nobody holds — the same problem, nothing adopted (the fact names no agency), nothing of B's revealed or touched
+  const nobody = await execute(pw, "0190d9a1-0000-7000-8000-000000000001", { expectedVersion: 2 });
+  for (const foreign of [foreignSale.orderId, foreignSale.captureId]) {
     const denied = await execute(pw, foreign, { expectedVersion: 2 });
     assert.equal(outcome(pw.api, denied), "404 NOT_FOUND -");
+    assert.deepEqual({ ...asProblem(pw.api, denied), correlationId: "" }, { ...asProblem(pw.api, nobody), correlationId: "" }, "a foreign resource and an unknown id answer alike");
     assert.deepEqual(await serviceFacts(denied.headers["x-correlation-id"]), [{ actor_kind: "SERVICE", actor_id: "payment-service", outcome: "DENY", reason_code: "NOT_FOUND", agency_id: null }]);
   }
+  // the cross-scope negative control of the global service role: the payment service's own unit of work, adopted through agency A's
+  // refund as CMD033 adopts it, sees nothing of agency B's refund, capture or order, cannot move B's refund and adopts no second scope
+  await inServiceScope(pw, { kind: "REFUND", key: refundId }, async (uow, adopted) => {
+    assert.equal(adopted, pw.w.A.agencyId);
+    assert.equal(await uow.commerce.refunds.get(foreignRefund), null);
+    assert.equal(await uow.commerce.refunds.lock(foreignRefund), null);
+    assert.equal(await uow.commerce.captures.get(foreignSale.captureId), null);
+    assert.equal(await uow.commerce.orders.get(foreignSale.orderId), null);
+    await assert.rejects(uow.adoptScope("REFUND", foreignRefund), (e: unknown) => e instanceof DomainFailure && e.code === "INTEGRITY_FAILURE");
+    await assert.rejects(uow.commerce.refunds.transition(foreignRefund, 2, { state: "SUBMITTING" }, clock.now()), (e: unknown) => e instanceof DomainFailure && e.code === "NOT_FOUND");
+  });
+  assert.deepEqual(await refundRow(foreignRefund), foreignBefore, "agency B's refund is untouched");
+  assert.equal((await refundAttempts(foreignRefund)).length, 0);
   // the wrong role of a service: an identity without PAYMENT_SERVICE, or issued for another environment; no identity at all
   const fiscal = await execute(pw, refundId, { expectedVersion: 2 }, { token: serviceToken(pw, { serviceId: "fiscal-service" }) });
   assert.equal(outcome(pw.api, fiscal), "403 NOT_AUTHORIZED SERVICE_NOT_PERMITTED");

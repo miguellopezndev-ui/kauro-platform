@@ -2,7 +2,9 @@
  * Lease store over `pg` (contract Lease: an old live worker cannot publish after another owner advances the fence;
  * 07 "Job and attempt states": a claim creates a monotonically increasing fence and a lease, a renewal cannot change the
  * immutable execution subject; S090: a resume that omits or swaps the stored checkpoint, or resets the absolute deadline, is
- * refused, and subject, clock, cost and checkpoint identity are preserved; decision D-LEASE-1). The atomic operations are the SQL functions kauro.claim_lease / heartbeat_lease /
+ * refused, and subject, clock, cost and checkpoint identity are preserved; decision D-LEASE-1; since the package-close review,
+ * finding B06-R1 and decision D-LEASE-3, an expired lease is resumed — by another owner or its former one — only under the next
+ * fence and with the stored checkpoint, and a spending lease that expired without one is not resumed at all). The atomic operations are the SQL functions kauro.claim_lease / heartbeat_lease /
  * checkpoint_lease / cancel_lease, run by kauro_control (SECURITY INVOKER). A claim runs under a savepoint so a refusal
  * (KA005 / KA004 raised by the guard triggers) does not abort the caller's transaction: a sweeper claims many leases in one
  * unit of work and answers each refusal on its own.

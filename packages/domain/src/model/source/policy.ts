@@ -76,6 +76,41 @@ export const PENDING_RESUME_GRACE_SECONDS = 30;
 /** Decision D-RUN-2: the bounded wait for one provider call made between the two units of work of a command. */
 export const PROVIDER_CALL_TIMEOUT_MS = 10_000;
 
+/**
+ * Decision D-HOLD-2 (B07-R1): the bound of one seal attempt's provider holds. A hold is recorded INTENDED before the provider call and
+ * must be SEALED by its seal's own transaction before this bound; past it the control plane may abandon and release it (a crash
+ * between the hold and the commit), and the database refuses to seal it (object_holds_attempt_bound = intended_at + 900 s, migration
+ * 0020). Longer than a seal's worst case — up to fifty bounded provider calls (PROVIDER_CALL_TIMEOUT_MS each) and its unit of work —
+ * and far shorter than any retention deadline, so an orphan hold never outlives its purpose by more than a sweep interval.
+ */
+export const SEAL_HOLD_ATTEMPT_SECONDS = 900;
+
+/**
+ * Decision D-HOLD-3 (B07-R1, second re-check): the bound of one release claim of an object's seal holds. A release is carried out by
+ * exactly one caller, the one whose claim (its fence token) the database recorded; the claimant issues its provider call only while
+ * the claim holds — this long after it began the unit of work that took the claim, on its own monotonic clock — and bounds the call
+ * by PROVIDER_CALL_TIMEOUT_MS. Past the claim's bound another caller may claim the release again. No hold of the object is intended
+ * while any claim may still land: until it is answered, or until `claim_expires_at` + PROVIDER_CALL_TIMEOUT_MS (`in_flight_until`,
+ * migration 0020 CHECKs both intervals: 900 s and 10 s). That time bound is defense in depth only: a call that outlives it is fenced by
+ * the provider itself, since every release names the metageneration of the hold incarnation it releases (D-HOLD-4).
+ */
+export const HOLD_RELEASE_CLAIM_SECONDS = 900;
+
+/**
+ * Decision D-HOLD-2 (B07-R1, second re-check): after its commit the seal re-asserts every sealed hold at the provider — the
+ * idempotent placement with the generation precondition, then a re-observation of the generation and its hold flag — and re-places
+ * a hold found missing on the live generation, at most this many rounds before it leaves the hold unconfirmed for OBJECT_INVENTORY.
+ */
+export const HOLD_REASSERTION_ROUNDS = 3;
+
+/**
+ * Decision D-HOLD-4 (B07-R1, third re-check): the release calls one claimant issues under one claim at most. A release names the
+ * metageneration of the hold incarnation it releases; when the provider refuses it (412) or none is recorded, the claimant re-observes
+ * the generation and, only when it is still live and held, records the observed metageneration under its live claim and releases
+ * again — never more than this many times before it leaves the release to the next claim.
+ */
+export const HOLD_RELEASE_ROUNDS = 2;
+
 /** Decision D-SAPI-2: a completion reference longer than this is refused structurally (text field of CMD014). */
 export const COMPLETION_REF_MAX_CHARS = 4_096;
 

@@ -19,6 +19,7 @@ import {
   type DatasetRevisionRepository,
   type EndClientRecord,
   type EndClientRepository,
+  type LockedSourceRevision,
   type MembershipId,
   type NewEndClient,
   type NewProject,
@@ -304,9 +305,12 @@ export class PgDatasetRevisionRepository implements DatasetRevisionRepository {
    * The revision of the plan's own project with that manifest hash (re-check finding N9), read after its transition lock
    * (D-TX-2): the identity lookup is stable (a manifest hash, once set, is referenced by the plan's key and never moves), the
    * lock is taken on that revision, and the state is read in the next statement — an expiry or supersession committed first is
-   * what comes back (the caller answers SOURCE_EXPIRED), one issued later waits for this transaction.
+   * what comes back (the caller answers SOURCE_EXPIRED), one issued later waits for this transaction. With it, how long the data
+   * stays available (review finding B06-R2, decision D-SRC-1): the latest effective deadline of a governing retention record
+   * that is ACTIVE and ahead of kauro.server_now() — exactly the rule of PgSourceAvailabilityReader (B07 D-RET-2) — or null. A
+   * record's effective deadline never moves and a request handler cannot write one, so the answer holds to COMMIT.
    */
-  async lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<DatasetRevisionRecord | null> {
+  async lockSealedByHash(agencyId: AgencyId, projectId: ProjectId, revisionHash: Sha256Hex): Promise<LockedSourceRevision | null> {
     const found = await execute<{ revision_id: string }>(
       this.db,
       "SELECT revision_id FROM kauro.dataset_revisions WHERE agency_id = $1 AND project_id = $2 AND manifest_hash = $3",
@@ -315,8 +319,20 @@ export class PgDatasetRevisionRepository implements DatasetRevisionRepository {
     const id = found.rows[0]?.revision_id;
     if (id === undefined) return null;
     await awaitTransition(this.db, "kauro.dataset_revisions", id);
-    const r = await execute<RevisionRow>(this.db, `SELECT ${REVISION_COLUMNS} FROM kauro.dataset_revisions WHERE revision_id = $1`, [id]);
-    return r.rows[0] ? revisionRecord(r.rows[0]) : null;
+    const r = await execute<RevisionRow & { available_until: Date | null }>(
+      this.db,
+      `SELECT ${REVISION_COLUMNS}, g.available_until
+         FROM kauro.dataset_revisions r
+         LEFT JOIN LATERAL (
+           SELECT max(x.effective_deadline) AS available_until FROM kauro.retention_records x
+            WHERE r.state = 'SEALED' AND x.agency_id = r.agency_id AND x.revision_id = r.revision_id
+              AND x.state = 'ACTIVE' AND x.effective_deadline > kauro.server_now()
+         ) g ON true
+        WHERE r.revision_id = $1`,
+      [id],
+    );
+    const row = r.rows[0];
+    return row ? { ...revisionRecord(row), availableUntil: optionalInstant(row.available_until) ?? null } : null;
   }
 }
 

@@ -17,8 +17,8 @@ import { join } from "node:path";
 import { ContractFakeAuthorityJournal, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { ContractFakeMalwareScanner, type ContractFakeScannerOptions } from "@kauro/data-plane/testing";
 import { createIdGenerator, toUtcInstant, type Clock, type CorrelationId, type IdGenerator } from "@kauro/domain";
-import type { KauroPool } from "@kauro/persistence";
-import { startHarness, type Harness } from "@kauro/persistence/testing";
+import { createPool, createUnitOfWorkFactory, type KauroPool, type PgUnitOfWorkFactory } from "@kauro/persistence";
+import { ROLES, TEST_CLOCK_OFFSET_SETTING, startHarness, type Harness } from "@kauro/persistence/testing";
 import { assembleControlPlane, platformParsers, type ControlPlane } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -88,6 +88,41 @@ export async function startControlEnv(options: EnvOptions = {}): Promise<Control
       await h.stop();
       rmSync(scratch, { recursive: true, force: true, maxRetries: 5 });
     },
+  };
+}
+
+/**
+ * The control plane's units of work as they will run `offsetSeconds` from now: a pool of its own with one kauro_control_test
+ * connection whose session sets the labelled TEST CLOCK's offset (TEST_CLOCK_OFFSET_SETTING), so kauro.server_now() of every
+ * transaction on it stands that far ahead of the real clock — a sweeper run once a provider horizon has passed (B07-R4), never a
+ * wait. Test-only: the TEST CLOCK exists only in the temporary clusters of @kauro/persistence/testing. `serverNow` reads the clock
+ * those transactions see; `close` ends the pool.
+ */
+export async function controlUnitsAhead(env: ControlEnv, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
+  return unitsAhead(env, ROLES.controlLogin, "kauro-test-control-ahead", offsetSeconds);
+}
+
+/**
+ * The request handlers' units of work (kauro_app_test) as they will run `offsetSeconds` from now, like `controlUnitsAhead`: a command
+ * issued once a bound has passed on the database clock (B07-R1: a seal once every earlier release claim's in-flight bound passed).
+ */
+export async function appUnitsAhead(env: ControlEnv, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
+  return unitsAhead(env, ROLES.appLogin, "kauro-test-api-ahead", offsetSeconds);
+}
+
+async function unitsAhead(env: ControlEnv, user: string, applicationName: string, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
+  const pool = createPool({ host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
+  const c = await pool.raw.connect();
+  try {
+    await c.query("SELECT set_config($1, $2, false)", [TEST_CLOCK_OFFSET_SETTING, String(offsetSeconds)]);
+  } finally {
+    c.release();
+  }
+  const units = createUnitOfWorkFactory(pool, { clock });
+  return {
+    units,
+    serverNow: () => units.runSource({ kind: "SYSTEM", serviceId: "test-clock-ahead", correlationId: ids.next() as CorrelationId }, (uow) => uow.serverInstant()),
+    close: () => pool.end(),
   };
 }
 

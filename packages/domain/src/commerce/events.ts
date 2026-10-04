@@ -283,10 +283,13 @@ export const COMMERCE_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<CommerceEventType
   "refund.submitting.v1": ["refundId", "agencyId", "attemptId"],
   "refund.uncertain.v1": ["refundId", "agencyId", "attemptId"],
   // fundsState and movableBalanceCents: the balance the refunded money is taken from, and the capture's movable balance before this
-  // refund, read after the completions of the same capture that committed before it (D-LEDGER-B5, D-LEDGER-B6)
+  // refund, read after the completions of the same capture that committed before it (D-LEDGER-B5, D-LEDGER-B6); returned*Cents: what
+  // this completion returns from the capture's unreturned components — its approved components, or nothing when the capture's
+  // reversal already returned them (commerce/ledger refundReturnOf, D-LEDGER-B7; B09-R2). serviceCents, taxCents and excessCents stay
+  // the approved components the credit note and the commissions follow.
   "refund.completed.v1": [
     "refundId", "agencyId", "projectId", "orderId", "captureId", "serviceCents", "taxCents", "excessCents", "serviceBasisAfterCents", "fundsState",
-    "movableBalanceCents", "previousState", "evidenceHash",
+    "movableBalanceCents", "returnedServiceCents", "returnedTaxCents", "returnedExcessCents", "previousState", "evidenceHash",
   ],
   "refund.failed.v1": ["refundId", "agencyId", "failureCode", "previousState"],
   "tax_document.drafted.v1": [
@@ -326,6 +329,8 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   { eventType: "commercial_authorization.issued.v1", consumer: "NOTIFICATIONS" },
   { eventType: "commercial_authorization.revoked.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "commercial_authorization.revoked.v1", consumer: "NOTIFICATIONS" },
+  // the processing package's delivery of the entitlement reaches the agency (package B08, migration 0022; D8-XPKG-7)
+  { eventType: "commercial_authorization.delivered.v1", consumer: "NOTIFICATIONS" },
   { eventType: "refund.requested.v1", consumer: "NOTIFICATIONS" },
   // an approved refund (and one returned to APPROVED after a proved no-effect) is executed by the payment service (CMD033)
   { eventType: "refund.approved.v1", consumer: "PAYMENT_SERVICE" },

@@ -1,0 +1,89 @@
+{
+  "verdict": "ACCEPT",
+  "summary": "All five previous B09 findings are FIXED at 6b670e3d6def487b8208728aa0cd64c6756240ae. Code inspection and recorded regression results support closure. No new blocking problem was identified within this re-check. Existing PARTIAL classifications and later-package dependencies remain applicable.",
+  "verify_observed": "verify.log ends with 'verify exit 0' at line 991. All 751 tests passed: contracts 12, domain 107, application 126, persistence 218, authorization 11, data-plane 13, control 17, API 206, tooling 41. Zero failures, cancellations, skips or todos. R1–R4 regressions passed at lines 676–679; the revised CMD032–CMD034 denial tests passed at lines 774, 778 and 781. Architecture, OpenAPI, matrix and clean-consumer checks succeeded. No tests were rerun during this read-only review.",
+  "cases": [
+    {"id":"S057","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; provider simulation and B15 dependency remain disclosed."},
+    {"id":"S058","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; mismatch and authentication controls remain supported."},
+    {"id":"S059","claimed_status":"PARTIAL","agree":true,"note":"R2 regression now covers refunds completing with or after reversal; B08/B15 dependencies remain."},
+    {"id":"S060","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; source-expiry and renewed-approval boundaries remain supported."},
+    {"id":"R2-077","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log resolves the previous execution-evidence gap."},
+    {"id":"R2-078","claimed_status":"PARTIAL","agree":true,"note":"R2 and R4 regressions establish correct return totals and retained-fee accounting; B15 statement settlement remains deferred."},
+    {"id":"R2-081","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; cumulative refund coverage and B10 dependency remain applicable."},
+    {"id":"R2-128","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; reviewed fiscal treatment and issuance boundaries remain disclosed."},
+    {"id":"R2-140","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; separate captures, excess obligations and deduplication remain supported."},
+    {"id":"CMD028-OK","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; durable intent and simulated provider creation remain correctly classified."},
+    {"id":"CMD028-DENY","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; prerequisite refusals and ambiguous creation remain covered."},
+    {"id":"CMD028-RACE","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; retry and crash-boundary evidence remains applicable."},
+    {"id":"CMD029-OK","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; server capture and authority creation use disclosed provider simulation."},
+    {"id":"CMD029-DENY","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; browser echoes and unauthenticated or unknown outcomes confer no authority."},
+    {"id":"CMD029-RACE","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; capture retry and competing-observation coverage remains applicable."},
+    {"id":"CMD030-OK","claimed_status":"PARTIAL","agree":true,"note":"R1 closes the refund-identity defect in webhook reconciliation."},
+    {"id":"CMD030-DENY","claimed_status":"PARTIAL","agree":true,"note":"Prior assessment retained; authentication, mismatch and duplicate controls remain supported."},
+    {"id":"CMD030-RACE","claimed_status":"PARTIAL","agree":true,"note":"R1 explicitly covers an unrelated refund webhook arriving between dispatch and settlement."},
+    {"id":"CMD031-OK","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log confirms the previously reviewed request-path evidence passed."},
+    {"id":"CMD031-DENY","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log confirms the previously reviewed denial evidence passed."},
+    {"id":"CMD031-RACE","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log confirms the previously reviewed retry and rollback evidence passed."},
+    {"id":"CMD032-OK","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log confirms immutable approval-intent coverage passed."},
+    {"id":"CMD032-DENY","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"R5 adds an existing foreign refund, unauthorized-principal checks and actual cross-scope read/write refusals."},
+    {"id":"CMD032-RACE","claimed_status":"EXECUTED_LOCAL","agree":true,"note":"The supplied verification log confirms the previously reviewed concurrency evidence passed."},
+    {"id":"CMD033-OK","claimed_status":"PARTIAL","agree":true,"note":"R1 and R2 close provider-identity and return-accounting defects; later-package dependencies remain."},
+    {"id":"CMD033-DENY","claimed_status":"PARTIAL","agree":true,"note":"R3 proves watchdog recovery despite an earlier refund; R5 supplies genuine cross-scope controls."},
+    {"id":"CMD033-RACE","claimed_status":"PARTIAL","agree":true,"note":"R1 and R2 now cover distinct refund identities and delayed refund/reversal observations."},
+    {"id":"CMD034-OK","claimed_status":"PARTIAL","agree":true,"note":"R1–R4 close the identified reconciliation defects; real provider queries remain a B15 dependency."},
+    {"id":"CMD034-DENY","claimed_status":"PARTIAL","agree":true,"note":"R5 tests another agency's actual order and stored query, including unchanged foreign state."},
+    {"id":"CMD034-RACE","claimed_status":"PARTIAL","agree":true,"note":"R1 and R2 supplement existing capture races with refund-identity and observation-order regressions."}
+  ],
+  "findings": [
+    {
+      "id": "B09-R1",
+      "severity": "BLOCKING",
+      "title": "Same-amount matching can attach an unrelated provider refund to a local attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 1366,
+      "detail": "FIXED. refundFor now requires an existing provider refund identity, the dispatch attempt's own response, or the platform refund reference; the amount-only fallback is removed. Unmatched refunds and conflicting provider identities create UNKNOWN_REFUND cases at lines 1308–1321, keyed by provider reference through migration 0019. The regression at apps/api/test/b09-review.test.ts:118 asserts the unrelated webhook leaves the local refund SUBMITTING, settlement records its own provider identity, and each unexplained refund retains a separate amount-bearing case. verify.log:676 records its pass.",
+      "reproduction": "Checked the original AFTER_CALL interleaving in apps/api/test/b09-review.test.ts:125: deliver a separate 1000-cent refund, then release settlement. Assertions at lines 137, 143 and 149 establish correct separation; lines 165–173 cover conflicting identities and repeated delivery.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R2",
+      "severity": "BLOCKING",
+      "title": "A reversal observed before its completed refund double-counts returned money",
+      "file": "packages/persistence/src/repositories/commerce-refunds.ts",
+      "line": 390,
+      "detail": "FIXED. Refund completion reads the capture status under a row lock and publishes zero additional returned components and zero movable balance after reversal. Approved refund components remain intact. packages/application/src/commerce/core/postings.ts:118 consumes the returned components. The regression at apps/api/test/b09-review.test.ts:226 checks three observation orders, with and without a retained fee, against actual ledger balances and event totals. verify.log:677 records its pass.",
+      "reproduction": "Checked the original 97125-cent capture and 1000-cent refund under ONE_QUERY and REVERSAL_THEN_REFUND, plus REFUND_THEN_REVERSAL as a control. Assertions at apps/api/test/b09-review.test.ts:233 and :239 require the capture to be returned exactly once; event delivery permutations are checked at line 241.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R3",
+      "severity": "MAJOR",
+      "title": "An earlier refund prevents the watchdog from resolving a later no-effect attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 835,
+      "detail": "FIXED. Absence checks now match each refund by provider refund identity or platform refund reference, rather than capture identity. An unrelated earlier refund no longer suppresses provedNoEffect. apps/api/test/b09-review.test.ts:286 exercises both a timeout without effect and a crash after claim before dispatch while an earlier completed refund remains visible. verify.log:679 records its pass.",
+      "reproduction": "The regression advances the provider/service clocks beyond both deadlines and calls watchAttempt repeatedly at apps/api/test/b09-review.test.ts:313. Assertions at lines 318–322 require both later attempts FAILED_NO_EFFECT, their refunds APPROVED, the earlier refund unchanged, and no new provider effect.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R4",
+      "severity": "BLOCKING",
+      "title": "Provider fees learned with or after reversal are silently discarded",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 987,
+      "detail": "FIXED. Fee learning now applies to COMPLETED and REVERSED captures. The fee event uses zero movable balance after reversal, also enforced by packages/persistence/src/repositories/commerce-captures.ts:370, so the retained fee is charged to the merchant's available balance. apps/api/test/b09-review.test.ts:248 verifies fees received with reversal, after reversal, and through a reversal webhook, including duplicate suppression and ledger balances. verify.log:678 records its pass.",
+      "reproduction": "Checked the original 5275-cent late-fee scenarios. Assertions at apps/api/test/b09-review.test.ts:258–270 require the durable fee and its event; line 279 requires PROCESSOR_EXPENSE 5275 and PSP_AVAILABLE -5275 after the capture is returned.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B09-R5",
+      "severity": "MAJOR",
+      "title": "Three advertised foreign-tenant denial checks use no foreign-tenant resource",
+      "file": "apps/api/test/cmd032-approve-refund.test.ts",
+      "line": 160,
+      "detail": "FIXED. CMD032 now creates another agency's real refund, compares unauthorized access with an unknown identifier, and tests cross-scope reads, approval and scope adoption at lines 170–195. CMD033 creates a real foreign approved refund and checks read, lock, transition and scope-adoption refusals at apps/api/test/cmd033-execute-refund.test.ts:95–120. CMD034 rejects a foreign stored query through the route and tests the reconciler against an actual foreign order under the adopted scope at apps/api/test/cmd034-reconcile-payment.test.ts:95–129. Each verifies unchanged foreign state. verify.log:774, :778 and :781 record passes.",
+      "reproduction": "Traced the foreign fixtures to agency B and inspected the actual foreign refund/order identifiers used in the cross-scope assertions. These controls now exercise existing foreign resources, independently of the retained wrong-kind and nonexistent-ID checks.",
+      "status": "FIXED"
+    }
+  ]
+}

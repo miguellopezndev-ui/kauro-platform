@@ -339,6 +339,12 @@ test("CMD025 DENY: stale receipt → 422 PLAN_NOT_VALIDATED; disclosures without
   assert.equal(expired.code, "SOURCE_EXPIRED");
   assert.deepEqual(expired.nextActions.map((a) => a.action), ["REQUEST_NEW_REVIEW"]);
   w.store().revisions.set(w.revisionId, { ...w.store().revisions.get(w.revisionId)!, state: "SEALED" });
+  // still SEALED, but its retention deadline is now (no sweeper ran): an expired source all the same (review finding B06-R2)
+  const deadline = w.store().retentionDeadlines.get(w.revisionId)!;
+  w.store().retentionDeadlines.set(w.revisionId, clock.now());
+  const lapsed = problem(await h.CMD025.execute(envelope(APPROVE_PLAN, w.approver, { key: KEY + "5b", agencyId: w.agencyId, path, body: approveBody(w) })));
+  assert.equal(lapsed.code, "SOURCE_EXPIRED");
+  w.store().retentionDeadlines.set(w.revisionId, deadline);
   w.store().targetContracts.forEach((tc, k) => w.store().targetContracts.set(k, { ...tc, supersededAt: clock.now() }));
   const target = problem(await h.CMD025.execute(envelope(APPROVE_PLAN, w.approver, { key: KEY + "6", agencyId: w.agencyId, path, body: approveBody(w) })));
   assert.equal(target.code, "TARGET_STALE");

@@ -57,6 +57,19 @@ export interface ObjectObservation {
   readonly crc32c?: string;
   readonly md5?: string;
   readonly observedAt: UtcInstant;
+  /**
+   * Whether the generation is under a temporary hold, when the provider reports it (Cloud Storage: the object resource's
+   * `temporaryHold`, on objects.get and objects.patch) — the seal's re-assertion after its commit reads it (B07-R1, D-HOLD-2); absent
+   * means unreported, never "not held".
+   */
+  readonly temporaryHold?: boolean;
+  /**
+   * The incarnation of the generation's metadata, when the provider reports it (Cloud Storage: the object resource's `metageneration`,
+   * an int64 as a decimal string, on objects.get and objects.patch). Every metadata update of the generation increments it — a hold
+   * placed or released is one — and a patch whose `ifMetagenerationMatch` names another one is refused (412) and changes nothing: the
+   * fence of every hold release (B07-R1 third re-check, D-HOLD-4).
+   */
+  readonly metageneration?: string;
 }
 
 /** A resumable session: a bearer credential usable until the provider lifetime unless cancelled (09 "Resumable session security"). */
@@ -69,6 +82,36 @@ export interface ResumableSession {
 }
 
 export type ProviderCancellationResult = "CONFIRMED" | "UNSUPPORTED" | "UNCERTAIN";
+
+/**
+ * What the provider answered a hold placement on an exact generation (B07-R1, decision D-HOLD-1; Cloud Storage "Object holds": a
+ * temporary hold set by objects.patch {temporaryHold: true} with ifGenerationMatch = the generation). While a generation is held the
+ * provider refuses to delete or replace it — so from the placement on, the accepted generation a seal names cannot vanish under it.
+ */
+export type HoldPlacement =
+  /**
+   * The generation is the name's live generation and is now held (also when it already was: a hold is a flag, not a count), at
+   * `metageneration` — the incarnation of its metadata after this placement, greater than any before it (D-HOLD-4): the one a release
+   * of this hold names.
+   */
+  | { readonly outcome: "HELD"; readonly observation: ObjectObservation; readonly metageneration: string }
+  /** The precondition failed (412: the live generation is another one) or no live object is under the name (404): nothing is held. */
+  | { readonly outcome: "GENERATION_NOT_LIVE" };
+
+/**
+ * What the provider answered a hold release under its generation and metageneration preconditions (B07-R1 third re-check, D-HOLD-4;
+ * Cloud Storage objects.patch {temporaryHold: false} with ifGenerationMatch and ifMetagenerationMatch).
+ */
+export type HoldRelease =
+  /** The generation is live at exactly that metageneration and is no longer held (also when it was not held); its metageneration moved on. */
+  | "RELEASED"
+  /** No live object is under the name (404): nothing is released. */
+  | "ABSENT"
+  /**
+   * A precondition failed (412): the live generation is another one, or its metadata changed since that metageneration (a newer hold
+   * was placed, or the hold was released already) — nothing changed. The caller re-observes; it never retries blindly.
+   */
+  | "PRECONDITION_FAILED";
 
 export interface ObjectStoragePort {
   readonly provider: string;
@@ -88,8 +131,28 @@ export interface ObjectStoragePort {
   read(location: StorageLocation, objectName: string, generation: string): AsyncIterable<Uint8Array>;
   /** Copies an exact source generation to a destination that must not exist (ifGenerationMatch=0); returns the new generation. */
   copy(from: { readonly location: StorageLocation; readonly objectName: string; readonly generation: string }, to: { readonly location: StorageLocation; readonly objectName: string }): Promise<{ readonly generation: string }>;
-  /** Deletes exactly `generation` (generation precondition). */
+  /**
+   * Deletes exactly `generation` (generation precondition). A held generation is refused by the provider (an error, Cloud Storage
+   * 403): its hold is released first (`releaseHold`, D-HOLD-1).
+   */
   delete(location: StorageLocation, objectName: string, generation: string): Promise<"DELETED" | "ALREADY_ABSENT" | "PRECONDITION_FAILED">;
+  /**
+   * Places a temporary hold on exactly `generation` with a generation precondition (Cloud Storage: objects.patch {temporaryHold:
+   * true}, ifGenerationMatch). From a HELD answer on, the provider refuses to delete or replace that generation until the hold is
+   * released. A temporary hold, never an event-based one: it does not interact with a bucket retention policy, so its release lets a
+   * lawful early deletion proceed at once (09 "Soft delete, versioning and holds"; decision D-HOLD-1). Every HELD answer is a metadata
+   * update of its own and reports the metageneration it produced (D-HOLD-4; Cloud Storage increments it on every objects.patch — B15's
+   * adapter qualifies that a patch setting an already set hold increments it too, and otherwise makes each placement a change of its
+   * own). Called outside any transaction.
+   */
+  placeHold(location: StorageLocation, objectName: string, generation: string): Promise<HoldPlacement>;
+  /**
+   * Releases the temporary hold of exactly `generation` at exactly `metageneration` (objects.patch {temporaryHold: false},
+   * ifGenerationMatch and ifMetagenerationMatch; HoldRelease). The hold itself is a flag, but a release names the incarnation it clears:
+   * a release that lands late — after a newer hold was placed, which incremented the metageneration — fails its precondition and clears
+   * nothing (D-HOLD-4). Issued only under the release's claim (D-HOLD-3).
+   */
+  releaseHold(location: StorageLocation, objectName: string, generation: string, metageneration: string): Promise<HoldRelease>;
   /** Provider inventory of a prefix (09: periodic inventory detects objects missing from the registry). */
   list(location: StorageLocation, prefix: string, page?: string): Promise<{ readonly objects: ReadonlyArray<{ readonly objectName: string; readonly generation: string; readonly bytes: number }>; readonly next?: string }>;
   /**

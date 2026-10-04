@@ -9,16 +9,18 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { ProblemOutcome, ServedCommandId } from "@kauro/application";
-import { B06_COMMANDS, B07_COMMANDS, COMMAND_OUTCOMES, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
+import { AUDIT_COMMANDS, B06_COMMANDS, B07_COMMANDS, COMMAND_OUTCOMES, EXECUTION_COMMANDS, INTAKE_OUTCOMES, PROBLEM_STATUS, READ_OUTCOMES, ResponseContractViolation, SERVED_COMMAND_IDS, SUPPORT_COMMANDS, checkReply, commandRouteResponses, outcomeOf, problemOf } from "@kauro/application";
 import type { FailureCode, FailureReason, FieldError, ProjectId } from "@kauro/domain";
 import { DomainFailure, FAILURE_CODES, FAILURE_REASONS } from "@kauro/domain";
 import { assembleApi, createBearerTokenAuthenticator, loadContractSchemas } from "../src/index.js";
+import { auditRoutes, decidedBody, driveTo, fundPool, startedAudit, storeDecisionArtifact, storedCandidates, storedData } from "./audit-support.js";
+import { activate } from "./source-support.js";
 import { approvalBodyOf, call, clock, completed, ids, outcome, routes, world, type World } from "./support.js";
 
 const validator = loadContractSchemas();
 const CONTENT_TYPE = "application/problem+json";
-/** The specs of every served command: B06's seven and B07's six (mandate B07-COMMANDS). */
-const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS, ...SUPPORT_COMMANDS };
+/** The specs of every served command: B06's seven, B07's six (mandate B07-COMMANDS), B08's two job commands (B08-COMMANDS-EXECUTION) and four audit commands (B08-COMMANDS-AUDIT), and B11's CMD044 (W4). */
+const SPECS = { ...B06_COMMANDS, ...B07_COMMANDS, ...EXECUTION_COMMANDS, ...AUDIT_COMMANDS, ...SUPPORT_COMMANDS };
 
 function problemFor(entry: ProblemOutcome, overrides: { readonly fields?: ReadonlyArray<FieldError>; readonly current?: boolean } = {}) {
   const fields = overrides.fields ?? (entry.fieldCodes !== undefined ? entry.fieldCodes.map((code) => ({ field: "expectedVersion", code })) : undefined);
@@ -199,6 +201,16 @@ const b06 = (file: string): ReadonlyArray<string> => [`commands/handlers/${file}
  * alone calls — every file whose sites the command can reach.
  */
 const b07 = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `sources/handlers/${f}`);
+/**
+ * A B08 handler (mandate B08-COMMANDS-EXECUTION): its own file with the execution package's shared helpers and the job projection —
+ * every file whose sites the command can reach.
+ */
+const b08 = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `execution/handlers/${f}`);
+
+/**
+ * A B08 audit handler (mandate B08-COMMANDS-AUDIT): its own file with the audit package's shared helpers and the audit and plan projections.
+ */
+const b08audit = (file: string, ...helpers: ReadonlyArray<string>): ReadonlyArray<string> => [file, "shared.ts", "projections.ts", ...helpers].map((f) => `audit/handlers/${f}`);
 
 /** The files of each served command's handler, under packages/application/src. */
 const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = {
@@ -215,6 +227,12 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = 
   CMD015: b07("cancel-upload.ts"),
   CMD016: b07("select-input-tables.ts", "selection-rules.ts"),
   CMD017: b07("seal-revision.ts"),
+  CMD036: b08("execute-project.ts"),
+  CMD037: b08("cancel-job.ts"),
+  CMD020: b08audit("start-audit.ts"),
+  CMD021: b08audit("cancel-audit.ts"),
+  CMD022: b08audit("create-plan.ts"),
+  CMD024: b08audit("validate-plan.ts"),
   CMD044: b06("create-support-case.ts"),
 };
 
@@ -281,6 +299,16 @@ test("B07-COMMANDS: every failure site of the source reads and of the selection 
   const intakeSites = [...sitesOf(source("packages/application/src/sources/handlers/intake.ts"), "intake.ts"), ...sitesOf(checkDocument, "selection-rules.ts checkDocument")];
   for (const site of intakeSites) assert.ok(outcomeOf(INTAKE_OUTCOMES.SubmitSelectionManifest, site.code, site.reason ?? undefined) !== null, `the intake failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
   assert.ok(intakeSites.some((s) => s.reason === "ROLE_INSUFFICIENT") && intakeSites.some((s) => s.reason === "SELECTION_MANIFEST_MISMATCH"));
+});
+
+test("B08-COMMANDS-AUDIT: every failure site of GetAudit and of the decision artifact intake is an entry of their catalogues — the read's own sites, the intake's own sites and the role it needs; GetAudit admits every role", () => {
+  const readSites = sitesOf(source("packages/application/src/audit/handlers/reads.ts"), "reads.ts");
+  assert.ok(readSites.length >= 2, `${readSites.length} audit read sites`);
+  for (const site of readSites) assert.ok(outcomeOf(READ_OUTCOMES.GetAudit, site.code, site.reason ?? undefined) !== null, `the audit read failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
+  assert.ok(!READ_OUTCOMES.GetAudit.some((o) => o.reason === "ROLE_INSUFFICIENT"), "every role reads an audit");
+  const intakeSites = sitesOf(source("packages/application/src/audit/handlers/intake.ts"), "intake.ts");
+  for (const site of intakeSites) assert.ok(outcomeOf(INTAKE_OUTCOMES.SubmitDecisionArtifact, site.code, site.reason ?? undefined) !== null, `the intake failure site ${site.code}/${site.reason ?? "-"} (${site.site}) is not in its catalogue`);
+  assert.ok(intakeSites.some((s) => s.reason === "ROLE_INSUFFICIENT") && intakeSites.some((s) => s.reason === "BODY_TOO_LARGE"));
 });
 
 test("N13/N16: every failure site of the reads (queries/reads.ts) is an entry of the read catalogues — the tenant-scoped decisions of every agency read, the query and cursor refusals of every list", () => {
@@ -355,7 +383,7 @@ test("N13: a command route never answers a problem its catalogue does not list �
   assert.equal(outcome(w, listed), "409 STALE_VERSION -");
 });
 
-test("N13: the deployable edition's own outcome of RevisePlan and ApprovePlan is in their catalogues — with the edition's collaborators (no plan services bound) both answer 422 INTEGRITY_FAILURE PLAN_SERVICES_UNAVAILABLE, nothing is journaled, and no violation reaches the sink", async () => {
+test("N13: the deployable edition's own outcome of CreatePlan and RevisePlan is in their catalogues — with the edition's collaborators and no core bound both answer 422 INTEGRITY_FAILURE CORE_SERVICES_UNAVAILABLE, nothing is journaled, no plan is written or changed, and no violation reaches the sink", async () => {
   const sunk: Array<{ correlationId: string; error: unknown }> = [];
   const edition = assembleApi({
     environment: "LOCAL",
@@ -369,17 +397,28 @@ test("N13: the deployable edition's own outcome of RevisePlan and ApprovePlan is
   });
   await edition.ready();
   try {
+    // an audit that awaits the agency's decisions, and the two artifacts the agency stored for it through the intake (the platform's own)
+    await activate(w);
+    const aw = { w, poolId: null };
+    await fundPool(aw);
+    const started = await startedAudit(aw);
+    await driveTo(w, started, "NEEDS_DECISION");
+    const candidates = await storedCandidates(w, started.auditId, decidedBody(started.subject, "n13-edition"));
+    const patchReply = await storeDecisionArtifact(w, started.auditId, { kind: "DECISION_PATCH", document: { candidate: "Phone", reasonCode: "X" } });
+    assert.equal(patchReply.status, 201, patchReply.text);
+    const patch = storedData(patchReply);
     const plan = await w.approvable(w.A, projectId, "n13-edition");
     const headers = { "content-type": "application/json", "x-kauro-agency": w.A.agencyId };
-    const revise = await edition.inject({ method: "POST", url: routes.revisePlan(plan.planId), headers: { ...headers, authorization: `Bearer ${w.operator.token}`, "idempotency-key": `n13-edition-revise-${plan.planId}` }, payload: JSON.stringify({ expectedVersion: plan.version, decisionPatchArtifactRef: w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: "X" }) }) });
-    const approve = await edition.inject({ method: "POST", url: routes.approvePlan(plan.planId), headers: { ...headers, authorization: `Bearer ${w.approver.token}`, "idempotency-key": `n13-edition-approve-${plan.planId}` }, payload: JSON.stringify(approvalBodyOf(plan, await w.stepUp(w.approver))) });
-    for (const reply of [revise, approve]) {
-      assert.equal(reply.statusCode, 422);
+    const create = await edition.inject({ method: "POST", url: auditRoutes.createPlan(started.auditId), headers: { ...headers, authorization: `Bearer ${w.operator.token}`, "idempotency-key": `n13-edition-create-${started.auditId}` }, payload: JSON.stringify({ candidateDecisionArtifactRef: candidates.artifactRef }) });
+    const revise = await edition.inject({ method: "POST", url: routes.revisePlan(plan.planId), headers: { ...headers, authorization: `Bearer ${w.operator.token}`, "idempotency-key": `n13-edition-revise-${plan.planId}` }, payload: JSON.stringify({ expectedVersion: plan.version, decisionPatchArtifactRef: patch.artifactRef }) });
+    for (const reply of [create, revise]) {
+      assert.equal(reply.statusCode, 422, reply.body);
       const problem = JSON.parse(reply.body) as { code: string; reason: string };
-      assert.deepEqual([problem.code, problem.reason], ["INTEGRITY_FAILURE", "PLAN_SERVICES_UNAVAILABLE"]);
+      assert.deepEqual([problem.code, problem.reason], ["INTEGRITY_FAILURE", "CORE_SERVICES_UNAVAILABLE"]);
     }
     assert.deepEqual(sunk, []);
     assert.equal(await w.count("command_journal", "idempotency_key LIKE 'n13-edition-%'"), 0);
+    assert.equal(await w.count("plans", `project_id = '${started.subject.projectId}'`), 0, "CreatePlan wrote no plan");
     const row = await w.row<{ state: string; version: string }>("plans", "plan_id = $1", [plan.planId]);
     assert.deepEqual(row && [row.state, row.version], ["VALIDATED", String(plan.version)]);
   } finally {

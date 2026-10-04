@@ -4,16 +4,16 @@
  *
  * startTemporaryPostgres() runs initdb into a fresh directory, starts the server on a free 127.0.0.1 port, creates the
  * database and the roles the platform expects, applies the migrations as the owner role, creates one login role per runtime
- * group (request handlers, control plane, step-up verifier, validator, provider ingress, payment service), and returns connection
- * factories. stop() shuts the server down and removes the
- * directory. Binaries: env PGBIN first, then C:\Tools\pgsql17\bin on Windows, /usr/lib/postgresql/17/bin on Linux.
+ * group (request handlers, control plane, step-up verifier, validator, provider ingress, payment service, commission service),
+ * and returns connection factories. stop() shuts the server down and removes the directory. Binaries: env PGBIN first, then
+ * C:\Tools\pgsql17\bin on Windows, /usr/lib/postgresql/17/bin on Linux.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 import { applyMigrations, type ApplyResult } from "../migrations/runner.js";
 
 export const ROLES = Object.freeze({
@@ -24,17 +24,19 @@ export const ROLES = Object.freeze({
   validator: "kauro_validator",
   ingress: "kauro_ingress",
   payment: "kauro_payment",
+  commission: "kauro_commission",
   appLogin: "kauro_app_test",
   controlLogin: "kauro_control_test",
   assuranceLogin: "kauro_assurance_test",
   validatorLogin: "kauro_validator_test",
   ingressLogin: "kauro_ingress_test",
   paymentLogin: "kauro_payment_test",
+  commissionLogin: "kauro_commission_test",
   superuser: "postgres",
   database: "kauro",
 });
 
-export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test" | "kauro_ingress_test" | "kauro_payment_test";
+export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test" | "kauro_ingress_test" | "kauro_payment_test" | "kauro_commission_test";
 
 export interface TemporaryPostgres {
   readonly port: number;
@@ -42,6 +44,8 @@ export interface TemporaryPostgres {
   readonly migrations: ApplyResult;
   /** A connected client as the given role (LOGIN roles only). The caller ends it. */
   connect(role: LoginRole): Promise<Client>;
+  /** The connection settings of a client as the given role, for a connection someone else opens (the fault harness's openConnection). */
+  clientConfig(role: LoginRole): ClientConfig;
   stop(): Promise<void>;
 }
 
@@ -121,8 +125,9 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   const logFile = join(base, "postgres.log");
   run(exe(bin, "pg_ctl"), ["-D", dataDir, "-l", logFile, "-o", serverOptions.join(" "), "-w", "-t", "60", "start"], "pg_ctl start", { detached: true, logFile });
 
+  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
   const connect = async (role: string, database: string = ROLES.database): Promise<Client> => {
-    const c = new Client({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
+    const c = new Client(clientConfig(role, database));
     await c.connect();
     return c;
   };
@@ -159,6 +164,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
         await su2.query(`CREATE ROLE ${ROLES.validatorLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.validator}`);
         await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}`);
         await su2.query(`CREATE ROLE ${ROLES.paymentLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.payment}`);
+        await su2.query(`CREATE ROLE ${ROLES.commissionLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.commission}`);
       } finally {
         await su2.end();
       }
@@ -177,6 +183,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
       dataDir,
       migrations,
       connect: (role) => connect(role),
+      clientConfig: (role) => clientConfig(role),
       stop,
     };
   } catch (e) {

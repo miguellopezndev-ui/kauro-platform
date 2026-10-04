@@ -15,8 +15,8 @@
 // Sources (nothing is written by hand): the served commands — B06's seven and B07's six — come from the provenance-verified
 // registry commands.json (path, method, operationId = registry name, role, idempotency, cases, precondition/effect/failure); their
 // request schemas, the response views (derived from the registry contract bundle), the envelopes, the Problem document, the reads
-// (READ_ROUTES: the manual-10 reads of re-check finding N16 and B07's source reads), the selection manifest intake
-// (SOURCE_INTAKE_ROUTES, B07 D-SEL-2) and the operational routes come from @kauro/application — the very objects the api's
+// (READ_ROUTES: the manual-10 reads of re-check finding N16, B07's source reads and B08's GetJob and GetAudit), the selection manifest
+// and the decision artifact intake (INTAKE_ROUTES: B07 D-SEL-2, B08 D8-CMA-7) and the operational routes come from @kauro/application — the very objects the api's
 // validator compiles and its send guard validates with. The routes
 // are the ones the composition root actually registers: tools/openapi.mjs builds the api with `assembleApi` over the real pg
 // unit-of-work adapter and reads its route inventory. Route registration needs no database: the pool is created lazily and
@@ -117,6 +117,15 @@ export function runtimeSchemas(sources) {
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
   }
   byId[application.SELECTION_MANIFEST_SCHEMA_ID] = application.SELECTION_MANIFEST_SCHEMA;
+  byId[application.DECISION_ARTIFACT_SCHEMA_ID] = application.DECISION_ARTIFACT_SCHEMA;
+  for (const [command, schema] of Object.entries(application.EXECUTION_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B08 request schema of ${command} collides with another one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
+  for (const [command, schema] of Object.entries(application.AUDIT_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B08 audit request schema of ${command} collides with another one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
   for (const [command, schema] of Object.entries(application.COMMERCE_REQUEST_SCHEMAS)) {
     if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B09 request schema of ${command} collides with a served one`);
     byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
@@ -125,7 +134,17 @@ export function runtimeSchemas(sources) {
     if (id in byId) throw new Error(`the operational request schema ${id} collides with another one`);
     byId[id] = schema;
   }
-  const defs = { ...bundle.$defs, ...responses.defs, ...commerce.defs };
+  // package B10: the commercial commands' closed schemas, derived under the same rules over the earlier packages' views (a served route's
+  // components are generated below; the others stay out of the document until their command lane serves them)
+  const commercial = application.buildCommercialResponseSchemas(bundle, { ...responses.defs, ...commerce.defs });
+  for (const id of Object.keys(commercial.roots)) if (id in byId) throw new Error(`the B10 schema ${id} collides with an earlier package's`);
+  for (const name of Object.keys(commercial.defs)) if (name in responses.defs || name in commerce.defs) throw new Error(`the B10 view ${name} collides with an earlier package's`);
+  Object.assign(byId, commercial.roots);
+  for (const [command, schema] of Object.entries(application.COMMERCIAL_REQUEST_SCHEMAS)) {
+    if (application.REQUEST_SCHEMA_PREFIX + command in byId) throw new Error(`the B10 request schema of ${command} collides with an earlier one`);
+    byId[application.REQUEST_SCHEMA_PREFIX + command] = schema;
+  }
+  const defs = { ...bundle.$defs, ...responses.defs, ...commerce.defs, ...commercial.defs };
   return { byId, defs };
 }
 
@@ -247,8 +266,8 @@ export function generateOpenApi(sources) {
 
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
-  // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS) and B11's CMD044 (mandate W4)
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.SUPPORT_COMMANDS };
+  // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS), B08's two execution commands (mandate B08-COMMANDS-EXECUTION) and its four audit commands (mandate B08-COMMANDS-AUDIT), and B11's CMD044 (mandate W4)
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
     const spec = specs[command.id];
@@ -262,9 +281,14 @@ export function generateOpenApi(sources) {
     const responses = {};
     for (const [status, declared] of Object.entries(contract.declared)) {
       if (declared.schemaId === application.ACCEPTED_RESPONSE_SCHEMA_ID) {
-        // an ACCEPTED command (B07 CompleteUpload, D-RUN-1): the shared envelope, added once below
+        // an ACCEPTED command (B07 CompleteUpload, D-RUN-1; B08 ExecuteProject, StartAudit and ValidatePlan, D8-API-1): the shared envelope, added once below
+        const accepted = {
+          CMD036: "ACCEPTED: the job was queued and runs asynchronously — the operation (the processing job), its state, the status path of GetJob and the polling guidance (package B08 D8-API-1)",
+          CMD020: "ACCEPTED: the audit was queued and runs asynchronously — the operation (the audit), its state, the status path of GetAudit and the polling guidance (package B08 D8-API-1)",
+          CMD024: "ACCEPTED: the plan's validation was requested and runs asynchronously — the operation (the plan), its state VALIDATING, the plan's status path and the polling guidance (package B08 D8-API-1, D8-CMA-4)",
+        };
         responses[status] = {
-          description: "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
+          description: accepted[command.id] ?? "ACCEPTED: completion remains asynchronous — the verification operation (the upload), its state, the status path and the polling guidance (package B07 D-RUN-1)",
           headers: REPLY_HEADERS,
           content: { [declared.contentType]: { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
         };
@@ -339,10 +363,14 @@ export function generateOpenApi(sources) {
     };
   }
 
-  // the document intakes (B07 D-SEL-2): the selection manifest, stored once per content — 201 stored, 200 the same document again
+  // the document intakes (B07 D-SEL-2, B08 D8-CMA-7): the selection manifest and the decision artifact, each stored once per content —
+  // 201 stored, 200 the same document again
   addComponent("SelectionManifestDocument", byId[application.SELECTION_MANIFEST_SCHEMA_ID], application.SELECTION_MANIFEST_SCHEMA_ID);
-  for (const spec of Object.values(application.SOURCE_INTAKE_ROUTES)) {
-    if (spec.schemaId !== application.SELECTION_MANIFEST_SCHEMA_ID) throw new Error(`${spec.operationId} admits a document schema this generator does not document`);
+  addComponent("DecisionArtifactDocument", byId[application.DECISION_ARTIFACT_SCHEMA_ID], application.DECISION_ARTIFACT_SCHEMA_ID);
+  const intakeDocuments = { [application.SELECTION_MANIFEST_SCHEMA_ID]: "SelectionManifestDocument", [application.DECISION_ARTIFACT_SCHEMA_ID]: "DecisionArtifactDocument" };
+  for (const spec of Object.values(application.INTAKE_ROUTES)) {
+    const documentComponent = intakeDocuments[spec.schemaId];
+    if (documentComponent === undefined) throw new Error(`${spec.operationId} admits a document schema this generator does not document`);
     const contract = application.intakeRouteResponses(spec.operationId);
     const schemaId = application.intakeResponseSchemaId(spec.operationId);
     addComponent(`${spec.operationId}Reply`, byId[schemaId], schemaId);
@@ -361,9 +389,9 @@ export function generateOpenApi(sources) {
           { $ref: "#/components/parameters/CorrelationId" },
           { $ref: "#/components/parameters/CsrfToken" },
         ],
-        requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}SelectionManifestDocument` } } } },
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${documentComponent}` } } } },
         responses: {
-          200: reply("STORED: the same document was already stored for this revision (created false; content-idempotent, D-SEL-2)"),
+          200: reply("STORED: the same document was already stored for this subject (created false; content-idempotent, D-SEL-2, D8-CMA-7)"),
           201: reply("STORED: the document is stored (created true)"),
           ...problemResponses(contract.outcomes),
         },
@@ -478,6 +506,87 @@ export function generateOpenApi(sources) {
     };
     if (application.isServedCommerceRead(operationId)) serve("GET", spec.path, operation);
     else planned[`GET ${spec.path}`] = operation;
+  }
+
+  // package B10: the served commercial commands (docs/design/B10-commercial-domain.md §13; COMMERCIAL_SERVED_COMMAND_IDS), generated from the
+  // application contracts exactly as the payment routes are; a command no lane serves yet is not documented
+  for (const spec of Object.values(application.COMMERCIAL_COMMANDS)) {
+    if (!application.isServedCommercialCommand(spec.id)) continue;
+    const command = registryCommands.find((c) => c.id === spec.id);
+    if (!command) throw new Error(`${spec.id} is served but absent from the registry`);
+    if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
+      throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
+    }
+    const requestId = application.REQUEST_SCHEMA_PREFIX + spec.id;
+    addComponent(`${spec.name}Request`, byId[requestId], requestId);
+    const reply = application.COMMERCIAL_COMMAND_RESPONSES[spec.id];
+    const replyId = application.commercialCommandResponseSchemaId(spec.id);
+    addComponent(`${spec.name}Completed`, byId[replyId], replyId);
+    const responses = {
+      [String(reply.status)]: {
+        description: `COMPLETED: ${command.effect}`,
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } },
+      },
+    };
+    Object.assign(responses, problemResponses(application.COMMERCIAL_COMMAND_OUTCOMES[spec.id]));
+    const contract = application.commercialCommandRouteResponses(spec.id);
+    const documented = Object.keys(responses).filter((status) => Number(status) < 400);
+    if (!isDeepStrictEqual(documented.sort(), Object.keys(contract.declared).sort())) throw new Error(`${spec.id}: the documented replies ${documented} differ from the route's ${Object.keys(contract.declared)}`);
+    serve(spec.method, spec.path, {
+      operationId: spec.name,
+      summary: `${spec.id} ${spec.name}`,
+      description: `Precondition: ${command.precondition}
+
+Effect: ${command.effect}
+
+Failure: ${command.failure}`,
+      "x-kauro-command": spec.id,
+      "x-kauro-role": spec.role,
+      "x-kauro-principal": spec.principal,
+      "x-kauro-runtime-role": spec.runtimeRole,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-idempotency": command.idempotency,
+      "x-kauro-step-up": spec.stepUp ? "REQUIRED" : "NEVER",
+      "x-kauro-gate": command.gate,
+      "x-kauro-cases": command.testIds ?? [],
+      "x-kauro-package": "B10",
+      // the commission group's service commands (CMD051, CMD053) authenticate a verified service identity, every other a person
+      security: [{ [spec.principal === "COMMERCIAL_SERVICE" ? "serviceAuth" : "bearerAuth"]: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope (reference/COMMAND_CATALOGUE).", schema: ID })),
+        { $ref: "#/components/parameters/IdempotencyKey" },
+        ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      requestBody: { required: true, content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Request` } } } },
+      responses,
+    });
+  }
+
+  // package B10: the served commercial reads (GetCommissionStatement since B10-STATEMENTS-PAYOUTS; COMMERCIAL_SERVED_READ_IDS)
+  for (const [operationId, spec] of Object.entries(application.COMMERCIAL_READ_ROUTES)) {
+    if (!application.isServedCommercialRead(operationId)) continue;
+    const schemaId = application.commercialReadResponseSchemaId(operationId);
+    addComponent(`${operationId}Reply`, byId[schemaId], schemaId);
+    serve("GET", spec.path, {
+      operationId,
+      summary: spec.summary,
+      description: `Authority: ${spec.authority}`,
+      "x-kauro-read": true,
+      "x-kauro-role": spec.role,
+      "x-kauro-scope": spec.scope,
+      "x-kauro-package": "B10",
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id; a statement the caller may not read answers as an id nobody holds.", schema: ID })),
+        { $ref: "#/components/parameters/CorrelationId" },
+      ],
+      responses: {
+        200: { description: `READ: ${spec.summary}`, headers: REPLY_HEADERS, content: { "application/json": { schema: { $ref: `${COMPONENTS}${operationId}Reply` } } } },
+        ...problemResponses(application.COMMERCIAL_READ_OUTCOMES[operationId]),
+      },
+    });
   }
 
   // the session routes' extra reply headers (B11 D-AUTH-1, D-PRIV-1): sign-in sets the cookie, logout clears it and the site data

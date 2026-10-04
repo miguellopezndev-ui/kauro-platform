@@ -14,6 +14,9 @@
  * not inferred solely from status code" — the status is a projection of the code, never the other way round.
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
+import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
+import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
+import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -270,14 +273,13 @@ export const FAILURE_REASONS = [
   "SELECTION_BYTES_LIMIT",
   "REUSE_NOT_AVAILABLE",
   "GENERATION_CHANGED",
+  "GENERATION_NOT_OBSERVED",
   // source lifecycle: integrity (migrations 0009..0012) and deployment completeness
   "QUOTA_LEDGER",
   "FENCE_DISCIPLINE",
   "LIFECYCLE_BINDING_MISSING",
   "SOURCE_SERVICES_UNAVAILABLE",
-  // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
-  ...COMMERCE_FAILURE_REASONS,
-  // support cases (B11 CMD044, D-SUP-2, D-SUP-4): the bounded detector refused the summary, and the covered-hours calendar does not
+  // support cases (B11 CMD044; placed before B09's list by the trunk sync so that B09, B08 and B10 keep their order, D11-SYNC-1, D-SUP-2, D-SUP-4): the bounded detector refused the summary, and the covered-hours calendar does not
   // reach the request date (fail closed rather than guess a review date)
   "SECRET_LIKE_CONTENT",
   "RECORD_LIKE_CONTENT",
@@ -285,6 +287,14 @@ export const FAILURE_REASONS = [
   // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
   // (W2) and its detector the support reasons above
   "INQUIRY_RATE_LIMITED",
+  // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
+  ...COMMERCE_FAILURE_REASONS,
+  // processing authority (package B08; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1)
+  ...EXECUTION_FAILURE_REASONS,
+  // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; the audit keys of migration 0023)
+  ...AUDIT_FAILURE_REASONS,
+  // agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md §12)
+  ...COMMERCIAL_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

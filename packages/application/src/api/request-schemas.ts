@@ -27,7 +27,7 @@ const SUPPORT_CATEGORY = { type: "string", enum: ["PRODUCT_DEFECT", "IMPORT_GUID
 /**
  * A text: at least one visible character, and no control character but the tab, the line feed and the carriage return (the
  * Unicode Cc set minus U+0009, U+000A and U+000D; U+0000 is refused with the rest), which is what the support_cases summary
- * check of migration 0023 keeps (PostgreSQL refuses NUL before any check). The lookahead scans the text once.
+ * check of migration 0026 keeps (PostgreSQL refuses NUL before any check). The lookahead scans the text once.
  */
 export const TEXT_PATTERN = "^(?=[\\s\\S]*\\S)[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f]+$";
 /** A support summary is 20..4000 characters (design section 5, W4 row). */

@@ -9,8 +9,8 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ScriptedCancellation } from "@kauro/application/testing";
-import { isDomainFailure, textDigest, type CausationId, type CorrelationId, type UploadId } from "@kauro/domain";
-import { clock, ids, startControlEnv, type ControlEnv } from "./support/env.js";
+import { isDomainFailure, textDigest, type AgencyId, type CausationId, type CorrelationId, type UploadId } from "@kauro/domain";
+import { clock, controlUnitsAhead, ids, startControlEnv, type ControlEnv } from "./support/env.js";
 import { asRequestHandler, cancel, eventsOf, issue, oracle, oracleRows, project, reserve, setSessionLimit, tenant, uploadAndReport, uploadThrough, type Upload } from "./support/fixtures.js";
 import { buildCsv } from "./support/workbook.js";
 
@@ -290,4 +290,67 @@ test("OBJECT_INVENTORY and DELETION_RETRIES: an admitted generation the provider
   assert.deepEqual([deleted.state, deleted.deletion_result, deleted.deletion_attempts], ["DELETED", "DELETED", 2]);
   assert.equal(env.storage.generationsOf(env.storage.location("QUARANTINE"), up.objectName).find((g) => g.generation === written.generation)?.status, "SOFT_DELETED");
   assert.equal((await env.plane.sweepers.deletionRetries.sweep(env.plane.units, 100)).examined, 0);
+});
+
+test("B07-R4: an unresolved provider cancellation outlives its provider horizon — STORAGE_LIFECYCLE and PROVIDER_SESSION_RECONCILIATION answered UNCERTAIN while the horizon was ahead, keeping the bearer record for the next attempt; once the horizon has passed on the server clock, PROVIDER_SESSION_RECONCILIATION still finds the record and purges it without asking the provider, the recorded state staying UNCERTAIN; agencies whose lapsed records were purged earlier never hide a later one", { timeout: 300_000 }, async () => {
+  const t = await tenant(env, "r4-horizon");
+  await setSessionLimit(env, t, 10);
+  const p = await project(env, t);
+  // issued now: the provider horizon is this file's session lifetime (twenty-five hours) ahead; the requester cancels at once
+  const up = await reserve(env, t, p, csv("r4").length, "CSV");
+  const ref = await issue(env, t, up);
+  assert.equal((await cancel(env, t, up)).providerCancellationState, "REQUESTED");
+  const horizon = await oracle<{ at: string }>(env, "SELECT to_char(provider_session_expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS at FROM kauro.upload_sessions WHERE upload_id = $1", [up.uploadId]);
+
+  // STORAGE_LIFECYCLE before the horizon: the provider answers UNCERTAIN; recorded, the bearer record kept for reconciliation
+  await dispatchStorageLifecycle(new Map<string, ScriptedCancellation>([[textDigest(ref), { answer: "UNCERTAIN", sessionCancelled: false }]]));
+  assert.deepEqual([(await uploadRow(up.uploadId)).provider_cancellation_state, (await uploadRow(up.uploadId)).secrets], ["UNCERTAIN", "1"]);
+  // PROVIDER_SESSION_RECONCILIATION before the horizon: attempted again, UNCERTAIN again — nothing recorded, the record kept
+  env.storage.scriptCancellation({ answer: "UNCERTAIN", sessionCancelled: false });
+  const ahead = await env.plane.sweepers.providerSessionReconciliation.sweep(env.plane.units, 100);
+  assert.deepEqual([ahead.acted, ahead.failed], [0, []]);
+  assert.deepEqual([(await uploadRow(up.uploadId)).provider_cancellation_state, (await uploadRow(up.uploadId)).secrets], ["UNCERTAIN", "1"], "the horizon is ahead: the record stays for the next attempt");
+  const attempts = env.storage.calls("cancelResumableSession").filter((c) => c.request["sessionDigest"] === textDigest(ref)).length;
+  assert.equal(attempts, 2, "STORAGE_LIFECYCLE and one reconciliation asked the provider");
+
+  // twenty-six hours later on the server clock (the labelled TEST CLOCK of the sweeper's own transactions): the horizon has passed
+  const later = await controlUnitsAhead(env, 26 * 3_600);
+  try {
+    assert.ok(Date.parse(await later.serverNow()) > Date.parse(horizon.at), "the sweeper's transactions stand past the provider horizon");
+    // the discovery the sweep relies on: unbound, the agency with the lapsed cancellation is named but no bearer record is visible;
+    // bound to that agency, the record still held is found
+    const unbound = { kind: "SYSTEM", serviceId: "provider-session-reconciliation", correlationId: ids.next() as CorrelationId } as const;
+    assert.ok((await later.units.runSource(unbound, (uow) => uow.sources.uploads.findAgenciesWithLapsedCancellations(100))).includes(t.ag.agencyId as AgencyId));
+    assert.deepEqual(await later.units.runSource(unbound, (uow) => uow.sources.uploads.findLapsedSessionSecrets(100)), [], "unbound, the bearer records are invisible");
+    assert.deepEqual(
+      (await later.units.runSource({ ...unbound, agencyId: t.ag.agencyId as AgencyId }, (uow) => uow.sources.uploads.findLapsedSessionSecrets(100))).map((x) => x.uploadId),
+      [up.uploadId],
+      "bound to the agency, its lapsed record still held is found",
+    );
+    const past = await env.plane.sweepers.providerSessionReconciliation.sweep(later.units, 100);
+    assert.deepEqual(past.failed, []);
+    const row = await uploadRow(up.uploadId);
+    assert.deepEqual([row.provider_cancellation_state, row.secrets], ["UNCERTAIN", "0"], "the dead session's bearer record is purged; no answer is invented");
+    assert.ok(past.acted >= 1, "the purge is the sweep's act");
+    assert.equal(env.storage.calls("cancelResumableSession").filter((c) => c.request["sessionDigest"] === textDigest(ref)).length, attempts, "no provider call past the horizon");
+    // nothing is left to find: a second run past the horizon acts on nothing
+    assert.deepEqual([(await env.plane.sweepers.providerSessionReconciliation.sweep(later.units, 100)).acted], [0]);
+
+    // no starvation: a later agency's lapsed record is found past every agency whose lapsed cancellations were purged before it
+    // (they stay lapsed and are listed first), even by a sweep of one item
+    const t2 = await tenant(env, "r4-later");
+    const p2 = await project(env, t2);
+    const up2 = await reserve(env, t2, p2, csv("r4-later").length, "CSV");
+    const ref2 = await issue(env, t2, up2);
+    await cancel(env, t2, up2);
+    await dispatchStorageLifecycle(new Map<string, ScriptedCancellation>([[textDigest(ref2), { answer: "UNCERTAIN", sessionCancelled: false }]]));
+    assert.deepEqual([(await uploadRow(up2.uploadId)).provider_cancellation_state, (await uploadRow(up2.uploadId)).secrets], ["UNCERTAIN", "1"]);
+    const firstPage = await later.units.runSource(unbound, (uow) => uow.sources.uploads.findAgenciesWithLapsedCancellations(1));
+    assert.ok(firstPage.length === 1 && firstPage[0] !== t2.ag.agencyId, "an agency whose record was already purged comes first");
+    const paged = await env.plane.sweepers.providerSessionReconciliation.sweep(later.units, 1);
+    assert.deepEqual([paged.acted, paged.failed], [1, []]);
+    assert.deepEqual([(await uploadRow(up2.uploadId)).provider_cancellation_state, (await uploadRow(up2.uploadId)).secrets], ["UNCERTAIN", "0"]);
+  } finally {
+    await later.close();
+  }
 });

@@ -368,6 +368,37 @@ test("hidden worksheets are counted only when the agency selects them with an ac
   assert.deepEqual(acknowledged.populations, { physicalSourceRows: 14, logicalSourceRecords: 14, billableSourceUnits: 14, associationEdges: 0 });
 });
 
+test("B07-R3: a column the parser choice excludes as hidden never feeds the count — a projection whose key or fields name an excluded hidden column is refused PROJECTION_COLUMN_HIDDEN and nothing of it is counted, so a hidden formula's cached value never passes under REJECT_FORMULAS; the same projection with the hidden column included is counted under the formula policy, and a projection over the visible column counts with the hidden one excluded", { timeout: 300_000 }, async () => {
+  // column B hidden; a header row and two data rows whose B values are a formula cached as 2 and the literal 3 (the reproduction)
+  const workbook = buildWorkbook({ sheets: [{ name: "Scores", rows: [["Key", "Score"], ["k1", { f: "1+1", v: 2 }], ["k2", 3]], hiddenColumns: [[2, 2]] }] });
+  const file = await admit(workbook, "XLSX", scratch);
+  assert.deepEqual(file.detected.map((t) => [t.visibility, t.hiddenColumnCount, t.hasFormulas]), [["VISIBLE", 1, true]]);
+  const scores = tableOf(file, 0).tableId;
+  const excludingHidden: WorksheetParserChoice = { ...SHEET, formulas: "REJECT_FORMULAS", hiddenColumns: "EXCLUDE" };
+  const only = (parser: WorksheetParserChoice, projections: ReadonlyArray<ProjectionDeclaration>): SelectionManifestDocument => manifest([{ admitted: file, include: true, tables: [{ include: true, parser }] }], projections);
+
+  // the referenced entity keyed on the excluded hidden column: refused, never counted (unfixed: COMPLETE with two logical records)
+  const keyed = await evaluate([file], only(excludingHidden, [entity("SCORE", scores, "SCORE", [1], [1])]));
+  assert.equal(keyed.outcome.result, "ADMISSION_FAILED", `the excluded hidden column was counted: ${JSON.stringify(keyed.outcome.result === "COMPLETE" ? keyed.outcome.projections : keyed.outcome.failures)}`);
+  assert.deepEqual(failures(keyed.outcome), [["PROJECTION_COLUMN_HIDDEN", scores]]);
+  assert.ok(!("projections" in keyed.outcome), "no logical record of the excluded column is reported");
+  // a row projection naming the excluded hidden column among its fields: refused alike (the column is not part of the selection)
+  const fielded = await evaluate([file], only(excludingHidden, [row("ROWS", scores, "SCORE_ROW", [0, 1])]));
+  assert.deepEqual(failures(fielded.outcome), [["PROJECTION_COLUMN_HIDDEN", scores]]);
+
+  // the hidden column included by the agency's choice: the formula is a counted cell, so the formula policy decides
+  const includingHidden: WorksheetParserChoice = { ...excludingHidden, hiddenColumns: "INCLUDE" };
+  const rejecting = await evaluate([file], only(includingHidden, [entity("SCORE", scores, "SCORE", [1], [1])]));
+  assert.deepEqual(failures(rejecting.outcome), [["FORMULAS_REJECTED", scores]]);
+  const cached = complete((await evaluate([file], only({ ...includingHidden, formulas: "USE_PRESENT_CACHED_VALUES_WITH_DISCLOSURE" }, [entity("SCORE", scores, "SCORE", [1], [1])]))).outcome);
+  assert.deepEqual(cached.projections.map((p) => [p.projectionKey, p.logicalRecords]), [["SCORE", 2]], "the cache 2 and the literal 3: two distinct keys");
+
+  // the positive control: with the hidden column excluded, a projection over the visible column counts, and the hidden formula is
+  // not a counted cell (REJECT_FORMULAS passes)
+  const visible = complete((await evaluate([file], only(excludingHidden, [entity("KEY", scores, "KEY", [0], [0])]))).outcome);
+  assert.deepEqual([visible.tables.map((t) => [t.tableId, t.physicalRows]), visible.projections.map((p) => [p.projectionKey, p.logicalRecords])], [[[scores, 2]], [["KEY", 2]]]);
+});
+
 test("the counting pass counts only the admitted bytes under the agency's choices: other bytes, an unknown pricing definition, a table of an excluded file, a revoked file, a parser of the other kind, an unconfirmed key, a projection over an unselected column, an invalid association, bytes undecodable as chosen and edges beyond the ceiling are refused, never silently dropped", { timeout: 300_000 }, async () => {
   const contacts = await admit(contactsCsv(), "CSV", scratch);
   const directory = await admit(directoryCsv(), "CSV", scratch);

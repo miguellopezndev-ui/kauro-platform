@@ -14,9 +14,11 @@
 import type { UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
+  refundReturnOf,
   type AgencyId,
   type AssuranceProofId,
   type CaptureId,
+  type CaptureStatus,
   type DeliveryPhase,
   type EvidenceArtifactRef,
   type EvidenceRef,
@@ -329,20 +331,23 @@ export class PgRefundRepository implements RefundRepository {
    * Every other listed move at expectedVersion + 1: the review's rejection (the finance scope), the execution's edges (the payment
    * service). A completion first takes SELECT ... FOR SHARE of its capture row (the capture before the refund, design §6.2); its
    * update then waits for any other completion of the capture in flight (refunds_completion_order, D-REF-B7), and it publishes
-   * refund.completed.v1 with the funds state read under the row lock, the capture's remaining service basis (R2-081) and the capture's
+   * refund.completed.v1 with the funds state read under the row lock, the capture's remaining service basis (R2-081), the capture's
    * movable balance before this refund — its amount less the reported fee and the money the completions before it returned — read
-   * after that wait (D-LEDGER-B6).
+   * after that wait (D-LEDGER-B6), and what it returns from the capture: its approved components, none once the capture is REVERSED
+   * (the reversal returned them; D-LEDGER-B7, B09-R2).
    */
   async transition(refundId: RefundId, expectedVersion: number, change: RefundChange, _now: UtcInstant): Promise<VersionedWrite<RefundRecord>> {
     let fundsState: string | undefined;
+    let captureStatus: CaptureStatus | undefined;
     if (change.state === "COMPLETED") {
-      const funds = await execute<{ funds_state: string }>(
+      const funds = await execute<{ funds_state: string; status: CaptureStatus }>(
         this.ctx.db,
-        "SELECT c.funds_state FROM kauro.capture_facts c WHERE c.capture_id = (SELECT f.capture_id FROM kauro.refunds f WHERE f.refund_id = $1) FOR SHARE",
+        "SELECT c.funds_state, c.status FROM kauro.capture_facts c WHERE c.capture_id = (SELECT f.capture_id FROM kauro.refunds f WHERE f.refund_id = $1) FOR SHARE",
         [refundId],
       );
       fundsState = funds.rows[0]?.funds_state;
-      if (fundsState === undefined) throw new DomainFailure("NOT_FOUND", "the refund or its capture is not visible in this context");
+      captureStatus = funds.rows[0]?.status;
+      if (fundsState === undefined || captureStatus === undefined) throw new DomainFailure("NOT_FOUND", "the refund or its capture is not visible in this context");
     }
     const params: unknown[] = [refundId, expectedVersion, change.state];
     const sets = ["version = t.version + 1", "state = $3"];
@@ -382,7 +387,18 @@ export class PgRefundRepository implements RefundRepository {
         [record.captureId, record.refundId],
       );
       const sums = balance.rows[0];
-      extra = { fundsState, serviceBasisAfterCents: sums ? cents(sums.basis) : undefined, movableBalanceCents: sums ? cents(sums.movable) : undefined };
+      // a capture reversed before this completion returned every component no completed refund had — this refund's money
+      // included —, so the completion returns nothing more and nothing of the capture is left to take it from (D-LEDGER-B7; B09-R2)
+      const reversed = captureStatus === "REVERSED";
+      const returns = record.approved === undefined ? undefined : refundReturnOf(record.approved.amounts, captureStatus ?? "COMPLETED");
+      extra = {
+        fundsState,
+        serviceBasisAfterCents: sums ? cents(sums.basis) : undefined,
+        movableBalanceCents: reversed ? 0n : sums ? cents(sums.movable) : undefined,
+        returnedServiceCents: returns?.serviceCents,
+        returnedTaxCents: returns?.taxCents,
+        returnedExcessCents: returns?.excessCents,
+      };
     }
     await publishVersion(this.ctx, "refund", { id: record.refundId, agencyId: record.agencyId, version: record.version }, { previousState: row.previous_state, state: record.state }, refundCandidate(record, row.previous_state, extra));
     return { kind: "APPLIED", record };
@@ -397,6 +413,7 @@ interface CaseRow {
   order_id: string | null;
   capture_id: string | null;
   refund_id: string | null;
+  provider_ref: string | null;
   kind: ReconciliationCaseRecord["kind"];
   version: string;
   state: ReconciliationCaseRecord["state"];
@@ -409,7 +426,7 @@ interface CaseRow {
   resolution_code: string | null;
 }
 
-const CASE_FIELDS = ["case_id", "agency_id", "order_id", "capture_id", "refund_id", "kind", "version", "state", "detail_code", "amount_cents", "currency", "evidence_hash", "opened_at", "resolved_at", "resolution_code"];
+const CASE_FIELDS = ["case_id", "agency_id", "order_id", "capture_id", "refund_id", "provider_ref", "kind", "version", "state", "detail_code", "amount_cents", "currency", "evidence_hash", "opened_at", "resolved_at", "resolution_code"];
 const CASE_COLUMNS = CASE_FIELDS.join(", ");
 const T_CASE_COLUMNS = CASE_FIELDS.map((c) => `t.${c}`).join(", ");
 
@@ -429,6 +446,7 @@ function caseRecord(r: CaseRow): ReconciliationCaseRecord {
       orderId: optionalText(r.order_id),
       captureId: optionalText(r.capture_id),
       refundId: optionalText(r.refund_id),
+      providerRef: optionalText(r.provider_ref),
       amountCents: optionalCents(r.amount_cents),
       currency: optionalText(r.currency),
       resolvedAt: optionalInstant(r.resolved_at),
@@ -456,18 +474,19 @@ export class PgReconciliationCaseRepository implements ReconciliationCaseReposit
   constructor(private readonly ctx: CommerceWriteContext) {}
 
   /**
-   * Opens a case (payment service only), or answers the open case of the same kind and subject (reconciliation_cases_one_open): a
-   * repeated observation adds history, never a second case, and publishes nothing.
+   * Opens a case (payment service only), or answers the open case of the same kind and subject (reconciliation_cases_one_open; the
+   * subject is the order, capture, refund and — since 0019 — the provider object no local fact holds): a repeated observation adds
+   * history, never a second case, and publishes nothing.
    */
   async open(entry: NewReconciliationCase): Promise<{ readonly opened: boolean; readonly record: ReconciliationCaseRecord }> {
     const r = await execute<CaseRow>(
       this.ctx.db,
-      `INSERT INTO kauro.reconciliation_cases (case_id, agency_id, order_id, capture_id, refund_id, kind, detail_code, amount_cents, currency, evidence_hash, opened_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11)
-       ON CONFLICT (agency_id, kind, coalesce(order_id, '00000000-0000-0000-0000-000000000000'::uuid), coalesce(capture_id, '00000000-0000-0000-0000-000000000000'::uuid), coalesce(refund_id, '00000000-0000-0000-0000-000000000000'::uuid))
+      `INSERT INTO kauro.reconciliation_cases (case_id, agency_id, order_id, capture_id, refund_id, kind, detail_code, amount_cents, currency, evidence_hash, opened_at, created_at, updated_at, provider_ref)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $11, $12)
+       ON CONFLICT (agency_id, kind, coalesce(order_id, '00000000-0000-0000-0000-000000000000'::uuid), coalesce(capture_id, '00000000-0000-0000-0000-000000000000'::uuid), coalesce(refund_id, '00000000-0000-0000-0000-000000000000'::uuid), coalesce(provider_ref, ''))
          WHERE state = 'OPEN' DO NOTHING
        RETURNING ${CASE_COLUMNS}`,
-      [entry.caseId, entry.agencyId, entry.orderId ?? null, entry.captureId ?? null, entry.refundId ?? null, entry.kind, entry.detailCode, entry.amountCents ?? null, entry.currency ?? null, entry.evidenceHash, entry.openedAt],
+      [entry.caseId, entry.agencyId, entry.orderId ?? null, entry.captureId ?? null, entry.refundId ?? null, entry.kind, entry.detailCode, entry.amountCents ?? null, entry.currency ?? null, entry.evidenceHash, entry.openedAt, entry.providerRef ?? null],
     );
     const row = r.rows[0];
     if (row) {
@@ -478,8 +497,9 @@ export class PgReconciliationCaseRepository implements ReconciliationCaseReposit
     const open = await execute<CaseRow>(
       this.ctx.db,
       `SELECT ${CASE_COLUMNS} FROM kauro.reconciliation_cases
-        WHERE agency_id = $1 AND kind = $2 AND order_id IS NOT DISTINCT FROM $3::uuid AND capture_id IS NOT DISTINCT FROM $4::uuid AND refund_id IS NOT DISTINCT FROM $5::uuid AND state = 'OPEN'`,
-      [entry.agencyId, entry.kind, entry.orderId ?? null, entry.captureId ?? null, entry.refundId ?? null],
+        WHERE agency_id = $1 AND kind = $2 AND order_id IS NOT DISTINCT FROM $3::uuid AND capture_id IS NOT DISTINCT FROM $4::uuid AND refund_id IS NOT DISTINCT FROM $5::uuid
+          AND provider_ref IS NOT DISTINCT FROM $6::text AND state = 'OPEN'`,
+      [entry.agencyId, entry.kind, entry.orderId ?? null, entry.captureId ?? null, entry.refundId ?? null, entry.providerRef ?? null],
     );
     const existing = open.rows[0];
     if (!existing) throw new DomainFailure("INTEGRITY_FAILURE", "a case of this kind and subject conflicted but is not visible");

@@ -1,8 +1,8 @@
 // Web client generator (B11 design D-GEN-1; 10 "Consumer tests use the actual generated DTOs"): the web application consumes the api's
 // DTOs only through apps/web/src/api/generated.ts, produced from apps/api/openapi.json — the served operations and the
 // `x-kauro-planned` operations (a root member keyed "METHOD path" that holds operation objects an owning branch has designed and not yet
-// served; empty where nothing is planned). An operation whose principal is not a browser's (`x-kauro-principal` PROVIDER or
-// PAYMENT_SERVICE: package B09's provider webhook and the payment service's own routes) is no call the browser makes and is left out,
+// served; empty where nothing is planned). An operation whose principal is not a browser's (`x-kauro-principal` PROVIDER,
+// PAYMENT_SERVICE or COMMERCIAL_SERVICE: package B09's provider webhook, the payment service's own routes and B10's commission service routes) is no call the browser makes and is left out,
 // named in the header; an unknown principal is a failure. Dependency-free and deterministic.
 //
 //   node tools/web-client.mjs generate   writes apps/web/src/api/generated.ts
@@ -34,9 +34,13 @@ const FORMATS = new Set(["date-time"]);
 
 const isAnnotation = (key) => ANNOTATIONS.has(key) || key.startsWith("x-");
 
-/** The principals of `x-kauro-principal` (package B09): those a browser session acts as, and those whose routes no browser calls. */
-const BROWSER_PRINCIPALS = new Set(["AGENCY_MEMBER", "CORPORATE_OPERATOR"]);
-const NON_BROWSER_PRINCIPALS = new Set(["PROVIDER", "PAYMENT_SERVICE"]);
+/**
+ * The principals of `x-kauro-principal` (package B09; package B10's commercial principals since the trunk sync, D11-SYNC-1): those a
+ * browser session acts as — B10's SELLER and SELLER_OR_OWNER are persons with a bearer session — and those whose routes no browser
+ * calls (B10's COMMERCIAL_SERVICE: the commission group's service commands authenticate a verified service identity).
+ */
+const BROWSER_PRINCIPALS = new Set(["AGENCY_MEMBER", "CORPORATE_OPERATOR", "SELLER", "SELLER_OR_OWNER"]);
+const NON_BROWSER_PRINCIPALS = new Set(["PROVIDER", "PAYMENT_SERVICE", "COMMERCIAL_SERVICE"]);
 
 /** The schema with its annotations removed: exactly what the validator reads. */
 function stripSchema(node, where, failures) {

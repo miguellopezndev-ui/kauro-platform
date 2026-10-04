@@ -1,0 +1,239 @@
+{
+  "verdict": "REJECT",
+  "summary": "Reviewed all 30 B09 case rows and resolved all 99 citations to 83 distinct test titles. Found three blocking financial defects and two major defects or evidence gaps. Provider fakes and later-package responsibilities are generally disclosed correctly. However, briefs.md and verify.log are absent; authority was recovered from the vendored registry using tools/package-brief.mjs. Agreement below concerns coverage and classification, not confirmation that tests passed.",
+  "verify_observed": "verify.log is missing from the prepared workspace. Exit code, executed test counts, failures and skips are therefore unknown. No build, database or test suite was started. Read-only execution of the existing observation planner reproduced the four implementation defects below; those probes do not establish PostgreSQL test results.",
+  "cases": [
+    {
+      "id": "S057",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 111; apps/api/test/b09-scenarios.test.ts :: \"S057: a browser return naming the provider order without a server capture creates no capture and no authorization; the order reads PENDING, then CHECKING while the capture is uncertain\". Checks durable absence of capture and authority before authenticated completion. Provider simulation and B15 live-capture responsibility are disclosed."
+    },
+    {
+      "id": "S058",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 112; apps/api/test/b09-scenarios.test.ts :: \"S058: wrong amount, currency, payee, environment or signature — no authorization; each raises its exception or case and the order stays unpaid\". Meaningful route-level negative controls inspect exceptions, inbox state and authority. Provider/verifier fakes are disclosed; live verification remains B15."
+    },
+    {
+      "id": "S059",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 113; apps/api/test/b09-scenarios.test.ts :: \"S059: a reversal before the local capture observation is recorded, allocated and reversed; after delivery it revokes POST_DELIVERY; no second charge\". Exercises the named reversal phases, but omits an outstanding refund completing behind the reversal. B09-R2 demonstrates incorrect reconciliation. B08 delivery and B15 live-provider deferrals are explicit."
+    },
+    {
+      "id": "S060",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 114; apps/api/test/b09-scenarios.test.ts :: \"S060: a price-valid quote whose source expired blocks CreatePaymentOrder with SOURCE_EXPIRED; a new sealed revision of the same bytes still needs a new approval and a new quote\". Uses the real source lifecycle and new approval boundary. B10 quote issuance/repricing remains explicitly deferred."
+    },
+    {
+      "id": "R2-077",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 115; packages/persistence/test/b09-migrations.test.ts :: \"R2-077 and D-QUOTE-B1: a quote carries the exact rounded arithmetic of the registry schedule, the approved plan's own subject, its profile's reviewed rule and its snapshot's applied rate\". Together with the cited arithmetic unit test, this provides substantive integer-money and PostgreSQL constraint coverage. Execution at this commit cannot be substantiated without verify.log."
+    },
+    {
+      "id": "R2-078",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 116; apps/api/test/b09-ledger.test.ts :: \"R2-078: the FINANCE consumer posts the provider-reported fee of a capture, never the illustration; the net receivable is exact\". Ordinary fee arithmetic is covered, but B09-R2 and B09-R4 invalidate broader accounting claims. The cited balance test completes refunds before reversal; it does not test the opposite observation order. B15 statement settlement is correctly deferred."
+    },
+    {
+      "id": "R2-081",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 117; apps/api/test/b09-scenarios.test.ts :: \"R2-081: one-cent refunds through CMD031–CMD033 publish serviceBasisAfterCents down to exactly zero; the 26th approval is refused REFUND_EXCEEDS_REMAINING\". Exercises the real command sequence and checks cumulative amounts and exhausted-balance denial. Concurrent completion coverage also uses observed database lock waits. Provider simulation and B10 commission-ledger responsibility are disclosed."
+    },
+    {
+      "id": "R2-128",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 118; apps/api/test/b09-fiscal.test.ts :: \"R2-128: the FISCAL consumer drafts a blocked invoice for an unreviewed profile and a validated one for a reviewed exempt export; the capture is reconciled in both\". Contrasts reviewed and unreviewed treatment while preserving capture facts. Domain tests check that foreign attributes do not establish exemption. B15 issuance and bridge qualification remain explicit."
+    },
+    {
+      "id": "R2-140",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 119; apps/api/test/b09-scenarios.test.ts :: \"R2-140: two captures of one order through the webhook — both recorded, the second as excess with an EXCESS_CAPTURE case and refund request, a repeated delivery adds nothing, one authorization\". Demonstrates separate capture identities, excess obligation and duplicate-event suppression. Provider simulation and B10 commission accounting are disclosed."
+    },
+    {
+      "id": "CMD028-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 125; apps/api/test/cmd028-create-payment-order.test.ts :: \"OK: an AGENCY_BILLING member creates one order for an issued quote — the intent commits before the provider call, the payment service settles the provider order, one provider order, 201 with the approval page\". Inspects durable intent before dispatch and the resulting order/attempt. Fake-provider evidence is correctly separated from B15 live creation."
+    },
+    {
+      "id": "CMD028-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 126; apps/api/test/cmd028-create-payment-order.test.ts :: \"DENY (race): a source expiry committed between the intent and the capture leaves the order without authority — the capture is reconciled and no authorization is issued\"; :: \"DENY (ambiguous): a creation timeout answers 202 and the same key observes by request identity — one provider order, never a second create\". These supplement genuine tenant/role/prerequisite refusals. B08 capacity and B15 provider ambiguity are disclosed."
+    },
+    {
+      "id": "CMD028-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 127; apps/api/test/cmd028-create-payment-order.test.ts :: \"RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, a crash between the intent commit and the claim resumes to one provider order, a crash between the claim and the settle (after the provider call) observes the order by its request identity and never creates a second one, and a second key is 409 PAYMENT_PENDING\". Exercises actual transaction boundaries and checks durable state and fake call identity. B15 remains deferred."
+    },
+    {
+      "id": "CMD029-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 128; apps/api/test/cmd029-capture-payment.test.ts :: \"OK: capture through the server adapter — the payment service's settle step records the authenticated completion, the CAPTURED order and one CommercialAuthorization, and the request handler completes its journal\". Product request/service composition and database authority boundaries are exercised. Provider authentication is simulated and B15 is named."
+    },
+    {
+      "id": "CMD029-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 129; apps/api/test/cmd029-capture-payment.test.ts :: \"DENY: a foreign tenant's order is NOT_FOUND, a wrong role is NOT_AUTHORIZED, and one missing prerequisite — a browser echo naming another order, an expired price, no deliverable capacity — is refused before any call; a forged webhook and an unknown capture result create no authorization\". Its direct fake-verifier check alone is insufficient, but the additionally cited S057/S058 route tests supply meaningful forged-event and uncertainty controls. B08/B15 deferrals are explicit."
+    },
+    {
+      "id": "CMD029-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 130; apps/api/test/cmd029-capture-payment.test.ts :: \"RACE: an identical retry replays, the same key with another providerApprovalRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, and a crash between the intent commit and the claim, one between the claim and the settle (after the provider call, observed by request identity and never dispatched again) and one between the settle and the journal completion converge to one capture and one authorization; the capture response and its webhook together yield one fact; a second capture command is 409 PAYMENT_PENDING\". Meaningful crash and competing-observation tests; live identity guarantees remain B15."
+    },
+    {
+      "id": "CMD030-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 131; apps/api/test/cmd030-payment-webhook.test.ts :: \"OK: a verified capture event is stored once in the inbox and applied to its order — capture fact, CAPTURED order, authorization, inbox APPLIED with the result event\". Demonstrates capture ingress and durable application, but does not cover refund-event identity confusion in the same reconciler (B09-R1). B15 authentication remains correctly simulated."
+    },
+    {
+      "id": "CMD030-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "Map line 132; apps/api/test/cmd030-payment-webhook.test.ts :: \"DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial; an event of a foreign tenant's environment or an unknown provider reference is an exception, never applied; one missing prerequisite — a wrong payee, currency, provider or order — is its specific exception and the record REJECTED; a duplicate delivery adds no capture, posting or commission event\". Meaningful ingress and mismatch controls inspect committed effects. Commission consumption remains B10 and live authentication B15."
+    },
+    {
+      "id": "CMD030-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 133; apps/api/test/cmd030-payment-webhook.test.ts :: \"RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED, a crash between the ingress commit and the application applies the record once, and delivery racing the capture settle yields one fact\". Capture races are substantive, but the refund-webhook versus dispatch-response interleaving in B09-R1 loses a distinct financial effect."
+    },
+    {
+      "id": "CMD031-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 134; apps/api/test/cmd031-request-refund.test.ts :: \"OK: an AGENCY_BILLING member requests a refund of a paid project — REQUESTED with the proposal, delivery phase, terms hash, evidence reference and the reason stored verbatim\". Checks the product request path, stored evidence and event minimization without invoking a provider. Local classification is appropriate in principle, but execution is unverified."
+    },
+    {
+      "id": "CMD031-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 135; apps/api/test/cmd031-request-refund.test.ts :: \"DENY: a foreign tenant's project is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite (nothing refundable) is refused; a request never reaches the provider\". Uses an actual other-tenant principal, compares foreign and nonexistent responses, and checks no refund attempt or provider call. Execution is unverified."
+    },
+    {
+      "id": "CMD031-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 136; apps/api/test/cmd031-request-refund.test.ts :: \"RACE: an identical retry replays, the same key with another reasonCode is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary files nothing and the retry files it once, and a second key is 409 REFUND_REQUEST_OPEN\". Exercises rollback after writes, replay and conflicting requests with committed-state assertions. Execution is unverified."
+    },
+    {
+      "id": "CMD032-OK",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 137; apps/api/test/cmd032-approve-refund.test.ts :: \"OK: a KAURO_OWNER with a fresh step-up approves the remaining service and the tax it releases — the immutable intent with its authorization and effects hashes, refund.approved.v1 to PAYMENT_SERVICE\". Tests real owner authorization and immutable intent; adapter tests additionally enforce immutability. B12 UI is appropriately distinguished from this command. Execution is unverified."
+    },
+    {
+      "id": "CMD032-DENY",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 138; apps/api/test/cmd032-approve-refund.test.ts :: \"DENY: a refund of a foreign tenant outside the grant is NOT_FOUND, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED, and one missing prerequisite — a stale step-up, an amount above the remaining capture, a tax split the sale's rule does not release, an uncovering standing policy — is refused; nothing is approved\". Balance, segregation, tax and policy controls are substantive, but the advertised foreign-tenant check uses nonexistent/wrong-kind identifiers (B09-R5). Execution is also unverified."
+    },
+    {
+      "id": "CMD032-RACE",
+      "claimed_status": "EXECUTED_LOCAL",
+      "agree": false,
+      "note": "Map line 139; apps/api/test/cmd032-approve-refund.test.ts :: \"RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION, and an approval racing a reversal waits and is refused\". Uses real competing transactions and observed PostgreSQL waits, with meaningful loser-state assertions. Execution is unverified."
+    },
+    {
+      "id": "CMD033-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 140; apps/api/test/cmd033-execute-refund.test.ts :: \"OK: the payment service executes an approved refund once — SUBMITTING, the provider refund under the attempt's identity, COMPLETED with refund.completed.v1 to FINANCE, FISCAL, COMMISSIONS and NOTIFICATIONS\". Happy-path evidence is substantive, but B09-R1 permits incorrect provider identity and B09-R2 incorrect return postings. B10 commission adjustment and B15 live refund/credit-note issuance are disclosed."
+    },
+    {
+      "id": "CMD033-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 141; apps/api/test/cmd033-execute-refund.test.ts :: \"DENY: a refund of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202) and a second execute is refused until reconciled — one provider refund call\". Timeout/no-blind-retry controls are meaningful, but omit a previous refund blocking watchdog recovery (B09-R3). The foreign-tenant claim is also unsupported (B09-R5)."
+    },
+    {
+      "id": "CMD033-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 142; apps/api/test/cmd033-execute-refund.test.ts :: \"RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, a crash between the intent commit and the claim resumes to one provider refund, a crash between the claim and the settle (after the provider call) observes the refund by its request identity and never dispatches it again, and two executions under two keys give one claim and 409 PAYMENT_PENDING\". Tests ordinary crash recovery, but misses distinct same-amount refund observations and refund/reversal ordering (B09-R1, B09-R2)."
+    },
+    {
+      "id": "CMD034-OK",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 143; apps/api/test/cmd034-reconcile-payment.test.ts :: \"OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization and records a partial capture of the same query as an AMOUNT_MISMATCH case\". Covers capture reconciliation, but B09-R1 through B09-R4 demonstrate incorrect or missing advancement of refund, reversal and fee facts. B15 real queries are disclosed."
+    },
+    {
+      "id": "CMD034-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 144; apps/api/test/cmd034-reconcile-payment.test.ts :: \"DENY: an order of a foreign tenant is NOT_FOUND, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (no stored evidence; evidence of another order) is refused; a held or pending provider balance stays HELD and is never bank cash\". HELD-versus-bank-cash and mismatched-evidence assertions are substantive. The foreign-tenant check substitutes wrong-kind/nonexistent IDs (B09-R5). B15 settlement remains explicit."
+    },
+    {
+      "id": "CMD034-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": false,
+      "note": "Map line 145; apps/api/test/cmd034-reconcile-payment.test.ts :: \"RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry, and reconciliation racing the webhook of the same capture yields one fact\". Demonstrates database serialization for the same capture, but not the distinct refund identities or delayed refund/reversal observations that fail in B09-R1 and B09-R2."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B09-R1",
+      "severity": "BLOCKING",
+      "title": "Same-amount matching can attach an unrelated provider refund to a local attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 1339,
+      "detail": "refundFor identifies an otherwise unknown provider refund solely by capture, amount and there being one local refund in flight. Neither webhook nor order-query observations prove that this provider refund belongs to that attempt. The code consequently confirms the local attempt and completes its refund using the unrelated provider identity. When the actual dispatch response subsequently carries a different refund ID, lines 1299–1301 return NO_CHANGE without recording the additional return or an UNKNOWN_REFUND incident. A read-only planner probe reproduced both transitions.",
+      "reproduction": "Capture 97125 cents and approve a local 1000-cent refund. Have a separate 1000-cent provider refund on the same capture whose webhook is delayed. Execute the local refund and pause CMD033 at AFTER_CALL, before settlement. Deliver the separate refund's webhook. The local refund becomes COMPLETED with the separate provider ID. Resume settlement with the actual local request's different provider refund ID: it is ignored. The provider returned 2000 cents, while the local refund facts and financial events account for only 1000. Require request-identity evidence rather than amount-based attribution.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B09-R2",
+      "severity": "BLOCKING",
+      "title": "A reversal observed before its completed refund double-counts returned money",
+      "file": "packages/persistence/src/repositories/commerce-captures.ts",
+      "line": 294,
+      "detail": "The reversal subtracts only refunds already locally COMPLETED when its event is published. observation.ts processes captures before refunds at lines 808–820 and ranks CAPTURE_ADVANCE before REFUND_TRANSITION. A newly observed refund completion therefore does not reduce the reversal. commerce-refunds.ts lines 373–385 subsequently publishes the full refund using a movable balance that also ignores reversal. FINANCE posts both returns without correction. The cited balance test covers refunds completed before reversal, not this order. The planner probe emitted a 97125-cent reversal plus a 1000-cent refund for one 97125-cent capture.",
+      "reproduction": "Start with a COMPLETED 97125-cent capture, no fee, UNKNOWN funds and a SUBMITTING 1000-cent refund whose successful provider response was lost. At the provider, complete that refund and reverse the remaining 96125 cents. Reconcile a snapshot containing the REVERSED capture and COMPLETED refund. The implementation publishes return events totaling 98125 cents; after the original capture posting, PSP_RECEIVABLE is -1000 instead of zero. Delivering the reversal webhook before the delayed refund observation has the same problem. Reconciliation must account for delayed refund facts without returning the same components twice.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B09-R3",
+      "severity": "MAJOR",
+      "title": "An earlier refund prevents the watchdog from resolving a later no-effect attempt",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 825,
+      "detail": "The absence check skips an in-flight refund whenever any observed refund has the same providerCaptureId, even when that observation belongs to a different, already completed local refund. apps/api/src/payments/service-commands.ts watchAttempt obtains an order-level query, so repeated watchdog/sweep reconciliation cannot prove the later attempt had no effect. It remains SUBMITTING or UNCERTAIN and continues reserving refundable balance. A read-only planner probe produced only the previous refund's DUPLICATE observation and no transition for the expired attempt.",
+      "reproduction": "Complete refund R1 on a capture. Approve R2 on that capture and make its dispatch time out without applying, or crash after claim before dispatch. After its deadline, return an authoritative order observation with absenceIsProof=true containing R1 only. Run watchAttempt repeatedly: line 825 treats R1's capture identity as evidence for R2 and never performs provedNoEffect for R2. Reconcile refund attempts by their request/refund identity; a prior refund on the same capture must not suppress absence proof.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B09-R4",
+      "severity": "BLOCKING",
+      "title": "Provider fees learned with or after reversal are silently discarded",
+      "file": "packages/application/src/commerce/core/observation.ts",
+      "line": 971,
+      "detail": "Fee learning runs only while the resulting capture status is COMPLETED. advanceCapture also copies a newly observed fee only when advancing to COMPLETED, at line 1041. Consequently, a previously completed capture with an unknown fee loses a fee supplied with its REVERSED observation; subsequent reversed observations still cannot record it. No fee event or inconsistency incident is produced. Read-only probes reproduced both the completion-to-reversal and already-reversed cases. This is B09's provider-fact ingestion path, not the deferred B15 bank-statement comparison.",
+      "reproduction": "Record a 97125-cent COMPLETED capture with providerFeeCents absent. Reconcile a REVERSED observation reporting feeCents=5275, or first reverse it and then report that fee. The planner emits no fee update or capture.fee_observed event. The ledger returns the entire capture and records zero processor expense instead of preserving the provider's retained 5275-cent fee. Repeating the query remains a duplicate. Preserve late fee facts across terminal reversal and post them using the correct post-return balance.",
+      "status": "OPEN"
+    },
+    {
+      "id": "B09-R5",
+      "severity": "MAJOR",
+      "title": "Three advertised foreign-tenant denial checks use no foreign-tenant resource",
+      "file": "apps/api/test/cmd032-approve-refund.test.ts",
+      "line": 160,
+      "detail": "The CMD032 DENY test advertises a refund outside the tenant/grant scope, but submits a fresh nonexistent ID and the current sale's capture ID. CMD033's corresponding loop at apps/api/test/cmd033-execute-refund.test.ts:95 uses an order ID and a nonexistent ID; CMD034 at apps/api/test/cmd034-reconcile-payment.test.ts:95 uses a quote ID and a nonexistent ID. These demonstrate missing-resource/type lookup, not isolation of an existing operation belonging to another tenant. The case map nevertheless claims every denial clause demonstrated, including EXECUTED_LOCAL for CMD032-DENY. This is an evidence defect, not proof of a tenant-access vulnerability.",
+      "reproduction": "Read the three denial loops and trace their IDs: none creates or addresses an existing foreign-tenant refund/order under a conflicting scope. These assertions would still return NOT_FOUND if tenant isolation were broken but nonexistent-resource lookup remained intact. Add an actual cross-scope negative control appropriate to the global operator/service roles, or explicitly leave that clause unproven instead of labeling these checks foreign-tenant evidence.",
+      "status": "OPEN"
+    }
+  ]
+}

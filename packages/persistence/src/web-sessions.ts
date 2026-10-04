@@ -1,5 +1,5 @@
 /**
- * The web sessions of the browser boundary (B11 design D-AUTH-1; migration 0022): the store of the authentication boundary's
+ * The web sessions of the browser boundary (B11 design D-AUTH-1; migration 0025): the store of the authentication boundary's
  * runtime group (kauro_assurance), the only group with any privilege on kauro.web_sessions. Each operation is one short
  * transaction of its own on a verified connection of that group, binding transaction-locally exactly what the policies check:
  * the identity a new session belongs to (kauro.user_id) and the secret hash the caller presents (kauro.session_sha256), so a

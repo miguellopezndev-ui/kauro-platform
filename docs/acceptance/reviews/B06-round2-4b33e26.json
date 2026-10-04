@@ -1,0 +1,75 @@
+{
+  "verdict": "ACCEPT",
+  "summary": "All three prior findings are FIXED at 4b33e264db0b. No unresolved BLOCKING or MAJOR finding remains. Acceptance is limited to this re-check; the case map correctly retains 11 PARTIAL cases with dependencies on other packages.",
+  "verify_observed": "verify.log ends with 'verify exit 0'. Nine suites report 769 tests, 769 passes and zero failures, cancellations, skips or todos. All 91 distinct tests cited by the 29 B06 cases have passing entries, including the regressions for B06-R1, B06-R2 and B06-R3. Typechecking, architecture, OpenAPI, matrix and clean-consumer checks pass. No tests were rerun during this read-only review.",
+  "cases": [
+    {
+      "id": "S090",
+      "claimed_status": "EXECUTED_LOCAL (integration)",
+      "agree": true,
+      "note": "B06-R1 regressions cover checkpoint-free spending leases, expired same-owner claims, checkpoint mismatches, advancing the fence and direct SQL enforcement."
+    },
+    {
+      "id": "CMD023-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The full registry outcome is restored. Real transaction evidence is distinguished from simulated compilation and deferred B03/B08 implementation."
+    },
+    {
+      "id": "CMD025-OK",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The positive fixture now independently asserts current retention. Disclosure composition remains explicitly simulated and assigned to B08."
+    },
+    {
+      "id": "CMD025-DENY",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The new route regression rejects a still-SEALED source whose retention deadline passed, preserves state and demonstrates a current-source positive control."
+    },
+    {
+      "id": "CMD025-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The full registry outcome is restored, with simulated disclosure composition and its B08 dependency explicitly identified."
+    },
+    {
+      "id": "CMD026-RACE",
+      "claimed_status": "PARTIAL",
+      "agree": true,
+      "note": "The full registry outcome is restored. Durable withdrawal and routing evidence are distinguished from deferred B08 cancellation/reconciliation and B17 completed-stage evidence."
+    }
+  ],
+  "findings": [
+    {
+      "id": "B06-R1",
+      "severity": "BLOCKING",
+      "title": "Expired spending leases can restart without the required checkpoint",
+      "file": "packages/persistence/migrations/0006_journals_leases.sql",
+      "line": 216,
+      "detail": "FIXED. The takeover guard rejects JOB_ATTEMPT and MODEL_TASK leases that never stored a checkpoint and requires exact checkpoint equality. claim_lease checks expiry before the owner branch at line 260; every expired claim, including the former owner's, advances the fence at line 280. Checked adapter regressions at packages/persistence/test/adapters-leases.test.ts:123 and :158, plus direct SQL enforcement at packages/persistence/test/journals-leases.test.ts:332. All three pass in verify.log.",
+      "reproduction": "The regressions reproduce both earlier paths: another owner claiming an expired checkpoint-free spending lease, and the original owner claiming after expiry with a missing or incorrect checkpoint. Both now return REFUSED RESUME_WITHOUT_CHECKPOINT without changing the row. A valid stored checkpoint resumes under fence 2 and fences out fence 1.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B06-R2",
+      "severity": "BLOCKING",
+      "title": "ApprovePlan accepts sources whose retention has already expired",
+      "file": "packages/application/src/commands/handlers/approve-plan.ts",
+      "line": 95,
+      "detail": "FIXED. ApprovePlan rejects null source availability. packages/persistence/src/repositories/workspace.ts:327 computes availability after the revision transition lock using ACTIVE retention records with effective_deadline > kauro.server_now(), matching the existing availability reader. Checked apps/api/test/cmd025-approve-plan.test.ts:240: the independent oracle confirms SEALED state and lapsed retention; the route returns SOURCE_EXPIRED with no approval, event or journal, while a current source succeeds. The positive test at line 73 also independently verifies future retention. Both pass in verify.log.",
+      "reproduction": "The new regression creates a source sealed fifteen days earlier and leaves its governing retention record ACTIVE without running the sweeper. Approval now returns 422 SOURCE_EXPIRED and leaves the plan VALIDATED v4. The same approval flow on a source sealed an hour earlier returns 201.",
+      "status": "FIXED"
+    },
+    {
+      "id": "B06-R3",
+      "severity": "MAJOR",
+      "title": "Three RACE rows narrow the registry outcome and overclaim complete execution",
+      "file": "docs/design/B06-case-map.md",
+      "line": 105,
+      "detail": "FIXED. CMD023-RACE, CMD025-RACE and CMD026-RACE at lines 105, 108 and 111 now quote the complete registry outcomes and claim PARTIAL. Each identifies demonstrated concurrency effects, simulated collaborators and the packages owning the undemonstrated clauses. Compared these rows with briefs.md:80, :89 and :98. The regression at tools/test/case-map.test.mjs:87 checks registry outcome equality and consistency with each OK row; verify.log records its pass.",
+      "reproduction": "Read the three corrected RACE rows alongside their registry expectations and OK rows. Compilation, disclosure composition and cancellation/reconciliation dependencies are now retained explicitly instead of being omitted from an EXECUTED_LOCAL claim.",
+      "status": "FIXED"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { ApprovePlanView, RevisePlanView } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
-import { expireSealedRevision } from "@kauro/persistence/testing";
+import { clockAt, expireSealedRevision } from "@kauro/persistence/testing";
 import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
 import { reachedHold, retentionSweeper, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
 
@@ -71,6 +71,11 @@ function approvalBody(plan: PlanFixture, proof: string, overrides: Partial<Recor
 
 test("OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; the approval hash binds the named preimage", async () => {
   const plan = await w.approvable(w.A, projectId, "approve-ok", "CLEAR");
+  // the source is current (review finding B06-R2): SEALED, and its governing retention record ACTIVE with the deadline ahead on
+  // the database's clock — read by the superuser oracle, not by the adapter under test
+  const source = await w.row<{ revision_id: string; state: string }>("dataset_revisions", "manifest_hash = $1", [plan.revisionHash]);
+  assert.equal(source?.state, "SEALED");
+  assert.equal(await w.count("retention_records", "revision_id = $1 AND state = 'ACTIVE' AND effective_deadline > now()", [source?.revision_id]), 1, "the approved source's retention lies ahead");
   const proof = await w.stepUp(w.approver);
   const key = freshKey("cmd025-ok");
   const reply = completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, key, body: approvalBody(plan, proof) }), 201);
@@ -230,6 +235,46 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   assert.equal(await w.count("approvals"), approvalsBefore);
 });
 
+const DAY_MS = 86_400_000;
+
+test("B06-R2 DENY: a source still SEALED whose governing retention deadline has passed on the server clock — the sweeper has not expired it yet — is refused 422 SOURCE_EXPIRED: no approval, the plan still VALIDATED v4, no journal row; the same approval of a source whose retention lies ahead is 201", async () => {
+  // Review finding B06-R2: CMD025-DENY "Any changed effect, expired source or stale receipt requires new review". A source is
+  // available only while a governing retention record is ACTIVE with its effective deadline ahead on the server clock (B07
+  // D-RET-2, the SourceAvailabilityReader's rule); a revision whose deadline passed is expired whether or not the sweeper has
+  // taken retention_expires yet. The fixture stands in the past on the TEST CLOCK: the source was sealed fifteen days ago, so
+  // its UNPAID hard cap (fourteen days from the seal) passed a day ago, and no sweeper ran.
+  const lapsed = await w.h.sealedRevision(w.A, projectId, "SEALED", { base: new Date(Date.now() - 15 * DAY_MS) });
+  // independent truth (superuser oracle, the database's own clock): SEALED, one governing record, ACTIVE, deadline behind
+  assert.equal((await w.row<{ state: string }>("dataset_revisions", "revision_id = $1", [lapsed.revisionId]))?.state, "SEALED");
+  assert.equal(await w.count("retention_records", "revision_id = $1 AND state = 'ACTIVE' AND effective_deadline <= now()", [lapsed.revisionId]), 1);
+  assert.equal(await w.count("retention_records", "revision_id = $1 AND state = 'ACTIVE' AND effective_deadline > now()", [lapsed.revisionId]), 0);
+  const target = await w.targetContract(w.A, projectId);
+  const plan = await w.plan(w.A, projectId, { revisionHash: lapsed.revisionHash, targetContractHash: target.targetContractHash, seed: "b06-r2-lapsed" });
+  const proof = await w.stepUp(w.approver);
+  const key = freshKey("cmd025-b06-r2");
+  const refused = await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, key, body: approvalBody(plan, proof) });
+  assert.equal(refused.status, 422, `a SEALED source whose retention deadline passed was answered ${refused.status}: ${refused.text.slice(0, 200)}`);
+  assert.equal(outcome(w, refused), "422 SOURCE_EXPIRED -");
+  assert.deepEqual(asProblem(w, refused).nextActions, [{ action: "REQUEST_NEW_REVIEW" }]);
+  assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 0);
+  const row = await w.row<{ state: string; version: string; approval_id: string | null }>("plans", "plan_id = $1", [plan.planId]);
+  assert.deepEqual(row && { state: row.state, version: row.version, approval: row.approval_id }, { state: "VALIDATED", version: "4", approval: null });
+  assert.equal(await w.count("domain_events", "aggregate_id = $1 AND event_type = 'plan.approved.v1'", [plan.planId]), 0);
+  assert.equal(await w.journal(key), null);
+  // the command decides availability; it does not expire the source (that is the sweeper's retention_expires)
+  assert.equal((await w.row<{ state: string }>("dataset_revisions", "revision_id = $1", [lapsed.revisionId]))?.state, "SEALED");
+
+  // positive control: the same kind of plan on a source sealed an hour ago (its retention ahead) is approved through the route
+  const current = await w.revision(w.A, projectId, "SEALED", { recent: true });
+  const currentRow = await w.row<{ revision_id: string }>("dataset_revisions", "manifest_hash = $1", [current.revisionHash]);
+  assert.ok(currentRow);
+  assert.equal(await w.count("retention_records", "revision_id = $1 AND state = 'ACTIVE' AND effective_deadline > now()", [currentRow.revision_id]), 1);
+  const onCurrent = await w.plan(w.A, projectId, { revisionHash: current.revisionHash, targetContractHash: target.targetContractHash, seed: "b06-r2-current" });
+  const approved = completed<ApprovePlanView>(await call(w, { url: routes.approvePlan(onCurrent.planId), token: w.approver.token, body: approvalBody(onCurrent, proof) }), 201);
+  assert.equal(approved.data.plan.state, "APPROVED");
+  assert.equal(await w.count("approvals", "plan_id = $1 AND withdrawn_at IS NULL", [onCurrent.planId]), 1);
+});
+
 test("RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the plan VALIDATED with no approval and the same key then approves it once", async () => {
   const plan = await w.approvable(w.A, projectId, "approve-race");
   const url = routes.approvePlan(plan.planId);
@@ -356,10 +401,13 @@ async function targetRowOf(plan: PlanFixture): Promise<{ contract_id: string }> 
 /**
  * B07's retention_expires edge (the governing retention record ACTIVE -> EXPIRED, then the revision SEALED -> EXPIRED with
  * dataset_revision.expired.v1), written by the retention sweeper inside the writer's open transaction (@kauro/persistence/testing
- * expireSealedRevision). The fixture sealed the source fifteen days ago, so its UNPAID hard cap has passed and the database admits
- * the expiry (it refuses one before the governing deadline, B07 decision D-RET-2).
+ * expireSealedRevision). The source is current for the approval (sealed an hour ago, its UNPAID deadline fourteen days after the
+ * seal: review finding B06-R2); the sweeper's transaction stands on the TEST CLOCK fifteen days ahead, past that deadline, so the
+ * database admits the expiry there (it refuses one before the governing deadline, B07 decision D-RET-2) while the approval runs
+ * on the real server clock, before it.
  */
 async function expireSource(writer: HeldTransaction, revision: { revision_id: string; project_id: string }): Promise<void> {
+  await clockAt(writer.client, new Date(Date.now() + 15 * DAY_MS));
   await expireSealedRevision(writer.client, { agencyId: w.A.agencyId, projectId: revision.project_id, ownerUserId: w.A.ownerUserId, ownerMembershipId: w.A.ownerMembershipId }, revision.revision_id);
 }
 

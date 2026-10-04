@@ -32,6 +32,23 @@ const contracts = list(reg("contracts.json"));
 const machines = list(reg("state_transitions.json"));
 const screens = list(reg("screens.json"));
 
+// Amendment A5 (authority/r2/amendments/A5_CMD024_SPLIT.md, 2026-10-01): the platform commands of the two core libraries are
+// split. The core package owns the semantic half; B08 owns the transactional half. The registry stays byte-identical until the
+// next re-issue, so the brief carries the split here.
+const A5 = { B01: ["CMD024"], B03: ["CMD020", "CMD021", "CMD022"] };
+const a5Note = (id) => {
+  const cmd = id.split("-")[0];
+  const core = Object.keys(A5).find((k) => A5[k].includes(cmd));
+  if (!core || !/^CMD0\d\d-(OK|DENY|RACE)$/.test(id)) return "";
+  return pkgId === core
+    ? `
+    amendment A5: this package owns the core half only (deterministic behaviour through the public API of the clean installed package); the transactional half (tenant and role, aggregate version, idempotency, crash at the intent/commit boundary, the record persisted once in PostgreSQL) belongs to B08. Closure required here: core half tested, row PARTIAL naming B08.`
+    : pkgId === "B08"
+      ? `
+    amendment A5: B08 owns the transactional half of this case; the core half belongs to ${core}.`
+      : "";
+};
+
 const brief = {
   package: pkg,
   gates: gates.map((g) => ({ id: g.id, owner: g.owner, evidenceRule: g.evidenceRule, cases: g.caseIds })),
@@ -52,7 +69,7 @@ if (flag === "--json") {
   console.log(`\n## Cases (${brief.cases.length})`);
   for (const c of brief.cases) {
     if (c.missing) { console.log(`- ${c.id}: MISSING in the registry`); continue; }
-    console.log(`- ${c.id} [${c.gate ?? ""}] ${c.title ?? c.scenario ?? ""}\n    expected: ${c.expected ?? ""}\n    verification: ${c.verification ?? ""}`);
+    console.log(`- ${c.id} [${c.gate ?? ""}] ${c.title ?? c.scenario ?? ""}\n    expected: ${c.expected ?? ""}\n    verification: ${c.verification ?? ""}${a5Note(c.id)}`);
   }
   console.log(`\n## Commands (${commands.length})`);
   for (const c of commands) console.log(`- ${c.id} ${c.name} ${c.method} ${c.path} role=${c.role} idempotency=${c.idempotency}\n    precondition: ${c.precondition}\n    effect: ${c.effect}\n    failure: ${c.failure}${c.stateCheck ? `\n    stateCheck: ${c.stateCheck}` : ""}`);

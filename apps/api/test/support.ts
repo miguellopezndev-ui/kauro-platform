@@ -34,19 +34,19 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, CommerceRequestCollaborators, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, SessionView } from "@kauro/application";
+import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
 import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
   ArtifactRef,
+  AuditUnitOfWork,
   AssuranceProofId,
   CapabilityId,
   CausationId,
   ClientId,
   Clock,
   CommandJournal,
-  CommerceUnitOfWork,
   CommerceUnitOfWorkFactory,
   ExecutionContext,
   IdGenerator,
@@ -74,11 +74,12 @@ import {
   commercialScopeInspector,
   createBearerTokenAuthenticator,
   createIdentityTokenVerifier,
+  externalActionInspector,
   loadContractSchemas,
-  noExternalActionsInThisEdition,
   openDatabase,
   subjectOf,
   type ApiLogger,
+  type CommissionRoutesBinding,
   type DatabaseHandle,
   type PaymentService,
   type RequestUnitOfWorkFactory,
@@ -231,12 +232,12 @@ export interface UnitOfWorkStats {
 
 /**
  * Decorates the pg unit-of-work factory with the hold points and the run counter; the real adapter runs underneath. Both kinds of
- * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07). The factory is the commerce one (package
- * B09): its units of work carry the commerce repositories beside B06's, and the decoration keeps them.
+ * unit of work are decorated alike: `run` and the source lifecycle's `runSource` (B07). The factory is the audit one (package
+ * B08): its units of work carry the audit and execution stores and the commerce repositories (B09) beside B06's, and the decoration keeps them.
  */
 export function instrumentedFactory(inner: RequestUnitOfWorkFactory, holds: HoldPoints, stats: UnitOfWorkStats): RequestUnitOfWorkFactory {
   return {
-    async run<T>(context: ExecutionContext, work: (uow: CommerceUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
+    async run<T>(context: ExecutionContext, work: (uow: AuditUnitOfWork) => Promise<T>, options?: UnitOfWorkOptions): Promise<T> {
       stats.runs += 1;
       const out = await inner.run(context, (uow) => work(instrumentUnitOfWork(uow, holds)), options);
       await holds.pass("after.commit");
@@ -451,19 +452,21 @@ export interface World {
    */
   person(name: string, opts?: { readonly verified?: boolean; readonly sync?: boolean; readonly state?: "ACTIVE" | "DISABLED" }): Promise<Person>;
   /** An OPEN CLEAN project with its DRAFT revision, written through the ports under the owner's context. */
-  project(agency: AgencyFixture, clientId: ClientId): Promise<{ projectId: ProjectId; revisionId: RevisionId }>;
+  project(agency: AgencyFixture, clientId: ClientId, options?: { readonly mode?: "CLEAN" | "HUBSPOT" }): Promise<{ projectId: ProjectId; revisionId: RevisionId }>;
   /**
-   * A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. Sealed
-   * fifteen days ago unless `options.recent` (sealed about an hour ago: a source the payments workflow can still quote, B09
-   * quotes_source_binding against B07's fourteen-day UNPAID cap; the B07 + B09 merge).
+   * A revision in a final state, as B07's upload lifecycle leaves it: SEALED (default) or EXPIRED, with its manifest hash. A SEALED
+   * revision is a current source: sealed about an hour ago, its UNPAID retention (fourteen days from the seal) ahead — what an
+   * approval (CMD025, review finding B06-R2) and a quote (B09 quotes_source_binding) require; `options.recent` states it
+   * explicitly (the B07 + B09 merge). An EXPIRED revision was sealed fifteen days ago and taken through retention_expires. A
+   * test that needs a SEALED revision whose retention has lapsed seals it in the past itself (Harness.sealedRevision `base`).
    */
-  revision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly recent?: boolean }): Promise<{ revisionId: RevisionId; revisionHash: Sha256Hex }>;
+  revision(agency: AgencyFixture, projectId: ProjectId, state?: "SEALED" | "EXPIRED", options?: { readonly recent?: boolean; readonly billableSourceUnits?: number }): Promise<{ revisionId: RevisionId; revisionHash: Sha256Hex }>;
   /** A target contract as B08's observation/confirmation leaves it: confirmed and current (default) or superseded. */
-  targetContract(agency: AgencyFixture, projectId: ProjectId, opts?: { readonly superseded?: boolean }): Promise<{ contractId: string; targetContractHash: Sha256Hex }>;
+  targetContract(agency: AgencyFixture, projectId: ProjectId, opts?: { readonly superseded?: boolean; readonly mode?: "CLEAN" | "HUBSPOT" }): Promise<{ contractId: string; targetContractHash: Sha256Hex }>;
   /** A plan revision at VALIDATION_REQUIRED (v2) or VALIDATED (v4, receipt bound), whose subjects name the given hashes. */
   plan(agency: AgencyFixture, projectId: ProjectId, subjects: { readonly revisionHash: Sha256Hex; readonly targetContractHash: Sha256Hex; readonly seed: string; readonly state?: "VALIDATION_REQUIRED" | "VALIDATED"; readonly intent?: "SET" | "CLEAR"; readonly storedBodyHash?: Sha256Hex }): Promise<PlanFixture>;
-  /** A complete approvable subject: sealed revision (recently when `options.recent`), confirmed target contract and a VALIDATED plan naming both. */
-  approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR", options?: { readonly recent?: boolean }): Promise<PlanFixture>;
+  /** A complete approvable subject: a current sealed revision (World.revision), confirmed target contract and a VALIDATED plan naming both. */
+  approvable(agency: AgencyFixture, projectId: ProjectId, seed: string, intent?: "SET" | "CLEAR", options?: { readonly recent?: boolean; readonly billableSourceUnits?: number; readonly mode?: "CLEAN" | "HUBSPOT" }): Promise<PlanFixture>;
   /** A step-up proof of the person: fresh (issued now) or stale (issued twenty minutes ago). */
   stepUp(person: Person, freshness?: "FRESH" | "STALE"): Promise<AssuranceProofId>;
   /** Runs statements as the runtime role under the agency owner's tenant context (direct writes for fixtures and negative controls). */
@@ -535,6 +538,8 @@ export interface IdentityFixture {
 }
 
 export interface WorldOptions {
+  /** Wraps the api's request unit-of-work factory (the B10 failure cells route a command's unit over a harness connection; test/fault-support.ts). */
+  readonly wrapUnitOfWork?: <F extends object>(inner: F) => F;
   /** Replaces or extends the collaborators before the server is built. */
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
   /** The clock the api (authorizer, handlers) runs on; the world's movable process clock by default. */
@@ -546,6 +551,10 @@ export interface WorldOptions {
    * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
    */
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
+  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader; test/sales-support.ts). */
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader };
+  /** Package B10 (CMD027 CreateQuote): the collaborators the api binds beyond the edition's (the buyer type fake, the replacement hold, a re-binder). */
+  readonly quotes?: (h: Harness) => Partial<QuoteCollaborators>;
   /**
    * Package B09 (stage-2 integration): the payment service the api binds (ApiAssembly.payments), built over the harness and the
    * api's verified request-handler pool before the server is assembled — so one api serves the B06 routes, the request side and the
@@ -557,6 +566,23 @@ export interface WorldOptions {
   readonly sessions?: boolean;
   /** The api's logger (silent by default): a test that inspects what the api logs passes a sink here. */
   readonly logger?: ApiLogger;
+  /**
+   * Package B10 (mandate B10-STATEMENTS-PAYOUTS): the commission group's service routes the api binds (ApiAssembly.commissions: the
+   * commission service's units of work, the labelled banking-calendar and payout-evidence fakes, the service commands' hold), built over
+   * the harness before the server is assembled and closed by stop() after the server, before the database (test/statements-support.ts).
+   */
+  readonly commissions?: (h: Harness, db: DatabaseHandle) => Promise<{ readonly binding: CommissionRoutesBinding; close(): Promise<void> }>;
+  /**
+   * Package B08 (mandate B08-COMMANDS-AUDIT): the cores the api binds (ApiAssembly.cores) — the labelled contract fake of the
+   * Intelligence core's plan compiler (SIMULATED). Absent: none, as a deployment of this edition runs (CORE_SERVICES_UNAVAILABLE).
+   */
+  readonly cores?: CoreServices;
+  /**
+   * The plan services the api itself binds: the decision artifacts of migration 0023, the patch compiler over `cores` and the real
+   * disclosure composer (package B08; edition.ts) — the test's deterministic plan services (`w.plans`) are then not handed to the
+   * assembly. Absent: the test plan services, which every B06 acceptance test binds.
+   */
+  readonly realPlanServices?: boolean;
 }
 
 export interface RawEvent {
@@ -613,6 +639,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: commercialScopeInspector };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
   const payments = options.payments !== undefined ? await options.payments(h, db) : null;
+  const commissions = options.commissions !== undefined ? await options.commissions(h, db) : null;
 
   const base: B06Collaborators = {
     abuseLimiter: createAdmissionLimiter(),
@@ -628,22 +655,29 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     externalActions: {
       async completedForPlan(uow, planId) {
         await holds.pass("collaborator");
-        return noExternalActionsInThisEdition.completedForPlan(uow, planId);
+        return externalActionInspector.completedForPlan(uow, planId);
       },
     },
     commercialConsequences: commercialConsequencesInspector,
   };
-  const collaborators = options.collaborators ? options.collaborators(base) : base;
+  const configured = options.collaborators ? options.collaborators(base) : base;
+  // the edition's own plan services replace the test's when asked: the three are left out, so the composition binds its defaults
+  const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
+  const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
   const app = assembleApi({
     environment: "LOCAL",
-    unitOfWork: instrumentedFactory(db.unitOfWork, holds, stats),
+    unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,
     sources,
     ...(options.commerce !== undefined ? { commerce: options.commerce(h) } : {}),
+    ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    ...(options.quotes !== undefined ? { quotes: options.quotes(h) } : {}),
     ...(payments !== null ? { payments: payments.service } : {}),
+    ...(commissions !== null ? { commissions: commissions.binding } : {}),
+    ...(options.cores !== undefined ? { cores: options.cores } : {}),
     validator,
     clock: apiClock,
     ids,
@@ -747,7 +781,9 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     hubspotCapabilityId,
     person,
 
-    async project(agency, clientId) {
+    async project(agency, clientId, projectOptions = {}) {
+      const mode = projectOptions.mode ?? "CLEAN";
+      const capabilityId = mode === "HUBSPOT" ? hubspotCapabilityId : cleanCapabilityId;
       const context = h.tenant(agency.agencyId, agency.ownerUserId);
       return h.app.run(context, async (uow) => {
         const projectId = uow.ids.next() as ProjectId;
@@ -756,24 +792,27 @@ export async function world(options: WorldOptions = {}): Promise<World> {
           projectId,
           agencyId: agency.agencyId,
           clientId,
-          mode: "CLEAN",
+          mode,
           purpose: "Quarterly cleanup",
-          capabilityId: cleanCapabilityId,
+          capabilityId,
           capabilityVersion: "R2-INITIAL",
           initialRevisionId: revisionId,
+          ...(mode === "CLEAN" ? {} : { targetInstanceRef: ids.next() as never }),
           createdByMembershipId: agency.ownerMembershipId,
           createdAt: clock.now(),
         });
         const actor = { kind: "USER", userId: agency.ownerUserId } as const;
-        await uow.events.publish({ aggregateKind: "project", aggregateId: projectId, aggregateVersion: project.version, agencyId: agency.agencyId, eventType: "project.created.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: context.correlationId, payload: { projectId, agencyId: agency.agencyId, clientId, mode: "CLEAN", capabilityId: cleanCapabilityId, capabilityVersion: "R2-INITIAL", initialRevisionId: revisionId, createdByMembershipId: agency.ownerMembershipId } });
+        await uow.events.publish({ aggregateKind: "project", aggregateId: projectId, aggregateVersion: project.version, agencyId: agency.agencyId, eventType: "project.created.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: context.correlationId, payload: { projectId, agencyId: agency.agencyId, clientId, mode, capabilityId, capabilityVersion: "R2-INITIAL", initialRevisionId: revisionId, createdByMembershipId: agency.ownerMembershipId } });
         await uow.events.publish({ aggregateKind: "dataset_revision", aggregateId: revisionId, aggregateVersion: revision.version, agencyId: agency.agencyId, eventType: "dataset_revision.created.v1", actor, causationId: uow.ids.next() as CausationId, correlationId: context.correlationId, payload: { revisionId, agencyId: agency.agencyId, projectId, state: revision.state } });
         return { projectId, revisionId };
       });
     },
 
     async revision(agency, projectId, state = "SEALED", options = {}) {
-      // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED)
-      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state, options.recent === true ? { base: new Date(Date.now() - RECENT_SEAL_MS) } : {});
+      // born DRAFT and walked along the listed DatasetRevision edges (the database refuses a revision born SEALED or EXPIRED); a
+      // SEALED source is current (its retention ahead), an EXPIRED one was sealed fifteen days ago and swept
+      const recent = options.recent ?? state === "SEALED";
+      const { revisionId, revisionHash } = await h.sealedRevision(agency, projectId, state, { ...(recent ? { base: new Date(Date.now() - RECENT_SEAL_MS) } : {}), ...(options.billableSourceUnits !== undefined ? { billableSourceUnits: options.billableSourceUnits } : {}) });
       return { revisionId, revisionHash };
     },
 
@@ -783,8 +822,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
       await w.asTenant(agency, async (c) => {
         await c.query(
           `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, superseded_at, created_at)
-           VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', $9, now())`,
-          [contractId, agency.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), opts.superseded ? new Date() : null],
+           VALUES ($1, $2, $3, $10, $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', $9, now())`,
+          [contractId, agency.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), opts.superseded ? new Date() : null, opts.mode ?? "CLEAN"],
         );
       });
       return { contractId, targetContractHash };
@@ -854,7 +893,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async approvable(agency, projectId, seed, intent = "SET", options = {}) {
       const source = await w.revision(agency, projectId, "SEALED", options);
-      const target = await w.targetContract(agency, projectId);
+      const target = await w.targetContract(agency, projectId, options.mode === undefined ? {} : { mode: options.mode });
       return w.plan(agency, projectId, { revisionHash: source.revisionHash, targetContractHash: target.targetContractHash, seed, state: "VALIDATED", intent });
     },
 
@@ -928,6 +967,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     async stop() {
       await app.close();
       if (payments !== null) await payments.close();
+      if (commissions !== null) await commissions.close();
       await db.close();
       await h.stop();
     },

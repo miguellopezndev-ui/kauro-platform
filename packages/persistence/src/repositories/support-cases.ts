@@ -1,5 +1,5 @@
 /**
- * Support cases over `pg` (B11 CMD044; migration 0023, D-SUP-6). A case belongs to one agency and to one of its projects: the
+ * Support cases over `pg` (B11 CMD044; migration 0026, D-SUP-6). A case belongs to one agency and to one of its projects: the
  * composite foreign keys refuse another agency's project or membership, and the tenant policy hides other agencies' rows, so the
  * repository relies on both instead of re-checking ownership in code.
  *

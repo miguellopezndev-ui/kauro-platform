@@ -84,3 +84,27 @@ B15: live providers. B16: DeletionReceipt.
 Both: architecture gate 8 packages, 23 edges, no violation; OpenAPI 39 operations served, 0 planned; matrix 28 machines, 252
 edges and initial states owned, 20 commands, 16 reads, 1 intake; clean-consume green. The Windows run began at `818ec51`; the
 one later commit changes `packages/persistence/README.md` only. The next commit adds this section only.
+
+## Review fixes merge
+
+The package-close review (amendment A4) of `integration/b07-b09` @ `0f15636` rejected both packages. Its fixes were made on
+`fix/b07-review` (`f7dbd91`, R1..R4, design §19 "Review findings") and `fix/b09-review` (`f2e800d`, R1..R5, design §17 "Review findings").
+Both branches start at `0f15636`; they were merged into `integration/b07-b09` one after the other (`3c4e2d4`, `9edc844`) with no conflict.
+Not pushed; not merged into `main`.
+
+| check after the two merges | result |
+|---|---|
+| migrations | B07 added none; B09 adds `0019_unknown_refund_cases.sql` (a second open case per capture and provider reference); the list in `migrations.test.ts` carries it, 0001..0019 applied from empty |
+| generated documents | `pnpm run matrix:generate` writes the file the auto-merge of both branches produced (no diff); `pnpm run openapi` matches 39 operations, the new `GENERATION_NOT_OBSERVED` reason included |
+| case maps | separate files, no overlap: B07 12 EXECUTED_LOCAL / 11 PARTIAL / 0 MISSING (CMD012 rows of the first merge untouched); B09's rows as its branch left them |
+| findings | B07-R1..R4, B09-R1..R5: every test fails on `0f15636` and passes here (each branch's own table names the test and its commit) |
+
+Verification, `pnpm install --frozen-lockfile` then `pnpm run verify` (Windows at `9edc844`, Linux at `10f2091`, whose only difference is this record; the lockfile did not change):
+
+| host | result | tests (pass / skip) |
+|---|---|---|
+| Windows 11, `C:\Tools\pgsql17\bin` | VERIFY_EXIT 0 | contracts 12, domain 107, application 126, persistence 218, authorization 11, data-plane 13, control 17, api 205 + 1 skipped (B06's Linux-only test), tools 41; 0 failed |
+| WSL Ubuntu 24.04, fresh clone, `PGBIN=/usr/lib/postgresql/17/bin` | VERIFY_EXIT 0 | the same counts, api 206 and 0 skipped; 0 failed; clone removed, 0 postgres processes left |
+
+Both: architecture gate 8 packages, 23 edges, no violation; OpenAPI 39 operations served, 0 planned; matrix 28 machines, 252 edges
+and initial states owned, 20 commands, 16 reads, 1 intake; clean-consume green.

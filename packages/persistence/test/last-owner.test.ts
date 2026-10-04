@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
+import { handled } from "../src/testing/harness.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 import { agency, bind, event, member, person, sqlState, tx, type AgencyFixture, type Person } from "./support.js";
 
@@ -64,7 +65,7 @@ test("two owners removing each other: one transition commits, the other is refus
     // T2 (bob) revokes alice: the membership boundary (re-check finding N11) reads bob's own authority after bob's transition
     // lock, so T2 waits for T1; once T1 committed, bob is no longer an owner and has no authority to remove anyone. Either way
     // the invariant is serialized and one valid owner remains (R2-043); the last-owner refusal itself is the next test's race.
-    const t2 = revoke(c2, ag, bob, ag.ownerMembershipId, 1);
+    const t2 = handled(revoke(c2, ag, bob, ag.ownerMembershipId, 1));
     await waitForLockWait(pid2);
     await c1.query("COMMIT");
     await assert.rejects(t2, (e: unknown) => sqlState(e) === "KA010");
@@ -103,7 +104,7 @@ test("two owners leaving at once (each revoking their own ownership while readin
     }
     // each actor keeps its own authority to the end: the only shared fact is the owner count on the agency row
     await revoke(c1, ag, gail, ag.ownerMembershipId, 1);
-    const t2 = revoke(c2, ag, hugo, hugoMembership, 2);
+    const t2 = handled(revoke(c2, ag, hugo, hugoMembership, 2));
     await waitForLockWait(pid2);
     await c1.query("COMMIT");
     await assert.rejects(t2, (e: unknown) => sqlState(e) === "KA001");

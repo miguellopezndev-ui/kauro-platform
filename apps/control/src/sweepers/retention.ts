@@ -1,9 +1,9 @@
 /**
- * RETENTION (docs/design/B07-upload-source-lifecycle.md §12.5; decisions D-RET-1..3, D-EXP-1, D-PERS-3, D-SEAL-1, D-CLOCK-1, D-CTRL-8; 09
- * "Retention schedule": unpaid sources no later than fourteen days from sealing; HASHING "Retention formulas": nothing resets a hard
- * clock; registry RetentionRecord: "a record expires no earlier than its effective deadline").
+ * RETENTION (docs/design/B07-upload-source-lifecycle.md §12.5; decisions D-RET-1..3, D-EXP-1, D-PERS-3, D-SEAL-1, D-CLOCK-1, D-CTRL-8,
+ * D-HOLD-3; 09 "Retention schedule": unpaid sources no later than fourteen days from sealing; HASHING "Retention formulas": nothing
+ * resets a hard clock; registry RetentionRecord: "a record expires no earlier than its effective deadline").
  *
- * Three edges, each decided by the database clock and never early (the database refuses an early one, D-EXP-1):
+ * Four steps, each decided by the database clock and never early (the database refuses an early one, D-EXP-1):
  * 1. ACTIVE records past their effective deadline → EXPIRED (effective_deadline_reached; retention_record.expired.v1);
  * 2. sealed files whose including revisions hold no ACTIVE record ahead → admission revoked RETENTION_EXPIRED (D-RET-3: a SUPERSEDED
  *    revision, which never expires itself, does not keep the bytes admitted and reusable), with the deletion of the accepted
@@ -11,11 +11,18 @@
  * 3. SEALED revisions with no ACTIVE record ahead, and REJECTED revisions whose every intake window closed → EXPIRED
  *    (retention_expires; dataset_revision.expired.v1 → STORAGE_LIFECYCLE, EXECUTION_CONTROL, AUTHORITY_JOURNAL). A REJECTED revision
  *    keeps its rejection's reason: a revision's terminal facts are set once (D-PERS-3, re-check residual FINAL-N2).
- * Records first, then files, then revisions, so an expired revision's accepted bytes are already released when its event is handled.
+ * 4. the seal holds (B07-R1; decisions D-HOLD-1..D-HOLD-3): a hold still INTENDED past its attempt bound — a seal that crashed between
+ *    its provider hold and its commit — is abandoned (CLOSED, ABANDONED), and every object whose holds nothing needs any more (no
+ *    attempt in flight, no seal retaining it: its file's admission ended) is released at the provider under this run's claim and the
+ *    answer recorded under it; a release claimed by another caller is left to it, and one whose claim lapsed unanswered is claimed
+ *    again (D-HOLD-3; an answer under a superseded claim records nothing). A sealed file's own hold is released in step 2,
+ *    by the deletion of its accepted generation (the provider refuses to delete a held generation), when its retention ends.
+ * Records first, then files, then revisions, then holds, so an expired revision's accepted bytes are already released when its event
+ * is handled, and a hold is released in the run that ended what needed it.
  */
 import type { ObjectStoragePort, SourceSweeper } from "@kauro/application";
 import type { RetentionRecordRow, SourceUnitOfWorkFactory } from "@kauro/domain";
-import { executeDeletion } from "../storage-work.js";
+import { executeDeletion, releaseObjectHolds } from "../storage-work.js";
 import { applied, boundTo, isAfter, publish } from "../work.js";
 import { SweepRun, type SweepResult, type SweeperDependencies } from "./sweep.js";
 
@@ -32,6 +39,10 @@ export interface RetentionSweepResult extends SweepResult {
   readonly recordsExpired: number;
   readonly filesRevoked: number;
   readonly revisionsExpired: number;
+  /** Seal holds abandoned past their attempt bound (a crash between the hold and the commit). */
+  readonly holdsAbandoned: number;
+  /** Objects whose seal holds were released at the provider and recorded. */
+  readonly holdsReleased: number;
 }
 
 export class RetentionSweeper implements SourceSweeper {
@@ -134,6 +145,35 @@ export class RetentionSweeper implements SourceSweeper {
       );
       if (done) revisionsExpired += 1;
     }
-    return { examined, acted: recordsExpired + filesRevoked + revisionsExpired, failed: run.failures, recordsExpired, filesRevoked, revisionsExpired };
+    // 4. seal holds: an attempt that never ended is abandoned past its bound; what nothing needs any more is released (D-HOLD-3)
+    const abandoned = await units.runSource(run.discovery, (uow) => uow.sources.holds.findAbandoned(limit));
+    examined += abandoned.length;
+    let holdsAbandoned = 0;
+    for (const found of abandoned) {
+      const item = run.itemFor(found.agencyId);
+      if (await run.attempt(found.holdId, () => units.runSource(boundTo(item), (uow) => uow.sources.holds.abandon(found.holdId)))) holdsAbandoned += 1;
+    }
+    const releasable = await units.runSource(run.discovery, (uow) => uow.sources.holds.findReleasable(limit));
+    examined += releasable.length;
+    let holdsReleased = 0;
+    for (const found of releasable) {
+      const item = run.itemFor(found.agencyId);
+      const released = await run.attempt(found.objectId, async () => {
+        const outcome = await releaseObjectHolds(this.deps.storage, units, item, found.objectId);
+        if (outcome.kind === "PENDING") throw Object.assign(new Error("the provider release of a seal hold did not complete"), { name: "HoldReleasePending", code: outcome.cause });
+        return outcome.kind === "RELEASED";
+      });
+      if (released) holdsReleased += 1;
+    }
+    return {
+      examined,
+      acted: recordsExpired + filesRevoked + revisionsExpired + holdsAbandoned + holdsReleased,
+      failed: run.failures,
+      recordsExpired,
+      filesRevoked,
+      revisionsExpired,
+      holdsAbandoned,
+      holdsReleased,
+    };
   }
 }

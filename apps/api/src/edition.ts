@@ -5,22 +5,26 @@
  *
  * - `activeWorkInspector`: the retained active work of a client is its open projects (D-CMD-3) and — since package B09 — the
  *   live commercial authorizations of its projects (`commercialInspectionsOf(uow).liveAuthorizationsOfClient`, B09 D-INSP-B1),
- *   read in the command's own unit of work under its tenant policies; jobs extend the summary with package B08, so their count is
- *   the zero of an edition in which the ProcessingJob aggregate does not exist (07 "Aggregate ownership").
- * - `noExternalActionsInThisEdition`: CMD026 identifies completed external actions separately (import stages, delivered
- *   packages). No ImportStage or PackageVersion aggregate exists in the B06 schema, so the set is empty by construction.
+ *   read in the command's own unit of work under its tenant policies; since package B08 the summary's `activeJobs` is the count of
+ *   the live processing jobs of the client's projects (`executionReadsOf(uow).activeJobsOfClient`, B08 D8-XPKG-3: reported, never a
+ *   decision, CMD010 retains the work).
+ * - `externalActionInspector`: CMD026 identifies completed external actions separately (import stages, delivered packages). Since
+ *   package B08 the delivered packages of the plan are read from its own tables (`executionReadsOf(uow).deliveredPackagesForPlan`,
+ *   PACKAGE_DELIVERED, never promised reversible); no import stage exists in this edition, so IMPORT_STAGE_* facts are never named.
  * - `commercialConsequencesInspector`: CMD023 revising an APPROVED plan checks the edge guard "Commercial/execution
  *   consequences are reconciled" (registry Plan machine). The facts that could be unreconciled are a Quote, a PaymentOrder, a
  *   CommercialAuthorization or a ProcessingJob resting on the approval (07 "Aggregate ownership"). Package B09 binds its own:
  *   the plan's live quotes, the open payment orders of those quotes and its non-revoked commercial authorizations
- *   (`commercialInspectionsOf(uow).unreconciledForPlan`, B09 D-INSP-B1; the re-check's residual FINAL-N3); B08 adds its jobs
- *   through the same port.
- * - `unavailablePlanServices`: CMD023 and CMD025 need the typed patch compiler and the disclosure composer. Until their
- *   packages bind real adapters the routes answer INTEGRITY_FAILURE / PLAN_SERVICES_UNAVAILABLE inside the unit of work
- *   (rolled back, no journal row, no effect): 07 "Command outcomes and error taxonomy" — integrity failure is a distinct,
- *   nonretryable outcome "until the subject or implementation changes"; 07 "Acceptance obligations" — "a downstream team must
- *   not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" — a local result is never
- *   presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md.
+ *   (`commercialInspectionsOf(uow).unreconciledForPlan`, B09 D-INSP-B1; the re-check's residual FINAL-N3); since package B08 the
+ *   plan's live jobs are named through the same port, after B09's facts (`executionReadsOf(uow).unreconciledJobsForPlan`, D8-XPKG-3).
+ * - `planServices`: CMD023 and CMD025 need the typed patch compiler and the disclosure composer, and CMD023 the artifact resolver. Since
+ *   package B08 the edition binds all three: the decision artifacts of migration 0023 (@kauro/persistence decisionArtifactResolver), the
+ *   patch compiler over the Intelligence core's plan compiler (`patchCompilerOver`) and the real disclosure composer (D8-CMA-6). A
+ *   deployment that binds no adapter of the core (ApiAssembly.cores absent) answers INTEGRITY_FAILURE / CORE_SERVICES_UNAVAILABLE for
+ *   CMD022 and CMD023 inside the unit of work (rolled back, no journal row, no effect): 07 "Command outcomes and error taxonomy" -
+ *   integrity failure is a distinct, nonretryable outcome "until the subject or implementation changes"; 07 "Acceptance obligations" -
+ *   "a downstream team must not fill a missing domain rule with a local guess"; 21 "Gate aliases and scoped closures" - a local
+ *   result is never presented as live readiness. Decision I-INT-2 in docs/design/B06-domain-db-authz.md, refined by D8-CMA-5.
  * - `commercialScopeInspector` (B07 port, bound by the B07 + B09 merge): CMD012's impact map names the live commercial
  *   authorizations bound to the revision it replaces (docs/design/B07-upload-source-lifecycle.md §17 item 7; B09 design §15 item 6):
  *   the replaced revision's manifest hash read in CMD012's own source unit of work (B07's source store), then package B09's
@@ -40,6 +44,8 @@ import type {
   CommerceRequestQueries,
   CommercialConsequenceInspector,
   CommercialScopeInspector,
+  CoreServices,
+  DeliveryCapacityPort,
   DisclosureComposer,
   ExternalActionInspector,
   PlanPatchCompiler,
@@ -47,28 +53,28 @@ import type {
   SourceAvailabilityReader,
   SourceLineageReader,
 } from "@kauro/application";
-import { DomainFailure } from "@kauro/domain";
-import { commerceRequestReadsOf, commercialAuthorizationsOf, commercialInspectionsOf, commercialSourceReadsOf, purchasedSubjectsOf, sourceStoreOf } from "@kauro/persistence";
+import { disclosureComposer, patchCompilerOver } from "@kauro/application";
+import { commerceRequestReadsOf, commercialAuthorizationsOf, commercialInspectionsOf, commercialSourceReadsOf, decisionArtifactResolver, executionReadsOf, purchasedSubjectsOf, sourceStoreOf } from "@kauro/persistence";
 
 export const activeWorkInspector: ActiveWorkInspector = {
   async inspectClient(uow, clientId) {
     return {
       openProjects: await uow.endClients.countOpenProjects(clientId),
-      activeJobs: 0,
+      activeJobs: await executionReadsOf(uow).activeJobsOfClient(clientId),
       liveCommercialAuthorizations: await commercialInspectionsOf(uow).liveAuthorizationsOfClient(clientId),
     };
   },
 };
 
-export const noExternalActionsInThisEdition: ExternalActionInspector = {
-  async completedForPlan() {
-    return [];
+export const externalActionInspector: ExternalActionInspector = {
+  async completedForPlan(uow, planId) {
+    return executionReadsOf(uow).deliveredPackagesForPlan(planId);
   },
 };
 
 export const commercialConsequencesInspector: CommercialConsequenceInspector = {
   async unreconciledForPlan(uow, planId) {
-    return commercialInspectionsOf(uow).unreconciledForPlan(planId);
+    return [...(await commercialInspectionsOf(uow).unreconciledForPlan(planId)), ...(await executionReadsOf(uow).unreconciledJobsForPlan(planId))];
   },
 };
 
@@ -93,33 +99,22 @@ export const sourceLineageReader: SourceLineageReader = {
   replacementOf: (uow, request) => commercialSourceReadsOf(uow).replacementOf(request),
 };
 
-function unavailable(service: string): DomainFailure {
-  return new DomainFailure("INTEGRITY_FAILURE", `${service} is not bound in this edition of the api`, { reason: "PLAN_SERVICES_UNAVAILABLE" });
-}
-
 export interface PlanServices {
   readonly artifacts: ArtifactResolver;
   readonly patchCompiler: PlanPatchCompiler;
   readonly disclosures: DisclosureComposer;
 }
 
-export function unavailablePlanServices(): PlanServices {
+/**
+ * The plan services of this edition over the cores it is composed with (D8-CMA-5, D8-CMA-6): the artifacts are the platform's own decision
+ * artifacts, the patch compiler is the core's plan compiler (an unbound core refuses inside the unit of work, D8-PORT-1) and the
+ * disclosure composer is computed from records alone.
+ */
+export function planServices(cores: CoreServices): PlanServices {
   return {
-    artifacts: {
-      async resolveDecisionPatch() {
-        throw unavailable("ArtifactResolver");
-      },
-    },
-    patchCompiler: {
-      async apply() {
-        throw unavailable("PlanPatchCompiler");
-      },
-    },
-    disclosures: {
-      async compose() {
-        throw unavailable("DisclosureComposer");
-      },
-    },
+    artifacts: decisionArtifactResolver,
+    patchCompiler: patchCompilerOver(cores),
+    disclosures: disclosureComposer,
   };
 }
 
@@ -146,12 +141,23 @@ export const commerceRequestQueries: CommerceRequestQueries = {
 };
 
 /**
+ * B08's deliverable capacity (D8-XPKG-4, D8-CAP-2): checkout never sells into a hidden queue, so B09's DeliveryCapacityPort answers from the
+ * agency's live-job ledger, the same three-live-jobs bound ExecuteProject enforces (@kauro/persistence executionReadsOf). It binds PLATFORM: the
+ * reading is the platform's own database, never a contract fake.
+ */
+export const deliveryCapacity: DeliveryCapacityPort = {
+  binding: "PLATFORM",
+  checkoutCapacity: (uow, request) => executionReadsOf(uow).checkoutCapacity({ agencyId: request.agencyId }),
+};
+
+/**
  * The payment collaborators of this edition (D-REQ-B1). It binds what it owns — the reads of its own database — and names what it
  * does not: the payment provider adapter and the payment service's pool arrive with the integration package (B15) and the payment
  * service's composition (ApiAssembly.payments: the composition root then takes both from the bound payment service, D-INT2-B3);
  * without them CreatePaymentOrder and CapturePayment answer INTEGRITY_FAILURE PROVIDER_SERVICES_UNAVAILABLE inside the unit of work
- * with nothing written; B08's admission is not bound, so deliverable capacity is "unanswered" and checkout answers
- * CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE (D-CAP-B1); B07's source availability is the platform's own
+ * with nothing written; deliverable capacity is B08's own since its commands are served (deliveryCapacity, D8-XPKG-4: the agency's
+ * live-job ledger), and a deployment that leaves the binding out still answers CAPACITY_UNAVAILABLE DELIVERY_CAPACITY_UNAVAILABLE
+ * (D-CAP-B1); B07's source availability is the platform's own
  * (sourceAvailabilityReader, bound since the B07 + B09 merge). A deployment, and the tests, bind the rest through ApiAssembly.commerce;
  * nothing here is a fake (D-FAKE-B1: no production wiring binds one).
  */
@@ -162,7 +168,7 @@ export function commerceEdition(): CommerceRequestCollaborators {
     provider: null,
     subjects: purchasedSubjectReader,
     queries: commerceRequestQueries,
-    capacity: null,
+    capacity: deliveryCapacity,
     sources: sourceAvailabilityReader,
   };
 }

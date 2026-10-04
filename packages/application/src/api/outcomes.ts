@@ -18,6 +18,8 @@
  * it with RESPONSE_CONTRACT_VIOLATION and the sink receives the violation under the correlation id.
  */
 import type { B06CommandId } from "../commands/contracts.js";
+import { AUDIT_COMMAND_OUTCOMES, AUDIT_INTAKE_OUTCOMES, AUDIT_ROUTE_OUTCOMES, CORE_SERVICES_UNAVAILABLE } from "../audit/outcomes.js";
+import { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "../execution/outcomes.js";
 import { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "../sources/outcomes.js";
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "./outcome-kit.js";
 import type { IntakeOperationId, ReadOperationId, ServedCommandId } from "./response-schemas.js";
@@ -30,7 +32,6 @@ const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, N
 
 const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is not visible to the caller's agency`);
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
-const PLAN_SERVICES = outcome("COMMAND", "INTEGRITY_FAILURE", "PLAN_SERVICES_UNAVAILABLE", "the plan services this command needs are not bound in this edition (I-INT-2)");
 const BODY_DIGEST = outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)");
 /** The text a support case would keep looks like a secret or customer records: 422, and the next action is the secure upload (B11 D-SUP-2). */
 const CONTENT_REFUSED: ReadonlyArray<ProblemOutcome> = Object.freeze([
@@ -80,7 +81,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_EFFECT_NOT_PERMITTED", "the typed patch asks for an effect the plan does not permit, or would move the plan's source, target or policy (N10)", { fieldCodes: ["PATCH_EFFECT_NOT_PERMITTED"] }),
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_MALFORMED", "the typed patch is not a patch document", { fieldCodes: ["PATCH_MALFORMED"] }),
     BODY_DIGEST,
-    PLAN_SERVICES,
+    CORE_SERVICES_UNAVAILABLE,
   ],
   CMD025: [
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "no step-up proof, or not a step-up proof"),
@@ -99,7 +100,6 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "SOURCE_EXPIRED", null, "the plan's source revision of its own project is no longer SEALED (N9)"),
     outcome("COMMAND", "TARGET_STALE", null, "the plan's target contract of its own project is not confirmed and current (N4, N9)"),
     BODY_DIGEST,
-    PLAN_SERVICES,
   ],
   CMD026: [
     NOT_VISIBLE("the plan"),
@@ -148,6 +148,8 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
   CMD044: catalogueOf("CMD044"),
+  ...EXECUTION_COMMAND_OUTCOMES,
+  ...AUDIT_COMMAND_OUTCOMES,
 });
 
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
@@ -192,11 +194,14 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   PreviewTable: SOURCE_ROUTE_OUTCOMES.PreviewTable,
   ListSupportCases: readCatalogueOf("ListSupportCases"),
   GetSupportCase: readCatalogueOf("GetSupportCase"),
+  GetJob: EXECUTION_ROUTE_OUTCOMES.GetJob,
+  GetAudit: AUDIT_ROUTE_OUTCOMES.GetAudit,
 });
 
-/** The closed problem catalogue of each served document intake (B07 D-SEL-2). */
+/** The closed problem catalogue of each served document intake (B07 D-SEL-2; B08 D8-PLAN-1). */
 export const INTAKE_OUTCOMES: Readonly<Record<IntakeOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   SubmitSelectionManifest: SOURCE_ROUTE_OUTCOMES.SubmitSelectionManifest,
+  SubmitDecisionArtifact: AUDIT_INTAKE_OUTCOMES.SubmitDecisionArtifact,
 });
 
 /**

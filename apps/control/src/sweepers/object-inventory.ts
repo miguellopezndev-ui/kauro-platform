@@ -13,16 +13,23 @@
  *    RESIDUAL for good; it never enters a revision);
  * 2. every generation the provider still holds soft-deleted that the registry does not know: recorded with the expiry the provider
  *    reports (PROVIDER_REPORTED, D-OBJ-2);
- * 3. every admitted file's accepted generation (a discovery read of ids and generations only): missing at the provider →
+ * 3. every sealed hold whose re-assertion is owed (B07-R1, second re-check; decision D-HOLD-2) — the seal's own after its commit was
+ *    never recorded although the attempt bound passed, or it found the generation not live: re-asserted at the provider (the
+ *    idempotent placement under the generation precondition, then a re-observation of the generation and its hold flag; a hold missing
+ *    on the live generation placed again) and the finding recorded; a generation that is not live is handed to the revocation of step
+ *    4 at once, for exactly that file — never a silent success;
+ * 4. every admitted file's accepted generation (a discovery read of ids and generations only): missing at the provider →
  *    GENERATION_MISSING, another live generation under its name → GENERATION_CHANGED — the admission is revoked
- *    (source_file.admission_revoked.v1) and, for a missing one, its registry row is closed by an absence check.
+ *    (source_file.admission_revoked.v1, naming every revision that selected or sealed the file) and, for a missing one, its registry
+ *    row is closed by an absence check.
  */
-import type { ObjectStoragePort, SourceSweeper, StorageLocation } from "@kauro/application";
+import { reassertHold, type ObjectStoragePort, type SourceSweeper, type StorageLocation } from "@kauro/application";
 import {
   isUuidV7,
   zonePrefix,
   type AdmissionRevocationReason,
   type AgencyId,
+  type HoldReassertionId,
   type ProjectId,
   type RevisionId,
   type SourceFileId,
@@ -30,6 +37,7 @@ import {
   type StorageZone,
   type StoredObjectId,
   type StoredObjectRecord,
+  type UnconfirmedSealedHold,
   type UploadId,
 } from "@kauro/domain";
 import { executeDeletion, locationOf, requestAndDelete } from "../storage-work.js";
@@ -49,6 +57,8 @@ export interface ObjectInventoryResult extends SweepResult {
   readonly residualsDeleted: number;
   readonly softDeletedRecorded: number;
   readonly admissionsRevoked: number;
+  /** Sealed holds re-asserted at the provider and their finding recorded (D-HOLD-2). */
+  readonly holdsReasserted: number;
 }
 
 /** The scope an opaque object name states (D-OBJ-1: the zone and two to five canonical UUIDs; the second is the owning agency). */
@@ -107,7 +117,22 @@ export class ObjectInventory implements SourceSweeper {
         }
       }
     }
-    // 3. admitted generations the provider no longer holds as admitted
+    // 3. sealed holds whose re-assertion is owed: re-asserted and recorded; a generation not live revoked at once (D-HOLD-2)
+    let holdsReasserted = 0;
+    const unconfirmed = await units.runSource(run.discovery, (uow) => uow.sources.holds.findUnconfirmed(limit));
+    for (const found of unconfirmed) {
+      examined += 1;
+      const item = run.itemFor(found.agencyId);
+      let revoked = false;
+      const done = await run.attempt(found.holdId, async () => {
+        const result = await this.#reassert(units, item, found);
+        if (result === "GENERATION_NOT_LIVE") revoked = await this.#checkAdmitted(units, item, { fileId: found.fileId, originRevisionId: found.originRevisionId, acceptedObjectId: found.objectId, providerGeneration: found.generation });
+        return true;
+      });
+      if (done) holdsReasserted += 1;
+      if (revoked) admissionsRevoked += 1;
+    }
+    // 4. admitted generations the provider no longer holds as admitted
     for (let after: SourceFileId | undefined, first = true; first || after !== undefined; first = false) {
       const page = await units.runSource(run.discovery, (uow) => uow.sources.files.admittedGenerations({ limit, ...(after === undefined ? {} : { after }) }));
       after = page.length === limit ? page[page.length - 1]?.fileId : undefined;
@@ -117,7 +142,24 @@ export class ObjectInventory implements SourceSweeper {
         if (done) admissionsRevoked += 1;
       }
     }
-    return { examined, acted: residualsDeleted + softDeletedRecorded + admissionsRevoked, failed: run.failures, residualsDeleted, softDeletedRecorded, admissionsRevoked };
+    return { examined, acted: residualsDeleted + softDeletedRecorded + admissionsRevoked + holdsReasserted, failed: run.failures, residualsDeleted, softDeletedRecorded, admissionsRevoked, holdsReasserted };
+  }
+
+  /**
+   * One owed re-assertion of a sealed hold (D-HOLD-2): re-asserted at the provider and recorded as OBJECT_INVENTORY's finding. A
+   * provider that does not answer or confirm leaves it owed (a failure of this run; the next run comes back).
+   */
+  async #reassert(units: SourceUnitOfWorkFactory, item: WorkItem, found: UnconfirmedSealedHold): Promise<"HELD" | "GENERATION_NOT_LIVE"> {
+    const object = await units.runSource(boundTo(item), (uow) => uow.sources.objects.get(found.objectId));
+    if (object === null) throw Object.assign(new Error("the object of a sealed hold is not visible"), { name: "HoldReassertionPending" });
+    const reasserted = await reassertHold(this.deps.storage, locationOf(object), object.objectName, found.generation);
+    if (reasserted === null) throw Object.assign(new Error("the provider did not confirm the sealed hold"), { name: "HoldReassertionPending" });
+    // a HELD finding records the metageneration observed with the hold: the hold's latest incarnation, which its release names (D-HOLD-4)
+    const metageneration = reasserted.result === "HELD" ? reasserted.metageneration : undefined;
+    await units.runSource(boundTo(item), (uow) =>
+      uow.sources.holds.recordReassertion({ reassertionId: uow.ids.next() as HoldReassertionId, holdId: found.holdId, result: reasserted.result, reassertedBy: "OBJECT_INVENTORY", ...(metageneration === undefined ? {} : { metageneration }) }),
+    );
+    return reasserted.result;
   }
 
   /** One live generation: known, the object of a settled intent, or unregistered (registered RESIDUAL and deleted). */

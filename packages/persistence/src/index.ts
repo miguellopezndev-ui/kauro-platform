@@ -22,13 +22,22 @@ export {
   MigratorRoleError,
 } from "./migrations/runner.js";
 export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, ApplyResult, MigratorConnection, LedgerEntry, SchemaCompatibility } from "./migrations/runner.js";
-export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, commerceReplayOf, COMMERCE_REPLAY_CONSTRAINTS, COMMERCE_INTEGRITY_CONSTRAINTS } from "./sqlstate.js";
+export { COMMERCIAL_UNIQUE_FAILURES } from "./sqlstate.js";
+export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, EXECUTION_CONSTRAINT_FAILURES, AUDIT_CONSTRAINT_FAILURES, commerceReplayOf, COMMERCE_REPLAY_CONSTRAINTS, COMMERCE_INTEGRITY_CONSTRAINTS } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
 export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf } from "./unit-of-work.js";
+// processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
+export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecutionUnitOfWork, executionReadsOf } from "./unit-of-work.js";
+export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
+export type { ExecutionWriteContext, CheckoutCapacity } from "./execution/index.js";
+// audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §9, §10)
+export { createAuditUnitOfWorkFactory, PgAuditUnitOfWorkFactory, PgAuditUnitOfWork, auditReadsOf, decisionArtifactResolver } from "./unit-of-work.js";
+export { PgAuditStore, PgAuditReads, PgAuditDiscovery, modelTaskJournalOf } from "./audit/index.js";
+export type { AuditWriteContext, ResolvedDecisionPatch, ModelTaskJournalBinding, PgModelTaskJournal } from "./audit/index.js";
 export type { UnitOfWorkDependencies, CommercePools } from "./unit-of-work.js";
 export { ConstraintViolation, LeaseRefusal, translateDatabaseError } from "./sql.js";
 export { PgEventPublisher } from "./event-publisher.js";
@@ -47,6 +56,7 @@ export {
   PgUploadSessionRepository,
   PgSessionSecretRepository,
   PgStoredObjectRepository,
+  PgObjectHoldRepository,
   PROVIDER_SOFT_DELETED_REASON,
   PgInspectionReceiptRepository,
   PgSourceFileRepository,
@@ -88,3 +98,36 @@ export type { RequestTransitionSubject } from "./repositories/commerce-request-r
 // the seams of the B07 + B09 merge: the source lifecycle's answers to the payments workflow (docs/design/B07-B09-merge.md)
 export { PgCommercialSourceReads } from "./source/commercial-reads.js";
 export type { CommercialSourceAvailability, CommercialSourceLineage } from "./source/commercial-reads.js";
+// package B10 (docs/design/B10-commercial-domain.md; mandate B10-ADAPTERS-RECURRENCE): the commercial unit of work and the recurrence and founding adapters
+export { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory, createCommercialUnitOfWorkFactory, recurrenceOf, foundingOf } from "./commercial-unit-of-work.js";
+export type { CommercialDependencies } from "./commercial-unit-of-work.js";
+export { PgRecurrenceRepository } from "./repositories/commercial-recurrence.js";
+export { PgFoundingRepository } from "./repositories/commercial-founding.js";
+export { PgFoundingOfferReader } from "./repositories/commercial-offer.js";
+export type { FoundingOffer } from "./repositories/commercial-offer.js";
+// the sales and attribution records of package B10 (mandate B10-ADAPTERS-SALES; docs/design/B10-commercial-domain.md §5, §11): the
+// SalesRepository and AttributionRepository adapters, the CommercialPrincipalReader, and their accessors over a unit of work
+export { PgSalesRepository, PgCommercialPrincipalReader } from "./repositories/commercial-sales.js";
+export type { SellerPrincipalFacts, OwnerGrantFacts } from "./repositories/commercial-sales.js";
+export { PgAttributionRepository } from "./repositories/commercial-attribution.js";
+export { salesOf, attributionOf, commercialPrincipalsOf } from "./commercial-sales-access.js";
+export { agencyOrderPrecedesClaim } from "./commercial-prospect-access.js";
+// the commission ledger, periods, statements and payouts of package B10 (mandate B10-ADAPTERS-LEDGER; docs/design/B10-commercial-domain.md
+// section 6, 7, 11): the CommissionLedgerRepository and StatementRepository adapters, their accessors over a unit of work and the platform
+// bindings of the recorded ports (D10-BIND-1)
+export { PgCommissionLedgerRepository } from "./repositories/commercial-ledger.js";
+export { PgStatementRepository } from "./repositories/commercial-statements.js";
+export { ledgerOf, statementsOf } from "./commercial-ledger-access.js";
+export { RecordedBankingCalendarSource, AuthorizationDeliveryCompletionSource, AUTHORIZATION_DELIVERY_EVIDENCE_DOMAIN } from "./commercial-bindings.js";
+export type { RecordedCalendarVersion, RecordedCompletion } from "./commercial-bindings.js";
+// the agency lifecycle of package B10 (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-commercial-domain.md §4, §8.1, §11): the published
+// agreement versions and acceptances CMD002 records, the closure CMD043 records with its obligations inventory, the relationship decisions
+// of R2-141, and the accessor over a unit of work
+export { PgAgencyLifecycleRepository } from "./repositories/commercial-agency-lifecycle.js";
+export { agencyLifecycleOf } from "./commercial-agency-access.js";
+// CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
+export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
+// the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):
+// what its sweeps find across agencies before each item is settled in a unit of work that adopts the item's agency
+export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.js";
+export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";

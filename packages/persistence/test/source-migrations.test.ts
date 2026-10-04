@@ -32,6 +32,7 @@ import {
   type SourceFixtureSessions,
   type TemporaryPostgres,
 } from "../src/testing/index.js";
+import { handled } from "../src/testing/harness.js";
 import { agency, endClient, event, ids, member, offeredCapability, person, processingAuthority, project, sha, tx, type AgencyFixture, type Context } from "./support.js";
 
 let pg: TemporaryPostgres;
@@ -436,7 +437,8 @@ function registryEnum(contract: string, field: string): string[] {
 const B07_TABLES = [
   "stored_objects", "storage_location_policies", "revision_quota", "upload_capacity", "upload_sessions", "upload_session_secrets",
   "inspection_receipts", "source_files", "source_tables", "source_table_columns", "selection_manifests", "selection_evaluations", "sealed_manifests",
-  "sealed_revision_files", "retention_anchor_kinds", "retention_anchors", "retention_records",
+  "sealed_revision_files", "retention_anchor_kinds", "retention_anchors", "retention_records", "object_holds", "object_hold_releases",
+  "object_hold_reassertions",
 ];
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -691,7 +693,7 @@ test("R2-052: two reservations that each fit alone serialize on the revision; on
   try {
     await reserveIn(app, t, projectId, revisionId, 1.5 * GB);
     // the second request, checked alone, fits (0 + 2e9 <= 5e9 in its snapshot); the database decides on the committed ledger
-    const second = reserveIn(app2, t, projectId, revisionId, 2 * GB);
+    const second = handled(reserveIn(app2, t, projectId, revisionId, 2 * GB));
     try {
       await waitForLockWait(su, APP_NAME, "INSERT INTO kauro.upload_sessions");
       // while the second waits, the first reserves another 2e9 (1.5e9 + 2e9 = 3.5e9 fits) and commits
@@ -728,7 +730,7 @@ test("an agency holds two concurrent upload sessions: the third is refused by th
   await hold(app2, as(t));
   try {
     await reserveIn(app, t, p2.projectId, p2.revisionId, 10);
-    const racing = reserveIn(app2, t, p3.projectId, p3.revisionId, 10);
+    const racing = handled(reserveIn(app2, t, p3.projectId, p3.revisionId, 10));
     try {
       await waitForLockWait(su, APP_NAME, "INSERT INTO kauro.upload_sessions");
     } finally {
@@ -834,7 +836,7 @@ test("D-LOCK-2 (B07-F14): a cancellation and an inspection outcome of the same r
     await app.query("SELECT 1 FROM kauro.dataset_revisions WHERE revision_id = $1 FOR NO KEY UPDATE", [b.revisionId]);
     await cancelUpload(app, t, b.uploadId, 5);
     await hold(control2, { agencyId: t.ag.agencyId });
-    const admission = admitIn(control2, t, b, "601", 64);
+    const admission = handled(admitIn(control2, t, b, "601", 64));
     try {
       await waitForLockWait(su, CONTROL_NAME, "FROM kauro.dataset_revisions");
     } finally {
@@ -1228,7 +1230,7 @@ test("a reservation and a revision transition are ordered by the revision row: a
   try {
     await cancelRevision(app2, t, first.revisionId);
     await hold(app, as(t));
-    const late = reserveIn(app, t, first.projectId, first.revisionId, 10);
+    const late = handled(reserveIn(app, t, first.projectId, first.revisionId, 10));
     try {
       await waitForLockWait(su, APP_NAME, "INSERT INTO kauro.upload_sessions");
     } finally {
@@ -1288,7 +1290,7 @@ test("a seal and an intake-expiry revocation of its file are ordered by the file
   try {
     await sealStatements(app, scopeOf(t, p1.projectId), ready1, new Date(ready1.initiatedAt.getTime() + 600_000));
     await hold(control2, { agencyId: t.ag.agencyId });
-    const revocation = revokeIn(control2, t, ready1.fileId, "INTAKE_EXPIRED");
+    const revocation = handled(revokeIn(control2, t, ready1.fileId, "INTAKE_EXPIRED"));
     try {
       await waitForLockWait(su, CONTROL_NAME, "UPDATE kauro.source_files");
     } finally {
@@ -1308,7 +1310,7 @@ test("a seal and an intake-expiry revocation of its file are ordered by the file
   try {
     await revokeIn(control2, t, ready2.fileId, "INTAKE_EXPIRED");
     await hold(app, as(t));
-    const seal = sealStatements(app, scopeOf(t, p2.projectId), ready2, new Date(ready2.initiatedAt.getTime() + 600_000));
+    const seal = handled(sealStatements(app, scopeOf(t, p2.projectId), ready2, new Date(ready2.initiatedAt.getTime() + 600_000)));
     try {
       await waitForLockWait(su, APP_NAME, "INSERT INTO kauro.sealed_revision_files");
     } finally {

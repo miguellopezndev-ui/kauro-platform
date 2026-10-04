@@ -98,6 +98,12 @@ export interface InMemoryStore {
   projects: Map<string, ProjectRecord>;
   supportCases: Map<string, SupportCaseRecord>;
   revisions: Map<string, DatasetRevisionRecord>;
+  /**
+   * The effective deadline of the governing retention record of a SEALED revision, by revision id (the source lifecycle's
+   * retention records, reduced to what CMD025 reads: a SEALED revision is available while its deadline lies ahead of the clock;
+   * no entry, no availability — review finding B06-R2).
+   */
+  retentionDeadlines: Map<string, UtcInstant>;
   targetContracts: Map<string, TargetContractRecord>;
   plans: Map<string, PlanRecord>;
   planBodies: Map<string, PlanBody>;
@@ -121,6 +127,7 @@ export function emptyStore(): InMemoryStore {
     projects: new Map(),
     supportCases: new Map(),
     revisions: new Map(),
+    retentionDeadlines: new Map(),
     targetContracts: new Map(),
     plans: new Map(),
     planBodies: new Map(),
@@ -546,7 +553,10 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       },
       async lockSealedByHash(agencyId, projectId, revisionHash) {
         if (tenantId() !== agencyId) return null;
-        return [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.projectId === projectId && r.manifestHash === revisionHash) ?? null;
+        const revision = [...s.revisions.values()].find((r) => r.agencyId === agencyId && r.projectId === projectId && r.manifestHash === revisionHash);
+        if (revision === undefined) return null;
+        const deadline = s.retentionDeadlines.get(revision.revisionId);
+        return { ...revision, availableUntil: revision.state === "SEALED" && deadline !== undefined && Date.parse(deadline) > clock.nowMs() ? deadline : null };
       },
     },
     targetContracts: {

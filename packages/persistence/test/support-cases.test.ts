@@ -1,4 +1,4 @@
-// Support cases on real PostgreSQL 17 (B11 W4, migration 0023, D-SUP-6): the table's guards are proven by the forbidden write
+// Support cases on real PostgreSQL 17 (B11 W4, migration 0026, D-SUP-6): the table's guards are proven by the forbidden write
 // performed as the runtime role that would perform it, beside the legitimate write that still commits (21 "Positive and
 // negative symmetry"), and the repository is proven through a real unit of work.
 import assert from "node:assert/strict";
