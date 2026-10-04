@@ -66,6 +66,8 @@ export const SQLSTATE = Object.freeze({
   PAYOUT_LINES_NOT_PAYABLE: "KC018",
   // package B10 (migration 0037, B10G-R1): a line payable through a second live statement
   PAYABLE_OWNER: "KC019",
+  // package B10 (migration 0040, B10G-R7 r2): a payout's step-up expired before its COMMIT
+  STEP_UP_EXPIRED: "KC020",
   // package B10 (migration 0028): the agency closure residuals the lifecycle adapter surfaces (docs/design/B10-commercial-domain.md §12)
   CLOSURE_RESIDUALS_OPEN: "KC006",
   // package B08 (migrations 0021..0023; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1): the fence of an attempt or a step, the
@@ -147,6 +149,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   // a PAYABLE line itemized payable, or taken over, by a statement other than its owner's correcting one (0037): never written by the
   // commands, so the database refusing it is an integrity failure
   KC019: { code: "INTEGRITY_FAILURE" },
+  // a payout whose step-up expired between its writes and its COMMIT (0040, D10-GAP-14): the approval's own outcome for a stale proof
+  KC020: { code: "ASSURANCE_REQUIRED", reason: "STEP_UP_STALE" },
   // CLOSING -> CLOSED while a payment, refund, authorization, tax document or reconciliation case of the agency is open (D10-AGY-4)
   KC006: { code: "PRECONDITION_FAILED", reason: "CLOSURE_RESIDUALS_OPEN" },
   // package B08 (D8-SQL-1): the control plane treats a lost fence as "the attempt or step lost" (DONE); a lost authority refuses the

@@ -713,6 +713,51 @@ faultCell(
   },
 );
 
+// --- 11b. PAY_REV (the step-up window at COMMIT), Codex r2 B10G-R7 ----------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "PAY_REV",
+    step: "CMD052 ApproveCommissionPayout, the owner's step-up proof expiring between the approval's writes and its COMMIT",
+    fault: "expiry",
+    expect:
+      "EXPIRY: a step-up proof fresh at the intent and APPROVED writes that expires before ApproveCommissionPayout commits refuses the approval at COMMIT 403 ASSURANCE_REQUIRED STEP_UP_STALE and writes nothing: the database judges the freshness again at COMMIT",
+  },
+  async (ctx) => {
+    const [st] = await takeIssued(1);
+    await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
+    const api = sw.w.processClock;
+    // a proof of the owner fresh now (issued 14 minutes ago on the api clock) that expires one minute from now
+    const proof = await sw.h.recordStepUp(sw.owner.userId as UserId, { issuedAt: new Date(api.nowMs() - 14 * 60_000).toISOString() as never });
+    const expiresAt = (await rows<{ expires_at: Date }>(sw, "SELECT expires_at FROM kauro.assurance_proofs WHERE proof_id = $1", [proof]))[0]!.expires_at.toISOString();
+    const body = { expectedVersion: st!.version, payeeRef: st!.s.destinationId, authorizationRef: proof };
+    ctx.deadline(expiresAt, "the step-up proof's expiry");
+    const conn = await open("kauro_app_test");
+    try {
+      const pause = ctx.points.pause("uow.before-commit");
+      const reply = await ctx.operation("the approval, its database clock moved past the proof's expiry before its COMMIT", async (op) => {
+        const running = approveOn(ctx, conn, st!, { body });
+        await pause.reachedBy(running);
+        // the writes are done and the proof was fresh at both
+        const fresh = await conn.query<{ fresh: boolean }>("SELECT kauro.effect_now() < $1::timestamptz AS fresh", [expiresAt]);
+        assert.equal(fresh.rows[0]!.fresh, true, "the proof is fresh when the approval reaches its COMMIT");
+        // the controlled clock crosses the expiry and the approving transaction's database clock stands there
+        ctx.clock.past(expiresAt, 1_000);
+        await op.clock.onServer(conn);
+        const crossed = await conn.query<{ crossed: boolean }>("SELECT kauro.effect_now() > $1::timestamptz AS crossed", [expiresAt]);
+        assert.equal(crossed.rows[0]!.crossed, true, "the database clock crossed the proof's expiry before the COMMIT");
+        pause.release();
+        return running;
+      });
+      assert.equal(outcome(sw.w, reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "a proof expired at COMMIT authorizes nothing");
+    } finally {
+      await conn.end();
+    }
+    assert.equal(await intentCount(st!.statementId), 0, "no intent was written");
+    assert.equal(await statementState(st!.statementId), "ISSUED");
+  },
+);
+
 // --- 12. PAY_REV (the step-up window), Codex r1 B10G-R7 ------------------------------------------------------------------------------
 // Last in the file: it moves the api's process clock forward past a proof's expiry, which no later cell of this file may inherit.
 
