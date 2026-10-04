@@ -134,7 +134,7 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(options: { readonly requestSide?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"] } = {}): Promise<PaymentWorld> {
+export async function paymentWorld(options: { readonly requestSide?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"] } = {}): Promise<PaymentWorld> {
   const providerClock = movableClock();
   const paypal = createPayPalContractFake({ clock: providerClock });
   const verifier = createWebhookVerifierFake({ clock });
@@ -171,6 +171,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean; re
           },
           ...(options.commissions !== undefined ? { commissions: options.commissions } : {}),
           ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+          ...(options.wrapUnitOfWork !== undefined ? { wrapUnitOfWork: options.wrapUnitOfWork } : {}),
         }
       : {},
   );

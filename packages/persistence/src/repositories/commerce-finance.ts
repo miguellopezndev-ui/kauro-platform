@@ -44,7 +44,7 @@ import {
   type TaxTreatment,
   type VersionedWrite,
 } from "@kauro/domain";
-import { execute, instant, int, optionalInstant, optionalText, type Queryable } from "../sql.js";
+import { execute, instant, int, lockPayoutCash, optionalInstant, optionalText, type Queryable } from "../sql.js";
 import { cents, defined, publishVersion, staleOf, type CommerceWriteContext } from "./commerce-shared.js";
 
 type Candidate = Readonly<Record<string, string | number | bigint | boolean | null | undefined>>;
@@ -433,6 +433,8 @@ export class PgSettlementRepository implements SettlementRepository {
 
   /** Platform-level (the payment service with no agency adopted); append-only; bank-available cash needs bank evidence. */
   async record(s: SettlementRecord): Promise<SettlementRecord> {
+    // a newer observation lands under the payout cash basis lock: an approval holding the old basis commits first, or reads the new one (D10-GAP-1)
+    await lockPayoutCash(this.ctx.db);
     const r = await execute<SettlementRow>(
       this.ctx.db,
       `INSERT INTO kauro.settlements (settlement_id, route_id, provider_balance_ref, currency, gross_cents, fee_cents, held_cents, withdrawn_cents, bank_available_cents, bank_evidence_hash, fx_rate, period_start, period_end, observed_at, evidence_hash, created_at)

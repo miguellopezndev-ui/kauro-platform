@@ -113,3 +113,13 @@ export function money(v: unknown): string {
 export function withOptional<T extends object, K extends string, V>(base: T, key: K, value: V | undefined): T & Partial<Record<K, V>> {
   return value === undefined ? base : { ...base, [key]: value };
 }
+
+/**
+ * The one lock of the payout cash basis (D10-GAP-1): the bank-available cash of the latest bank-evidenced settlement and the unsettled
+ * authorized intents are ONE quantity every writer of either takes first, transaction-scoped, so a coverage check and the write it
+ * licenses see one basis. CMD052 takes it after its statement's row lock to read the cash; CMD053 takes it after the statement's row
+ * lock before an intent leaves the unsettled set; B09's settlement record takes it before a newer observation lands.
+ */
+export async function lockPayoutCash(client: Queryable): Promise<void> {
+  await execute(client, "SELECT pg_advisory_xact_lock(hashtextextended('kauro.payout-cash', 0))");
+}

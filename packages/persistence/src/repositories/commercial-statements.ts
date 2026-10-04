@@ -78,7 +78,7 @@ import {
   type CompletionKind,
   type CompletionSource,
 } from "@kauro/domain";
-import { execute, int, type Queryable } from "../sql.js";
+import { execute, int, lockPayoutCash, type Queryable } from "../sql.js";
 import { calendarDate, canonical, centsOrZero, defined, instantOf, money, optionalInstantOf, optionalMoney, optionalString, staleRow } from "./commercial-ledger-rows.js";
 
 // --- calendars and periods ------------------------------------------------------------------------------------------------------------
@@ -873,6 +873,8 @@ export class PgStatementRepository implements StatementRepository {
   // --- payouts -------------------------------------------------------------------------------------------------------------------------
 
   async payoutCash(): Promise<PayoutCash> {
+    // one basis for the coverage check and the intent it licenses (D10-GAP-1): the caller holds its statement's row lock
+    await lockPayoutCash(this.db);
     const bank = await execute<{ bank_available_cents: string }>(
       this.db,
       "SELECT bank_available_cents FROM kauro.settlements WHERE bank_evidence_hash IS NOT NULL ORDER BY observed_at DESC, settlement_id DESC LIMIT 1",
@@ -917,6 +919,8 @@ export class PgStatementRepository implements StatementRepository {
     const owner = await execute<{ statement_id: string }>(this.db, "SELECT statement_id FROM kauro.payout_intents WHERE intent_id = $1", [intentId]);
     if (owner.rows[0] === undefined) throw new DomainFailure("NOT_FOUND", "the payout intent is not visible in this context");
     await this.lockStatementRow(owner.rows[0].statement_id);
+    // the intent leaves (or re-enters) the unsettled set under the cash basis lock (D10-GAP-1)
+    await lockPayoutCash(this.db);
     // SETTLED, FAILED and RETURNED keep the evidence of the matching reconciliation recorded for that kind (the database checks it at COMMIT)
     const r = await execute<IntentRow>(
       this.db,

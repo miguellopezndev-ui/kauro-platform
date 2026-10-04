@@ -463,6 +463,8 @@ export interface World {
 }
 
 export interface WorldOptions {
+  /** Wraps the api's request unit-of-work factory (the B10 failure cells route a command's unit over a harness connection; test/fault-support.ts). */
+  readonly wrapUnitOfWork?: <F extends object>(inner: F) => F;
   /** Replaces or extends the collaborators before the server is built. */
   readonly collaborators?: (base: B06Collaborators) => B06Collaborators;
   /** The clock the api (authorizer, handlers) runs on; the world's movable process clock by default. */
@@ -572,7 +574,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
   const app = assembleApi({
     environment: "LOCAL",
-    unitOfWork: instrumentedFactory(db.unitOfWork, holds, stats),
+    unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
     collaborators,

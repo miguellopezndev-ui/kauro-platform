@@ -26,6 +26,7 @@ import { ROLES, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller
 import { proposeCommissionClose } from "@kauro/application";
 import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, type CommissionPools, type CommissionService } from "../src/index.js";
 import { CommissionHolds, approvedPlan, captureOf, checkoutOf, purchase, recordSyntheticSchedule, sellingAgency, statedQuote, type CommissionWorld, type Purchase, type Selling } from "./commission-support.js";
+import { FaultRouting } from "./fault-support.js";
 import { paymentWorld, serviceToken, type PaymentWorld } from "./payment-support.js";
 import { call, clock, freshKey, ids, movableClock, sha, type Person, type Reply, type World, type WorldOptions } from "./support.js";
 
@@ -123,6 +124,8 @@ export interface StatementsWorld extends CommissionWorld {
   readonly calendar: ContractFakeBankingCalendar;
   readonly payouts: ContractFakePayoutEvidence;
   readonly serviceHolds: ServiceHolds;
+  /** Routes a command's real unit of work over a connection of the common fault harness (the B10 failure cells; test/fault-support.ts). */
+  readonly faults: FaultRouting;
   /** A corporate person with an ACTIVE KAURO_OWNER grant and a bearer token (CMD052, the reads). */
   readonly owner: Person;
   /** Stands the service routes' units of work at `at` on the TEST CLOCK (never behind the real clock); null: the real clock. */
@@ -137,19 +140,22 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
   calendar.serve({ calendarVersion: FIXTURE_CALENDAR.calendarVersion, jurisdiction: "CO", source: "TEST_FIXTURE", nonbankingDates: [...BANKING_CALENDAR_FIXTURE_NONBANKING], coversFrom: FIXTURE_CALENDAR.coversFrom, coversTo: FIXTURE_CALENDAR.coversTo, recordedAt: new Date(Date.parse(now) - 3_600_000).toISOString() as UtcInstant, evidenceHash: sha("fixture") as Sha256Hex });
   const payouts = new ContractFakePayoutEvidence({ clock });
   const serviceHolds = new ServiceHolds();
+  const faults = new FaultRouting();
   let standing: string | null = null;
   const opened: { pools: CommissionPools | null } = { pools: null };
   const pw: PaymentWorld = await paymentWorld({
     requestSide: true,
+    wrapUnitOfWork: (inner) => faults.wrap(inner),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
-      return { binding: { units, calendar, payoutEvidence: payouts, hold: serviceHolds.hook }, close: () => pools.close() };
+      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: payouts, hold: serviceHolds.hook }, close: () => pools.close() };
     },
   });
+  faults.stand = () => (standing === null ? null : { at: standing });
   const pools = opened.pools;
   if (pools === null) throw new Error("the commission pools were not opened by the api's assembly");
   const { w } = pw;
@@ -179,6 +185,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     calendar,
     payouts,
     serviceHolds,
+    faults,
     standAt(at) {
       standing = at;
     },
@@ -417,10 +424,10 @@ export async function eligibleLines(
 let observed = 0;
 
 /** A settlement observation of the payment service with bank evidence: the bank-available cash CMD052 reads (B09 settlements). */
-export async function bankCash(sw: StatementsWorld, bankAvailableCents: bigint): Promise<void> {
+export async function bankCash(sw: StatementsWorld, bankAvailableCents: bigint, units: { run: typeof sw.pw.pools.commerce.run } = sw.pw.pools.commerce): Promise<void> {
   observed += 1;
   const at = new Date(Date.UTC(2026, 0, 1) + observed * 60_000 + (Date.now() - Date.UTC(2026, 0, 1))).toISOString() as UtcInstant;
-  await sw.pw.pools.commerce.run({ kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId }, (uow) =>
+  await units.run({ kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId }, (uow) =>
     uow.commerce.settlements.record({
       settlementId: uow.ids.next() as SettlementId,
       routeId: sw.pw.route.routeId,
