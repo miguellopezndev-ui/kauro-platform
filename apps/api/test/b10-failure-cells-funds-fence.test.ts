@@ -10,7 +10,8 @@ import type { PayoutIntentView, PayoutReconciliationView } from "@kauro/applicat
 import { faultCell } from "@kauro/persistence/testing";
 import { acceptedThrough, agentOf, approvePayout, bankCash, bought, claimed, claimedCents, closedAt, dispatched, integrationWorld, intentOf, madeEligible, oracleRows, reconcilePayout, scriptEvidence, statementReads, statementsOfSeller, type IntegrationWorld } from "./integration-support.js";
 import type { Purchase } from "./commission-support.js";
-import { bindCells, eventsOf, fundsReport, ledgerOfPurchase, runConsumer, stateOf } from "./b10-cells-support.js";
+import { bindCells, consumeOn, contend, eventsOf, fundsReport, ledgerOfPurchase, mustHaveSettled, runConsumer, stateOf, type Actor } from "./b10-cells-support.js";
+import type { SqlStep } from "./fault-support.js";
 import { itemsOf } from "./statements-support.js";
 import { completed, outcome } from "./support.js";
 import { providerReports } from "./integration-support.js";
@@ -145,5 +146,64 @@ faultCell(
       assert.deepEqual(s.ledger.lines, before.ledger.lines, `delivery ${i + 1}: no hold, version unchanged`);
     }
     assert.equal((await eventsOf(e.purchase.captureId, "capture.funds_observed.v1")).length >= 2, true);
+  },
+);
+
+// =====================================================================================================================================
+// B10G5-R4: the funds fact against CMD052's funds read
+// =====================================================================================================================================
+// CMD052 reads the capture's latest funds inside kauro.payout_lines_unpayable after taking the SHARED transition subject of each payable
+// line; every writer of a funds fact takes the EXCLUSIVE half of the same subjects of the capture's lines before it inserts the fact
+// (D10-GAP-24), so either the fact commits first and the approval sees it and refuses, or the approval commits first and the fact lands on a
+// line already in an intent: the payout stands (its cash is bank evidence, D10-PAY-1), the HELD fact is recorded and the line is unchanged.
+
+faultCell(
+  {
+    id: "FUNDS_FENCE",
+    step: "CMD052 ApproveCommissionPayout (stopped right after its funds read, kauro.payout_lines_unpayable answered, shared line subjects held) and the COMMISSIONS consumer's HELD funds fact (stopped right before its fact insert, exclusive line subjects held) on a PAYABLE line",
+    fault: "race",
+    expect:
+      "RACE: a HELD funds fact racing the approval's funds read, in both orders with the lock wait observed: fact first, the approval waits for it (observed), sees HELD and is refused 409 STALE_VERSION LEDGER_CHANGED with no intent; approval first, the fact waits for the approval (observed) and is recorded after it: the intent is AUTHORIZED, the line unchanged, and the payout settles through CMD053",
+  },
+  async (ctx) => {
+    const unpayable: SqlStep = { label: "unpayable", match: /SELECT kauro\.payout_lines_unpayable/ };
+    const factInsert: SqlStep = { label: "fact_insert", match: /INSERT INTO kauro\.capture_funds_observations/ };
+    for (const order of ["FACT_FIRST", "APPROVAL_FIRST"] as const) {
+      const what = `funds fact against CMD052, ${order}`;
+      const e = await eligible(`fence-race-${order === "FACT_FIRST" ? "f" : "a"}`);
+      await closedAt(iw, order === "FACT_FIRST" ? "2026-05" : "2026-04", "2026-10-07T17:00:00Z");
+      const [statement] = await statementsOfSeller(iw, e.seller.sellerId);
+      assert.deepEqual([statement!.payable_cents, statement!.state], [e.cents, "ISSUED"]);
+      await bankCash(iw, (await claimedCents(iw)) + BigInt(e.cents));
+      // the HELD observation reported by the provider and not yet delivered
+      const held = await fundsReport(e.purchase, "DELAYED");
+      const body = { expectedVersion: Number(statement!.version), payeeRef: e.seller.destinationId, authorizationRef: await iw.w.stepUp(iw.owner) };
+      const approval: Actor = {
+        name: "CMD052",
+        login: "kauro_app_test",
+        holdAt: "db.unpayable.after",
+        run: (conn) => iw.faults.on(conn, "kauro_app", ctx.points, [unpayable], () => approvePayout(iw, statement!.statement_id, body)),
+      };
+      const observer: Actor = { name: "the funds consumer", login: "kauro_commission_test", holdAt: "db.fact_insert.before", run: (conn) => consumeOn(ctx, conn, held, [factInsert]) };
+      const lineBefore = (await ledgerOfPurchase(e.purchase)).lines;
+      const out = order === "FACT_FIRST" ? await contend(ctx, observer, approval, what) : await contend(ctx, approval, observer, what);
+      const reply = mustHaveSettled(order === "FACT_FIRST" ? out.waiter : out.holder, "the approval") as Parameters<typeof outcome>[1];
+      assert.equal(mustHaveSettled(order === "FACT_FIRST" ? out.holder : out.waiter, "the funds consumer"), "APPLIED", `${what}: the fact is recorded`);
+      const after = await ledgerOfPurchase(e.purchase);
+      assert.deepEqual(after.facts.map((f) => f[1]).slice(-1), ["HELD"], `${what}: the HELD fact is recorded`);
+      assert.deepEqual(after.lines, lineBefore, `${what}: the PAYABLE line is untouched`);
+      const intents = await oracleRows(iw, "SELECT state FROM kauro.payout_intents WHERE statement_id = $1", [statement!.statement_id]);
+      if (order === "FACT_FIRST") {
+        assert.equal(outcome(iw.w, reply), "409 STALE_VERSION LEDGER_CHANGED", `${what}: the approval saw the fact and was refused`);
+        assert.deepEqual(intents, [], `${what}: no intent`);
+      } else {
+        assert.equal((reply as { status: number }).status, 200, `${what}: the approval, ordered first, authorized the payout`);
+        assert.deepEqual(intents.map((i) => i["state"]), ["AUTHORIZED"], `${what}: the intent stands`);
+        const intent = await intentOf(iw, statement!.statement_id);
+        const evidence = iw.payouts.matching({ reference: intent.reference, destinationDigest: intent.destinationDigest, amountCents: intent.amount, currency: intent.currency }, "SETTLED");
+        const settled = completed<PayoutReconciliationView>(await reconcilePayout(iw, statement!.statement_id, { providerPayoutEvidenceRef: scriptEvidence(iw, evidence) }), 200);
+        assert.deepEqual([settled.data.intentState, settled.data.linesPaid], ["SETTLED", 1], `${what}: the payout settles through CMD053`);
+      }
+    }
   },
 );

@@ -489,6 +489,11 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
     return out;
   }
 
+  async fenceLinesOfCapture(captureId: CaptureId): Promise<void> {
+    const lines = await execute<{ line_id: string }>(this.db, "SELECT line_id FROM kauro.commission_lines WHERE capture_id = $1 ORDER BY line_id", [captureId]);
+    for (const { line_id } of lines.rows) await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.commission_lines', $1))", [line_id]);
+  }
+
   async applyBasisChange(
     poolId: CommissionPoolId,
     basisCents: bigint,

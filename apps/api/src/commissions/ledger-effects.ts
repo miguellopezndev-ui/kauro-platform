@@ -345,6 +345,11 @@ export async function observeFunds(
   now: UtcInstant,
 ): Promise<boolean> {
   const ledger = ledgerOf(uow);
+  // the capture's pools and lines first, then the exclusive half of each line's transition subject, and only then the fact (D10-GAP-24): CMD052
+  // reads the capture's funds after the shared half of the same subjects, so the fact commits before that read (the approval refuses) or
+  // after the approval (the payout stands); never between its read and its COMMIT. Row locks before the subject, as every line writer
+  const pools = await ledger.lockPoolsOfCapture(input.captureId);
+  await ledger.fenceLinesOfCapture(input.captureId);
   const reviewAt = input.fundsState === "HELD" ? addHours(now, HOLD_REVIEW_HOURS) : undefined;
   const observation = await ledger.recordFundsObservation({
     observationId: uow.ids.next() as FundsObservationId,
@@ -359,7 +364,7 @@ export async function observeFunds(
   let held = 0;
   if (input.fundsState === "HELD" && (await ledger.fundsStateOf(input.captureId)) === "HELD") {
     const review = observation.record.reviewAt ?? addHours(now, HOLD_REVIEW_HOURS);
-    for (const { lines } of await ledger.lockPoolsOfCapture(input.captureId)) {
+    for (const { lines } of pools) {
       for (const line of lines) {
         if (line.state !== "ACCRUED_PENDING" || line.cumulativeEntitlementCents - line.paidCents <= 0n) continue;
         const final = (await ledger.completionsOf(line.purchaseId)).find((c) => c.kind === "FINAL");

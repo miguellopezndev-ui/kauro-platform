@@ -274,16 +274,19 @@ function assertFundsAndSweep(what: string, order: Order, r: Raced): void {
 faultCell(
   {
     id: "ELIG_REV",
-    step: "COMMISSIONS consumer capture.funds_observed.v1 HELD (F1: the funds fact recorded, its transaction paused after its pool and line locks) and the ELIGIBILITY pass (paused after its line lock), contending for a due line",
+    step: "COMMISSIONS consumer capture.funds_observed.v1 HELD (F1: the funds fact, its transaction paused after its pool and line locks, before its fact insert) and the ELIGIBILITY pass (paused after its line lock), contending for a due line",
     fault: "race",
     expect:
-      "RACE: a HELD funds fact landing while the ELIGIBILITY pass makes a due line ELIGIBLE, in both orders with the lock wait observed (the fact inserted but uncommitted while the pass holds the line; the pass waiting on the consumer's line lock): never ELIGIBLE under a covering hold and no failed unit. Pass first: the line is ELIGIBLE (committed under funds AVAILABLE) and the later HELD fact opens no hold over it; fact first: the line is HELD under an OPEN FUNDS_HELD hold of its whole amount and the pass settles it without writing",
+      "RACE: a HELD funds fact landing while the ELIGIBILITY pass makes a due line ELIGIBLE, in both orders with the lock wait observed (the consumer waiting for the line the pass holds before it inserts its fact; the pass waiting on the consumer's line lock): never ELIGIBLE under a covering hold and no failed unit. Pass first: the line is ELIGIBLE (committed under funds AVAILABLE) and the later HELD fact opens no hold over it; fact first: the line is HELD under an OPEN FUNDS_HELD hold of its whole amount and the pass settles it without writing",
   },
   async (ctx) => {
     for (const order of ["SWEEP_FIRST", "CONSUMER_FIRST"] as const) {
+      const inserts = (): number => ctx.points.passed.filter((p) => p === "db.fact_insert.after").length;
+      const insertsBefore = inserts();
       const r = await racedWithSweep(ctx, "fact", order, "db.lines_lock.after", [FACT_INSERT, LINES_LOCK], async (d) => {
-        // the fact's insert answered (uncommitted, so the superuser still sees one observation) while the other unit holds the line
-        assert.ok(ctx.points.passed.includes("db.fact_insert.after"), "the consumer inserted its fact before it stopped or waited");
+        // the consumer takes the capture's pool and line locks and the lines' transition subjects BEFORE it inserts its fact (D10-GAP-24): it is
+        // stopped or waiting at the lines, its fact not inserted, while the other unit holds the line
+        assert.equal(inserts(), insertsBefore, "the consumer has not inserted its fact: it holds or waits for the line first");
         assert.deepEqual((await ledgerOfPurchase(d.c.first)).facts.map((f) => f[1]), ["AVAILABLE"], "the HELD fact is not committed yet");
       });
       assertFundsAndSweep(`fact, ${order}`, order, r);

@@ -605,6 +605,12 @@ export interface CommissionLedgerRepository {
   openHold(hold: NewCommissionHold): Promise<CommissionHoldRecord>;
   resolveHold(holdId: CommissionHoldId, expectedVersion: number, state: Exclude<CommissionHoldState, "OPEN">, now: UtcInstant): Promise<VersionedWrite<CommissionHoldRecord>>;
   holdsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionHoldRecord>>;
+  /**
+   * The exclusive half of the transition subject of every line of the capture, ascending, held to COMMIT, after the caller took the pools' and
+   * lines' row locks (lockPoolsOfCapture): what every writer of a funds fact takes before it inserts the fact, so that CMD052's funds read
+   * (kauro.payout_lines_unpayable, the shared half of the same subjects) is ordered against it (D10-GAP-24).
+   */
+  fenceLinesOfCapture(captureId: CaptureId): Promise<void>;
   /** The ELIGIBILITY sweep's work: ACCRUED_PENDING and HELD lines whose purchase has a FINAL completion due at `now`. */
   linesDueForEligibility(now: UtcInstant, limit: number): Promise<ReadonlyArray<CommissionLineRecord>>;
   /**
