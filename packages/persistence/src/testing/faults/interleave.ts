@@ -8,7 +8,7 @@
  */
 import { Client, type ClientConfig } from "pg";
 import { connectionPid } from "./points.js";
-import { bracketStatement, currentScope, inScope, recordStatement, registerSession, settleStatement, statementText, trackSettlement, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
+import { bracketStatement, currentScope, extendedArgs, inScope, recordStatement, registerSession, settleStatement, statementText, trackSettlement, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
 
 export class InterleavingNotObserved extends Error {
   constructor(message: string) {
@@ -75,6 +75,8 @@ export async function openConnection(config: ClientConfig): Promise<HarnessConne
         const tagged = `/* ${tag} */ ${text}`;
         args[0] = typeof config === "string" ? tagged : { ...(config as object), text: tagged };
       }
+      // every statement of an operation goes through the extended protocol: the server refuses a multi-statement string
+      args.splice(0, args.length, ...extendedArgs(args));
       issued = recordStatement(holder.proxy as object, statementText(args[0]), tag);
       const cb = args.findIndex((x) => typeof x === "function");
       if (issued !== undefined && cb >= 0) {

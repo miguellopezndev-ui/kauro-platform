@@ -1180,7 +1180,9 @@ test("FH-R6 (r4) a lock wait is credited only to the operation's own statement �
 // only because a fragment of them starts with END), and refused both positive cases (their text names ROLLBACK TO).
 
 test("FH-R2 (r6) an onServer instant is consumed only when probes the harness runs immediately before and after the operation's statement, on that connection, read the call's clock token and the same txid: a comment-split, cached-method, DO-block, function-body or multi-statement undo FAILS whatever its SQL text; an untouched transaction passes", async () => {
-  const unused = (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message);
+  // since r7 the server refuses an operation's multi-statement string (extended protocol): that refusal is a failure too
+  const unused = (e: unknown) =>
+    (e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message)) || (e instanceof Error && /cannot insert multiple commands into a prepared statement/.test(e.message));
   const cell = { step: "server-clock step", fault: "timeout", expect: "past deadline" } as const;
   const options = { clockStart: "2100-01-01T00:00:00.000Z" } as const;
   /** onServer in the operation; `outside` runs from a callback registered in the body; then the operation's `statement`. */
@@ -1244,8 +1246,8 @@ test("FH-R2 (r6) an onServer instant is consumed only when probes the harness ru
     await a.query("DO $$ BEGIN PERFORM set_config('kauro_test.clock_offset_seconds', '0', true); END $$");
     await before(a)(d);
   });
-  // passes: a multi-statement string with transaction control that leaves the instant in place (a savepoint taken and rolled back
-  // to AFTER onServer) — the SQL text names ROLLBACK TO, the server proves the instant stood before and after it
+  // passes: transaction control that leaves the instant in place (a savepoint taken and rolled back to AFTER onServer, one
+  // statement each since r7) — the SQL text names ROLLBACK TO, the server proves the instant stood before and after each
   for (const [label, session] of [
     ["harness connection", () => a],
     ["plain client", () => h.oracle],
@@ -1260,8 +1262,97 @@ test("FH-R2 (r6) an onServer instant is consumed only when probes the harness ru
         try {
           await ctx.withClock(`server-clock step (${label})`, async (clock) => {
             await clock.onServer(c);
-            const r = (await c.query(`SAVEPOINT inner_step; ROLLBACK TO SAVEPOINT inner_step; SELECT kauro.server_now() < '${d}'::timestamptz AS before`)) as unknown as Array<{ rows: Array<{ before: boolean }> }>;
-            assert.equal(r[2]!.rows[0]!.before, false, "the statement ran past the deadline");
+            await c.query("SAVEPOINT inner_step");
+            await c.query("ROLLBACK TO SAVEPOINT inner_step");
+            const r = await c.query<{ before: boolean }>(`SELECT kauro.server_now() < '${d}'::timestamptz AS before`);
+            assert.equal(r.rows[0]!.before, false, "the statement ran past the deadline");
+          });
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      },
+      options,
+    );
+  }
+});
+
+// --- FH-R2 (Codex re-check 6 of 1e32feb): the probes bracket exactly ONE server statement --------------------------------------
+// On 1e32feb one multi-statement string took a SAVEPOINT after onServer, reset the clock override, ran its deadline check (before
+// the deadline) and ROLLBACK TO restored the settings before the closing probe: both probes matched and the instant was credited.
+// Every statement of an operation now goes through the extended query protocol (Parse/Bind/Execute), so the SERVER refuses a
+// multi-statement string, and only a statement the driver sent that way can prove an instant consumed.
+
+test("FH-R2 (r7) the probes bracket exactly one server statement: an operation's multi-statement string that undoes the instant (SAVEPOINT, reset, deadline check, ROLLBACK TO) is refused by the server on a harness connection and on a tapped plain client; a single statement past the deadline passes", async () => {
+  const cell = { step: "server-clock step", fault: "timeout", expect: "past deadline" } as const;
+  const options = { clockStart: "2100-01-01T00:00:00.000Z" } as const;
+  const refused = (e: unknown) =>
+    (e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message)) || (e instanceof Error && /cannot insert multiple commands into a prepared statement/.test(e.message));
+  for (const [label, session] of [
+    ["harness connection", () => a],
+    ["plain client", () => h.oracle],
+  ] as const) {
+    // Codex's counterexample, exactly: one string, inside the operation, after onServer
+    await assert.rejects(
+      runCell(
+        cell,
+        async (ctx) => {
+          const d = ctx.deadline(ctx.clock.at(1000));
+          ctx.clock.past(d);
+          const c = session();
+          await c.query("BEGIN");
+          try {
+            await ctx.withClock(`server-clock step (${label})`, async (clock) => {
+              await clock.onServer(c);
+              const r = (await c.query(
+                `SAVEPOINT s; SELECT set_config('kauro_test.clock_offset_seconds', '0', true); SELECT kauro.server_now() < '${d}'::timestamptz AS before; ROLLBACK TO SAVEPOINT s`,
+              )) as unknown as Array<{ rows: Array<{ before: boolean }> }>;
+              assert.equal(r[2]!.rows[0]!.before, true, "the deadline check ran before the deadline");
+            });
+          } finally {
+            await c.query("ROLLBACK");
+          }
+        },
+        options,
+      ),
+      refused,
+      `${label}: a multi-statement string undoing the instant between the probes`,
+    );
+    // the same string with its refusal swallowed by the operation: nothing executed, nothing is credited
+    await assert.rejects(
+      runCell(
+        cell,
+        async (ctx) => {
+          const d = ctx.deadline(ctx.clock.at(1000));
+          ctx.clock.past(d);
+          const c = session();
+          await c.query("BEGIN");
+          try {
+            await ctx.withClock(`server-clock step (${label}, swallowed)`, async (clock) => {
+              await clock.onServer(c);
+              await c.query(`SAVEPOINT s; SELECT set_config('kauro_test.clock_offset_seconds', '0', true); SELECT kauro.server_now() < '${d}'::timestamptz AS before; ROLLBACK TO SAVEPOINT s`).catch(() => undefined);
+            });
+          } finally {
+            await c.query("ROLLBACK");
+          }
+        },
+        options,
+      ),
+      (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message),
+      `${label}: a refused multi-statement string proves nothing`,
+    );
+    // passes: one statement past the deadline, bracketed by the probes
+    await runCell(
+      cell,
+      async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        const c = session();
+        await c.query("BEGIN");
+        try {
+          await ctx.withClock(`server-clock step (${label}, single)`, async (clock) => {
+            await clock.onServer(c);
+            const r = await c.query<{ before: boolean }>(`SELECT kauro.server_now() < '${d}'::timestamptz AS before`);
+            assert.equal(r.rows[0]!.before, false, "the statement ran past the deadline");
           });
         } finally {
           await c.query("ROLLBACK");

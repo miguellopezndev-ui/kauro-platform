@@ -9,7 +9,7 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { Client } from "pg";
+import { Client, Query } from "pg";
 import { TEST_CLOCK_OFFSET_SETTING } from "../temporary-postgres.js";
 
 /** One piece of evidence, recorded by the harness only (module-private writers), with a global sequence for ordering. */
@@ -168,6 +168,28 @@ export function statementText(config: unknown): string | undefined {
   return typeof text === "string" ? text : undefined;
 }
 
+/**
+ * The arguments of a query call rewritten so the driver sends the statement through PostgreSQL's EXTENDED query protocol
+ * (Parse/Bind/Execute, `queryMode: "extended"`): the SERVER then refuses a string holding more than one command ("cannot insert
+ * multiple commands into a prepared statement"), so the probes around it bracket exactly one server statement. Values and a
+ * callback stay where they were. A submittable is left as it is (it earns no credit unless the driver sent it extended).
+ */
+export function extendedArgs(args: ReadonlyArray<unknown>): unknown[] {
+  const config = args[0];
+  if (typeof config === "string") return [{ text: config, queryMode: "extended" }, ...args.slice(1)];
+  if (typeof config === "object" && config !== null && !("submit" in config) && typeof (config as { text?: unknown }).text === "string") {
+    return [{ ...(config as object), queryMode: "extended" }, ...args.slice(1)];
+  }
+  return [...args];
+}
+
+/** Whether the driver sends (sent) this query object through the extended protocol: one server statement, never a multi-statement string. */
+export function sentExtended(driverQuery: object): boolean {
+  if (!(driverQuery instanceof Query)) return false;
+  const q = driverQuery as unknown as { requiresPreparation?: () => boolean };
+  return typeof q.requiresPreparation === "function" && q.requiresPreparation() === true;
+}
+
 /** A statement recorded in a scope, with the scope that issued it (it executed only if it settled while that scope was open). */
 export interface IssuedStatement {
   readonly event: StatementEvent;
@@ -286,9 +308,10 @@ interface ProbeRow {
  * scope is live on that session — by two probes the harness sends itself (Client.prototype.query, no wrapper) in the same
  * synchronous turn, so the driver's FIFO queue holds probe, statement, probe with nothing between them (checked on the queue
  * itself). Each probe reads, on the server, the clock token, the clock override and txid_current(). The application is proven
- * consumed only if both probes read exactly its token, offset and txid, and the statement executed while its scope was open.
- * No SQL text is parsed: whatever the statement or anything before it did (a ROLLBACK TO behind a comment, a DO block, a function,
- * a multi-statement string, a cached query method), only what the server reports decides. The verdict lands asynchronously; the
+ * consumed only if both probes read exactly its token, offset and txid, the driver sent the statement through the extended
+ * protocol (sentExtended: one server statement, the server refuses a multi-statement string) and it executed while its scope was
+ * open. No SQL text is parsed: whatever the statement or anything before it did (a ROLLBACK TO behind a comment, a DO block, a
+ * function, a cached query method), only what the server reports decides. The verdict lands asynchronously; the
  * scope keeps it pending until the probes answered (settleProofs).
  */
 export function bracketStatement(raw: object, issued: IssuedStatement | undefined, send: () => unknown, onSent?: (driverQuery: object) => void): unknown {
@@ -307,14 +330,19 @@ export function bracketStatement(raw: object, issued: IssuedStatement | undefine
   };
   // the three are queued in one synchronous turn: no other statement can be queued between them on this client
   const first = probe("before");
-  const statement = sendObserved(raw, send, onSent);
+  // one server statement only: the driver must send it through the extended protocol (judged when it is actually sent)
+  let extended = false;
+  const statement = sendObserved(raw, send, (q) => {
+    extended = sentExtended(q);
+    onSent?.(q);
+  });
   const last = probe("after");
   const order = [internals._activeQuery ?? null, ...(internals._queryQueue ?? [])];
   const i = first.entry === undefined ? -1 : order.indexOf(first.entry);
   const adjacent = i >= 0 && statement.entry !== undefined && last.entry !== undefined && order[i + 1] === statement.entry && order[i + 2] === last.entry;
   const verdict = Promise.all([first.out, last.out]).then(
     ([b, a]) => {
-      if (!adjacent || !issued.event.executed) return;
+      if (!adjacent || !extended || !issued.event.executed) return;
       const pb = b.rows[0];
       const pa = a.rows[0];
       if (pb === undefined || pa === undefined) return;
@@ -352,7 +380,9 @@ export function tapSession(session: object, scope: OperationScope): void {
       value: (...args: unknown[]) => {
         const text = statementText(args[0]);
         const issued = recordStatement(session, text, undefined);
-        const out = bracketStatement(session, issued, () => previous.apply(session, args), () => {
+        // a statement of the operation goes through the extended protocol: the server refuses a multi-statement string
+        const sent = issued === undefined ? args : extendedArgs(args);
+        const out = bracketStatement(session, issued, () => previous.apply(session, sent), () => {
           if (issued !== undefined) issued.event.dispatched = true;
         });
         trackSettlement(issued, out);
