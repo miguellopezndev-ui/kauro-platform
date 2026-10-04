@@ -4,7 +4,8 @@
  * intent for eligible value"; 15 "Commission integration"; policy minimumPayoutCents 0, feeBearer KAURO; example 22).
  *
  * One unit of work of the owner's OPERATOR context, in B06's pipeline order: access (the caller's own ACTIVE KAURO_OWNER grant) → journal
- * reserve (or the replay) → the body, the first failure answering: the owner's step-up fresh (ASSURANCE_REQUIRED; its ALLOW fact commits
+ * reserve (or the replay) → the body, the first failure answering: the owner's step-up fresh (ASSURANCE_REQUIRED; judged again with the
+ * clock's instant after every lock the unit waited on, right before the writes — B10G-R7; its ALLOW fact commits
  * with the intent) → the statement FOR UPDATE (NOT_FOUND) → expectedVersion (STALE_VERSION: two approvals of one statement serialize on its
  * row, the second finding the first's version) → ISSUED (UNLISTED_TRANSITION) → payeeRef the seller's current destination version and
  * VERIFIED (PAYEE_UNVERIFIED: a change pending verification, a superseded or another seller's destination; the database repeats it, KC009)
@@ -88,6 +89,10 @@ export function approveCommissionPayoutHandler(runtime: CommerceRequestRuntime, 
           if ((await statements.unpayableLine(statementId)) !== null) {
             throw new DomainFailure("STALE_VERSION", "a payable line of the statement is held or no longer payable: the held cents are not authorized", { reason: "LEDGER_CHANGED", currentVersion: statement.version, currentState: statement.state });
           }
+          // the step-up judged again at the effect, after every lock this unit waited on (statement, cash, lines): a proof that expired
+          // during a wait authorizes nothing (B10G-R7; the database repeats it at the write, kauro.effect_now(), migration 0038)
+          const atEffect = await co.assurance.verifyStepUp(uow, envelope.userId, body.authorizationRef as AssuranceProofId, runtime.clock.now());
+          if (atEffect.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `approving a payout needs a step-up still fresh at its effect: ${atEffect.reason}`, { reason: atEffect.reason });
           const intentId = uow.ids.next() as PayoutIntentId;
           const authorized = await statements.authorizeIntent({
             intent: {

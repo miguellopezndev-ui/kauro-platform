@@ -712,3 +712,44 @@ faultCell(
     assert.equal(await intentCount(c!.statementId), 0);
   },
 );
+
+// --- 12. PAY_REV (the step-up window), Codex r1 B10G-R7 ------------------------------------------------------------------------------
+// Last in the file: it moves the api's process clock forward past a proof's expiry, which no later cell of this file may inherit.
+
+faultCell(
+  {
+    id: "PAY_REV",
+    step: "CMD052 ApproveCommissionPayout, the owner's step-up window passing while the approval waits on the statement's lock",
+    fault: "race",
+    expect:
+      "RACE: a step-up proof that expires while ApproveCommissionPayout waits on its statement's row lock refuses the approval 403 ASSURANCE_REQUIRED STEP_UP_STALE and writes no intent: the freshness is judged again at the effect, after the locks, never only at the unit's start",
+  },
+  async (ctx) => {
+    const [st] = await takeIssued(1);
+    await bankCash(sw, (await claimedCents(sw)) + PAYABLE);
+    const api = sw.w.processClock;
+    // a proof of the owner fresh now (issued 14 minutes ago on the api clock) that expires one minute from now
+    const issuedAt = new Date(api.nowMs() - 14 * 60_000).toISOString();
+    const proof = await sw.h.recordStepUp(sw.owner.userId as UserId, { issuedAt: issuedAt as never });
+    const expiresAt = (await rows<{ expires_at: Date }>(sw, "SELECT expires_at FROM kauro.assurance_proofs WHERE proof_id = $1", [proof]))[0]!.expires_at.getTime();
+    const body = { expectedVersion: st!.version, payeeRef: st!.s.destinationId, authorizationRef: proof };
+    const holding = await open("kauro_commission_test");
+    const approving = await open("kauro_app_test");
+    try {
+      await holding.query("BEGIN");
+      await holding.query("SELECT 1 FROM kauro.commission_statements WHERE statement_id = $1 FOR UPDATE", [st!.statementId]);
+      assert.ok(api.nowMs() < expiresAt, "the proof is fresh when the approval starts");
+      const waiting = await ctx.mustWait(sw.h.oracle, { waiter: approving, holder: connectionPid(holding) }, (conn) => approveOn(ctx, conn, st!, { body }), "the approval while the statement's row is locked");
+      // the window passes while the approval waits on the lock
+      api.advance(expiresAt - api.nowMs() + 1_000);
+      assert.ok(api.nowMs() > expiresAt, "the api clock crossed the proof's expiry during the wait");
+      await holding.query("COMMIT");
+      assert.equal(outcome(sw.w, value(await waiting.pending)), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "a proof that expired during the wait authorizes nothing");
+    } finally {
+      await holding.end();
+      await approving.end();
+    }
+    assert.equal(await intentCount(st!.statementId), 0);
+    assert.equal(await statementState(st!.statementId), "ISSUED");
+  },
+);

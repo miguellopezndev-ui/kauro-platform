@@ -622,6 +622,47 @@ test("B10G-R1 at the database: a PAYABLE line is payable through one live statem
   assert.equal(await owner(), a.statementId);
 });
 
+test("B10G-R7 at the database: a step-up proof that expires during the approving transaction refuses the intent at its write (the expiry is compared with the statement's clock, not the transaction's start)", async () => {
+  const s = await activeSeller(w, "expiry-s");
+  const { ag, first, lineId } = await firstLine("EXPIRY", s);
+  await completion(w, ag, first, "FINAL");
+  await funds(w, ag, first, "AVAILABLE", 2);
+  await makeEligible(w, lineId);
+  const statement = await issueStatement(w, october, s, [lineId]);
+  // the owner's proof: issued almost 15 minutes ago, expiring 800 ms from now
+  const proofId = ids.next();
+  await within(w.assurance, { userId: w.kora }, (c) =>
+    c.query(
+      `INSERT INTO kauro.assurance_proofs (proof_id, user_id, kind, method, issued_at, expires_at, correlation_id, created_at)
+       VALUES ($1, $2, 'STEP_UP', 'TOTP', clock_timestamp() - interval '15 minutes' + interval '800 milliseconds', clock_timestamp() + interval '800 milliseconds', $3, now())`,
+      [proofId, w.kora, ids.next()],
+    ),
+  );
+  const intentId = ids.next();
+  await assert.rejects(
+    within(w.app, ownerOf(w), async (c) => {
+      // the transaction starts while the proof is fresh; its write comes after the proof expired
+      const started = await c.query<{ fresh: boolean }>("SELECT p.expires_at > transaction_timestamp() AS fresh FROM kauro.assurance_proofs p WHERE p.proof_id = $1", [proofId]);
+      assert.equal(started.rows[0]!.fresh, true, "fresh at the transaction's start");
+      await c.query("SELECT pg_sleep(1.2)");
+      const now = await c.query<{ expired: boolean }>("SELECT p.expires_at <= clock_timestamp() AS expired FROM kauro.assurance_proofs p WHERE p.proof_id = $1", [proofId]);
+      assert.equal(now.rows[0]!.expired, true, "expired at the write");
+      await c.query(
+        `INSERT INTO kauro.payout_intents (intent_id, statement_id, seller_id, amount_cents, currency, fee_bearer, destination_id, destination_version, destination_digest, reference,
+           authorized_by_user_id, authorization_proof_ref, authorized_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'USD', 'KAURO', $5, 1, $6, $7, $8, $9, kauro.server_now(), now(), now())`,
+        [intentId, statement.statementId, s.sellerId, statement.payableCents, s.destinationId, s.destinationDigest, `kauro-payout-${intentId}`, w.kora, proofId],
+      );
+      await c.query(
+        "UPDATE kauro.commission_statements SET state = 'APPROVED', approved_by_user_id = $2, approved_at = kauro.server_now(), approval_proof_ref = $3, version = version + 1 WHERE statement_id = $1",
+        [statement.statementId, w.kora, proofId],
+      );
+    }),
+    // the intent's birth refuses the expired proof (not the COMMIT-time check of an approved statement)
+    (e: unknown) => refusedWith("23514", "payout_intents_authorization")(e) && /with a fresh step-up/.test(String((e as Error).message)),
+  );
+});
+
 // --- CMD053 ------------------------------------------------------------------------------------------------------------------------------
 
 test("CMD053 at the database: a line becomes PAID only when its statement's intent is SETTLED with an evidence hash (KC010), and a FAILED or RETURNED intent is kept with its evidence", async () => {
