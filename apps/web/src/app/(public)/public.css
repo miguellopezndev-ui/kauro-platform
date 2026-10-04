@@ -1,0 +1,432 @@
+/* The public site's presentation (UI01-UI08, UI48, UI49), on the tokens of @kauro/ui only: no colour, size or space is typed here that a
+   token names. Every class is kauro-site-*, so nothing here can meet a selector of the application shell (W3) or of the component
+   library (W1). No inline style is ever needed: the policy forbids style attributes (D-SEC-1), and nothing below relies on colour alone
+   (a state is always written out, an error has its words, the current page is bold and underlined).
+   Reflow: the layout is one column from 320 CSS pixels up and never scrolls sideways; a table wraps its words instead of scrolling. */
+
+body:has(> .kauro-site-header) {
+  margin: 0;
+}
+
+.kauro-site-skip {
+  position: absolute;
+  inset-block-start: var(--kauro-space-2);
+  inset-inline-start: var(--kauro-space-2);
+  z-index: 10;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-primary);
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius);
+  font-weight: 600;
+  transform: translateY(-300%);
+}
+.kauro-site-skip:focus {
+  transform: none;
+}
+
+/* ---- header, navigation, footer -------------------------------------------------------------------------------------------------- */
+
+.kauro-site-header {
+  border-block-end: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-background);
+}
+.kauro-site-header-inner,
+.kauro-site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  padding: var(--kauro-space-3) var(--kauro-space-4);
+  box-sizing: border-box;
+}
+.kauro-site-brand {
+  order: 1;
+  color: var(--kauro-color-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.kauro-site-signin {
+  order: 2;
+  margin-inline-start: auto;
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+}
+.kauro-site-header .kauro-site-nav {
+  order: 3;
+  flex: 1 1 100%;
+}
+.kauro-site-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-1) var(--kauro-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-nav-list a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 36px;
+  padding-inline: var(--kauro-space-2);
+  color: var(--kauro-color-primary);
+}
+.kauro-site-nav-list a[aria-current="page"] {
+  color: var(--kauro-color-text);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 6px;
+}
+@media (min-width: 64rem) {
+  .kauro-site-header .kauro-site-nav {
+    order: 2;
+    flex: 1 1 auto;
+  }
+  .kauro-site-signin {
+    order: 3;
+    margin-inline-start: 0;
+  }
+}
+
+.kauro-site-footer {
+  margin-block-start: var(--kauro-space-7);
+  border-block-start: 1px solid var(--kauro-color-border);
+  background: var(--kauro-color-surface);
+}
+.kauro-site-footer-note {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+}
+
+/* ---- the page ------------------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-main {
+  box-sizing: border-box;
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  padding: var(--kauro-space-5) var(--kauro-space-4) 0;
+  overflow-wrap: break-word;
+}
+.kauro-site-main:focus {
+  outline: none;
+}
+.kauro-site-main p,
+.kauro-site-main li {
+  max-inline-size: 68ch;
+}
+.kauro-site-main a {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-main h1 {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: clamp(1.75rem, 1.2rem + 2.4vw, 2.5rem);
+  line-height: var(--kauro-line-height-heading);
+}
+.kauro-site-main h2 {
+  margin: 0 0 var(--kauro-space-3);
+  font-size: 1.5rem;
+  line-height: var(--kauro-line-height-heading);
+}
+.kauro-site-main h3 {
+  margin: 0 0 var(--kauro-space-2);
+  font-size: 1.125rem;
+  line-height: var(--kauro-line-height-heading);
+}
+.kauro-site-pagehead {
+  margin-block-end: var(--kauro-space-4);
+}
+.kauro-site-lead {
+  font-size: 1.125rem;
+}
+.kauro-site-section {
+  margin-block: var(--kauro-space-6);
+}
+.kauro-site-note {
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-list {
+  margin-block: var(--kauro-space-3);
+  padding-inline-start: var(--kauro-space-5);
+}
+.kauro-site-list li {
+  margin-block: var(--kauro-space-1);
+}
+.kauro-site-steps {
+  margin-block: var(--kauro-space-3);
+  padding-inline-start: var(--kauro-space-5);
+}
+.kauro-site-steps > li {
+  margin-block: var(--kauro-space-4);
+  padding-inline-start: var(--kauro-space-1);
+}
+.kauro-site-toc {
+  margin-block: var(--kauro-space-4);
+}
+.kauro-site-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kauro-space-3);
+  margin-block: var(--kauro-space-4);
+}
+.kauro-site-hero {
+  margin-block-end: var(--kauro-space-6);
+}
+
+/* ---- buttons and links that look like them --------------------------------------------------------------------------------------- */
+
+.kauro-site-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-block-size: 44px;
+  padding: var(--kauro-space-2) var(--kauro-space-4);
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.kauro-site-main a.kauro-site-button {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-button:hover {
+  border-color: var(--kauro-color-primary-hover);
+  color: var(--kauro-color-primary-hover);
+}
+.kauro-site-button--primary,
+.kauro-site-main a.kauro-site-button--primary {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-site-button--primary:hover,
+.kauro-site-main a.kauro-site-button--primary:hover {
+  background: var(--kauro-color-primary-hover);
+  border-color: var(--kauro-color-primary-hover);
+  color: var(--kauro-color-on-primary);
+}
+.kauro-site-button[aria-disabled="true"] {
+  border-color: var(--kauro-color-control-border);
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  cursor: progress;
+}
+
+/* ---- cards, states, badges ------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--kauro-space-4);
+  margin: var(--kauro-space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-card {
+  box-sizing: border-box;
+  padding: var(--kauro-space-4);
+  border: 1px solid var(--kauro-color-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-surface);
+}
+.kauro-site-card p {
+  margin-block: var(--kauro-space-2);
+}
+.kauro-site-state {
+  display: inline-block;
+  margin: 0 0 var(--kauro-space-2);
+  padding: var(--kauro-space-1) var(--kauro-space-2);
+  border: 1px solid currentColor;
+  border-radius: var(--kauro-radius);
+  font-size: var(--kauro-font-size-dense);
+  font-weight: 600;
+}
+.kauro-site-state--available {
+  background: var(--kauro-color-success-surface);
+  color: var(--kauro-color-success-text);
+}
+.kauro-site-state--limited {
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+}
+.kauro-site-state--closed {
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-state--unread {
+  background: var(--kauro-color-info-surface);
+  color: var(--kauro-color-info-text);
+}
+.kauro-site-badge {
+  display: inline-block;
+  margin: 0 0 var(--kauro-space-4);
+  padding: var(--kauro-space-1) var(--kauro-space-3);
+  border: 2px solid var(--kauro-color-warning-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-warning-surface);
+  color: var(--kauro-color-warning-text);
+  font-weight: 700;
+}
+
+/* ---- tables ---------------------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-table {
+  inline-size: 100%;
+  margin-block: var(--kauro-space-4);
+  border-collapse: collapse;
+  font-size: var(--kauro-font-size-dense);
+}
+.kauro-site-table caption {
+  padding-block-end: var(--kauro-space-2);
+  font-weight: 600;
+  text-align: start;
+}
+.kauro-site-table th,
+.kauro-site-table td {
+  padding: var(--kauro-space-2);
+  border: 1px solid var(--kauro-color-border);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.kauro-site-table thead th {
+  background: var(--kauro-color-surface);
+}
+.kauro-site-table tbody th {
+  font-weight: 600;
+}
+@media (min-width: 40rem) {
+  .kauro-site-table {
+    font-size: var(--kauro-font-size-body);
+  }
+  .kauro-site-table th,
+  .kauro-site-table td {
+    padding: var(--kauro-space-3);
+  }
+}
+
+/* ---- forms ----------------------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-form {
+  display: grid;
+  gap: var(--kauro-space-4);
+  max-inline-size: 40rem;
+  margin-block: var(--kauro-space-4);
+}
+.kauro-site-field label {
+  display: block;
+  margin-block-end: var(--kauro-space-1);
+  font-weight: 600;
+}
+.kauro-site-field input,
+.kauro-site-field select,
+.kauro-site-field textarea {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: var(--kauro-space-2) var(--kauro-space-3);
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-text);
+  font: inherit;
+}
+.kauro-site-field textarea {
+  resize: vertical;
+}
+.kauro-site-field [aria-invalid="true"] {
+  border: 2px solid var(--kauro-color-danger-text);
+}
+.kauro-site-field p {
+  margin-block: var(--kauro-space-1);
+}
+.kauro-site-fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kauro-site-fieldset legend {
+  padding: 0;
+  margin-block-end: var(--kauro-space-1);
+  font-weight: 600;
+}
+.kauro-site-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kauro-space-2);
+  min-block-size: 44px;
+  padding-block: var(--kauro-space-2);
+}
+.kauro-site-choice input {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0.125rem 0 0;
+}
+.kauro-site-choice label {
+  font-weight: 400;
+}
+.kauro-site-error {
+  margin: 0;
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+.kauro-site-result {
+  min-block-size: 1.5em;
+}
+.kauro-site-estimate--result {
+  padding-inline-start: var(--kauro-space-3);
+  border-inline-start: 4px solid var(--kauro-color-primary);
+  font-weight: 600;
+}
+.kauro-site-estimate--invalid {
+  color: var(--kauro-color-danger-text);
+  font-weight: 600;
+}
+
+/* ---- the panels of the fit form -------------------------------------------------------------------------------------------------- */
+
+.kauro-site-panel {
+  box-sizing: border-box;
+  max-inline-size: 40rem;
+  margin-block: var(--kauro-space-4);
+  padding: var(--kauro-space-4);
+  border: 2px solid var(--kauro-color-danger-text);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-danger-surface);
+  overflow-wrap: anywhere;
+}
+.kauro-site-panel:focus {
+  outline: var(--kauro-focus-width) solid var(--kauro-color-focus);
+  outline-offset: var(--kauro-focus-offset);
+}
+.kauro-site-panel--received {
+  border-color: var(--kauro-color-success-text);
+  background: var(--kauro-color-success-surface);
+}
+.kauro-site-panel--limited {
+  border-color: var(--kauro-color-warning-text);
+  background: var(--kauro-color-warning-surface);
+}
+.kauro-site-panel p {
+  margin-block: var(--kauro-space-2) 0;
+}
+
+@media (forced-colors: active) {
+  .kauro-site-state,
+  .kauro-site-badge,
+  .kauro-site-panel,
+  .kauro-site-card {
+    border-color: CanvasText;
+  }
+}

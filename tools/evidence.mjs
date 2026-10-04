@@ -50,6 +50,9 @@ export const SUITES = [
   { name: "data-plane", cwd: "packages/data-plane", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "api", cwd: "apps/api", script: 'node --test --test-reporter=spec --test-concurrency=3 "dist/test/**/*.test.js"', args: ["--test-concurrency=3", "dist/test/**/*.test.js"] },
   { name: "control", cwd: "apps/control", script: 'node --test --test-reporter=spec --test-concurrency=2 "dist/test/**/*.test.js"', args: ["--test-concurrency=2", "dist/test/**/*.test.js"] },
+  // package B11: the design tokens and accessible primitives, and the web runtime's node:test suites (the browser suite is outside verify)
+  { name: "ui", cwd: "packages/ui", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  { name: "web", cwd: "apps/web", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "tools", cwd: ".", script: null, args: ["tools/test/**/*.test.mjs"] },
 ];
 

@@ -20,6 +20,9 @@ import type {
   ProjectRecord,
   ProjectState,
   ServiceMode,
+  SupportCaseRecord,
+  SupportCategory,
+  SupportSeverity,
   TargetContractRecord,
   ValidationReceiptRecord,
 } from "../model/aggregates.js";
@@ -36,6 +39,7 @@ import type {
   ProcessingAuthorityId,
   ProjectId,
   RevisionId,
+  SupportCaseId,
   TargetContractId,
   TargetInstanceRef,
   UserId,
@@ -239,6 +243,29 @@ export interface ProjectRepository {
   /** Inserts the project and its draft revision (both at version 1) in one statement sequence; atomic with the unit of work. */
   insertWithDraftRevision(project: NewProject): Promise<{ readonly project: ProjectRecord; readonly revision: DatasetRevisionRecord }>;
   transition(projectId: ProjectId, expectedVersion: number, change: { readonly state: ProjectState }, now: UtcInstant): Promise<VersionedWrite<ProjectRecord>>;
+}
+
+export interface NewSupportCase {
+  readonly caseId: SupportCaseId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly category: SupportCategory;
+  readonly severity: SupportSeverity;
+  readonly summary: string;
+  readonly evidenceRefs: ReadonlyArray<string>;
+  readonly createdByUserId: UserId;
+  readonly createdByMembershipId: MembershipId;
+  readonly nextReviewAt: UtcInstant;
+  readonly createdAt: UtcInstant;
+}
+
+/** Support cases of one agency (B11 CMD044 and its two reads); a case is born OPEN at version 1 and this edition never edits one. */
+export interface SupportCaseRepository {
+  get(caseId: SupportCaseId): Promise<SupportCaseRecord | null>;
+  /** Inserts an OPEN case at version 1; a project of another agency fails the composite foreign key, a membership of another agency too. */
+  insert(input: NewSupportCase): Promise<SupportCaseRecord>;
+  /** One project's cases, paginated by (createdAt, caseId) inside the current agency (07 "Pagination uses a total ordering"). */
+  listByProject(agencyId: AgencyId, projectId: ProjectId, page: KeysetPage<SupportCaseId>): Promise<ReadonlyArray<SupportCaseRecord>>;
 }
 
 /**

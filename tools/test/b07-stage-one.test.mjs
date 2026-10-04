@@ -55,12 +55,15 @@ test("B07 stage 1 is one implementation: each provider port has exactly one labe
     "@kauro/data-plane/testing": await load("packages/data-plane/dist/src/testing/index.js"),
   };
   const exported = Object.entries(entries).flatMap(([entry, m]) => Object.keys(m).filter((k) => /^ContractFake\w+$/.test(k) && typeof m[k] === "function" && !/(Error|Refusal)$/.test(k)).map((k) => `${entry} ${k}`));
-  // the four fakes of package B10's ports (packages/application/src/commercial/testing; B10 design §11) are not source-lifecycle
-  // provider ports: each has its own owner file there and is listed only so that an unlisted fake still fails this check
+  // beside B07's, the test-only subpath carries B11's identity provider fake (ContractFakeIdentityIssuer, owner mandate W2, B11 design
+  // section 6): not a provider port of the source lifecycle, and the one fake of its own port; the four fakes of package B10's ports
+  // (packages/application/src/commercial/testing; B10 design §11) are not source-lifecycle provider ports either: each has its own owner
+  // file there and is listed only so that an unlisted fake still fails this check
   assert.deepEqual(exported.sort(), [
     "@kauro/application/testing ContractFakeAuthorityJournal",
     "@kauro/application/testing ContractFakeBankingCalendar",
     "@kauro/application/testing ContractFakeBuyerTypeReader",
+    "@kauro/application/testing ContractFakeIdentityIssuer",
     "@kauro/application/testing ContractFakeObjectStorage",
     "@kauro/application/testing ContractFakePayoutEvidence",
     "@kauro/application/testing ContractFakePreparationCompletion",

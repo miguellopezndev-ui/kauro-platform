@@ -21,22 +21,30 @@ import type { B06CommandId } from "../commands/contracts.js";
 import { AUDIT_COMMAND_OUTCOMES, AUDIT_INTAKE_OUTCOMES, AUDIT_ROUTE_OUTCOMES, CORE_SERVICES_UNAVAILABLE } from "../audit/outcomes.js";
 import { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "../execution/outcomes.js";
 import { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "../sources/outcomes.js";
-import { OUTCOME_BLOCKS, problemOutcome as outcome, type ProblemOutcome } from "./outcome-kit.js";
+import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "./outcome-kit.js";
 import type { IntakeOperationId, ReadOperationId, ServedCommandId } from "./response-schemas.js";
 
 // the outcome kit (api/outcome-kit) is part of this module's public surface, as it was before the B07 catalogues joined
 export { OUTCOME_BLOCKS, problemOutcome, closedCatalogue, outcomeOf, outcomesByStatus } from "./outcome-kit.js";
 export type { ProblemOutcome, OutcomeLayer, FieldCode } from "./outcome-kit.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED, COOKIE_CSRF } = OUTCOME_BLOCKS;
 
 const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is not visible to the caller's agency`);
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 const BODY_DIGEST = outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)");
+/** The text a support case would keep looks like a secret or customer records: 422, and the next action is the secure upload (B11 D-SUP-2). */
+const CONTENT_REFUSED: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the summary holds a private key, a cloud or API key, a token or a name-and-value credential; nothing was stored, sent or logged"),
+  outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the summary holds rows of records (three delimited lines) or three e-mail addresses; nothing was stored, sent or logged"),
+]);
 const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTROLLER", "only the approving actor or an OWNER ends an approval's future use (D-AUTHZ-3)");
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
-const COMMAND_SPECIFIC: Readonly<Record<B06CommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+/** The commands this module catalogues itself: B06's seven and B11's CMD044 (B07's come composed from sources/outcomes). */
+type CatalogueCommandId = B06CommandId | "CMD044";
+
+const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: [
     outcome("COMMAND", "ADMISSION_LIMITED", "CREATION_RATE_LIMITED", "the creation limit of the identity or of the client network is reached (08 Abuse controls, R34)"),
     outcome("COMMAND", "ADMISSION_LIMITED", "DRAFT_AGENCY_EXISTS", "the identity already created an agency that is still DRAFT (D-CMD-1)"),
@@ -99,14 +107,20 @@ const COMMAND_SPECIFIC: Readonly<Record<B06CommandId, ReadonlyArray<ProblemOutco
     STALE("plan"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_NOT_APPROVED", "the plan is not APPROVED", { current: "ALWAYS" }),
   ],
+  CMD044: [
+    NOT_VISIBLE("the project"),
+    ...CONTENT_REFUSED,
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "SUPPORT_CALENDAR_UNAVAILABLE", "the versioned holiday calendar does not cover the year of the follow-up, so no next review can be promised; retry with the same key"),
+  ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<B06CommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
-const HEADER_COMMANDS: ReadonlySet<B06CommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]);
+const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
 
-function catalogueOf(command: B06CommandId): ReadonlyArray<ProblemOutcome> {
+function catalogueOf(command: CatalogueCommandId): ReadonlyArray<ProblemOutcome> {
   const entries = [
     ...EVERY_ROUTE,
+    ...COOKIE_CSRF,
     ...(TENANT_COMMANDS.has(command) ? [...PATH_IDS, ...TENANT] : []),
     ...(HEADER_COMMANDS.has(command) ? AGENCY_HEADER : []),
     ...COMMAND_SPECIFIC[command],
@@ -133,13 +147,15 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
+  CMD044: catalogueOf("CMD044"),
   ...EXECUTION_COMMAND_OUTCOMES,
   ...AUDIT_COMMAND_OUTCOMES,
 });
 
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
 
-type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject";
+/** The reads this module catalogues itself: B06's five manual-10 reads and B11's two support reads (W4). */
+type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | "ListSupportCases" | "GetSupportCase";
 
 const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   ListAgencies: [...PAGINATED],
@@ -147,6 +163,8 @@ const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOu
   ListMembers: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   ListClients: [...PATH_IDS, ...TENANT_READ, ...PAGINATED],
   GetProject: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the project")],
+  ListSupportCases: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the project")],
+  GetSupportCase: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the case")],
 });
 
 function readCatalogueOf(operationId: B06ReadOperationId): ReadonlyArray<ProblemOutcome> {
@@ -174,6 +192,8 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   GetUpload: SOURCE_ROUTE_OUTCOMES.GetUpload,
   GetUploadSession: SOURCE_ROUTE_OUTCOMES.GetUploadSession,
   PreviewTable: SOURCE_ROUTE_OUTCOMES.PreviewTable,
+  ListSupportCases: readCatalogueOf("ListSupportCases"),
+  GetSupportCase: readCatalogueOf("GetSupportCase"),
   GetJob: EXECUTION_ROUTE_OUTCOMES.GetJob,
   GetAudit: AUDIT_ROUTE_OUTCOMES.GetAudit,
 });
@@ -198,5 +218,60 @@ export const ROUTE_OUTCOME_FRAGMENTS = Object.freeze({
   EVERY_READ,
   TENANT_READ,
   NO_QUERY: Object.freeze([NO_QUERY]) as ReadonlyArray<ProblemOutcome>,
+  COOKIE_CSRF,
+});
+
+// --- the operational routes with a closed catalogue (B11: the session boundary W2, the public routes W5b) -----------------------
+
+const TRANSPORT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "TRANSPORT"));
+const PLATFORM_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "PLATFORM"));
+/** A body admitted like a command's, without an idempotency key: content type, size, strict JSON, closed schema. */
+const BODY_ADMISSION: ReadonlyArray<ProblemOutcome> = Object.freeze(EVERY_ROUTE.filter((o) => o.layer === "ADMISSION" && o.reason !== "IDEMPOTENCY_KEY_MISSING" && o.reason !== "IDEMPOTENCY_KEY_INVALID"));
+const AMBIGUOUS = EVERY_ROUTE.find((o) => o.reason === "AMBIGUOUS_CREDENTIALS") as ProblemOutcome;
+const ANONYMOUS = EVERY_ROUTE.find((o) => o.code === "AUTHENTICATION_REQUIRED" && o.reason === null) as ProblemOutcome;
+const TOKEN_INVALID = outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", "IDENTITY_TOKEN_INVALID", "the identity token failed verification — shape, algorithm, key, signature, issuer, audience, lifetime or subject — one answer for every defect, which never says whether an account exists (D-AUTH-4)");
+const NO_BODY = outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the route takes no body and no query parameter", { fieldCodes: ["UNKNOWN_FIELD"] });
+
+/**
+ * The closed problem catalogues of the operational routes that have one (the session boundary's and the public routes'; the
+ * probes answer any problem the Problem schema admits). The api's send guard refuses any other problem on these routes, like a
+ * command's.
+ */
+export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  openSession: closedCatalogue("openSession", [
+    ...TRANSPORT_OUTCOMES,
+    ...BODY_ADMISSION,
+    AMBIGUOUS,
+    outcome("AUTHENTICATION", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the sign-in's Origin is not exactly an application origin, or the browser reports a cross-site request (login CSRF)"),
+    TOKEN_INVALID,
+    outcome("AUTHENTICATION", "ASSURANCE_REQUIRED", "EMAIL_NOT_VERIFIED", "the token proves the account, whose e-mail is not verified yet: verify it, then sign in again"),
+    ...PLATFORM_OUTCOMES,
+  ]),
+  getCurrentSession: closedCatalogue("getCurrentSession", [...TRANSPORT_OUTCOMES, NO_BODY, AMBIGUOUS, outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", null, "no live session: no cookie, or its session is unknown, revoked or past its idle or absolute deadline"), ...PLATFORM_OUTCOMES]),
+  revokeCurrentSession: closedCatalogue("revokeCurrentSession", [...TRANSPORT_OUTCOMES, NO_BODY, AMBIGUOUS, ...COOKIE_CSRF, ...PLATFORM_OUTCOMES]),
+  createStepUp: closedCatalogue("createStepUp", [
+    ...TRANSPORT_OUTCOMES,
+    ...BODY_ADMISSION,
+    AMBIGUOUS,
+    ...COOKIE_CSRF,
+    ANONYMOUS,
+    TOKEN_INVALID,
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the re-authentication is another person's than the caller's"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "the re-authentication has no second factor"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the re-authentication is more than 300 s old"),
+    ...PLATFORM_OUTCOMES,
+  ]),
+  getIdentityConfig: closedCatalogue("getIdentityConfig", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  // the public routes (W5b): no credential, the capability publication and the fit inquiry
+  getCapabilityPublication: closedCatalogue("getCapabilityPublication", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  createInquiry: closedCatalogue("createInquiry", [
+    ...TRANSPORT_OUTCOMES,
+    outcome("ACCESS", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the request's Origin is absent or is not exactly the public or the application origin: decided before the body is read, nothing is stored or counted (D-PUB-2)"),
+    ...BODY_ADMISSION,
+    outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the description looks like a credential, a key or a token: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the description looks like customer records: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
+    outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client-address hash has 5 accepted inquiries in the trailing hour, or the e-mail hash has 3 in the trailing day; retryAfterSeconds says when the first leaves the window (D-PUB-3)"),
+    ...PLATFORM_OUTCOMES,
+  ]),
 });
 

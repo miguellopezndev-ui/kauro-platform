@@ -1,0 +1,41 @@
+{
+  "name": "@kauro/ui",
+  "version": "0.1.0",
+  "description": "Kauro design system for the web surfaces: the colour, type, spacing and focus tokens of the interface contract (their rendered stylesheet tokens.css and the WCAG 2.2 AA contrast checks that bind them) and the accessible React primitives built on them (B11 W1).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./tokens.css": "./tokens.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "tokens.css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\"",
+    "generate": "node scripts/render-tokens-css.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "5.9.2"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

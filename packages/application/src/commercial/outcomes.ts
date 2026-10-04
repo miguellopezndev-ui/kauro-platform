@@ -19,7 +19,7 @@ import {
   RECONCILE_COMMISSION_PAYOUT_OUTCOMES,
 } from "./statements/outcomes.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, NO_QUERY } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, NO_QUERY, COOKIE_CSRF } = OUTCOME_BLOCKS;
 
 /** The corporate principals of the sales commands (D10-CTX-1, D10-CTX-2): a person without the ACTIVE seller row or owner grant the command needs. */
 const CORPORATE_ACCESS: ReadonlyArray<ProblemOutcome> = Object.freeze([
@@ -74,10 +74,10 @@ const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046
 });
 
 /** A tenant command whose path names the agency: the authorizer's membership decisions and the path id, no agency selector. */
-const agencyPathCommand = (id: "CMD002" | "CMD043") => closedCatalogue(id, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
+const agencyPathCommand = (id: "CMD002" | "CMD043") => closedCatalogue(id, [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...TENANT, ...COMMAND_SPECIFIC[id]]);
 
 /** A corporate command: the seller or owner access decision, the path id when the route has one, and the command's own outcomes. */
-const corporateCommand = (id: "CMD045" | "CMD046" | "CMD047", pathId: boolean) => closedCatalogue(id, [...EVERY_ROUTE, ...(pathId ? PATH_IDS : []), ...CORPORATE_ACCESS, ...COMMAND_SPECIFIC[id]]);
+const corporateCommand = (id: "CMD045" | "CMD046" | "CMD047", pathId: boolean) => closedCatalogue(id, [...EVERY_ROUTE, ...COOKIE_CSRF, ...(pathId ? PATH_IDS : []), ...CORPORATE_ACCESS, ...COMMAND_SPECIFIC[id]]);
 
 /** The closed problem catalogue of each served B10 command route. */
 export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
@@ -87,14 +87,14 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD046: corporateCommand("CMD046", true),
   CMD047: corporateCommand("CMD047", true),
   // the corporate owner's seller commands (B10-COMMANDS-SELLERS): the path id, the owner's access, the command-layer outcomes of sellers/outcomes
-  CMD048: closedCatalogue("CMD048", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ASSIGN_ACCOUNT_OUTCOMES]),
-  CMD049: closedCatalogue("CMD049", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ACTIVATE_SELLER_OUTCOMES]),
-  CMD050: closedCatalogue("CMD050", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...TERMINATE_SELLER_OUTCOMES]),
+  CMD048: closedCatalogue("CMD048", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ASSIGN_ACCOUNT_OUTCOMES]),
+  CMD049: closedCatalogue("CMD049", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...ACTIVATE_SELLER_OUTCOMES]),
+  CMD050: closedCatalogue("CMD050", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...TERMINATE_SELLER_OUTCOMES]),
   // CreateQuote (B10-COMMANDS-QUOTE): the agency is selected by the header and the project is the path id
-  CMD027: closedCatalogue("CMD027", [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...CREATE_QUOTE_OUTCOMES]),
+  CMD027: closedCatalogue("CMD027", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...CREATE_QUOTE_OUTCOMES]),
   // the statement and payout commands (B10-STATEMENTS-PAYOUTS): the commission group's service routes and the owner's approval
   CMD051: closedCatalogue("CMD051", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...CLOSE_COMMISSION_PERIOD_OUTCOMES]),
-  CMD052: closedCatalogue("CMD052", [...EVERY_ROUTE, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...APPROVE_COMMISSION_PAYOUT_OUTCOMES]),
+  CMD052: closedCatalogue("CMD052", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...APPROVE_COMMISSION_PAYOUT_OUTCOMES]),
   CMD053: closedCatalogue("CMD053", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...RECONCILE_COMMISSION_PAYOUT_OUTCOMES]),
 });
 

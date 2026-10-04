@@ -12,6 +12,7 @@
  * Every variable is validated here; a malformed or missing value refuses the start with the variable name (never its value).
  */
 import { readFileSync } from "node:fs";
+import { isApplicationOrigin } from "@kauro/application";
 import type { Environment } from "@kauro/domain";
 import { ENVIRONMENTS } from "@kauro/domain";
 import { DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS } from "@kauro/persistence";
@@ -55,6 +56,16 @@ export interface MigratorConfig {
   readonly passwordFile: string | null;
 }
 
+/**
+ * The two public routes (B11 W5b; D-TOPO-2, D-PUB-2): the exact browser origins of the public site and of the application, and the
+ * file of the key the inquiry digests are computed with (identical on every instance that shares the database).
+ */
+export interface PublicApiConfig {
+  readonly publicOrigin: string;
+  readonly appOrigin: string;
+  readonly hashKeyFile: string;
+}
+
 export interface ApiConfig {
   readonly environment: Environment;
   readonly http: HttpConfig;
@@ -72,7 +83,51 @@ export interface ApiConfig {
    * every instance (N16). Required outside LOCAL; in LOCAL, when absent, each process uses a fresh random key.
    */
   readonly cursorKeyFile: string | null;
+  /**
+   * The browser session boundary (B11 design D-AUTH-*), or null when it is not bound (the B06 edition: LOCAL authenticates with
+   * the bearer-token file, SANDBOX and LIVE refuse to start, I-INT-3). All of its variables come together or none does.
+   */
+  readonly identity: IdentityConfig | null;
+  /** Present when KAURO_PUBLIC_ORIGIN, KAURO_APP_ORIGIN and KAURO_PUBLIC_HASH_KEY_FILE are all set; the public routes exist only then. */
+  readonly publicApi: PublicApiConfig | null;
 }
+
+/** The session boundary's configuration (B11 W2). */
+export interface IdentityConfig {
+  /** KAURO_IDENTITY_KEY_SOURCE: GOOGLE_X509 (Identity Platform) or CONTRACT_FAKE (LOCAL only). */
+  readonly keySource: "GOOGLE_X509" | "CONTRACT_FAKE";
+  /** KAURO_IDENTITY_PROJECT_ID: the Google Cloud project id (the tokens' audience). */
+  readonly projectId: string;
+  /** KAURO_APP_ORIGINS: the exact browser origins of the application, comma-separated (CSRF and login-CSRF rule, D-AUTH-5). */
+  readonly appOrigins: ReadonlyArray<string>;
+  /** KAURO_IDENTITY_FAKE_JWKS_FILE: the contract fake's JWKS (CONTRACT_FAKE only). */
+  readonly fakeJwksFile: string | null;
+  /**
+   * KAURO_IDENTITY_FAKE_ENDPOINT: where the page reaches the contract fake, announced to it (CONTRACT_FAKE only, optional): a path of the
+   * application's own origin that the edge routes to the fake, so the page's connect-src stays 'self' (D-SEC-1; B11 D-INT1-4).
+   */
+  readonly fakeEndpoint: string | null;
+  /**
+   * KAURO_DB_ASSURANCE_USER / _PASSWORD / _POOL_MAX: the login of the authentication boundary group (kauro_assurance) and its
+   * pool, which shares the api's connection budget with the runtime pool (07: four per instance).
+   */
+  readonly assuranceDatabase: { readonly user: string; readonly password?: string; readonly poolMax: number };
+}
+
+/** The variables of the session boundary: any one of them binds it, and then each required one is required by name. */
+export const IDENTITY_VARIABLES = Object.freeze([
+  "KAURO_IDENTITY_KEY_SOURCE",
+  "KAURO_IDENTITY_PROJECT_ID",
+  "KAURO_APP_ORIGINS",
+  "KAURO_IDENTITY_FAKE_JWKS_FILE",
+  "KAURO_IDENTITY_FAKE_ENDPOINT",
+  "KAURO_DB_ASSURANCE_USER",
+  "KAURO_DB_ASSURANCE_PASSWORD",
+  "KAURO_DB_ASSURANCE_POOL_MAX",
+]);
+
+/** The session boundary's pool: one or two connections of the api's budget. */
+export const ASSURANCE_POOL_CEILING = 2;
 
 /** 07 "Connection budget": the API runs at most two instances with four connections each (R43). */
 export const API_POOL_CEILING = 4;
@@ -226,10 +281,85 @@ export function loadConfig(env: Env = process.env): ApiConfig {
     migrateOnStart,
     bearerTokensFile,
     cursorKeyFile: optional(env, CURSOR_KEY_FILE_VARIABLE) ?? null,
+    identity: null,
+    publicApi: publicApiOf(env, environment),
   };
+  const identity = identityOf(env, environment, runtimeUser, config.database.poolMax, migrateOnStart?.user ?? null);
+  // one application origin (B11 stage-1 integration, D-INT1-6): the origin the public inquiry accepts as the application's (W5b,
+  // KAURO_APP_ORIGIN) is one of the origins the session boundary's CSRF rule accepts (W2, KAURO_APP_ORIGINS)
+  if (identity !== null && config.publicApi !== null && !identity.appOrigins.includes(config.publicApi.appOrigin)) {
+    throw new ConfigError("KAURO_APP_ORIGIN", "must be one of KAURO_APP_ORIGINS: the public routes and the session boundary serve one application origin");
+  }
   // every instance behind the load balancer must open the cursors another one sealed (10 "Pagination, search and exports")
   if (config.cursorKeyFile === null && environment !== "LOCAL") throw new ConfigError(CURSOR_KEY_FILE_VARIABLE, "is required outside LOCAL: every instance seals and opens the same list cursors");
-  return config;
+  return identity === null ? config : { ...config, identity };
+}
+
+const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+/** The contract fake's address on the application origin (IdentityConfigView.endpoint). */
+const FAKE_ENDPOINT_PATH = /^(?=.{2,200}$)(\/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)+$/;
+
+/** The session boundary's variables, validated together (null when none is set). */
+function identityOf(env: Env, environment: Environment, runtimeUser: string, runtimePoolMax: number, migratorUser: string | null): IdentityConfig | null {
+  if (!IDENTITY_VARIABLES.some((name) => optional(env, name) !== undefined)) return null;
+  const keySource = required(env, "KAURO_IDENTITY_KEY_SOURCE");
+  if (keySource !== "GOOGLE_X509" && keySource !== "CONTRACT_FAKE") throw new ConfigError("KAURO_IDENTITY_KEY_SOURCE", "must be GOOGLE_X509 or CONTRACT_FAKE");
+  if (keySource === "CONTRACT_FAKE" && environment !== "LOCAL") throw new ConfigError("KAURO_IDENTITY_KEY_SOURCE", "CONTRACT_FAKE is accepted in the LOCAL environment only (B11 design D-AUTH-3)");
+  const projectId = required(env, "KAURO_IDENTITY_PROJECT_ID");
+  if (!PROJECT_ID.test(projectId)) throw new ConfigError("KAURO_IDENTITY_PROJECT_ID", "must be a Google Cloud project id (6..30 lowercase letters, digits and hyphens)");
+  const origins = required(env, "KAURO_APP_ORIGINS").split(",");
+  for (const origin of origins) {
+    if (!isApplicationOrigin(origin, environment === "LOCAL")) {
+      throw new ConfigError("KAURO_APP_ORIGINS", `must list exact origins (https://host[:port], lowercase, no path; http only for localhost in LOCAL), comma-separated`);
+    }
+  }
+  if (new Set(origins).size !== origins.length) throw new ConfigError("KAURO_APP_ORIGINS", "names an origin twice");
+  let fakeJwksFile: string | null = null;
+  let fakeEndpoint: string | null = null;
+  if (keySource === "CONTRACT_FAKE") {
+    fakeJwksFile = required(env, "KAURO_IDENTITY_FAKE_JWKS_FILE");
+    fakeEndpoint = optional(env, "KAURO_IDENTITY_FAKE_ENDPOINT") ?? null;
+    if (fakeEndpoint !== null && !FAKE_ENDPOINT_PATH.test(fakeEndpoint)) throw new ConfigError("KAURO_IDENTITY_FAKE_ENDPOINT", "must be a path of the application origin (/segment[/segment]..., no dot segment, at most 200 characters)");
+  } else {
+    for (const name of ["KAURO_IDENTITY_FAKE_JWKS_FILE", "KAURO_IDENTITY_FAKE_ENDPOINT"]) {
+      if (optional(env, name) !== undefined) throw new ConfigError(name, "is accepted with KAURO_IDENTITY_KEY_SOURCE=CONTRACT_FAKE only");
+    }
+  }
+  const user = roleName(env, "KAURO_DB_ASSURANCE_USER");
+  if (user === runtimeUser || user === migratorUser) throw new ConfigError("KAURO_DB_ASSURANCE_USER", "must be its own login of kauro_assurance, neither the request handlers' nor the migrator's");
+  const poolMax = integer(env, "KAURO_DB_ASSURANCE_POOL_MAX", undefined, 1, ASSURANCE_POOL_CEILING);
+  if (runtimePoolMax + poolMax > API_POOL_CEILING) {
+    throw new ConfigError("KAURO_DB_ASSURANCE_POOL_MAX", `with KAURO_DB_POOL_MAX it exceeds the api's ${API_POOL_CEILING} connections per instance (07 connection budget)`);
+  }
+  const password = optional(env, "KAURO_DB_ASSURANCE_PASSWORD");
+  return { keySource, projectId, appOrigins: origins, fakeJwksFile, fakeEndpoint, assuranceDatabase: { user, ...(password === undefined ? {} : { password }), poolMax } };
+}
+
+/** The variables that bind the public routes: all three or none. */
+export const PUBLIC_API_VARIABLES = Object.freeze(["KAURO_PUBLIC_ORIGIN", "KAURO_APP_ORIGIN", "KAURO_PUBLIC_HASH_KEY_FILE"] as const);
+
+/**
+ * An exact browser origin as the Origin header carries it: https://host[:port], lowercase, no path or trailing slash; http only
+ * for localhost in the LOCAL environment.
+ */
+function originOf(env: Env, name: string, environment: Environment): string {
+  const value = required(env, name);
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(value);
+  } catch {
+    parsed = undefined;
+  }
+  const local = environment === "LOCAL" && parsed !== undefined && parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  if (parsed === undefined || parsed.origin !== value || (parsed.protocol !== "https:" && !local)) {
+    throw new ConfigError(name, "must be an exact origin (https://host[:port], lowercase, no path; http only for localhost in LOCAL)");
+  }
+  return value;
+}
+
+function publicApiOf(env: Env, environment: Environment): PublicApiConfig | null {
+  if (PUBLIC_API_VARIABLES.every((name) => optional(env, name) === undefined)) return null;
+  return { publicOrigin: originOf(env, "KAURO_PUBLIC_ORIGIN", environment), appOrigin: originOf(env, "KAURO_APP_ORIGIN", environment), hashKeyFile: required(env, "KAURO_PUBLIC_HASH_KEY_FILE") };
 }
 
 /** The list cursors' key as a file (N16). */

@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "declaration": false,
+    "declarationMap": false,
+    "rewriteRelativeImportExtensions": true,
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "jsx": "react-jsx",
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/api/**/*.ts",
+    "src/client/**/*.ts",
+    "src/copy/**/*.ts",
+    "src/legal/**/*.ts",
+    "src/legal/**/*.json",
+    "src/public/**/*.ts",
+    "src/public/**/*.tsx",
+    "src/server/**/*.ts",
+    "src/shell/**/*.ts",
+    "src/shell/**/*.tsx",
+    "src/screens.ts",
+    "test/**/*.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": [
+    "src/shell/app-shell.tsx",
+    "src/shell/browser-page.ts"
+  ]
+}

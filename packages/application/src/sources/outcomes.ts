@@ -12,7 +12,7 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { B07CommandId } from "./contracts.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED, COOKIE_CSRF } = OUTCOME_BLOCKS;
 
 const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is not visible to the caller's agency`);
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
@@ -107,7 +107,7 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
 const HEADER_COMMANDS: ReadonlySet<B07CommandId> = new Set(["CMD012", "CMD013", "CMD014", "CMD015", "CMD016", "CMD017"]);
 
 function commandCatalogue(command: B07CommandId): ReadonlyArray<ProblemOutcome> {
-  return closedCatalogue(command, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...(HEADER_COMMANDS.has(command) ? AGENCY_HEADER : []), ...COMMAND_SPECIFIC[command]]);
+  return closedCatalogue(command, [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...TENANT, ...(HEADER_COMMANDS.has(command) ? AGENCY_HEADER : []), ...COMMAND_SPECIFIC[command]]);
 }
 
 /** The closed problem catalogue of each B07 command. */
@@ -145,6 +145,7 @@ const ROUTE_SPECIFIC: Readonly<Record<SourceRouteId, ReadonlyArray<ProblemOutcom
   /** Non-journaled, content-idempotent intake (D-SEL-2): a body admission route without an idempotency key. */
   SubmitSelectionManifest: [
     ...EVERY_ROUTE.filter((o) => o.layer !== "IDEMPOTENCY" && o.reason !== "IDEMPOTENCY_KEY_MISSING" && o.reason !== "IDEMPOTENCY_KEY_INVALID"),
+    ...COOKIE_CSRF,
     ...PATH_IDS,
     ...TENANT,
     ...AGENCY_HEADER,

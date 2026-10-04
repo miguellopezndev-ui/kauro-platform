@@ -13,10 +13,35 @@ import { readFileSync } from "node:fs";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AuthenticatedSubject } from "@kauro/application";
 import { isCalendarDateTime } from "@kauro/application";
-import { identityUserId } from "@kauro/domain";
+import { identityUserId, type DomainFailure } from "@kauro/domain";
 
 export interface Authenticator {
   authenticate(headers: Readonly<Record<string, string | undefined>>): Promise<AuthenticatedSubject | null>;
+  /**
+   * The request-aware form (B11 D-AUTH-5), when the authenticator has one: it sees the method as well, so it can decide the CSRF
+   * rule of an unsafe cookie-authenticated request, and it can refuse the credentials themselves (AMBIGUOUS_CREDENTIALS,
+   * ORIGIN_REJECTED, CSRF_TOKEN_INVALID) — decided here, before the command journal is reserved. The server prefers it.
+   */
+  authenticateRequest?(request: AuthenticationRequest): Promise<Authentication>;
+}
+
+/** What authentication sees of a request: its method and its lowercased single-valued headers. */
+export interface AuthenticationRequest {
+  readonly method: string;
+  readonly headers: Readonly<Record<string, string | undefined>>;
+}
+
+/** An authenticated subject, no credential at all, or credentials refused as such (the refusal's failure). */
+export type Authentication =
+  | { readonly kind: "SUBJECT"; readonly subject: AuthenticatedSubject; readonly sessionSecret: string | null }
+  | { readonly kind: "NONE" }
+  | { readonly kind: "REFUSED"; readonly failure: DomainFailure };
+
+/** The authentication of a request by an authenticator of either form. */
+export async function authenticationOf(authenticator: Authenticator, request: AuthenticationRequest): Promise<Authentication> {
+  if (authenticator.authenticateRequest !== undefined) return authenticator.authenticateRequest(request);
+  const subject = await authenticator.authenticate(request.headers);
+  return subject === null ? { kind: "NONE" } : { kind: "SUBJECT", subject, sessionSecret: null };
 }
 
 export interface SubjectFacts {

@@ -1,0 +1,68 @@
+// Every class name the primitives emit, in one place. styles.ts writes a rule for each and styles.test.ts checks that no name is
+// emitted without one, so a component can only be styled through the generated tokens.css (B11 D-SEC-1: no inline style).
+
+export const CLASS = Object.freeze({
+  icon: "kauro-icon",
+  heading: "kauro-heading",
+  safeText: "kauro-safe-text",
+  safeTextMarker: "kauro-safe-text-marker",
+  safeTextFull: "kauro-safe-text-full",
+  disclosure: "kauro-disclosure",
+  count: "kauro-count",
+  money: "kauro-money",
+  deadline: "kauro-deadline",
+  button: "kauro-button",
+  buttonPrimary: "kauro-button-primary",
+  buttonSecondary: "kauro-button-secondary",
+  buttonDanger: "kauro-button-danger",
+  field: "kauro-field",
+  label: "kauro-label",
+  hint: "kauro-hint",
+  fieldError: "kauro-field-error",
+  errorSummary: "kauro-error-summary",
+  errorSummaryList: "kauro-error-summary-list",
+  dialog: "kauro-dialog",
+  dialogSummary: "kauro-dialog-summary",
+  dialogActions: "kauro-dialog-actions",
+  effectList: "kauro-effect-list",
+  effect: "kauro-effect",
+  effectDescription: "kauro-effect-description",
+  effectAcknowledge: "kauro-effect-acknowledge",
+  tableRegion: "kauro-table-region",
+  table: "kauro-table",
+  tableCaption: "kauro-table-caption",
+  tableEnd: "kauro-table-end",
+  tableEmpty: "kauro-table-empty",
+  sortButton: "kauro-sort-button",
+  pagination: "kauro-pagination",
+  toneNeutral: "kauro-tone-neutral",
+  toneInfo: "kauro-tone-info",
+  toneSuccess: "kauro-tone-success",
+  toneWarning: "kauro-tone-warning",
+  toneDanger: "kauro-tone-danger",
+  statusBadge: "kauro-status-badge",
+  banner: "kauro-banner",
+  bannerBody: "kauro-banner-body",
+  bannerTitle: "kauro-banner-title",
+  phaseList: "kauro-phase-list",
+  phase: "kauro-phase",
+  phaseLabel: "kauro-phase-label",
+  phaseState: "kauro-phase-state",
+  phaseDone: "kauro-phase-done",
+  phaseCurrent: "kauro-phase-current",
+  phaseUpcoming: "kauro-phase-upcoming",
+  phaseFailed: "kauro-phase-failed",
+  countPanel: "kauro-count-denominators",
+  measures: "kauro-measures",
+  measure: "kauro-measure",
+  measureValue: "kauro-measure-value",
+  measureDefinition: "kauro-measure-definition",
+  outputFiles: "kauro-output-files",
+});
+
+export type ClassName = (typeof CLASS)[keyof typeof CLASS];
+
+/** Joins the class names that are present. */
+export function cx(...names: ReadonlyArray<string | false | null | undefined>): string {
+  return names.filter((name): name is string => typeof name === "string" && name !== "").join(" ");
+}

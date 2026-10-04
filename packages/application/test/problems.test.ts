@@ -11,13 +11,13 @@ const MANUAL_10_CODES = [
   "PAYMENT_UNCERTAIN", "BUDGET_EXHAUSTED", "CAPACITY_UNAVAILABLE", "INTEGRITY_FAILURE", "OPERATION_CANCELLED",
 ];
 
-test("every code of manual 10 is a failure code with a status and a title; platform additions are exactly three", () => {
+test("every code of manual 10 is a failure code with a status and a title; platform additions are exactly four", () => {
   for (const c of MANUAL_10_CODES) {
     assert.ok((FAILURE_CODES as ReadonlyArray<string>).includes(c), c);
     assert.ok(AUTHORITY_FAILURE_CODES.has(c as "NOT_FOUND"), c);
   }
   const additions = FAILURE_CODES.filter((c) => !AUTHORITY_FAILURE_CODES.has(c));
-  assert.deepEqual(additions, ["PRECONDITION_FAILED", "ADMISSION_LIMITED", "INTERNAL_ERROR"]);
+  assert.deepEqual(additions, ["PRECONDITION_FAILED", "ADMISSION_LIMITED", "CONTENT_REFUSED", "INTERNAL_ERROR"]);
   for (const c of FAILURE_CODES) {
     assert.ok(Number.isInteger(PROBLEM_STATUS[c]) && PROBLEM_STATUS[c] >= 400 && PROBLEM_STATUS[c] <= 599, c);
     assert.ok(PROBLEM_TITLE[c].length > 0, c);
@@ -26,6 +26,8 @@ test("every code of manual 10 is a failure code with a status and a title; platf
   assert.equal(PROBLEM_STATUS.IDEMPOTENCY_CONFLICT, 409);
   assert.equal(PROBLEM_STATUS.CAPABILITY_UNAVAILABLE, 422);
   assert.equal(PROBLEM_STATUS.NOT_FOUND, 404);
+  // B11 CMD044 (D-SUP-2) and the public inquiry (W5b, D-PUB-4): a text the detector refuses is a final 422 that points to the secure upload
+  assert.equal(PROBLEM_STATUS.CONTENT_REFUSED, 422);
 });
 
 test("problems carry code, reason, current version and next actions but never the internal message or SQL", () => {

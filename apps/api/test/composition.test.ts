@@ -107,6 +107,8 @@ test("configuration: every variable is validated and a missing or malformed one 
     migrateOnStart: null,
     bearerTokensFile: null,
     cursorKeyFile: null,
+    identity: null,
+    publicApi: null,
   });
 });
 

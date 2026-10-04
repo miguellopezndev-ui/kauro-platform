@@ -19,6 +19,7 @@ import {
   CREATE_AGENCY,
   CREATE_CLIENT,
   CREATE_PROJECT,
+  CREATE_SUPPORT_CASE,
   FORBIDDEN_RESPONSE_FIELDS,
   LABEL_PATTERN,
   OPERATIONAL_ROUTES,
@@ -35,6 +36,7 @@ import {
   commandRouteResponses,
   createB06Handlers,
   createSchemaValidator,
+  createSupportHandlers,
   declaredMembers,
   openObjects,
   operationalResponseSchemaId,
@@ -160,12 +162,30 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
   }
   assert.deepEqual(SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view === null), ["CMD014", "CMD036", "CMD020", "CMD024"]);
   assert.ok(validator.knownSchemaIds.includes(ACCEPTED_RESPONSE_SCHEMA_ID));
-  // the operational routes of this edition are the two probes (14 "Monitoring and service health"); the default validator
-  // compiles exactly their declared replies, and a probe's reply is checked like a command's
-  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [["GET", "/livez", "getLiveness", ["200"]], ["GET", "/readyz", "getReadiness", ["200", "503"]]]);
+  // the operational routes of this edition are the two probes (14 "Monitoring and service health"), the five routes of the
+  // browser session boundary (B11 W2, D-AUTH-4) and the two public routes (B11 W5b, D-PUB-1..D-PUB-6); the default validator
+  // compiles exactly their declared reply bodies (the logout's 204 has none), and their replies are checked like a command's
+  assert.deepEqual(OPERATIONAL_ROUTES.map((r) => [r.method, r.path, r.operationId, Object.keys(r.responses)]), [
+    ["GET", "/livez", "getLiveness", ["200"]],
+    ["GET", "/readyz", "getReadiness", ["200", "503"]],
+    ["POST", "/api/v1/sessions", "openSession", ["201"]],
+    ["GET", "/api/v1/sessions/current", "getCurrentSession", ["200"]],
+    ["POST", "/api/v1/sessions/current/revoke", "revokeCurrentSession", ["204"]],
+    ["POST", "/api/v1/assurance/step-ups", "createStepUp", ["201"]],
+    ["GET", "/api/v1/public/identity-config", "getIdentityConfig", ["200"]],
+    ["GET", "/api/v1/public/capability-publication", "getCapabilityPublication", ["200"]],
+    ["POST", "/api/v1/public/inquiries", "createInquiry", ["201"]],
+  ]);
   for (const route of OPERATIONAL_ROUTES) {
-    for (const status of Object.keys(route.responses)) assert.ok(validator.knownSchemaIds.includes(operationalResponseSchemaId(route.operationId, status)), `${route.operationId} ${status}`);
+    for (const [status, response] of Object.entries(route.responses)) {
+      assert.equal(validator.knownSchemaIds.includes(operationalResponseSchemaId(route.operationId, status)), response.schema !== null, `${route.operationId} ${status}`);
+    }
   }
+  // a reply declared without a body is checked as one: nothing sent, no media type
+  const logout = operationalRouteResponses("revokeCurrentSession");
+  checkReply(validator, logout, 204, undefined, undefined);
+  assert.throws(() => checkReply(validator, logout, 204, "application/json", { ended: true }), (e: unknown) => e instanceof ResponseContractViolation);
+  assert.throws(() => checkReply(validator, logout, 204, "application/json", undefined), (e: unknown) => e instanceof ResponseContractViolation);
   const live = operationalRouteResponses("getLiveness");
   assert.deepEqual(live.declared, { "200": { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getLiveness:200" } });
   checkReply(validator, live, 200, "application/json; charset=utf-8", { status: "LIVE" });
@@ -244,13 +264,15 @@ function envelopeOf<V>(command: keyof typeof COMMAND_RESPONSES, r: CommandResult
   return { kind: "COMPLETED", version: c.version, replayed: c.replayed, data: c.view };
 }
 
-test("R23 / R29: the COMPLETED reply of each of the seven handlers satisfies its response schema; the approval view recomputes its KAURO_PLAN_APPROVAL_V1 hash from its own members", async () => {
+test("R23 / R29: the COMPLETED reply of each of the eight handlers satisfies its response schema; the approval view recomputes its KAURO_PLAN_APPROVAL_V1 hash from its own members", async () => {
   const w = world();
   const h = createB06Handlers(w.runtime, collaborators(w));
   const replies: Array<[keyof typeof COMMAND_RESPONSES, unknown]> = [];
   replies.push(["CMD001", envelopeOf("CMD001", await h.CMD001.execute(envelope(CREATE_AGENCY, subject("founder"), { key: "response-schema-cmd001", body: { displayName: "Founded" } })))]);
   replies.push(["CMD009", envelopeOf("CMD009", await h.CMD009.execute(envelope(CREATE_CLIENT, w.operator, { key: "response-schema-cmd009", path: { agencyId: w.agencyId }, body: { displayName: "Another", processingAuthorityRef: w.authorityId } })))]);
   replies.push(["CMD011", envelopeOf("CMD011", await h.CMD011.execute(envelope(CREATE_PROJECT, w.operator, { key: "response-schema-cmd011", agencyId: w.agencyId, path: { clientId: w.clientId }, body: { mode: "CLEAN", purpose: "Dedupe" } })))]);
+  const projectId = (replies.at(-1)![1] as { data: { projectId: string } }).data.projectId;
+  replies.push(["CMD044", envelopeOf("CMD044", await createSupportHandlers(w.runtime).CMD044.execute(envelope(CREATE_SUPPORT_CASE, w.operator, { key: "response-schema-cmd044", agencyId: w.agencyId, path: { projectId }, body: { category: "BILLING", summary: "The invoice total of the last import differs from the quote by a few cents." } })))]);
   replies.push(["CMD010", envelopeOf("CMD010", await h.CMD010.execute(envelope(ARCHIVE_CLIENT, w.owner, { key: "response-schema-cmd010", agencyId: w.agencyId, path: { clientId: w.clientId }, body: { expectedVersion: 1 } })))]);
   const planHash = bodyHashOf(w.planBody);
   const approved = envelopeOf("CMD025", await h.CMD025.execute(envelope(APPROVE_PLAN, w.approver, { key: "response-schema-cmd025", agencyId: w.agencyId, path: { planId: w.planId }, body: { expectedVersion: 4, planHash, validationReceiptHash: w.receiptHash, disclosuresHash: sha(`disclosures:${planHash}`), assuranceProofRef: w.proofId } })));
@@ -259,8 +281,8 @@ test("R23 / R29: the COMPLETED reply of each of the seven handlers satisfies its
   const other = world();
   const revised = await createB06Handlers(other.runtime, collaborators(other)).CMD023.execute(envelope(REVISE_PLAN, other.operator, { key: "response-schema-cmd023", agencyId: other.agencyId, path: { planId: other.planId }, body: { expectedVersion: 4, decisionPatchArtifactRef: "0192f3a4-5b6c-7d8e-9f01-23456789abcd" } }));
   replies.push(["CMD023", envelopeOf("CMD023", revised)]);
-  // the seven B06 handlers (B07's six are exercised through the real route in apps/api/test/cmd012..cmd017)
-  assert.deepEqual(replies.map(([c]) => c).sort(), Object.keys(B06_COMMANDS).sort());
+  // the seven B06 handlers and B11's CMD044 (B07's six are exercised through the real route in apps/api/test/cmd012..cmd017)
+  assert.deepEqual(replies.map(([c]) => c).sort(), [...Object.keys(B06_COMMANDS), "CMD044"].sort());
   for (const [command, reply] of replies) assert.deepEqual(validator.validate(commandResponseSchemaId(command), reply), { kind: "VALID", value: reply }, command);
 
   // R29: a consumer holding only the DTO recomputes the approval hash (the preimage members, nothing else)

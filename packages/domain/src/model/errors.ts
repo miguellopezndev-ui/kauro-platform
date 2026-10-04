@@ -38,6 +38,7 @@ export const FAILURE_CODES = [
   "OPERATION_CANCELLED",
   "PRECONDITION_FAILED",
   "ADMISSION_LIMITED",
+  "CONTENT_REFUSED",
   "INTERNAL_ERROR",
 ] as const;
 export type FailureCode = (typeof FAILURE_CODES)[number];
@@ -73,6 +74,7 @@ export const FAILURE_HTTP_STATUS: Readonly<Record<FailureCode, number>> = Object
   INTEGRITY_FAILURE: 422,
   BUDGET_EXHAUSTED: 429,
   ADMISSION_LIMITED: 429,
+  CONTENT_REFUSED: 422,
   CAPACITY_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
 });
@@ -96,6 +98,7 @@ export const FAILURE_TITLES: Readonly<Record<FailureCode, string>> = Object.free
   PLAN_NOT_VALIDATED: "The plan has no current valid validation",
   INTEGRITY_FAILURE: "An integrity check failed",
   ADMISSION_LIMITED: "The request was not admitted by the abuse or capacity limits",
+  CONTENT_REFUSED: "The submitted text looks like a secret or customer records and was not accepted",
   BUDGET_EXHAUSTED: "The operating budget for this operation is exhausted",
   CAPACITY_UNAVAILABLE: "Capacity is temporarily unavailable",
   INTERNAL_ERROR: "An unexpected error was recorded under the correlation id",
@@ -126,6 +129,15 @@ export const FAILURE_REASONS = [
   "STEP_UP_STALE",
   "STEP_UP_NOT_OWNED",
   "TENANT_CONTEXT_MISSING",
+  // the browser session boundary (B11 design D-AUTH-4, D-AUTH-5): every defect of an identity token is one reason (no account
+  // enumeration); a proven account whose e-mail is unverified; a request carrying a session cookie and another credential (or
+  // two session cookies); an unsafe cookie-authenticated request from outside the exact application origin, or without the
+  // session's CSRF token
+  "IDENTITY_TOKEN_INVALID",
+  "EMAIL_NOT_VERIFIED",
+  "AMBIGUOUS_CREDENTIALS",
+  "ORIGIN_REJECTED",
+  "CSRF_TOKEN_INVALID",
   // aggregate state (07 state machines, reference/TRANSITIONS_AND_EVENT_EFFECTS.md)
   "UNLISTED_TRANSITION",
   "AGENCY_NOT_OPEN",
@@ -267,6 +279,14 @@ export const FAILURE_REASONS = [
   "FENCE_DISCIPLINE",
   "LIFECYCLE_BINDING_MISSING",
   "SOURCE_SERVICES_UNAVAILABLE",
+  // support cases (B11 CMD044; placed before B09's list by the trunk sync so that B09, B08 and B10 keep their order, D11-SYNC-1, D-SUP-2, D-SUP-4): the bounded detector refused the summary, and the covered-hours calendar does not
+  // reach the request date (fail closed rather than guess a review date)
+  "SECRET_LIKE_CONTENT",
+  "RECORD_LIKE_CONTENT",
+  "SUPPORT_CALENDAR_UNAVAILABLE",
+  // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
+  // (W2) and its detector the support reasons above
+  "INQUIRY_RATE_LIMITED",
   // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
   ...COMMERCE_FAILURE_REASONS,
   // processing authority (package B08; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1)
