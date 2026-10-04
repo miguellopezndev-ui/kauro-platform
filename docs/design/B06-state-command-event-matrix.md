@@ -1998,6 +1998,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | PAYOUT_EVIDENCE_UNAVAILABLE | — | — | COMMAND | the payout evidence verifier did not answer within its bound or failed: nothing changed and the same key retries (D10-GAP-6) |
 
 ## 4. Contract-test applicability (manual 10)
 
