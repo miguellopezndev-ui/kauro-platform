@@ -7,8 +7,8 @@
  * pipeline of CMD051's close), in the lock order of design 10 (statement, then lines):
  *  1. the predecessor statement FOR UPDATE (NOT_FOUND); expectedVersion (STALE_VERSION: two corrections, or a correction and an approval,
  *     of one statement serialize on its row, the second finding the first's version); then ISSUED or DISPUTED (UNLISTED_TRANSITION: an
- *     APPROVED, PAID or CORRECTED statement has no edge to CORRECTED, so a CORRECTED one is never corrected twice and no payout intent
- *     ever names a CORRECTED statement);
+ *     APPROVED, PAID or CORRECTED statement has no edge to CORRECTED, so a CORRECTED one is never corrected twice and no live payout
+ *     intent names a CORRECTED statement; a FAILED or RETURNED one keeps naming the statement CMD053 supersedes, D10-GAP-12);
  *  2. the lines of the predecessor (every line any of its items names, D10-GAP-15) locked in ascending id, then the statement recomposed
  *     over exactly those lines from the ledger as it stands now (composeStatement), its own reported adjustments carried and its negative
  *     balance with them: a line PAYABLE through the predecessor (its payable owner, 0037) stays payable through the successor's
