@@ -8,7 +8,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { STATE_MACHINES, registryJson } from "@kauro/contracts";
-import { AGGREGATE_KINDS, COMMERCIAL_PLATFORM_MACHINES, EVENT_TYPES, EXECUTION_PLATFORM_MACHINES, PLATFORM_STATE_MACHINES, SOURCE_LIFECYCLE_STATE_MACHINES } from "@kauro/domain";
+import {
+  AGGREGATE_KINDS,
+  COMMERCIAL_PLATFORM_MACHINES,
+  EVENT_TYPES,
+  EXECUTION_PLATFORM_MACHINES,
+  PLATFORM_STATE_MACHINES,
+  SOURCE_LIFECYCLE_STATE_MACHINES,
+  SUPPORT_CASE_STATES,
+} from "@kauro/domain";
 import { MIGRATIONS_DIR, MigrationDriftError, applyMigrations, appliedMigrations, listMigrations } from "../src/index.js";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 
@@ -24,7 +32,8 @@ after(async () => {
 test("every migration applied once, in order, with its checksum recorded; a second run applies nothing", async () => {
   const files = listMigrations();
   // B06 owns 0001..0007; 0008 is the shared aggregate-kind registry (docs/design/FOUNDATION-aggregate-kinds.md); B07 owns 0009..0012
-  // and B09 0013..0017 (the second of B07 and B09 to merge was renumbered after the first)
+  // and B09 0013..0017 (the second of B07 and B09 to merge was renumbered after the first); the package-close reviews took 0019
+  // (B09) and 0020 (B07), B08 0021..0024, B11 0025..0027 (D11-SYNC-1) and B10 0028 onward
   assert.deepEqual(files.map((f) => f.file), [
     "0001_schema_roles_helpers.sql",
     "0002_identity_agencies_memberships.sql",
@@ -57,11 +66,11 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0022_staging_verification_packages.sql",
     "0023_audits_cost_grants.sql",
     "0024_execution_review_fixes.sql",
-    // the contiguous runner's numbers of package B11 not on B10's base: B11 owns 0025..0027 (B08 took 0024, D10-SYNC-1); each file
-    // reserves its number (a header and SELECT 1) until its owner's migration replaces it (docs/design/B10-commercial-domain.md D10-BASE-1)
-    "0025_reserved_b11.sql",
-    "0026_reserved_b11.sql",
-    "0027_reserved_b11.sql",
+    // package B11: numbered 0009 on each mandate's branch, 0022..0024 by the stage-1 integrator (D-INT1-1) and 0025..0027 by the
+    // trunk sync, which replaced the reservations of main (B08 took 0022..0024; D10-SYNC-1, docs/design/B11-agency-app.md D11-SYNC-1)
+    "0025_web_sessions.sql",
+    "0026_support_cases.sql",
+    "0027_inquiries.sql",
     // package B10 (docs/design/B10-commercial-domain.md): the recurrence history, the founding cohort and the agency lifecycle records
     "0028_recurrence_founding_agency.sql",
     // package B10: the sales and attribution records, the commission ledger, and the periods, statements and payouts
@@ -191,6 +200,9 @@ test("state and enum CHECK constraints carry exactly the registry vocabularies",
       ["inbox_records", "state", "InboxRecord", "state"],
       ["inbox_records", "environment", "InboxRecord", "environment"],
       ["target_contracts", "mode", "TargetContract", "mode"],
+      ["support_cases", "category", "SupportCase", "category"],
+      ["support_cases", "severity", "SupportCase", "severity"],
+      ["support_cases", "state", "SupportCase", "state"],
       // package B08 (0023): the registry Audit and CostGrant vocabularies
       ["audits", "state", "Audit", "state"],
       ["cost_grants", "state", "CostGrant", "state"],
@@ -211,8 +223,13 @@ test("state and enum CHECK constraints carry exactly the registry vocabularies",
         [table, column],
       );
       assert.equal(r.rows.length, 1, `${table}.${column} has no enum CHECK`);
-      const values = [...r.rows[0]!.def.matchAll(/'([A-Z_]+)'::text/g)].map((m) => m[1]);
-      assert.deepEqual(values, registryEnum(contract, field), `${table}.${column}`);
+      const values = [...r.rows[0]!.def.matchAll(/'([A-Z][A-Z0-9_]*)'::text/g)].map((m) => m[1]);
+      // the vendored registry still spells one token of SupportCase.state with the authority edition's brand; the generated contract, which
+      // the domain vocabulary is typed against, emits the Kauro token (amendment A2), so that one enum is compared through it
+      const raw = registryEnum(contract, field);
+      const emitted = contract === "SupportCase" && field === "state" ? [...SUPPORT_CASE_STATES] : raw;
+      assert.equal(emitted.length, raw.length, `${table}.${column} keeps the registry's size`);
+      assert.deepEqual(values, emitted, `${table}.${column}`);
     }
   } finally {
     await su.end();
@@ -244,15 +261,15 @@ test("the listed-transition seed equals the registry machines for every machine 
   }
 });
 
-test("R20: the initial-state seed equals the registry machines (and the platform machines of D-AGG-1/D-AGG-2 and of package B09); every table that guards its listed edges also guards its birth state", async () => {
+test("R20: the initial-state seed equals the registry machines (and the platform machines of D-AGG-1/D-AGG-2, of package B09 and of B11 D-SUP-6); every table that guards its listed edges also guards its birth state", async () => {
   const su = await pg.connect("postgres");
   try {
     const seeded = await su.query<{ machine: string; initial_state: string }>("SELECT machine, initial_state FROM kauro.state_machines ORDER BY machine");
     // B07 adds the platform machines of the source lifecycle (D-UP-1, D-OBJ-1, D-FILE-1, D-RET-2), package B09 its commerce
     // machines, package B08 the registry machine Job and its platform machines of design 8.2, and the registry machines Audit and
     // CostGrant (0023), and package B10 its founding reservation (D10-FOUND-1), the registry's CommissionLine and its sales, ledger and
-    // payout machines (0029..0031), each born in its initial state
-    const expected = ["Agency", "AttributionClaim", "Audit", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "CostGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Job", "Membership", "PackageVersion", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "ProcessingAttempt", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "TaxDocument", "UploadSession"].map((name) => {
+    // payout machines (0029..0031), and package B11 its SupportCase (D-SUP-6), each born in its initial state
+    const expected = ["Agency", "AttributionClaim", "Audit", "Capability", "CaptureFact", "CommercialAuthorization", "CommissionEntitlement", "CommissionHold", "CommissionLine", "CommissionPeriod", "CommissionStatement", "CorporateGrant", "CostGrant", "DatasetRevision", "EndClient", "FiscalIssuerRoute", "FoundingReservation", "Job", "Membership", "PackageVersion", "PaymentAttempt", "PaymentOrder", "PaymentRoute", "PayoutDestination", "PayoutIntent", "Plan", "ProcessingAttempt", "Project", "Prospect", "Quote", "ReconciliationCase", "Refund", "RefundPolicy", "RetentionRecord", "Seller", "SourceFile", "StoredObject", "SupportCase", "TaxDocument", "UploadSession"].map((name) => {
       const m =
         STATE_MACHINES.find((x) => x.contract === name) ??
         PLATFORM_STATE_MACHINES.find((x) => x.contract === name) ??
@@ -287,7 +304,7 @@ test("R20: the initial-state seed equals the registry machines (and the platform
     const births = machineOf(["enforce_initial_state", "enforce_initial_state_of", "enforce_observed_birth"]);
     for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
     assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
-    assert.equal(edges.size, 39, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven)");
+    assert.equal(edges.size, 40, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven, B11 one)");
     for (const d of defs.rows) {
       if (/enforce_initial_state|enforce_membership_initial_state|enforce_observed_birth/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
     }
@@ -325,6 +342,11 @@ test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's s
         ["plan", "plans", "plan_id"],
         ["project", "projects", "project_id"],
       ],
+    );
+    // B11 W4 registers its own kind in its own migration (0026, D11-SYNC-1), owned by B11
+    assert.deepEqual(
+      r.rows.filter((x) => x.owner_package === "B11").map((x) => [x.aggregate_kind, x.table_name, x.id_column]),
+      [["support_case", "support_cases", "case_id"]],
     );
     // D-EVT-1 over the registry: every registered kind's table carries require_event_for_version(kind, id column), and every such
     // trigger names a registered kind with that table and column — the event-per-version rule and the binding agree on each kind

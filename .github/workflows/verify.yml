@@ -57,7 +57,7 @@ jobs:
       - name: Install from the lockfile
         run: pnpm install --frozen-lockfile
 
-      - name: Verify (generate, build, typecheck, test, arch, openapi, matrix, clean-consume)
+      - name: Verify (generate, build, typecheck, test, arch, openapi, web-client, matrix, clean-consume)
         run: |
           set -o pipefail
           pnpm run verify 2>&1 | tee verify.log
@@ -70,6 +70,7 @@ jobs:
           path: |
             verify.log
             apps/api/openapi.json
+            apps/web/src/api/generated.ts
             docs/design/B06-state-command-event-matrix.md
           if-no-files-found: warn
           retention-days: 14

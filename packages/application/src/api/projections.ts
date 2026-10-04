@@ -14,11 +14,12 @@ import type {
   MembershipRole,
   PlanRecord,
   ProjectRecord,
+  SupportCaseRecord,
   TargetContractRecord,
 } from "@kauro/domain";
 import { OFFERED_CAPABILITY_STATES, capabilitiesOf } from "@kauro/domain";
 import type { ResourceAction } from "./permitted-actions.js";
-import type { AgencyMembershipView, AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, ReadinessBlocker, TeamMemberView } from "./views.js";
+import type { AgencyMembershipView, AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, ReadinessBlocker, SupportCaseView, TeamMemberView } from "./views.js";
 
 export function agencyView(agency: AgencyRecord, callerRole: MembershipRole): AgencyView {
   return {
@@ -172,5 +173,23 @@ export function teamMemberView(m: MembershipRecord, callerMembershipId: string, 
     self: m.membershipId === callerMembershipId,
     ...(managesTeam ? { createdAt: m.createdAt } : {}),
     ...(managesTeam && m.acceptedAt !== undefined ? { acceptedAt: m.acceptedAt } : {}),
+  };
+}
+
+/** A support case: an explicit selection, so the identity of the opener (the user id) and the audit columns never reach the wire. */
+export function supportCaseView(c: SupportCaseRecord): SupportCaseView {
+  return {
+    caseId: c.caseId,
+    agencyId: c.agencyId,
+    projectId: c.projectId,
+    category: c.category,
+    severity: c.severity,
+    state: c.state,
+    summary: c.summary,
+    evidenceRefs: [...c.evidenceRefs],
+    nextReviewAt: c.nextReviewAt,
+    createdByMembershipId: c.createdByMembershipId,
+    createdAt: c.createdAt,
+    version: c.version,
   };
 }

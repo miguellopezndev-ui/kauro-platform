@@ -41,6 +41,7 @@ import {
   commercialCommandResponseSchemaId,
   commercialReadResponseSchemaId,
   intakeResponseSchemaId,
+  operationalRequestSchemaId,
   operationalResponseSchemaId,
   readResponseSchemaId,
   requestSchemaId,
@@ -120,7 +121,8 @@ test("the validator the api composes is closed: exactly the contract names, the 
     // every served command that completes (B07's CompleteUpload answers the ACCEPTED envelope, D-RUN-1)
     ...SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId),
     ACCEPTED_RESPONSE_SCHEMA_ID,
-    ...OPERATIONAL_ROUTES.flatMap((r) => Object.keys(r.responses).map((s) => operationalResponseSchemaId(r.operationId, s))),
+    // (a reply declared without a body, the logout's 204, has no schema; the public routes' replies are bodies)
+    ...OPERATIONAL_ROUTES.flatMap((r) => Object.entries(r.responses).filter(([, response]) => response.schema !== null).map(([s]) => operationalResponseSchemaId(r.operationId, s))),
     // the READ envelopes of the manual-10 reads (N16) and of the source reads (B07)
     ...READ_OPERATION_IDS.map(readResponseSchemaId),
     // the STORED envelope of the selection manifest intake (B07 D-SEL-2)
@@ -134,10 +136,12 @@ test("the validator the api composes is closed: exactly the contract names, the 
     ...(Object.keys(COMMERCIAL_READ_ROUTES) as CommercialReadOperationId[]).map(commercialReadResponseSchemaId),
   ];
   // the request schemas: B06's seven, B07's six and the selection manifest document the intake admits, B09's seven, B08's two job commands and
-  // four audit commands and the decision artifact document its intake admits, and B10's twelve
+  // four audit commands and the decision artifact document its intake admits, B10's twelve, and the request bodies of the operational
+  // routes that take one (B11 W2: the identity token of a sign-in and of a step-up; W5b: the fit inquiry)
   const commerceRequestIds = Object.keys(COMMERCE_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
   const commercialRequestIds = Object.keys(COMMERCIAL_REQUEST_SCHEMAS).map((command) => `${REQUEST_SCHEMA_PREFIX}${command}`);
-  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, ...commercialRequestIds];
+  const operationalRequestIds = OPERATIONAL_ROUTES.filter((r) => r.request !== undefined).map((r) => operationalRequestSchemaId(r.operationId));
+  const requestIds = [...REQUEST_SCHEMA_IDS, ...SOURCE_REQUEST_SCHEMA_IDS, SELECTION_MANIFEST_SCHEMA_ID, ...commerceRequestIds, ...EXECUTION_REQUEST_SCHEMA_IDS, ...AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, ...commercialRequestIds, ...operationalRequestIds];
   const expected = [...CONTRACT_NAMES, ...requestIds, ...responseIds, "Problem"].sort();
   assert.deepEqual([...w.validator.knownSchemaIds].sort(), expected);
   assert.equal(new Set(expected).size, expected.length);

@@ -16,6 +16,7 @@ import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD
 import { AUDIT_AGGREGATE_KINDS, AUDIT_AUTHORITY_EVENT_TYPES, AUDIT_CONSUMERS, AUDIT_EVENT_PAYLOAD_ALLOWLIST, AUDIT_EVENT_SUBSCRIPTIONS } from "./audit/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
 import { isUuid } from "./ids.js";
+import { isUtcInstant } from "../ports/clock.js";
 import type { ActorRef } from "./tenant.js";
 
 export const EVENT_TYPES = [
@@ -89,6 +90,8 @@ export const EVENT_TYPES = [
   "source_file.admission_revoked.v1",
   // Payments and fiscal workflow (package B09, commerce/events.ts; migration 0013)
   ...COMMERCE_EVENT_TYPES,
+  // Support (B11 CMD044: a case is born OPEN; the summary never travels in an event, D-SUP-5)
+  "support_case.opened.v1",
   // Processing authority (package B08, model/execution/events.ts; migrations 0021 and 0022)
   ...EXECUTION_EVENT_TYPES,
   // Audit authority (package B08, model/audit/events.ts; migration 0023)
@@ -104,9 +107,9 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here (B07: upload_session, source_file, retention_record, registered by migrations 0009, 0010 and
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
- * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023).
+ * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -173,6 +176,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
   // payments and fiscal workflow (package B09, commerce/events.ts)
   ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
+  // nextReviewAt is a canonical UTC instant, admitted by the payload gate (D-SUP-5); the summary and the evidence are never in it
+  "support_case.opened.v1": ["caseId", "projectId", "category", "severity", "nextReviewAt"],
   // processing authority (package B08, model/execution/events.ts)
   ...EXECUTION_EVENT_PAYLOAD_ALLOWLIST,
   // audit authority (package B08, model/audit/events.ts)
@@ -262,7 +267,7 @@ export function isSafeToken(value: unknown): value is string {
 function isSafeScalar(v: unknown): boolean {
   if (typeof v === "boolean") return true;
   if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0;
-  if (typeof v === "string") return isUuid(v) || isSha256Hex(v) || TOKEN.test(v);
+  if (typeof v === "string") return isUuid(v) || isSha256Hex(v) || TOKEN.test(v) || isUtcInstant(v);
   return false;
 }
 

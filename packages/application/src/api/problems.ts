@@ -11,7 +11,7 @@ export const PROBLEM_TYPE_PREFIX = "urn:kauro:problem:";
 
 export interface NextAction {
   /** A stable action token the UI maps to its own control flow (e.g. RELOAD, COMPARE_VERSIONS, REAUTHENTICATE, RETRY_LATER). */
-  readonly action: "RELOAD" | "COMPARE_VERSIONS" | "REAUTHENTICATE" | "STEP_UP" | "RETRY_LATER" | "RETRY_SAME_KEY" | "REQUEST_NEW_REVIEW" | "CONTACT_SUPPORT" | "CHOOSE_ANOTHER_MODE";
+  readonly action: "RELOAD" | "COMPARE_VERSIONS" | "REAUTHENTICATE" | "STEP_UP" | "RETRY_LATER" | "RETRY_SAME_KEY" | "REQUEST_NEW_REVIEW" | "CONTACT_SUPPORT" | "CHOOSE_ANOTHER_MODE" | "SECURE_UPLOAD";
   /** Relative application path when the action has a destination; never an absolute or attacker-controllable URL. */
   readonly href?: string;
 }
@@ -50,6 +50,7 @@ export const PROBLEM_STATUS: Readonly<Record<FailureCode, number>> = Object.free
   INTEGRITY_FAILURE: 422,
   BUDGET_EXHAUSTED: 429,
   ADMISSION_LIMITED: 429,
+  CONTENT_REFUSED: 422,
   CAPACITY_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
 });
@@ -73,6 +74,7 @@ export const PROBLEM_TITLE: Readonly<Record<FailureCode, string>> = Object.freez
   INTEGRITY_FAILURE: "An integrity check failed",
   BUDGET_EXHAUSTED: "The operating budget for this operation is exhausted",
   ADMISSION_LIMITED: "The request was not admitted by the abuse or capacity limits",
+  CONTENT_REFUSED: "The submitted text looks like a secret or customer records and was not accepted",
   CAPACITY_UNAVAILABLE: "Capacity is temporarily unavailable",
   INTERNAL_ERROR: "An unexpected error was recorded under the correlation id",
 });
@@ -99,6 +101,7 @@ const NEXT_ACTIONS: Readonly<Record<FailureCode, ReadonlyArray<NextAction>>> = O
   INTEGRITY_FAILURE: [{ action: "CONTACT_SUPPORT" }],
   BUDGET_EXHAUSTED: [{ action: "CONTACT_SUPPORT" }],
   ADMISSION_LIMITED: [{ action: "RETRY_LATER" }],
+  CONTENT_REFUSED: [{ action: "SECURE_UPLOAD" }],
   CAPACITY_UNAVAILABLE: [{ action: "RETRY_SAME_KEY" }],
   INTERNAL_ERROR: [{ action: "RETRY_SAME_KEY" }],
 });

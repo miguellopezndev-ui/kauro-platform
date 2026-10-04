@@ -11,7 +11,7 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { ExecutionCommandId, ExecutionRouteId } from "./contracts.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, COOKIE_CSRF } = OUTCOME_BLOCKS;
 
 const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is not visible to the caller's agency`);
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
@@ -38,7 +38,7 @@ const COMMAND_SPECIFIC: Readonly<Record<ExecutionCommandId, ReadonlyArray<Proble
 });
 
 function commandCatalogue(command: ExecutionCommandId): ReadonlyArray<ProblemOutcome> {
-  return closedCatalogue(command, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...COMMAND_SPECIFIC[command]]);
+  return closedCatalogue(command, [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...COMMAND_SPECIFIC[command]]);
 }
 
 /** The closed problem catalogue of each execution command. */

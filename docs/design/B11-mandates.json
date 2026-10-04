@@ -1,0 +1,164 @@
+{
+  "package": "B11",
+  "design": "docs/design/B11-agency-app.md",
+  "caseMap": "docs/design/B11-case-map.md",
+  "rules": [
+    "Acceptance tests first (the exact titles of B11-case-map.md), then code; focused tests while working, pnpm run verify once at the end.",
+    "Extend B06, never fork it: pipeline order, runtime roles and pools, journal, outbox, closed replies, generated OpenAPI and matrix (pnpm run openapi:generate / matrix:generate), @kauro/persistence/testing.",
+    "Real PostgreSQL 17 in api and persistence tests; interleavings by hold points and pg_stat_activity lock waits, never sleeps.",
+    "A migration is numbered 0009 on the mandate's own branch; the integrator renumbers.",
+    "Only the fakes listed in owns_fakes may be created by the mandate; every fake is labelled CONTRACT_FAKE and its evidence class is SIMULATED.",
+    "No new dependency beyond the design's pins (D-STACK-1); a needed one is pinned, justified in the design and lands with its lockfile in the same commit.",
+    "English copy through apps/web/src/copy/en.ts only (A3); never the pre-rename brand.",
+    "Record per case: case | test file :: exact title | status | commit, in B11-case-map.md."
+  ],
+  "mandates": [
+    {
+      "key": "W1",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)"],
+      "owns_fakes": [],
+      "cases": ["S069", "R2-062", "R2-065"],
+      "creates_tests": ["packages/ui/test/safe-text.test.ts", "packages/ui/test/confirm-dialog.test.ts", "packages/ui/test/count-denominators.test.ts"],
+      "task": "packages/ui: the accessible primitives of D-DS-1 as React 19 components (react/react-dom 19.3.0 as peer and dev dependencies, already in the lockfile), styled only through tokens.css classes (no inline style, no dangerouslySetInnerHTML: add a source test that refuses both in packages/ui and apps/web). SafeText (D-DS-3), ConfirmDialog (D-A11Y-2), CountDenominators (R2-065 definitions: physical rows = rows read from the admitted files; billable source units = the price denominator of 16 'Billable unit'; output rows = rows of each delivered file), Money (minor-unit string, BigInt, 'USD 1,295.00'), Deadline, PhaseList, DataTable, Field/ErrorSummary, StatusBadge, Banner, NavigationGuard. Tests render with react-dom/server renderToStaticMarkup (no DOM library) and assert markup, ARIA names and associations; behaviour in the browser is proven by the stage-2 specs."
+    },
+    {
+      "key": "W2",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)"],
+      "owns_fakes": ["ContractFakeIdentityIssuer (@kauro/application/testing)", "fake identity HTTP server (apps/api/test/support/fake-identity-server.ts)"],
+      "migration": "0009_web_sessions.sql",
+      "cases": ["S067", "R2-134"],
+      "creates_tests": ["apps/api/test/b11-sessions.test.ts"],
+      "task": "Session and identity boundary of D-AUTH-1..5: the IdentityTokenVerifier port in @kauro/application and its jose 6.2.12 adapter in apps/api (RS256 only, iss/aud/exp/iat/auth_time/sub/email_verified/second factor; key sources GOOGLE_X509 (code and unit tests against the documented format; live qualification is B15) and CONTRACT_FAKE (refused unless KAURO_ENV=LOCAL)); the contract-fake issuer (RS256 key pair, JWKS, password + TOTP sign-in, re-authentication, test clock) and its HTTP server for the browser suite; migration web_sessions under kauro_assurance only (runtime-boundary matrix updated); the routes POST /api/v1/sessions, GET /api/v1/sessions/current, POST /api/v1/sessions/current/revoke (Clear-Site-Data), POST /api/v1/assurance/step-ups (B06 STEP_UP proof), GET /api/v1/public/identity-config, declared as operational routes with closed replies and served in openapi.json; the SessionAuthenticator (cookie) with the CSRF rule (exact Origin, Sec-Fetch-Site, X-Kauro-CSRF HMAC) decided before the journal reserve, AMBIGUOUS_CREDENTIALS, no CORS; config KAURO_APP_ORIGINS, KAURO_IDENTITY_PROJECT_ID, KAURO_IDENTITY_KEY_SOURCE. Tests through the real routes on PostgreSQL 17: every token defect answers the one 401, CSRF refusals consume no idempotency key, revocation takes effect on the next request, idle and absolute expiry by the test clock, a step-up proof is usable by CMD025."
+    },
+    {
+      "key": "W3",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)", "W2 route contract as pinned in D-AUTH-4 (code against the design; integration at INT-1)"],
+      "owns_fakes": ["IdentityClient contract-fake adapter (apps/web/src/client/identity/contract-fake.ts)", "ContractFakeAgencyApi (apps/web/e2e/support/fake-routes.ts)"],
+      "cases": ["S066", "R2-064"],
+      "creates_tests": ["apps/web/test/operation-runner.test.ts", "apps/web/test/navigation-guard.test.ts"],
+      "task": "apps/web runtime: route groups (public)/(app) and host routing in proxy.ts (D-TOPO-2); src/screens.ts mapping every PUBLIC and APP screen of registry screens.json to one route (D-ROUTE-1; test); the generator tools/web-client.mjs generate|check (dependency-free; types + closed runtime guards from apps/api/openapi.json, served and x-kauro-planned; check added to pnpm run verify; tools/test test) and src/api/generated.ts; the api client (same-origin, cache no-store, X-Kauro-Agency, X-Kauro-CSRF, correlation id); OperationRunner (D-OPS-1: UUIDv5 subject-bound keys, UUIDv7 form keys, same-key retry then durable re-read); the exhaustive problem-code state table (D-STATE-1; a test per stable code of manual 10); the session and privacy runtime (D-PRIV-1: pagehide wipe, pageshow/visibilitychange re-check, hard navigation on agency switch, logout, no storage); NavigationGuard state (D-OPS-3); the IdentityClient port with its contract-fake adapter; the copy catalogue src/copy/en.ts and the A3 copy lint test (D-COPY-1); server-only config in src/server with import \"server-only\" (server-only 0.0.1) and the gate check of D-SEC-2; ContractFakeAgencyApi mounted by the e2e edge for planned operations only (refuses a served route). No screen content beyond the app shell (agency context indicator, navigation, skip link)."
+    },
+    {
+      "key": "W4",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)"],
+      "owns_fakes": [],
+      "migration": "0009_support_cases.sql",
+      "cases": ["CMD044-OK", "CMD044-DENY", "CMD044-RACE"],
+      "creates_tests": ["apps/api/test/cmd044-create-support-case.test.ts"],
+      "task": "CMD044 CreateSupportCase end to end in the api (design §5 W4 row): command contract and closed request schema with the registry field names (category, summary, evidenceRefs), handler in one unit of work (journal reserve, authorization AGENCY_MEMBER with project visibility, locked preconditions, insert born OPEN, support_case.opened.v1, journal commit), severity table, covered-hours next review (policy support.*, America/Bogota, versioned Colombian holiday calendar with its source record), the bounded secret/record detector with SECRET_LIKE_CONTENT / RECORD_LIKE_CONTENT and next action SECURE_UPLOAD, evidenceRefs empty until B07 upload ids are on main; the two reads (keyset list per project, one case); migration support_cases with forced RLS, composite FK to projects, the SupportCase platform machine seed, the support_case kind in the 0008 registry; outcome catalogues, OpenAPI and matrix regenerated. The DENY test also captures the api log sink and asserts the summary text appears in no log line, event payload or outbox record."
+    },
+    {
+      "key": "W5a",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)", "W5b route contract as pinned in design §5 (code against the design; integration at INT-1)"],
+      "owns_fakes": [],
+      "blocked_owner": "Operator facts (company, DIAN/RUT) from 2026-10-08: the legal pages ship refusing to publish until then; final legal text is B19's lawyer review",
+      "cases": [],
+      "creates_tests": ["apps/web/test/legal-renderer.test.ts", "apps/web/test/public-copy.test.ts"],
+      "task": "Public pages UI01-UI08, UI45-UI49 under (public) with A3 copy (D-COPY-1): Home (job line, CTA 'Request a free data health check', at most one AI context sentence below the fold), How it works, Supported services (capability publication, CLEAN beside HubSpot/Salesforce, no compatibility claims), Pricing (ladder from the vendored policy bands, the one in-house sentence, founding line hidden until B10 reports a reservable slot), Sample delivery (labelled synthetic), Data handling, Contact (fit form with the buyer-type question; posts to W5b), Status (honest unavailable state), Help (static versioned guides), Unsubscribe (explicitly unavailable until B12). The legal renderer of D-LEGAL-1 with operator-facts.json all null: tests prove a null or REQUIRES_REVIEW fact yields HTTP 503 'not published', no version label, and that a complete fact set yields a stable version label from the rendered text."
+    },
+    {
+      "key": "W5b",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["B06 (main)", "W4 detector (shared in @kauro/application; W5b codes against the design's pattern set, INT-1 unifies)"],
+      "owns_fakes": [],
+      "migration": "0009_inquiries.sql",
+      "blocked_owner": "Resend (2026-10-08) for the owner notification e-mail; the outbox event is built now",
+      "cases": [],
+      "creates_tests": ["apps/api/test/b11-public-routes.test.ts"],
+      "task": "Public api of design §5 W5b: GET /api/v1/public/capability-publication (no auth, no-store, only publishable states, never a DESIGN or internal capability) and POST /api/v1/public/inquiries (no auth, exact public/app Origin, closed schema with buyerType agency|in-house per A3 3.7, destination enum without third-party CRM names, content-idempotent for 24 h, limiter by client-address hash and e-mail hash, detector refusals, inquiry.received.v1 with ids only); migration inquiries (no tenant, kauro_app INSERT only); declared operational routes, OpenAPI regenerated. Tests on PostgreSQL 17 through the routes."
+    },
+    {
+      "key": "INT-1",
+      "stage": 1,
+      "starts_from": "b11/design",
+      "depends_on": ["W1", "W2", "W3", "W4", "W5a", "W5b"],
+      "owns_fakes": [],
+      "cases": [],
+      "creates_tests": [],
+      "task": "Merge W1..W5b into b11/stage-1 in that order; renumber the three 0009 migrations (W2 0009, W4 0010, W5b 0011); unify the detector (one module in @kauro/application used by CMD044 and inquiries); regenerate OpenAPI, matrix and the web client; pnpm install --frozen-lockfile and pnpm run verify on Windows and on a Linux clone (WSL user miguel); run the harness and W3's unit suites; update the case map statuses of stage 1."
+    },
+    {
+      "key": "W6",
+      "stage": 2,
+      "starts_from": "b11/stage-1",
+      "depends_on": ["INT-1", "B06 (main)", "B10 CMD002 and B16 CMD004 as planned operations through ContractFakeAgencyApi"],
+      "owns_fakes": [],
+      "migration": "0009_agency_buyer_types.sql",
+      "cases": ["S067", "S068", "R2-134"],
+      "creates_tests": ["apps/web/e2e/s067-browser-privacy.spec.ts", "apps/web/e2e/s068-forms-keyboard.spec.ts", "apps/web/e2e/r2-134-expired-login-legal.spec.ts"],
+      "task": "Screens UI50 sign-in, UI09 onboarding (agency creation CMD001, buyer type, MFA enrolment via IdentityClient, agreements step against the legal renderer, activation through the fake until B10), UI10 switcher, UI51 invitation (fake until B16), UI11 projects with the new dashboard read GET /api/v1/agencies/{agencyId}/projects (phase and required action from durable facts on main), UI12 clients (CMD009/CMD010), UI13 overview, UI31 team read; POST /api/v1/agencies/{agencyId}/buyer-type (OWNER, set once) with its migration; the e2e launcher (temporary PostgreSQL 17 + api process + fake identity server + edge) in apps/web/e2e/support; the S067, S068 and R2-134 specs in all three engines on Windows."
+    },
+    {
+      "key": "W7",
+      "stage": 2,
+      "starts_from": "b11/stage-1 merged with main once B07 is on main",
+      "depends_on": ["INT-1", "B07 routes on main (CMD012-CMD017, source reads)", "B08/B13 package manifest output rows (planned; labelled fixture until then)"],
+      "owns_fakes": [],
+      "cases": ["R2-065"],
+      "creates_tests": ["apps/web/e2e/r2-065-count-denominators.spec.ts"],
+      "task": "Screens UI14 source intake (reserve, resumable upload through the provider session, cancel, retry, replace before seal; per-file declared size, progress, inspection, disposition), UI15 selection (positional duplicate headers 'Email - column 3'), UI16 seal review with CountDenominators; the R2-065 spec with a flat source sealed through B07's source-lifecycle fixture and output rows from a labelled fixture DTO (SIMULATED) until B08/B13."
+    },
+    {
+      "key": "W8",
+      "stage": 2,
+      "starts_from": "b11/stage-1",
+      "depends_on": ["INT-1", "B06 CMD023/CMD025 (main)", "B08 audit and plan reads, CMD024 (planned; ContractFakeAgencyApi)"],
+      "owns_fakes": [],
+      "cases": ["R2-062", "R2-064"],
+      "creates_tests": ["apps/web/e2e/r2-062-keyboard-approval.spec.ts", "apps/web/e2e/r2-064-unsaved-decisions.spec.ts"],
+      "task": "Screens UI18 (Free data health check view, read via the fake until B08), UI19 mapping with enum-map editing and NavigationGuard, UI20 identity, UI21 relationships, UI22 approval with ConfirmDialog, step-up (W2) and CMD025 on the real route; plan fixtures written through @kauro/persistence/testing as the owning roles. R2-062 and R2-064 specs in all three engines; the approval oracle reads the approvals table and journal as superuser."
+    },
+    {
+      "key": "W9",
+      "stage": 2,
+      "starts_from": "b11/stage-1 merged with main once B09 is on main",
+      "depends_on": ["INT-1", "B09 routes on main (CMD028, CMD029, CMD031, quote/order/refund reads)", "B10 CMD027 (planned; B09 commerce fixture issues the quote)", "B08 CMD036 (planned)"],
+      "owns_fakes": [],
+      "cases": ["S066", "R2-063"],
+      "creates_tests": ["apps/web/e2e/s066-payment-recovery.spec.ts", "apps/web/e2e/r2-063-stale-quote-tab.spec.ts"],
+      "task": "Screens UI23 quote and checkout (blockers, terms before redirect, disabled Pay when not checkoutReady), UI24 payment return ('Checking payment' until reconciled; PENDING, CHECKING, FAILED, CONFIRMED texts from paymentStatus and nextActions only), UI30 billing reads; B09's PaymentProviderAdapter contract fake drives the provider; S066 with double click, route.fetch()+route.abort() lost response and reload, oracle = one order, one capture, one provider capture call; R2-063 with two browser contexts."
+    },
+    {
+      "key": "W10",
+      "stage": 2,
+      "starts_from": "b11/stage-1",
+      "depends_on": ["INT-1", "W4 (CMD044 routes)", "B13 CMD008 logo pipeline and report PDF (planned)"],
+      "owns_fakes": [],
+      "cases": ["CMD044-OK", "CMD044-DENY", "CMD044-RACE", "S069", "S070"],
+      "creates_tests": ["apps/web/e2e/cmd044-support-case.spec.ts", "apps/web/e2e/s069-hostile-names.spec.ts", "apps/web/e2e/s070-report-print.spec.ts"],
+      "task": "Screen UI52 support (project cases list and detail, create form with the warning text, refusal with the secure-upload route, created case with its next response time) and the Help entry points; the in-app report views (health check summary and delivery summary) with print CSS for Letter and A4 (@page size, repeated thead, break-inside avoid, legends kept with tables); S069 spec with hostile names seeded through the real commands; S070 spec printing with Chromium page.pdf and reading page boxes and ToUnicode font maps from the PDF bytes (no PDF library)."
+    },
+    {
+      "key": "INT-2",
+      "stage": 2,
+      "starts_from": "b11/stage-1",
+      "depends_on": ["W6", "W7", "W8", "W9", "W10"],
+      "owns_fakes": [],
+      "cases": [],
+      "creates_tests": [],
+      "task": "Merge W6..W10 into b11/stage-2; renumber migrations after main; verify on Windows and Linux; install the Chromium system dependencies on the WSL verify host once as root (playwright install-deps chromium, 27 apt packages, nothing under /srv); run the browser suites (Windows: three engines; Linux: Chromium) and record them in the evidence bundle; move every case map row to EXECUTED_LOCAL or PARTIAL with its remaining owner; prepare the reviewer's screen-reader pass (D-A11Y-1)."
+    },
+    {
+      "key": "W-IDP-LIVE",
+      "stage": 3,
+      "starts_from": "b11/stage-2",
+      "depends_on": ["INT-2", "OWNER 2026-10-08: Google Cloud project with billing, Identity Platform enabled with e-mail/password and TOTP MFA, authorized domains"],
+      "owns_fakes": [],
+      "blocked_owner": "Google Cloud billing and Identity Platform configuration (2026-10-08)",
+      "cases": [],
+      "creates_tests": [],
+      "task": "The live IdentityClient adapter (firebase modular SDK pinned after an advisory check, inMemoryPersistence, dynamic import on /login, /onboarding and the step-up dialog, sign-out after the exchange), the page-scoped CSP connect origins, and the identity-config of SANDBOX; the live key-source qualification itself is B15."
+    }
+  ]
+}

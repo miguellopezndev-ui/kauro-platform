@@ -4,7 +4,7 @@
  * the platform needs for concurrency and lineage; the wire DTOs in @kauro/application select from these, never the reverse.
  * Project is not a registry contract (07 names the aggregate; no field contract exists) — decision D-AGG-1 fixes its shape.
  */
-import type { Agency, Approval, Capability, DatasetRevision, EndClient, Membership, Plan, Sha256Hex, TargetContract, UtcInstant, ValidationReceipt } from "@kauro/contracts";
+import type { Agency, Approval, Capability, DatasetRevision, EndClient, Membership, Plan, Sha256Hex, SupportCase, TargetContract, UtcInstant, ValidationReceipt } from "@kauro/contracts";
 import type {
   AgencyId,
   ApprovalId,
@@ -17,6 +17,7 @@ import type {
   ProcessingAuthorityId,
   ProjectId,
   RevisionId,
+  SupportCaseId,
   TargetContractId,
   TargetInstanceRef,
   UserId,
@@ -102,6 +103,30 @@ export interface ProjectRecord {
   readonly capabilityVersion: string;
   readonly currentRevisionId: RevisionId;
   readonly createdByMembershipId: MembershipId;
+  readonly createdAt: UtcInstant;
+  readonly updatedAt: UtcInstant;
+}
+
+/** The registry SupportCase vocabularies (owner manual 18); CMD044 (B11) opens a case, it never takes any of these from the request but the category. */
+export type SupportCategory = SupportCase["category"];
+export type SupportSeverity = SupportCase["severity"];
+export type SupportCaseState = SupportCase["state"];
+export const SUPPORT_CATEGORIES: ReadonlyArray<SupportCategory> = ["PRODUCT_DEFECT", "IMPORT_GUIDANCE", "BILLING", "PRIVACY", "SECURITY", "GENERAL"];
+export const SUPPORT_SEVERITIES: ReadonlyArray<SupportSeverity> = ["S1", "S2", "S3", "S4"];
+export const SUPPORT_CASE_STATES: ReadonlyArray<SupportCaseState> = ["OPEN", "TRIAGED", "WAITING_KAURO", "WAITING_AGENCY", "RESOLVED", "CLOSED"];
+
+/**
+ * A support case: the registry SupportCase contract with the platform columns (migration 0026, D-SUP-6). The case always names a
+ * project of its agency (the registry field is optional; agency-level cases have no catalogue command, Q-B11-1) and is born OPEN.
+ */
+export interface SupportCaseRecord extends Omit<SupportCase, "caseId" | "agencyId" | "projectId" | "evidenceRefs"> {
+  readonly caseId: SupportCaseId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly evidenceRefs: ReadonlyArray<string>;
+  readonly createdByUserId: UserId;
+  readonly createdByMembershipId: MembershipId;
+  readonly version: number;
   readonly createdAt: UtcInstant;
   readonly updatedAt: UtcInstant;
 }

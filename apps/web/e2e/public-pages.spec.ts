@@ -1,0 +1,399 @@
+// The public pages in a real browser (W5a; D-A11Y-1, D-SEC-1, D-TOPO-2): every page in every reading of the capability publication under the
+// built server's nonce policy with axe finding no WCAG 2.2 A/AA violation, 320 px reflow, the skip link, the fit form's every outcome with
+// focus and live-region behaviour, the estimator, the unavailable pages and the legal refusal. The publication is the CONTRACT_FAKE of
+// e2e/support/public-api.ts (read by the server on each request); the inquiry POST is answered at the browser's network boundary
+// (page.route), so what the page sends is inspected as sent. B11 has no case-map case for W5a: these are the mandate's own checks.
+import { AxeBuilder } from "@axe-core/playwright";
+import { expect, test, type Page, type Response } from "@playwright/test";
+import { startPublicApi, type PublicApi, type Reading } from "./support/public-api.ts";
+
+const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+const UUID = "0192d3a4-5b6c-7d8e-9f01-23456789abcd";
+
+interface PageUnderTest {
+  readonly route: string;
+  readonly h1: string;
+  /** Whether the page's text depends on the capability publication. */
+  readonly reads: boolean;
+}
+
+const PAGES: readonly PageUnderTest[] = [
+  { route: "/", h1: "Prepare and verify CRM data from files.", reads: true },
+  { route: "/how-it-works", h1: "From source files to a reviewed import package.", reads: false },
+  { route: "/supported-services", h1: "Check your files and target before you start.", reads: true },
+  { route: "/pricing", h1: "One scoped project, priced by source units.", reads: true },
+  { route: "/sample-delivery", h1: "See a synthetic delivery package.", reads: false },
+  { route: "/security", h1: "Know what is processed and when it is deleted.", reads: false },
+  { route: "/contact", h1: "Describe the task; keep CRM files out of this form.", reads: false },
+  { route: "/status", h1: "Current service availability.", reads: true },
+  { route: "/help", h1: "Find the next step for your project.", reads: false },
+  { route: "/unsubscribe/an-opaque-value-from-a-link", h1: "Stop optional messages.", reads: false },
+];
+
+const READINGS: ReadonlyArray<readonly [string, Reading]> = [
+  ["all three services listed", [["CLEAN", "AVAILABLE"], ["HUBSPOT", "AVAILABLE"], ["SALESFORCE", "AVAILABLE"]]],
+  ["one service limited and one listed", [["CLEAN", "AVAILABLE_LIMITED"], ["HUBSPOT", "AVAILABLE"]]],
+  ["no service listed", []],
+  ["the publication unreadable", "BROKEN"],
+];
+
+let api: PublicApi;
+test.beforeAll(async () => {
+  api = await startPublicApi();
+});
+test.afterAll(async () => {
+  await api.close();
+});
+test.beforeEach(() => {
+  api.publish([["CLEAN", "AVAILABLE"], ["HUBSPOT", "AVAILABLE"], ["SALESFORCE", "AVAILABLE"]]);
+});
+
+/** What a page must never do: raise a policy violation or an error, fail to load a resource of its own, or ask any origin but its own for anything. */
+function watch(page: Page): { readonly problems: string[] } {
+  const problems: string[] = [];
+  const own = `https://localhost:${process.env["KAURO_E2E_PORT"] ?? 44300}`;
+  page.on("console", (message) => {
+    // a deliberate 4xx or 5xx answer to the inquiry is logged by the browser as a failed load: the response listener below judges loads
+    if (/Content Security Policy|Content-Security-Policy/i.test(message.text())) problems.push(`policy: ${message.text()}`);
+    else if (message.type() === "error" && !/^Failed to load resource/.test(message.text())) problems.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/^https?:$/.test(url.protocol) && url.origin !== own) problems.push(`request to another origin: ${request.url()}`);
+  });
+  page.on("response", (response) => {
+    const request = response.request();
+    if (request.resourceType() !== "document" && !request.url().endsWith("/api/v1/public/inquiries") && response.status() >= 400) problems.push(`${response.status()} for ${request.url()}`);
+  });
+  return { problems };
+}
+
+async function assertDocument(page: Page, response: Response | null, status: number): Promise<void> {
+  expect(response?.status()).toBe(status);
+  const headers = response?.headers() ?? {};
+  const nonce = /'nonce-([A-Za-z0-9+/]{22}==)'/.exec(headers["content-security-policy"] ?? "")?.[1];
+  expect(nonce, "the document carries a per-request nonce policy").toBeDefined();
+  expect(headers["cache-control"]).toContain("no-store");
+  const scripts = await page.locator("script").evaluateAll((elements) => elements.map((element) => (element as unknown as { readonly nonce: string }).nonce));
+  for (const value of scripts) expect(value).toBe(nonce);
+}
+
+async function assertAccessible(page: Page): Promise<void> {
+  const result = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+  expect(result.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(" ")).join(" | ")}`)).toEqual([]);
+}
+
+// ---- every page, every reading --------------------------------------------------------------------------------------------------------
+
+for (const { route, h1, reads } of PAGES) {
+  for (const [name, reading] of reads ? READINGS : READINGS.slice(0, 1)) {
+    test(`${route}${reads ? ` (${name})` : ""}: its own heading, a nonce policy every script bears, no policy violation and no axe WCAG 2.2 A/AA violation`, async ({ page }) => {
+      api.publish(reading);
+      const seen = watch(page);
+      const response = await page.goto(route);
+      await assertDocument(page, response, 200);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(h1);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+      await expect(page.locator("main#kauro-main")).toHaveCount(1);
+      expect(await page.title()).toMatch(/Kauro/);
+      await assertAccessible(page);
+      expect(seen.problems).toEqual([]);
+    });
+  }
+}
+
+test("every page reflows to one column at 320 CSS pixels with no horizontal scroll, in the widest reading", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  for (const { route } of PAGES) {
+    await page.goto(route);
+    const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(overflow.scroll, `${route} scrolls sideways`).toBeLessThanOrEqual(overflow.client);
+  }
+  await page.goto("/contact");
+  await hydrated(page);
+  await page.getByRole("button", { name: "Send inquiry" }).click();
+  const summary = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+  expect(summary.scroll, "the error summary reflows").toBeLessThanOrEqual(summary.client);
+});
+
+test("the pages give the same reading twice in a row: the publication is read on every request, never cached", async ({ page }) => {
+  api.publish([["CLEAN", "AVAILABLE"]]);
+  await page.goto("/status");
+  await expect(page.locator("main")).toContainText("CLEAN");
+  await expect(page.locator("main")).not.toContainText("HubSpot");
+  api.publish([["CLEAN", "AVAILABLE"], ["HUBSPOT", "AVAILABLE"]]);
+  await page.goto("/status");
+  await expect(page.locator("main")).toContainText("HubSpot");
+  api.publish("BROKEN");
+  await page.goto("/status");
+  await expect(page.locator("main")).toContainText("Status cannot be shown");
+  await expect(page.locator("main")).not.toContainText("HubSpot");
+});
+
+// ---- the frame ------------------------------------------------------------------------------------------------------------------------
+
+test("keyboard: the skip link is the first stop, visible when focused, and moves focus to the main content", async ({ page }) => {
+  await page.goto("/pricing");
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skip).toBeFocused();
+  const box = await skip.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+  await page.keyboard.press("Enter");
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("kauro-main");
+});
+
+test("navigation: the current page is marked in the main navigation, and every link of the navigations reaches a page that answers", async ({ page, request }) => {
+  await page.goto("/pricing");
+  const main = page.getByRole("navigation", { name: "Main" });
+  await expect(main.locator('a[aria-current="page"]')).toHaveText("Pricing");
+  await expect(main.locator('a[aria-current="page"]')).toHaveCount(1);
+  const hrefs = await page.locator("header a, footer a").evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).getAttribute("href") ?? ""));
+  expect(hrefs.length).toBeGreaterThan(8);
+  for (const href of new Set(hrefs.filter((value) => value.startsWith("/") && value !== "/login"))) {
+    const answer = await request.get(href);
+    expect([200, 503], `${href} answers`).toContain(answer.status());
+  }
+});
+
+// ---- the fit form ---------------------------------------------------------------------------------------------------------------------
+
+async function hydrated(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form[method='post']");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+  });
+}
+
+async function fillValid(page: Page): Promise<void> {
+  await page.getByRole("radio", { name: "An agency preparing data for clients" }).check();
+  await page.getByLabel("Your name").fill("Ada Example");
+  await page.getByLabel("Work email").fill("ada@example.com");
+  await page.getByLabel("Company", { exact: true }).fill("Example Agency");
+  await page.getByLabel("How will your team receive the cleaned data?").selectOption("files-only");
+  await page.getByLabel("Roughly how many records?").selectOption({ index: 1 });
+  await page.getByLabel("When would you like to start?").selectOption("flexible");
+}
+
+const focusedGroupLabel = (page: Page): Promise<string | null> => page.evaluate(() => document.activeElement?.getAttribute("aria-labelledby") ?? null);
+
+test("contact: an empty form sends nothing, moves focus to a summary that links to each field, and marks each field with its message", async ({ page }) => {
+  let posted = 0;
+  await page.route("**/api/v1/public/inquiries", async (route) => {
+    posted += 1;
+    await route.abort();
+  });
+  const seen = watch(page);
+  await page.goto("/contact");
+  await hydrated(page);
+  await page.getByRole("button", { name: "Send inquiry" }).click();
+  expect(await focusedGroupLabel(page)).toBe("contact-summary-heading");
+  await expect(page.getByRole("group", { name: "Some answers need a look" }).getByRole("link")).toHaveCount(7);
+  for (const [field, message] of [
+    ["contact-name", "Enter your name."],
+    ["contact-email", "Enter an email address such as name@company.com."],
+    ["contact-company", "Enter your company."],
+    ["contact-destination", "Choose how your team will receive the data."],
+    ["contact-band", "Choose the nearest size."],
+    ["contact-timing", "Choose when you would like to start."],
+  ] as const) {
+    const control = page.locator(`#${field}`);
+    await expect(control).toHaveAttribute("aria-invalid", "true");
+    await expect(control).toHaveAttribute("aria-describedby", `${field}-error`);
+    await expect(page.locator(`#${field}-error`)).toHaveText(message);
+  }
+  await expect(page.locator("#contact-buyer")).toHaveAttribute("aria-describedby", "contact-buyer-error");
+  await page.getByRole("link", { name: "Enter your name." }).click();
+  await expect(page.locator("#contact-name")).toBeFocused();
+  await assertAccessible(page);
+  expect(posted, "nothing was sent").toBe(0);
+  expect(seen.problems).toEqual([]);
+});
+
+test("contact: a valid inquiry is sent once, as the api's vocabulary, with no cookie and no credential, and the received panel takes focus and says the reference", async ({ page }) => {
+  const bodies: string[] = [];
+  const cookies: Array<string | undefined> = [];
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/v1/public/inquiries", async (route) => {
+    bodies.push(route.request().postData() ?? "");
+    cookies.push(route.request().headers()["cookie"]);
+    await held;
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ inquiryId: UUID }) });
+  });
+  const seen = watch(page);
+  await page.goto("/contact");
+  await hydrated(page);
+  await fillValid(page);
+  await page.getByLabel("Anything we should know? (optional)").fill("Two CRMs to merge before a migration.");
+  const send = page.getByRole("button", { name: "Send inquiry" });
+  await send.click();
+  await expect(page.getByRole("status").filter({ hasText: "Sending your inquiry." })).toHaveCount(1);
+  await expect(send).toHaveAttribute("aria-disabled", "true");
+  await send.click({ force: true });
+  await page.keyboard.press("Enter");
+  release();
+  await expect(page.getByRole("heading", { name: "We received your inquiry" })).toBeVisible();
+  expect(await focusedGroupLabel(page)).toBe("contact-outcome-heading");
+  await expect(page.getByRole("group", { name: "We received your inquiry" })).toContainText(UUID);
+  await expect(page.locator("form[method='post']")).toHaveCount(0);
+  expect(bodies, "a second press while sending sends nothing").toHaveLength(1);
+  expect(JSON.parse(bodies[0] ?? "null")).toEqual({
+    buyerType: "agency",
+    contactName: "Ada Example",
+    contactEmail: "ada@example.com",
+    companyName: "Example Agency",
+    destination: "files-only",
+    recordBand: expect.stringMatching(/^up-to-\d+$/),
+    timing: "flexible",
+    description: "Two CRMs to merge before a migration.",
+  });
+  expect(cookies).toEqual([undefined]);
+  await assertAccessible(page);
+  expect(seen.problems).toEqual([]);
+});
+
+const REPLIES: ReadonlyArray<{ readonly name: string; readonly status: number; readonly body: unknown; readonly heading: string; readonly text: RegExp }> = [
+  { name: "the api refuses the content", status: 422, body: { code: "CONTENT_REFUSED" }, heading: "Nothing was sent", text: /credential or customer records/ },
+  { name: "the api limits admission and says when to return", status: 429, body: { code: "ADMISSION_LIMITED", retryAfterSeconds: 90 }, heading: "Too many inquiries for now", text: /Please try again in 2 minutes\. Nothing you typed has been lost\./ },
+  { name: "the api limits admission and says nothing more", status: 429, body: { code: "ADMISSION_LIMITED" }, heading: "Too many inquiries for now", text: /Please try again in a little while\./ },
+  { name: "the api refuses the fields", status: 400, body: { code: "INVALID_REQUEST" }, heading: "Some answers need a look", text: /The inquiry was not accepted as written\./ },
+  { name: "the api answers something the contract does not describe", status: 500, body: { code: "SOMETHING_ELSE" }, heading: "The inquiry could not be sent", text: /safe to retry/ },
+];
+
+for (const reply of REPLIES) {
+  test(`contact: when ${reply.name}, the panel takes focus, the answers stay in the form, and axe finds no violation`, async ({ page }) => {
+    await page.route("**/api/v1/public/inquiries", (route) => route.fulfill({ status: reply.status, contentType: "application/json", body: JSON.stringify(reply.body) }));
+    const seen = watch(page);
+    await page.goto("/contact");
+    await hydrated(page);
+    await fillValid(page);
+    await page.getByRole("button", { name: "Send inquiry" }).click();
+    const panel = page.getByRole("group", { name: reply.heading });
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText(reply.text);
+    expect(await focusedGroupLabel(page)).toBe("contact-outcome-heading");
+    await expect(page.getByLabel("Your name")).toHaveValue("Ada Example");
+    await expect(page.getByLabel("Work email")).toHaveValue("ada@example.com");
+    await assertAccessible(page);
+    expect(seen.problems).toEqual([]);
+  });
+}
+
+test("contact: a request that never reaches the api is a failure the visitor can send again, and the second send is the same inquiry", async ({ page }) => {
+  const bodies: string[] = [];
+  let attempts = 0;
+  await page.route("**/api/v1/public/inquiries", async (route) => {
+    attempts += 1;
+    bodies.push(route.request().postData() ?? "");
+    if (attempts === 1) await route.abort("connectionreset");
+    else await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ inquiryId: UUID }) });
+  });
+  await page.goto("/contact");
+  await hydrated(page);
+  await fillValid(page);
+  await page.getByRole("button", { name: "Send inquiry" }).click();
+  await expect(page.getByRole("group", { name: "The inquiry could not be sent" })).toBeVisible();
+  await page.getByRole("button", { name: "Send inquiry" }).click();
+  await expect(page.getByRole("heading", { name: "We received your inquiry" })).toBeVisible();
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]).toBe(bodies[0]);
+});
+
+test("contact: an address that is not one is told so before anything is sent", async ({ page }) => {
+  let posted = 0;
+  await page.route("**/api/v1/public/inquiries", async (route) => {
+    posted += 1;
+    await route.abort();
+  });
+  await page.goto("/contact");
+  await hydrated(page);
+  await fillValid(page);
+  await page.getByLabel("Work email").fill("ada at example");
+  await page.getByRole("button", { name: "Send inquiry" }).click();
+  await expect(page.locator("#contact-email-error")).toHaveText("Enter an email address such as name@company.com.");
+  await expect(page.getByRole("group", { name: "Some answers need a look" }).getByRole("link")).toHaveCount(1);
+  expect(posted).toBe(0);
+});
+
+test("no scripts: the fit form and the estimator each say they need scripts, in words on the page", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, ignoreHTTPSErrors: true, baseURL: `https://localhost:${process.env["KAURO_E2E_PORT"] ?? 44300}` });
+  try {
+    const page = await context.newPage();
+    await page.goto("/contact");
+    // the text engine of the tool skips a noscript element by design, so the note is addressed by structure
+    await expect(page.locator("noscript > p")).toHaveText("This form needs JavaScript to send your inquiry.");
+    await expect(page.locator("noscript > p")).toBeVisible();
+    await page.goto("/pricing");
+    await expect(page.locator("noscript > p")).toHaveText("The estimate needs JavaScript. The table above shows every band and price.");
+    await expect(page.locator("noscript > p")).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+// ---- the estimator --------------------------------------------------------------------------------------------------------------------
+
+test("pricing: the estimator answers in a polite live region only when asked, in words a screen reader can read, and never as a quote", async ({ page }) => {
+  await page.goto("/pricing");
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form.kauro-site-form");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+  });
+  const result = page.locator("#estimate-result");
+  await expect(result).toHaveAttribute("role", "status");
+  await expect(result).toContainText("Enter a number to see the indicative band.");
+  await page.getByLabel("Billable source units").fill("many");
+  await expect(result, "typing announces nothing").toContainText("Enter a number to see the indicative band.");
+  await page.getByRole("button", { name: "Show the indicative band" }).click();
+  await expect(result).toContainText("Enter a whole number of units, such as 42,000.");
+  await page.getByLabel("Billable source units").fill("42,000");
+  await page.getByRole("button", { name: "Show the indicative band" }).press("Enter");
+  await expect(result).toContainText(/Indicative band: .+ units, .+ for CLEAN\. This is an estimate and reserves nothing\./);
+  await page.getByLabel("Service").selectOption("HUBSPOT");
+  await page.getByRole("button", { name: "Show the indicative band" }).click();
+  await expect(result).toContainText(/for HubSpot/);
+  await assertAccessible(page);
+});
+
+test("pricing: a service the publication does not list says it cannot be bought, beside the estimate", async ({ page }) => {
+  api.publish([["CLEAN", "AVAILABLE"]]);
+  await page.goto("/pricing");
+  await page.waitForFunction(() => {
+    const form = document.querySelector("form.kauro-site-form");
+    return form !== null && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+  });
+  await page.getByLabel("Billable source units").fill("42,000");
+  await page.getByLabel("Service").selectOption("SALESFORCE");
+  await page.getByRole("button", { name: "Show the indicative band" }).click();
+  await expect(page.locator("#estimate-result")).toContainText("Salesforce is not available for purchase right now.");
+});
+
+// ---- the pages that refuse ------------------------------------------------------------------------------------------------------------
+
+test("unsubscribe: the page changes nothing, never shows the value in its address, and a link in a message reaches it under any value", async ({ page }) => {
+  const token = "abc123-not-a-real-token";
+  const response = await page.goto(`/unsubscribe/${token}`);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "This page cannot stop messages yet" })).toBeVisible();
+  expect(await page.locator("body").innerText(), "the value is not shown").not.toContain(token);
+  expect(await page.title()).not.toContain(token);
+  await expect(page.locator("main form, main input, main button")).toHaveCount(0);
+});
+
+for (const document of ["terms", "privacy", "data-processing"]) {
+  test(`legal ${document}: with the operator's facts unknown the page is refused with 503, says it is not published and names no version, and axe finds no violation`, async ({ page }) => {
+    const seen = watch(page);
+    const response = await page.goto(`/legal/${document}`);
+    await assertDocument(page, response, 503);
+    await expect(page.locator("body")).toContainText("This document is not published yet");
+    expect(await page.content()).not.toMatch(new RegExp(`${document}-\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{12}`));
+    await assertAccessible(page);
+    expect(seen.problems).toEqual([]);
+  });
+}

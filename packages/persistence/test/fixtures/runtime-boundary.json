@@ -421,6 +421,18 @@
         ]
       }
     },
+    "kauro_assurance": {
+      "kauro.web_sessions": {
+        "UPDATE": [
+          "idle_expires_at",
+          "last_seen_at",
+          "revoke_reason",
+          "revoked_at",
+          "step_up_fresh_until",
+          "step_up_proof_id"
+        ]
+      }
+    },
     "kauro_commission": {
       "kauro.agencies": {
         "SELECT": [
@@ -2901,6 +2913,38 @@
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.payment_routes r\n  WHERE (r.provider = inbox_records.provider)))",
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.payment_routes r\n  WHERE (r.provider = inbox_records.provider)))"
     },
+    "inquiries/inquiries_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
+    "inquiry_admissions/inquiry_admissions_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
+    "inquiry_admissions/inquiry_admissions_public_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "inquiry_events/inquiry_events_public_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "true"
+    },
     "inspection_receipts/inspection_receipts_control_insert": {
       "command": "INSERT",
       "roles": [
@@ -4778,6 +4822,14 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
+    "support_cases/support_cases_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
     "target_contracts/target_contracts_control_execution_read": {
       "command": "SELECT",
       "roles": [
@@ -4985,6 +5037,30 @@
       ],
       "using": null,
       "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "web_sessions/web_sessions_open": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": null,
+      "check": "((user_id = kauro.current_user_id()) AND (secret_sha256 = kauro.current_session_sha256()))"
+    },
+    "web_sessions/web_sessions_presented": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())",
+      "check": null
+    },
+    "web_sessions/web_sessions_presented_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_assurance"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())",
+      "check": "(secret_sha256 = kauro.current_session_sha256())"
     }
   },
   "tables": {
@@ -5154,6 +5230,16 @@
       ],
       "kauro.identities": [
         "SELECT"
+      ],
+      "kauro.inquiries": [
+        "INSERT"
+      ],
+      "kauro.inquiry_admissions": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.inquiry_events": [
+        "INSERT"
       ],
       "kauro.inspection_receipts": [
         "SELECT"
@@ -5387,6 +5473,10 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.support_cases": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.target_contracts": [
         "INSERT",
         "SELECT",
@@ -5423,6 +5513,10 @@
     "kauro_assurance": {
       "kauro.assurance_proofs": [
         "INSERT"
+      ],
+      "kauro.web_sessions": [
+        "INSERT",
+        "SELECT"
       ]
     },
     "kauro_commission": {

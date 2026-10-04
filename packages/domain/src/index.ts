@@ -13,6 +13,7 @@ export type {
   ProcessingAuthorityId,
   ClientId,
   ProjectId,
+  SupportCaseId,
   RevisionId,
   TargetContractId,
   PlanId,
@@ -21,6 +22,7 @@ export type {
   AssuranceProofId,
   CapabilityId,
   EventId,
+  InquiryId,
   OutboxId,
   InboxId,
   CorrelationId,
@@ -178,6 +180,10 @@ export type {
   ServiceMode,
   ProjectState,
   ProjectRecord,
+  SupportCategory,
+  SupportSeverity,
+  SupportCaseState,
+  SupportCaseRecord,
   DatasetRevisionRecord,
   TargetContractRecord,
   PlanRecord,
@@ -186,7 +192,26 @@ export type {
   ApprovalRecord,
   CapabilityRecord,
 } from "./model/aggregates.js";
-export { SERVICE_MODES, PROJECT_STATES, OFFERED_CAPABILITY_STATES, isOffered, AGENCY_OPEN_STATES } from "./model/aggregates.js";
+export { SERVICE_MODES, PROJECT_STATES, SUPPORT_CATEGORIES, SUPPORT_SEVERITIES, SUPPORT_CASE_STATES, OFFERED_CAPABILITY_STATES, isOffered, AGENCY_OPEN_STATES } from "./model/aggregates.js";
+
+export type {
+  InquiryBuyerType,
+  InquiryDestination,
+  InquiryRecordBand,
+  InquiryTiming,
+  InquiryAdmissionKind,
+  InquiryContent,
+  InquiryAdmissionKeys,
+} from "./model/inquiry.js";
+export {
+  INQUIRY_BUYER_TYPES,
+  INQUIRY_DESTINATIONS,
+  INQUIRY_RECORD_BANDS,
+  INQUIRY_TIMINGS,
+  INQUIRY_RECEIVED_EVENT,
+  INQUIRY_ADMISSION_KINDS,
+  INQUIRY_LIMITS,
+} from "./model/inquiry.js";
 
 export type { Environment, IdempotencyIdentity, CommandRequestSubject, JournalState, CommandJournalEntry } from "./model/idempotency.js";
 export { ENVIRONMENTS, IDEMPOTENCY_KEY, COMMAND_REQUEST_DOMAIN, commandRequestDigest } from "./model/idempotency.js";

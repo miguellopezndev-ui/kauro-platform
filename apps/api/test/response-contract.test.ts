@@ -172,12 +172,17 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/audits/:auditId/cancel", "CancelAudit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD021" } }],
       ["POST", "/api/v1/audits/:auditId/plans", "CreatePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD022" } }],
       ["POST", "/api/v1/plans/:planId/validate", "ValidatePlan", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      // the support package (B11 W4)
+      ["POST", "/api/v1/projects/:projectId/support-cases", "CreateSupportCase", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD044" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
       ["GET", "/api/v1/agencies/:agencyId/members", "ListMembers", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListMembers" } }],
       ["GET", "/api/v1/agencies/:agencyId/clients", "ListClients", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListClients" } }],
       ["GET", "/api/v1/projects/:projectId", "GetProject", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetProject" } }],
+      // the support reads (B11 W4), registered with the manual-10 reads (createReadHandlers)
+      ["GET", "/api/v1/projects/:projectId/support-cases", "ListSupportCases", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSupportCases" } }],
+      ["GET", "/api/v1/support-cases/:caseId", "GetSupportCase", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSupportCase" } }],
       // the source reads (B07 design §9.1)
       ["GET", "/api/v1/revisions/:revisionId/selection-manifests/:selectionManifestId", "GetSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSelectionManifest" } }],
       ["GET", "/api/v1/revisions/:revisionId", "GetRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRevision" } }],

@@ -1,11 +1,11 @@
 /**
- * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands and the six B07
- * source-lifecycle commands, registered from the command specs of @kauro/application (method, path, scope), with the admission
- * pipeline of manual 10 (content type, byte size, strict JSON, closed schema, envelope headers, authenticated subject) in front of
- * every handler, typed replies (CompletedResponse / AcceptedResponse / Problem) and the safe problem translation of every failure
- * (opaque INTERNAL_ERROR by correlation id; 07 "Command outcomes"); the manual-10 reads and the source reads; the selection
- * manifest intake (B07 D-SEL-2: a document stored once per content, STORED 201 or 200); plus the liveness and readiness probes
- * outside /api/v1 (health.ts).
+ * The Kauro HTTP API (10 "API, contracts and integration seams"): Fastify routes for the seven B06 commands, the six B07
+ * source-lifecycle commands and the support package's CMD044 (B11 W4), registered from the command specs of @kauro/application
+ * (method, path, scope), with the admission pipeline of manual 10 (content type, byte size, strict JSON, closed schema, envelope
+ * headers, authenticated subject) in front of every handler, typed replies (CompletedResponse / AcceptedResponse / Problem) and the
+ * safe problem translation of every failure (opaque INTERNAL_ERROR by correlation id; 07 "Command outcomes"); the manual-10 reads,
+ * the source reads and the support reads; the selection manifest intake (B07 D-SEL-2: a document stored once per content, STORED
+ * 201 or 200); plus the liveness and readiness probes outside /api/v1 (health.ts).
  *
  * Fastify's built-in JSON parser and Ajv are not used for command bodies: the body reaches the route as raw bytes and goes
  * through the strict UTF-8 decoding, the strict parser and the closed validator of @kauro/application, so an invalid byte, a
@@ -72,6 +72,7 @@ import type {
   SchemaValidator,
   SourceIntakeHandlers,
   SourceReadHandlers,
+  SupportHandlers,
   UnauthenticatedRequest,
 } from "@kauro/application";
 import {
@@ -106,7 +107,10 @@ import {
 } from "@kauro/application";
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import type { Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type Authenticator } from "./authenticator.js";
+import { sendProblem, singleValued } from "./http.js";
+import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
+import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
 import { HEALTH_PATHS, registerHealthRoutes, type HealthOptions } from "./health.js";
 
 /** Request and socket deadlines (10 "Request envelope": a reverse proxy's limit is not the only guard; review R36). */
@@ -148,9 +152,15 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
 
 export interface ApiServerOptions {
   readonly environment: Environment;
-  /** The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11) the two B08 execution commands and the four B08 audit commands (B08 design §12). */
-  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers;
-  /** The manual-10 agency, team, client and project reads (re-check finding N16), the source reads (B07 design §9.1) GetJob and GetAudit (B08 design §12). */
+  /**
+   * The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11), the two B08 execution commands and the four B08
+   * audit commands (B08 design §12), and the support package's CMD044 (B11 W4).
+   */
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers;
+  /**
+   * The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4), the source reads
+   * (B07 design §9.1), GetJob and GetAudit (B08 design §12).
+   */
   readonly reads: ReadHandlers & SourceReadHandlers & ExecutionReadHandlers & AuditReadHandlers;
   /** The document intakes: the selection manifest (B07 D-SEL-2) and the decision artifact (B08 D8-PLAN-1). */
   readonly intakes: SourceIntakeHandlers & AuditIntakeHandlers;
@@ -180,6 +190,16 @@ export interface ApiServerOptions {
    * The composition root binds the runtime's `refuseUnauthenticated`.
    */
   readonly refuseUnauthenticated: (action: string, request: UnauthenticatedRequest) => Promise<Problem>;
+  /**
+   * Answers a request whose credentials the authenticator refused as such (B11 D-AUTH-5: AMBIGUOUS_CREDENTIALS, ORIGIN_REJECTED,
+   * CSRF_TOKEN_INVALID): records the durable anonymous DENY fact and returns the problem. The composition root binds the
+   * runtime's refuseAnonymously; without it the refusal is answered without a fact.
+   */
+  readonly refuseCredentials?: (action: string, request: UnauthenticatedRequest, failure: DomainFailure) => Promise<Problem>;
+  /** The routes of the browser session boundary (B11 W2), registered when the boundary is bound. */
+  readonly sessions?: Omit<SessionRoutesOptions, "validator" | "refuseUnauthenticated" | "refuseCredentials" | "sink">;
+  /** The two public routes of B11 W5b (no authentication), registered when bound; without it neither route exists. */
+  readonly publicApi?: PublicApiOptions;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -189,6 +209,8 @@ export interface ApiServerOptions {
   readonly logger?: ApiLogger;
   /** Receives every unexpected exception with its correlation id; the default writes the safe classification to stderr. */
   readonly onInternalError?: (correlationId: string, error: unknown) => void;
+  /** Receives the cause of a CAPACITY_UNAVAILABLE answer of a public route by correlation id; the internal-error sink by default. */
+  readonly onUnavailable?: (correlationId: string, cause: unknown) => void;
   /**
    * Proxy hops in front of this process whose X-Forwarded-For entries are trusted (14 "Initial architecture": the external
    * HTTPS load balancer in front of Cloud Run). 0 — the default — trusts none: the socket peer is the client and a
@@ -226,21 +248,6 @@ export function fastifyPath(cataloguePath: string): string {
   return cataloguePath.replace(/\{([a-zA-Z]+)\}/g, ":$1");
 }
 
-function singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>> {
-  const out: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(headers)) out[k.toLowerCase()] = typeof v === "string" ? v : undefined;
-  return out;
-}
-
-function sendProblem(reply: FastifyReply, problem: Problem): FastifyReply {
-  // the headers every reply carries are set here too: a framework error is answered outside the hooks that set them (N15)
-  return reply
-    .code(problem.status)
-    .header(HEADERS.correlationId, problem.correlationId)
-    .header(HEADERS.cacheControl, PRIVATE_CACHE_POLICY)
-    .type(HEADERS.problemContentType)
-    .send(problem);
-}
 
 /** The safe classification of an unexpected exception: class names only (the adapter attaches the original error as cause). */
 export function classifyInternalError(error: unknown): string {
@@ -357,6 +364,16 @@ function installResponseGuard(app: FastifyInstance, options: ApiServerOptions, s
     if (checked.has(reply)) return payload;
     const responses = request.routeOptions.config.responses ?? UNROUTED_RESPONSES;
     checked.add(reply);
+    if (payload === undefined || payload === null || payload === "") {
+      // a reply without a body (204): checked against its declaration like any other — declared without a body, no media type
+      try {
+        checkReply(options.validator, responses, reply.statusCode, headerText(reply.getHeader("content-type")), undefined);
+        return payload;
+      } catch (e) {
+        const violation = e instanceof ResponseContractViolation ? e : new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the response check could not run", [], { cause: e });
+        return JSON.stringify(refuse(request, reply, violation));
+      }
+    }
     const violation = new ResponseContractViolation(responses.operationId, reply.statusCode, null, "the reply was sent without passing the response check (not a JSON object body)");
     return JSON.stringify(refuse(request, reply, violation));
   });
@@ -509,7 +526,55 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   }
   options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
   options.commissionRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
+  if (options.sessions !== undefined) {
+    registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
+  }
+  if (options.publicApi !== undefined) {
+    registerPublicRoutes(app, {
+      ...options.publicApi,
+      validator: options.validator,
+      clock: options.clock,
+      ids: options.ids,
+      clientNetwork: (address) => (address === undefined || address === "" ? null : clientNetworkOf(address)),
+      sink,
+      onUnavailable: options.onUnavailable ?? sink,
+    });
+  }
   return app;
+}
+
+/** The answer to refused credentials: the bound refusal (with its durable fact), or the problem alone. */
+function refusalOfCredentials(options: ApiServerOptions): (action: string, request: UnauthenticatedRequest, failure: DomainFailure) => Promise<Problem> {
+  return options.refuseCredentials ?? (async (_action, request, failure) => problemOf(failure, request.correlationId));
+}
+
+/**
+ * The subject of a request, or the answer that refuses it: refused credentials (their anonymous fact), or no subject at all (the
+ * anonymous fact of an unauthenticated request). An authenticator's failure to decide (its store unavailable) is its failure.
+ */
+async function subjectOrRefusal(
+  options: ApiServerOptions,
+  request: FastifyRequest,
+  headers: Readonly<Record<string, string | undefined>>,
+  action: string,
+  refused: UnauthenticatedRequest,
+  sink: (correlationId: string, error: unknown) => void,
+): Promise<{ readonly kind: "SUBJECT"; readonly subject: Extract<Authentication, { kind: "SUBJECT" }>["subject"] } | { readonly kind: "PROBLEM"; readonly problem: Problem }> {
+  let authentication: Authentication;
+  try {
+    authentication = await authenticationOf(options.authenticator, { method: request.method, headers });
+  } catch (error) {
+    if (error instanceof DomainFailure && error.code !== "INTERNAL_ERROR") return { kind: "PROBLEM", problem: problemOf(error, refused.correlationId) };
+    sink(refused.correlationId, error);
+    return { kind: "PROBLEM", problem: internalProblem(refused.correlationId) };
+  }
+  if (authentication.kind === "SUBJECT") return { kind: "SUBJECT", subject: authentication.subject };
+  try {
+    return { kind: "PROBLEM", problem: authentication.kind === "REFUSED" ? await refusalOfCredentials(options)(action, refused, authentication.failure) : await options.refuseUnauthenticated(action, refused) };
+  } catch (error) {
+    sink(refused.correlationId, error);
+    return { kind: "PROBLEM", problem: internalProblem(refused.correlationId) };
+  }
 }
 
 /** The body of an intake's 201 or 200 (the STORED envelope of @kauro/application's intake response schemas). */
@@ -552,17 +617,11 @@ function registerIntake<View>(app: FastifyInstance, options: ApiServerOptions, h
       );
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
       const { correlationId, agencyId, path, body } = admission.admission;
-      const subject = await options.authenticator.authenticate(headers);
-      if (!subject) {
-        let refusal: Problem;
-        try {
-          refusal = await options.refuseUnauthenticated(spec.action, { correlationId, agencyId });
-        } catch (error) {
-          sink(correlationId, error);
-          return sendProblem(reply, internalProblem(correlationId));
-        }
-        return sendProblem(reply, refusal);
-      }
+      // refused credentials (B11 D-AUTH-5: an ambiguous credential, or an unsafe cookie request failing the CSRF rule) and a request
+      // without a subject are refused with their anonymous fact, as a command's are, before the handler runs
+      const authenticated = await subjectOrRefusal(options, request, headers, spec.action, { correlationId, agencyId }, sink);
+      if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
+      const subject = authenticated.subject;
       let result: IntakeResult<View>;
       try {
         result = await handler.execute({ correlationId, subject, agencyId, path, body });
@@ -606,17 +665,9 @@ function registerRead<View>(
       });
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
       const correlationId = admission.correlationId;
-      const subject = await options.authenticator.authenticate(headers);
-      if (!subject) {
-        let refusal: Problem;
-        try {
-          refusal = await options.refuseUnauthenticated(spec.action, { correlationId, agencyId: admission.agencyId });
-        } catch (error) {
-          sink(correlationId, error);
-          return sendProblem(reply, internalProblem(correlationId));
-        }
-        return sendProblem(reply, refusal);
-      }
+      const authenticated = await subjectOrRefusal(options, request, headers, spec.action, { correlationId, agencyId: admission.agencyId }, sink);
+      if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
+      const subject = authenticated.subject;
       let result: ReadResult<View>;
       try {
         result = await execute({ correlationId, subject, agencyId: admission.agencyId, path: admission.path, query: admission.query });
@@ -669,19 +720,11 @@ function registerCommand<Body, View>(
       };
       const admission = admitStructure(spec, raw, options.validator, options.clock);
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
-      const subject = await options.authenticator.authenticate(headers);
-      if (!subject) {
-        // the refusal of an unauthenticated consequential command is a durable fact before it is an answer (08 "Audit events")
-        const correlationId = admission.admission.correlationId;
-        let refusal: Problem;
-        try {
-          refusal = await options.refuseUnauthenticated(spec.id as CommandId, { correlationId, agencyId: admission.admission.agencyId });
-        } catch (error) {
-          sink(correlationId, error);
-          return sendProblem(reply, internalProblem(correlationId));
-        }
-        return sendProblem(reply, refusal);
-      }
+      // the refusal of an unauthenticated consequential command — or of refused credentials (B11 D-AUTH-5: decided here, before
+      // the journal is reserved, so no idempotency key is consumed) — is a durable fact before it is an answer (08 "Audit events")
+      const authenticated = await subjectOrRefusal(options, request, headers, spec.id as CommandId, { correlationId: admission.admission.correlationId, agencyId: admission.admission.agencyId }, sink);
+      if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
+      const subject = authenticated.subject;
       const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
       let result: CommandResult<View>;
       try {

@@ -12,6 +12,7 @@ import type {
   CreateAgencyHandler,
   CreateClientHandler,
   CreateProjectHandler,
+  CreateSupportCaseHandler,
   RevisePlanHandler,
   WithdrawApprovalHandler,
 } from "../contracts.js";
@@ -21,6 +22,7 @@ import { archiveClientHandler } from "./archive-client.js";
 import { createAgencyHandler } from "./create-agency.js";
 import { createClientHandler } from "./create-client.js";
 import { createProjectHandler } from "./create-project.js";
+import { createSupportCaseHandler, type SupportOptions } from "./create-support-case.js";
 import { revisePlanHandler } from "./revise-plan.js";
 import { withdrawApprovalHandler } from "./withdraw-approval.js";
 
@@ -44,6 +46,15 @@ export interface B06Handlers {
   readonly CMD026: WithdrawApprovalHandler;
 }
 
+/** The support package's commands (B11 W4): served beside the seven of B06, which stay a closed set. */
+export interface SupportHandlers {
+  readonly CMD044: CreateSupportCaseHandler;
+}
+
+export function createSupportHandlers(runtime: CommandRuntime, options: SupportOptions = {}): SupportHandlers {
+  return Object.freeze({ CMD044: createSupportCaseHandler(runtime, options) });
+}
+
 export function createB06Handlers(runtime: CommandRuntime, collaborators: B06Collaborators): B06Handlers {
   return Object.freeze({
     CMD001: createAgencyHandler(runtime, collaborators.abuseLimiter),
@@ -60,6 +71,8 @@ export { createAgencyHandler, LAUNCH_ASSURANCE_POLICY } from "./create-agency.js
 export { createClientHandler } from "./create-client.js";
 export { archiveClientHandler } from "./archive-client.js";
 export { createProjectHandler } from "./create-project.js";
+export { createSupportCaseHandler } from "./create-support-case.js";
+export type { SupportOptions } from "./create-support-case.js";
 export { revisePlanHandler } from "./revise-plan.js";
 export { approvePlanHandler, approvalHashOf } from "./approve-plan.js";
 export type { ApprovalPreimage } from "./approve-plan.js";

@@ -46,6 +46,7 @@ const EVERY_ROUTE: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("ADMISSION", "INVALID_REQUEST", "IDEMPOTENCY_KEY_INVALID", "the Idempotency-Key header is not a key of the accepted shape"),
   outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", null, "no authenticated subject: the anonymous denial is recorded"),
   outcome("AUTHENTICATION", "AUTHENTICATION_REQUIRED", "SUBJECT_UNAUTHENTICATED", "the subject is not the identity the unit of work is bound to"),
+  outcome("AUTHENTICATION", "INVALID_REQUEST", "AMBIGUOUS_CREDENTIALS", "a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded"),
   outcome("ACCESS", "NOT_AUTHORIZED", "IDENTITY_DISABLED", "the token's or the stored identity state is DISABLED"),
   outcome("ACCESS", "NOT_AUTHORIZED", "IDENTITY_UNVERIFIED", "the launch policy needs a verified email and enrolled MFA"),
   outcome("IDEMPOTENCY", "IDEMPOTENCY_CONFLICT", "REQUEST_DIGEST_DIFFERS", "the key was used with another request: nothing was executed again"),
@@ -54,6 +55,16 @@ const EVERY_ROUTE: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("PLATFORM", "INTERNAL_ERROR", null, "an unexpected exception, recorded under the correlation id; retry with the same key"),
   outcome("PLATFORM", "INTEGRITY_FAILURE", null, "a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes"),
   outcome("PLATFORM", "INTEGRITY_FAILURE", "RESPONSE_CONTRACT_VIOLATION", "the reply its route's contract refused was not sent (R23, N13)"),
+]);
+
+/**
+ * The CSRF rule of an unsafe request authenticated by the session cookie (B11 D-AUTH-5), decided at authentication, before the
+ * journal is reserved: no idempotency key is consumed and the anonymous denial is recorded. A read (GET) never reaches it; every
+ * unsafe route a person authenticates for — a command, a document intake — answers it.
+ */
+const COOKIE_CSRF: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("AUTHENTICATION", "NOT_AUTHORIZED", "ORIGIN_REJECTED", "the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed"),
+  outcome("AUTHENTICATION", "NOT_AUTHORIZED", "CSRF_TOKEN_INVALID", "the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed"),
 ]);
 
 /** Routes whose path carries ids. */
@@ -96,7 +107,7 @@ const PAGINATED: ReadonlyArray<ProblemOutcome> = Object.freeze([
  * The pipeline's shared outcome lists and the entry constructor, exported so a later package composes the closed catalogues of its
  * own routes from the same entries instead of restating them (the B07 source lifecycle: @kauro/application sources/outcomes).
  */
-export const OUTCOME_BLOCKS = Object.freeze({ EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED });
+export const OUTCOME_BLOCKS = Object.freeze({ EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, PAGINATED, COOKIE_CSRF });
 export { outcome as problemOutcome };
 
 /** A closed catalogue from its entries: refuses an entry listed twice (by code and reason). */

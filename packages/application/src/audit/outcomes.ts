@@ -11,7 +11,7 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import type { AuditCommandId, AuditIntakeId, AuditRouteId } from "./contracts.js";
 
-const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY } = OUTCOME_BLOCKS;
+const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, TENANT_READ, NO_QUERY, COOKIE_CSRF } = OUTCOME_BLOCKS;
 
 const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is not visible to the caller's agency`);
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
@@ -53,7 +53,7 @@ const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOut
 });
 
 function commandCatalogue(command: AuditCommandId): ReadonlyArray<ProblemOutcome> {
-  return closedCatalogue(command, [...EVERY_ROUTE, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...COMMAND_SPECIFIC[command]]);
+  return closedCatalogue(command, [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...TENANT, ...AGENCY_HEADER, ...COMMAND_SPECIFIC[command]]);
 }
 
 /** The closed problem catalogue of each audit command. */
@@ -76,6 +76,8 @@ export const AUDIT_ROUTE_OUTCOMES: Readonly<Record<AuditRouteId, ReadonlyArray<P
 export const AUDIT_INTAKE_OUTCOMES: Readonly<Record<AuditIntakeId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   SubmitDecisionArtifact: closedCatalogue("SubmitDecisionArtifact", [
     ...EVERY_ROUTE.filter((o) => o.layer !== "IDEMPOTENCY" && o.reason !== "IDEMPOTENCY_KEY_MISSING" && o.reason !== "IDEMPOTENCY_KEY_INVALID"),
+    // the cookie CSRF rule of an unsafe route a person authenticates for (B11 D-AUTH-5, D-INT1-2; joined by the trunk sync, D11-SYNC-1)
+    ...COOKIE_CSRF,
     ...PATH_IDS,
     ...TENANT,
     ...AGENCY_HEADER,

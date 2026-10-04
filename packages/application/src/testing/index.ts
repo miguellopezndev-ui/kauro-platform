@@ -79,5 +79,12 @@ export const CONTRACT_FAKES: ReadonlyArray<ContractFakeEntry> = Object.freeze([
 // D-FAKE-B1): one test-only subpath, one index re-exporting both packages' sets (B07 design §17 item 15). Each fake keeps its single
 // owner and its label (CONTRACT_FAKE, evidence class SIMULATED); no composition root binds any of them.
 export * from "../commerce/testing/index.js";
+
+// Package B11's labelled contract fake of the identity provider (design docs/design/B11-agency-app.md §6, owner mandate W2):
+// ContractFakeIdentityIssuer (label CONTRACT_FAKE, evidence class SIMULATED) and the test clock the api and the fake share. Like
+// every fake of this subpath, the package's main entry exports none of it and no composition root binds it.
+export { ContractFakeIdentityIssuer, testClock, totpCode, CONTRACT_FAKE_LABEL, SIMULATED_EVIDENCE } from "./identity-issuer.js";
+export type { TestClock, FakeAccount, FakeAccountSpec, FakeSignIn, FakeRefusal, FakeTotpEnrollment, MintOptions } from "./identity-issuer.js";
+
 // B10 (agency recurrence and commission domain) adds its four fakes beside them; same rules: one owner per fake, labelled, never bound.
 export * from "../commercial/testing/index.js";

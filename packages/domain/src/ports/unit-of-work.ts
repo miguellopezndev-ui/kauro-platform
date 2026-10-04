@@ -28,6 +28,7 @@ import type {
   ProcessingAuthorityRepository,
   ProjectRepository,
   SecurityEventRepository,
+  SupportCaseRepository,
   TargetContractRepository,
   ValidationReceiptRepository,
 } from "./repositories.js";
@@ -54,6 +55,8 @@ export interface UnitOfWork {
   readonly processingAuthorities: ProcessingAuthorityRepository;
   readonly endClients: EndClientRepository;
   readonly projects: ProjectRepository;
+  /** Support cases (B11 CMD044): a member of the agency opens one for a project of that agency. */
+  readonly supportCases: SupportCaseRepository;
   readonly revisions: DatasetRevisionRepository;
   readonly targetContracts: TargetContractRepository;
   readonly plans: PlanRepository;

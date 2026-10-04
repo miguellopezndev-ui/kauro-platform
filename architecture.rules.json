@@ -28,9 +28,16 @@
     "ui": ["contracts"],
     "web": ["contracts", "ui"]
   },
-  "publicSubpaths": ["/canonical", "/digest", "/registry", "/generated/types", "/schemas.json", "/package.json", "/testing"],
+  "publicSubpaths": ["/canonical", "/digest", "/registry", "/generated/types", "/schemas.json", "/package.json", "/testing", "/tokens.css"],
   "testOnlySubpaths": ["/testing"],
   "clientBundles": ["apps/web/", "packages/ui/"],
+  "$commentClientBundles": "B11 design D-SEC-2. clientBundleNodeSide lists, relative to a client-bundle package, the files that never ship to a browser (tests, build scripts and configuration, the browser-test harness): the client-bundle rules do not apply to them, the layer rules still do. A client bundle may not declare a Server Action or a server data cache, and may not import a module forbiddenInClientBundles names.",
+  "clientBundleNodeSide": ["test/", "e2e/", "scripts/", "next.config.ts", "playwright.config.ts"],
+  "$commentServerConfig": "B11 design D-SEC-2. Every file of a client-bundle package that reads the environment (process.env, import.meta.env) lives in one of serverConfigDirectories and starts with the serverOnlyImport line, so the bundler refuses to put it in a browser bundle; the pure modules beside it take their values as arguments and stay importable by node:test.",
+  "serverConfigDirectories": ["apps/web/src/server/config/"],
+  "serverOnlyImport": "server-only",
+  "environmentReaders": ["\\bprocess\\s*(\\?\\.|\\.)\\s*env\\b", "\\bprocess\\s*\\[\\s*[\"']env[\"']\\s*\\]", "\\bimport\\.meta\\.env\\b", "\\{[^}]*\\benv\\b[^}]*\\}\\s*=\\s*process\\b"],
+  "forbiddenInClientBundles": { "directives": ["use server", "use cache"], "specifiers": ["next/og"] },
   "serverOnlyPackages": ["pg", "fastify", "@kauro/persistence", "@kauro/data-plane", "@kauro/application", "@kauro/domain", "@kauro/authorization"],
   "credentialPatterns": ["DATABASE_URL", "PAYPAL_CLIENT_SECRET", "SERVICE_ACCOUNT_KEY", "PRIVATE_KEY", "process\\.env\\.[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|KEY)"]
 }

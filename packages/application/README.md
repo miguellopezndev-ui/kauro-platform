@@ -40,6 +40,18 @@ The application layer of the Kauro platform: the contracts of the public command
   keywords, foreign `$ref`s and unasserted formats are refused at compile time; `date-time` is a real Gregorian instant).
 - `api/projections` — record → view projections and `readinessBlockersOf`.
 - `testing/in-memory-ports` — the in-memory implementation of the domain ports for pure orchestration tests only.
+- `ports/sessions`, `sessions/protocol`, `sessions/service` — the browser session boundary of B11 W2
+  (`docs/design/B11-agency-app.md` D-AUTH-1..5): the `IdentityTokenVerifier` and `WebSessionStore` ports; the protocol of
+  the `__Host-kauro_session` cookie (32-byte secret, stored only as SHA-256), its CSRF token (HMAC of the secret), the exact
+  application Origin and `presentedCredential` (AMBIGUOUS_CREDENTIALS, ORIGIN_REJECTED, CSRF_TOKEN_INVALID, decided before the
+  journal); `createSessionService`: sign-in, resume (last-seen at most once a minute; idle 1 800 s, absolute 43 200 s), logout,
+  step-up as a B06 STEP_UP proof, and their security facts. The five session routes are operational routes
+  (`SESSION_ROUTES` in `OPERATIONAL_ROUTES`, with request bodies, a 204 without body and closed catalogues in
+  `OPERATIONAL_OUTCOMES`).
+- `@kauro/application/testing` (test-only subpath; the architecture gate refuses it from production sources) —
+  `ContractFakeIdentityIssuer` (label CONTRACT_FAKE, evidence class SIMULATED): the identity provider's contract fake (RS256
+  key pair and JWKS, password and TOTP sign-in, sign-up, e-mail verification, TOTP enrolment, re-authentication, tokens of
+  the documented claim shape) and `testClock`.
 
 The labelled contract fakes of three provider ports of the source lifecycle (B07 mandate B07-PROVIDER-FAKES; design
 `docs/design/B07-upload-source-lifecycle.md` §2, §15, D-FAKE-1) are the separate, TEST-ONLY export subpath

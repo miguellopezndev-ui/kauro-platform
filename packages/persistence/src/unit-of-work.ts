@@ -87,6 +87,7 @@ import { PgPurchasedSubjects } from "./repositories/commerce-subject.js";
 import { PgPaymentSweeps } from "./repositories/commerce-sweeps.js";
 import { PgCommerceRequestReads } from "./repositories/commerce-request-reads.js";
 import { PgApprovalRepository, PgPlanRepository, PgValidationReceiptRepository } from "./repositories/plans.js";
+import { PgSupportCaseRepository } from "./repositories/support-cases.js";
 import { PgAgencyRepository, PgIdentityRepository, PgInvitationRepository, PgMembershipRepository, PgSecurityEventRepository } from "./repositories/tenancy.js";
 import { PgCapabilityRepository, PgDatasetRevisionRepository, PgEndClientRepository, PgProcessingAuthorityRepository, PgProjectRepository, PgTargetContractRepository } from "./repositories/workspace.js";
 import { PgRequestJournal } from "./request-journal.js";
@@ -155,6 +156,7 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly processingAuthorities: PgProcessingAuthorityRepository;
   readonly endClients: PgEndClientRepository;
   readonly projects: PgProjectRepository;
+  readonly supportCases: PgSupportCaseRepository;
   readonly revisions: PgDatasetRevisionRepository;
   readonly targetContracts: PgTargetContractRepository;
   readonly plans: PgPlanRepository;
@@ -202,6 +204,7 @@ export class PgUnitOfWork implements UnitOfWork {
     this.processingAuthorities = new PgProcessingAuthorityRepository(client);
     this.endClients = new PgEndClientRepository(client);
     this.projects = new PgProjectRepository(client);
+    this.supportCases = new PgSupportCaseRepository(client);
     this.revisions = new PgDatasetRevisionRepository(client);
     this.targetContracts = new PgTargetContractRepository(client);
     this.plans = new PgPlanRepository(client);

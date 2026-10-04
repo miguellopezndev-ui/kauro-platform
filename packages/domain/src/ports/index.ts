@@ -21,6 +21,8 @@ export type {
   EndClientRepository,
   NewProject,
   ProjectRepository,
+  NewSupportCase,
+  SupportCaseRepository,
   DatasetRevisionRepository,
   LockedSourceRevision,
   TargetContractRepository,
@@ -126,6 +128,7 @@ export type {
   CommerceUnitOfWork,
   CommerceUnitOfWorkFactory,
 } from "./commerce.js";
+export type { InquiryStore, InquiryAdmission, InquiryAdmissionRequest, CapabilityPublication, PublishedCapability } from "./inquiries.js";
 export type {
   QuoteIssuanceRequest,
   RecurrenceRepository,
