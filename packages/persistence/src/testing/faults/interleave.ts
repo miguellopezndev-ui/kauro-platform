@@ -8,7 +8,7 @@
  */
 import { Client, type ClientConfig } from "pg";
 import { connectionPid } from "./points.js";
-import { currentScope, inScope, recordStatement, registerSession, settleStatement, statementText, trackSettlement, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
+import { currentScope, inScope, recordStatement, registerSession, sendTracked, settleStatement, statementText, trackSettlement, trackTransactions, type IssuedStatement, type OperationScope, type StatementEvent } from "./scope.js";
 
 export class InterleavingNotObserved extends Error {
   constructor(message: string) {
@@ -86,29 +86,16 @@ export async function openConnection(config: ClientConfig): Promise<HarnessConne
         };
       }
     }
-    const activeBefore = internals._activeQuery ?? null;
-    const queuedBefore = internals._queryQueue?.length ?? 0;
-    const out = realQuery.apply(raw, args);
-    if (issued !== undefined) {
-      const event = issued.event;
-      const active = internals._activeQuery ?? null;
-      const queue = internals._queryQueue ?? [];
-      if (active !== null && active !== activeBefore) {
-        // the connection was free: the driver sent it at once
-        driverQuery.set(event, active);
-        event.dispatched = true;
-      } else if (queue.length > queuedBefore) {
-        // queued behind another statement: dispatched only when the driver submits it
-        const q = queue[queue.length - 1]!;
-        driverQuery.set(event, q);
-        const submit = q.submit;
-        q.submit = function (this: unknown, ...a: unknown[]) {
-          event.dispatched = true;
-          return submit.apply(this, a);
-        };
-      }
-      trackSettlement(issued, out);
-    }
+    // every statement on the connection, in a scope or not, is sent through the transaction track (an outside ROLLBACK ends the
+    // transaction an onServer positioned); the operation's own statement is dispatched only once the driver sends it, not while
+    // it is queued behind another statement
+    const out = sendTracked(raw, statementText(args[0]), issued, () => realQuery.apply(raw, args), (q) => {
+      if (issued === undefined) return;
+      // the driver's query object behind the statement (to tell the one it is running from one still queued)
+      driverQuery.set(issued.event, q);
+      issued.event.dispatched = true;
+    });
+    trackSettlement(issued, out);
     return out;
   };
   const proxy = new Proxy(raw, {
@@ -129,6 +116,8 @@ export async function openConnection(config: ClientConfig): Promise<HarnessConne
   holder.proxy = proxy;
   connections.set(proxy, conn);
   registerSession(proxy, raw);
+  // the connection's transaction boundaries, from every statement sent on it and from the server, from its first statement on
+  trackTransactions(raw);
   return proxy;
 }
 

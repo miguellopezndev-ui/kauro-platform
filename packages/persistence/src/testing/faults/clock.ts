@@ -9,7 +9,7 @@ import type { Clock } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
 import type { SqlSession } from "../source-lifecycle.js";
 import { TEST_CLOCK_OFFSET_SETTING } from "../temporary-postgres.js";
-import { currentScope, record, sessionKey, tapSession } from "./scope.js";
+import { currentScope, currentTransaction, record, sessionKey, tapSession, trackTransactions } from "./scope.js";
 
 export type InstantLike = Date | number | string;
 
@@ -96,6 +96,8 @@ export function controlledClock(start: InstantLike = Date.now()): ControlledCloc
     before: (boundary, marginMs = 1) => moveTo(epochMs(boundary) - marginMs, "before"),
     async onServer(session) {
       const instant = current;
+      // the session's transaction boundaries are tracked from here on (a harness connection's from its first statement)
+      trackTransactions(sessionKey(session));
       await session.query("SELECT set_config($1, extract(epoch FROM ($2::timestamptz - transaction_timestamp()))::text, true)", [TEST_CLOCK_OFFSET_SETTING, toUtcInstant(instant)]);
       const r = await session.query<{ now: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS now`);
       const now = r.rows[0]?.now;
@@ -106,7 +108,9 @@ export function controlledClock(start: InstantLike = Date.now()): ControlledCloc
       // in an operation scope: the application, and from now on the statements of that session, are the scope's evidence
       const scope = currentScope();
       if (scope !== undefined && scope.open) {
-        record((s) => ({ kind: "SERVER_APPLIED", at: instant, session: sessionKey(session), seq: s }));
+        // the transaction the instant now stands on: only a statement of the operation sent in this same one consumes it
+        const txn = currentTransaction(sessionKey(session));
+        record((s) => ({ kind: "SERVER_APPLIED", at: instant, session: sessionKey(session), txn, seq: s }));
         tapSession(session, scope);
       }
       return now;

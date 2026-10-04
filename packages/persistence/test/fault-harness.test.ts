@@ -962,6 +962,132 @@ test("FH-R2 (r4) an expiry or timeout cell FAILS unless its operation CONSUMED a
   });
 });
 
+// --- FH-R2 (Codex re-check 4 of bb93069): a call's instants are its arguments AT the call; a transaction ends whoever ends it -----
+// The first assertion of each block below is Codex's r4 counterexample; each passed on bb93069.
+
+test("FH-R2 (r5) consumption is judged from what the call received and the transaction the statement ran in: an argument mutated after the call, an outside ROLLBACK (or COMMIT; BEGIN, ROLLBACK TO a savepoint) between onServer and the operation's statement FAIL; the same transaction passes", async () => {
+  const unused = (e: unknown) => e instanceof FaultNotInjected && /nothing used the clock after it crossed/.test(e.message);
+  // Codex's counterexample 1, exactly: the claim received 1000 ms; the argument object is changed to the discarded 2001 ms afterwards
+  await assert.rejects(
+    runCell(
+      { step: "lease claim", fault: "expiry", expect: "expired" },
+      async (ctx) => {
+        const input = { at: ctx.clock.at(0) };
+        let received: string | undefined;
+        const leases = instrumentPort({ async claim(x: { at: string }) { received = x.at; } }, ctx.points, "leases");
+        ctx.clock.past(ctx.deadline(ctx.clock.at(1000)));
+        await ctx.withClock("claim", async (clock) => {
+          void clock.now();
+          await leases.claim(input);
+        });
+        input.at = ctx.clock.at(0);
+        assert.notEqual(received, input.at);
+      },
+      { clockStart: 1000 },
+    ),
+    unused,
+    "an argument mutated after the call",
+  );
+  // the same with a Date argument moved after the call (setTime), nested one level down
+  await assert.rejects(
+    runCell({ step: "lease claim", fault: "timeout", expect: "expired" }, async (ctx) => {
+      const input = { lease: { at: new Date(Date.parse(ctx.clock.at(0))) } };
+      const leases = instrumentPort({ async claim(_x: unknown) {} }, ctx.points, "leases");
+      ctx.clock.past(ctx.deadline(ctx.clock.at(1000)));
+      await ctx.withClock("claim", async (clock) => {
+        const late = clock.nowMs();
+        await leases.claim(input);
+        input.lease.at.setTime(late);
+      });
+    }),
+    unused,
+    "a Date argument moved after the call, inside the operation",
+  );
+  // Codex's counterexample 2, exactly: an outside callback rolls the transaction back between onServer and the operation's SELECT
+  const outsideEnd = async (label: string, end: (c: Client) => Promise<unknown>) =>
+    assert.rejects(
+      runCell(
+        { step: "server-clock step", fault: "timeout", expect: "past deadline" },
+        async (ctx) => {
+          const d = ctx.deadline(ctx.clock.at(1000));
+          ctx.clock.past(d);
+          const { gate, open } = gated();
+          const outside = gate.then(() => end(a));
+          await a.query("BEGIN");
+          try {
+            await ctx.withClock("server-clock step", async (clock) => {
+              await clock.onServer(a);
+              open();
+              await outside;
+              const r = await a.query<{ before: boolean }>("SELECT kauro.server_now() < $1::timestamptz AS before", [d]);
+              assert.equal(r.rows[0]!.before, true);
+            });
+          } finally {
+            await a.query("ROLLBACK");
+          }
+        },
+        { clockStart: "2100-01-01T00:00:00.000Z" },
+      ),
+      unused,
+      label,
+    );
+  await outsideEnd("an outside ROLLBACK between onServer and the operation's statement", (c) => c.query("ROLLBACK"));
+  await outsideEnd("an outside COMMIT; BEGIN in one string (the operation's statement runs in a new transaction)", (c) => c.query("COMMIT; BEGIN"));
+  // the transaction-local setting is undone by a rollback to a savepoint taken before onServer: the transaction goes on, the instant is gone
+  await assert.rejects(
+    runCell(
+      { step: "server-clock step", fault: "timeout", expect: "past deadline" },
+      async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        const { gate, open } = gated();
+        const outside = gate.then(() => a.query("ROLLBACK TO SAVEPOINT before_clock"));
+        await a.query("BEGIN");
+        await a.query("SAVEPOINT before_clock");
+        try {
+          await ctx.withClock("server-clock step", async (clock) => {
+            await clock.onServer(a);
+            open();
+            await outside;
+            const r = await a.query<{ before: boolean }>("SELECT kauro.server_now() < $1::timestamptz AS before", [d]);
+            assert.equal(r.rows[0]!.before, true);
+          });
+        } finally {
+          await a.query("ROLLBACK");
+        }
+      },
+      { clockStart: "2100-01-01T00:00:00.000Z" },
+    ),
+    unused,
+    "an outside ROLLBACK TO a savepoint taken before onServer",
+  );
+  // passes: the operation's statement runs in the transaction onServer positioned (on a harness connection and on a plain client)
+  for (const [label, session] of [
+    ["harness connection", () => a],
+    ["plain client", () => h.oracle],
+  ] as const) {
+    await runCell(
+      { step: "server-clock step", fault: "timeout", expect: "past deadline" },
+      async (ctx) => {
+        const d = ctx.deadline(ctx.clock.at(1000));
+        ctx.clock.past(d);
+        const c = session();
+        await c.query("BEGIN");
+        try {
+          await ctx.withClock(`server-clock step (${label})`, async (clock) => {
+            await clock.onServer(c);
+            const r = await c.query<{ before: boolean }>("SELECT kauro.server_now() < $1::timestamptz AS before", [d]);
+            assert.equal(r.rows[0]!.before, false);
+          });
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      },
+      { clockStart: "2100-01-01T00:00:00.000Z" },
+    );
+  }
+});
+
 test("FH-R6 (r4) a lock wait is credited only to the operation's own statement — tagged fault-op:<id>:<n>, issued in its scope on a connection the harness opened, the one the driver is running: a query method bound before mustWait, a statement bypassing the handle after the idle check, the operation's identical SQL still queued behind it FAIL", async () => {
   const x = await newItem();
   const y = await newItem();

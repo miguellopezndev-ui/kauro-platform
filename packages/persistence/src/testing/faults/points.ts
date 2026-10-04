@@ -7,7 +7,7 @@
  * reached is a failed test, never a silent pass (assertAllReached). A crash is recorded only when it fires in the code under test.
  */
 import type { Client } from "pg";
-import { currentScope, record, type OperationScope } from "./scope.js";
+import { currentScope, instantsAtCall, record, type OperationScope } from "./scope.js";
 
 /** A simulated process death at a named point: not a DomainFailure, so a unit of work rolls back and a transport answers 500. */
 export class SimulatedCrash extends Error {
@@ -295,8 +295,10 @@ export function instrumentPort<P extends object>(port: P, points: FaultPoints, n
       const method = value as AnyFn;
       return async (...args: never[]) => {
         await points.pass(`${name}.${prop}.before`);
-        // the call reaches the real method with these arguments: a sink of the operation scope it runs in
-        record((seq) => ({ kind: "CALL", name: `${name}.${prop}`, args: [...(args as unknown[])], seq }));
+        // the call reaches the real method with these arguments: a sink of the operation scope it runs in. The instants they carry
+        // are read now, before the method runs, into a frozen snapshot: a later change to an argument changes no evidence
+        const instants = instantsAtCall(args as unknown[]);
+        record((seq) => ({ kind: "CALL", name: `${name}.${prop}`, instants, seq }));
         const out = await method.apply(target, args);
         await passCompleted(points, `${name}.${prop}.after`);
         return out;
