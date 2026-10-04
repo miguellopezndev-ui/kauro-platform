@@ -1375,6 +1375,14 @@
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
     },
+    "agency_recurrence/agency_recurrence_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
     "agency_recurrence/agency_recurrence_payment": {
       "command": "ALL",
       "roles": [

@@ -65,6 +65,8 @@ export function terminateSellerHandler(runtime: CommerceRequestRuntime, co: Sell
           if (!TERMINABLE.has(seller.state)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the seller is not ACTIVE or SUSPENDED: a termination is requested from those states only", { reason: "UNLISTED_TRANSITION", currentVersion: seller.version, currentState: seller.state });
           }
+          // the global order (D10-GAP-20): seller, then the agencies of its claims and assignments, then the claims
+          await attribution.lockAgencies(await sales.agenciesOfSeller(sellerId));
           const terms = await sales.getTerminationTerms(body.terminationTermsRef as TerminationTermsRef);
           if (terms === null || terms.sellerId !== sellerId || terms.effectiveAt !== undefined) {
             throw new DomainFailure("PRECONDITION_FAILED", "no termination terms prepared for this seller are waiting to take effect", { reason: "TERMINATION_TERMS_UNPREPARED" });

@@ -24,6 +24,8 @@ export interface SqlStep {
   readonly match: RegExp;
   /** Only the nth (1-based) statement of the route that matches instruments the step (a unit that repeats one statement, once per beneficiary). */
   readonly nth?: number;
+  /** Only a statement whose parameters satisfy this instruments the step (a sweep that visits several agencies, paused at one's lock). */
+  readonly when?: (params: ReadonlyArray<unknown>) => boolean;
 }
 
 interface Route {
@@ -53,6 +55,7 @@ function routedClient(route: Route): PoolClient {
           const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
           for (const step of route.steps) {
             if (!step.match.test(text)) continue;
+            if (step.when !== undefined && !step.when((args[1] as ReadonlyArray<unknown> | undefined) ?? [])) continue;
             if (step.nth !== undefined) {
               const n = (route.seen!.get(step.label) ?? 0) + 1;
               route.seen!.set(step.label, n);

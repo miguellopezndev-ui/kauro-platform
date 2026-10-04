@@ -91,8 +91,8 @@ export async function convertAcceptedClaims(rt: CommissionRuntime, uow: PgCommer
   if (recurrence === null) return 0;
   const allocation = await attributionOf(uow).frozenAllocationOf(agencyId);
   if (allocation === null) return 0;
-  // the agency row before any claim: §10's global order, the consumer's (D10-GAP-17)
-  await recurrenceOf(uow).lockAgency(agencyId);
+  // the agency row before any claim: §10's global order, the consumer's (D10-GAP-17, D10-GAP-20)
+  await attributionOf(uow).lockAgencies([agencyId]);
   const first = await recurrenceOf(uow).getPurchase(recurrence.firstPurchaseId);
   if (first === null) throw new DomainFailure("INTEGRITY_FAILURE", "the agency's first designation names no qualifying purchase");
   let converted = 0;

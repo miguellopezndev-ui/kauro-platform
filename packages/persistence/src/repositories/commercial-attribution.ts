@@ -242,6 +242,12 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0] ? claimRecord(r.rows[0]) : null;
   }
 
+  async lockAgencies(agencyIds: ReadonlyArray<AgencyId>): Promise<void> {
+    // ascending, one statement each: the lock order is the id order. The owner's session cannot lock an agency row (its update policy is the
+    // tenant's), so the agency's commission work serializes on a transition subject of its own, held to COMMIT.
+    for (const agencyId of [...new Set(agencyIds)].sort()) await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agency_commissions', $1))", [agencyId]);
+  }
+
   /** The claim FOR UPDATE, after the writer's half of its prospect's claims lock (CMD047, CMD050, the conversion). */
   async lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null> {
     const prospect = (await execute<{ prospect_id: string }>(this.db, "SELECT prospect_id FROM kauro.attribution_claims WHERE claim_id = $1", [claimId])).rows[0];

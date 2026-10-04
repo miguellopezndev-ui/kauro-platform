@@ -335,6 +335,8 @@ export interface SalesRepository {
   getSeller(sellerId: SellerId): Promise<SellerRecord | null>;
   /** The seller row FOR UPDATE with the exclusive half of `kauro.sellers` (CMD049, CMD050). */
   lockSeller(sellerId: SellerId): Promise<SellerRecord | null>;
+  /** The agencies the seller's open claims and current operational assignments name, ascending: what CMD050 locks before its first claim (D10-GAP-20). */
+  agenciesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<AgencyId>>;
   transitionSeller(sellerId: SellerId, expectedVersion: number, change: SellerChange, now: UtcInstant): Promise<VersionedWrite<SellerRecord>>;
   getAgreement(agreementId: SellerAgreementId): Promise<SellerAgreementRecord | null>;
   /** The seller's agreement in force at `at` (claims cite its version; entitlements bind it). */
@@ -461,6 +463,12 @@ export interface AttributionRepository {
   claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>>;
   /** The seller's open claims (SUBMITTED, DISPUTED, ACCEPTED): CMD050 expires the unlisted ones. */
   openClaimsOf(sellerId: SellerId): Promise<ReadonlyArray<AttributionClaimRecord>>;
+  /**
+   * The agencies' commission transition subject (`kauro.agency_commissions`) held to COMMIT, in ascending id: the global order's agency lock
+   * (D10-GAP-20), taken before any claim by every writer that locks a claim or writes an agency's rights (CMD047, CMD050, the conversion, the
+   * accrual), so their foreign-key row locks (claim, seller, agency) can never cross.
+   */
+  lockAgencies(agencyIds: ReadonlyArray<AgencyId>): Promise<void>;
   /**
    * Whether the claim's agency's first designation admits its conversion, by the database's own comparison at its own grain (the
    * microsecond): the first purchase confirmed before the claim's end (its tail's end, else its acceptance window's) and the claim submitted

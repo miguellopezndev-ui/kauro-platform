@@ -20,7 +20,7 @@
 import type { CommerceEventDelivery } from "@kauro/application";
 import type { AgencyId, CaptureId, EventId, QualifyingPurchaseId } from "@kauro/domain";
 import { COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_SUBSCRIPTIONS, DomainFailure } from "@kauro/domain";
-import { commissionWorkOf, recurrenceOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
+import { attributionOf, commissionWorkOf, recurrenceOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
 import type { ConsumerOutcome } from "../payments/index.js";
 import { accruePurchase, applyBasisChange, convertAcceptedClaims, mirrorDesignation, observeFunds, recordCompletions, serverNow } from "./ledger-effects.js";
 import { COMMISSIONS_CONSUMER, inAgency, type CommissionRuntime } from "./runtime.js";
@@ -46,6 +46,8 @@ function cents(delivery: CommerceEventDelivery, key: string): bigint {
 
 /** The purchase's first accrual, as each of its events makes it when it is the first to arrive: mirror, conversions, pools. */
 async function accrueOnEvent(rt: CommissionRuntime, uow: PgCommercialUnitOfWork, agencyId: AgencyId, captureId: CaptureId): Promise<{ readonly found: boolean; readonly applied: boolean; readonly applicable: boolean }> {
+  // the agency's commission subject before any row of it (D10-GAP-20), as every writer of its claims and rights takes it
+  await attributionOf(uow).lockAgencies([agencyId]);
   const now = await serverNow(uow);
   const mirrored = await mirrorDesignation(uow, agencyId, now);
   const purchase = await recurrenceOf(uow).purchaseOfCapture(captureId);

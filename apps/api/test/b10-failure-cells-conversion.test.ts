@@ -14,8 +14,9 @@ import { after, before, test } from "node:test";
 import { connectionPid, crashedAt, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import type { AttributionView, SellerTerminationView, WebhookAck } from "@kauro/application";
 import { deliver } from "./payment-support.js";
-import { agentOf, integrationWorld, opportunityOf, oracleRows, orderedThrough, planOf, quoted, terminatedThrough, terminationBody, webhookPurchase, type Agent, type IntegrationWorld } from "./integration-support.js";
+import { agentOf, integrationWorld, assignedThrough, opportunityOf, oracleRows, orderedThrough, planOf, quoted, terminatedThrough, terminationBody, webhookPurchase, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { seller } from "./statements-support.js";
+import { recordServiceAssignment } from "@kauro/persistence/testing";
 import type { RecordedSeller } from "@kauro/persistence/testing";
 import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
@@ -1067,6 +1068,64 @@ faultCell(
       mustHaveSettled(out.holder, "the holder");
       mustHaveSettled(out.waiter, "the waiter");
       assert.deepEqual(await rightsOf(c), convertedFor(c, shares), `${what}: one entitlement per beneficiary, each claim CONVERTED once, one pool and one line per beneficiary`);
+    }
+  },
+);
+
+// =====================================================================================================================================
+// 25 (again). CONV_RACE and the lock order of the commercial aggregates (Codex r1 B10G4-R1, decision D10-GAP-20)
+// =====================================================================================================================================
+// Row locks taken by a foreign key count: an entitlement insert takes the seller's and the agency's row (KEY SHARE), a claim's acceptance and
+// an account link the agency's, so a writer that locks a claim and only then reaches its seller or agency can cycle with one that holds them
+// first. The claimant has an OPERATIONAL ASSIGNMENT on the agency (the account link CMD050 appends, SELLER_TERMINATED, is the agency FK
+// lock), and every schedule stops the holder at an intermediate lock point, where the earlier cells paused at the COMMIT, in both roles.
+
+const AGENCY_LOCK: SqlStep = { label: "agency_lock", match: /pg_advisory_xact_lock\(kauro\.transition_key\('kauro\.agency_commissions'/ };
+const CLAIM_LOCK: SqlStep = { label: "claim_lock", match: /FROM kauro\.attribution_claims WHERE claim_id = \$1 FOR (NO KEY )?UPDATE/ };
+
+faultCell(
+  {
+    id: "CONV_RACE",
+    step: "Claim conversion (consumer, ACCRUAL_RECONCILIATION) and TerminateSeller of the claimant, who holds an operational assignment on the agency, paused at the intermediate lock points",
+    fault: "race",
+    expect:
+      "RACE: the conversion paused after its agency lock, the consumer paused between its claim update and its entitlement insert, and TerminateSeller paused right after its claim lock, each against the other command, with the lock wait observed: no deadlock and no failed transaction; the claim CONVERTED once with its entitlement, the account link SELLER_TERMINATED appended, the seller TERMINATED",
+  },
+  async (ctx) => {
+    const schedules = [
+      { name: "the sweep holds the agency, TerminateSeller waits", holder: "sweep", holdAt: "db.agency_lock.after" },
+      { name: "the consumer holds the claim before its entitlement insert, TerminateSeller waits", holder: "consumer", holdAt: "db.entitlement_insert.before" },
+      { name: "TerminateSeller holds its claim lock, the consumer waits", holder: "terminate-consumer", holdAt: "db.claim_lock.after" },
+      { name: "TerminateSeller holds its claim lock, the sweep waits", holder: "terminate-sweep", holdAt: "db.claim_lock.after" },
+    ] as const;
+    for (const sc of schedules) {
+      const c = await converting(`conv-lockorder-${sc.holder}`, [10_000]);
+      iw.buyers.set(c.agencyId as never, "AGENCY");
+      const sellerId = c.att.sellers[0]!.sellerId;
+      const assigned = await assignedThrough(iw, c.agencyId, { expectedVersion: 0, sellerId, serviceAssignmentRef: await recordServiceAssignment(iw.h, { ownerUserId: iw.owner.userId as never, agencyId: c.agencyId as never, sellerId }) });
+      assert.equal(assigned.sellerId, sellerId, "the claimant holds the agency's operational assignment");
+      const body = await terminationBody(iw, sellerId, []);
+      const steps = [{ ...AGENCY_LOCK, when: (params: ReadonlyArray<unknown>) => params[0] === c.agencyId }, CLAIM_LOCK, CLAIM_UPDATE, ENTITLEMENT_INSERT];
+      const terminate: Actor = {
+        name: "TerminateSeller",
+        login: "kauro_app_test",
+        holdAt: sc.holdAt,
+        run: (conn) => iw.faults.on(conn, "kauro_app", ctx.points, steps, () => call(iw.w, { url: `/api/v1/sales/sellers/${sellerId}/terminate`, token: iw.owner.token, agency: null, key: freshKey("conv-lockorder"), body })),
+      };
+      const consumer: Actor = { name: "the consumer", login: "kauro_commission_test", holdAt: sc.holdAt, run: (conn) => consumeOn(ctx, conn, c.delivery, steps) };
+      const sweep: Actor = { name: "the ACCRUAL_RECONCILIATION pass", login: "kauro_commission_test", holdAt: sc.holdAt, run: (conn) => sweepOn(ctx, conn, RECONCILIATION, steps) };
+      const [holder, waiter] = sc.holder === "sweep" ? [sweep, terminate] : sc.holder === "consumer" ? [consumer, terminate] : sc.holder === "terminate-consumer" ? [terminate, consumer] : [terminate, sweep];
+      const out = await contend(ctx, holder, waiter, sc.name);
+      const [termination, other] = holder === terminate ? [out.holder, out.waiter] : [out.waiter, out.holder];
+      completed<SellerTerminationView>(mustHaveSettled(termination, "TerminateSeller") as Reply, 200);
+      mustHaveSettled(other, "the conversion");
+      // a sweep that was only the waiter may have found nothing left to convert: the next pass settles what remains
+      await svc.runSweep(RECONCILIATION);
+      await svc.consumer.handle(c.delivery as never);
+      const rights = await rightsOf(c);
+      assert.deepEqual([rights.claims, rights.entitlements.map((e) => e[0]), rights.pools, rights.lines], [["CONVERTED"], [sellerId], 1, 1], `${sc.name}: converted once, the entitlement kept`);
+      assert.deepEqual(await oracleRows(iw, "SELECT state FROM kauro.sellers WHERE seller_id = $1", [sellerId]), [{ state: "TERMINATED" }]);
+      assert.deepEqual(await oracleRows(iw, "SELECT count(*)::int AS n FROM kauro.account_assignments WHERE agency_id = $1 AND reason = 'SELLER_TERMINATED'", [c.agencyId]), [{ n: 1 }], `${sc.name}: the assignment ended`);
     }
   },
 );
