@@ -15,11 +15,27 @@ concurrency:
 
 jobs:
   verify:
-    name: verify
-    runs-on: ubuntu-24.04
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            pgbin: /usr/lib/postgresql/17/bin
+          # Windows on every PR (owner 2026-10-04): local Windows verify is then only needed at package close.
+          - os: windows-latest
+            pgbin: C:/pgsql17/pgsql/bin
+    runs-on: ${{ matrix.os }}
     env:
-      PGBIN: /usr/lib/postgresql/17/bin
+      PGBIN: ${{ matrix.pgbin }}
+    defaults:
+      run:
+        shell: bash
     steps:
+      # Byte-exact checkout on Windows too: digests and generated-file checks compare bytes.
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
       # Third-party actions are pinned to immutable commit SHAs.
       - name: Check out
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
@@ -42,6 +58,7 @@ jobs:
       # ephemeral clusters as the runner user (packages/persistence/src/testing/temporary-postgres.ts) — this
       # step only makes the server and client binaries available on PGBIN, it does not run a shared server.
       - name: Install PostgreSQL 17 (PGDG)
+        if: runner.os == 'Linux'
         run: |
           set -eu
           sudo install -d /usr/share/postgresql-common/pgdg
@@ -53,6 +70,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-17
           "$PGBIN/postgres" --version
+
+      # PostgreSQL 17.6 (the version the owner measures with locally) from the EDB binaries zip; no service, the
+      # tests start their own ephemeral clusters from PGBIN.
+      - name: Install PostgreSQL 17 (EDB binaries)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri https://get.enterprisedb.com/postgresql/postgresql-17.6-1-windows-x64-binaries.zip -OutFile $env:RUNNER_TEMP\pg17.zip
+          Expand-Archive -Path $env:RUNNER_TEMP\pg17.zip -DestinationPath C:\pgsql17
+          & "$env:PGBIN/postgres.exe" --version
 
       - name: Install from the lockfile
         run: pnpm install --frozen-lockfile
@@ -66,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: verify-logs
+          name: verify-logs-${{ matrix.os }}
           path: |
             verify.log
             apps/api/openapi.json
