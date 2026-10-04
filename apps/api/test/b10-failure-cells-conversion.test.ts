@@ -11,16 +11,21 @@
 // RETRY), the others run without one and assert that they have none.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
-import { faultCell, type FaultContext } from "@kauro/persistence/testing";
+import { crashedAt, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import type { WebhookAck } from "@kauro/application";
 import { deliver } from "./payment-support.js";
 import { agentOf, integrationWorld, oracleRows, orderedThrough, planOf, quoted, type IntegrationWorld } from "./integration-support.js";
-import { completed } from "./support.js";
-import type { WebhookAck } from "@kauro/application";
+import { acceptAttribution, claimsOn, deliveryOf, eventOf, linesOf, poolsOf, purchase, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
+import type { SqlStep } from "./fault-support.js";
+import { createCommissionService, type CommissionService } from "../src/index.js";
+import type { CommissionSweepName } from "../src/commissions/sweeps.js";
+import { completed, ids } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   await installDbFaults();
+  svc = createCommissionService({ assembly: { units: iw.faults.wrap(iw.pools.units), completions: iw.completions }, environment: "LOCAL", clock: iw.clock, ids, onBackgroundFailure: (subject, error) => void failures.push({ subject, error }) });
 });
 after(async () => {
   await iw.stop();
@@ -316,5 +321,335 @@ faultCell(
     assert.equal((await report(ctx, x, { eventId })).inboxState, "APPLIED", "the redelivery of the same event finds it applied");
     assert.deepEqual(await designationOf(x), committed, "one designation, no second authorization or purchase");
     consumedOnce(first, committed);
+  },
+);
+
+// =====================================================================================================================================
+// Claim conversion and entitlement creation (COMMISSIONS consumer C1; ACCRUAL_RECONCILIATION sweep C2)
+// =====================================================================================================================================
+// The consumer's unit of work (accrueOnEvent) mirrors the first designation, converts the agency's ACCEPTED claims (each: the claim to
+// CONVERTED, then its beneficiary's ACQUISITION entitlement) and accrues the purchase's pools and lines, in ONE commit. The routed unit
+// (test/fault-support.ts) runs it over a connection the harness opened; the statements of the conversion are the cell's steps.
+
+const CLAIM_UPDATE: SqlStep = { label: "claim_update", match: /UPDATE kauro\.attribution_claims/ };
+const ENTITLEMENT_INSERT: SqlStep = { label: "entitlement_insert", match: /INSERT INTO kauro\.commission_entitlements/ };
+
+type Login = "kauro_app_test" | "kauro_commission_test";
+const open = (login: Login): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
+
+/** The commission service whose units are the routed ones: real outside `faults.on`, the cell's connection inside it. */
+let svc: CommissionService;
+/** The failures the commission service handed to its background sink (a sweep item's failure), by subject. */
+const failures: Array<{ readonly subject: string; readonly error: unknown }> = [];
+
+/** An agency whose seller(s)' claims are ACCEPTED under one frozen allocation (the shares in bps), before the agency's first purchase. */
+async function accepted(label: string, shares: ReadonlyArray<number>): Promise<{ readonly s: Selling; readonly att: Attribution; readonly allocationId: string; readonly agencyId: string }> {
+  const s = await sellingAgency(iw, label);
+  const att = await claimsOn(iw, label, shares.length);
+  const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, shares);
+  return { s, att, allocationId, agencyId: s.agency.agencyId };
+}
+type Delivery = Awaited<ReturnType<typeof deliveryOf>>;
+const deliveryOfCapture = async (p: Purchase): Promise<Delivery> => deliveryOf(iw, await eventOf(iw, p.captureId, "capture.completed.v1"));
+
+interface Converting {
+  readonly s: Selling;
+  readonly att: Attribution;
+  readonly allocationId: string;
+  readonly agencyId: string;
+  readonly first: Purchase;
+  readonly delivery: Delivery;
+}
+/** Claims accepted, then the agency's first purchase confirmed: the capture's delivery waits for COMMISSIONS (nothing is dispatched). */
+async function converting(label: string, shares: ReadonlyArray<number>): Promise<Converting> {
+  const a = await accepted(label, shares);
+  const first = await purchase(iw, a.s, label);
+  return { ...a, first, delivery: await deliveryOfCapture(first) };
+}
+
+interface Rights {
+  readonly claims: ReadonlyArray<string>;
+  readonly entitlements: ReadonlyArray<readonly [string, string, number]>;
+  readonly pools: number;
+  readonly lines: number;
+}
+/** The rights the conversion creates or leaves: each claim's state, each beneficiary's entitlement (largest share first), the purchase's pools and lines. */
+async function rightsOf(c: { readonly att: Attribution; readonly agencyId: string; readonly first: Purchase }): Promise<Rights> {
+  const claims = await oracleRows<{ claim_id: string; state: string }>(iw, "SELECT claim_id, state FROM kauro.attribution_claims WHERE claim_id = ANY ($1::uuid[])", [c.att.claimIds]);
+  const entitlements = await oracleRows<{ seller_id: string; state: string; share_bps: number }>(iw, "SELECT seller_id, state, share_bps FROM kauro.commission_entitlements WHERE agency_id = $1 ORDER BY share_bps DESC, seller_id", [c.agencyId]);
+  return {
+    claims: c.att.claimIds.map((id) => claims.find((x) => x.claim_id === id)!.state),
+    entitlements: entitlements.map((e) => [e.seller_id, e.state, e.share_bps] as const),
+    pools: (await poolsOf(iw, c.first.authorizationId)).length,
+    lines: (await linesOf(iw, c.first.authorizationId)).length,
+  };
+}
+const nothingFor = (c: { readonly att: Attribution }): Rights => ({ claims: c.att.claimIds.map(() => "ACCEPTED"), entitlements: [], pools: 0, lines: 0 });
+
+/** What one converted purchase leaves: every claim CONVERTED, one ACTIVE entitlement per beneficiary at its share, one acquisition pool and one line per beneficiary. */
+function convertedFor(c: { readonly att: Attribution }, shares: ReadonlyArray<number>): Rights {
+  const sellers = c.att.sellers.map((s, i) => [s.sellerId, shares[i]!] as const).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  return { claims: c.att.claimIds.map(() => "CONVERTED"), entitlements: sellers.map(([id, bps]) => [id, "ACTIVE", bps] as const), pools: 1, lines: shares.length };
+}
+
+/** The consumer's delivery on `conn` (the unit routed over it), the service's units standing at `at` on the TEST CLOCK when given. */
+function consumeOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, delivery: Delivery, steps: ReadonlyArray<SqlStep> = [], at: string | null = null): Promise<string> {
+  iw.standAt(at);
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.consumer.handle(delivery as never)).finally(() => iw.standAt(null));
+}
+/** One pass of a sweep on `conn`. */
+function sweepOn(ctx: Pick<FaultContext, "points">, conn: HarnessConnection, sweep: CommissionSweepName, steps: ReadonlyArray<SqlStep> = [], at: string | null = null) {
+  iw.standAt(at);
+  return iw.faults.on(conn, "kauro_commission", ctx.points, steps, () => svc.runSweep(sweep)).finally(() => iw.standAt(null));
+}
+const itemOf = (report: { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> }, subject: string): string | undefined => report.items.find((i) => i.subject === subject)?.outcome;
+
+/**
+ * A pass of `sweep` on `conn` stopped at the first claim UPDATE of its first conversion, where `arm` arms the cell's fault: how a sweep, which
+ * opens several units, is faulted in the conversion's own unit.
+ */
+async function sweepFaultedInConversion(ctx: FaultContext, conn: HarnessConnection, sweep: CommissionSweepName, arm: () => void, steps: ReadonlyArray<SqlStep>, what: string) {
+  const pause = ctx.points.pause("db.claim_update.before");
+  const running = ctx.operation(what, () => sweepOn(ctx, conn, sweep, steps));
+  await pause.reachedBy(running);
+  arm();
+  pause.release();
+  return running;
+}
+/** The last failure the commission service reported for the subject. */
+const failureOf = (subject: string): unknown => [...failures].reverse().find((f) => f.subject === subject)?.error;
+
+/** The settlement of an operation the cell expects to fail: its error, or the answer it got. */
+const settled = <T>(p: Promise<T>): Promise<{ readonly answer: T } | { readonly failure: unknown }> => p.then((answer) => ({ answer }), (failure: unknown) => ({ failure }));
+
+// --- 28. CONV_CRASH, C1 (consumer) -----------------------------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), a crash after the entitlement inserts and immediately before the unit's COMMIT",
+    fault: "crash-before-commit",
+    at: "uow",
+    expect:
+      "RACE (crash): a crash right before the consumer's COMMIT, after both beneficiaries' claim CONVERTED updates and entitlement inserts answered, leaves both claims ACCEPTED, no entitlement, pool or line; the redelivery converts once: one entitlement per beneficiary, each claim CONVERTED once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await converting("conv-crash-before", shares);
+    assert.deepEqual(await rightsOf(c), nothingFor(c));
+    const crash = ctx.points.crash("uow.before-commit");
+    const conn = await open("kauro_commission_test");
+    try {
+      const outcome = await ctx.operation("the conversion whose COMMIT is never issued", () => settled(consumeOn(ctx, conn, c.delivery, [CLAIM_UPDATE, ENTITLEMENT_INSERT])));
+      await crash.reached;
+      assert.ok("failure" in outcome && crashedAt("uow.before-commit")(outcome.failure), "the unit died at its COMMIT boundary");
+      // both beneficiaries' claim updates and entitlement inserts answered before the crash: the step the cell names
+      const passed = ctx.points.passed;
+      const before = passed.slice(0, passed.lastIndexOf("uow.before-commit"));
+      assert.deepEqual([before.filter((p) => p === "db.claim_update.after").length, before.filter((p) => p === "db.entitlement_insert.after").length], [2, 2]);
+    } finally {
+      await conn.end();
+    }
+    assert.deepEqual(await rightsOf(c), nothingFor(c), "no entitlement, pool or line remains and both claims are still ACCEPTED");
+    assert.equal(await svc.consumer.handle(c.delivery as never), "APPLIED", "the redelivery converts");
+    assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), a crash right after the unit's COMMIT, before the delivery is settled",
+    fault: "crash-after-commit",
+    at: "uow",
+    expect:
+      "RACE (crash): the answer lost after the consumer's COMMIT leaves the conversion committed once (one entitlement per beneficiary, each claim CONVERTED); the redelivery converts nothing again and answers DUPLICATE",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await converting("conv-crash-after", shares);
+    const crash = ctx.points.crash("uow.after-commit");
+    const conn = await open("kauro_commission_test");
+    try {
+      const outcome = await ctx.operation("the conversion whose answer is lost after its COMMIT", () => settled(consumeOn(ctx, conn, c.delivery)));
+      await crash.reached;
+      assert.ok("failure" in outcome && crashedAt("uow.after-commit")(outcome.failure));
+    } finally {
+      await conn.end();
+    }
+    const committed = await rightsOf(c);
+    assert.deepEqual(committed, convertedFor(c, shares), "the unit had committed");
+    assert.equal(await svc.consumer.handle(c.delivery as never), "DUPLICATE", "the redelivery finds the conversion made");
+    assert.deepEqual(await rightsOf(c), committed, "no second entitlement per beneficiary, no second pool or line");
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), the first capture's delivery repeated",
+    fault: "retry",
+    expect: "DENY: the first capture's delivery repeated converts nothing again: one entitlement per beneficiary, each claim CONVERTED once, and the repeat answers DUPLICATE",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await converting("conv-retry", shares);
+    const answers = await ctx.sequentially(2, () => svc.consumer.handle(c.delivery as never));
+    assert.deepEqual(answers.map((r) => (r.status === "fulfilled" ? r.value : r.reason)), ["APPLIED", "DUPLICATE"]);
+    assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
+  },
+);
+
+// --- 27. CONV_PAR, C1 -------------------------------------------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "CONV_PAR",
+    step: "Claim conversion and entitlement creation (COMMISSIONS consumer), a failure after a claim CONVERTED and before its beneficiary's entitlement insert, and after the first beneficiary's entitlement insert and before the second claim's update",
+    fault: "partial",
+    expect:
+      "RACE (partial): a failure injected between a claim's CONVERTED update and its entitlement insert, and between the first beneficiary's entitlement insert and the second claim's update, rolls the whole conversion back (both claims ACCEPTED, no entitlement, pool or line); the redelivery then converts once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const cases: ReadonlyArray<{ readonly label: string; readonly at: string; readonly steps: ReadonlyArray<SqlStep>; readonly what: string }> = [
+      { label: "claim-then-entitlement", at: "db.entitlement_insert.before", steps: [CLAIM_UPDATE, ENTITLEMENT_INSERT], what: "the conversion failing after the first claim CONVERTED and before its entitlement insert" },
+      { label: "between-beneficiaries", at: "db.claim_update.before", steps: [{ ...CLAIM_UPDATE, nth: 2 }, ENTITLEMENT_INSERT], what: "the conversion failing after the first beneficiary's entitlement insert and before the second claim's update" },
+    ];
+    for (const { label, at, steps, what } of cases) {
+      const c = await converting(`conv-par-${label}`, shares);
+      const conn = await open("kauro_commission_test");
+      try {
+        await ctx.partial(what, at, async () => {
+          const outcome = await settled(consumeOn(ctx, conn, c.delivery, steps));
+          if ("failure" in outcome) throw outcome.failure;
+          return outcome.answer;
+        });
+      } finally {
+        await conn.end();
+      }
+      assert.deepEqual(await rightsOf(c), nothingFor(c), `${label}: the whole conversion rolled back`);
+      assert.equal(await svc.consumer.handle(c.delivery as never), "APPLIED");
+      assert.deepEqual(await rightsOf(c), convertedFor(c, shares), `${label}: the redelivery converts once`);
+    }
+  },
+);
+
+// --- C2: ACCRUAL_RECONCILIATION, the acceptance that follows the first purchase ---------------------------------------------------------
+
+/** The agency's first purchase confirmed and consumed (nothing to convert yet), then the claims ACCEPTED: the conversion is the sweep's. */
+async function acceptedLater(label: string, shares: ReadonlyArray<number>): Promise<Converting> {
+  const s = await sellingAgency(iw, label);
+  const att = await claimsOn(iw, label, shares.length);
+  const first = await purchase(iw, s, label);
+  const delivery = await deliveryOfCapture(first);
+  assert.equal(await svc.consumer.handle(delivery as never), "APPLIED", "the first purchase is mirrored and consumed with no claim to convert");
+  const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, shares);
+  const c = { s, att, allocationId, agencyId: s.agency.agencyId, first, delivery };
+  assert.deepEqual(await rightsOf(c), nothingFor(c));
+  return c;
+}
+const RECONCILIATION: CommissionSweepName = "ACCRUAL_RECONCILIATION";
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "ACCRUAL_RECONCILIATION (claim conversion for an acceptance after the first purchase), a crash after the entitlement inserts and immediately before the conversion unit's COMMIT",
+    fault: "crash-before-commit",
+    at: "uow",
+    expect:
+      "RACE (crash): a crash right before the COMMIT of the sweep's conversion unit, after both beneficiaries' claim updates and entitlement inserts answered, leaves both claims ACCEPTED and no entitlement; the next pass converts once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await acceptedLater("conv2-crash-before", shares);
+    const conn = await open("kauro_commission_test");
+    try {
+      const report = await sweepFaultedInConversion(ctx, conn, RECONCILIATION, () => void ctx.points.crash("uow.before-commit"), [CLAIM_UPDATE, ENTITLEMENT_INSERT], "the sweep whose conversion COMMIT is never issued");
+      assert.match(itemOf(report, c.agencyId) ?? "", /^FAILED /, "the agency's conversion failed at the crash");
+      assert.ok(crashedAt("uow.before-commit")(failureOf(c.agencyId)), "and it is the crash at the COMMIT boundary that failed it");
+      const passed = ctx.points.passed;
+      const before = passed.slice(0, passed.lastIndexOf("uow.before-commit"));
+      assert.deepEqual([before.filter((p) => p === "db.claim_update.after").length, before.filter((p) => p === "db.entitlement_insert.after").length], [2, 2], "both claims updated and both entitlements inserted before the crash");
+    } finally {
+      await conn.end();
+    }
+    assert.deepEqual(await rightsOf(c), nothingFor(c), "no entitlement remains, both claims are still ACCEPTED");
+    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 2", "the next pass converts");
+    assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "ACCRUAL_RECONCILIATION (claim conversion for an acceptance after the first purchase), a crash right after the conversion unit's COMMIT",
+    fault: "crash-after-commit",
+    at: "uow",
+    expect: "RACE (crash): the sweep stopped right after its conversion unit committed leaves the conversion made once; the next pass converts nothing again",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await acceptedLater("conv2-crash-after", shares);
+    const conn = await open("kauro_commission_test");
+    try {
+      const report = await sweepFaultedInConversion(ctx, conn, RECONCILIATION, () => void ctx.points.crash("uow.after-commit"), [CLAIM_UPDATE, ENTITLEMENT_INSERT], "the sweep stopped after its conversion COMMIT");
+      assert.match(itemOf(report, c.agencyId) ?? "", /^FAILED /, "the sweep never recorded the conversion's result");
+      assert.ok(crashedAt("uow.after-commit")(failureOf(c.agencyId)), "the crash at the COMMIT boundary is what failed it");
+    } finally {
+      await conn.end();
+    }
+    const committed = await rightsOf(c);
+    assert.deepEqual([committed.claims, committed.entitlements], [convertedFor(c, shares).claims, convertedFor(c, shares).entitlements], "the unit had committed: one entitlement per beneficiary, each claim CONVERTED");
+    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "NOTHING_TO_CONVERT", "the next pass converts nothing again");
+    const after = await rightsOf(c);
+    assert.deepEqual([after.claims, after.entitlements], [committed.claims, committed.entitlements], "no second entitlement per beneficiary");
+    assert.deepEqual([after.pools, after.lines], [1, 2], "the purchase accrued once, for both beneficiaries");
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_CRASH",
+    step: "ACCRUAL_RECONCILIATION (claim conversion for an acceptance after the first purchase), a second pass after the first converted",
+    fault: "retry",
+    expect: "DENY: a second pass of ACCRUAL_RECONCILIATION converts nothing again: one entitlement per beneficiary, each claim CONVERTED once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await acceptedLater("conv2-retry", shares);
+    const passes = await ctx.sequentially(2, () => svc.runSweep(RECONCILIATION));
+    assert.deepEqual(passes.map((r) => (r.status === "fulfilled" ? itemOf(r.value, c.agencyId) : r.reason)), ["CONVERTED 2", "NOTHING_TO_CONVERT"]);
+    assert.deepEqual(await rightsOf(c), convertedFor(c, shares), "one entitlement per beneficiary, each claim CONVERTED once");
+  },
+);
+
+faultCell(
+  {
+    id: "CONV_PAR",
+    step: "ACCRUAL_RECONCILIATION (claim conversion for an acceptance after the first purchase), a failure after the first beneficiary's entitlement insert and before the second claim's update",
+    fault: "partial",
+    expect:
+      "RACE (partial): a failure between the first beneficiary's entitlement insert and the second claim's update rolls the sweep's conversion back (both claims ACCEPTED, no entitlement); the next pass converts once",
+  },
+  async (ctx) => {
+    const shares = [6_000, 4_000];
+    const c = await acceptedLater("conv2-par", shares);
+    const conn = await open("kauro_commission_test");
+    try {
+      await ctx.partial("the sweep's conversion failing after the first beneficiary's entitlement insert and before the second claim's update", "db.claim_update.before", async () => {
+        const seen = failures.length;
+        const report = await sweepOn(ctx, conn, RECONCILIATION, [{ ...CLAIM_UPDATE, nth: 2 }, ENTITLEMENT_INSERT]);
+        const failure = failures.slice(seen).find((f) => f.subject === c.agencyId);
+        assert.match(itemOf(report, c.agencyId) ?? "", /^FAILED /);
+        if (failure === undefined) throw new Error("the sweep recorded no failure of the agency");
+        throw failure.error;
+      });
+    } finally {
+      await conn.end();
+    }
+    assert.deepEqual(await rightsOf(c), nothingFor(c), "the whole conversion rolled back");
+    assert.equal(itemOf(await svc.runSweep(RECONCILIATION), c.agencyId), "CONVERTED 2");
+    assert.deepEqual(await rightsOf(c), convertedFor(c, shares));
   },
 );
