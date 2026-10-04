@@ -7,7 +7,8 @@
  * inspection, selection, evaluation and seal path), the B09 purchase fixtures, the B08 execution fixtures (a job queued from a paid
  * purchase, admitted, launched, staged, verified and published), the B08 audit fixture (the platform's funded model pool) and the
  * deterministic interleaving helpers
- * (lock-wait observation, barrier).
+ * (lock-wait observation, barrier) and the common fault harness of faults/ (controlled clock, named crash and pause points,
+ * two-actor interleavings in both orders, duplicates and retries, failure-matrix cells as tests).
  *
  * It is a separate export subpath so that no production import graph carries process-spawning test code: the package's
  * main entry (`@kauro/persistence`) exports none of it, and the architecture gate refuses an import of this subpath from any
@@ -89,3 +90,5 @@ export type { FixtureArtifact } from "./execution-fixtures.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT): the owner's funding act of the platform's model pool (Q8-1)
 export { fundPlatformPool } from "./audit-fixtures.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
+// the common fault harness (docs/design/FAULT-HARNESS.md): controlled clock, crash and pause points, interleavings, matrix cells
+export * from "./faults/index.js";

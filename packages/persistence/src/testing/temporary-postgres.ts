@@ -13,7 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 import { applyMigrations, type ApplyResult } from "../migrations/runner.js";
 
 export const ROLES = Object.freeze({
@@ -44,6 +44,8 @@ export interface TemporaryPostgres {
   readonly migrations: ApplyResult;
   /** A connected client as the given role (LOGIN roles only). The caller ends it. */
   connect(role: LoginRole): Promise<Client>;
+  /** The connection settings of a client as the given role, for a connection someone else opens (the fault harness's openConnection). */
+  clientConfig(role: LoginRole): ClientConfig;
   stop(): Promise<void>;
 }
 
@@ -123,8 +125,9 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   const logFile = join(base, "postgres.log");
   run(exe(bin, "pg_ctl"), ["-D", dataDir, "-l", logFile, "-o", serverOptions.join(" "), "-w", "-t", "60", "start"], "pg_ctl start", { detached: true, logFile });
 
+  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
   const connect = async (role: string, database: string = ROLES.database): Promise<Client> => {
-    const c = new Client({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
+    const c = new Client(clientConfig(role, database));
     await c.connect();
     return c;
   };
@@ -180,6 +183,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
       dataDir,
       migrations,
       connect: (role) => connect(role),
+      clientConfig: (role) => clientConfig(role),
       stop,
     };
   } catch (e) {
