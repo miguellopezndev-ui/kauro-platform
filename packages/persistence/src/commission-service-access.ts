@@ -148,9 +148,17 @@ export class PgCommissionWork {
     return r.rows.map((row) => ({ periodId: row.period_id, month: row.month }));
   }
 
-  /** The adjustments an issued statement already reports (statement_items ADJUSTMENT): a close reports each adjustment once. */
+  /**
+   * The adjustments a live statement already reports (statement_items ADJUSTMENT of a statement that is not CORRECTED): a close reports
+   * each adjustment once. A CORRECTED statement's are its successor's to report (D10-GAP-15): one the successor does not carry (its line
+   * owned elsewhere) is reported again by the next close rather than lost.
+   */
   async reportedAdjustments(): Promise<ReadonlySet<string>> {
-    const r = await execute<{ adjustment_id: string }>(this.db, "SELECT DISTINCT adjustment_id FROM kauro.statement_items WHERE item_kind = 'ADJUSTMENT' AND adjustment_id IS NOT NULL");
+    const r = await execute<{ adjustment_id: string }>(
+      this.db,
+      `SELECT DISTINCT i.adjustment_id FROM kauro.statement_items i JOIN kauro.commission_statements s ON s.statement_id = i.statement_id
+        WHERE i.item_kind = 'ADJUSTMENT' AND i.adjustment_id IS NOT NULL AND s.state <> 'CORRECTED'`,
+    );
     return new Set(r.rows.map((row) => row.adjustment_id));
   }
 
