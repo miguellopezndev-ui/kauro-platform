@@ -160,7 +160,7 @@ faultCell(
     id: "CORR_DUP",
     step: "CMD051 correcting statement (correction_issued), the same correction twice",
     fault: "retry",
-    expect: "RACE: two corrections of one ISSUED statement on two keys yield one successor and one STALE_VERSION; the same key replays; each line is payable through exactly one live statement item",
+    expect: "RETRY: the same key replays; a second correction of one ISSUED statement on another key at the same version (in sequence, no concurrent actor) yields STALE_VERSION and one successor; each line is payable through exactly one live statement item",
   },
   async (ctx) => {
     const [a, b] = await takeIssued(2);
