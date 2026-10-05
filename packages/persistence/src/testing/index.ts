@@ -17,6 +17,7 @@
  */
 export { startTemporaryPostgres, ROLES, TEST_CLOCK_OFFSET_SETTING, TEST_CLOCK_FUNCTION, TEST_CLOCK_COMMENT } from "./temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions, LoginRole } from "./temporary-postgres.js";
+export { serverNow } from "./server-now.js";
 export { start as startHarness, waitForLockWait, settlesOrWaits, backendPid, barrier, handled, CAPABILITY_PUBLICATION_PATH } from "./harness.js";
 export type { Harness, AgencyFixture, CapabilityPublicationState, LockObservation } from "./harness.js";
 export {

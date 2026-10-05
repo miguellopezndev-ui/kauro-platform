@@ -115,12 +115,16 @@ $$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(curren
 export const TEST_CLOCK_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: transaction_timestamp() plus the transaction-local kauro_test.clock_offset_seconds; never present in a deployment";
 
 export async function startTemporaryPostgres(options: StartOptions = {}): Promise<TemporaryPostgres> {
+  // A cluster default reaches every runtime pool; transaction-local clock settings still override it.
+  const offsetMs = Number(process.env["KAURO_TEST_CLOCK_OFFSET_MS"] ?? 0);
+  if (!Number.isFinite(offsetMs)) throw new Error("KAURO_TEST_CLOCK_OFFSET_MS must be a finite number");
   const bin = pgbin();
   const base = mkdtempSync(join(tmpdir(), "kauro-pg-"));
   const dataDir = join(base, "data");
   run(exe(bin, "initdb"), ["-D", dataDir, "-U", ROLES.superuser, "-A", "trust", "-E", "UTF8", "--no-locale"], "initdb");
   const port = await freePort();
   const serverOptions = [`-p ${port}`, "-c listen_addresses=127.0.0.1", "-c fsync=off", "-c synchronous_commit=off", "-c full_page_writes=off", "-c max_connections=40"];
+  if (options.testClock !== false && offsetMs !== 0) serverOptions.push(`-c ${TEST_CLOCK_OFFSET_SETTING}=${offsetMs / 1000}`);
   if (process.platform !== "win32") serverOptions.push(`-k ${base}`);
   const logFile = join(base, "postgres.log");
   run(exe(bin, "pg_ctl"), ["-D", dataDir, "-l", logFile, "-o", serverOptions.join(" "), "-w", "-t", "60", "start"], "pg_ctl start", { detached: true, logFile });

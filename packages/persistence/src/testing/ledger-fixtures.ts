@@ -11,6 +11,7 @@
 import type { Client } from "pg";
 import {
   composeStatement,
+  toUtcInstant,
   commissionCutoffHash,
   type CommissionHoldId,
   type CommissionLineId,
@@ -26,6 +27,7 @@ import {
 import type { UtcInstant } from "@kauro/contracts";
 import { PgCommissionLedgerRepository } from "../repositories/commercial-ledger.js";
 import { PgStatementRepository } from "../repositories/commercial-statements.js";
+import { serverNow } from "./server-now.js";
 import { clock, ids, sha, type Harness } from "./harness.js";
 
 /** A person's OPERATOR session (the owner's) or the commission service's adopted agency (none for the corporate rows). */
@@ -135,7 +137,7 @@ export async function recordEligibleLine(h: Harness, input: LedgerLineInput): Pr
       purchaseId: input.authorizationId as NewCommissionPool["purchaseId"],
       agencyId: input.agencyId as NewCommissionPool["agencyId"],
       kind: "FINAL",
-      completedAt: input.completedAt ?? (new Date(Date.now() - 60_000).toISOString() as UtcInstant),
+      completedAt: input.completedAt ?? toUtcInstant(Date.parse(await serverNow(c)) - 60_000),
       evidenceHash: sha(`completion-${input.authorizationId}`) as never,
       source: "AUTHORIZATION_DELIVERY",
       recordedAt: now,
