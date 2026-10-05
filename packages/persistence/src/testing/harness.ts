@@ -51,6 +51,7 @@ import { createAuditUnitOfWorkFactory, createCommerceUnitOfWorkFactory, createEx
 import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPaymentRoute, revokeCorporateRole, type QualifiedRoute } from "./commerce-fixtures.js";
 import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
+import { serverNow } from "./server-now.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -137,7 +138,7 @@ export interface Harness {
   inviteMember(agency: AgencyFixture, userId: UserId, role: MembershipRole): Promise<{ readonly membershipId: MembershipId; readonly invitationId: InvitationId; readonly tokenHash: Sha256Hex }>;
   /**
    * A step-up proof recorded by the step-up verifier (kauro_assurance; 08 "Authentication and assurance"), issued at `issuedAt`
-   * (default now) and valid for fifteen minutes. The request-handler role cannot write proofs.
+   * (default one second before the database clock) and valid for fifteen minutes. The request-handler role cannot write proofs.
    */
   recordStepUp(userId: UserId, options?: { readonly issuedAt?: UtcInstant; readonly method?: AssuranceMethod }): Promise<AssuranceProofId>;
   /**
@@ -358,7 +359,7 @@ export async function start(): Promise<Harness> {
 
     async recordStepUp(userId, options = {}) {
       const proofId = ids.next() as AssuranceProofId;
-      const issuedAt = options.issuedAt ?? clock.now();
+      const issuedAt = options.issuedAt ?? toUtcInstant(Date.parse(await serverNow(assurancePool.raw)) - 1000);
       const expiresAt = toUtcInstant(Date.parse(issuedAt) + 15 * 60_000);
       await proofs.record({ proofId, userId, kind: "STEP_UP", method: options.method ?? "TOTP", issuedAt, expiresAt }, correlation(), clock.now());
       return proofId;

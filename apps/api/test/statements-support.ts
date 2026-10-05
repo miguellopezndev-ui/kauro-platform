@@ -20,9 +20,9 @@ import { BANKING_CALENDAR_FIXTURE_NONBANKING, ContractFakeBankingCalendar, Contr
 import { correctCommissionStatement, realProviderCallTimer, type CommandResult, type StatementCorrectionView, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CorrelationId, ExecutionContext, SettlementId, UserId } from "@kauro/domain";
-import { registryCommissionPolicy, registryPricePolicy } from "@kauro/domain";
+import { registryCommissionPolicy, registryPricePolicy, toUtcInstant } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory, ledgerOf, statementsOf } from "@kauro/persistence";
-import { ROLES, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller, recordClaim, recordConversion, recordEligibleLine, recordProspect, type RecordedSeller, type SellerTerms } from "@kauro/persistence/testing";
+import { ROLES, serverNow, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller, recordClaim, recordConversion, recordEligibleLine, recordProspect, type RecordedSeller, type SellerTerms } from "@kauro/persistence/testing";
 import { proposeCommissionClose } from "@kauro/application";
 import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, statementServiceRuntime, type CommissionPools, type CommissionService } from "../src/index.js";
 import { CommissionHolds, approvedPlan, captureOf, checkoutOf, purchase, recordSyntheticSchedule, sellingAgency, statedQuote, type CommissionWorld, type Purchase, type Selling } from "./commission-support.js";
@@ -445,7 +445,7 @@ export async function eligibleLines(
           purchaseId: p.authorizationId as never,
           agencyId: selling.agency.agencyId,
           kind: "FINAL",
-          completedAt: new Date(Date.now() - 60_000).toISOString() as UtcInstant,
+          completedAt: toUtcInstant(Date.parse(await serverNow((uow as unknown as { readonly client: Client }).client)) - 60_000),
           evidenceHash: sha(`final-${p.authorizationId}`),
           source: "AUTHORIZATION_DELIVERY",
           recordedAt: `${(await uow.serverInstant()).slice(0, 23)}Z` as UtcInstant,

@@ -65,7 +65,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { PgWebSessionStore } from "@kauro/persistence";
-import { ROLES, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
+import { ROLES, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   activeWorkInspector,
@@ -899,7 +899,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stepUp(person, freshness = "FRESH") {
       // recorded by the step-up verifier (kauro_assurance), never by the request-handler role whose gate the proof satisfies
-      const issuedMs = freshness === "FRESH" ? Date.now() : Date.now() - 20 * 60_000;
+      const issuedMs = Date.parse(await serverNow(h.assurancePool.raw)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
       return h.recordStepUp(person.userId, { issuedAt: toUtcInstant(issuedMs) });
     },
 

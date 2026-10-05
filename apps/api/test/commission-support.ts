@@ -50,6 +50,7 @@ import {
   recordActiveSeller,
   recordClaim,
   recordProspect,
+  serverNow,
   type AgencyFixture,
   type Harness,
   type RecordedSeller,
@@ -498,7 +499,8 @@ export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFa
       idempotencyHash: sha(`intent-${orderId}`),
       createdByMembershipId: s.agency.ownerMembershipId as MembershipId,
       intentEntryId: reservation.entryId as JournalEntryId,
-      createdAt: now,
+      // The database clock, so that the provider completion default (also the database clock, read later) is never before it.
+      createdAt: await serverNow((uow as unknown as { readonly client: Client }).client),
     });
     await uow.commerce.attempts.prepare({ attemptId, agencyId: s.agency.agencyId, orderId, operation: "CREATE_ORDER", ordinal: 1, provider: route.provider, environment: route.environment, requestHash: sha(`create-request-${orderId}`), providerRequestId: `kauro-${attemptId}`, intentEntryId: reservation.entryId as JournalEntryId, startedAt: now });
     await uow.scopes.record({ kind: "PAYMENT_ORDER", key: orderId, agencyId: s.agency.agencyId, orderId }, now);
@@ -548,12 +550,23 @@ export interface Purchase {
 export interface CaptureOptions {
   /** The reconciliation's confirmation instant: the payment service's transaction stands there on the labelled TEST CLOCK. */
   readonly confirmedAt?: string;
-  /** The provider's authenticated completion instant (default: now, before the reconciliation's transaction begins). */
+  /** The provider's authenticated completion instant (default: one second before the database clock). */
   readonly providerCompletedAt?: string;
   /** Runs after the capture fact is recorded, before the authorization (and its designation) is issued — inside the transaction. */
   readonly afterCapture?: () => Promise<void>;
   /** Runs after the authorization is issued, before the reconciliation commits — inside the transaction. */
   readonly beforeCommit?: () => Promise<void>;
+}
+
+/**
+ * The provider's default completion instant: one second behind the database clock that will confirm it (server_now()), but never
+ * before the order's own creation (also the database clock), which the domain requires too (providerTimePlausible).
+ */
+async function defaultProviderCompletedAt(cw: CommissionWorld, orderId: PaymentOrderId): Promise<UtcInstant> {
+  const behind = Date.parse(await serverNow(cw.h.paymentPool.raw)) - 1000;
+  const order = await cw.h.oracle.query<{ created_at: Date }>("SELECT created_at FROM kauro.payment_orders WHERE order_id = $1", [orderId]);
+  const created = order.rows[0]?.created_at.getTime() ?? behind;
+  return toUtcInstant(Math.max(behind, created));
 }
 
 /**
@@ -565,8 +578,8 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
   const { pw } = cw;
   const route = pw.route;
   const { quote } = checkout;
-  // the provider completed the capture before the payment service learned of it (default: now, before the reconciliation begins)
-  const providerCompletedAt = (options.providerCompletedAt ?? clock.now()) as UtcInstant;
+  // One second behind the database clock (the confirmation is server_now()), and never before the order's creation.
+  const providerCompletedAt = (options.providerCompletedAt ?? await defaultProviderCompletedAt(cw, checkout.orderId)) as UtcInstant;
   pw.paypal.approve(checkout.providerOrderId);
   const providerCaptureId = pw.paypal.captureAtProvider(checkout.providerOrderId, { completedAt: providerCompletedAt });
   const service: ServiceContext = { kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId };

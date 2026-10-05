@@ -39,6 +39,8 @@ import {
 } from "@kauro/domain";
 import type { QualifiedRoute } from "./commerce-fixtures.js";
 import { clock, type AgencyFixture, type Harness } from "./harness.js";
+import type { SqlSession } from "./source-lifecycle.js";
+import { serverNow } from "./server-now.js";
 
 const HOUR_MS = 3_600_000;
 
@@ -329,7 +331,8 @@ export async function paidPurchase(h: Harness, input: PurchaseInput): Promise<Pa
       amountCents: quote.amounts.totalCents,
       allocation: { serviceCents: quote.amounts.serviceCents, taxCents: quote.amounts.taxCents, excessCents: 0n },
       fundsState: "UNKNOWN",
-      providerCompletedAt: providerCapture?.completedAt ?? now,
+      // the reconciliation's own transaction clock (= its server_now() confirmation), never before the order's creation (same clock, earlier)
+      providerCompletedAt: providerCapture?.completedAt ?? await serverNow((uow as unknown as { readonly client: SqlSession }).client),
       firstObservationSource: "WEBHOOK",
       observedAt: now,
       evidenceHash: sha(`capture-evidence-${captureId}`),
@@ -418,7 +421,8 @@ async function openCheckout(h: Harness, input: PurchaseInput) {
       idempotencyHash: sha(`intent-${orderId}`),
       createdByMembershipId: agency.ownerMembershipId as MembershipId,
       intentEntryId: reservation.entryId as JournalEntryId,
-      createdAt: now,
+      // The database clock: the completion default (same clock, read later in the reconciliation) is never before it.
+      createdAt: await serverNow((uow as unknown as { readonly client: SqlSession }).client),
     });
     await uow.commerce.attempts.prepare({ attemptId, agencyId: agency.agencyId, orderId, operation: "CREATE_ORDER", ordinal: 1, provider: route.provider, environment: route.environment, requestHash: sha(`create-request-${orderId}`), providerRequestId: `kauro-${attemptId}`, intentEntryId: reservation.entryId as JournalEntryId, startedAt: now });
     await uow.scopes.record({ kind: "PAYMENT_ORDER", key: orderId, agencyId: agency.agencyId, orderId }, now);
