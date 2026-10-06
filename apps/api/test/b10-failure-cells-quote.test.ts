@@ -583,7 +583,14 @@ faultCell(
     // exactly AT the end first (the clock moves only forward), then one millisecond past it: each member is its own founding checkout
     for (const position of ["at", "past"] as const) {
       const x = await foundingCheckout(`qe-expiry-${position}`);
-      const deadline = ctx.deadline(x.reservation.ends_at, `the founding reservation's 336-hour end (${position})`);
+      // the controlled clock reads milliseconds and the reservation's end is stored in microseconds: the AT member stands on the first millisecond
+      // AT OR AFTER the end (never the truncated one, which can precede it by up to 999 microseconds), proven by the database's own comparison
+      const [atMs] = await oracleRows<{ at_ms: string }>(iw, "SELECT to_char(date_trunc('milliseconds', ends_at + interval '999 microseconds') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at_ms FROM kauro.founding_slot_reservations WHERE reservation_id = $1", [x.reservation.reservation_id]);
+      const deadline = ctx.deadline(position === "at" ? atMs!.at_ms : x.reservation.ends_at, `the founding reservation's 336-hour end (${position})`);
+      if (position === "at") {
+        const [reached] = await oracleRows<{ reached: boolean; within: boolean }>(iw, "SELECT $1::timestamptz >= ends_at AS reached, $1::timestamptz - ends_at < interval '1 millisecond' AS within FROM kauro.founding_slot_reservations WHERE reservation_id = $2", [deadline, x.reservation.reservation_id]);
+        assert.deepEqual(reached, { reached: true, within: true }, "the AT member's clock instant is the end or less than a millisecond after it, never before it (the database's comparison)");
+      }
       if (position === "at") ctx.clock.set(deadline);
       else ctx.clock.past(deadline);
       const conn = await connect("kauro_payment_test");
