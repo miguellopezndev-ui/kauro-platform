@@ -1,0 +1,33 @@
+{
+  "name": "@kauro/migration-core",
+  "version": "0.1.0",
+  "description": "Kauro wrapper of the vendored Migration Core 3.0.0 (kauro-migration-core): re-exports the core's root API exactly and is the only place the raw core may be imported (D5-1, D5-6, S045/S046).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "kauro-migration-core": "3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

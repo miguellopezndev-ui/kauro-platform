@@ -4,3 +4,5 @@ packages:
 
 overrides:
   sharp: "-"
+  kauro-migration-core: file:vendor/kauro-migration-core-3.0.0.tgz
+  kauro-intelligence-core: file:vendor/kauro-intelligence-core-0.6.0.tgz
