@@ -33,8 +33,51 @@ interface Route {
   readonly seen?: Map<string, number>;
   readonly conn: HarnessConnection;
   readonly role: RouteRole;
+  /** onRoles: one connection per role (the unit of work's role picks it), one counter for all of them. */
+  readonly conns?: ReadonlyMap<RouteRole, HarnessConnection>;
   readonly points: FaultPoints;
   readonly steps: ReadonlyArray<SqlStep>;
+  /** The `faults.on` / `onRoles` invocation the route belongs to: its unit counter, its target ordinal and its unit log. */
+  readonly invocation?: Invocation;
+  /** The unit of work this route serves (its statement log), once the invocation numbered it. */
+  readonly unit?: UnitLog;
+}
+
+/**
+ * The units of work one `faults.on` / `onRoles` invocation opened, in order (B10-KIT-SUITES section 3, r1 R6): the counter is the
+ * invocation's, across every access to the routed factory; a unit whose work the factory runs again (a retried transaction) is attempt n
+ * of the same ordinal. Each unit keeps its statement log.
+ */
+interface Invocation {
+  seq: number;
+  readonly target: number | null;
+  readonly log: UnitLog[];
+}
+
+/** One statement a routed unit dispatched: its step label (null: no step instruments it), text, parameters, attempt and outcome. */
+export interface LoggedStatement {
+  readonly label: string | null;
+  readonly text: string;
+  readonly params: ReadonlyArray<unknown>;
+  readonly attempt: number;
+  /** "answered" once the server answered it, "failed" with the SQLSTATE when it failed, "pending" while it runs (a lock wait). */
+  outcome: "pending" | "answered" | "failed";
+  code: string | null;
+}
+
+/** One unit of work of an invocation: its ordinal (from 1), its commit-boundary name ("target" or "uow"), its role and statements. */
+export interface UnitLog {
+  readonly ordinal: number;
+  readonly name: "target" | "uow";
+  role: RouteRole | null;
+  attempts: number;
+  readonly statements: LoggedStatement[];
+}
+
+/** What a cell asks of an invocation's routing: the ordinal of its target unit (crashable as "target"), and the log to fill. */
+export interface Routing {
+  readonly target?: number;
+  readonly log?: UnitLog[];
 }
 
 type AnyFactory = { run(context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown): Promise<unknown> };
@@ -66,8 +109,23 @@ function routedClient(route: Route): PoolClient {
             }
             hit ??= step;
           }
-          if (hit !== null) return instrumented.get(hit.label)!(...args);
-          return (target.query as (...x: unknown[]) => unknown)(...args);
+          const answer = (): unknown => (hit !== null ? instrumented.get(hit.label)!(...args) : (target.query as (...x: unknown[]) => unknown)(...args));
+          const unit = route.unit;
+          if (unit === undefined) return answer();
+          const params = ((args[1] as ReadonlyArray<unknown> | undefined) ?? (first as { values?: ReadonlyArray<unknown> } | undefined)?.values ?? []) as ReadonlyArray<unknown>;
+          // a unit's attempt is its transaction: every BEGIN the factory issues for it (a retried transaction begins again) starts the next
+          if (/^\s*BEGIN\b/i.test(text)) unit.attempts += 1;
+          const logged: LoggedStatement = { label: hit?.label ?? null, text, params, attempt: unit.attempts, outcome: "pending", code: null };
+          unit.statements.push(logged);
+          const out = answer() as Promise<unknown>;
+          out.then(
+            () => void (logged.outcome = "answered"),
+            (e: unknown) => {
+              logged.outcome = "failed";
+              logged.code = typeof (e as { code?: unknown } | null)?.code === "string" ? (e as { code: string }).code : null;
+            },
+          );
+          return out;
         };
       }
       const value: unknown = Reflect.get(target, prop, target);
@@ -79,8 +137,10 @@ function routedClient(route: Route): PoolClient {
 function poolOf(route: Route, role: RouteRole): unknown {
   return {
     async acquire() {
-      if (route.role !== role) throw new Error(`the routed connection logs in as ${route.role}, the unit of work needs ${role}`);
-      return { client: routedClient(route), connection: { role, loginRole: `${role}-harness` } };
+      const conn = route.conns !== undefined ? route.conns.get(role) : route.role === role ? route.conn : undefined;
+      if (conn === undefined) throw new Error(`the routed connection logs in as ${route.conns !== undefined ? [...route.conns.keys()].join(" or ") : route.role}, the unit of work needs ${role}`);
+      if (route.unit !== undefined) route.unit.role = role;
+      return { client: routedClient({ ...route, conn, role }), connection: { role, loginRole: `${role}-harness` } };
     },
   };
 }
@@ -90,9 +150,8 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
     super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
   }
 
-  protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, idsOf: never, clockOf: never): PgCommercialUnitOfWork {
-    return new PgCommercialUnitOfWork(client, context, idsOf, clockOf, [] as never);
-  }
+  // the routed unit of work is the production one: the factory's own createUnitOfWork, with the price policies production binds (deps
+  // pricePolicies unset, so [registryPricePolicy()]). An empty policy list made every routed CreateQuote fail INTEGRITY_FAILURE (lane 6a).
 
   override run<T>(context: ExecutionContext, work: (uow: PgCommercialUnitOfWork) => Promise<T>, options?: Parameters<PgCommercialUnitOfWorkFactory["run"]>[2]): Promise<T> {
     return super.run(
@@ -195,9 +254,24 @@ export class FaultRouting {
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 
-  /** Runs `fn` with every unit of work it opens routed over `conn` (a harness connection of the login of `role`), wrapped in crashable points named `uow`. */
-  on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>): Promise<T> {
-    return this.#als.run({ conn, role, points, steps, seen: new Map() }, fn);
+  /**
+   * Runs `fn` with every unit of work it opens routed over `conn` (a harness connection of the login of `role`), wrapped in crashable points
+   * named `uow` — the unit whose ordinal is `routing.target` named `target` instead — each unit numbered by this invocation and logged
+   * into `routing.log` (B10-KIT-SUITES section 3).
+   */
+  on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
+    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] } }, fn);
+  }
+
+  /**
+   * `on` over one connection per role (the dispatcher's control units and the consumer's SERVICE units: B10-KIT-SUITES section 3), the
+   * unit of work's role choosing its connection, one counter for the whole invocation.
+   */
+  onRoles<T>(conns: Partial<Record<RouteRole, HarnessConnection>>, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
+    const map = new Map(Object.entries(conns) as Array<[RouteRole, HarnessConnection]>);
+    const [first] = [...map.entries()];
+    if (first === undefined) throw new Error("onRoles needs at least one connection");
+    return this.#als.run({ conn: first[1], role: first[0], conns: map, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] } }, fn);
   }
 
   /**
@@ -249,8 +323,20 @@ export class FaultRouting {
         const route = this.#als.getStore();
         if (route === undefined || typeof value !== "function") return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
-        const routed = this.unit(route.conn, route.role, route.points, route.steps);
-        return routed.run.bind(routed);
+        const invocation = route.invocation;
+        if (invocation === undefined) {
+          const routed = this.unit(route.conn, route.role, route.points, route.steps);
+          return routed.run.bind(routed);
+        }
+        // the ordinal is taken when the unit runs, from the invocation's counter (never per factory access); SqlStep.nth counts within the
+        // unit, as before
+        return (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) => {
+          invocation.seq += 1;
+          const unit: UnitLog = { ordinal: invocation.seq, name: invocation.target === invocation.seq ? "target" : "uow", role: null, attempts: 0, statements: [] };
+          invocation.log.push(unit);
+          const routed = crashableFactory(new RoutedFactory({ ...route, unit, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock) as unknown as AnyFactory, route.points, unit.name, ["run"]);
+          return routed.run(context, work, options);
+        };
       },
     });
   }
