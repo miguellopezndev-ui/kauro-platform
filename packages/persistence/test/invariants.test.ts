@@ -832,20 +832,41 @@ function balanced(sql: string, open: number): string | undefined {
  */
 const COUNT_ONLY = /^SELECT\s+count\s*\([^()]*\)(?:\s+FILTER\s*\(\s*WHERE\s+[^()]*\))?\s+FROM\s+[\w.]+(?:\s+(?:AS\s+)?(?!WHERE\b)\w+)?(?:\s+WHERE\s+[^()]*)?$/i;
 const COUNT_FORBIDDEN = /\b(?:LIMIT|OFFSET|FETCH|UNION|EXCEPT|INTERSECT|GROUP|HAVING|WINDOW|SELECT)\b/i;
-/** A select whose top level has an aggregate with neither GROUP BY nor OVER: one row, NULL over an absent input (a scalar in disguise). */
+/**
+ * Row-source subqueries (after EXISTS, IN, FROM, JOIN, LATERAL, AS) as an ALLOWLIST (ADV-24, ADV-26): any function call in one must be a known
+ * non-aggregate function, OVER-windowed (after an optional FILTER or WITHIN GROUP), or sit in a select with a real GROUP BY (at least one
+ * column: not (), GROUPING SETS, ROLLUP, CUBE). Otherwise it can be a one-row aggregate that is NULL over an absent input, a scalar in disguise.
+ */
+const NON_AGGREGATE_FUNCTIONS: ReadonlySet<string> = new Set(["cast", "abs", "lower", "upper", "length"]);
+const NOT_A_CALL: ReadonlySet<string> = new Set(["in", "and", "or", "not", "where", "when", "then", "else", "case", "end", "by", "using", "as", "from", "join", "exists", "any", "all", "some", "select", "distinct", "over", "filter", "group", "order", "partition", "having", "lateral", "on", "set", "sets", "values", "within", "between", "is", "like", "union", "limit", "offset", "returning"]);
 function ungroupedAggregate(text: string): boolean {
   let skeleton = "";
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === "(") {
+    if (text[i] === "(" && /^\(\s*SELECT\b/i.test(text.slice(i, i + 40))) {
       const inner = balanced(text, i);
       if (inner === undefined) return true;
       skeleton += "(~)";
       i += inner.length + 1;
     } else skeleton += text[i];
   }
-  if (/\bGROUP\s+BY\b/i.test(skeleton)) return false;
-  for (const m of skeleton.matchAll(/\b(?:count|sum|avg|min|max|bool_and|bool_or|every|array_agg|string_agg|json_agg|jsonb_agg|xmlagg)\s*\(~\)(\s*FILTER\s*\(~\))?(\s*OVER\b)?/gi)) {
-    if (m[2] === undefined) return true;
+  const realGroup = /\bGROUP\s+BY\s+(?!\(\s*\)|GROUPING\b|ROLLUP\b|CUBE\b)[\w.(]/i.test(skeleton);
+  for (const m of skeleton.matchAll(/\b([A-Za-z_][\w.]*)\s*\(/g)) {
+    const name = m[1]!.toLowerCase();
+    if (NOT_A_CALL.has(name)) continue;
+    const open = m.index + m[0].length - 1;
+    const args = balanced(skeleton, open);
+    if (args === undefined) return true;
+    let rest = skeleton.slice(open + args.length + 2);
+    for (;;) {
+      const mod = /^\s*(?:FILTER|WITHIN\s+GROUP)\s*\(/i.exec(rest);
+      if (mod === null) break;
+      const mArgs = balanced(rest, mod[0].length - 1);
+      if (mArgs === undefined) return true;
+      rest = rest.slice(mod[0].length + mArgs.length + 1);
+    }
+    if (/^\s*OVER\b/i.test(rest)) continue;
+    if (NON_AGGREGATE_FUNCTIONS.has(name) || realGroup) continue;
+    return true;
   }
   return false;
 }
@@ -975,16 +996,16 @@ test("every UNION ALL branch of an invariant is named in its whys and is ONE ato
 
 test("the structural check refuses a branch that joins two predicates with OR, compares a count with <> 1, uses IS DISTINCT FROM or reads an absent case as a value (COALESCE, IFNULL, NULLIF, GREATEST, LEAST, ISNULL, NOTNULL, CASE ... ELSE, NOT IN (SELECT, a nullable scalar subquery)", () => {
   const atomic = (sql: string) => nonAtomic(sql).length === 0;
-  assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x > coalesce(u.x, 0)"), false);
+  assert.equal(atomic("SELECT 1 FROM t JOIN u ON true WHERE t.x > coalesce(u.x, 0)"), false);
   assert.equal(atomic("SELECT 1 FROM t GROUP BY t.k HAVING COALESCE (sum(t.x), 0) <> 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE ifnull(t.x, 0) > 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE nullif(t.x, 0) > 0"), false);
-  assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x > CASE WHEN u.x IS NULL THEN 0 ELSE u.x END"), false);
+  assert.equal(atomic("SELECT 1 FROM t JOIN u ON true WHERE t.x > CASE WHEN u.x IS NULL THEN 0 ELSE u.x END"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE t.x IS NULL AND NOT EXISTS (SELECT 1 FROM u)"), true, "a NULL test of its own is one predicate");
   assert.equal(atomic("SELECT 1 FROM chain ch WHERE ch.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND ch.z IS NULL"), true, "a CASE over a NOT NULL column is not an absent case");
   assert.equal(atomic("SELECT 1 FROM t WHERE a <> b OR c < 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE (SELECT count(*) FROM u) <> 1"), false);
-  assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x IS DISTINCT FROM u.x"), false);
+  assert.equal(atomic("SELECT 1 FROM t JOIN u ON true WHERE t.x IS DISTINCT FROM u.x"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE a <> b ORDER BY a"), true, "ORDER is not OR");
   assert.equal(atomic("SELECT 1 FROM t WHERE (SELECT count(*) FROM u) <> 10"), true);
   assert.equal(atomic("SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u)"), true, "a count is never NULL");
@@ -1002,11 +1023,11 @@ test("the structural check refuses every bypass of the ban found by the adversar
     ["<> 1 without spacing", "SELECT 1 FROM t GROUP BY k HAVING count(*)<>1"],
     ["GREATEST", "SELECT 1 FROM t JOIN u ON true WHERE t.x > GREATEST(t.a, u.x)"],
     ["lowercase least", "SELECT 1 FROM t JOIN u ON true WHERE t.x > least (t.a, u.x)"],
-    ["postfix ISNULL", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN u.x ISNULL THEN 0 ELSE u.x END"],
+    ["postfix ISNULL", "SELECT 1 FROM t JOIN u ON true WHERE t.y > CASE WHEN u.x ISNULL THEN 0 ELSE u.x END"],
     ["postfix NOTNULL", "SELECT 1 FROM t WHERE u.x NOTNULL AND t.y > 0"],
     ["bare lowercase isnull", "SELECT 1 FROM t WHERE u.x isnull"],
-    ["CASE WHEN ... ELSE default", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN u.x > 0 THEN u.x ELSE 0 END"],
-    ["simple CASE over a nullable column with ELSE", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE u.x WHEN 1 THEN 5 ELSE 0 END"],
+    ["CASE WHEN ... ELSE default", "SELECT 1 FROM t JOIN u ON true WHERE t.y > CASE WHEN u.x > 0 THEN u.x ELSE 0 END"],
+    ["simple CASE over a nullable column with ELSE", "SELECT 1 FROM t JOIN u ON true WHERE t.y > CASE u.x WHEN 1 THEN 5 ELSE 0 END"],
     ["NOT IN (SELECT", "SELECT 1 FROM t WHERE t.x NOT IN (SELECT u.n FROM u)"],
     ["lowercase not in ( select", "SELECT 1 FROM t WHERE t.x not in ( select u.n FROM u)"],
     ["scalar subquery on the right of a comparison", "SELECT 1 FROM t WHERE t.x <> (SELECT u.amount FROM u WHERE u.k = t.k)"],
@@ -1018,14 +1039,14 @@ test("the structural check refuses every bypass of the ban found by the adversar
 
 test("the structural check refuses the six residual bypasses of the allowlists (ADV-21): one forged snippet each", () => {
   const bypasses: ReadonlyArray<readonly [string, string]> = [
-    ["a nullable CASE ... ELSE nested inside the ch.direction CASE", "SELECT 1 FROM chain ch LEFT JOIN u ON true WHERE ch.x > CASE ch.direction WHEN 'INCREASE' THEN CASE WHEN u.x > 0 THEN u.x ELSE 0 END ELSE -1 END"],
-    ["the row_number() prefix followed by more conditions", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN row_number() OVER (PARTITION BY k ORDER BY rem DESC) <= 1 AND u.x > 0 THEN 1 ELSE 0 END"],
+    ["a nullable CASE ... ELSE nested inside the ch.direction CASE", "SELECT 1 FROM chain ch JOIN u ON true WHERE ch.x > CASE ch.direction WHEN 'INCREASE' THEN CASE WHEN u.x > 0 THEN u.x ELSE 0 END ELSE -1 END"],
+    ["the row_number() prefix followed by more conditions", "SELECT 1 FROM t JOIN u ON true WHERE t.y > CASE WHEN row_number() OVER (PARTITION BY k ORDER BY rem DESC) <= 1 AND u.x > 0 THEN 1 ELSE 0 END"],
     ["count(*) ... GROUP BY", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u WHERE u.k = t.k GROUP BY u.j)"],
     ["count(*) ... HAVING", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u WHERE u.k = t.k HAVING sum(u.n) > 5)"],
     ["count(*) + max(x)", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) + max(u.x) FROM u WHERE u.k = t.k)"],
     ["a count subquery wrapped in arithmetic", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u) + 1"],
     ["a max subquery wrapped in arithmetic", "SELECT 1 FROM t WHERE ((SELECT max(u.x) FROM u WHERE u.k = t.k) + 0) > t.x"],
-    ["the alias ch on a nullable LEFT JOIN table", "SELECT 1 FROM t LEFT JOIN u ch ON true WHERE t.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
+    ["the alias ch on a nullable JOIN table", "SELECT 1 FROM t LEFT JOIN u ch ON true WHERE t.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
     ["the alias ch on a table other than the chain CTE", "SELECT 1 FROM u ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
   ];
   for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
@@ -1095,6 +1116,12 @@ test("the structural check refuses a LIMIT, OFFSET, FETCH or set operation anywh
     ["a LATERAL max() row source", "SELECT 1 FROM t JOIN LATERAL (SELECT max(u.x) AS m FROM u WHERE u.k = t.k) s ON true WHERE t.x > s.m"],
     ["a CTE max() row source", "WITH s AS (SELECT max(u.x) AS m FROM u) SELECT 1 FROM t, s WHERE t.x > s.m"],
     ["IN (SELECT max(...))", "SELECT 1 FROM t WHERE t.x IN (SELECT max(u.x) FROM u WHERE u.k = t.k)"],
+    ["a parenthesised max() row source", "SELECT 1 FROM t JOIN LATERAL (SELECT (max(u.x)) AS m FROM u WHERE u.k = t.k) s ON true WHERE t.x > s.m"],
+    ["GROUP BY () row source", "SELECT 1 FROM t JOIN LATERAL (SELECT max(u.x) AS m FROM u WHERE u.k = t.k GROUP BY ()) s ON true WHERE t.x > s.m"],
+    ["GROUP BY GROUPING SETS (()) row source", "SELECT 1 FROM t JOIN LATERAL (SELECT max(u.x) AS m FROM u WHERE u.k = t.k GROUP BY GROUPING SETS (())) s ON true WHERE t.x > s.m"],
+    ["an aggregate off the old name list (bit_or)", "SELECT 1 FROM t JOIN LATERAL (SELECT bit_or(u.x) AS m FROM u WHERE u.k = t.k) s ON true WHERE t.x > s.m"],
+    ["IN (SELECT (max()))", "SELECT 1 FROM t WHERE t.x IN (SELECT (max(u.x)) FROM u WHERE u.k = t.k)"],
+    ["a CTE with a parenthesised sum()", "WITH s AS (SELECT (sum(u.x)) AS m FROM u) SELECT 1 FROM t JOIN s ON true WHERE t.x > s.m"],
     ["a LEFT JOIN compared", "SELECT 1 FROM t LEFT JOIN u ON u.k = t.k WHERE t.x > u.x"],
   ];
   for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
