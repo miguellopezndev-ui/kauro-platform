@@ -414,6 +414,34 @@ test("5.6 forged: a member whose declared refusal is not the act's is refused (t
 test("5.6 forged: a `holdAfter` receipt whose identity params are not the member's is refused (the paused statement must carry the identity; B10-KIT-PR1-02)", async () => {
   await assert.rejects(run(membershipMember("TPL_REV_HOLDID", "[tplrevhi]", { holdAfter: { ...STMT_LOCK, identity: () => () => false } })), /TPL_REV_HOLDID: the act paused after stmt_lock with the member's identity params/);
 });
+test("5.6 forged: phase three refuses as declared but leaves an unrelated durable write: its footprint (zero change) is refused (B10-KIT-PR1-03)", async () => {
+  const phase3 = new Set<string>();
+  const honest = membershipMember("TPL_REV_RESIDUE", "[tplrevres]");
+  const m: M = {
+    ...honest,
+    fixture: async (label, after?: Fix) => {
+      const f = await honest.fixture(label, after);
+      if (after !== undefined) phase3.add(f.statementId);
+      return f;
+    },
+    // the act after the revocation commits a change of its statement's row (superuser, triggers off) before it is refused NOT_AUTHORIZED
+    act: async (_ctx, f, key) => {
+      if (phase3.has(f.statementId)) {
+        await sw.h.oracle.query("BEGIN");
+        try {
+          await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+          await sw.h.oracle.query("UPDATE kauro.commission_statements SET updated_at = updated_at + interval '1 second' WHERE statement_id = $1", [f.statementId]);
+          await sw.h.oracle.query("COMMIT");
+        } catch (e) {
+          await sw.h.oracle.query("ROLLBACK");
+          throw e;
+        }
+      }
+      return approve(f, key);
+    },
+  };
+  await assert.rejects(run(m), /TPL_REV_RESIDUE refused after the revocation \(every act after it\): kauro\.commission_statements gained exactly the rows/);
+});
 
 // 5.7 step-up expiry (last: it moves the api's process clock past a proof's expiry) -----------------------------------------------
 test("5.7 step-up expiry: an honest member passes (the proof runs out while the act waits on the cash lock; refused, nothing written)", async () => {

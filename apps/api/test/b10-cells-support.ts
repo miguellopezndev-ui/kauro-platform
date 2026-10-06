@@ -874,10 +874,13 @@ async function membership<F>(ctx: FaultContext, m: Member<F, unknown>, point: Ex
     });
     // (3) every act after the revocation is refused
     const f3 = await m.fixture(`${label}-3`, f2);
+    const before3 = await snapshot(m.tables);
     const c3 = await connectionsOf(m as Member<unknown, unknown>);
     try {
       await ctx.fenced(`${m.code}: an act after the revocation`, () => routedAct(ctx, m, f3, keyOf(m as Member<unknown, unknown>), c3.conns, [], {}), point.refusal);
       await m.failed(f3, undefined);
+      // the refused act changes nothing durable (B10-KIT-PR1-03): no earlier unit, so the footprint is the one before, exactly
+      await assertFootprint(`${m.code} refused after the revocation (every act after it)`, before3, m.tables, {});
     } finally {
       await c3.end();
     }
