@@ -20,6 +20,11 @@ import type { Client } from "pg";
 export interface Invariant {
   readonly id: `INV-${string}`;
   readonly decision: string;
+  /**
+   * The `why` text of each UNION ALL branch, in order (a branch is one condition of the invariant: the self-test forges a state for EACH and
+   * requires its own text among the rows returned). Absent: the invariant is a single condition without a `why` column.
+   */
+  readonly whys?: ReadonlyArray<string>;
   readonly sql: string;
 }
 
@@ -60,17 +65,19 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-L-02",
+    whys: ["not a mirror","entry reversed more than once"],
     decision: "a reversal mirrors its entry (same account, currency, amount, the opposite direction) and an entry is reversed once (mig 0017)",
     sql: `SELECT r.entry_id, r.reverses_entry_id, 'not a mirror' AS why
             FROM kauro.ledger_entries r LEFT JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id
            WHERE r.reverses_entry_id IS NOT NULL
              AND (o.entry_id IS NULL OR o.account_code <> r.account_code OR o.currency <> r.currency OR o.amount_cents <> r.amount_cents OR o.direction = r.direction)
           UNION ALL
-          SELECT min(r.entry_id::text)::uuid, r.reverses_entry_id, 'reversed ' || count(*) || ' times'
+          SELECT min(r.entry_id::text)::uuid, r.reverses_entry_id, 'entry reversed more than once'
             FROM kauro.ledger_entries r WHERE r.reverses_entry_id IS NOT NULL GROUP BY r.reverses_entry_id HAVING count(*) > 1`,
   },
   {
     id: "INV-S-01",
+    whys: ["payable not derived","HOLD item of a line the statement does not itemize"],
     decision: "an item's payable is derived: cumulative - previously paid - held - same-statement HOLD items of its line - offset, never negative (D10-STMT-2, R2-102)",
     sql: `WITH w AS (
             SELECT hi.statement_id, h.line_id, sum(hi.held_cents) AS cents
@@ -113,6 +120,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-05",
+    whys: ["SETTLED intent of a statement not PAID","PAID statement without exactly one SETTLED intent","line paid cents not its paid items"],
     decision: "paid conservation: a settled intent's statement is PAID, a PAID statement has exactly one settled intent, a line's paid cents are its paid statements' payable items (SETTLE_PAR)",
     sql: `SELECT p.statement_id, p.intent_id AS ref, s.state AS detail, 'SETTLED intent of a statement not PAID' AS why
             FROM kauro.payout_intents p JOIN kauro.commission_statements s ON s.statement_id = p.statement_id
@@ -139,6 +147,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-07",
+    whys: ["OFFSET item not its offset","offset not under the negative line's signed future-offset terms","payable item offsets beyond the durable offsets against its line"],
     decision: "offsets: an OFFSET item reports its durable offset, an offset names the negative line's agreement with signed SIGNED_FUTURE_OFFSET terms, a payable item offsets at most the durable offsets against its line (D10-NEG-1, KC017)",
     sql: `SELECT i.item_id AS ref, i.offset_id AS other, i.offset_cents || ' reported, ' || o.amount_cents || ' durable' AS detail, 'OFFSET item not its offset' AS why
             FROM kauro.statement_items i JOIN kauro.commission_offsets o ON o.offset_id = i.offset_id
@@ -158,6 +167,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-08",
+    whys: ["pool not rounded once","line not its share of the pool"],
     decision: "pool arithmetic: pool = basis x rate rounded once; each line = its largest-remainder share of the pool less its agreed corrections (D10-POOL-1, D10-ADJ-1)",
     sql: `WITH ${split(`SELECT p.pool_id AS k, p.pool_id, p.pool_cents AS total FROM kauro.commission_pools p`)}
           SELECT p.pool_id AS ref, p.basis_cents || ' x ' || p.rate_bps || ' bps' AS detail, p.pool_cents AS cents, ${rounded("p.basis_cents", "p.rate_bps")} AS expected, 'pool not rounded once' AS why
@@ -169,6 +179,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-09",
+    whys: ["agreed correction that increases","agreed corrections beyond the upheld holds","refund or reversal not the split at its new basis","SPLIT_CORRECTION has no B10 writer"],
     decision: "corrections evidenced: an agreed correction only decreases and never beyond the line's UPHELD holds; a refund or reversal lands on the split at its new basis; no SPLIT_CORRECTION (D10-ADJ-1, R2-102)",
     sql: `WITH ${split(`SELECT a.adjustment_id AS k, l.pool_id, ${rounded("a.new_basis_cents", "p.rate_bps")} AS total
                         FROM kauro.commission_adjustments a JOIN kauro.commission_lines l ON l.line_id = a.line_id JOIN kauro.commission_pools p ON p.pool_id = l.pool_id
@@ -190,6 +201,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-10",
+    whys: ["first adjustment not from the initial split","adjustment not from the prior one's new cumulative","new cumulative not previous moved by the amount","last adjustment not the line's cumulative"],
     decision: "adjustment chain: seq 1 starts at the split of the pool's initial basis, each starts where the last ended, moves by its amount in its direction, and the last is the line's cumulative (mig 0030)",
     sql: `WITH ${split(`SELECT p.pool_id AS k, p.pool_id, ${rounded("p.initial_basis_cents", "p.rate_bps")} AS total FROM kauro.commission_pools p`)},
           chain AS (
@@ -222,6 +234,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-12",
+    whys: ["live reservations above the slots","live reservation not on exactly one slot of its agency","slot names a reservation that is not live in its agency"],
     decision: "founding capacity: live reservations within the policy's slots, each the live reservation of exactly one slot of its agency, and the reverse (R1 R12)",
     sql: `WITH live AS (SELECT * FROM kauro.founding_slot_reservations WHERE state IN ('RESERVED', 'RECONCILIATION_HOLD', 'CONSUMED'))
           SELECT v.policy_version AS ref, count(*)::text || ' live, ' || (SELECT count(*) FROM kauro.founding_slots f WHERE f.policy_version = v.policy_version) || ' slots' AS detail, 'live reservations above the slots' AS why
@@ -244,6 +257,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-14",
+    whys: ["pool with no line","claim entitlement whose claim is not CONVERTED","CONVERTED claim without an entitlement","first qualifying purchase without the first designation naming its capture","agencies mirror neither NULL nor the first designation","paid purchase with two non-REVOKED authorizations","CORRECTED statement with an intent not FAILED or RETURNED","predecessor with two successors"],
     decision: "completeness of the pairs written in one unit: pool and lines, claim and entitlement, first designation, the agencies mirror, one live authorization per purchase, corrections (CONS_PAR, CONV_PAR, D10-FIRST-1, REPL_*, D10-GAP-7)",
     sql: `SELECT p.pool_id::text AS ref, NULL AS other, 'pool with no line' AS why
             FROM kauro.commission_pools p WHERE NOT EXISTS (SELECT 1 FROM kauro.commission_lines l WHERE l.pool_id = p.pool_id)

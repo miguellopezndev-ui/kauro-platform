@@ -119,7 +119,7 @@ async function acquiredAt(name: string, seller: Seller, terms: { readonly firstB
 /** What the positive controls leave, for the negative controls to forge on. */
 interface Built {
   r102: { statementId: string; disputedLine: string; wholeLine: string; wholeItem: string };
-  r104: { repeatLine: string; firstLine: string; intentId: string; laterStatement: string; offsetItem: string };
+  r104: { repeatLine: string; firstLine: string; intentId: string; laterStatement: string; offsetItem: string; offsetLineItem: string };
   r301: { allocationId: string; a: Seller; aPaidLine: string; adjustmentSeq2: string };
   held: { lineId: string };
 }
@@ -242,7 +242,7 @@ test("positive controls: R2-102 partial hold, R2-104 negative balance with examp
   const adjustmentSeq2 = chain.rows.find((r) => r.seq === 2)!.adjustment_id;
   built = {
     r102: { statementId: r102.statementId, disputedLine: L1, wholeLine: L2, wholeItem },
-    r104: { repeatLine, firstLine, intentId: paid.get(T.sellerId)!.intentId, laterStatement: later.statementId, offsetItem },
+    r104: { repeatLine, firstLine, intentId: paid.get(T.sellerId)!.intentId, laterStatement: later.statementId, offsetItem, offsetLineItem: laterItems.rows.find((i) => i.item_kind === "LINE")!.item_id },
     r301: { allocationId: r301.allocationId, a: A, aPaidLine, adjustmentSeq2 },
     held: { lineId: heldLine },
   };
@@ -250,25 +250,35 @@ test("positive controls: R2-102 partial hold, R2-104 negative balance with examp
 
 /**
  * Forges a state as the superuser inside a transaction that is rolled back (triggers off: session_replication_role = replica) and
- * requires `id` among the invariants firing on it; the others the forgery also violates are reported.
+ * requires `id` among the invariants firing on it; the others the forgery also violates are reported. `why`: the branch of a multi-branch
+ * invariant the forgery is for — the rows the invariant returns must carry that branch's own text (not just fire on some other branch).
  */
-async function forged(t: TestContext, id: string, forge: (c: Client) => Promise<void>): Promise<void> {
+async function forged(t: TestContext, id: string, forge: (c: Client) => Promise<void>, why?: string): Promise<void> {
   const o = w.h.oracle;
+  const inv = B10_INVARIANTS.find((i) => i.id === id);
+  assert.ok(inv !== undefined, `${id} is a B10 invariant`);
   await o.query("BEGIN");
   try {
     await o.query("SET LOCAL session_replication_role = replica");
     await forge(o);
     const fired = await firing(o);
     assert.ok(fired.includes(id), `${id} fires on its forged state (fired: ${fired.join(", ") || "none"})`);
-    t.diagnostic(`${id} fires; also firing on the same forged state: ${fired.filter((f) => f !== id).join(", ") || "none"}`);
+    if (why !== undefined) {
+      assert.ok(inv.whys?.includes(why), `${id} declares the branch "${why}"`);
+      const branch = await o.query(`SELECT * FROM (${inv.sql}) violation WHERE violation.why = $1 LIMIT 1`, [why]);
+      assert.equal(branch.rows.length, 1, `${id} returns its branch "${why}" on its forged state (fired: ${fired.join(", ")})`);
+    }
+    t.diagnostic(`${id}${why !== undefined ? ` [${why}]` : ""} fires; also firing on the same forged state: ${fired.filter((f) => f !== id).join(", ") || "none"}`);
   } finally {
     await o.query("ROLLBACK");
   }
   assert.deepEqual(await firing(o), [], "the rollback restored a state on which nothing fires");
 }
+/** `rows`: the exact count the forgery writes; -1: at least one (a forgery over every row of a kind). */
 const exec = async (c: Client, sql: string, params: ReadonlyArray<unknown> = [], rows = 1): Promise<void> => {
   const r = await c.query(sql, [...params]);
-  assert.equal(r.rowCount, rows, `the forgery wrote ${rows} row(s): ${sql}`);
+  if (rows < 0) assert.ok((r.rowCount ?? 0) >= 1, `the forgery wrote a row: ${sql}`);
+  else assert.equal(r.rowCount, rows, `the forgery wrote ${rows} row(s): ${sql}`);
 };
 
 /** A settlement posting entry written as the superuser with triggers off (no settlement row is needed then): the ledger's base fact. */
@@ -288,21 +298,47 @@ test("INV-L-01 fires on a posting set that does not balance", (t) =>
   }));
 
 test("INV-L-02 fires on a reversal that is not the mirror of its entry (balanced, on another account)", (t) =>
-  forged(t, "INV-L-02", async (c) => {
-    const event = ids.next();
-    const reversed = ids.next();
-    await entry(c, { id: reversed, event, lineNo: 1, account: "BANK_CASH", direction: "DEBIT", cents: 100 });
-    await entry(c, { id: ids.next(), event, lineNo: 2, account: "OWNER_CONTRIBUTION", direction: "CREDIT", cents: 100, reverses: reversed });
-  }));
+  forged(
+    t,
+    "INV-L-02",
+    async (c) => {
+      const event = ids.next();
+      const reversed = ids.next();
+      await entry(c, { id: reversed, event, lineNo: 1, account: "BANK_CASH", direction: "DEBIT", cents: 100 });
+      await entry(c, { id: ids.next(), event, lineNo: 2, account: "OWNER_CONTRIBUTION", direction: "CREDIT", cents: 100, reverses: reversed });
+    },
+    "not a mirror",
+  ));
+
+test("INV-L-02 fires on an entry reversed twice (each reversal a mirror)", (t) =>
+  forged(
+    t,
+    "INV-L-02",
+    async (c) => {
+      // the unique index ledger_entries_reversed_once (mig 0017) stands in the way of a second reversal: dropped inside the rolled-back forgery
+      await c.query("DROP INDEX kauro.ledger_entries_reversed_once");
+      const event = ids.next();
+      const original = ids.next();
+      await entry(c, { id: original, event, lineNo: 1, account: "BANK_CASH", direction: "DEBIT", cents: 100 });
+      await entry(c, { id: ids.next(), event, lineNo: 2, account: "OWNER_CONTRIBUTION", direction: "CREDIT", cents: 100 });
+      const back = ids.next();
+      await entry(c, { id: ids.next(), event: back, lineNo: 1, account: "BANK_CASH", direction: "CREDIT", cents: 100, reverses: original });
+      await entry(c, { id: ids.next(), event: back, lineNo: 2, account: "BANK_CASH", direction: "CREDIT", cents: 100, reverses: original });
+    },
+    "entry reversed more than once",
+  ));
 
 test("INV-S-01 fires on Codex r2 R4's item: payable 200 on a cumulative of 100", (t) =>
-  forged(t, "INV-S-01", (c) => exec(c, "UPDATE kauro.statement_items SET cumulative_cents = 100, previously_paid_cents = 0, offset_cents = 0, payable_cents = 200 WHERE item_id = $1", [b().r102.wholeItem])));
+  forged(t, "INV-S-01", (c) => exec(c, "UPDATE kauro.statement_items SET cumulative_cents = 100, previously_paid_cents = 0, offset_cents = 0, payable_cents = 200 WHERE item_id = $1", [b().r102.wholeItem]), "payable not derived"));
 
 test("INV-S-01 fires on a HOLD item of a line its statement does not itemize", (t) =>
-  forged(t, "INV-S-01", (c) => exec(c, "DELETE FROM kauro.statement_items WHERE statement_id = $1 AND item_kind = 'LINE' AND line_id = $2", [b().r102.statementId, b().r102.disputedLine])));
+  forged(t, "INV-S-01", (c) => exec(c, "DELETE FROM kauro.statement_items WHERE statement_id = $1 AND item_kind = 'LINE' AND line_id = $2", [b().r102.statementId, b().r102.disputedLine]), "HOLD item of a line the statement does not itemize"));
 
 test("INV-S-02 fires on a statement whose payable is not its items' sum", (t) =>
   forged(t, "INV-S-02", (c) => exec(c, "UPDATE kauro.commission_statements SET payable_cents = payable_cents + 1 WHERE statement_id = $1", [b().r102.statementId])));
+
+test("INV-S-02 fires on a statement whose held total is not its items' sum", (t) =>
+  forged(t, "INV-S-02", (c) => exec(c, "UPDATE kauro.commission_statements SET held_cents = held_cents + 1 WHERE statement_id = $1", [b().r102.statementId])));
 
 test("INV-S-03 fires on an intent that pays other than its statement's payable", (t) =>
   forged(t, "INV-S-03", (c) => exec(c, "UPDATE kauro.payout_intents SET amount_cents = amount_cents + 1 WHERE intent_id = $1", [b().r104.intentId])));
@@ -318,8 +354,14 @@ test("INV-S-04 fires on a second live intent of one statement", (t) =>
     );
   }));
 
+test("INV-S-05 fires on a SETTLED intent whose statement is not PAID (money: a payout settled for a statement still unpaid)", (t) =>
+  forged(t, "INV-S-05", (c) => exec(c, "UPDATE kauro.commission_statements SET state = 'APPROVED', paid_at = NULL, payout_evidence_hash = NULL WHERE statement_id = (SELECT statement_id FROM kauro.payout_intents WHERE intent_id = $1)", [b().r104.intentId]), "SETTLED intent of a statement not PAID"));
+
+test("INV-S-05 fires on a PAID statement without exactly one SETTLED intent (money: paid with no settled payout)", (t) =>
+  forged(t, "INV-S-05", (c) => exec(c, "UPDATE kauro.payout_intents SET state = 'RETURNED', settled_at = NULL, returned_at = now() WHERE intent_id = $1", [b().r104.intentId]), "PAID statement without exactly one SETTLED intent"));
+
 test("INV-S-05 fires on a line whose paid cents are not its paid statements' payable items", (t) =>
-  forged(t, "INV-S-05", (c) => exec(c, "UPDATE kauro.commission_lines SET paid_cents = paid_cents + 1 WHERE line_id = $1", [b().r104.repeatLine])));
+  forged(t, "INV-S-05", (c) => exec(c, "UPDATE kauro.commission_lines SET paid_cents = paid_cents + 1 WHERE line_id = $1", [b().r104.repeatLine]), "line paid cents not its paid items"));
 
 test("INV-S-06 fires on a line itemized PAYABLE by two statements not CORRECTED", (t) =>
   forged(t, "INV-S-06", (c) =>
@@ -330,47 +372,151 @@ test("INV-S-06 fires on a line itemized PAYABLE by two statements not CORRECTED"
     )));
 
 test("INV-S-07 fires on an OFFSET item whose offset differs from its durable offset", (t) =>
-  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.statement_items SET offset_cents = offset_cents + 1 WHERE item_id = $1", [b().r104.offsetItem])));
+  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.statement_items SET offset_cents = offset_cents + 1 WHERE item_id = $1", [b().r104.offsetItem]), "OFFSET item not its offset"));
 
+const UNDER_TERMS = "offset not under the negative line's signed future-offset terms";
 test("INV-S-07 fires on an offset whose agreement carries no signed SIGNED_FUTURE_OFFSET terms", (t) =>
-  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.seller_agreements SET offset_terms = 'NONE' WHERE agreement_id = $1", [b().r301.a.agreementId])));
+  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.seller_agreements SET offset_terms = 'NONE' WHERE agreement_id = $1", [b().r301.a.agreementId]), UNDER_TERMS));
 
-test("INV-S-08 and INV-S-09 fire on Codex r2 R3's agreed-correction chain raising a line 1000 cents", (t) =>
-  forged(t, "INV-S-08", async (c) => {
-    const line = b().r102.wholeLine;
-    for (const [seq, from, to] of [[1, 50000, 50500], [2, 50500, 51000]] as const) {
-      await exec(
-        c,
-        `INSERT INTO kauro.commission_adjustments (adjustment_id, agency_id, line_id, seller_id, adjustment_seq, reason, direction, amount_cents, previous_cumulative_cents, new_cumulative_entitlement_cents, new_basis_cents, source_event_id, agreement_version, created_at)
-         SELECT $1, l.agency_id, l.line_id, l.seller_id, $2, 'AGREED_ERROR_CORRECTION', 'INCREASE', $4::bigint - $3::bigint, $3, $4, l.net_service_basis_cents, $5, 'V1', now() FROM kauro.commission_lines l WHERE l.line_id = $6`,
-        [ids.next(), seq, from, to, ids.next(), line],
-      );
-    }
-    await exec(c, "UPDATE kauro.commission_lines SET cumulative_entitlement_cents = 51000 WHERE line_id = $1", [line]);
-    assert.ok((await firing(c)).includes("INV-S-09"), "the same chain fires INV-S-09 (an agreed correction that increases)");
-  }));
+test("INV-S-07 fires on an offset whose agreement was never signed", (t) =>
+  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.seller_agreements SET signed_at = NULL, signature_evidence_hash = NULL WHERE agreement_id = $1", [b().r301.a.agreementId]), UNDER_TERMS));
+
+test("INV-S-07 fires on an offset recorded under another agreement than its negative line's entitlement", (t) =>
+  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.commission_offsets SET agreement_id = gen_random_uuid() WHERE seller_id = $1", [b().r301.a.sellerId]), UNDER_TERMS));
+
+test("INV-S-07 fires on a payable item offsetting more than the durable offsets against its line (money: more taken off than owed)", (t) =>
+  forged(t, "INV-S-07", (c) => exec(c, "UPDATE kauro.statement_items SET offset_cents = offset_cents + 1 WHERE item_id = $1", [b().r104.offsetLineItem]), "payable item offsets beyond the durable offsets against its line"));
+
+/** Codex r2 R3's agreed-correction chain raising a line 1000 cents. */
+async function raiseByAgreedCorrections(c: Client): Promise<void> {
+  const line = b().r102.wholeLine;
+  for (const [seq, from, to] of [[1, 50000, 50500], [2, 50500, 51000]] as const) {
+    await exec(
+      c,
+      `INSERT INTO kauro.commission_adjustments (adjustment_id, agency_id, line_id, seller_id, adjustment_seq, reason, direction, amount_cents, previous_cumulative_cents, new_cumulative_entitlement_cents, new_basis_cents, source_event_id, agreement_version, created_at)
+       SELECT $1, l.agency_id, l.line_id, l.seller_id, $2, 'AGREED_ERROR_CORRECTION', 'INCREASE', $4::bigint - $3::bigint, $3, $4, l.net_service_basis_cents, $5, 'V1', now() FROM kauro.commission_lines l WHERE l.line_id = $6`,
+      [ids.next(), seq, from, to, ids.next(), line],
+    );
+  }
+  await exec(c, "UPDATE kauro.commission_lines SET cumulative_entitlement_cents = 51000 WHERE line_id = $1", [line]);
+}
+
+test("INV-S-08 fires on Codex r2 R3's agreed-correction chain raising a line 1000 cents (the line is not its share of the pool)", (t) => forged(t, "INV-S-08", raiseByAgreedCorrections, "line not its share of the pool"));
 
 test("INV-S-08 fires on a pool whose cents are not its basis rounded once", (t) =>
-  forged(t, "INV-S-08", (c) => exec(c, "UPDATE kauro.commission_pools p SET pool_cents = pool_cents + 1 FROM kauro.commission_lines l WHERE l.pool_id = p.pool_id AND l.line_id = $1", [b().r104.firstLine])));
+  forged(t, "INV-S-08", (c) => exec(c, "UPDATE kauro.commission_pools p SET pool_cents = pool_cents + 1 FROM kauro.commission_lines l WHERE l.pool_id = p.pool_id AND l.line_id = $1", [b().r104.firstLine]), "pool not rounded once"));
+
+test("INV-S-09 fires on an agreed correction that increases (the same chain)", (t) => forged(t, "INV-S-09", raiseByAgreedCorrections, "agreed correction that increases"));
+
+test("INV-S-09 fires on an agreed correction beyond the line's UPHELD holds (money: a decrease no reviewed decision upheld)", (t) =>
+  forged(
+    t,
+    "INV-S-09",
+    (c) =>
+      exec(
+        c,
+        `INSERT INTO kauro.commission_adjustments (adjustment_id, agency_id, line_id, seller_id, adjustment_seq, reason, direction, amount_cents, previous_cumulative_cents, new_cumulative_entitlement_cents, new_basis_cents, source_event_id, agreement_version, created_at)
+         SELECT $1, l.agency_id, l.line_id, l.seller_id, 1, 'AGREED_ERROR_CORRECTION', 'DECREASE', 1, l.cumulative_entitlement_cents, l.cumulative_entitlement_cents - 1, l.net_service_basis_cents, $2, 'V1', now() FROM kauro.commission_lines l WHERE l.line_id = $3`,
+        [ids.next(), ids.next(), b().r102.wholeLine],
+      ),
+    "agreed corrections beyond the upheld holds",
+  ));
+
+test("INV-S-09 fires on a refund or reversal that is not the split at its new basis (money: a line posted at another cumulative than its basis gives)", (t) =>
+  forged(t, "INV-S-09", (c) => exec(c, "UPDATE kauro.commission_adjustments SET new_basis_cents = new_basis_cents + 1000 WHERE adjustment_id = $1", [b().r301.adjustmentSeq2]), "refund or reversal not the split at its new basis"));
 
 test("INV-S-09 fires on a SPLIT_CORRECTION, which has no B10 writer", (t) =>
-  forged(t, "INV-S-09", (c) => exec(c, "UPDATE kauro.commission_adjustments SET reason = 'SPLIT_CORRECTION' WHERE adjustment_id = $1", [b().r301.adjustmentSeq2])));
+  forged(t, "INV-S-09", (c) => exec(c, "UPDATE kauro.commission_adjustments SET reason = 'SPLIT_CORRECTION' WHERE adjustment_id = $1", [b().r301.adjustmentSeq2]), "SPLIT_CORRECTION has no B10 writer"));
+
+test("INV-S-10 fires on a first adjustment that does not start at the split of the initial basis", (t) =>
+  forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_adjustments SET previous_cumulative_cents = previous_cumulative_cents + 1 WHERE line_id = $1 AND adjustment_seq = 1", [b().r301.aPaidLine]), "first adjustment not from the initial split"));
 
 test("INV-S-10 fires on an adjustment that does not start where the last one ended", (t) =>
-  forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_adjustments SET previous_cumulative_cents = previous_cumulative_cents + 1 WHERE adjustment_id = $1", [b().r301.adjustmentSeq2])));
+  forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_adjustments SET previous_cumulative_cents = previous_cumulative_cents + 1 WHERE adjustment_id = $1", [b().r301.adjustmentSeq2]), "adjustment not from the prior one's new cumulative"));
+
+test("INV-S-10 fires on an adjustment whose new cumulative is not the previous moved by its amount", (t) =>
+  forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_adjustments SET amount_cents = amount_cents + 1 WHERE adjustment_id = $1", [b().r301.adjustmentSeq2]), "new cumulative not previous moved by the amount"));
+
+test("INV-S-10 fires on a last adjustment that is not the line's cumulative", (t) =>
+  forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_lines SET cumulative_entitlement_cents = cumulative_entitlement_cents + 1 WHERE line_id = $1", [b().r301.aPaidLine]), "last adjustment not the line's cumulative"));
 
 test("INV-S-11 fires on a frozen allocation whose shares do not sum to 10000 bps", (t) =>
   forged(t, "INV-S-11", (c) => exec(c, "UPDATE kauro.allocation_shares SET share_bps = share_bps - 1 WHERE allocation_id = $1 AND seller_id = $2", [b().r301.allocationId, b().r301.a.sellerId])));
 
+/** A live reservation of a made-up agency and quote (the foreign keys stand off with the triggers) on slot 1 of the policy. */
+const reservation = (c: Client): Promise<void> =>
+  exec(
+    c,
+    "INSERT INTO kauro.founding_slot_reservations (reservation_id, agency_id, quote_id, policy_version, slot_no, version, state, ends_at, created_at, updated_at) VALUES ($1, $2, $3, 'R2-INITIAL', 1, 1, 'RESERVED', now(), now(), now())",
+    [ids.next(), ids.next(), ids.next()],
+  );
+
+test("INV-S-12 fires on live reservations above the policy's slots", (t) =>
+  forged(
+    t,
+    "INV-S-12",
+    async (c) => {
+      await reservation(c);
+      await exec(c, "DELETE FROM kauro.founding_slots WHERE policy_version = 'R2-INITIAL'", [], -1);
+    },
+    "live reservations above the slots",
+  ));
+
+test("INV-S-12 fires on a live reservation that is on no slot of its agency", (t) => forged(t, "INV-S-12", reservation, "live reservation not on exactly one slot of its agency"));
+
 test("INV-S-12 fires on a founding slot held for a reservation that is not live", (t) =>
-  forged(t, "INV-S-12", (c) =>
-    exec(c, "UPDATE kauro.founding_slots SET held = true, live_reservation_id = $1, live_agency_id = (SELECT min(agency_id::text)::uuid FROM kauro.agencies) WHERE slot_no = (SELECT min(slot_no) FROM kauro.founding_slots WHERE live_reservation_id IS NULL AND policy_version = 'R2-INITIAL') AND policy_version = 'R2-INITIAL'", [ids.next()])));
+  forged(
+    t,
+    "INV-S-12",
+    (c) =>
+      exec(c, "UPDATE kauro.founding_slots SET held = true, live_reservation_id = $1, live_agency_id = (SELECT min(agency_id::text)::uuid FROM kauro.agencies) WHERE slot_no = (SELECT min(slot_no) FROM kauro.founding_slots WHERE live_reservation_id IS NULL AND policy_version = 'R2-INITIAL') AND policy_version = 'R2-INITIAL'", [ids.next()]),
+    "slot names a reservation that is not live in its agency",
+  ));
 
 test("INV-S-13 fires on a HELD line with no hold row", (t) =>
   forged(t, "INV-S-13", (c) => exec(c, "UPDATE kauro.commission_lines SET state = 'HELD' WHERE line_id = $1", [b().r102.wholeLine])));
 
 test("INV-S-14 fires on a pool with no line", (t) =>
-  forged(t, "INV-S-14", (c) => exec(c, "DELETE FROM kauro.commission_lines WHERE line_id = $1", [b().r102.wholeLine])));
+  forged(t, "INV-S-14", (c) => exec(c, "DELETE FROM kauro.commission_lines WHERE line_id = $1", [b().r102.wholeLine]), "pool with no line"));
+
+test("INV-S-14 fires on a claim entitlement whose claim is not CONVERTED", (t) =>
+  forged(t, "INV-S-14", (c) => exec(c, "UPDATE kauro.attribution_claims SET state = 'ACCEPTED', converted_at = NULL WHERE claim_id = (SELECT claim_id FROM kauro.commission_entitlements WHERE claim_id IS NOT NULL ORDER BY entitlement_id LIMIT 1)", []), "claim entitlement whose claim is not CONVERTED"));
+
+test("INV-S-14 fires on a CONVERTED claim without an entitlement", (t) =>
+  forged(t, "INV-S-14", (c) => exec(c, "DELETE FROM kauro.commission_entitlements WHERE entitlement_id = (SELECT entitlement_id FROM kauro.commission_entitlements WHERE claim_id IS NOT NULL ORDER BY entitlement_id LIMIT 1)", []), "CONVERTED claim without an entitlement"));
+
+test("INV-S-14 fires on a first qualifying purchase whose capture the first designation does not name", (t) =>
+  forged(t, "INV-S-14", (c) => exec(c, "DELETE FROM kauro.agency_recurrence WHERE agency_id = (SELECT agency_id FROM kauro.qualifying_purchases WHERE confirmation_seq = 1 ORDER BY authorization_id LIMIT 1)", []), "first qualifying purchase without the first designation naming its capture"));
+
+test("INV-S-14 fires on an agencies mirror that is not the first designation", (t) =>
+  forged(t, "INV-S-14", (c) => exec(c, "UPDATE kauro.agencies SET first_qualifying_capture_id = gen_random_uuid() WHERE agency_id = (SELECT agency_id FROM kauro.agencies ORDER BY agency_id LIMIT 1)", []), "agencies mirror neither NULL nor the first designation"));
+
+test("INV-S-14 fires on a paid purchase with two non-REVOKED authorizations", (t) =>
+  forged(
+    t,
+    "INV-S-14",
+    async (c) => {
+      // a second, re-bound authorization of the purchase's capture: the unique indexes commercial_authorizations_one_live_per_capture and _one_live_per_project (mig 0015) stand in its way, dropped inside the rolled-back forgery
+      await c.query("DROP INDEX kauro.commercial_authorizations_one_live_per_capture");
+      await c.query("DROP INDEX kauro.commercial_authorizations_one_live_per_project");
+      await exec(
+        c,
+        "INSERT INTO kauro.commercial_authorizations SELECT (jsonb_populate_record(NULL::kauro.commercial_authorizations, to_jsonb(a) || jsonb_build_object('authorization_id', $1::text, 'quote_id', $2::text, 'rebinding_id', $3::text))).* FROM kauro.commercial_authorizations a WHERE a.state <> 'REVOKED' AND a.capture_id IS NOT NULL ORDER BY a.authorization_id LIMIT 1",
+        [ids.next(), ids.next(), ids.next()],
+      );
+    },
+    "paid purchase with two non-REVOKED authorizations",
+  ));
+
+test("INV-S-14 fires on a CORRECTED statement whose intent is neither FAILED nor RETURNED (money: a superseded statement still paying)", (t) =>
+  forged(t, "INV-S-14", (c) => exec(c, "UPDATE kauro.commission_statements SET state = 'CORRECTED', corrected_at = now(), paid_at = NULL, payout_evidence_hash = NULL WHERE statement_id = (SELECT statement_id FROM kauro.payout_intents WHERE intent_id = $1)", [b().r104.intentId]), "CORRECTED statement with an intent not FAILED or RETURNED"));
+
+test("INV-S-14 fires on a predecessor statement with two successors", (t) =>
+  forged(t, "INV-S-14", async (c) => {
+    // commission_statements_one_correction (mig 0031) keeps one successor per statement: dropped inside the rolled-back forgery
+    await c.query("DROP INDEX kauro.commission_statements_one_correction");
+    await exec(c, "UPDATE kauro.commission_statements SET corrects_statement_id = (SELECT min(statement_id::text)::uuid FROM kauro.commission_statements WHERE statement_id NOT IN ($1, $2)) WHERE statement_id IN ($1, $2)", [b().r102.statementId, b().r104.laterStatement], 2);
+  }, "predecessor with two successors"));
 
 test("every invariant has a negative control in this file", () => {
   const covered = ["INV-L-01", "INV-L-02", "INV-S-01", "INV-S-02", "INV-S-03", "INV-S-04", "INV-S-05", "INV-S-06", "INV-S-07", "INV-S-08", "INV-S-09", "INV-S-10", "INV-S-11", "INV-S-12", "INV-S-13", "INV-S-14"];
