@@ -94,7 +94,7 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
           // the beneficiaries' claims, then the prospect's other live claims the allocation rules against
           const beneficiaries = new Map<string, AttributionClaimRecord>();
           for (const share of allocation.shares) {
-            const shareClaim = share.claimId === claim.claimId ? claim : await attribution.lockClaim(share.claimId);
+            const shareClaim: AttributionClaimRecord | null = share.claimId === claim.claimId ? claim : await attribution.lockClaim(share.claimId);
             if (shareClaim !== null && shareClaim.prospectId === claim.prospectId && shareClaim !== claim) await refuseLapsed(shareClaim, false);
             if (shareClaim === null || shareClaim.prospectId !== claim.prospectId || !REVIEWABLE.has(shareClaim.state)) {
               throw new DomainFailure("PRECONDITION_FAILED", "a share names a claim that is not under review on this prospect", { reason: "CLAIM_NOT_REVIEWABLE" });
