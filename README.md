@@ -51,7 +51,8 @@ Design documents: `docs/design/B06-domain-db-authz.md` (domain, database and aut
 aggregate-kind registry of migration 0008 and how a package registers its kinds); B07: `docs/design/B07-upload-source-lifecycle.md`
 (upload, inspection and source lifecycle) and `docs/design/B07-case-map.md` (its 23 cases and their status); for package B09,
 `docs/design/B09-payments-fiscal.md` (payments and fiscal: design, decisions, mandates, integration obligations and critique record)
-and `docs/design/B09-case-map.md` (its 30 acceptance cases, their tests and their closure); the merge of both packages:
+and `docs/design/B09-case-map.md` (its 30 acceptance cases, their tests and their closure);
+[ACH bank-transfer route (A8)](docs/design/ACH-ROUTE.md) (proposed domain, Wise port and failure matrices); the merge of both packages:
 `docs/design/B07-B09-merge.md`. Persistence tests start a real PostgreSQL 17
 (binaries from `PGBIN`, else `C:\Tools\pgsql17\bin` or `/usr/lib/postgresql/17/bin`); nothing fakes the database.
 
