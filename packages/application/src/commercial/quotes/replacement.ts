@@ -41,7 +41,7 @@ import type { CommandEnvelope } from "../../api/envelope.js";
 import { quoteViewOf } from "../../commerce/request/checkout.js";
 import { providerServicesUnavailable, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { applied } from "../agency/shared.js";
-import { withinCallBound } from "../call-bound.js";
+import { withinCallBound, type Bounded } from "../call-bound.js";
 import type { CreateQuoteBody } from "../contracts.js";
 import type { CreateQuoteView } from "../views.js";
 import type { QuotedSubject } from "./create-quote.js";
@@ -210,19 +210,35 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
   if (factory === null || rebinder === null) throw providerServicesUnavailable();
   // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6a): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
   // open (nothing is concluded), and the request answers the retriable 202 — the same key resumes and observes the re-binding by its identity
-  const bounded = await withinCallBound(co.providerTimer, () =>
-    factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
-      if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
-      const to = await svc.commerce.quotes.get(ctx.toQuoteId);
-      if (to === null) throw new NotFoundFailure("quote");
-      if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
-      if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
-      const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
-      return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
-    }),
-    // no abandon: the re-binding is its own SERVICE unit of work and keeps running to its COMMIT or ROLLBACK, whose outcome the same key observes
-    { call: "CMD027.rebind", ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}) },
-  );
+  const service = { kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId } as const;
+  let bounded: Bounded<Concluded>;
+  try {
+    bounded = await withinCallBound(co.providerTimer, () =>
+      factory.run(service, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
+        if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
+        const to = await svc.commerce.quotes.get(ctx.toQuoteId);
+        if (to === null) throw new NotFoundFailure("quote");
+        if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
+        if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
+        const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
+        return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
+      }),
+      // no abandon: the re-binding is its own SERVICE unit of work and keeps running to its COMMIT or ROLLBACK, whose outcome the same key observes
+      { call: "CMD027.rebind", ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}) },
+    );
+  } catch (e) {
+    // A re-binding that lost a race on the database's own guard (an abandoned unit of this very replacement committed first, or is committing
+    // while this one waited on its locks) failed on a state that is no failure: observe it by the replacement's identity, never repeat it.
+    if (e instanceof DomainFailure && (e.details.reason === "REPLACEMENT_NOT_ALLOWED" || e.code === "STALE_VERSION")) {
+      const observed = await factory.run(service, async (svc: CommerceUnitOfWork): Promise<boolean> => {
+        if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
+        const to = await svc.commerce.quotes.get(ctx.toQuoteId);
+        return to !== null && to.state === "ACCEPTED_FOR_CHECKOUT" && (await svc.commerce.rebindings.findTo(ctx.toQuoteId)) !== null;
+      });
+      if (observed) return { kind: "REBOUND" };
+    }
+    throw e;
+  }
   return bounded.timedOut ? { kind: "PENDING" } : bounded.value;
 }
 

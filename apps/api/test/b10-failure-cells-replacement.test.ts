@@ -11,10 +11,11 @@ import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { CreateQuoteView, PurchaseRebinder } from "@kauro/application";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { admitJob, faultCell, queueJob, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
 import { bindCells, contend, open } from "./b10-cells-support.js";
+import { blockedBy } from "./b10-cells-6a-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
@@ -606,54 +607,109 @@ faultCell(
 
 // --- REPL_TMO ----------------------------------------------------------------------------------------------------------------------
 
+/** Polls the oracle until `check` holds (the abandoned SERVICE unit's own COMMIT or ROLLBACK is not a statement the harness routes). */
+async function until(what: string, check: () => Promise<boolean>, limitMs = 10_000): Promise<void> {
+  const limit = Date.now() + limitMs;
+  while (!(await check())) {
+    if (Date.now() > limit) assert.fail(`${what}: not seen within ${limitMs} ms`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+/**
+ * A replacement whose re-binding runs for real (the payment service's own PurchaseRebinder, in its SERVICE unit) and is held right after its
+ * allowance record: the cell crosses the provider-call bound on its clock, so the application gives that unit up and answers the retriable 202.
+ * The abandoned unit keeps running to its COMMIT or ROLLBACK once the cell lets it, whatever the caller was told.
+ */
+async function abandonedRebinding(ctx: FaultContext, x: Fixture, key: string, label: string): Promise<{ readonly pause: ReturnType<FaultContext["points"]["pause"]>; readonly reply: Reply }> {
+  const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), `the re-binding's call bound (${label})`);
+  const pause = ctx.points.pause("pay.rebindings.record.after");
+  const running = ctx.operation(`the replacement whose re-binding is held after its allowance record (${label})`, () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key)));
+  await pause.reachedBy(running);
+  ctx.clock.past(deadline);
+  const settled = await Promise.race([running, new Promise<null>((resolve) => setTimeout(() => resolve(null), 5_000))]);
+  if (settled === null) {
+    pause.release();
+    await running.catch(() => undefined);
+    assert.fail(`${label}: CreateQuote did not answer within 5 s after the re-binding's ${PROVIDER_CALL_TIMEOUT_MS} ms bound was crossed (expected the retriable 202 with the replacement ISSUED and the journal entry open)`);
+  }
+  assert.equal(settled.status, 202, `${label}: the retriable answer: ${settled.text}`);
+  const s = await stateOf(x, key);
+  untouched(x, s);
+  assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"], `${label}: nothing concluded while the abandoned unit is open`);
+  return { pause, reply: settled };
+}
+
 faultCell(
   {
     id: "REPL_TMO",
-    step: "CMD027 included-replacement protocol / TIMEOUT: S2 PurchaseRebinder never answering",
+    step: "CMD027 included-replacement protocol / TIMEOUT: S2 PurchaseRebinder held past its bound, its unit abandoned",
     fault: "timeout",
     expect:
-      "RACE (replacement): a re-binding that times out leaves the replacement ISSUED with its journal entry open, the same key observes the re-binding by its identity and never re-binds twice, and the answer is the retriable 202",
+      "RACE (replacement): a re-binding that outlives its bound answers the retriable 202 with the replacement ISSUED and the journal entry open, and the abandoned SERVICE unit still ends: its late COMMIT before the retry, or racing it, or its late failure (reported, not swallowed), leaves the same key observing the final state by identity: exactly one re-binding, allowance ordinal 1, never re-bound twice",
   },
   async (ctx) => {
-    const x = await fixture("repl-tmo");
-    const key = freshKey("repl-tmo");
-    // the re-binder never answers; the cell crosses the provider-call bound on its clock and then gives the application time to answer
-    const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), "the re-binding's call bound");
-    let called!: () => void;
-    const reached = new Promise<void>((resolve) => (called = resolve));
-    let abandon!: (e: Error) => void;
-    const hung = new Promise<never>((_resolve, reject) => (abandon = reject));
-    hung.catch(() => undefined);
-    let reply: Reply | undefined;
-    try {
-      await withRebinder(
-        () => {
-          called();
-          return hung;
-        },
-        async () => {
-          const running = ctx.operation("the replacement whose re-binding never answers", () => quoteCall(x.a, x.plan, key));
-          await reached;
-          ctx.clock.past(deadline);
-          const settled = await Promise.race([running.then((r) => r), new Promise<null>((resolve) => setTimeout(() => resolve(null), 5_000))]);
-          if (settled === null) {
-            // no bound fired: let the hung call fail so the SERVICE transaction rolls back, then report the gap
-            abandon(new Error("the test abandoned the re-binder that never answered"));
-            await running.catch(() => undefined);
-            assert.fail(`CreateQuote did not answer within 5 s after the re-binding's ${PROVIDER_CALL_TIMEOUT_MS} ms bound was crossed: PurchaseRebinder has no bound (expected the retriable 202 with the replacement ISSUED and the journal entry open)`);
-          }
-          reply = settled;
-        },
-      );
-    } finally {
-      abandon(new Error("cleanup"));
+    // 1. the abandoned unit commits after the 202, then the same key retries: the re-binding it made is observed by its identity
+    {
+      const x = await fixture("repl-tmo-late-commit");
+      const key = freshKey("repl-tmo-late-commit");
+      const { pause } = await abandonedRebinding(ctx, x, key, "late commit");
+      pause.release();
+      await until("the abandoned re-binding committed", async () => (await stateOf(x, key)).rebindings.length === 1);
+      const replacement = await replacementOf(x);
+      const landed = await stateOf(x, key);
+      reboundOnce(x, landed, replacement);
+      assert.deepEqual([landed.replacements, landed.journal], [["ACCEPTED_FOR_CHECKOUT"], "RESERVED"], "the late commit re-bound the purchase; the 202 journaled nothing, the entry is still open");
+      const first = await quoteCall(x.a, x.plan, key);
+      const resumed = view(first);
+      assert.deepEqual([resumed.replacement?.outcome, resumed.quote.quoteId, resumed.replacement?.revokedAuthorizationId], ["REBOUND", replacement, x.paid.purchase.authorizationId], "the same key answers the committed re-binding");
+      const after = await stateOf(x, key);
+      reboundOnce(x, after, replacement);
+      assert.equal(after.journal, "COMMITTED");
+      assert.equal((await quoteCall(x.a, x.plan, key)).text, replayTextOf(first), "and replays it byte for byte");
+      assert.deepEqual(iw.lateFailures.filter((l) => l.call === "CMD027.rebind"), [], "a late COMMIT is no failure");
     }
-    assert.equal(reply!.status, 202, `the retriable answer: ${reply!.text}`);
-    const s = await stateOf(x, key);
-    untouched(x, s);
-    assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"]);
-    const resumed = view(await quoteCall(x.a, x.plan, key));
-    assert.equal(resumed.replacement?.outcome, "REBOUND");
-    reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+    // 2. the same key retried while the abandoned unit is still in flight (holding the re-binding's locks): the retry waits on it, then observes its commit
+    {
+      const x = await fixture("repl-tmo-in-flight");
+      const key = freshKey("repl-tmo-in-flight");
+      const { pause } = await abandonedRebinding(ctx, x, key, "retry in flight");
+      const holder = await oracleRows<{ pid: number }>(iw, "SELECT pid FROM pg_stat_activity WHERE application_name LIKE 'kauro-api-payment%' AND state = 'idle in transaction'");
+      assert.equal(holder.length, 1, "the abandoned SERVICE unit stands open with its writes");
+      const retry = ctx.operation("the same key retried while the abandoned re-binding is in flight", () => quoteCall(x.a, x.plan, key)).then(
+        (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+        (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+      );
+      const waiting = await blockedBy(iw.h.oracle, holder[0]!.pid, "kauro-api-payment");
+      assert.match(waiting.application, /^kauro-api-payment/, "the retry's re-binding waits on the abandoned unit's locks");
+      pause.release();
+      const answer = await retry;
+      assert.equal(answer.status, "fulfilled");
+      if (answer.status === "fulfilled" && answer.value.status !== 201) assert.fail(`the retry answered ${answer.value.status} ${answer.value.text}: ${JSON.stringify(iw.w.internalErrors.slice(-2).map((e) => String((e.error as Error)?.message ?? e.error)))}`);
+      const resumed = view(answer.status === "fulfilled" ? answer.value : (undefined as never));
+      assert.equal(resumed.replacement?.outcome, "REBOUND", "the retry observes the committed re-binding by its identity");
+      const after = await stateOf(x, key);
+      reboundOnce(x, after, resumed.quote.quoteId);
+      assert.equal(after.journal, "COMMITTED");
+    }
+    // 3. the abandoned unit fails late and rolls back: nothing was re-bound, the failure is reported (never swallowed), the same key then re-binds once
+    {
+      const x = await fixture("repl-tmo-late-failure");
+      const key = freshKey("repl-tmo-late-failure");
+      const lateBefore = iw.lateFailures.length;
+      const { pause } = await abandonedRebinding(ctx, x, key, "late failure");
+      pause.crash();
+      await until("the abandoned re-binding's failure was reported", async () => iw.lateFailures.length > lateBefore);
+      const [late] = iw.lateFailures.slice(lateBefore);
+      assert.equal(late!.call, "CMD027.rebind");
+      assert.equal(simulatedCrashOf(late!.error)?.point, "pay.rebindings.record.after", "the reported failure is the one that ended the abandoned unit");
+      await until("the abandoned unit rolled back", async () => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM pg_stat_activity WHERE application_name LIKE 'kauro-api-payment%' AND state = 'idle in transaction'"))[0]!.n === 0);
+      const s = await stateOf(x, key);
+      untouched(x, s);
+      assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"], "the rolled-back unit left the replacement ISSUED and the entry open");
+      const resumed = view(await quoteCall(x.a, x.plan, key));
+      assert.equal(resumed.replacement?.outcome, "REBOUND");
+      reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+    }
   },
 );
