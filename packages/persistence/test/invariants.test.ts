@@ -770,11 +770,14 @@ test("the oracle runs once more in the file's after hook: an effect that settles
 
 /** The comparison operators a scalar subquery may stand beside (longest first). */
 const COMPARISON = /(<>|!=|<=|>=|=|<|>)/;
-/** The only CASE operands that are NOT NULL columns, so a CASE over one has no absent case for ELSE to swallow. */
-const NOT_NULL_CASE_OPERANDS: ReadonlySet<string> = new Set(["ch.direction"]);
 
-/** The one searched CASE the oracle uses: the split's one-cent-each bit, 1 for the rows whose rank is within the remainder, over NOT NULL operands (INV-S-08 split CTE). */
-const SPLIT_ONE_CENT = /^\s*WHEN\s+row_number\(\)\s+OVER\s*\(/i;
+/**
+ * The only CASEs with an ELSE the oracle uses, matched on their ENTIRE body (the SQL with literals blanked), so nothing can ride along:
+ * (1) a simple CASE over ch.direction (a NOT NULL column of the chain CTE, bound below) with literal WHEN arms, plain operands and no nested CASE;
+ * (2) the split's one-cent bit, exactly as the oracle writes it, over NOT NULL operands (INV-S-08 split CTE).
+ */
+const DIRECTION_CASE = /^\s*ch\.direction(?:\s+WHEN\s+''\s+THEN\s+-?[\w.]+)+\s+ELSE\s+-?[\w.]+\s*$/i;
+const SPLIT_ONE_CENT_CASE = /^\s*WHEN\s+row_number\(\)\s+OVER\s*\(\s*PARTITION\s+BY\s+k\s+ORDER\s+BY\s+rem\s+DESC\s*,\s*seller_id::text\s+COLLATE\s+""\s*\)\s*<=\s*total\s*-\s*sum\(fl\)\s+OVER\s*\(\s*PARTITION\s+BY\s+k\s*\)\s+THEN\s+1\s+ELSE\s+0\s*$/i;
 
 /** The SQL with comments, quoted literals and quoted identifiers blanked: only keywords and operators are left to match, whatever their case or spacing. */
 function stripLiterals(sql: string): string {
@@ -785,7 +788,31 @@ function stripLiterals(sql: string): string {
     .replace(/"(?:[^"]|"")*"/g, '""');
 }
 
-/** Scalar subqueries ("(SELECT ...)") used as an operand of a comparison, other than count(...) which is never NULL: a subquery over an absent row is NULL and the comparison silently false. */
+/** Every CASE ... END, balanced (a nested CASE is its own entry and also part of its parent's body); an unclosed CASE runs to the end. */
+function caseBodies(sql: string): string[] {
+  const bodies: string[] = [];
+  const open: number[] = [];
+  for (const m of sql.matchAll(/\b(CASE|END)\b/gi)) {
+    if (m[1]!.toUpperCase() === "CASE") open.push(m.index + 4);
+    else {
+      const start = open.pop();
+      if (start !== undefined) bodies.push(sql.slice(start, m.index));
+    }
+  }
+  for (const start of open) bodies.push(sql.slice(start));
+  return bodies;
+}
+
+/** `ch` is the NOT NULL chain CTE only when it aliases `chain` in FROM or an inner JOIN, and nothing outer-joins or re-aliases it. */
+function chBoundToChain(sql: string): boolean {
+  const bound = /(?:\bFROM|\bJOIN|,)\s+chain\s+(?:AS\s+)?ch\b/i.test(sql);
+  const outer = /\b(?:LEFT|RIGHT|FULL)\s+(?:OUTER\s+)?JOIN\s+(?:[\w.]+|\([\s\S]*?\))\s+(?:AS\s+)?ch\b/i.test(sql);
+  const otherTable = [...sql.matchAll(/(?:\bFROM|\bJOIN|,)\s+([\w.]+|\))\s+(?:AS\s+)?ch\b/gi)].some((m) => m[1]!.toLowerCase() !== "chain");
+  const nullsTheChain = /\b(?:RIGHT|FULL)\s+(?:OUTER\s+)?JOIN\b/i.test(sql);
+  return bound && !outer && !otherTable && !nullsTheChain;
+}
+
+/** Scalar subqueries ("(SELECT ...)") that are an operand of a comparison or of arithmetic, other than a bare count(...) which is never NULL: a subquery over an absent row is NULL and the comparison silently false. */
 function nullableScalarComparisons(sql: string): string[] {
   const found: string[] = [];
   for (const m of sql.matchAll(/\(\s*SELECT\b/gi)) {
@@ -799,10 +826,17 @@ function nullableScalarComparisons(sql: string): string[] {
       }
     }
     const inner = sql.slice(m.index + 1, end < 0 ? sql.length : end).replace(/^\s*SELECT\s+(DISTINCT\s+)?/i, "");
-    const before = sql.slice(0, m.index).trimEnd();
-    const after = end < 0 ? "" : sql.slice(end + 1).trimStart();
-    const operand = new RegExp(`${COMPARISON.source}$`).test(before) || new RegExp(`^${COMPARISON.source}`).test(after);
-    if (operand && !/^count\s*\(/i.test(inner)) found.push(inner.slice(0, 40));
+    let before = sql.slice(0, m.index).trimEnd();
+    let after = end < 0 ? "" : sql.slice(end + 1).trimStart();
+    // redundant parentheses around the subquery do not change what it is an operand of
+    while (before.endsWith("(") && after.startsWith(")")) {
+      before = before.slice(0, -1).trimEnd();
+      after = after.slice(1).trimStart();
+    }
+    const arithmetic = /[-+*/%]$/.test(before) || /^[-+*/%]/.test(after);
+    const comparison = new RegExp(`${COMPARISON.source}$`).test(before) || new RegExp(`^${COMPARISON.source}`).test(after);
+    const bareCount = /^count\s*\([^()]*\)(?:\s+FILTER\s*\([^()]*\))?\s+FROM\b/i.test(inner) && !/\b(?:GROUP\s+BY|HAVING)\b/i.test(inner);
+    if ((comparison || arithmetic) && !(bareCount && !arithmetic)) found.push(inner.slice(0, 40));
   }
   return found;
 }
@@ -826,12 +860,11 @@ function nonAtomic(branch: string): string[] {
   has("postfix ISNULL / NOTNULL", /\b(ISNULL|NOTNULL)\b/i);
   has("CASE WHEN ... IS NULL", /\bCASE\b(?:(?!\bEND\b)[\s\S])*?\bIS\s+(NOT\s+)?NULL\b/i);
   has("NOT IN (SELECT", /\bNOT\s+IN\s*\(\s*SELECT\b/i);
-  // a CASE with an ELSE is a default for the absent case unless its operand is a NOT NULL column
-  for (const m of sql.matchAll(/\bCASE\b((?:(?!\bEND\b)[\s\S])*)\bEND\b/gi)) {
-    if (!/\bELSE\b/i.test(m[1] ?? "")) continue;
-    const operand = /^\s*([A-Za-z_][\w.]*)\s+WHEN\b/i.exec(m[1] ?? "")?.[1];
-    if (SPLIT_ONE_CENT.test(m[1] ?? "")) continue;
-    if (operand === undefined || !NOT_NULL_CASE_OPERANDS.has(operand)) hit.push("CASE ... ELSE as a default");
+  // a CASE with an ELSE is a default for the absent case unless its whole body is one of the two allowed shapes (nested CASEs are checked as their own entries)
+  for (const body of caseBodies(sql)) {
+    if (!/\bELSE\b/i.test(body)) continue;
+    const allowed = (DIRECTION_CASE.test(body) && chBoundToChain(sql)) || SPLIT_ONE_CENT_CASE.test(body);
+    if (!allowed) hit.push("CASE ... ELSE as a default");
   }
   if (nullableScalarComparisons(sql).length > 0) hit.push("a scalar subquery as a comparison operand");
   return hit;
@@ -862,7 +895,7 @@ test("the structural check refuses a branch that joins two predicates with OR, c
   assert.equal(atomic("SELECT 1 FROM t WHERE nullif(t.x, 0) > 0"), false);
   assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x > CASE WHEN u.x IS NULL THEN 0 ELSE u.x END"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE t.x IS NULL AND NOT EXISTS (SELECT 1 FROM u)"), true, "a NULL test of its own is one predicate");
-  assert.equal(atomic("SELECT 1 FROM t WHERE t.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND t.z IS NULL"), true, "a CASE over a NOT NULL column is not an absent case");
+  assert.equal(atomic("SELECT 1 FROM chain ch WHERE ch.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND ch.z IS NULL"), true, "a CASE over a NOT NULL column is not an absent case");
   assert.equal(atomic("SELECT 1 FROM t WHERE a <> b OR c < 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE (SELECT count(*) FROM u) <> 1"), false);
   assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x IS DISTINCT FROM u.x"), false);
@@ -893,6 +926,21 @@ test("the structural check refuses every bypass of the ban found by the adversar
     ["scalar subquery on the right of a comparison", "SELECT 1 FROM t WHERE t.x <> (SELECT u.amount FROM u WHERE u.k = t.k)"],
     ["scalar subquery on the left of a comparison", "SELECT 1 FROM t WHERE (SELECT max(u.amount) FROM u WHERE u.k = t.k) < t.x"],
     ["scalar subquery inside HAVING", "SELECT 1 FROM t GROUP BY k HAVING sum(t.x) >= (SELECT u.cap FROM u WHERE u.k = t.k)"],
+  ];
+  for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
+});
+
+test("the structural check refuses the six residual bypasses of the allowlists (ADV-21): one forged snippet each", () => {
+  const bypasses: ReadonlyArray<readonly [string, string]> = [
+    ["a nullable CASE ... ELSE nested inside the ch.direction CASE", "SELECT 1 FROM chain ch LEFT JOIN u ON true WHERE ch.x > CASE ch.direction WHEN 'INCREASE' THEN CASE WHEN u.x > 0 THEN u.x ELSE 0 END ELSE -1 END"],
+    ["the row_number() prefix followed by more conditions", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN row_number() OVER (PARTITION BY k ORDER BY rem DESC) <= 1 AND u.x > 0 THEN 1 ELSE 0 END"],
+    ["count(*) ... GROUP BY", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u WHERE u.k = t.k GROUP BY u.j)"],
+    ["count(*) ... HAVING", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u WHERE u.k = t.k HAVING sum(u.n) > 5)"],
+    ["count(*) + max(x)", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) + max(u.x) FROM u WHERE u.k = t.k)"],
+    ["a count subquery wrapped in arithmetic", "SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u) + 1"],
+    ["a max subquery wrapped in arithmetic", "SELECT 1 FROM t WHERE ((SELECT max(u.x) FROM u WHERE u.k = t.k) + 0) > t.x"],
+    ["the alias ch on a nullable LEFT JOIN table", "SELECT 1 FROM t LEFT JOIN u ch ON true WHERE t.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
+    ["the alias ch on a table other than the chain CTE", "SELECT 1 FROM u ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
   ];
   for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
 });
