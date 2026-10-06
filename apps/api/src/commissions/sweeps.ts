@@ -74,6 +74,14 @@ async function quoteExpiry(rt: CommissionRuntime, limit: number): Promise<SweepR
         // lock order (§10): the quote, then the founding reservation
         const quote = await uow.commerce.quotes.lock(due.quoteId);
         const reservation = await foundingOf(uow).lockReservation(due.reservationId);
+        if (quote === null || reservation === null) {
+          // The commission role's UPDATE policies admit only live states (0028: quotes_commission_expiry,
+          // founding_slot_reservations_commission_sweep), so a lock that waited on the actor that released or consumed the reservation
+          // (a superseding CreateQuote, a capture, a closure) reads its row as absent. Re-read it with the policy's SELECT: a reservation
+          // that is visible and no longer due is settled by that actor and there is nothing to release. Anything else is a real defect.
+          const seen = await foundingOf(uow).getReservation(due.reservationId);
+          if (seen !== null && seen.state !== "RESERVED" && seen.state !== "RECONCILIATION_HOLD") return "SETTLED";
+        }
         if (quote === null || reservation === null) throw new DomainFailure("INTEGRITY_FAILURE", "a due reservation's quote is not visible in its agency");
         if (reservation.state !== "RESERVED" && reservation.state !== "RECONCILIATION_HOLD") return "SETTLED";
         if (Date.parse(reservation.endsAt) > Date.parse(now)) return "NOT_DUE";
