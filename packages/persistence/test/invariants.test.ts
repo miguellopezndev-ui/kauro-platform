@@ -13,7 +13,7 @@ import { allocatePool, recomputePool, type AdjustmentReason, type BasisChange, t
 import { PgCommissionLedgerRepository } from "../src/index.js";
 import { clock } from "../src/testing/harness.js";
 import { recordAccruedLine, recordEligibleLine, recordHold, recordIssuedStatement } from "../src/testing/index.js";
-import { B10_INVARIANTS, assertInvariants, invariantRows, invariantsAfterEach } from "../src/testing/invariants.js";
+import { B10_INVARIANTS, assertInvariants, invariantRows, invariantsAfterEach, type InvariantHooks } from "../src/testing/invariants.js";
 import {
   acceptAttribution,
   accrue,
@@ -536,6 +536,21 @@ test("INV-S-14 fires on a predecessor statement with two successors", (t) =>
     await c.query("DROP INDEX kauro.commission_statements_one_correction");
     await exec(c, "UPDATE kauro.commission_statements SET corrects_statement_id = (SELECT min(statement_id::text)::uuid FROM kauro.commission_statements WHERE statement_id NOT IN ($1, $2)) WHERE statement_id IN ($1, $2)", [b().r102.statementId, b().r104.laterStatement], 2);
   }, "predecessor with two successors"));
+
+test("the oracle runs once more in the file's after hook: an effect that settles after the last test's afterEach is still judged", async () => {
+  const registered: { afterEach: Array<(t: { readonly name: string }) => Promise<void>>; after: Array<() => Promise<void>> } = { afterEach: [], after: [] };
+  const hooks: InvariantHooks = { afterEach: (hook) => void registered.afterEach.push(hook), after: (hook) => void registered.after.push(hook) };
+  // a stand-in oracle: every invariant returns one row once `violating` is set (a violation committed after the last test's hook ran)
+  let violating = false;
+  const oracle = { query: async (sql: string) => ({ rows: violating && sql.startsWith("SELECT * FROM (") ? [{ ref: "late" }] : [] }) } as unknown as Client;
+  invariantsAfterEach(() => oracle, hooks);
+  assert.equal(registered.afterEach.length, 1, "the per-test hook");
+  assert.equal(registered.after.length, 1, "the file-level hook");
+  await registered.afterEach[0]!({ name: "the last test" });
+  await registered.after[0]!();
+  violating = true;
+  await assert.rejects(registered.after[0]!(), /B10 state invariants violated after the end of the file/);
+});
 
 test("every UNION ALL branch of an invariant is named in its whys (a branch added without its name and control would escape)", () => {
   for (const inv of B10_INVARIANTS) {

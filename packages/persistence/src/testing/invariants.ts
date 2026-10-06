@@ -14,7 +14,7 @@
  * of committed rows (an invariant of any committed state holds in every snapshot).
  */
 import assert from "node:assert/strict";
-import { afterEach } from "node:test";
+import { after, afterEach } from "node:test";
 import type { Client } from "pg";
 
 export interface Invariant {
@@ -313,9 +313,24 @@ export async function assertInvariants(oracle: Client, opts: { readonly label?: 
   assert.deepEqual(fired, [], `B10 state invariants violated${opts.label !== undefined ? ` after ${opts.label}` : ""}:\n${fired.join("\n")}`);
 }
 
-/** One top-level line per B10 DB test file: the oracle after every test of the file (the client is read when the hook runs). */
-export function invariantsAfterEach(oracle: () => Client): void {
-  afterEach(async (t) => {
+/** Where invariantsAfterEach registers its two hooks (node:test's, unless the self-test substitutes a recorder). */
+export interface InvariantHooks {
+  afterEach(hook: (t: { readonly name: string }) => Promise<void>): void;
+  after(hook: () => Promise<void>): void;
+}
+const nodeHooks: InvariantHooks = { afterEach: (hook) => afterEach(hook as never), after: (hook) => after(hook) };
+
+/**
+ * One top-level line per B10 DB test file: the oracle after every test of the file (the client is read when the hook runs), and once more in
+ * the file's after hook. A background effect (a sink, a consumer, a sweep item) that settles after the last test's afterEach ran would
+ * otherwise never be judged. Call it BEFORE the file registers the after hook that closes its world: after hooks run in registration order,
+ * so this one still has its oracle.
+ */
+export function invariantsAfterEach(oracle: () => Client, hooks: InvariantHooks = nodeHooks): void {
+  hooks.afterEach(async (t) => {
     await assertInvariants(oracle(), { label: t.name });
+  });
+  hooks.after(async () => {
+    await assertInvariants(oracle(), { label: "the end of the file (effects that settled after its last test)" });
   });
 }
