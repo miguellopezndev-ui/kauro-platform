@@ -101,6 +101,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0042_owner_reads_first_designation.sql",
     // package B10 (lane 5 of the failure-matrix GAPs, Codex r1 B10G5-R1, D10-GAP-23): a payout is authorized only over lines whose capture's funds are AVAILABLE
     "0043_payout_funds_fence.sql",
+    // P0 R2-046: an older ledger waiter retries with a fresh transaction instant.
+    "0044_admission_instants.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

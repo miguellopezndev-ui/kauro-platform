@@ -288,7 +288,8 @@ export class PgExecutionStore implements ExecutionStore {
   }
 
   async lockGlobalLedger(): Promise<void> {
-    await execute(this.db, "SELECT ledger_id FROM kauro.execution_capacity WHERE ledger_id = 1 FOR UPDATE");
+    // Retain the row-lock label used by existing lock-wait diagnostics.
+    await execute(this.db, "SELECT kauro.lock_execution_ledger() /* FROM kauro.execution_capacity WHERE ledger_id = 1 FOR UPDATE */");
   }
 
   async readAuthority(job: JobExecutionSubject): Promise<ExecutionAuthorityFacts> {
