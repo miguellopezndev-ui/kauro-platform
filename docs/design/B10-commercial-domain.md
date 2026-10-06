@@ -435,14 +435,14 @@ does): every insert that references the row takes its KEY SHARE, which `FOR UPDA
 KEY SHARE in either order (the continuation of CMD028: shared half, then its events; every journaled tenant command: the journal
 reservation's agency foreign key, then the shared half), so a `FOR UPDATE` writer deadlocks with one order or the other whichever half
 it takes first (40P01; B10 kit, Windows CI of c9f7f95, adversary ADV-1 of 593c47f). CMD002 and CMD043 lock the agency row
-`FOR NO KEY UPDATE` (AgencyLifecycleRepository.lockAgencyRow) and then take the exclusive half (the trigger; closureObligations); the
+`FOR NO KEY UPDATE` (AgencyLifecycleRepository.lockAgencyRow) and then take the exclusive half (CMD002 through the trigger; CMD043 at once, before the first read of its inventory, the active-work inspection included, so no project or job commits beside the closure, D10-AGY-6); the
 lock-order cells cover both reader orders in both interleavings. The concurrency
 cases fix interleavings with hold points and observe waits in `pg_stat_activity`, never a sleep: the last founding slot (R2-090),
 simultaneous first captures (R2-137, both orders), a snapshot against a designation (CMD027-RACE), claims of two sellers
 (CMD046-RACE), two acceptances for one agency (CMD047-RACE), a termination against an acceptance (CMD050-RACE, end to end in
 B10-INTEGRATION because the two commands are built in parallel lanes), a close against an adjustment (CMD051-RACE), a closure against
 a payment order (CMD043-RACE: B09's CreatePaymentOrder takes the agency's shared half and, through its inserts, the row's KEY SHARE;
-CloseAgency the row FOR NO KEY UPDATE and then the exclusive half), an activation or a closure against a reader of the agency in both
+CloseAgency the row FOR NO KEY UPDATE and at once the exclusive half; a refund (CMD031) takes no agency shared half and is ordered after the closure, KC006 guarding CLOSED), an activation or a closure against a reader of the agency in both
 lock orders (CMD002-RACE, CMD043-RACE lock-order cells).
 
 ## 11. Ports, fakes and implementers
