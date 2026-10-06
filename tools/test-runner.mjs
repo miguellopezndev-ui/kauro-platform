@@ -108,14 +108,29 @@ export function summarizeEvents(path, file, identityFile = file, { baseSymbols }
   // at a deeper nesting level. This also covers parents made with test()/t.test(), not just describe().
   const completed = records.flatMap((record, index) => record.event === "pass" || record.event === "fail"
     ? [{ ...record, ...(records[index - 1]?.event === "error" ? records[index - 1] : {}), event: record.event }] : []);
-  // Walking postorder backwards visits each parent before its children. Preserve every ancestor as
-  // a separate path component, so identical names (or names containing separators) cannot collide.
+  // Walking postorder backwards visits each parent before its children. Keep parent records,
+  // not just names: same-named suites are distinct parents too.
   const ancestors = [];
   for (let index = completed.length - 1; index >= 0; index--) {
     const record = completed[index];
     ancestors.length = record.nesting;
-    record.path = [identityFile.replaceAll("\\", "/"), ...ancestors, record.name];
-    ancestors[record.nesting] = record.name;
+    record.ancestors = ancestors.slice();
+    ancestors[record.nesting] = record;
+  }
+  const siblingCounts = new Map();
+  for (const record of completed) {
+    const parent = record.ancestors.at(-1);
+    if (!siblingCounts.has(parent)) siblingCounts.set(parent, new Map());
+    const counts = siblingCounts.get(parent);
+    record.ordinal = (counts.get(record.name) ?? 0) + 1;
+    counts.set(record.name, record.ordinal);
+  }
+  // Count skipped/todo siblings as well, so skipping the regression never renumbers its passing twin.
+  // Unique names retain their existing key; duplicate components carry a one-based ordinal.
+  const component = (record) => siblingCounts.get(record.ancestors.at(-1)).get(record.name) > 1
+    ? [record.name, record.ordinal] : record.name;
+  for (const record of completed) {
+    record.path = [identityFile.replaceAll('\\', '/'), ...record.ancestors.map(component), component(record)];
   }
   for (let index = 0; index < completed.length; index++) {
     const record = completed[index];
