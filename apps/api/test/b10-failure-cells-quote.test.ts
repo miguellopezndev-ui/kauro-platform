@@ -9,10 +9,10 @@
 // The founding cohort has three slots and this file's cells share them: every cell that takes a slot gives it back (a superseding quote releases
 // it) except the QE_CAPTURE_RACE cells, whose captures consume them for good; they run last.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
+import { after, before, test } from "node:test";
 import type { CreateQuoteView } from "@kauro/application";
 import { commercialSourceReadsOf } from "@kauro/persistence";
-import { faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, failureOf, open, sweepOn } from "./b10-cells-support.js";
 import { checkoutOf, quoteFactsOf, type Checkout } from "./commission-support.js";
@@ -227,7 +227,7 @@ const value = <T>(r: PromiseSettledResult<T>): T => {
   return r.value;
 };
 /** The QUOTE_EXPIRY pass standing a minute past the reservation's end, on `conn`. */
-const expiryPassOn = (ctx: FaultContext, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = [], expectFailure = false) =>
+const expiryPassOn = (ctx: Pick<FaultContext, "points">, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = [], expectFailure = false) =>
   sweepOn(ctx, conn, "QUOTE_EXPIRY", steps, new Date(Date.parse(endsAt) + 60_000).toISOString(), expectFailure ? { expectFailure: true } : {});
 const quoteState = async (quoteId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [quoteId]))[0]!.state;
 
@@ -337,6 +337,56 @@ faultCell(
     if (early.eligibility.foundingOffer === "RESERVED") await giveSlotBack(a, plan);
   },
 );
+
+// --- QUOTE_EXPIRY re-read: what the sweep may call SETTLED (DENY) ---------------------------------------------------------------------
+
+test("QUOTE_EXPIRY DENY: a reservation RELEASED under a quote that is still ISSUED is INTEGRITY_FAILURE, never SETTLED (the sweep's re-read settles only what its actor left consistent)", async () => {
+  const { a, plan } = await fresh("qe-deny-released-issued");
+  const first = await quoted(iw, a, plan);
+  assert.equal(first.eligibility.foundingOffer, "RESERVED");
+  const [reservation] = await reservationsOf(a.s.agency.agencyId);
+  assert.ok(reservation !== undefined && reservation.state === "RESERVED");
+  const points = new FaultPoints();
+  const conn = await open("kauro_commission_test");
+  let report: Report;
+  try {
+    // the pass lists the reservation due and is held before it locks the quote; then the reservation is released without its quote leaving
+    // ISSUED (a state no actor of the protocol produces; forced as the superuser with the triggers off), so the reservation's UPDATE policy hides it
+    const pause = points.pause("db.quote_lock.before");
+    const running = expiryPassOn({ points }, conn, reservation.ends_at, [{ label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/ }], true);
+    await pause.reachedBy(running);
+    const forced = await iw.h.pg.connect("postgres");
+    try {
+      await forced.query("BEGIN");
+      await forced.query("SET LOCAL session_replication_role = replica");
+      await forced.query("UPDATE kauro.founding_slot_reservations SET state = 'RELEASED', release_reason = 'QUOTE_SUPERSEDED', released_at = now(), version = version + 1 WHERE reservation_id = $1", [reservation.reservation_id]);
+      await forced.query("UPDATE kauro.founding_slots SET held = false, live_reservation_id = NULL, live_agency_id = NULL, updated_at = now() WHERE live_reservation_id = $1", [reservation.reservation_id]);
+      await forced.query("COMMIT");
+    } finally {
+      await forced.end();
+    }
+    pause.release();
+    report = (await running) as Report;
+  } finally {
+    await conn.end();
+  }
+  const outcome = report.items.filter((i) => i.subject === reservation.reservation_id).map((i) => i.outcome);
+  assert.equal(outcome.length, 1, "the pass visited the reservation");
+  assert.ok(outcome[0]!.startsWith("FAILED"), `the inconsistent state is a failure, not a settlement: ${outcome[0]}`);
+  const e = failureOf(reservation.reservation_id) as { readonly code?: string } | undefined;
+  assert.equal(e?.code, "INTEGRITY_FAILURE");
+  assert.equal(await quoteState(first.quote.quoteId), "ISSUED", "the quote was not touched");
+  // leave the agency consistent for the cells that follow (their later passes assert no item fails)
+  const owner = await iw.h.pg.connect("postgres");
+  try {
+    await owner.query("BEGIN");
+    await owner.query("SET LOCAL session_replication_role = replica");
+    await owner.query("UPDATE kauro.quotes SET state = 'WITHDRAWN', version = version + 1 WHERE quote_id = $1", [first.quote.quoteId]);
+    await owner.query("COMMIT");
+  } finally {
+    await owner.end();
+  }
+});
 
 // --- QE_CAPTURE_RACE (consumes founding slots for good: last) -------------------------------------------------------------------------
 

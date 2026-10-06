@@ -77,10 +77,16 @@ async function quoteExpiry(rt: CommissionRuntime, limit: number): Promise<SweepR
         if (quote === null || reservation === null) {
           // The commission role's UPDATE policies admit only live states (0028: quotes_commission_expiry,
           // founding_slot_reservations_commission_sweep), so a lock that waited on the actor that released or consumed the reservation
-          // (a superseding CreateQuote, a capture, a closure) reads its row as absent. Re-read it with the policy's SELECT: a reservation
-          // that is visible and no longer due is settled by that actor and there is nothing to release. Anything else is a real defect.
+          // (a superseding CreateQuote, a capture, a closure) reads its row as absent. Re-read both with the policies' SELECT: a reservation
+          // that is no longer due is settled by that actor only when its quote agrees (a RELEASED reservation: the quote left ISSUED and
+          // ACCEPTED_FOR_CHECKOUT; a CONSUMED one: the quote is no longer merely ISSUED). Anything else is a real defect and stays one: a quote
+          // still live over a released reservation is not an actor's settlement.
           const seen = await foundingOf(uow).getReservation(due.reservationId);
-          if (seen !== null && seen.state !== "RESERVED" && seen.state !== "RECONCILIATION_HOLD") return "SETTLED";
+          if (seen !== null && (seen.state === "RELEASED" || seen.state === "CONSUMED")) {
+            const current = quote ?? (await uow.commerce.quotes.get(due.quoteId));
+            const unsettled = current === null || current.state === "ISSUED" || (seen.state === "RELEASED" && current.state === "ACCEPTED_FOR_CHECKOUT");
+            if (!unsettled) return "SETTLED";
+          }
         }
         if (quote === null || reservation === null) throw new DomainFailure("INTEGRITY_FAILURE", "a due reservation's quote is not visible in its agency");
         if (reservation.state !== "RESERVED" && reservation.state !== "RECONCILIATION_HOLD") return "SETTLED";
