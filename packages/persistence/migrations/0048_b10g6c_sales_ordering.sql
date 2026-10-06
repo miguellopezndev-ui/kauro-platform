@@ -50,3 +50,34 @@ DROP TRIGGER IF EXISTS seller_agreements_transition_lock ON kauro.seller_agreeme
 CREATE TRIGGER seller_agreements_transition_lock BEFORE UPDATE OF starts_at, ends_at ON kauro.seller_agreements
   FOR EACH ROW WHEN (OLD.starts_at IS DISTINCT FROM NEW.starts_at OR OLD.ends_at IS DISTINCT FROM NEW.ends_at)
   EXECUTE FUNCTION kauro.take_transition_lock('kauro.sellers', 'seller_id');
+
+-- --- CMD_EXP_ASSURE: the activation's step-up judged again at COMMIT (as 0040 for payouts) --------------------------------------------
+-- sellers_activation_guard (0029) judges the owner's proof in a BEFORE trigger only, so a proof fresh at the write could expire before the
+-- transaction committed and the seller still commit ACTIVE. A constraint trigger, INITIALLY DEFERRED, judges it again when the transaction
+-- commits, against kauro.effect_now() read then: the first activation (CANDIDATE -> ACTIVE) needs its step-up proof unexpired at COMMIT,
+-- else STEP_UP_EXPIRED (KC020, ASSURANCE_REQUIRED STEP_UP_STALE) and nothing commits.
+CREATE OR REPLACE FUNCTION kauro.seller_activation_step_up_at_commit() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  who uuid;
+  proof uuid;
+BEGIN
+  SELECT s.activated_by_user_id, s.activation_proof_ref INTO who, proof FROM kauro.sellers s WHERE s.seller_id = NEW.seller_id AND s.state = 'ACTIVE';
+  -- the seller moved on in the same transaction: its own guards decided it
+  IF proof IS NULL THEN
+    RETURN NULL;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM kauro.assurance_proofs a
+     WHERE a.user_id = who AND a.proof_id = proof AND a.kind = 'STEP_UP' AND a.expires_at > kauro.effect_now()
+  ) THEN
+    RAISE EXCEPTION 'STEP_UP_EXPIRED: the step-up activating seller % expired before the COMMIT', NEW.seller_id USING ERRCODE = 'KC020';
+  END IF;
+  RETURN NULL;
+END
+$$;
+
+DROP TRIGGER IF EXISTS sellers_activation_step_up_at_commit ON kauro.sellers;
+CREATE CONSTRAINT TRIGGER sellers_activation_step_up_at_commit AFTER UPDATE OF state ON kauro.sellers
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.state = 'ACTIVE' AND OLD.state = 'CANDIDATE') EXECUTE FUNCTION kauro.seller_activation_step_up_at_commit();
