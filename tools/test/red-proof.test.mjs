@@ -298,6 +298,7 @@ test("a timed-out red-proof worker is dead before head runs and the gate returns
   const f = fixture();
   const pidFile = join(f.parent, "worker-pid");
   let pid;
+  let dead = false; // a confirmed-dead pid may be reused by the OS and must not be signalled again
   try {
     f.put(file, HEAD + `import {readFileSync, writeFileSync} from 'node:fs';
 const pidFile = ${JSON.stringify(pidFile)};
@@ -313,13 +314,14 @@ test('hang at base', () => {
     const result = command(process.execPath, [script, f.base, head, "--tests", file, "--timeout-min", "0.03"], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
     pid = Number(readFileSync(pidFile, "utf8"));
     assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `worker ${pid} survived red-proof`);
+    dead = true;
     assert.equal(result.status, 2, result.output);
     const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
     assert.equal(report.tests[0].passedAtHead, true, result.output);
     assert.match(report.inconclusive.join("\n"), /timed out/);
     assert.deepEqual(readdirSync(f.scratch), []);
   } finally {
-    if (pid) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
+    if (pid && !dead) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
     rmSync(f.parent, { recursive: true, force: true });
   }
 });

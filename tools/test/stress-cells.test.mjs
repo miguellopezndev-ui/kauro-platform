@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { command } from "../test-runner.mjs";
-import { interruptedWorker, withCleanup } from './gate-process.mjs';
+import { interruptedWorker, killUnconfirmed, withCleanup } from './gate-process.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../stress-cells.mjs");
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
@@ -148,15 +148,16 @@ if (existsSync(path)) for (const pid of readFileSync(path, 'utf8').trim().split(
 test('hang', () => { appendFileSync(path, process.pid + '\\n'); return new Promise(() => setInterval(() => {}, 1000)); });
 `);
   let pids = [];
+  const confirmed = new Set(); // a confirmed-dead pid may be reused by the OS and must not be signalled again
   try {
     const result = command(process.execPath, [script, "fake.test.mjs", "2", "--timeout-min", "0.03"], root);
     assert.equal(result.status, 1, result.output);
     pids = readFileSync(join(root, "worker-pids"), "utf8").trim().split("\n").map(Number);
     assert.equal(pids.length, 2);
-    for (const pid of pids) assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `worker ${pid} survived the timeout`);
+    for (const pid of pids) { assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `worker ${pid} survived the timeout`); confirmed.add(pid); }
     assert.throws(() => readFileSync(join(root, "overlap")), { code: "ENOENT" });
   } finally {
-    for (const pid of pids) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
+    killUnconfirmed(pids, confirmed);
     rmSync(root, { recursive: true, force: true });
   }
 });
