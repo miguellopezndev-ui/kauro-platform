@@ -54,6 +54,22 @@ test("registration refuses an incomplete or ambiguous family, naming every reaso
   assert.throws(() => validateMembers([member({ point: { kind: "port-timeout", port: "BuyerTypeReader", boundMs: 0 } })]), /declares the application's bound/);
 });
 
+test("registration refuses a twice member without its reverse order (a second member with holder and waiter swapped) or an explicit N/A reason", () => {
+  const receipt = (label: string) => ({ label, match: /x/, identity: () => () => true });
+  const unit = { ordinal: 1, phase: "ELIGIBLE", witness: step, identity: () => () => true };
+  const twice = (over: Record<string, unknown> = {}) => member({ code: "SWEEP_TWI", tag: "[gsweeptwi]", point: { kind: "twice", holder: { unit, holdAfter: receipt("a.after") }, waiter: { unit, blocks: receipt("b.wait") } }, ...over });
+  assert.throws(() => validateMembers([twice()]), /SWEEP_TWI: a twice member needs its reverse order as a second member of the same cell/);
+  validateMembers([twice({ reverseNa: "the two actors are one command: swapping them changes nothing" })]);
+  assert.throws(() => validateMembers([twice({ reverseNa: "  " })]), /needs its reverse order/);
+  // a "reverse" that is the same order again (or another cell's member) is no reverse
+  const same = twice({ tag: "[gsweeptwj]", variant: "again" });
+  assert.throws(() => validateMembers([twice(), same]), /SWEEP_TWI: a twice member needs its reverse order/);
+  const reverse = twice({ tag: "[gsweeptwr]", variant: "reverse", point: { kind: "twice", holder: { unit, holdAfter: receipt("b.wait") }, waiter: { unit, blocks: receipt("a.after") } } });
+  validateMembers([twice(), reverse]);
+  const elsewhere = { ...reverse, cell: { table: "Sweep ELIGIBILITY", row: "HELD", column: "RACE" } };
+  assert.throws(() => validateMembers([twice(), elsewhere as never]), /needs its reverse order/);
+});
+
 test("registration refuses an empty family (a filtered list that comes out empty registers no cell and would pass silently)", () => {
   assert.throws(() => validateMembers([]), /the family has no member/);
   assert.throws(() => registerFamily([]), /the family has no member/);

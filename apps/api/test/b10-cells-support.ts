@@ -328,6 +328,11 @@ export interface Member<F, A> {
   /** Exactly once by durable identity; the earlier commits preserved. */
   recovered(f: F, recovery: unknown): Promise<void>;
   readonly expect: string;
+  /**
+   * A `twice` member only (5.5: "the reverse order is a second member"): the reason the reverse order does not exist for this cell (the two
+   * actors are one and the same command, so swapping them changes nothing). Without it, the family must hold the reverse member.
+   */
+  readonly reverseNa?: string;
 }
 
 /** The world a family runs in: the superuser oracle, the fault routing of its api, and connections of the login roles. */
@@ -382,6 +387,24 @@ export function memberCell(m: Member<never, never>): MatrixCell {
   return { id: m.code, step: `${m.cell.table} ${m.cell.row} ${m.cell.column}${m.variant !== undefined ? ` (${m.variant})` : ""} ${m.tag}`, fault, ...(at !== undefined ? { at } : {}), expect: m.expect };
 }
 
+/** The reverse order of a `twice` member (5.5): another member of its code and cell whose holder holds after what this one's waiter blocks on, and the converse; or its declared N/A reason. */
+function hasReverse(m: Member<never, never>, members: ReadonlyArray<Member<never, never>>): boolean {
+  if (m.reverseNa !== undefined && m.reverseNa.trim().length > 0) return true;
+  const p = m.point;
+  if (p.kind !== "twice") return true;
+  return members.some(
+    (o) =>
+      o !== m &&
+      o.point.kind === "twice" &&
+      o.code === m.code &&
+      o.cell.table === m.cell.table &&
+      o.cell.row === m.cell.row &&
+      o.cell.column === m.cell.column &&
+      o.point.holder.holdAfter.label === p.waiter.blocks.label &&
+      o.point.waiter.blocks.label === p.holder.holdAfter.label,
+  );
+}
+
 /** Refuses an incomplete or ambiguous family at registration (section 4): every reason, not the first. */
 export function validateMembers(members: ReadonlyArray<Member<never, never>>): void {
   const problems: string[] = [];
@@ -400,6 +423,7 @@ export function validateMembers(members: ReadonlyArray<Member<never, never>>): v
     if (m.point.kind === "crash-after" && m.committed === undefined) problems.push(`${m.code}: a crash-after member declares what its committed unit leaves (committed)`);
     if ((m.point.kind === "crash-before" || m.point.kind === "crash-after" || m.point.kind === "partial") && !(Number.isInteger(m.point.unit.ordinal) && m.point.unit.ordinal >= 1)) problems.push(`${m.code}: the target unit's ordinal is a positive integer`);
     if (m.point.kind === "twice" && m.point.holder.holdAfter.label === m.point.waiter.blocks.label) problems.push(`${m.code}: the holder's and the waiter's receipts are one label`);
+    if (m.point.kind === "twice" && !hasReverse(m, members)) problems.push(`${m.code}: a twice member needs its reverse order as a second member of the same cell (holder and waiter swapped), or reverseNa with the reason there is none`);
     if (m.point.kind === "port-timeout" && !(m.point.boundMs > 0)) problems.push(`${m.code}: a port-timeout member declares the application's bound`);
     if (m.expect.trim().length === 0) problems.push(`${m.code}: no expected end state`);
   }

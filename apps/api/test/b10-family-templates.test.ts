@@ -235,6 +235,7 @@ const twice = (code: string, tag: string, blocks: Receipt<Fix>): M =>
     tag,
     // the same command twice (one key): A holds the statement lock after the journal insert, B waits on A's journal row
     act: async (_ctx, f) => approve(f, f.key),
+    reverseNa: "both actors are the same command under one key: swapping which one holds changes nothing",
     point: { kind: "twice", holder: { unit: unit1(JOURNAL), holdAfter: STMT_LOCK }, waiter: { unit: unit1(JOURNAL), blocks } },
     recovered: async (f, both) => {
       const { a, b } = both as { a: PromiseSettledResult<Reply>; b: PromiseSettledResult<Reply> };
