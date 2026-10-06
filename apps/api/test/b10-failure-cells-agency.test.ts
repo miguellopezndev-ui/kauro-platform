@@ -7,7 +7,7 @@
 // roles; the superuser only reads. Nothing sleeps, except the bounded real-time wait of a timeout cell for an answer that must come.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
-import type { AgencyClosureView, CreateQuoteView } from "@kauro/application";
+import { LIMIT_MARGIN_MS, type AgencyClosureView, type CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { connectionPid, faultCell, openConnection, publishAgreementVersions, raceStatementTimeoutMs, recordReviewedFiscalProfile, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
@@ -219,7 +219,7 @@ faultCell(
     id: "INSPECT_FAIL",
     step: "CMD043 CloseAgency / TIMEOUT: W0 ActiveWorkInspector waiting on a lock another session holds",
     fault: "timeout",
-    expect: "RACE (timeout): an inspector whose read waits on a lock another session holds ends, once the call bound elapses, in a retriable refusal within the bound, nothing withdrawn and no closure, and the abandoned call's late failure reaches the late-failure sink instead of being swallowed (the destroy of the abandoned unit's connection is proved on a real pool by packages/persistence/test/adapters-unit-of-work.test.ts: routed connections are harness-owned); a timed-out inventory is never read as zero",
+    expect: "RACE (timeout): an inspector whose read waits on a lock another session holds ends, once the call bound elapses, in a retriable refusal within the bound, nothing withdrawn and no closure, the abandoned inspector's backend is ended by the database's transaction limit that CMD043 armed (its locks released by the bound plus the 1 s margin, real time), and the abandoned call's late failure reaches the late-failure sink instead of being swallowed (the destroy of the abandoned unit's connection is proved on a real pool by packages/persistence/test/adapters-unit-of-work.test.ts: routed connections are harness-owned); a timed-out inventory is never read as zero",
   },
   async (ctx) => {
     const x = await twoClients("inspect-fail-timeout");
@@ -232,11 +232,15 @@ faultCell(
     // a real lock wait: another session holds the projects table, so the inspector's first read (B06's own SQL) waits on it
     const lock = await openConnection(iw.h.pg.clientConfig("kauro_owner"));
     const conn = await connect("kauro_app_test");
+    // the database ends this connection itself (the transaction limit): the client's own "Connection terminated unexpectedly" event is part of the scenario
+    conn.on("error", () => undefined);
     const lateBefore = iw.lateFailures.length;
     let reply: Reply;
+    let armedAt = 0;
     try {
       await lock.query("BEGIN");
       await lock.query("LOCK TABLE kauro.projects IN ACCESS EXCLUSIVE MODE");
+      armedAt = Date.now();
       reply = await ctx.operation("the closure whose inspection waits on a lock another session holds", async () => {
         const waiting = await ctx.mustWait(iw.h.oracle, { waiter: conn, holder: connectionPid(lock) }, (c) => closeOn(ctx, c, x.a, key, body, [INSPECTION(1)]), "the closure's first client inspection waiting on the lock another session holds");
         assert.ok(ctx.points.passed.includes("db.inspect_1.before") && !ctx.points.passed.includes("db.inspect_1.after"), "the wait is the inspector's own first read");
@@ -245,11 +249,21 @@ faultCell(
       });
       assert.equal(reply.status, 503, `a retriable refusal: ${reply.text}`);
       assert.equal(outcome(iw.w, reply), "503 CAPACITY_UNAVAILABLE -");
-      // this cell does NOT exercise the destroy: the routed release is a no-op (fault-support.ts) and the harness owns the connection. The destroy of
-      // an abandoned unit's connection (client.release(error)) is proved on a real pool in adapters-unit-of-work.test.ts. Here the cell ends the
-      // connection itself, to cause the late failure of the statement still waiting on the lock; what it asserts is that the failure is reported
-      // to the sink (not swallowed) and that the skipped ROLLBACK did not queue behind the abandoned read (the 503 above came within the bound)
-      await conn.end();
+      // this cell does NOT exercise the destroy: the routed release is a no-op (fault-support.ts) and the harness owns the connection (the destroy is
+      // proved on a real pool in adapters-unit-of-work.test.ts). The routed pool has no raw pool either, so no explicit end of the backend can reach it:
+      // what releases the abandoned inspector's locks here is the transaction limit CMD043 armed before the call (close-agency.ts limit; D10-GAP-6a,
+      // Codex F2). The harness does not end the connection: the database does, at the bound plus LIMIT_MARGIN_MS of REAL time since the call started
+      // (the bound itself ran on the controlled clock), whatever statement the inspector is in. Without the limit the backend waits on the lock
+      // until the cell ends it, and this wait fails.
+      const pid = connectionPid(conn);
+      const releasedBy = armedAt + PROVIDER_CALL_TIMEOUT_MS + LIMIT_MARGIN_MS + 2_000;
+      let alive = true;
+      while (alive && Date.now() < releasedBy) {
+        await iw.h.oracle.query("SELECT pg_stat_clear_snapshot()");
+        alive = (await iw.h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid])).rows.length === 1;
+        if (alive) await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      assert.equal(alive, false, "the abandoned inspector's backend was ended by the database's transaction limit, so its locks are released by the bound plus the margin");
       for (let i = 0; iw.lateFailures.length === lateBefore; i++) {
         assert.ok(i < 1_000, "the abandoned inspector call failed and was reported");
         await new Promise((resolve) => setTimeout(resolve, 10));

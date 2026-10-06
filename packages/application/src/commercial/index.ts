@@ -9,6 +9,7 @@
 export * from "./ports.js";
 export * from "./bindings.js";
 export type { LateFailure, LateFailureSink } from "./call-bound.js";
+export { LIMIT_MARGIN_MS } from "./call-bound.js";
 export * from "./vocabulary.js";
 export * from "./views.js";
 export * from "./contracts.js";
