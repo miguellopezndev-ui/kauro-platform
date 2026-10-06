@@ -42,8 +42,7 @@ export async function assertDead(pids, label, signal, confirmed, attempts = 100,
     let alive = true;
     for (let attempt = 0; attempt < attempts; attempt++) {
       try { process.kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') { alive = false; break; } throw error; }
-      // A zombie has terminated and cannot execute against a removed checkout.
-      if (process.platform === 'linux' && /\) Z /.test(readFileSync(`/proc/${pid}/stat`, 'utf8'))) { alive = false; break; }
+      if (hasTerminated(pid)) { alive = false; break; }
       await delay(25);
     }
     if (!alive) confirmed.add(pid);
@@ -66,4 +65,11 @@ async function removeWithRetry(root, remove) {
       await delay(50 * (retry + 1));
     }
   }
+}
+
+// A zombie has terminated and cannot execute against a removed checkout; a pid whose /proc entry vanished after the
+// liveness probe has exited. Only Linux consults /proc.
+export function hasTerminated(pid, platform = process.platform, read = (path) => readFileSync(path, 'utf8')) {
+  if (platform !== 'linux') return false;
+  try { return /\) Z /.test(read(`/proc/${pid}/stat`)); } catch (error) { if (error.code === 'ENOENT') return true; throw error; }
 }

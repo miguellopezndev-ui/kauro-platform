@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { assertDead, interruptedWorker, killUnconfirmed, withCleanup } from './gate-process.mjs';
+import { assertDead, hasTerminated, interruptedWorker, killUnconfirmed, withCleanup } from './gate-process.mjs';
 
 test('cleanup failure never replaces the primary assertion error', async () => {
   const primary = new Error('worker survived');
@@ -71,4 +71,13 @@ test('cleanup retries a transient EPERM/EBUSY itself (rmSync does not on Node 24
   let denied = 0;
   await assert.rejects(withCleanup('x', async () => {}, () => { denied++; throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
   assert.equal(denied, 1, 'a non-transient error is not retried');
+});
+
+test('a pid that vanishes between the liveness probe and the /proc read counts as dead', () => {
+  const enoent = () => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); };
+  assert.equal(hasTerminated(1, 'linux', enoent), true);
+  assert.equal(hasTerminated(1, 'linux', () => '1 (node) Z 0'), true, 'zombie');
+  assert.equal(hasTerminated(1, 'linux', () => '1 (node) S 0'), false);
+  assert.equal(hasTerminated(1, 'win32', enoent), false, 'only Linux consults /proc');
+  assert.throws(() => hasTerminated(1, 'linux', () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
 });
