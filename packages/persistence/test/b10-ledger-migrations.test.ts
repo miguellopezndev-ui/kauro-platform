@@ -5,6 +5,7 @@
 // service; the superuser only reads, and probes a refusal no grant stands in front of. Amounts are the worked examples' integer cents,
 // written here as the oracle. Every guard is shown by the forbidden write refused beside the legitimate write that commits (21
 // "Positive and negative symmetry"). The tests assert the raw KC SQLSTATEs; their translation is the stage-2 lanes' (design §12).
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -55,6 +56,8 @@ import {
 } from "./b10-commission-support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 /** The October 2026 period every payout of this file closes into (one statement per seller): dated by example 21's fixture calendar. */
 let october: string;
 

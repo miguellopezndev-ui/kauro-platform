@@ -6,6 +6,7 @@
 // fixtures of @kauro/persistence/testing (ledger-fixtures.ts); amounts are the worked examples' integer cents, written here as the
 // oracle and never read back from the function under test. Interleavings are fixed by hold points and lock waits observed in
 // pg_stat_activity, never by a sleep.
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -65,6 +66,8 @@ import {
 import { stepUpProof } from "./support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 /** The September 2026 period every statement of this file closes into (one statement per seller), dated by example 21's fixture calendar. */
 let period: string;
 let calendarId: string;

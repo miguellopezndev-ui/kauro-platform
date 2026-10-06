@@ -6,6 +6,7 @@
 // profile, plans approved through CMD025), because a closure is irreversible; the purchases are the adapter-written fixtures of
 // @kauro/persistence/testing and the closing agency's commission lines are written by its fixtures as kauro_commission. The provider is
 // B09's labelled contract fake (SIMULATED): nothing here is a provider fact.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AgencyClosureView, CreatePaymentOrderView, RequestRefundView } from "@kauro/application";
@@ -27,6 +28,8 @@ import { paymentRoutes, paymentsWorld, type PaymentsWorld } from "./commerce-sup
 import { SimulatedCrash, approveThroughRoute, asProblem, call, clock, completed, freshKey, ids, outcome, replayTextOf, routes, sha, waitForApiLockWait, type Person, type Reply } from "./support.js";
 
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 before(async () => {
   pw = await paymentsWorld();
 });

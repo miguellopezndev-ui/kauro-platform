@@ -2,6 +2,7 @@
 // risk" -> "Tier 1"), each a cell of the common fault harness (docs/design/FAULT-HARNESS.md): the REAL route of CMD051 runs its REAL unit of
 // work over a connection the harness opened (test/fault-support.ts), so a race cell observes the close itself waiting on the holder's lock or
 // holding it until its COMMIT. PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { UtcInstant } from "@kauro/contracts";
@@ -13,6 +14,8 @@ import { createCommissionService } from "../src/index.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

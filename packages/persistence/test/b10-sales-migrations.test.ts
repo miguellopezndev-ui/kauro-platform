@@ -6,6 +6,7 @@
 // stands in front of. Every guard is shown by the forbidden write refused beside the legitimate write that commits (21 "Positive and
 // negative symmetry"). The tests assert the raw KC SQLSTATEs; their translation into failure reasons is the stage-2 lanes' (design
 // §12).
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { COMMERCIAL_PLATFORM_MACHINES } from "@kauro/domain";
@@ -55,6 +56,8 @@ import { commerceEvent } from "./commerce-support.js";
 import { stepUpProof } from "./support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 
 before(async () => {
   w = await openWorld("b10-sales");
