@@ -253,6 +253,29 @@ async function reboundByIdentity(factory: NonNullable<QuoteCollaborators["reques
 }
 
 /**
+ * The replacement quote and whether it was re-bound, from the durable facts under the quote's lock (Codex F1). A refused replacement still
+ * ISSUED is withdrawn, but only if it is still ISSUED once the lock is held: an abandoned re-binding that was committing has accepted it, and a
+ * replacement accepted for checkout with a re-binding recorded for it is REBOUND whatever the refusal said.
+ */
+export async function concludeReplacement(
+  c: CommerceUnitOfWork["commerce"],
+  ctx: Pick<ReplacementContext, "toQuoteId">,
+  settled: Concluded,
+  now: UtcInstant,
+): Promise<{ readonly quote: QuoteRecord; readonly rebound: boolean }> {
+  let quote = await c.quotes.get(ctx.toQuoteId);
+  if (quote === null) throw new NotFoundFailure("quote");
+  if (settled.kind === "REFUSED" && quote.state === "ISSUED") {
+    const locked = await c.quotes.lock(ctx.toQuoteId);
+    if (locked === null) throw new NotFoundFailure("quote");
+    quote = locked.state === "ISSUED" ? applied(await c.quotes.transition(ctx.toQuoteId, locked.version, { state: "WITHDRAWN" }, now)) : locked;
+  }
+  const rebound = settled.kind === "REBOUND" || (quote.state === "ACCEPTED_FOR_CHECKOUT" && (await c.rebindings.findTo(ctx.toQuoteId)) !== null);
+  if (rebound && quote.state !== "ACCEPTED_FOR_CHECKOUT") throw new DomainFailure("INTEGRITY_FAILURE", "a re-bound replacement is not accepted for checkout");
+  return { quote, rebound };
+}
+
+/**
  * COMPLETE: answers from the durable facts. A re-bound replacement is answered with the entitlement it revoked; a refused one is withdrawn
  * and answered with its blockers. The journal entry commits with the answer (a retry then replays it). Safe to run again.
  */
@@ -271,19 +294,7 @@ export async function completeReplacement(
     }
     const c = uow.commerce;
     const now: UtcInstant = runtime.clock.now();
-    let quote = await c.quotes.get(ctx.toQuoteId);
-    if (quote === null) throw new NotFoundFailure("quote");
-    if (settled.kind === "REFUSED" && quote.state === "ISSUED") {
-      const locked = await c.quotes.lock(ctx.toQuoteId);
-      if (locked === null) throw new NotFoundFailure("quote");
-      // the lock waits for an abandoned re-binding that is committing: what it left is read under the lock, and a replacement it accepted is
-      // never withdrawn (the withdrawal would be an unlisted transition over a re-bound purchase)
-      quote = locked.state === "ISSUED" ? applied(await c.quotes.transition(ctx.toQuoteId, locked.version, { state: "WITHDRAWN" }, now)) : locked;
-    }
-    // the outcome comes from the durable facts, not from the refusal alone (Codex F1): a refused answer over a replacement that a late COMMIT
-    // accepted with its re-binding recorded is REBOUND
-    const rebound = settled.kind === "REBOUND" || (quote.state === "ACCEPTED_FOR_CHECKOUT" && (await c.rebindings.findTo(ctx.toQuoteId)) !== null);
-    if (rebound && quote.state !== "ACCEPTED_FOR_CHECKOUT") throw new DomainFailure("INTEGRITY_FAILURE", "a re-bound replacement is not accepted for checkout");
+    const { quote, rebound } = await concludeReplacement(c, ctx, settled, now);
     const snapshot = await c.quotes.snapshot(ctx.toQuoteId);
     if (snapshot === null) throw new DomainFailure("INTEGRITY_FAILURE", "the replacement has no eligibility snapshot");
     const revoked = rebound ? await c.authorizations.findByQuote(ctx.fromQuoteId) : null;
