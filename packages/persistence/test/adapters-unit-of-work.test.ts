@@ -3,8 +3,9 @@
 // transactions, exceptions, retry paths and concurrent pooled requests. 07 "Transaction discipline": state, event and
 // outbox commit atomically; read committed with locks and constraints, bounded serializable retries where chosen).
 import assert from "node:assert/strict";
+import type { PoolClient } from "pg";
 import { after, before, test } from "node:test";
-import { DomainFailure, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
+import { DomainFailure, abandonWorkOf, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
 import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
@@ -284,6 +285,53 @@ test("statement_timeout is transaction-local: a lock wait past the ceiling fails
       client.release();
     }
   }
+});
+
+test("work a caller gave up inside a unit of work (a bound elapsed) destroys its connection: the unit answers without waiting for the abandoned call, the backend ends, the abandoned call's next statements fail there, and later requests on the pool are unaffected (D10-GAP-6a)", async () => {
+  const locked = barrier();
+  const release = barrier();
+  const holder = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+    assert.notEqual(await uow.agencies.lock(A.agencyId), null);
+    locked.open();
+    await release.wait;
+  });
+  await locked.wait;
+  let abandonedPid = 0;
+  let late: Promise<unknown> = Promise.resolve();
+  const given = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+    const client = (uow as unknown as { client: PoolClient }).client;
+    abandonedPid = Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+    // the call the caller starts and then gives up: it waits on the holder's lock and, were it ever answered, goes on to read
+    late = uow.agencies.lock(A.agencyId).then(() => uow.endClients.countOpenProjects(uow.ids.next() as ClientId));
+    late.catch(() => undefined);
+    for (let seen = false; !seen; ) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      seen = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'", [abandonedPid])).rows.length === 1;
+    }
+    abandonWorkOf(uow, "the bound of the call elapsed");
+    throw new DomainFailure("CAPACITY_UNAVAILABLE", "the call did not answer in time", { retryAfterSeconds: 1 }, true);
+  });
+  given.catch(() => undefined);
+  // the answer comes while the holder still holds the lock: nothing queued a ROLLBACK behind the abandoned call
+  const answered = await Promise.race([given.then(() => "committed", (e: unknown) => failure(e).code), new Promise<string>((resolve) => setTimeout(() => resolve("still waiting for the abandoned call"), 5_000))]);
+  assert.equal(answered, "CAPACITY_UNAVAILABLE");
+  await assert.rejects(late, "the abandoned call fails on its destroyed connection, it never reads on a pooled one");
+  release.open();
+  await holder;
+  // the backend of the abandoned unit is gone, and no pooled connection is it
+  for (let alive = true; alive; ) {
+    await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+    alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+  }
+  for (let i = 0; i < 4; i++) {
+    const { client } = await h.appPool.acquire();
+    try {
+      assert.notEqual(Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid), abandonedPid);
+    } finally {
+      client.release();
+    }
+  }
+  assert.notEqual(await h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.agencies.lock(A.agencyId)), null, "a later request on the pool runs unaffected");
 });
 
 test("compare-and-swap writes: a stale expected version applies nothing and returns the current safe version and state; an invisible row is NOT_FOUND", async () => {

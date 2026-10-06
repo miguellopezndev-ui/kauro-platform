@@ -7,7 +7,7 @@
 // contract (status, COMPLETED envelope) before a test reads it; the superuser only reads. A leg of a scenario that stands at another
 // instant (a purchase after a window's end) runs through the labelled TEST CLOCK of the support it reuses (D10-CLOCK-1).
 import assert from "node:assert/strict";
-import type { ProviderCallTimer } from "@kauro/application";
+import type { LateFailure, ProviderCallTimer } from "@kauro/application";
 import { realProviderCallTimer } from "@kauro/application";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
 import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
@@ -42,6 +42,8 @@ export async function claimed(iw: IntegrationWorld, label: string, count = 1): P
 export interface IntegrationWorld extends StatementsWorld {
   /** B11's buyer type port, bound to its labelled contract fake (SIMULATED): every selling agency below is an AGENCY. */
   readonly buyers: ContractFakeBuyerTypeReader;
+  /** The failures of collaborator calls after their bound elapsed (the late-failure sink of ApiAssembly.commercial), in order. */
+  readonly lateFailures: LateFailure[];
 }
 
 /**
@@ -78,8 +80,9 @@ const cellProviderTimer: ProviderCallTimer = {
 
 export async function integrationWorld(): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
-  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer } });
-  return Object.assign(sw, { buyers });
+  const lateFailures: LateFailure[] = [];
+  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) } });
+  return Object.assign(sw, { buyers, lateFailures });
 }
 
 /** A selling agency with the BILLING member whose token the public payment commands run under. */

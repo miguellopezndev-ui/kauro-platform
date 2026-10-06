@@ -21,7 +21,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
 import type { AgencyClosureId, AgencyId, AssuranceProofId, CausationId, ClientId, ClosureCaseEntry, ClosureFromState, EndClientRecord, QuoteId } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, abandonSetup, requestClosure } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, abandonSetup, abandonWorkOf, requestClosure } from "@kauro/domain";
 import type { MoneyMinorUnits } from "@kauro/contracts";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { agencyView } from "../../api/projections.js";
@@ -86,8 +86,13 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           for (;;) {
             const page: ReadonlyArray<EndClientRecord> = await uow.endClients.list(agencyId, { ...(after !== undefined ? { after } : {}), limit: CLIENT_PAGE });
             for (const client of page) {
-              // bounded (D10-GAP-6): an inspector that does not answer is no inventory, never zero work — the closure is refused, retriably
-              const inspected = await withinCallBound(co.providerTimer, () => co.activeWork.inspectClient(uow, client.clientId));
+              // bounded (D10-GAP-6a): an inspector that does not answer is no inventory, never zero work — the closure is refused, retriably
+              const inspected = await withinCallBound(co.providerTimer, () => co.activeWork.inspectClient(uow, client.clientId), {
+                call: "CMD043.inspectClient",
+                ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}),
+                // the inspector still runs on the unit's connection: the unit gives it up, so the connection is destroyed, never returned to the pool
+                abandon: () => abandonWorkOf(uow, "the ActiveWorkInspector did not answer within its bound"),
+              });
               if (inspected.timedOut) throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency's active work could not be inspected in time; nothing changed, retry with the same key", { retryAfterSeconds: INSPECTOR_RETRY_AFTER_SECONDS }, true);
               const work = inspected.value;
               activeWork += work.openProjects + work.activeJobs;

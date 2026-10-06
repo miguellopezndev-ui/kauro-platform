@@ -11,6 +11,7 @@ import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { CommandSpec } from "../../ports/command-handler.js";
 import type { ActiveWorkInspector } from "../../ports/work-inspectors.js";
 import type { CommercialCommandSpec } from "../contracts.js";
+import type { LateFailureSink } from "../call-bound.js";
 import type { ProviderCallTimer } from "../ports.js";
 
 export interface AgencyLifecycleCollaborators {
@@ -22,6 +23,8 @@ export interface AgencyLifecycleCollaborators {
   readonly assurance: AssuranceVerifier;
   /** The bound of the inspector's call (PROVIDER_CALL_TIMEOUT_MS): realProviderCallTimer when absent; a fault cell binds a clock-driven one. */
   readonly providerTimer?: ProviderCallTimer;
+  /** Where the failure of an inspector call after its bound elapsed goes (stderr when absent). */
+  readonly onLateFailure?: LateFailureSink;
 }
 
 /** A served B10 command: its catalogue spec, the spec the transport's admission reads, and its execution. */

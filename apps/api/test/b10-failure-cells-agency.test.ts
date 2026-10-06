@@ -3,14 +3,14 @@
 // AGREEMENT_EXP for CMD002), each a cell of the common fault harness (docs/design/FAULT-HARNESS.md): the REAL routes of CMD043, CMD002, CMD027,
 // CMD011 and CMD031 run their REAL units of work over connections the harness opened (`faults.on`), so a race cell observes one command waiting
 // on the other's lock in pg_stat_activity, a partial cell fails after a statement of the unit completed. B06's ActiveWorkInspector is the
-// edition's; its "collaborator" hold of the world is the cell's port hook for a call that never answers. PostgreSQL 17 through the runtime login
+// edition's: its timeout cell holds a REAL lock (another session's LOCK TABLE) its first read waits on. PostgreSQL 17 through the runtime login
 // roles; the superuser only reads. Nothing sleeps, except the bounded real-time wait of a timeout cell for an answer that must come.
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { AgencyClosureView, CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { connectionPid, faultCell, openConnection, publishAgreementVersions, recordReviewedFiscalProfile, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { connectionPid, faultCell, openConnection, publishAgreementVersions, raceStatementTimeoutMs, recordReviewedFiscalProfile, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import type { PurchaseRebinder } from "@kauro/application";
 import { agentOf, anotherClient, bought, integrationWorld, oracleRows, planOf, quoted, replacementPlanOf, type Agent, type IntegrationWorld } from "./integration-support.js";
@@ -217,9 +217,9 @@ faultCell(
 faultCell(
   {
     id: "INSPECT_FAIL",
-    step: "CMD043 CloseAgency / TIMEOUT: W0 ActiveWorkInspector never answering",
+    step: "CMD043 CloseAgency / TIMEOUT: W0 ActiveWorkInspector waiting on a lock another session holds",
     fault: "timeout",
-    expect: "RACE (timeout): an inspector that never answers ends in a retriable refusal within the call bound, nothing withdrawn and no closure; a timed-out inventory is never read as zero",
+    expect: "RACE (timeout): an inspector whose read waits on a lock another session holds ends, once the call bound elapses, in a retriable refusal within the bound, nothing withdrawn and no closure, and its abandoned call fails late instead of running on a pooled connection; a timed-out inventory is never read as zero",
   },
   async (ctx) => {
     const x = await twoClients("inspect-fail-timeout");
@@ -227,20 +227,37 @@ faultCell(
     const before = await closingOf(x.a, key);
     const body = await closureBody(x.a);
     const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), "the inspector call's bound");
-    // the world's "collaborator" hold is passed by B06's ActiveWorkInspector before it reads: held there, the inspection never answers
-    const hold = iw.w.holds.arm("collaborator");
-    const running = ctx.operation("the closure whose inspector never answers", () => closeCall(x.a, key, body));
-    await hold.reached;
-    ctx.clock.past(deadline);
-    const settled = await Promise.race([running, new Promise<null>((resolve) => setTimeout(() => resolve(null), 5_000))]);
-    if (settled === null) {
-      hold.abort(new Error("the test abandoned the inspection that never answered"));
-      await running.catch(() => undefined);
-      assert.deepEqual(await closingOf(x.a, key), before, "the abandoned closure wrote nothing");
-      assert.fail(`CloseAgency did not answer within 5 s after the inspector's ${PROVIDER_CALL_TIMEOUT_MS} ms bound was crossed: ActiveWorkInspector has no bound in CMD043 (expected a retriable refusal, nothing withdrawn, no closure)`);
+    // the bound is below the statement timeout the unit runs under: the bound ends the wait, not the database
+    assert.ok((iw.faults.statementTimeoutMs ?? raceStatementTimeoutMs()) > PROVIDER_CALL_TIMEOUT_MS, "the unit's statement timeout is above the call bound");
+    // a real lock wait: another session holds the projects table, so the inspector's first read (B06's own SQL) waits on it
+    const lock = await openConnection(iw.h.pg.clientConfig("kauro_owner"));
+    const conn = await connect("kauro_app_test");
+    const lateBefore = iw.lateFailures.length;
+    let reply: Reply;
+    try {
+      await lock.query("BEGIN");
+      await lock.query("LOCK TABLE kauro.projects IN ACCESS EXCLUSIVE MODE");
+      reply = await ctx.operation("the closure whose inspection waits on a lock another session holds", async () => {
+        const waiting = await ctx.mustWait(iw.h.oracle, { waiter: conn, holder: connectionPid(lock) }, (c) => closeOn(ctx, c, x.a, key, body, [INSPECTION(1)]), "the closure's first client inspection waiting on the lock another session holds");
+        assert.ok(ctx.points.passed.includes("db.inspect_1.before") && !ctx.points.passed.includes("db.inspect_1.after"), "the wait is the inspector's own first read");
+        ctx.clock.past(deadline);
+        return value(await waiting.pending);
+      });
+      assert.equal(reply.status, 503, `a retriable refusal: ${reply.text}`);
+      assert.equal(outcome(iw.w, reply), "503 CAPACITY_UNAVAILABLE -");
+      // the pool destroys the abandoned unit's connection (client.release(error), proved on a real pool in adapters-unit-of-work.test.ts): here the
+      // harness connection is ended, so the inspector's statement still waiting on the lock fails there and is reported, never answered
+      await conn.end();
+      for (let i = 0; iw.lateFailures.length === lateBefore; i++) {
+        assert.ok(i < 1_000, "the abandoned inspector call failed and was reported");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } finally {
+      await lock.query("ROLLBACK");
+      await lock.end();
+      await conn.end().catch(() => undefined);
     }
-    hold.release();
-    assert.equal(settled.status, 503, `a retriable refusal: ${settled.text}`);
+    assert.deepEqual(iw.lateFailures.slice(lateBefore).map((l) => l.call), ["CMD043.inspectClient"], "the abandoned call's failure was logged, not swallowed");
     assert.deepEqual(await closingOf(x.a, key), before, "nothing withdrawn, no closure");
     const done = closed(await closeCall(x.a, key, body));
     assert.equal(done.obligations.activeWorkItems, await openProjectsOf(x.a.s.agency.agencyId));

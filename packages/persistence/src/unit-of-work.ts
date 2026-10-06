@@ -188,6 +188,7 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly auditReads: PgAuditReads;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
+  #abandoned: Error | null = null;
 
   constructor(
     protected readonly client: PoolClient,
@@ -250,6 +251,18 @@ export class PgUnitOfWork implements UnitOfWork {
 
   get userId(): UserId | null {
     return userIdOf(this.context);
+  }
+
+  /**
+   * AbandonableWork: the caller gave up a call it started on this unit's connection (a bound elapsed). The unit can no longer commit; the
+   * factory destroys the connection instead of rolling it back through the queue the abandoned call blocks and instead of returning it.
+   */
+  abandonWork(reason: string): void {
+    this.#abandoned ??= new Error(`work given up inside the unit of work: ${reason}`);
+  }
+
+  get abandonedWork(): Error | null {
+    return this.#abandoned;
   }
 
   get resolvedMembershipId(): MembershipId | null {
@@ -422,13 +435,16 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       throw new DomainFailure("INTEGRITY_FAILURE", `a ${context.kind} context runs under ${expectedRole}, this pool is ${connection.role} (08 Database isolation)`);
     }
     let destroy: Error | undefined;
+    let unit: U | undefined;
     try {
       await execute(client, `BEGIN ISOLATION LEVEL ${ISOLATION_SQL[isolation]}`);
       await execute(client, `SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
       await bindContext(client, context);
       const ids = new TrackingIdGenerator(createIdGenerator(this.deps.clock, this.#random));
       const uow = open(client, ids);
+      unit = uow;
       const out = await work(uow);
+      if (uow.abandonedWork !== null) throw new DomainFailure("INTEGRITY_FAILURE", `a unit of work whose work was given up cannot commit; correlation ${context.correlationId}`);
       // COMMIT inside an aborted transaction block does not fail: the server answers with the ROLLBACK tag and a WARNING.
       // A handler that caught a database refusal and carried on would otherwise "succeed" having persisted nothing.
       const commit = await execute(client, "COMMIT");
@@ -439,10 +455,17 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
     } catch (e) {
       // ROLLBACK after a failed COMMIT or BEGIN is a harmless no-op on the server (a WARNING, never an error); a failure here
       // means the connection itself is gone, and it is destroyed rather than returned to the pool.
-      try {
-        await client.query("ROLLBACK");
-      } catch (rollbackError) {
-        destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+      const abandoned = unit?.abandonedWork ?? null;
+      if (abandoned !== null) {
+        // work the caller gave up is still running on this connection: ROLLBACK would queue behind it, and the connection must never serve
+        // another unit of work with that work alive on it. The server rolls the transaction back when the connection ends.
+        destroy = abandoned;
+      } else {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
       }
       throw asFailure(e, context.correlationId);
     } finally {

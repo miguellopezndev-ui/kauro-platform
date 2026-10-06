@@ -95,6 +95,22 @@ export interface UnitOfWork {
   readonly userId: UserId | null;
 }
 
+/**
+ * A unit of work whose in-flight work its caller can give up (D10-GAP-6a): when a bound on a call made inside the unit elapses, the call
+ * keeps running on the unit's connection, so the connection must never go back to the pool. `abandonWork` marks the unit: it then ends
+ * in a failure, its connection is destroyed (never rolled back through the queue the abandoned call blocks, never returned), and what
+ * the abandoned call still tries on that connection fails there.
+ */
+export interface AbandonableWork {
+  abandonWork(reason: string): void;
+}
+
+/** Gives up the in-flight work of `uow` when it supports it (a unit of work of @kauro/persistence); other implementations have nothing to destroy. */
+export function abandonWorkOf(uow: object, reason: string): void {
+  const candidate = uow as Partial<AbandonableWork>;
+  if (typeof candidate.abandonWork === "function") candidate.abandonWork(reason);
+}
+
 export interface UnitOfWorkFactory {
   /**
    * Runs `work` inside one transaction bound to `context`; commits when it returns, rolls back when it throws and rethrows.

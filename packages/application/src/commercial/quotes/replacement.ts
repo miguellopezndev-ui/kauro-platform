@@ -208,7 +208,7 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
   const factory = co.request.payment;
   const rebinder = co.rebinder;
   if (factory === null || rebinder === null) throw providerServicesUnavailable();
-  // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
+  // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6a): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
   // open (nothing is concluded), and the request answers the retriable 202 — the same key resumes and observes the re-binding by its identity
   const bounded = await withinCallBound(co.providerTimer, () =>
     factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
@@ -220,6 +220,8 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
       const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
       return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
     }),
+    // no abandon: the re-binding is its own SERVICE unit of work and keeps running to its COMMIT or ROLLBACK, whose outcome the same key observes
+    { call: "CMD027.rebind", ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}) },
   );
   return bounded.timedOut ? { kind: "PENDING" } : bounded.value;
 }
