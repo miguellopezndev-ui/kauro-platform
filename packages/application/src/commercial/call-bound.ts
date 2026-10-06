@@ -34,13 +34,23 @@ export interface CallBoundOptions {
   readonly onLateFailure?: LateFailureSink;
   /** Runs when the bound elapsed first: the caller gives up the work the call still has in flight (a unit of work destroys its connection). */
   readonly abandon?: () => void;
+  /**
+   * Limits the lifetime of the whole transaction the call runs in (D10-GAP-6a): armed to the bound plus LIMIT_MARGIN_MS before the call starts and
+   * lifted once the call answered in time. The database then ends an abandoned unit's session at the bound whatever statement the call is in
+   * and whether or not the explicit end of its backend got a connection (statement_timeout restarts with every statement).
+   */
+  readonly limit?: (ms: number | null) => Promise<void>;
 }
+
+/** The database's limit stands this long after the application's bound: the bound always fires first, the limit is its backstop. */
+export const LIMIT_MARGIN_MS = 1_000;
 
 /**
  * `call` within PROVIDER_CALL_TIMEOUT_MS: its value, or `{ timedOut: true }` once the bound elapsed first (after `abandon` ran). A call
  * that fails within the bound rethrows; one that fails after the bound was given up reaches the late-failure sink (nobody awaits it).
  */
 export async function withinCallBound<T>(timer: ProviderCallTimer | undefined, call: () => Promise<T>, options: CallBoundOptions): Promise<Bounded<T>> {
+  await options.limit?.(PROVIDER_CALL_TIMEOUT_MS + LIMIT_MARGIN_MS);
   const bound = (timer ?? realProviderCallTimer).start(PROVIDER_CALL_TIMEOUT_MS);
   const running = call();
   let given = false;
@@ -57,6 +67,7 @@ export async function withinCallBound<T>(timer: ProviderCallTimer | undefined, c
       }),
     ]);
     if (outcome.timedOut) options.abandon?.();
+    else await options.limit?.(null);
     return outcome;
   } finally {
     bound.cancel();

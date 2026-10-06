@@ -261,6 +261,16 @@ export class PgUnitOfWork implements UnitOfWork {
     this.#abandoned ??= new Error(`work given up inside the unit of work: ${reason}`);
   }
 
+  /**
+   * AbandonableWork: the database ends this session when the transaction has lived `ms` more (SET LOCAL transaction_timeout, PostgreSQL 17:
+   * set inside a transaction it arms the timer from now, 0 disarms it). Unlike statement_timeout it does not restart with each statement.
+   */
+  async limitWork(ms: number | null): Promise<void> {
+    if (this.#abandoned !== null) return;
+    if (ms !== null && (!Number.isInteger(ms) || ms < 1)) throw new RangeError("a work limit is a positive integer of milliseconds");
+    await execute(this.client, ms === null ? "SET LOCAL transaction_timeout = 0" : `SET LOCAL transaction_timeout = '${ms}ms'`);
+  }
+
   get abandonedWork(): Error | null {
     return this.#abandoned;
   }

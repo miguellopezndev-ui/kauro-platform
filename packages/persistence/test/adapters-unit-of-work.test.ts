@@ -3,9 +3,9 @@
 // transactions, exceptions, retry paths and concurrent pooled requests. 07 "Transaction discipline": state, event and
 // outbox commit atomically; read committed with locks and constraints, bounded serializable retries where chosen).
 import assert from "node:assert/strict";
-import type { PoolClient } from "pg";
+import { Client, type PoolClient } from "pg";
 import { after, before, test } from "node:test";
-import { DomainFailure, abandonWorkOf, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
+import { DomainFailure, abandonWorkOf, isDomainFailure, limitWorkOf, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
 import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
 import { END_BACKEND_WAIT_MS, endAbandonedBackend } from "../src/unit-of-work.js";
@@ -412,6 +412,74 @@ test("the explicit end is skipped when the side connection is not in hand within
   await new Promise((resolve) => setTimeout(resolve, 1_000));
   assert.deepEqual(statements, [], "no signalling statement ran after the wait");
   assert.equal(releases, 1, "the late connection went back to the pool unused");
+});
+
+test("a unit limited as a whole is ended by the database at its limit although each of its statements started inside it: the second statement of a call does not extend the lock lifetime (D10-GAP-6a, Codex F2)", async () => {
+  const LIMIT_MS = 2_000;
+  const first = new Client(h.pg.clientConfig("kauro_owner"));
+  const second = new Client(h.pg.clientConfig("kauro_owner"));
+  await first.connect();
+  await second.connect();
+  let given: Promise<unknown> = Promise.resolve();
+  try {
+    await first.query("BEGIN");
+    await first.query("LOCK TABLE kauro.projects IN ACCESS EXCLUSIVE MODE");
+    await second.query("BEGIN");
+    await second.query("LOCK TABLE kauro.end_clients IN ACCESS EXCLUSIVE MODE");
+    let pid = 0;
+    let armedAt = 0;
+    const armed = barrier();
+    // the unit takes its agency's row lock, limits its whole lifetime, then runs a call of two sequential statements: the first waits on `first`'s
+    // table lock until the test releases it one second before the limit, the second then waits on `second`'s for as long as the test lets it.
+    // statement_timeout (30 s) never fires: only the transaction limit can end the session in time
+    given = h.app.run(
+      h.tenant(A.agencyId, owner),
+      async (uow) => {
+        const client = (uow as unknown as { client: PoolClient }).client;
+        assert.notEqual(await uow.agencies.lock(A.agencyId), null);
+        pid = Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+        await limitWorkOf(uow, LIMIT_MS);
+        armedAt = Date.now();
+        armed.open();
+        await client.query("SELECT count(*) FROM kauro.projects");
+        await client.query("SELECT count(*) FROM kauro.end_clients");
+      },
+      { statementTimeoutMs: 30_000 },
+    );
+    given.catch(() => undefined);
+    await armed.wait;
+    const lockedAgency = async (): Promise<boolean> => {
+      await h.oracle.query("BEGIN");
+      try {
+        await h.oracle.query("SELECT 1 FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE NOWAIT", [A.agencyId]);
+        return false;
+      } catch (e) {
+        if ((e as { code?: string }).code === "55P03") return true;
+        throw e;
+      } finally {
+        await h.oracle.query("ROLLBACK");
+      }
+    };
+    await new Promise((resolve) => setTimeout(resolve, LIMIT_MS / 2 - (Date.now() - armedAt)));
+    await first.query("COMMIT"); // the first statement answers one second before the limit; the second starts now
+    assert.equal(await lockedAgency(), true, "the unit still holds its agency lock one second before its limit, inside the second statement");
+    const deadline = armedAt + LIMIT_MS + 700;
+    let alive = true;
+    while (alive && Date.now() < deadline) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid])).rows.length === 1;
+      if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(alive, false, "the database ended the limited unit's session at its limit (plus a margin), not when its second statement ended");
+    assert.equal(await lockedAgency(), false, "and its agency lock is released");
+    await assert.rejects(given, "the unit failed: it can never commit what it did");
+  } finally {
+    await second.query("ROLLBACK").catch(() => undefined);
+    await first.query("ROLLBACK").catch(() => undefined);
+    await second.end();
+    await first.end();
+    await given.catch(() => undefined);
+  }
 });
 
 test("compare-and-swap writes: a stale expected version applies nothing and returns the current safe version and state; an invisible row is NOT_FOUND", async () => {

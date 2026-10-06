@@ -21,7 +21,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
 import type { AgencyClosureId, AgencyId, AssuranceProofId, CausationId, ClientId, ClosureCaseEntry, ClosureFromState, EndClientRecord, QuoteId } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, abandonSetup, abandonWorkOf, requestClosure } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, abandonSetup, abandonWorkOf, limitWorkOf, requestClosure } from "@kauro/domain";
 import type { MoneyMinorUnits } from "@kauro/contracts";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { agencyView } from "../../api/projections.js";
@@ -92,6 +92,8 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
                 ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}),
                 // the inspector still runs on the unit's connection: the unit gives it up, so the connection is destroyed, never returned to the pool
                 abandon: () => abandonWorkOf(uow, "the ActiveWorkInspector did not answer within its bound"),
+                // the whole unit is limited by the database, not per statement: the inspector runs several statements (D10-GAP-6a)
+                limit: (ms) => limitWorkOf(uow, ms),
               });
               if (inspected.timedOut) throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency's active work could not be inspected in time; nothing changed, retry with the same key", { retryAfterSeconds: INSPECTOR_RETRY_AFTER_SECONDS }, true);
               const work = inspected.value;

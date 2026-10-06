@@ -3,7 +3,7 @@ export { toUtcInstant, isUtcInstant } from "./clock.js";
 export type { IdGenerator, RandomBytes } from "./id-generator.js";
 export { createIdGenerator } from "./id-generator.js";
 export type { UnitOfWork, UnitOfWorkFactory, UnitOfWorkOptions, IsolationLevel, AbandonableWork } from "./unit-of-work.js";
-export { abandonWorkOf } from "./unit-of-work.js";
+export { abandonWorkOf, limitWorkOf } from "./unit-of-work.js";
 export type { EventPublisher, PublishedEvent } from "./event-publisher.js";
 export type { CommandJournal, ReservationOutcome, JournalCommit } from "./command-journal.js";
 export type {
