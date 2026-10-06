@@ -421,6 +421,18 @@ test("INV-S-01 fires on a PAYABLE line item without its previously paid (the abs
 test("INV-S-01 fires on a HOLD item of a line its statement does not itemize", (t) =>
   forged(t, "INV-S-01", (c) => exec(c, "DELETE FROM kauro.statement_items WHERE statement_id = $1 AND item_kind = 'LINE' AND line_id = $2", [b().r102.statementId, b().r102.disputedLine]), "HOLD item of a line the statement does not itemize"));
 
+test("INV-S-01 fires on a HOLD item whose hold row is absent (not a line the statement fails to itemize)", (t) =>
+  forged(
+    t,
+    "INV-S-01",
+    // statement_items_hold_fk (mig 0031: FOREIGN KEY (hold_id, seller_id) REFERENCES commission_holds) keeps a HOLD item on a real hold: its
+    // trigger stands off under session_replication_role = replica, as the forged state needs. The item's hold no longer joins, so its line
+    // loses its derived HOLD sum, which the control declares (a state that cannot exist without it)
+    (c) => exec(c, "UPDATE kauro.statement_items SET hold_id = gen_random_uuid() WHERE statement_id = $1 AND item_kind = 'HOLD'", [b().r102.statementId]),
+    "HOLD item with no hold row",
+    ["payable not derived (its line has no HOLD item)"],
+  ));
+
 test("INV-S-02 fires on a statement whose payable is not its items' sum", (t) =>
   forged(t, "INV-S-02", (c) => exec(c, "UPDATE kauro.commission_statements SET payable_cents = payable_cents + 1 WHERE statement_id = $1", [b().r102.statementId]), "payable total not its items' sum"));
 
@@ -605,6 +617,16 @@ test("INV-S-09 fires on a SPLIT_CORRECTION, which has no B10 writer", (t) =>
 test("INV-S-10 fires on a first adjustment that does not start at the split of the initial basis", (t) =>
   // seq 1 is a DECREASE: its previous and its amount both one higher still land on its new cumulative, so only the start predicate fires
   forged(t, "INV-S-10", (c) => exec(c, "UPDATE kauro.commission_adjustments SET previous_cumulative_cents = previous_cumulative_cents + 1, amount_cents = amount_cents + 1 WHERE line_id = $1 AND adjustment_seq = 1", [b().r301.aPaidLine]), "first adjustment not from the initial split"));
+
+test("INV-S-10 fires on an adjustment chain that does not start at seq 1 (a gap: seq 2 with seq 1 absent)", (t) =>
+  forged(
+    t,
+    "INV-S-10",
+    // the KC015 trigger (mig 0030, ADJUSTMENT_NOT_CUMULATIVE: NEW.adjustment_seq <> latest seq + 1) and the append-only trigger keep a chain
+    // gapless in production: both stand off under session_replication_role = replica, so seq 1 can be deleted from under seq 2
+    (c) => exec(c, "DELETE FROM kauro.commission_adjustments WHERE adjustment_seq = 1 AND line_id = (SELECT line_id FROM kauro.commission_adjustments WHERE adjustment_id = $1)", [b().r301.adjustmentSeq2]),
+    "adjustment chain not starting at seq 1",
+  ));
 
 test("INV-S-10 fires on an adjustment that does not start where the last one ended", (t) =>
   // seq 2 is an INCREASE: its previous one lower and its amount one higher still land on its new cumulative, so only the chaining predicate fires

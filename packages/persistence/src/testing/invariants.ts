@@ -112,6 +112,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
       "PAYABLE line item without a cumulative",
       "PAYABLE line item without its previously paid",
       "HOLD item of a line the statement does not itemize",
+      "HOLD item with no hold row",
     ],
     decision: "an item's payable is derived: cumulative - previously paid - held - same-statement HOLD items of its line - offset, never negative; a PAYABLE line item carries its cumulative and previously paid (D10-STMT-2, R2-102)",
     sql: `WITH w AS (
@@ -148,9 +149,13 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
            WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.previously_paid_cents IS NULL
           UNION ALL
           SELECT hi.statement_id, hi.item_id, h.line_id, hi.held_cents, NULL, 'HOLD item of a line the statement does not itemize'
-            FROM kauro.statement_items hi LEFT JOIN kauro.commission_holds h ON h.hold_id = hi.hold_id
+            FROM kauro.statement_items hi JOIN kauro.commission_holds h ON h.hold_id = hi.hold_id
            WHERE hi.item_kind = 'HOLD'
-             AND NOT EXISTS (SELECT 1 FROM kauro.statement_items li WHERE li.statement_id = hi.statement_id AND li.item_kind = 'LINE' AND li.line_id = h.line_id)`,
+             AND NOT EXISTS (SELECT 1 FROM kauro.statement_items li WHERE li.statement_id = hi.statement_id AND li.item_kind = 'LINE' AND li.line_id = h.line_id)
+          UNION ALL
+          SELECT hi.statement_id, hi.item_id, NULL, hi.held_cents, NULL, 'HOLD item with no hold row'
+            FROM kauro.statement_items hi
+           WHERE hi.item_kind = 'HOLD' AND NOT EXISTS (SELECT 1 FROM kauro.commission_holds h WHERE h.hold_id = hi.hold_id)`,
   },
   {
     id: "INV-S-02",
@@ -340,7 +345,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-10",
-    whys: ["first adjustment not from the initial split","adjustment not from the prior one's new cumulative","new cumulative not previous moved by the amount","last adjustment not the line's cumulative"],
+    whys: ["first adjustment not from the initial split","adjustment chain not starting at seq 1","adjustment not from the prior one's new cumulative","new cumulative not previous moved by the amount","last adjustment not the line's cumulative"],
     decision: "adjustment chain: seq 1 starts at the split of the pool's initial basis, each starts where the last ended, moves by its amount in its direction, and the last is the line's cumulative (mig 0030)",
     sql: `WITH ${split(`SELECT p.pool_id AS k, p.pool_id, ${rounded("p.initial_basis_cents", "p.rate_bps")} AS total FROM kauro.commission_pools p`)},
           chain AS (
@@ -352,6 +357,9 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
           SELECT ch.adjustment_id AS ref, ch.line_id AS line, ch.adjustment_seq AS seq, ch.previous_cumulative_cents || ' previous, ' || sp.share || ' initial split' AS detail, 'first adjustment not from the initial split' AS why
             FROM chain ch JOIN split sp ON sp.line_id = ch.line_id
            WHERE ch.adjustment_seq = 1 AND ch.previous_cumulative_cents <> sp.share
+          UNION ALL
+          SELECT ch.adjustment_id, ch.line_id, ch.adjustment_seq, 'seq ' || ch.adjustment_seq || ' with no prior', 'adjustment chain not starting at seq 1'
+            FROM chain ch WHERE ch.prior_seq IS NULL AND ch.adjustment_seq > 1
           UNION ALL
           SELECT ch.adjustment_id, ch.line_id, ch.adjustment_seq, ch.previous_cumulative_cents || ' previous, ' || ch.prior_new || ' prior new', 'adjustment not from the prior one''s new cumulative'
             FROM chain ch WHERE ch.prior_seq IS NOT NULL AND ch.previous_cumulative_cents <> ch.prior_new
