@@ -27,11 +27,24 @@ export function normalizePath(file, { platform = process.platform, realpath = re
   return platform === 'win32' ? path.toLowerCase() : path;
 }
 
-function frameMatchesFile(frame, file) {
-  // Strip the frame wrapper and line/column before converting the URL, including a drive's colon.
+// Where was the error thrown? 'test': the test file, or a file under a test/ or test-support directory.
+// 'product': under src/ (packages/*/src, apps/*/src, or their dist equivalents). 'unlocated': the frame has no file location.
+// 'other': anything else (node_modules, unrelated paths). The nearest path segment decides, so dist/test/x.js is test code
+// and dist/src/x.js is product code.
+const TEST_SEGMENTS = new Set(['test', 'tests', '__tests__', 'test-support', 'test-utils']);
+export function frameOrigin(frame, file) {
   const location = /\((.+):\d+:\d+\)$/.exec(frame ?? '') ?? /^\s*at (.+):\d+:\d+$/.exec(frame ?? '');
-  if (!location) return false;
-  try { return normalizePath(location[1]) === file; } catch { return false; }
+  if (!location) return 'unlocated';
+  let path;
+  try { path = normalizePath(location[1]); } catch { return 'unlocated'; }
+  if (path === file) return 'test';
+  const segments = path.split(/[\\/]/).slice(0, -1);
+  for (let index = segments.length - 1; index >= 0; index--) {
+    if (segments[index] === 'node_modules') return 'other';
+    if (TEST_SEGMENTS.has(segments[index])) return 'test';
+    if (segments[index] === 'src') return 'product';
+  }
+  return 'other';
 }
 
 function killRunner(pid) {
@@ -117,7 +130,7 @@ export function firstFailingAssertion(output) {
 // Summarises the structured events written by tools/test-events-reporter.mjs. Nothing here reads spec text.
 // A "leaf" is a real test with no subtests (details.type "test", not a suite, skipped or todo). The synthetic failure node:test
 // reports for a file that fails to load or throws at top level is named after the file and is never a leaf.
-export function summarizeEvents(path, file, identityFile = file, { baseSymbols } = {}) {
+export function summarizeEvents(path, file, identityFile = file, { classifyMissingApi = false } = {}) {
   let records = [];
   try { records = readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch { /* an absent or torn file means "no evidence" */ }
   const normalizedFile = normalizePath(file);
@@ -189,11 +202,12 @@ export function summarizeEvents(path, file, identityFile = file, { baseSymbols }
       const assertion = record.message == null ? null : record.errorName
         ? `${record.errorName}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}` : record.message;
       summary.assertion ??= assertion;
-      // Only a direct call in this test to a symbol absent from the base runtime build is a missing API.
-      // Error text identifies that symbol, but never substitutes for the error's type or code.
-      const symbol = /^(?:[A-Za-z_$][\w$]*\.)*([A-Za-z_$][\w$]*) is not a (?:function|constructor)\b/.exec(record.message ?? '')?.[1];
-      const missingApi = record.errorName === 'TypeError' && symbol && baseSymbols && !baseSymbols.has(symbol)
-        && frameMatchesFile(record.errorFrame, normalizedFile);
+      // A "not a function/constructor" TypeError thrown from test code (or one whose origin cannot be located) means the
+      // API the test calls is absent: its behaviour assertion never ran. One thrown inside product code is a real failure.
+      // Decided by where it was thrown, never by the name in the message.
+      const missingApi = classifyMissingApi && record.errorName === 'TypeError'
+        && /\bis not a (?:function|constructor)\b/.test(record.message ?? '')
+        && ['test', 'unlocated'].includes(frameOrigin(record.errorFrame, normalizedFile));
       if (missingApi || ['ERR_MODULE_NOT_FOUND', 'ECONNREFUSED'].includes(record.errorCode)) {
         summary.inconclusiveFailures.push(assertion);
       } else {
@@ -220,26 +234,6 @@ export function workspacePackages(root) {
     }
   }
   return packages;
-}
-
-// A conservative identifier inventory of emitted runtime code; tests cannot supply a missing base API.
-export function baseBuildSymbols(packages) {
-  const symbols = new Set();
-  function scan(dir) {
-    if (!existsSync(dir)) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) { if (!['test', 'tests', 'node_modules'].includes(entry.name)) scan(path); }
-      else if (/\.[cm]?js$/.test(entry.name)) {
-        for (const symbol of readFileSync(path, 'utf8').match(/[A-Za-z_$][\w$]*/g) ?? []) symbols.add(symbol);
-      }
-    }
-  }
-  for (const pkg of packages) {
-    const dist = join(pkg.dir, 'dist');
-    scan(existsSync(dist) ? dist : join(pkg.dir, 'src'));
-  }
-  return symbols;
 }
 
 export function dependencyOrder(packages, selected = packages) {
@@ -289,7 +283,7 @@ export function testTarget(root, file) {
   return { file: rel.split(sep).join("/"), dir, manifest, compiled, concurrency };
 }
 
-export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000, baseSymbols } = {}) {
+export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000, classifyMissingApi } = {}) {
   if (!existsSync(target.compiled)) throw new Error(`compiled test is missing: ${target.compiled}`);
   const eventsDir = mkdtempSync(join(tmpdir(), "kauro-events-"));
   const eventsFile = join(eventsDir, "events.jsonl");
@@ -349,7 +343,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
         finish(status, signal);
       });
     });
-    const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled, { baseSymbols });
+    const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled, { classifyMissingApi });
     return { ...result, firstFailingAssertion: summary.assertion ?? firstFailingAssertion(result.output), summary };
   } finally {
     cleanup();

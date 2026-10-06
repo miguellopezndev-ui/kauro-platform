@@ -3,7 +3,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { baseBuildSymbols, buildPackage, command, dependencyOrder, normalizePath, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
+import { buildPackage, command, dependencyOrder, normalizePath, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
 
 function usage(message) {
   console.error(`${message}\nUsage: node tools/red-proof.mjs <base> <head> --tests <file>[,<file>...] [--out red-proof.json] [--timeout-min 30]`);
@@ -111,10 +111,9 @@ try {
       report.errors.push(`${label} preparation: ${error.message}`);
       return; // A build/install failure is not a failing test and cannot prove red.
     }
-    const baseSymbols = withoutFix ? baseBuildSymbols(buildOrder) : undefined;
     for (let i = 0; i < targets.length; i++) {
       try {
-        const result = await runTest(targets[i], undefined, { timeoutMs, baseSymbols });
+        const result = await runTest(targets[i], undefined, { timeoutMs, classifyMissingApi: withoutFix });
         const row = report.tests[i];
         if (result.killFailure) {
           report.inconclusive.push(`${label}: ${targets[i].file}: ${result.killFailure}`);

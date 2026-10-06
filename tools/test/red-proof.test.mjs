@@ -226,6 +226,13 @@ for (const [name, body, extra, reason] of [
       f.put('packages/cell/src/value.ts', LEDGER_HEAD);
       if (extra.helper) f.put('packages/cell/test/helper.ts', extra.helper);
       if (extra.support) f.put('packages/cell/test/test-support/helper.ts', extra.support);
+      if (extra.support) {
+        // The suite's stand-in compiler copies flat directories; a nested test-support directory needs a recursive copy.
+        f.put('packages/cell/build.mjs', [
+          "import {mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';",
+          "function copy(from, to) { mkdirSync(to, {recursive: true}); for (const name of readdirSync(from)) { const source = from + '/' + name; if (statSync(source).isDirectory()) copy(source, to + '/' + name); else writeFileSync(to + '/' + name.replace(/\\.ts$/, '.js'), readFileSync(source)); } }",
+          "for (const dir of ['src', 'test']) copy(dir, 'dist/' + dir);", ''].join('\n'));
+      }
       f.put(file, NO_VALUE(body));
       f.git('add', '.'); f.git('commit', '-qm', name);
       const result = command(process.execPath, [script, f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, {env: {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'}});
