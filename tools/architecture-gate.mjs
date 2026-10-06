@@ -81,6 +81,8 @@ const pkgs = workspacePackages(argvRoot);
 const violations = [];
 const edges = new Map(); // pkg -> Set(pkg) for cycle detection
 const testOnlySubpaths = rules.testOnlySubpaths ?? [];
+const rawCores = rules.rawCores ?? {};
+const rawCoreForbiddenSubpaths = rules.rawCoreForbiddenSubpaths ?? [];
 
 for (const pkg of pkgs) {
   if (!pkg.layer) {
@@ -131,7 +133,19 @@ for (const pkg of pkgs) {
       }
       const ref = packageOfSpecifier(spec, pkgs);
       if (!ref) continue;
+      if (ref.name in rawCores) {
+        const wrapper = rawCores[ref.name];
+        if (pkg.name !== wrapper) violations.push({ file: rel, line, rule: "raw-core", text: `${ref.name} is imported outside its wrapper ${wrapper} (B05 D5-1)` });
+        else if (!(ref.name in pkg.deps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
+        if (ref.sub !== "") {
+          if (!isTestFile && rawCoreForbiddenSubpaths.some((s) => ref.sub === s || ref.sub.startsWith(s + "/"))) violations.push({ file: rel, line, rule: "raw-core", text: `production source imports ${ref.name}${ref.sub}, a campaign-only surface (B05 D5-1)` });
+          else violations.push({ file: rel, line, rule: "raw-core", text: `deep import into the raw core ${ref.name}${ref.sub}; only its root is allowed` });
+        }
+        if (isClientBundle && rules.serverOnlyPackages.includes(ref.name)) violations.push({ file: rel, line, rule: "client-bundle", text: `server-only package ${ref.name} imported from a client bundle` });
+        continue;
+      }
       if (ref.pkg) {
+        if (isClientBundle && rules.serverOnlyPackages.includes(ref.name)) violations.push({ file: rel, line, rule: "client-bundle", text: `server-only package ${ref.name} imported from a client bundle` });
         edges.set(pkg.name, (edges.get(pkg.name) ?? new Set()).add(ref.pkg.name));
         imported.add(ref.pkg.name);
         if (!(ref.name in pkg.deps) && !(isNodeSide && ref.name in pkg.devDeps)) violations.push({ file: rel, line, rule: "declared", text: `${ref.name} is imported but not declared in ${pkg.name}/package.json dependencies` });
