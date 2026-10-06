@@ -21,8 +21,11 @@ export interface Invariant {
   readonly id: `INV-${string}`;
   readonly decision: string;
   /**
-   * The `why` text of each UNION ALL branch, in order (a branch is one condition of the invariant: the self-test forges a state for EACH and
-   * requires its own text among the rows returned). Absent: the invariant is a single condition without a `why` column.
+   * The `why` text of each UNION ALL branch, in order. A branch is ONE atomic predicate of the invariant (a conjunction of the facts that
+   * select its rows, never a disjunction: no OR, no `<> 1` over a count, which is "none" or "several", no IS DISTINCT FROM over a nullable
+   * side, which is "absent" or "different"): the self-test forges a state for EACH that fires that predicate alone among the invariant's
+   * branches, unless it declares the others the same state must also fire. Absent: the invariant is a single atomic predicate without a
+   * `why` column.
    */
   readonly whys?: ReadonlyArray<string>;
   readonly sql: string;
@@ -65,19 +68,30 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-L-02",
-    whys: ["not a mirror","entry reversed more than once"],
+    whys: ["reversal of no entry", "reversal on another account", "reversal in another currency", "reversal of another amount", "reversal in the same direction", "entry reversed more than once"],
     decision: "a reversal mirrors its entry (same account, currency, amount, the opposite direction) and an entry is reversed once (mig 0017)",
-    sql: `SELECT r.entry_id, r.reverses_entry_id, 'not a mirror' AS why
-            FROM kauro.ledger_entries r LEFT JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id
-           WHERE r.reverses_entry_id IS NOT NULL
-             AND (o.entry_id IS NULL OR o.account_code <> r.account_code OR o.currency <> r.currency OR o.amount_cents <> r.amount_cents OR o.direction = r.direction)
+    sql: `SELECT r.entry_id, r.reverses_entry_id, 'reversal of no entry' AS why
+            FROM kauro.ledger_entries r
+           WHERE r.reverses_entry_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM kauro.ledger_entries o WHERE o.entry_id = r.reverses_entry_id)
+          UNION ALL
+          SELECT r.entry_id, r.reverses_entry_id, 'reversal on another account'
+            FROM kauro.ledger_entries r JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id WHERE o.account_code <> r.account_code
+          UNION ALL
+          SELECT r.entry_id, r.reverses_entry_id, 'reversal in another currency'
+            FROM kauro.ledger_entries r JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id WHERE o.currency <> r.currency
+          UNION ALL
+          SELECT r.entry_id, r.reverses_entry_id, 'reversal of another amount'
+            FROM kauro.ledger_entries r JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id WHERE o.amount_cents <> r.amount_cents
+          UNION ALL
+          SELECT r.entry_id, r.reverses_entry_id, 'reversal in the same direction'
+            FROM kauro.ledger_entries r JOIN kauro.ledger_entries o ON o.entry_id = r.reverses_entry_id WHERE o.direction = r.direction
           UNION ALL
           SELECT min(r.entry_id::text)::uuid, r.reverses_entry_id, 'entry reversed more than once'
             FROM kauro.ledger_entries r WHERE r.reverses_entry_id IS NOT NULL GROUP BY r.reverses_entry_id HAVING count(*) > 1`,
   },
   {
     id: "INV-S-01",
-    whys: ["payable not derived","HOLD item of a line the statement does not itemize"],
+    whys: ["payable not derived", "derived payable negative", "HOLD item of a line the statement does not itemize"],
     decision: "an item's payable is derived: cumulative - previously paid - held - same-statement HOLD items of its line - offset, never negative (D10-STMT-2, R2-102)",
     sql: `WITH w AS (
             SELECT hi.statement_id, h.line_id, sum(hi.held_cents) AS cents
@@ -89,7 +103,9 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
               FROM kauro.statement_items i LEFT JOIN w ON w.statement_id = i.statement_id AND w.line_id = i.line_id
              WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE'
           )
-          SELECT statement_id, item_id, line_id, payable_cents, derived, 'payable not derived' AS why FROM d WHERE payable_cents <> derived OR derived < 0
+          SELECT statement_id, item_id, line_id, payable_cents, derived, 'payable not derived' AS why FROM d WHERE payable_cents <> derived
+          UNION ALL
+          SELECT statement_id, item_id, line_id, payable_cents, derived, 'derived payable negative' FROM d WHERE derived < 0
           UNION ALL
           SELECT hi.statement_id, hi.item_id, h.line_id, hi.held_cents, NULL, 'HOLD item of a line the statement does not itemize'
             FROM kauro.statement_items hi LEFT JOIN kauro.commission_holds h ON h.hold_id = hi.hold_id
@@ -98,11 +114,17 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-02",
+    whys: ["payable total not its items' sum", "held total not its items' sum"],
     decision: "a statement's payable and held totals are the sums of its items' (D10-STMT-2)",
-    sql: `SELECT s.statement_id, s.state, s.payable_cents, coalesce(sum(i.payable_cents), 0) AS items_payable, s.held_cents, coalesce(sum(i.held_cents), 0) AS items_held
+    sql: `SELECT s.statement_id, s.state, s.payable_cents AS cents, coalesce(sum(i.payable_cents), 0) AS items, 'payable total not its items'' sum' AS why
             FROM kauro.commission_statements s LEFT JOIN kauro.statement_items i ON i.statement_id = s.statement_id
            GROUP BY s.statement_id
-          HAVING s.payable_cents <> coalesce(sum(i.payable_cents), 0) OR s.held_cents <> coalesce(sum(i.held_cents), 0)`,
+          HAVING s.payable_cents <> coalesce(sum(i.payable_cents), 0)
+          UNION ALL
+          SELECT s.statement_id, s.state, s.held_cents, coalesce(sum(i.held_cents), 0), 'held total not its items'' sum'
+            FROM kauro.commission_statements s LEFT JOIN kauro.statement_items i ON i.statement_id = s.statement_id
+           GROUP BY s.statement_id
+          HAVING s.held_cents <> coalesce(sum(i.held_cents), 0)`,
   },
   {
     id: "INV-S-03",
@@ -120,15 +142,19 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-05",
-    whys: ["SETTLED intent of a statement not PAID","PAID statement without exactly one SETTLED intent","line paid cents not its paid items"],
+    whys: ["SETTLED intent of a statement not PAID", "PAID statement without a SETTLED intent", "PAID statement with several SETTLED intents", "line paid cents not its paid items"],
     decision: "paid conservation: a settled intent's statement is PAID, a PAID statement has exactly one settled intent, a line's paid cents are its paid statements' payable items (SETTLE_PAR)",
     sql: `SELECT p.statement_id, p.intent_id AS ref, s.state AS detail, 'SETTLED intent of a statement not PAID' AS why
             FROM kauro.payout_intents p JOIN kauro.commission_statements s ON s.statement_id = p.statement_id
            WHERE p.state = 'SETTLED' AND s.state <> 'PAID'
           UNION ALL
-          SELECT s.statement_id, NULL, (SELECT count(*) FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED')::text, 'PAID statement without exactly one SETTLED intent'
+          SELECT s.statement_id, NULL, '0', 'PAID statement without a SETTLED intent'
             FROM kauro.commission_statements s
-           WHERE s.state = 'PAID' AND (SELECT count(*) FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED') <> 1
+           WHERE s.state = 'PAID' AND NOT EXISTS (SELECT 1 FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED')
+          UNION ALL
+          SELECT s.statement_id, NULL, (SELECT count(*) FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED')::text, 'PAID statement with several SETTLED intents'
+            FROM kauro.commission_statements s
+           WHERE s.state = 'PAID' AND (SELECT count(*) FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED') > 1
           UNION ALL
           SELECT NULL, l.line_id, coalesce(l.paid_cents, 0) || ' paid, ' || coalesce(x.cents, 0) || ' in paid statements', 'line paid cents not its paid items'
             FROM kauro.commission_lines l
@@ -147,18 +173,36 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-07",
-    whys: ["OFFSET item not its offset","offset not under the negative line's signed future-offset terms","payable item offsets beyond the durable offsets against its line"],
+    whys: [
+      "OFFSET item not its offset",
+      "offset under another agreement than its negative line's",
+      "offset agreement absent for its seller",
+      "offset agreement terms not SIGNED_FUTURE_OFFSET",
+      "offset agreement never signed",
+      "payable item offsets beyond the durable offsets against its line",
+    ],
     decision: "offsets: an OFFSET item reports its durable offset, an offset names the negative line's agreement with signed SIGNED_FUTURE_OFFSET terms, a payable item offsets at most the durable offsets against its line (D10-NEG-1, KC017)",
     sql: `SELECT i.item_id AS ref, i.offset_id AS other, i.offset_cents || ' reported, ' || o.amount_cents || ' durable' AS detail, 'OFFSET item not its offset' AS why
             FROM kauro.statement_items i JOIN kauro.commission_offsets o ON o.offset_id = i.offset_id
            WHERE i.item_kind = 'OFFSET' AND i.offset_cents <> o.amount_cents
           UNION ALL
-          SELECT o.offset_id, o.agreement_id, coalesce(g.offset_terms, '(no agreement)') || ' signed ' || coalesce(g.signed_at::text, 'never'), 'offset not under the negative line''s signed future-offset terms'
+          SELECT o.offset_id, o.agreement_id, 'entitlement under ' || e.agreement_id, 'offset under another agreement than its negative line''s'
             FROM kauro.commission_offsets o
             JOIN kauro.commission_lines l ON l.line_id = o.negative_line_id
             JOIN kauro.commission_entitlements e ON e.entitlement_id = l.entitlement_id
-            LEFT JOIN kauro.seller_agreements g ON g.seller_id = o.seller_id AND g.agreement_id = o.agreement_id
-           WHERE o.agreement_id <> e.agreement_id OR g.agreement_id IS NULL OR g.offset_terms <> 'SIGNED_FUTURE_OFFSET' OR g.signed_at IS NULL
+           WHERE o.agreement_id <> e.agreement_id
+          UNION ALL
+          SELECT o.offset_id, o.agreement_id, '(no agreement)', 'offset agreement absent for its seller'
+            FROM kauro.commission_offsets o
+           WHERE NOT EXISTS (SELECT 1 FROM kauro.seller_agreements g WHERE g.seller_id = o.seller_id AND g.agreement_id = o.agreement_id)
+          UNION ALL
+          SELECT o.offset_id, o.agreement_id, g.offset_terms, 'offset agreement terms not SIGNED_FUTURE_OFFSET'
+            FROM kauro.commission_offsets o JOIN kauro.seller_agreements g ON g.seller_id = o.seller_id AND g.agreement_id = o.agreement_id
+           WHERE g.offset_terms <> 'SIGNED_FUTURE_OFFSET'
+          UNION ALL
+          SELECT o.offset_id, o.agreement_id, 'never signed', 'offset agreement never signed'
+            FROM kauro.commission_offsets o JOIN kauro.seller_agreements g ON g.seller_id = o.seller_id AND g.agreement_id = o.agreement_id
+           WHERE g.signed_at IS NULL
           UNION ALL
           SELECT i.item_id, i.line_id, i.offset_cents || ' offset, ' || coalesce(x.cents, 0) || ' durable', 'payable item offsets beyond the durable offsets against its line'
             FROM kauro.statement_items i
@@ -234,16 +278,20 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-12",
-    whys: ["live reservations above the slots","live reservation not on exactly one slot of its agency","slot names a reservation that is not live in its agency"],
+    whys: ["live reservations above the slots", "live reservation on no slot of its agency", "live reservation on several slots of its agency", "slot names a reservation that is not live in its agency"],
     decision: "founding capacity: live reservations within the policy's slots, each the live reservation of exactly one slot of its agency, and the reverse (R1 R12)",
     sql: `WITH live AS (SELECT * FROM kauro.founding_slot_reservations WHERE state IN ('RESERVED', 'RECONCILIATION_HOLD', 'CONSUMED'))
           SELECT v.policy_version AS ref, count(*)::text || ' live, ' || (SELECT count(*) FROM kauro.founding_slots f WHERE f.policy_version = v.policy_version) || ' slots' AS detail, 'live reservations above the slots' AS why
             FROM live v GROUP BY v.policy_version
           HAVING count(*) > (SELECT count(*) FROM kauro.founding_slots f WHERE f.policy_version = v.policy_version)
           UNION ALL
-          SELECT v.reservation_id::text, (SELECT count(*) FROM kauro.founding_slots f WHERE f.live_reservation_id = v.reservation_id AND f.live_agency_id = v.agency_id AND f.policy_version = v.policy_version)::text || ' slots', 'live reservation not on exactly one slot of its agency'
+          SELECT v.reservation_id::text, '0 slots', 'live reservation on no slot of its agency'
             FROM live v
-           WHERE (SELECT count(*) FROM kauro.founding_slots f WHERE f.live_reservation_id = v.reservation_id AND f.live_agency_id = v.agency_id AND f.policy_version = v.policy_version) <> 1
+           WHERE NOT EXISTS (SELECT 1 FROM kauro.founding_slots f WHERE f.live_reservation_id = v.reservation_id AND f.live_agency_id = v.agency_id AND f.policy_version = v.policy_version)
+          UNION ALL
+          SELECT v.reservation_id::text, (SELECT count(*) FROM kauro.founding_slots f WHERE f.live_reservation_id = v.reservation_id AND f.live_agency_id = v.agency_id AND f.policy_version = v.policy_version)::text || ' slots', 'live reservation on several slots of its agency'
+            FROM live v
+           WHERE (SELECT count(*) FROM kauro.founding_slots f WHERE f.live_reservation_id = v.reservation_id AND f.live_agency_id = v.agency_id AND f.policy_version = v.policy_version) > 1
           UNION ALL
           SELECT f.policy_version || '#' || f.slot_no, f.live_reservation_id::text, 'slot names a reservation that is not live in its agency'
             FROM kauro.founding_slots f
@@ -257,14 +305,18 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-14",
-    whys: ["pool with no line","claim entitlement whose claim is not CONVERTED","CONVERTED claim without an entitlement","first qualifying purchase without the first designation naming its capture","agencies mirror neither NULL nor the first designation","paid purchase with two non-REVOKED authorizations","CORRECTED statement with an intent not FAILED or RETURNED","predecessor with two successors"],
+    whys: ["pool with no line","claim entitlement whose claim does not exist","claim entitlement whose claim is not CONVERTED","CONVERTED claim without an entitlement","first qualifying purchase without the first designation naming its capture","agencies mirror without a first designation","agencies mirror not the first designation","paid purchase with two non-REVOKED authorizations","CORRECTED statement with an intent not FAILED or RETURNED","predecessor with two successors"],
     decision: "completeness of the pairs written in one unit: pool and lines, claim and entitlement, first designation, the agencies mirror, one live authorization per purchase, corrections (CONS_PAR, CONV_PAR, D10-FIRST-1, REPL_*, D10-GAP-7)",
     sql: `SELECT p.pool_id::text AS ref, NULL AS other, 'pool with no line' AS why
             FROM kauro.commission_pools p WHERE NOT EXISTS (SELECT 1 FROM kauro.commission_lines l WHERE l.pool_id = p.pool_id)
           UNION ALL
-          SELECT e.entitlement_id::text, e.claim_id::text || ' ' || coalesce(c.state, '(none)'), 'claim entitlement whose claim is not CONVERTED'
-            FROM kauro.commission_entitlements e LEFT JOIN kauro.attribution_claims c ON c.claim_id = e.claim_id
-           WHERE e.claim_id IS NOT NULL AND c.state IS DISTINCT FROM 'CONVERTED'
+          SELECT e.entitlement_id::text, e.claim_id::text, 'claim entitlement whose claim does not exist'
+            FROM kauro.commission_entitlements e
+           WHERE e.claim_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM kauro.attribution_claims c WHERE c.claim_id = e.claim_id)
+          UNION ALL
+          SELECT e.entitlement_id::text, e.claim_id::text || ' ' || c.state, 'claim entitlement whose claim is not CONVERTED'
+            FROM kauro.commission_entitlements e JOIN kauro.attribution_claims c ON c.claim_id = e.claim_id
+           WHERE c.state <> 'CONVERTED'
           UNION ALL
           SELECT c.claim_id::text, NULL, 'CONVERTED claim without an entitlement'
             FROM kauro.attribution_claims c WHERE c.state = 'CONVERTED' AND NOT EXISTS (SELECT 1 FROM kauro.commission_entitlements e WHERE e.claim_id = c.claim_id)
@@ -273,9 +325,13 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
             FROM kauro.qualifying_purchases q
            WHERE q.confirmation_seq = 1 AND NOT EXISTS (SELECT 1 FROM kauro.agency_recurrence r WHERE r.agency_id = q.agency_id AND r.first_capture_id = q.capture_id)
           UNION ALL
-          SELECT a.agency_id::text, a.first_qualifying_capture_id::text || ' mirror, ' || coalesce(r.first_capture_id::text, '(no designation)'), 'agencies mirror neither NULL nor the first designation'
-            FROM kauro.agencies a LEFT JOIN kauro.agency_recurrence r ON r.agency_id = a.agency_id
-           WHERE a.first_qualifying_capture_id IS NOT NULL AND a.first_qualifying_capture_id IS DISTINCT FROM r.first_capture_id
+          SELECT a.agency_id::text, a.first_qualifying_capture_id::text || ' mirror, no designation', 'agencies mirror without a first designation'
+            FROM kauro.agencies a
+           WHERE a.first_qualifying_capture_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM kauro.agency_recurrence r WHERE r.agency_id = a.agency_id)
+          UNION ALL
+          SELECT a.agency_id::text, a.first_qualifying_capture_id::text || ' mirror, ' || r.first_capture_id::text || ' designated', 'agencies mirror not the first designation'
+            FROM kauro.agencies a JOIN kauro.agency_recurrence r ON r.agency_id = a.agency_id
+           WHERE a.first_qualifying_capture_id <> r.first_capture_id
           UNION ALL
           SELECT ca.capture_id::text, count(*)::text || ' live authorizations', 'paid purchase with two non-REVOKED authorizations'
             FROM kauro.commercial_authorizations ca WHERE ca.state <> 'REVOKED' GROUP BY ca.agency_id, ca.capture_id HAVING count(*) > 1
