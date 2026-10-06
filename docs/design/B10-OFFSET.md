@@ -1,8 +1,9 @@
-# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r3, D10-NEG-4..7)
+# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r4, D10-NEG-4..7)
 
 Lane `B10-OFFSET` (branch `b10/offset`, builds after kit PR1 merges). r1 = 97839bd; r2 answers Codex design review r1
 (`tools/review/out/b10-offset-design-97839bdc0b32`, REJECT, OFF-R1..R8); r3 answers design r2 on 18ca05b
-(`tools/review/out/b10-offset-design-r2-18ca05bdf51e`, REJECT: OFF-R1..R3, R5, R7, R8 FIXED; OFF-R4, OFF-R6 PARTIAL; OFF-R2-01..04 new). Supersedes D10-NEG-3 and the provisional
+(`tools/review/out/b10-offset-design-r2-18ca05bdf51e`, REJECT: OFF-R1..R3, R5, R7, R8 FIXED; OFF-R4, OFF-R6 PARTIAL; OFF-R2-01..04 new); r4 answers design r3 on af1ff58
+(`tools/review/out/b10-offset-design-r3-af1ff58c9899`, REJECT, converging: r2 defects and release guards FIXED; OFF-R3-01, OFF-R3-02 new; OFF-R6 PARTIAL). Supersedes D10-NEG-3 and the provisional
 `0045_offset_capacity_holds.sql` (843bf01; reverted on the kit by f78af7b). Inputs: adversary ADV-3, ADV-9, ADV-10, ADV-14, ADV-15,
 ADV-17, ADV-18. Governing text: 17 "Refunds after payout and negative balances" (the statement shows original accrual, payout,
 adjustment and current balance), 17 "Accrual, eligibility and payout" (approved undisputed payable amounts; no minimum payout), 17
@@ -35,6 +36,9 @@ r3 (design r2 findings):
 | OFF-R2-04 cutoff misses offsets and credit payments | KAURO_COMMISSION_CUTOFF_V2 hashes offsets, releases, credit entries, CREDIT items with their statement state, noncash settlements (§2.8; S57, S58) |
 | OFF-R4 PARTIAL release guards | the guard records the applying statement at INSERT; at COMMIT a release of an applied claim requires that statement CORRECTED with no AUTHORIZED, SUBMITTED or SETTLED intent, whatever the line's final state; settlement is refused at INSERT and again at COMMIT (§4; T28, T29) |
 | OFF-R6 PARTIAL pairs | funds-observation, C-ST, HR-NC, I-NC, NC-NC, different-object pairs (HR-U, F-F, ST-ST, K-K) each a held RACE or a stated non-interaction; TIMEOUT cells for guarded INSERTs; discovery growth S54; NC retry S50 (§7) |
+| (r4) OFF-R3-01 direct CREDIT insert lock inversion | every guarded INSERT guard takes the prefix rows its FKs will lock (statement row, then the line row, KEY SHARE) **before** the subject, so the FK's later KEY SHARE is already held; audit of all four guarded INSERTs (§4, §5.1); RACE C14, C15, T30, S59 |
+| (r4) OFF-R3-02 cutoff misses funds | V2 hashes each close line's capture's latest funds observation (id, capture version, funds state); `observeFunds` takes the capture's line rows and subjects first (D10-GAP-24), so the close's locks hold them still (§2.8); S60, S61 |
+| (r4) OFF-R6 PARTIAL | U-ST S62 and U-NC S63 (zero credit either order); RELEASED tests assert the order's credit and the conserved total (line cash + credit = entitlement); PARTIAL cells now inject a failure at a later write (Y24, C16, S64-S68) or are N/A for one INSERT; every pair in §7 is a cell or a written non-interaction proof |
 | rule 16 (lock-set family, third round) | added to FAILURE-MATRIX-TEMPLATE.md; §5.1 sweeps every guarded aggregate: offsets, releases, credit entries, CREDIT items, noncash settlements, cutoff |
 
 ## 1. What is wrong on 0030 today (latent: `recordOffset` has no production caller, OQ-1)
@@ -117,10 +121,12 @@ settled sources (§2.2) and settled credit lines (§2.4). A mixed statement (cas
 ### 2.8 Cutoff (OFF-R2-04): KAURO_COMMISSION_CUTOFF_V2
 The close's proposal hash (`commissionCutoffHash`, design-owned, not authority) moves to domain `KAURO_COMMISSION_CUTOFF_V2`: V1's
 lines, adjustments and holds plus, for the close's lines, offsets (id, source, receiver, amount), releases (id, offset, amount, cause),
-seller credit entries (id, line, kind, amount), CREDIT items with their statement's id and state, and noncash settlements (id,
-statement). Every economic input the composition reads is hashed: an offset recorded or a CREDIT item paid after the proposal changes
+seller credit entries (id, line, kind, amount), CREDIT items with their statement's id and state, noncash settlements (id,
+statement), and for each capture of the close's lines its latest funds observation (observation id, capture version, funds state),
+which decides PAYABLE or AWAITING_FUNDS (D10-GAP-23; OFF-R3-02). Every economic input the composition reads is hashed: an offset recorded or a CREDIT item paid after the proposal changes
 the hash and the close refuses STALE_VERSION LEDGER_CHANGED. Under the close's locks (all lines FOR UPDATE, then subjects) none of
-these can change (each writer needs a line row or subject the close holds), so the second read equals what is composed. The close's
+these can change (each writer needs a line row or subject the close holds; a funds observation is written after its capture's line rows and
+subjects, D10-GAP-24), so the second read equals what is composed. The close's
 own releases and credit entries are written after the comparison, in its COMMIT.
 
 ### 2.7 Statement
@@ -151,7 +157,7 @@ causes: ENTITLEMENT_CHANGED, HOLD_CHANGED, LINE_SETTLED, CLAIMS_APPLIED, APPLICA
 Database guards (named, each its own DENY test, rule 12):
 - `commission_offsets_authorized`: KC017 (0030); `commission_offsets_amount` (23514) for each of: source never settled; amount >
   pos(N) - out(N); amount > cap(R) - claims(R); `commission_offsets_applicable` (23514): R not ELIGIBLE.
-- `commission_offset_releases_guard` (BEFORE INSERT): takes the receiving line's subject **before** reading live; records on the row
+- `commission_offset_releases_guard` (BEFORE INSERT): takes the receiving line's row (KEY SHARE) and then its subject **before** reading live; records on the row
   `applying_statement_id` = the statement of the receiving line's live PAYABLE LINE item (not CORRECTED; the oldest when a successor is
   already in the same COMMIT), or NULL; refuses `commission_offset_releases_within_live` (amount > live) and
   `commission_offset_releases_settled` (the applying statement PAID, or noncash-settled, or the line PAID or ADJUSTED).
@@ -159,16 +165,22 @@ Database guards (named, each its own DENY test, rule 12):
   line's final state): a release with an applying statement commits only if that statement is CORRECTED and has no AUTHORIZED,
   SUBMITTED or SETTLED intent; `commission_offset_releases_settled` is checked again at COMMIT (a release followed by the applying
   statement's settlement in the same transaction is refused). OFF-R4.
-- `seller_credit_entries_reconciled` (BEFORE INSERT, takes the line's subject before reading): the row equals the difference that brings
+- `seller_credit_entries_reconciled` (BEFORE INSERT, takes the line's row KEY SHARE, the lock its FK takes later, then its subject, before reading): the row equals the difference that brings
   R - V to max(X, itemized); anything else refused.
-- `statement_items_credit_guard` (BEFORE INSERT WHEN kind CREDIT, takes the line's subject before reading): itemized(L) + the item ≤
+- `statement_items_credit_guard` (BEFORE INSERT WHEN kind CREDIT: the statement row KEY SHARE, then the line row KEY SHARE (the locks its
+  FKs take after BEFORE triggers), then the line's subject, then reads; OFF-R3-01): itemized(L) + the item ≤
   R - V, and the line is settled; `statement_items_credit_within_recognized` (deferred) repeats it at COMMIT. OFF-R2-01.
 - Payout admission (`payout_lines_unpayable`, re-issued over 0036/0043): CREDIT item lines join the PAYABLE lines in the ascending
   shared-subject loop; a CREDIT line with an OPEN hold the statement does not withhold, or funds not AVAILABLE, blocks (KC018). OFF-R2-02.
-- `commission_noncash_settlements_admissible` (BEFORE INSERT; takes the statement row FOR UPDATE, then its item lines' shared subjects
+- `commission_noncash_settlements_admissible` (BEFORE INSERT; takes the statement row FOR UPDATE, then its item lines' rows KEY SHARE
+  ascending, then their shared subjects
   ascending, before reading; UNIQUE statement_id): statement ISSUED, payable 0, at least one PAYABLE LINE item, pay date
   reached, 0036 fence clear, evidence digest matches; `commission_statements_noncash_frozen` (every state change) and `commission_lines_noncash_frozen` (state and payable owner only;
   cumulative adjustments in both directions pass, OFF-R2-03).
+- FK audit (OFF-R3-01): an RI check locks its parent row FOR KEY SHARE after the BEFORE triggers. Each guarded INSERT's guard takes those
+  parent rows first, in the global order (statement, then lines ascending), so the RI lock is re-entrant and no guard holds a subject
+  while waiting for a row: offsets (N, R), releases (R; the FK parent is the offset row, level 4, never locked exclusively), credit
+  entries (L), CREDIT items (statement, L), noncash settlements (statement, its lines).
 - Grants: INSERT on releases and credit entries to `kauro_commission` (and to the owner on `kauro_app` only for cause HOLD_OPENED /
   HOLD_CHANGED, the triggers of an owner-opened hold); the helper functions are EXECUTE for both; every path passes the guards above.
 
@@ -210,14 +222,14 @@ transaction requests a row or subject of (1)/(2) after taking any subject. Each 
 | aggregate | lock taken before any read of it | writers (incl. direct INSERT grants) | RACE cells (both orders) |
 |---|---|---|---|
 | offsets (capacity of R, position of N) | N and R rows KEY SHARE, then both subjects (guard trigger: every INSERT path) | offset INSERT (commission service; OQ-1 writer) | T11, T12, T13, T19, T23, Y17, Y18, S09, S15, S45 |
-| releases (live amount of o) | o's receiving line's subject (guard trigger) | hold, line and close/correction/CMD053 yields; direct INSERT (commission service) | T24, Y11, Y12, Y20, Y21, S29, S33; TIMEOUT T27 |
-| seller credit entries (R - V of L) | L's subject (guard trigger) | reconcile from line, hold, close, correction, CMD053, noncash; direct INSERT | C06, C08, S14, S17, S42, S49; TIMEOUT C09 |
-| CREDIT items (itemized of L) | L's subject (item guard trigger) | close, correction; direct INSERT | C13, S47, S31; TIMEOUT C10 |
+| releases (live amount of o) | o's receiving line's row KEY SHARE, then its subject (guard trigger) | hold, line and close/correction/CMD053 yields; direct INSERT (commission service) | T24, T30, Y11, Y12, Y20, Y21, S29, S33; TIMEOUT T27 |
+| seller credit entries (R - V of L) | L's row KEY SHARE, then its subject (guard trigger) | reconcile from line, hold, close, correction, CMD053, noncash; direct INSERT | C06, C08, C15, C17, C18, S14, S17, S42, S49; TIMEOUT C09 |
+| CREDIT items (itemized of L) | the statement row, then L's row KEY SHARE, then L's subject (item guard trigger) | close, correction; direct INSERT | C13, C14, S47, S31; TIMEOUT C10 |
 | CREDIT payout admission (holds and funds of L) | L's shared subject (payout_lines_unpayable) | CMD052, intent INSERT trigger | S55, S56 |
-| noncash settlements (statement) | statement row FOR UPDATE, then its lines' subjects (guard trigger) | PERIODS sweep; direct INSERT | S36, S39, S46, S48, S49, S50, S35, S38, S45 |
-| cutoff V2 (every hashed input) | the close's lines FOR UPDATE and subjects (all input lines) | every writer above needs one of them | S09, S38, S47, S57, S58 |
+| noncash settlements (statement) | statement row FOR UPDATE, its lines' rows KEY SHARE ascending, then their subjects (guard trigger) | PERIODS sweep; direct INSERT | S36, S39, S46, S48, S49, S50, S35, S38, S45, S59, S63 |
+| cutoff V2 (every hashed input, funds included) | the close's lines FOR UPDATE and subjects (all input lines) | every writer above, and `observeFunds`, needs one of them | S09, S38, S47, S57, S58, S60, S61 |
 
-## 6. Tests (exact titles). Counts: F1 29, F2 23, F3 6, F4 58, F5 11, F6 13 = 140
+## 6. Tests (exact titles). Counts: F1 30, F2 25, F3 6, F4 69, F5 11, F6 18 = 159
 
 F1 `packages/persistence/test/b10-offset-bounds.test.ts` (recreated). T01-T04, T06-T12, T16 kept verbatim from 843bf01:
 - T01 "DENY: an offset of 101 cents against an unpaid 100-cent line with a 1000-cent negative position is refused commission_offsets_amount and writes nothing"
@@ -249,6 +261,7 @@ F1 `packages/persistence/test/b10-offset-bounds.test.ts` (recreated). T01-T04, T
 - T27 "RACE (timeout): a direct release waiting on its receiving line's subject past its statement timeout rolls back and writes nothing; the holder's release stands"
 - T28 "DENY (OFF-R4): a release of an applied claim whose line is then moved to HELD in the same transaction without its applying statement CORRECTED is refused at COMMIT commission_offset_releases_applied"
 - T29 "DENY (OFF-R4): a release of an applied claim followed in the same transaction by its applying statement's settlement is refused at COMMIT commission_offset_releases_settled"
+- T30 "RACE (OFF-R3-01): a direct release INSERT and a period close holding its receiving line's row, both orders: the guard waits at the line row before any subject; no deadlock (40P01 never), the release refused or admitted after the close by live amount"
 
 F2 `packages/persistence/test/b10-offset-yield.test.ts` (new):
 - Y01 "OK (ADV-15 A, full refund): a refund of the receiving line's capture to 0 releases its whole 600-cent offset in the refund's COMMIT (ENTITLEMENT_DECREASED); the line VOID, the offset's live amount 0, the negative line's position 600 to recover"
@@ -274,6 +287,8 @@ F2 `packages/persistence/test/b10-offset-yield.test.ts` (new):
 - Y21 "RACE: a hold opened and another hold RELEASED on one 1000-cent line carrying 500 under a 500 hold, both orders: the second waits on the line's subject; releases follow the order's capacities and never revive"
 - Y22 "RACE: an UPHELD resolution with its correction and a new 300-cent dispute hold on the same line, both orders: the second waits on the line's subject; claims end within E - P - H in either order"
 - Y23 "RACE: one hold RELEASED and another UPHELD with its correction on one line carrying 500, both orders: the second waits on the line's subject; claims, releases and credit equal in either order"
+- Y24 "RACE (partial): a hold on a line carrying a 600-cent offset whose INSERT succeeded and whose release write is then failed by an injected fault leaves no hold and no release"
+- Y25 "RACE: two UPHELD resolutions with their corrections on one line carrying an offset, both orders: the second waits on the line's row; claims end within the final capacity, equal in either order"
 
 F3 `packages/domain/test/b10-offset-compose.test.ts` (new, pure):
 - P01 "composeStatement applies the live claims against an ELIGIBLE line (amount less releases) and reports each OFFSET item at its live cents; a fully released offset has no item"
@@ -317,7 +332,7 @@ F4 `apps/api/test/b10-offset-statements.test.ts` (new; CMD051, correction, CMD05
 - S31 "RACE: a period close and a correction of an earlier statement sharing a line, both orders: the second waits on the shared line's row; one live payable item per line and no claim applied twice"
 - S32 "RACE: a hold RELEASED and a correction of the statement its PAYABLE line belongs to, both orders: release first, the successor applies 600; correction first, it releases 100 and applies 500"
 - S33 "RACE: a dispute hold RELEASED and CMD053 FAILED on its PAYABLE line, both orders: either order ends HELD PAYOUT_FAILED with 600 released"
-- S34 "RACE: a hold RELEASED and a period close over its ELIGIBLE line, both orders: release first, the statement pays the 500; close first, the 500 is withheld and becomes a 500-cent seller credit when the line is PAID"
+- S34 "RACE: a 500-cent hold RELEASED and a period close over its ELIGIBLE 1000-cent line, both orders: release first, no credit and the 500 in the line's payable; close first, the 500 withheld and, once the line is PAID, a 500-cent seller credit; in both, line cash plus credit is 1000"
 - S35 "RACE: the noncash settlement sweep and a refund of one of its lines, both orders: no deadlock; either order ends settled with the same negative position"
 - S36 "RACE: the noncash settlement sweep and a correction of the same statement, both orders: the second waits on the statement row; settle first, the correction is refused; correction first, the successor settles at its own pay date"
 - S37 "RACE: a period close and CMD053 FAILED of an earlier statement, both orders: no deadlock; the failed line is itemized by exactly one live statement"
@@ -343,6 +358,17 @@ F4 `apps/api/test/b10-offset-statements.test.ts` (new; CMD051, correction, CMD05
 - S56 "RACE (OFF-R2-02): CMD052 approval of a statement carrying a CREDIT item and a funds HELD observation of its line's capture, both orders: observation first, the approval is refused; approval first, the observation lands after the intent"
 - S57 "DENY (OFF-R2-04): an offset recorded after the close's proposal changes KAURO_COMMISSION_CUTOFF_V2; the close is refused STALE_VERSION LEDGER_CHANGED and writes nothing"
 - S58 "DENY (OFF-R2-04): a CREDIT item paid (its statement SETTLED) after the close's proposal changes KAURO_COMMISSION_CUTOFF_V2; the close is refused STALE_VERSION LEDGER_CHANGED"
+- S59 "RACE (OFF-R3-01): a direct noncash-settlement INSERT and a period close sharing a line, both orders: the guard takes the statement row and the line rows before any subject; no deadlock"
+- S60 "DENY (OFF-R3-02): a funds HELD observation of an ELIGIBLE line's capture after the close's proposal changes KAURO_COMMISSION_CUTOFF_V2; the close is refused STALE_VERSION LEDGER_CHANGED and writes nothing"
+- S61 "RACE: a funds HELD observation and a period close over a capture's ELIGIBLE line carrying a 600-cent offset, both orders: the second waits on the line rows; observation first, the line AWAITING_FUNDS with no offset applied; close first, PAYABLE with 600 applied and the observation after it"
+- S62 "RACE (OFF-R6): an UPHELD resolution with its 300-cent correction and CMD053 SETTLED on a PAYABLE 1000-cent line with 300 withheld and 700 cash payable, both orders: the second waits on the line's row; zero seller credit in either order"
+- S63 "RACE (OFF-R6): an UPHELD resolution with its 300-cent correction and the noncash settlement of an all-offset statement withholding those 300 on its line, both orders: zero seller credit in either order"
+- S64 "RACE (partial): CMD053 FAILED whose release succeeded and whose correcting statement INSERT is then failed leaves the intent, the line, the claims and the predecessor as they were"
+- S65 "RACE (partial, OFF-R6): CMD053 SETTLED whose line moved to PAID with 700 and whose credit recognition is then failed leaves neither the payment state nor any credit"
+- S66 "RACE (partial): a close whose releases and CREDIT item succeeded and whose second statement INSERT is then failed leaves no statement, release, credit item or line change"
+- S67 "RACE (partial): a correction whose cancellation releases succeeded and whose successor INSERT is then failed leaves the predecessor live with its applied claims"
+- S68 "RACE (partial): a noncash settlement whose row succeeded and whose credit reconcile is then failed leaves no settlement and no credit"
+- S69 "RACE: an independent correction and CMD053 FAILED of the same statement, both orders: the second waits on the statement row; one successor, the application cancelled once"
 
 F5 `packages/persistence/test/invariants.test.ts` (forged controls; positive controls stay silent):
 - V1 "INV-S-15 fires on a release beyond its offset (money: 600 released twice from a 600-cent offset)"
@@ -371,6 +397,11 @@ F6 `packages/persistence/test/b10-seller-credit.test.ts` (new):
 - C11 "OK (OFF-R2-02): a dispute hold opened after a 300-cent credit was itemized keeps 300 recognized while the item is live; the correction that supersedes it reverses the 300 (ITEM_CANCELLED) and itemizes none"
 - C12 "OK (OFF-R2-03): shares 5556/3333/1111 of a 14-cent pool (8/5/1) with the third line settled noncash: a refund to 13 (7/4/2) posts its INCREASE to 2 and records a 1-cent credit"
 - C13 "RACE (OFF-R2-01): two 300-cent CREDIT items for one line's 300-cent recognized credit inserted in two statements, both orders: the second waits on the line's subject taken by the item guard and is refused statement_items_credit_within_recognized; 300 itemized"
+- C14 "RACE (OFF-R3-01): a direct CREDIT item INSERT and a period close already holding its line's row, both orders: the item guard waits at the statement and line rows before the subject; no deadlock (40P01 never), 300 itemized once"
+- C15 "RACE (OFF-R3-01): a direct credit-entry INSERT and a period close holding its line's row, both orders: the guard waits at the line row before the subject; no deadlock"
+- C16 "RACE (partial): a hold RELEASED on a PAID line whose credit entry write is then failed leaves the hold OPEN and no credit"
+- C17 "RACE: a hold opened and an INCREASE on one PAID line, both orders: the second waits on the line's subject; the same credit in either order"
+- C18 "RACE: two holds RELEASED on one PAID line, both orders: the second waits on the line's subject; credit equals both withheld amounts"
 
 Family suites (kit `apps/api/test/b10-cells-support.ts`): CONS_TMO/CRB/CRA (refund, reversal), CMD_CRB/CRA of CMD051, the correction,
 CMD053 and the PERIODS sweep (SWEEP_*) cover the new writes once each member's footprint includes `commission_offset_releases`,
@@ -381,33 +412,39 @@ CMD053 and the PERIODS sweep (SWEEP_*) cover the new writes once each member's f
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | M1 offset INSERT | **C** pairs below (O-*) | **C** T20 | N/A: no deadline governs an offset; R is already ELIGIBLE | **C** T21 | N/A: no response step; the writer (OQ-1) owns it | **GAP** OQ-1: the writer's idempotency identity | N/A: agreement terms immutable once signed (0029 `seller_agreements_immutable`, `learned_once`), read after the lock | N/A: one INSERT; DENY T01-T10, T17, T18 |
-| M2 hold INSERT + yield + credit | **C** pairs (H-*) | **C** Y16 | N/A: review_at acts on nothing | **C** Y14 | **GAP** FOOT-REL (SWEEP_CRA, CONS_CRA members opening holds); the dispute command is B12's | N/A: own hold id; B12's key | N/A: B12's grant | **C** Y14 (hold and release roll back together) |
-| M3 hold RESOLVED (RELEASED, UPHELD) + credit | **C** pairs (HR-*, U-*) | **GAP** FOOT-REL (ELIGIBILITY sweep timeout member) | N/A | **GAP** FOOT-REL (SWEEP_CRB ELIGIBILITY) | **GAP** FOOT-REL (SWEEP_CRA) | **C** resolveHold CAS (existing STALE on version) + C06 | N/A: commission service / B12 | **C** C03 (credit with the resolution, one COMMIT) |
+| M2 hold INSERT + yield + credit | **C** pairs (H-*) | **C** Y16 | N/A: review_at acts on nothing | **C** Y14 | **GAP** FOOT-REL (SWEEP_CRA, CONS_CRA members opening holds); the dispute command is B12's | N/A: own hold id; B12's key | N/A: B12's grant | **C** Y24 |
+| M3 hold RESOLVED (RELEASED, UPHELD) + credit | **C** pairs (HR-*, U-*) | **GAP** FOOT-REL (ELIGIBILITY sweep timeout member) | N/A | **GAP** FOOT-REL (SWEEP_CRB ELIGIBILITY) | **GAP** FOOT-REL (SWEEP_CRA) | **C** resolveHold CAS (existing STALE on version) + C06 | N/A: commission service / B12 | **C** C16 |
 | M4 line E change + yield + credit (refund, reversal; B12 correction) | **C** pairs (D-*) | **GAP** FOOT-REL CONS_TMO | N/A | **GAP** FOOT-REL CONS_CRB | **GAP** FOOT-REL CONS_CRA | **C** Y10 | **C** CONS_REV (kit, existing) | **C** Y15 |
-| M5 CMD053 FAILED/RETURNED (cancellation, HELD or zero path, correction) | **C** pairs (F-*) | **GAP** FOOT-REL CMD053 member | N/A: evidence has no B10 deadline (B15) | **GAP** FOOT-REL CMD_CRB | **GAP** FOOT-REL CMD_CRA | **C** CMD053 RETRY cell (existing); S06, S20 one release | N/A: finance service fact | **C** S06, S20 (hold or none, line, release, credit, correction: one COMMIT) |
-| M6 CMD053 SETTLED (lines PAID, claims settled, credit) | **C** pairs (ST-*) | **GAP** FOOT-REL | N/A | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** CMD053 RETRY (existing) | N/A | **C** S41 |
-| M7 close CMD051 (yield, §2.5 applications, credit, CREDIT items) | **C** pairs (C-*) | **GAP** FOOT-REL | N/A here: the period's due date is CMD051's existing EXPIRY cell | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** CMD051 RETRY (existing); S05, S18 | N/A | **C** P02, S01-S05, S08, S18 |
-| M8 correction (lock set, cancellation, recompose) | **C** pairs (K-*) | **GAP** FOOT-REL | N/A | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** existing "corrected once" | N/A | **C** S07, S12 (LEDGER_CHANGED rolls back releases) |
-| M9 noncash settlement (PERIODS sweep) | **C** pairs (NC-*) | **GAP** FOOT-REL SWEEP_TMO | **C** S21 (before, at, after the pay date on the controlled clock) | **GAP** FOOT-REL SWEEP_CRB | **GAP** FOOT-REL SWEEP_CRA | **C** S50 | N/A: commission service | **C** S21 (settlement and credit, one COMMIT) |
+| M5 CMD053 FAILED/RETURNED (cancellation, HELD or zero path, correction) | **C** pairs (F-*) | **GAP** FOOT-REL CMD053 member | N/A: evidence has no B10 deadline (B15) | **GAP** FOOT-REL CMD_CRB | **GAP** FOOT-REL CMD_CRA | **C** CMD053 RETRY cell (existing); S06, S20 one release | N/A: finance service fact | **C** S64 |
+| M6 CMD053 SETTLED (lines PAID, claims settled, credit) | **C** pairs (ST-*) | **GAP** FOOT-REL | N/A | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** CMD053 RETRY (existing) | N/A | **C** S65 |
+| M7 close CMD051 (yield, §2.5 applications, credit, CREDIT items) | **C** pairs (C-*) | **GAP** FOOT-REL | N/A here: the period's due date is CMD051's existing EXPIRY cell | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** CMD051 RETRY (existing); S05, S18 | N/A | **C** S66 |
+| M8 correction (lock set, cancellation, recompose) | **C** pairs (K-*) | **GAP** FOOT-REL | N/A | **GAP** FOOT-REL | **GAP** FOOT-REL | **C** existing "corrected once" | N/A | **C** S67 |
+| M9 noncash settlement (PERIODS sweep) | **C** pairs (NC-*) | **GAP** FOOT-REL SWEEP_TMO | **C** S21 (before, at, after the pay date on the controlled clock) | **GAP** FOOT-REL SWEEP_CRB | **GAP** FOOT-REL SWEEP_CRA | **C** S50 | N/A: commission service | **C** S68 |
 | M10 lock acquisition (pools, fence, prelocks) | **C** Y13, S13, S25 | N/A: M4/M5 | N/A | N/A: locks only | N/A | N/A | N/A | N/A: locks only |
-| M11 release INSERT (guarded) | **C** T24 | **C** T27 | N/A | N/A: single INSERT | N/A | **C** T24 (a second release refused beyond live) | N/A | **C** T22, T25, T26, T28, T29 |
-| M12 credit entry INSERT / CREDIT item INSERT (guarded) | **C** C06, C08, C13 | **C** C09, C10 | N/A | N/A: single INSERT | N/A | **C** C07 | N/A | **C** C05, C07 |
+| M11 release INSERT (guarded) | **C** T24, T30 | **C** T27 | N/A | N/A: single INSERT | N/A | **C** T24 (a second release refused beyond live) | N/A | N/A: one INSERT (rule 4); its guards are DENY T22, T25, T26, T28, T29 |
+| M12 credit entry INSERT / CREDIT item INSERT (guarded) | **C** C06, C08, C13, C14, C15 | **C** C09, C10 | N/A | N/A: single INSERT | N/A | **C** C07 | N/A | N/A: one INSERT (rule 4); its guards are DENY C05, C07 |
 | M13 CMD052 with CREDIT items (shared subjects, holds, funds) | **C** S55, S56 | **C** CMD052 TIMEOUT cell (existing; CREDIT lines join its subject loop) | **C** CMD052 step-up EXPIRY cells (existing) | **C** CMD052 CRASH-BEFORE (existing) | **C** CMD052 CRASH-AFTER (existing) | **C** CMD052 RETRY (existing) | **C** CMD052 REVOCATION (existing: destination, step-up) | N/A: one intent INSERT; its KC018 trigger is the guard (S55) |
-| M14 cutoff V2 (proposal vs close) | **C** S09, S47 | N/A: hash comparison, no wait | N/A | N/A: read-only | N/A | **C** S57, S58 (stale proposal refused) | N/A | N/A: read-only |
+| M14 cutoff V2 (proposal vs close) | **C** S09, S47, S61 | N/A: hash comparison, no wait | N/A | N/A: read-only | N/A | **C** S57, S58, S60 (stale proposal refused) | N/A | N/A: read-only |
 
-Writer-pair table on one line (O offset, H hold opened, HR hold RELEASED, U UPHELD + correction (X-B12-1, built here as the protocol,
-B12 calls it), D entitlement change, C close, K correction, F CMD053 FAILED/RETURNED, ST CMD053 SETTLED, NC noncash sweep, FO funds
-observation, I source increase). Every cell holds one actor at a named lock, both orders:
-O-O T11, T12; O-H T13; O-HR Y18; O-U Y17; O-D T19; O-I T23; O-C S09; O-K S15; O-F S13; O-ST S25; O-NC S45; H-H Y12; H-HR Y21; H-U Y22; H-D Y11; H-C S10;
-H-K S12; H-F S29; H-ST S40; H-NC S39; HR-D Y20; HR-C S34; HR-K S32; HR-F S33; HR-ST S41; HR-I C06; U-D Y19; U-C S28; U-K S44;
-U-F S43; D-C S11; D-K S16; D-F S30; D-ST S26; D-NC S35; I-C S17; I-K S14; I-F S42; C-K S31; C-F S37; C-NC S38; K-F: serialized on the
-statement row (D10-GAP-12 existing cell; CMD053 corrects in its own COMMIT); K-NC S36; F-ST: one intent, one evidence (existing CMD053
-cell); ST-FO S27; C-ST S47; HR-NC S48; I-NC S49; NC-NC S50; FO-NC S46; A-H (CMD052 vs a hold on a CREDIT line) S55; A-FO S56.
-Different objects on one line: HR-U Y23; F-F S51; ST-ST S52; K-K S53. Same object (one hold, one statement, one intent): CAS cells
-(existing STALE). Funds observation (FO) with O, H, HR, U, D, I, C, K, F: no interaction with any guarded aggregate (FO writes funds
-facts and moves only ACCRUED_PENDING lines, which carry no claim, no credit and no settlement) and the same lock protocol (capture rows
-ascending, then subjects: Y13); its money effect reaches offsets and credit only through payout admission (S55, S56), the noncash sweep
-(S46) and the close's AWAITING_FUNDS branch (kit FUNDS_* cells, D10-GAP-23). Discovery growth: S54.
+Writer pairs on one line. Writers: O offset, H hold opened, HR hold RELEASED, U UPHELD + its correction (X-B12-1 protocol, built here,
+called by B12), D entitlement change (refund, reversal), I entitlement change of a settled source, C close, K correction, F CMD053
+FAILED/RETURNED, ST CMD053 SETTLED, NC noncash sweep, FO funds observation, A CMD052 approval. A **cell** holds one actor at a named
+lock and runs the other, both orders; a **proof** states why the two cannot change a common guarded aggregate and why their locks
+cannot cycle (same order, §5).
+
+| | cells | proofs |
+|---|---|---|
+| O | O-O T11, T12; O-H T13; O-HR Y18; O-U Y17; O-D T19; O-I T23; O-C S09; O-K S15; O-F S13; O-ST S25; O-NC S45 | O-FO: FO moves only ACCRUED_PENDING lines (an offset needs ELIGIBLE R and a settled N), rows then subjects on both sides. O-A: A takes shared subjects only and its lines are PAYABLE (an offset against them is refused); the offset's rows-then-subjects cannot wait on A while A waits on nothing it holds |
+| H | H-H Y12; H-HR Y21; H-U Y22; H-D Y11; H-I C17; H-C S10; H-K S12; H-F S29; H-ST S40; H-NC S39; H-A S55 (on a CREDIT line; on PAYABLE lines the existing D10-GAP-8 cells) | H-FO: FO opens FUNDS_HELD holds only on ACCRUED_PENDING lines (no claim, no credit); two holds serialize on the line subject as H-H |
+| HR | HR-HR C18; HR-U Y23; HR-D Y20; HR-I C06; HR-C S34; HR-K S32; HR-F S33; HR-ST S41; HR-NC S48 | HR-FO: the ELIGIBILITY sweep's FUNDS_HELD release and FO change only ACCRUED_PENDING/HELD funds lines (claims 0 by INV-S-15.3). HR-A: a release only removes a blocker; A reads holds after its shared subject: refused or admitted, never paying held cents |
+| U | U-U Y25; U-D Y19; U-C S28; U-K S44; U-F S43; U-ST S62; U-NC S63 | U-I: both are entitlement writes of one line under its row lock (as D-D, kit CONS_DUP_LINE); U-FO as HR-FO; U-A: as HR-A plus a decrease on a PAYABLE line (existing D10-GAP-8 cells) |
+| D, I | D-D, I-I, D-I: kit CONS_DUP_LINE (one capture's lines under pool and row locks); D-C S11; D-K S16; D-F S30; D-ST S26; D-NC S35; I-C S17; I-K S14; I-F S42; I-NC S49 | I-ST: ST settles R's applied claims (Aout(N) counts applied and settled alike, X(N) unchanged) and locks R, not N. D-FO, I-FO: one capture's rows then subjects in both (Y13, D10-GAP-24). D-A, I-A: existing D10-GAP-8 cells (a decrease on a PAYABLE line) |
+| C | C-K S31; C-F S37; C-ST S47; C-NC S38; C-FO S61 | C-C: each close takes its period FOR UPDATE, then every input line FOR UPDATE ascending, then subjects ascending: two closes serialize on their first common line, the second composing from what the first committed (a line PAYABLE through the first is not re-itemized; INV-S-15.4). C-A: C takes its period, new statement rows, line rows then exclusive subjects; A takes its old statement row, cash, then shared subjects of its PAYABLE and CREDIT lines, never a row after a subject: no cycle. Common aggregate: a CREDIT line of A's statement; A's item is live, so C itemizes none of it (R - V - itemized), and A changes no itemized amount |
+| K | K-K S53; K-F S69; K-NC S36 | K-ST, K-A on one statement: both take its row FOR UPDATE first; an APPROVED or PAID statement has no CORRECTED edge (registry CommissionStatement), so after A or ST the correction is refused, and before them A/ST find a CORRECTED statement and refuse. K-FO: K's lines are PAYABLE or settled, not moved by FO; locks rows then subjects on both |
+| F, ST | F-F S51; ST-ST S52; ST-FO S27; F-ST on one intent: CMD053-RACE (existing, serialized settlement on the statement row) | F-NC, ST-NC: NC needs payable 0, F and ST need an intent (payable > 0): never the same statement; on a shared line both take its row FOR UPDATE before subjects (S51 is the same lock shape) |
+| NC, FO, A | NC-NC S50; NC-FO S46; A-FO S56; A-A CMD052-RACE (existing: two approvals) | A-NC: A needs payable > 0, NC payable 0: never one statement; on a shared line, NC takes the line rows FOR UPDATE and A only shared subjects, both ascending. FO-FO: one fact per capture version (UNIQUE, 0030), the capture's line rows then subjects (D10-GAP-24) |
+
+Discovery growth: S54. FOOT-REL (crash/timeout family footprints) stays an implementation obligation of lane FOOT, not coverage.
 
 ## 8. Migration plan (provisional numbers, contiguous; never edit 0030 or 0031: new migrations ALTER and CREATE OR REPLACE)
 
