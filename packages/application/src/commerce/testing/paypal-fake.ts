@@ -31,6 +31,7 @@ import type {
   PaymentEnvironment,
   ProviderRequest,
 } from "@kauro/domain";
+import { toUtcInstant } from "@kauro/domain";
 import type { CaptureIntent, CreateOrderIntent, PaymentProviderAdapter, ProviderDispatchResult, ProviderOrderObservation, RefundIntent, StoredEvidence } from "../ports.js";
 import { CONTRACT_FAKE, FAKE_EVIDENCE_CLASS, centsOf, decimalOf, sha256Hex, type FakeCall } from "./labels.js";
 
@@ -262,10 +263,21 @@ export function createPayPalContractFake(options: PayPalContractFakeOptions): Pa
     };
   }
 
+  /** The instant halfway between two instants of this fake's clock: an external completion strictly inside the interval. */
+  function midwayBetween(from: UtcInstant, to: UtcInstant): UtcInstant {
+    return toUtcInstant(Date.parse(from) + Math.floor((Date.parse(to) - Date.parse(from)) / 2));
+  }
+
   function makeCapture(order: FakeOrder, requestId: string | null, overrides: CaptureOverrides = {}): FakeCapture {
     const now = clock.now();
     const status = overrides.status ?? "COMPLETED";
-    const completedAt = overrides.completedAt !== undefined ? overrides.completedAt : status === "COMPLETED" || status === "REVERSED" ? now : null;
+    // The default completion lies halfway between the order's creation at the provider and this capture call: a real provider
+    // completes the capture inside that interval, and taking its middle keeps the instant between the database's own order
+    // creation and its later confirmation even when the database clock and this process's clock differ by a few ms (the
+    // Windows-only R2-080 HELD PROVIDER_TIME_UNVERIFIED flake, main 21b310f run 37416726572). `now` itself is not: the
+    // confirmation is stamped by the database after this call and may read a clock a millisecond behind.
+    const midway = midwayBetween(order.createdAt, now);
+    const completedAt = overrides.completedAt !== undefined ? overrides.completedAt : status === "COMPLETED" || status === "REVERSED" ? midway : null;
     const capture: FakeCapture = {
       id: nextCapture(),
       orderId: order.id,
@@ -514,7 +526,10 @@ export function createPayPalContractFake(options: PayPalContractFakeOptions): Pa
       const capture = captures.get(providerCaptureId);
       if (capture === undefined) throw new RangeError("unknown provider capture");
       if (change.status !== undefined) {
-        if (change.status === "COMPLETED" && capture.completedAt === null) capture.completedAt = clock.now();
+        // a PENDING capture completes between its creation and this observation call, never at the call itself (ADV-3)
+        // (the instant written is the midpoint, not the observation instant itself, which the fixture-clock lint would refuse)
+        const observedAt = clock.now();
+        if (change.status === "COMPLETED" && capture.completedAt === null) capture.completedAt = midwayBetween(capture.createTime, observedAt);
         capture.status = change.status;
       }
       if (change.feeCents !== undefined) capture.feeCents = change.feeCents;
