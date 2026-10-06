@@ -32,7 +32,7 @@ test("SEC-DEPTH enforcement (negative, SDP-36): a first cell naming the delivery
   const line = "### 3b x\n\n- `commercial_authorizations` (row 20; feeds money and authority) birth: [commercial_authorizations_require_capture]; first: `delivered_at` [commercial_authorizations_delivery_bound] only on DELIVERED.\n\n## A.";
   const found = problems(inv, line, db);
   assert.equal(found.length, 1);
-  assert.match(found[0], /commercial_authorizations_delivery_bound .*WHEN.*does not read delivered_at/);
+  assert.match(found[0], /commercial_authorizations_delivery_bound .*WHEN.*is not a change predicate on delivered_at/);
   const learnedOnceOnly = line.replace("commercial_authorizations_delivery_bound", "commercial_authorizations_learned_once");
   assert.match(problems(inv, learnedOnceOnly, db)[0], /does not read delivered_at|learned-once trigger itself|does not fire on INSERT/);
 });
@@ -73,6 +73,39 @@ test("SEC-DEPTH enforcement (negative): an unknown trigger, a missing birth, an 
     assert.ok(ofList.some((x) => /checkpoint_hash: leases_guard fires only on UPDATE OF fence, expires_at/.test(x)), ofList.join("\n"));
     const missingPlanned = problems(inv, good.replace("in 0009", "in 0002"), db);
     assert.ok(missingPlanned.some((x) => /planned trigger leases_planned on leases is missing from migration 0002/.test(x)), missingPlanned.join("\n"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("SEC-DEPTH enforcement (negative, SDP-41): a WHEN that mentions the column but is not a change predicate, and a read of the column in another table, never certify", async () => {
+  const { whenCovers, fnReads, readsOfFunctions } = await import("../sec/guard-reads.mjs");
+  const base = { table: "commercial_authorizations", name: "probe", events: new Set(["INSERT", "UPDATE"]), ofCols: null, fn: "x", args: [], planned: false };
+  assert.equal(whenCovers({ ...base, when: "(NEW.state = 'DELIVERED' AND NEW.delivered_at IS NOT NULL)" }, "delivered_at"), false);
+  assert.equal(whenCovers({ ...base, when: "(OLD.delivered_at IS DISTINCT FROM NEW.delivered_at)" }, "delivered_at"), true);
+  assert.equal(whenCovers({ ...base, when: "(OLD.state IS DISTINCT FROM NEW.state OR NEW.delivered_at IS DISTINCT FROM OLD.delivered_at)" }, "delivered_at"), true);
+  assert.equal(whenCovers({ ...base, when: "(OLD.state IS DISTINCT FROM NEW.state)" }, "delivered_at"), false);
+  const dir = mkdtempSync(join(tmpdir(), "kauro-guard-reads-"));
+  try {
+    writeFileSync(join(dir, "0001_t.sql"), [
+      "CREATE TABLE kauro.a (",
+      "  delivered_at     timestamptz",
+      ");",
+      "CREATE TABLE kauro.b (",
+      "  delivered_at     timestamptz",
+      ");",
+      "CREATE OR REPLACE FUNCTION kauro.a_guard() RETURNS trigger LANGUAGE plpgsql AS $$",
+      "BEGIN",
+      "  PERFORM 1 FROM kauro.b x WHERE x.delivered_at IS NOT NULL;",
+      "  RETURN NEW;",
+      "END",
+      "$$;",
+      "CREATE TRIGGER a_guard BEFORE INSERT OR UPDATE ON kauro.a FOR EACH ROW EXECUTE FUNCTION kauro.a_guard();",
+      "",
+    ].join("\n"));
+    const db = parseMigrations(dir);
+    const trig = db.triggers.get("a.a_guard");
+    assert.equal(fnReads(db, trig, "delivered_at", readsOfFunctions(db)), false, "a read of b.delivered_at does not bind a.delivered_at");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,8 +1,22 @@
-# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r13
+# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r14
 
 Target path: `docs/design/SEC-DEPTH-PROVENANCE.md`. Base: kauro-platform `main` 21b310f. Closes Codex p0-admission-r2 (on 0217109)
 findings 1-3 and the 0015 analogue. r2-r9 answered design reviews 062a982 .. 84ef1e6. r8 stepped back to P1 (below).
-r13 answers Codex design r12 (f15dccc, REJECT: SDP-34/35 and all earlier FIXED, SDP-26/30 PARTIAL, SDP-36/37/38 new). Root cause:
+r14 answers Codex design r13 (1902fda, REJECT: SDP-36/37/38 and all earlier FIXED, SDP-26/30 PARTIAL, SDP-39/40/41 new):
+- SDP-39: B15 binds the eligibility clock to the database: a fresh quote is born with issued_at = server_now() and expires_at =
+  issued_at + its policy's quote_seconds; its snapshot with as_of = server_now() and lookback_starts_at = as_of - the policy's
+  repeat_lookback_seconds (every policy, not only R2-INITIAL). The one historical-copy path, a replacement quote (replaces_quote_id,
+  packages/application/src/commercial/quotes/replacement.ts:179-193), copies its replaced quote's snapshot eligibility exactly and is checked
+  against that snapshot, not against a window (B13 branch R).
+- SDP-40: B13 (iii) proves absence: a founding reservation and a fresh founding snapshot are born only while the agency has no
+  agency_recurrence row, no qualifying purchase and no other founding reservation (any state), read under the shared half of the
+  agency's recurrence lock held to COMMIT, so a designation (exclusive half, 0028:500) is ordered wholly before or after.
+- SDP-41: the checker never certifies by mention: a WHEN covers a column only when it is absent, a disjunction of exact change terms
+  `OLD.c IS DISTINCT FROM NEW.c` naming the column, or a reviewed text in REVIEWED_WHEN (empty on 21b310f); a read counts only as
+  NEW/OLD.c of the trigger row or a statement-level read of that column of the same table by a called function. Tool counts
+  unchanged (50 tables, 335 columns, 53 first assignments, 18 planned, 0 problems); its test now has the Codex probe as a DENY.
+- Sweep (section 2 rows CLOCK and ABSENCE): caller-written instants bounding a money or authority window, and every "first X".
+r13 answered Codex design r12 (f15dccc, REJECT: SDP-34/35 and all earlier FIXED, SDP-26/30 PARTIAL, SDP-36/37/38 new). Root cause:
 a textual cell is no binding. `tools/sec/guard-reads.mjs --check` now requires every bound or first cell to NAME its enforcing
 trigger and verifies, from the migration SQL (or the 3c declaration of a planned trigger, until its migration exists), that it
 fires on that column's write (no UPDATE OF list or one naming it; no WHEN, or a WHEN reading the column), reads the column, and for
@@ -161,6 +175,9 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | LIFETIME: birth or transitions bound, but DELETE/TRUNCATE, replacement or identity change left open; a counter bound only by "no decrease" (15) | SDP-31, SDP-32 (third round) | every table of section 3, enumerated row by row | fixed by section 3 + B11 (uniform DELETE/TRUNCATE refusal, config freeze), B9 (capacity identity, singleton birth), B2 (cancel +1 by its operation) |
 | LOCK ORDER: an added lock that reverses an existing actor's order, or upgrades a weaker lock (14) | SDP-29 (after SEC-109) | sweep (grant -> requests), reservation (grant -> upstream requests), HOLD/RELEASE (carve -> pool), every reconciling writer, FK KEY SHARE | fixed: one global order and one grant lock mode (B3 lock protocol); a writer outside it fails fast with NOWAIT, never waits; R12e covers each pair in both orders |
 | FIRST ASSIGNMENT / UNLISTED TABLE: a learned-once column taken as operation-bound, or a read table missing from the hand-built list (15) | SDP-34, SDP-35 | every table and column extracted by tools/sec/guard-reads.mjs (3b) | fixed: B12 (47 first assignments), founding_slots row 25 (B11); completeness test fails on any unmapped entry |
+| CLOCK: a caller-written instant bounds a money or authority window (16) | SDP-39 (after F4 leases, SDP-34 stamps) | quotes issued_at/expires_at, snapshot as_of/lookback (B15, fixed); founding reservation ends_at = quote expiry (0028:311, now DB-derived); source_available_until (bounded by sealed facts 0014:333 and CHECK 0014:283); leases.deadline_at (caller p_deadline, 0006:239: now bounded by the subject's deadline at birth, B2, fixed); audits.absolute_deadline_at (0023:444) and jobs.delivery_deadline_at (0021:447) are DB-stamped; cost grant expiry: AUDIT := least(now + 24 h, pool) (0023:139), pool = the owner's funding statement (control, immutable); capture provider_completed_at (provider evidence, <= now, B12); qualifying confirmed_at = now (B8) | fixed where caller-written |
+| ABSENCE: a "first X" eligibility without an absence proof under the lock that orders X (16) | SDP-40 | founding rate (B13 iii, fixed); first designation (agency_recurrence PK, 0028:513; agencies.first_qualifying_capture_id bound to recurrence 0028:840-848); founding owner (NOT EXISTS membership, 0002:221); attempt 1 / lease fence 1 (UNIQUE ordinal 0021, lease PK); free audit (one per revision and target for good, 0023:360; one live per agency, 0023:392) | fixed or already bound |
+| CHECKER: certification by lexical mention (15) | SDP-41 | firesOnUpdateOf WHEN rule, fnReads row rule | fixed: exact change-predicate or reviewed-text allowlist; row-specific reads |
 | IDENTITY exemption (single; P1) | SDP-23 | grep of F1 | only G14 (removed) and G5 (authorisation, kept) |
 
 ## 3. Lifetime matrix (rule 15): every table a G1-G14 guard or a B binding reads or protects
@@ -246,7 +263,7 @@ money nor authority. Re-run when 0045-0052 land: a planned trigger missing from 
 - `dataset_revisions` (row 31; feeds authority) birth: [dataset_revisions_initial_state]; imm: `agency_id` `project_id` `revision_id`; bound: `manifest_hash` [dataset_revisions_lifecycle_guard]; `state` [dataset_revisions_transition] listed edge.
 - `delivery_artifacts` (row 36; feeds authority) birth: [delivery_artifacts_in_prefix]; imm: `agency_id` `object_name` `package_version_id` `source_object_name`.
 - `execution_capacity` (row 22; feeds authority) birth: [execution_capacity_birth]; bound: `active_jobs` [execution_capacity_ledgers] recount (0021:410); `last_admission_at` [execution_capacity_last_admission_guard] G11; `ledger_id` [execution_capacity_last_admission_guard] CHECK = 1 (0021:287); `updated_at` [execution_capacity_last_admission_guard] now(); `waiting_jobs` [execution_capacity_ledgers] recount (0021:410).
-- `founding_slot_reservations` (row 16; feeds money) birth: [founding_slot_reservations_snapshot_binding]; imm: `agency_id` `ends_at` `policy_version` `quote_id` `reservation_id` `slot_no`; bound: `state` [founding_slot_reservations_transition] listed + 0028:237, :270, :290; `version` [founding_slot_reservations_version] +1; first: `consumed_at` [founding_slot_reservations_first_assignment] only in ->CONSUMED := now (B8/B12); `consumed_by_authorization_id` [founding_slot_reservations_first_assignment] only in ->CONSUMED = the purchase's authorization (B8/B12).
+- `founding_slot_reservations` (row 16; feeds money) birth: [founding_slot_reservations_snapshot_binding, founding_slot_reservations_eligibility]; imm: `agency_id` `ends_at` `policy_version` `quote_id` `reservation_id` `slot_no`; bound: `state` [founding_slot_reservations_transition] listed + 0028:237, :270, :290; `version` [founding_slot_reservations_version] +1; first: `consumed_at` [founding_slot_reservations_first_assignment] only in ->CONSUMED := now (B8/B12); `consumed_by_authorization_id` [founding_slot_reservations_first_assignment] only in ->CONSUMED = the purchase's authorization (B8/B12).
 - `founding_slots` (row 25; feeds money) birth: [founding_slots_birth]; bound: `live_reservation_id` [founding_slots_guard] founding_slots_guard (0028:344), settled (0028:375); `policy_version` [founding_slots_guard] birth only by the 0028 seed (B11); founding_slots_guard (0028:344); `slot_no` [founding_slots_guard] birth only by the 0028 seed (B11); founding_slots_guard (0028:344).
 - `leases` (row 7; feeds authority) birth: [leases_birth]; imm: `cost_authority_id` `created_at` `deadline_at` `resource_id` `resource_kind` `subject_hash`; bound: `cancel_version` [leases_guard] +1 alone, JOB_ATTEMPT with a job cancel request (B2); `checkpoint_hash` [leases_guard] kept once stored (B2); `expires_at` [leases_guard] B2; `fence` [leases_guard] +1 after expiry (B2); `heartbeat_at` [leases_guard] now (B2); `owner_id` [leases_guard] takeover after expiry (B2); `updated_at` [leases_touch] now().
 - `memberships` (row 2; feeds authority) birth: [memberships_initial_state]; imm: `agency_id` `user_id`; bound: `role` [memberships_authority] listed + authority (0002:307) + B5a; `state` [memberships_transition] listed + authority + B5a.
@@ -261,7 +278,7 @@ money nor authority. Re-run when 0045-0052 land: a planned trigger missing from 
 - `projects` (row 26; feeds authority) birth: [projects_initial_state]; imm: `agency_id` `project_id`; bound: `state` [projects_transition] listed edge.
 - `prospects` (row 17; feeds money) birth: [prospects_initial_state]; imm: `prospect_id`; bound: `state` [prospects_transition] listed edge; `version` [prospects_version] +1.
 - `qualifying_purchases` (row 19; feeds money) birth: [qualifying_purchases_designation_only]; bound: `agency_id` [qualifying_purchases_designation_only]; `allocated_service_cents` [qualifying_purchases_designation_only]; `authorization_id` [qualifying_purchases_designation_only]; `capture_id` [qualifying_purchases_designation_only]; `confirmation_seq` [qualifying_purchases_designation_only]; `confirmed_at` [qualifying_purchases_designation_only]; `created_at` [qualifying_purchases_designation_only]; `founding_basis` [qualifying_purchases_designation_only]; `founding_reservation_id` [qualifying_purchases_designation_only]; `order_created_at` [qualifying_purchases_designation_only]; `order_id` [qualifying_purchases_designation_only]; `project_id` [qualifying_purchases_designation_only]; `provider_completed_at` [qualifying_purchases_designation_only]; `quote_id` [qualifying_purchases_designation_only].
-- `quotes` (row 30; feeds money) birth: [quotes_source_binding]; imm: `agency_id` `expires_at` `quote_id`; bound: `state` [quotes_transition] listed edge.
+- `quotes` (row 30; feeds money) birth: [quotes_source_binding, quotes_issuance_clock]; imm: `agency_id` `expires_at` `quote_id`; bound: `state` [quotes_transition] listed edge.
 - `request_journal` (row 10; feeds money) birth: [request_journal_reserves_grant]; imm: `agency_id` `cost_grant_id` `fence` `request_id` `reserved_cents` `task_id`; bound: `response_artifact_hash` [request_journal_guard] once (0006:149); `state` [request_journal_guard] 0006:143-159; `usage_state` [request_journal_guard] frozen once RECONCILED (B3).
 - `retention_anchors` (row 32; feeds authority) birth: [retention_anchors_bound]; imm: `agency_id` `anchor_kind` `revision_id`.
 - `retention_records` (row 33; feeds authority) birth: [retention_records_initial_state]; imm: `agency_id` `class` `revision_id`.
@@ -279,7 +296,7 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 - planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0046 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
 - planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0046 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0047 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at`) B2
+- planned `leases_birth` BEFORE INSERT ON `leases` in 0047 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
 - planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0049 (columns: `provider_completed_at`) B12
 - planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0049 (columns: `allocated_cents`) B4
 - planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0051 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
@@ -288,6 +305,8 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 - planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0052 (columns: `*`) B11
 - planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0052 (columns: `*`) B11
 - planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0052 (columns: `*`) B11, SDP-35
+- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0051 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
+- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0051 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
 - planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0046 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
 - planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0046 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
 - planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0048 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
@@ -324,7 +343,9 @@ B1 processing_jobs (G3), `0046_job_fence_provenance.sql`, 0021:465-468 replaced:
 `NEW.attempt_count = OLD.attempt_count + 1` and an attempt (agency, job, `attempt_id = NEW.current_attempt_id`, `ordinal =
 NEW.attempt_count`, created_at = now); fence change needs `NEW.current_attempt_id = OLD.current_attempt_id`, `NEW.fence > OLD.fence`,
 that attempt CLAIMED at `fence = NEW.fence` with claimed_at = now, and `attempt_owns_lease`. jobRecord stays fail-closed.
-B2 leases (G13), `0047_lease_server_clock.sql`: cancel_version (SDP-32): a change is exactly +1 in an UPDATE that changes no owner,
+B2 leases (G13), `0047_lease_server_clock.sql`: deadline_at at birth (CLOCK sweep) is at most its subject's deadline: JOB_ATTEMPT
+<= the job's execution_deadline_at, else its delivery_deadline_at; MODEL_TASK <= the model task's interpretation_deadline_at; the
+kinds that spend nothing keep the caller's deadline. cancel_version (SDP-32): a change is exactly +1 in an UPDATE that changes no owner,
 fence, expiry, heartbeat or checkpoint (cancel_lease's shape, 0006:331), and for JOB_ATTEMPT only while its job (resource_id) has
 cancel_version >= 1 (cancel_command, 0021:471); other kinds have no production cancellation source (F15), so +1 per statement makes
 the safe-integer cap unreachable. INSERT fence 1, cancel_version 0, heartbeat/created/updated := now, `now < expires_at <= deadline_at`;
@@ -462,6 +483,19 @@ src/repositories/commercial-recurrence.ts by the L3 designer, verify-before-spen
 from 0051 on; 0051 reports (NOTICE) the count of existing founding snapshots without a reservation and does not rewrite them;
 production holds none (pre-launch, no AWS data, A9). UNBACKED stays a valid designation basis only for a reservation RELEASED
 before capture (B8).
+B13 (iii) founding absence (SDP-40), `founding_slot_reservations_eligibility` BEFORE INSERT (0051) and inside
+price_eligibility_snapshots_birth for founding_discount_bps > 0: `pg_advisory_xact_lock_shared(kauro.transition_key(
+'kauro.agency_recurrence', agency))` (the shared half CreateQuote already holds, D10-REC-2), then refuse (KC001) when the agency has an
+agency_recurrence row, any qualifying_purchases row, or any other founding_slot_reservations row (a prior founding designation is a
+CONSUMED one; a live one is a second founding offer). B13 branch R (replacement, the authorised historical copy): when the quote has
+replaces_quote_id, the snapshot's qualifying set, count, repeat, founding ref and rate, applied rate and policy equal the replaced
+quote's snapshot (itself bound at its own birth), the replaced quote is the one the re-binding names (B09 binding stands), and (i),
+(ii), (iii) do not apply; as_of/lookback still follow B15.
+B15 issuance clock (SDP-39), `quotes_issuance_clock` BEFORE INSERT on quotes (0051): issued_at = server_now() and expires_at =
+issued_at + price_policies.quote_seconds of its policy (KA004 otherwise; CreateQuote and the replacement already take issuedAt from
+serverNow() in the writing unit, packages/application/src/commercial/quotes/create-quote.ts:138); price_eligibility_snapshots_birth: as_of = server_now() and lookback_starts_at
+= as_of - repeat_lookback_seconds of its policy. Fixtures that back-date quotes move the test clock (src/testing/server-now.ts),
+not the column (D-FIX-2).
 B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0052`: confirmed_at and superseded_at
 are NULL or := now at birth; each moves only NULL->now, once; superseded_at only once confirmed_at is set; neither is ever cleared
 or moved (KA004). The transition lock (0003:262) stays. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
@@ -510,6 +544,7 @@ race proof (rule 1).
 | R27 lifetime: DELETE/TRUNCATE (section 3, all rows) | N/A single statement | N/A | N/A | N/A | N/A | N/A | GAP SEC-L01..SEC-L24 T :: "DENY SEC-DEPTH (lifetime <table>): a superuser-owned nested DELETE of a row and a TRUNCATE are refused and the row survives", one title per section 3 row (row 17 iterates its 10 tables, row 15 its 3); OK sibling: none, no production writer deletes (F14) | N/A (DENY) |
 | R29 first assignment (SDP-34, 3b "first:") | N/A guard | N/A | N/A | N/A | N/A | GAP SEC-F01..SEC-F47 T :: "DENY SEC-DEPTH (first assignment <table>.<column>): a superuser-owned nested UPDATE assigning it outside its owning operation is refused KA004", one title per 3b first: entry, generated from the inventory; SEC-133 S :: "DENY SEC-DEPTH (forged admission instant): a nested admitted_at on a QUEUED job with its event, then both admission instants moved, is refused KA004 at the first write"; SEC-134 S :: "DENY SEC-DEPTH (forged ready instant): a nested ready_at = 10000-01-01 on a RUNNING ACTIVE job is refused and jobRecord still reads the job" | GAP SEC-135 H :: "DENY SEC-DEPTH (founding slot birth): a nested INSERT of founding slot 4 for R2-INITIAL is refused, and a later eligible quote gets no founding rate" | N/A (DENY) |
 | R30 authority and money sources (SDP-36/37/38) | N/A guard | N/A | N/A | GAP SEC-138 M :: "DENY SEC-DEPTH (unbacked founding snapshot): a snapshot at 2500 bps naming a fresh founding_slot_ref with no reservation is refused at COMMIT, with its quote and events rolled back"; SEC-139 M :: "DENY SEC-DEPTH (fabricated repeat eligibility): a snapshot naming a qualifying project that is not a qualifying purchase of the agency in the window is refused at COMMIT" | N/A guard | GAP SEC-136 S :: "DENY SEC-DEPTH (delivery pre-assignment): delivered_at set on a CONSUMED authorization of a RUNNING job, state unchanged, is refused KA004, and the later publication delivers"; SEC-137 S :: "DENY SEC-DEPTH (consumption pre-assignment): job_ref or consumed_at set on an ACTIVE authorization, state unchanged, is refused KA004" | GAP SEC-140 H :: "DENY SEC-DEPTH (target restoration): kauro_app clearing superseded_at of a superseded target is refused KA004, and an audit naming it is still refused"; SEC-141 H :: "DENY SEC-DEPTH (target re-dating): moving confirmed_at or superseded_at of a target is refused KA004" | N/A (DENY) |
+| R31 eligibility clock and absence (SDP-39/40) | GAP SEC-144 H :: "RACE SEC-DEPTH (first purchase vs founding offer): an agency's first designation and its founding reservation, both orders held at the recurrence lock; the reservation after the designation is refused KC001, the one before it is consumed by it" | N/A guard | GAP SEC-142 M :: "DENY SEC-DEPTH (back-dated window): a quote and snapshot born with issued_at = as_of = 13 days ago counting a purchase outside today's window are refused KA004, with quote, snapshot and events rolled back" | N/A guard | N/A guard | GAP SEC-143 H :: "DENY SEC-DEPTH (returning founder): a real RESERVED reservation on a free seeded slot for an agency with a qualifying purchase is refused KC001, with slot, reservation, quote and snapshot rolled back"; SEC-145 M :: "DENY SEC-DEPTH (replacement copy): a replacement snapshot whose eligibility differs from its replaced quote's snapshot is refused" | GAP SEC-146 S :: "DENY SEC-DEPTH (lease deadline): a JOB_ATTEMPT lease born with a deadline after its job's deadline is refused KA005" | N/A (DENY) |
 | R28 lifetime: replacement, identity, counters (SDP-31/32, config) | N/A covered by SEC-50/54/70 locks | N/A | N/A | N/A | N/A | GAP SEC-125 S :: "DENY SEC-DEPTH (platform ledger replacement): a nested DELETE and re-INSERT of execution_capacity with matching counts and last_admission_at = infinity is refused, and the next admission commits"; SEC-126 S :: "DENY SEC-DEPTH (agency ledger replacement): a nested DELETE and re-INSERT of an agency ledger with matching live_jobs and NULL last_admitted_at is refused"; SEC-127 S :: "DENY SEC-DEPTH (agency ledger reparent): a nested UPDATE of a zero-live ledger's agency_id to another agency is refused KA004" | GAP SEC-128 S :: "DENY SEC-DEPTH (lease cancel jump): kauro_control setting a live lease's cancel_version to 9007199254740991 with heartbeat_at = server_now is refused KA005"; SEC-129 S :: "DENY SEC-DEPTH (lease cancel source): cancel_lease on a JOB_ATTEMPT lease whose job has no cancel request is refused KA005"; SEC-130 S :: "DENY SEC-DEPTH (config freeze): a nested INSERT of a state_transitions edge or a commercial_machines row, and an UPDATE of a registry scope, are refused" | N/A (DENY) |
 | R23 authorization bounds (G14) | N/A guard (B08's 0021/0022 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-106 S :: "DENY SEC-DEPTH (superuser definer flush): a superuser-owned definer consuming an ACTIVE authorization with no admission, with its event and SET CONSTRAINTS ALL IMMEDIATE, is refused KA081"; SEC-107 S :: "DENY SEC-DEPTH (superuser definer flush): CONSUMED to DELIVERED with no READY job and AVAILABLE package is refused KA081" | GAP SEC-108 S :: "OK SEC-DEPTH (real execution facts): consumption through queueJob and admitJob and delivery through publishJob commit for the oracle-free fixtures" | N/A guard |
 | R17 catalog gate | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A; S :: "SEC-DEPTH catalog: no kauro function reads pg_trigger_depth() or rolsuper, is_control_session() guards no value, no kauro function is SECURITY DEFINER, and the 11 history attachments equal kauro.commercial_machines" |
@@ -519,7 +554,7 @@ Timeout bound for SEC-38/46t/50t/54t/96t: the transaction's `SET LOCAL statement
 
 C1 Baseline proof. Must FAIL on 21b310f through base SQL only (the superuser-owned probe uses no new function or signature):
 SEC-24, 25, 28, 28b, 29, 30, 32, 34, 36, 39, 40, 40b, 48, 52, 56, 71, 73, 76, 78, 80, 18, and new in r9: SEC-82, 86, 90, 93, 94,
-95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117, and in r11 SEC-125, 126, 127, 128, 130, and in r12 SEC-133, 134, 135, and in r13 SEC-136, 137, 138, 139, 140, 141 and every
+95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117, and in r11 SEC-125, 126, 127, 128, 130, and in r12 SEC-133, 134, 135, and in r13 SEC-136, 137, 138, 139, 140, 141, and in r14 SEC-142, 143, 145, 146 and every
 SEC-Fnn whose owning operation is not already the only writer on main, and every
 SEC-Lnn whose row says "frozen (B11)" or "frozen (B9)". New-ledger-only (no baseline object; fail with the B3
 checks reverted): SEC-92, SEC-96t, SEC-97, SEC-114, SEC-118. SEC-119 fails with B4's per-order queue reverted; SEC-129 fails with B2's source rule
@@ -545,7 +580,10 @@ commit with ledger_seq 0 and allocated_cents 0"; SEC-116 -> SEC-27b; SEC-117 -> 
 creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-Fnn -> "OK SEC-DEPTH (first assignment <table>.<column>): its owning operation assigns it" (one
 per entry, same generator); SEC-133/134 -> SEC-108 (real admission and publication); SEC-135 -> "OK SEC-DEPTH (founding): the first
 three eligible agencies reserve slots 1-3 of the seeded cohort"; SEC-136/137 -> SEC-108; SEC-138/139 -> "OK SEC-DEPTH (eligibility):
-a founding quote with its reservation and a repeat quote over real qualifying purchases commit"; SEC-140/141 -> "OK SEC-DEPTH
+a founding quote with its reservation and a repeat quote over real qualifying purchases commit"; SEC-142 -> "OK SEC-DEPTH (issuance clock): CreateQuote issues at server_now with
+the policy's expiry and lookback"; SEC-143 -> "OK SEC-DEPTH (founder): a first-time agency reserves a slot and its first purchase
+consumes it"; SEC-145 -> "OK SEC-DEPTH (replacement): a source replacement copies the paid snapshot and commits"; SEC-146 ->
+SEC-27b; SEC-140/141 -> "OK SEC-DEPTH
 (target): confirming a target and superseding it by a newer confirmed one commit, and audits follow the current target"; SEC-125/126 -> "OK SEC-DEPTH (capacity): an admission and a job end move both ledgers and
 the admission instants"; SEC-127 -> the same; SEC-128/129 -> "OK SEC-DEPTH (lease cancel): cancel_command then
 mirrorCancellation advances the JOB_ATTEMPT lease's cancel_version by one"; SEC-130 -> "OK SEC-DEPTH (config): a fresh migration
@@ -573,6 +611,8 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 - apps/api/test/b09-scenarios.test.ts:299-315 and apps/api/test/commission-support.ts:707-730: `deliverThroughExecution(h, agency,
   authorizationId)` (queueJob -> admitJob -> launchJob -> stageJob -> verifyJob -> publishJob); commission-support returns the
   DELIVERED event id read from domain_events. The "B08 is not on this branch" comments are removed.
+- D-FIX-2 (SDP-39): fixtures that write quotes or snapshots with their own instants (test/commerce-support.ts:400-432 issuedAt from
+  the fixture clock) pass server_now(), or move the test clock with src/testing/server-now.ts to back-date; the K lane counts them.
 - D-FIX-1 (SDP-37, technical, no owner act): B09's quote fixtures fabricate founding references (src/testing/commerce-purchases.ts
   :205-264 `foundingSlotRef: input.foundingReservationId ?? uow.ids.next()`; test/commerce-support.ts:415-432). B13 refuses them.
   Default: the fixtures quote the founding rate only through a real reservation on a fixture cohort: the harness seeds policy
@@ -592,14 +632,14 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | L1 hardening | migrations/0045, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
 | L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129), B12 jobs/attempts/audits/steps/packages, SEC-133/134, SEC-136/137 | 235 min, 530k | Opus |
 | L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
-| L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21, B13 (SEC-138/139), founding first assignment | 175 min, 410k | Opus |
-| L0b founding fixtures (D-FIX-1) | src/testing/commerce-purchases.ts (:205-264), test/commerce-support.ts (:415-432), harness cohort seed | SEC-138 siblings | 60 min, 140k | claude-sonnet-5-5 |
+| L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21, R31, B13 (i-iii, R), B15, founding first assignment | 220 min, 500k | Opus |
+| L0b quote fixtures (D-FIX-1, D-FIX-2) | src/testing/commerce-purchases.ts (:205-264), test/commerce-support.ts (:400-432), harness cohort seed | SEC-138/142 siblings | 80 min, 180k | claude-sonnet-5-5 |
 | L4 lifetime | migrations/0052, T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
 shown failing on 21b310f (log) and passing on the branch; C2 siblings green; full suites green in ci-local (WSL + Windows). Total
-about 17.3 h agent time, 2.35M tokens (r12: 14.8 h; r11: 13.5 h; r10: 11.1 h). Split proposal in F. The completeness tool and its test
+about 18.3 h agent time, 2.48M tokens (r13: 17.3 h; r12: 14.8 h). The tool and its test are done. Split proposal in F (Q8). The completeness tool and its test
 are done in this commit.
 
 ## F. Decisions and open questions
@@ -611,7 +651,8 @@ are done in this commit.
   follow-up (B06 domain + 3 dispatchers).
 - Q3 withdrawn: per-source events, no SUM.
 - Q7 Completeness and enforcer firing are machine-checked (3b/3c; 0 problems on 21b310f); the residual holds only the 2 tables that
-  feed neither money nor authority (domain_events, commerce_event_bindings).
+  feed neither money nor authority (domain_events, commerce_event_bindings). WHEN coverage and row reads are certified only by the
+  rules of SDP-41 (REVIEWED_WHEN empty).
 - Q8 Split (for the coordinator; money and authority stay in this lane): SEC-DEPTH-M (money: rows 3-4, 8-11, 16, 18-21, 25, 30;
   B3, B4, B5b, B8, B13; lanes L0b, L2b, L3 money half) and SEC-DEPTH-A (authority: the other rows; B1, B2, B5a, B6, B7, B9-B12,
   B14; lanes K, L0, L1 boundary part, L2a, L3 history half, L4) as two candidates reviewed and merged in sequence, sharing the tool

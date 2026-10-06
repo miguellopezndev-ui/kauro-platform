@@ -246,25 +246,56 @@ export function sectionLines(doc) {
   return { tables, residual };
 }
 
-export function fnReads(db, trig, col) {
+// Row-specific reads (Codex r13 SDP-41): the trigger's own function must read the column of THIS row (NEW.col / OLD.col, its
+// trigger arguments, or a whole-row refusal), or a function it calls must read that column of THIS table by the statement-level
+// extraction of the inventory (a deferred recount re-selecting the row). A column token of another table never counts.
+export function fnReads(db, trig, col, readsByFn = readsOfFunctions(db)) {
   if (trig.planned) return trig.columns.has(col) || trig.columns.has("*");
   if (trig.fn === "forbid_change") return true; // whole-row refusal
   if (trig.args.join(",").split(",").map((x) => x.trim()).includes(col)) return true;
   if (["enforce_listed_transition", "enforce_initial_state"].includes(trig.fn)) return col === "state";
   if (trig.fn === "touch_updated_at") return col === "updated_at";
   if (trig.fn === "enforce_version_bump") return col === "version";
-  // the trigger function and the kauro functions it calls (a deferred recount reads through its helper)
+  const own = (db.functions.get(trig.fn)?.body ?? "").replace(/'(?:[^']|'')*'/g, "''");
+  if (new RegExp(`\\b(NEW|OLD)\\.${col}\\b`).test(own)) return true;
   const seen = new Set();
   const queue = [trig.fn];
   while (queue.length) {
     const fn = queue.shift();
     if (seen.has(fn) || GENERIC.has(fn)) continue;
     seen.add(fn);
-    const body = (db.functions.get(fn)?.body ?? "").replace(/'(?:[^']|'')*'/g, "''");
-    if (new RegExp(`\\b${col}\\b`).test(body)) return true;
-    for (const c of callees(body)) if (db.functions.has(c)) queue.push(c);
+    if (readsByFn.get(fn)?.has(`${trig.table}.${col}`)) return true;
+    for (const c of callees(db.functions.get(fn)?.body ?? "")) if (db.functions.has(c)) queue.push(c);
   }
   return false;
+}
+
+// statement-level reads of every function (same extraction as the inventory, NEW/OLD excluded): fn -> Set("table.column")
+const readsCache = new WeakMap();
+export function readsOfFunctions(db) {
+  if (readsCache.has(db)) return readsCache.get(db);
+  const out = new Map();
+  for (const [fn, def] of db.functions) {
+    const set = new Set();
+    const body = def.body.replace(/'(?:[^']|'')*'/g, "''");
+    for (const stmt of body.split(";")) {
+      const aliases = new Map();
+      for (const m of stmt.matchAll(/kauro\.([a-z_][a-z0-9_]*)\b(?:\s+(?:AS\s+)?([a-z_][a-z0-9_]*))?/gi)) {
+        if (!db.tables.has(m[1])) continue;
+        aliases.set(m[1], m[1]);
+        if (m[2] && !KEYWORDS.has(m[2].toLowerCase())) aliases.set(m[2], m[1]);
+      }
+      for (const m of stmt.matchAll(/\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/g)) {
+        const t = aliases.get(m[1]);
+        if (t && db.tables.get(t).has(m[2])) set.add(`${t}.${m[2]}`);
+      }
+      const named = [...new Set(aliases.values())];
+      if (named.length === 1) for (const m of stmt.matchAll(/(?<![.\w])([a-z_][a-z0-9_]*)(?![\w.(])/g)) if (db.tables.get(named[0]).has(m[1])) set.add(`${named[0]}.${m[1]}`);
+    }
+    out.set(fn, set);
+  }
+  readsCache.set(db, out);
+  return out;
 }
 
 export function resolveTrigger(db, planned, table, name, migrationsPresent) {
@@ -277,10 +308,44 @@ export function resolveTrigger(db, planned, table, name, migrationsPresent) {
   return { error: `planned trigger ${name} on ${table} is missing from migration ${p.migration}` };
 }
 
+// A trigger's WHEN never certifies by mention (Codex r13 SDP-41; the kit lint's allowlist principle): a cell is covered only when
+// the WHEN is absent, or is exactly a disjunction of change terms `OLD.c IS DISTINCT FROM NEW.c` (either order) one of which is the
+// column, or its normalized text is in REVIEWED_WHEN for that trigger and column. Anything else fails.
+export const REVIEWED_WHEN = new Map([
+  // "table.trigger" -> { when: normalized text, columns: [...] } — add only after review; none needed on 21b310f
+]);
+
+export function normalizeWhen(when) {
+  let w = when.replace(/\s+/g, " ").trim();
+  while (/^\((.*)\)$/.test(w) && balanced(w.slice(1, -1))) w = w.slice(1, -1).trim();
+  return w;
+}
+
+function balanced(s) {
+  let d = 0;
+  for (const ch of s) { if (ch === "(") d += 1; if (ch === ")") { d -= 1; if (d < 0) return false; } }
+  return d === 0;
+}
+
+export function whenCovers(trig, col) {
+  if (!trig.when) return true;
+  const w = normalizeWhen(trig.when);
+  const reviewed = REVIEWED_WHEN.get(`${trig.table}.${trig.name}`);
+  if (reviewed && reviewed.when === w && reviewed.columns.includes(col)) return true;
+  const terms = w.split(/ OR /i).map((t) => normalizeWhen(t));
+  const cols = [];
+  for (const t of terms) {
+    const m = /^(OLD|NEW)\.([a-z_][a-z0-9_]*) IS DISTINCT FROM (NEW|OLD)\.([a-z_][a-z0-9_]*)$/i.exec(t);
+    if (!m || m[1].toUpperCase() === m[3].toUpperCase() || m[2] !== m[4]) return false;
+    cols.push(m[2]);
+  }
+  return cols.includes(col);
+}
+
 export function firesOnUpdateOf(trig, col) {
   if (!trig.events.has("UPDATE")) return "does not fire on UPDATE";
   if (trig.ofCols && !trig.ofCols.has(col)) return `fires only on UPDATE OF ${[...trig.ofCols].join(", ")}`;
-  if (trig.when && !new RegExp(`\\b(NEW|OLD)\\.${col}\\b`).test(trig.when)) return `its WHEN (${trig.when.replace(/\s+/g, " ").slice(0, 80)}) does not read ${col}`;
+  if (!whenCovers(trig, col)) return `its WHEN (${trig.when.replace(/\s+/g, " ").slice(0, 80)}) is not a change predicate on ${col} nor a reviewed text`;
   return null;
 }
 
@@ -288,6 +353,7 @@ export function problems(inv, doc, db) {
   const { tables, residual } = sectionLines(doc);
   const planned = plannedTriggers(doc);
   const migrationsPresent = new Set(db.files.map((f) => f.slice(0, 4)));
+  const readsByFn = readsOfFunctions(db);
   const out = [];
   for (const [t, cols] of Object.entries(inv.tables)) {
     if (residual.has(t)) { if (tables.has(t)) out.push(`${t}: both a 3b line and a residual entry`); continue; }
@@ -320,7 +386,7 @@ export function problems(inv, doc, db) {
         const trig = r.trig;
         const why = firesOnUpdateOf(trig, c);
         if (why) { reasons.push(`${name} ${why}`); return false; }
-        if (!fnReads(db, trig, c)) { reasons.push(`${name} does not read ${c}`); return false; }
+        if (!fnReads(db, trig, c, readsByFn)) { reasons.push(`${name} does not read ${c} of this row`); return false; }
         if (cell.kind === "first") {
           if (!trig.events.has("INSERT")) { reasons.push(`${name} does not fire on INSERT (first write at birth)`); return false; }
           if (trig.fn === "forbid_reassignment") { reasons.push(`${name} is the learned-once trigger itself`); return false; }
