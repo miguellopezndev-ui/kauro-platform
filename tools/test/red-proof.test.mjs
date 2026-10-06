@@ -229,7 +229,7 @@ test('hang at base', () => {
   }
 });
 
-for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason] of [
+for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason, expectedPaths] of [
   ["a before() hook failing at base is INCONCLUSIVE, not red",
     "before(() => { if (value === 1) throw new Error('fixture unavailable'); });\ntest('regression', () => {});\n", 2, "INCONCLUSIVE", false, true, /hook failed/],
   ["a reverted run that executes no test is INCONCLUSIVE, not FAIL",
@@ -246,6 +246,10 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason]
     "test('regression', () => {});\nif (value === 1) throw new Error('top-level failure');\n", 2, "INCONCLUSIVE", false, true, /failed to load or threw/],
   ["a different test passing at head does not recover the test that failed at base",
     "test(value === 1 ? 'regression' : 'renamed', () => assert.equal(value, 2));\n", 1, "FAIL", true, false],
+  ["a same-named test in another suite cannot recover a skipped regression",
+    "describe('outer', () => { describe('regression suite', () => { test('same name', {skip: value === 2}, () => assert.equal(value, 2)); }); describe('unrelated suite', () => { test('same name', () => {}); }); });\n", 1, "FAIL", true, false, undefined, [[file, "outer", "regression suite", "same name"]]],
+  ["a nested regression recovers at its full path despite a same-named sibling",
+    "describe('outer', () => { describe('regression suite', () => { test('same name', () => assert.equal(value, 2)); }); describe('unrelated suite', () => { test('same name', () => {}); }); });\n", 0, "PASS", true, true, undefined, [[file, "outer", "regression suite", "same name"]]],
   ["a missing function at base is INCONCLUSIVE, not red",
     "test('regression', () => { const api = value === 2 ? () => {} : undefined; api(); });\n", 2, "INCONCLUSIVE", false, true, /TypeError.*is not a function/],
   ["a missing constructor at base is INCONCLUSIVE, not red",
@@ -271,7 +275,8 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason]
       const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
       assert.equal(report.verdict, verdict, result.output);
       assert.equal(report.tests[0].failedWithoutFix, failedWithoutFix, result.output);
-      if (status === 1) assert.equal(report.tests[0].passedAtHead, passedAtHead, result.output);
+      if (status !== 2) assert.equal(report.tests[0].passedAtHead, passedAtHead, result.output);
+      if (expectedPaths) assert.deepEqual(report.tests[0].baseFailedPaths, expectedPaths);
       if (reason) assert.match(report.inconclusive.join("\n"), reason);
       assert.deepEqual(readdirSync(f.scratch), []);
     } finally { rmSync(f.parent, { recursive: true, force: true }); }

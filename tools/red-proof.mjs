@@ -64,7 +64,7 @@ try {
     throw error;
   }
   report.tests = targets.map(({ file }) => ({
-    file, failedWithoutFix: false, baseFailedNames: [], firstFailingAssertion: null, passedAtHead: false,
+    file, failedWithoutFix: false, baseFailedNames: [], baseFailedPaths: [], firstFailingAssertion: null, passedAtHead: false,
     durations: { withoutFixMs: null, atHeadMs: null },
   }));
   report.revertedPaths = requireCommand("git", ["diff", "--name-only", "--no-renames", "-z", base, head, "--"], checkout).output
@@ -122,6 +122,7 @@ try {
           const timedOut = result.timedOut;
           row.failedWithoutFix = !timedOut && !sum.inconclusiveFailures.length && result.status !== 0 && sum.leafFailed >= 1;
           row.baseFailedNames = row.failedWithoutFix ? sum.bodyFailedNames : [];
+          row.baseFailedPaths = row.failedWithoutFix ? sum.bodyFailedPaths : [];
           if (!row.failedWithoutFix && !(result.status === 0 && ran >= 1)) {
             const why = timedOut ? `timed out after ${timeoutMin} min`
               : sum.inconclusiveFailures.length ? sum.inconclusiveFailures.join("; ")
@@ -134,7 +135,8 @@ try {
           row.firstFailingAssertion = row.failedWithoutFix ? sum.assertion : result.firstFailingAssertion;
           row.durations.withoutFixMs = result.durationMs;
         } else {
-          const recovered = row.baseFailedNames.every((name) => sum.passedNames.includes(name));
+          const passedPaths = new Set(sum.passedPaths.map((path) => JSON.stringify(path)));
+          const recovered = row.baseFailedPaths.every((path) => passedPaths.has(JSON.stringify(path)));
           row.passedAtHead = result.status === 0 && sum.complete && sum.leafPassed >= 1 && !sum.anyFailure && sum.cancelled === 0 && recovered;
           row.durations.atHeadMs = result.durationMs;
           if (!row.passedAtHead) row.firstFailingAssertionAtHead = result.firstFailingAssertion ?? (result.status === 0 ? "head run is not green: no executed passing test, or a base-failing test did not pass" : null);

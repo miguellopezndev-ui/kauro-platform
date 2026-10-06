@@ -31,7 +31,8 @@ Each named file must fail with reverted source
 and pass with unchanged head source. Both gates read structured events from the reporter exported by `tools/test-runner.mjs`,
 which adds error identity to `tools/test-events-reporter.mjs`'s JSON lines in `KAURO_TEST_EVENTS`, never spec text. Red means at least one leaf test failed
 its own body (`testCodeFailure`); hook failures, cancellations, load errors, timeouts and runs that executed no test are
-INCONCLUSIVE (exit 2). Green at head needs at least one passing leaf test, no failure, and every base-failing test passing. Preparation errors cannot count as a failing test. Added, removed and renamed source
+INCONCLUSIVE (exit 2). Green at head needs at least one passing leaf test, no failure, and every base-failing test passing
+at the same full path (file, all ancestor suite/test names, leaf name), recorded as `baseFailedPaths`. Preparation errors cannot count as a failing test. Added, removed and renamed source
 paths are restored correctly; emitted artifacts are cleared before each phase. The caller's worktree and Git metadata are
 untouched, including when `.git` is read-only. Temporary clone and worktree cleanup runs on success, errors and handled signals.
 

@@ -69,19 +69,29 @@ export function firstFailingAssertion(output) {
 // Summarises the structured events written by tools/test-events-reporter.mjs. Nothing here reads spec text.
 // A "leaf" is a real test with no subtests (details.type "test", not a suite, skipped or todo). The synthetic failure node:test
 // reports for a file that fails to load or throws at top level is named after the file and is never a leaf.
-export function summarizeEvents(path, file) {
+export function summarizeEvents(path, file, identityFile = file) {
   let records = [];
   try { records = readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch { /* an absent or torn file means "no evidence" */ }
   const base = file.split(/[\\/]/).pop();
   const summary = {
     complete: records.some((record) => record.event === "summary"),
     passedNames: [], failedNames: [], bodyFailedNames: [], hookFailures: 0, cancelled: 0, otherFailures: 0, fileFailures: 0,
+    passedPaths: [], bodyFailedPaths: [],
     leafPassed: 0, leafFailed: 0, skipped: 0, todo: 0, assertion: null, inconclusiveFailures: [],
   };
   // Completion events are in postorder: a parent's last child completes immediately before the parent,
   // at a deeper nesting level. This also covers parents made with test()/t.test(), not just describe().
   const completed = records.flatMap((record, index) => record.event === "pass" || record.event === "fail"
     ? [{ ...record, ...(records[index - 1]?.event === "error" ? { errorName: records[index - 1].errorName, errorCode: records[index - 1].errorCode } : {}) }] : []);
+  // Walking postorder backwards visits each parent before its children. Preserve every ancestor as
+  // a separate path component, so identical names (or names containing separators) cannot collide.
+  const ancestors = [];
+  for (let index = completed.length - 1; index >= 0; index--) {
+    const record = completed[index];
+    ancestors.length = record.nesting;
+    record.path = [identityFile.replaceAll("\\", "/"), ...ancestors, record.name];
+    ancestors[record.nesting] = record.name;
+  }
   for (let index = 0; index < completed.length; index++) {
     const record = completed[index];
     const hasSubtests = completed[index - 1]?.nesting > record.nesting;
@@ -106,10 +116,11 @@ export function summarizeEvents(path, file) {
       }
       continue;
     }
-    if (record.event === "pass") { summary.leafPassed++; summary.passedNames.push(record.name); continue; }
+    if (record.event === "pass") { summary.leafPassed++; summary.passedNames.push(record.name); summary.passedPaths.push(record.path); continue; }
     summary.failedNames.push(record.name);
     if (record.failureType === "testCodeFailure") {
       summary.leafFailed++; summary.bodyFailedNames.push(record.name);
+      summary.bodyFailedPaths.push(record.path);
       summary.assertion ??= record.message == null ? null : record.errorName
         ? `${record.errorName}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}` : record.message;
     } else if (record.failureType === "hookFailed") summary.hookFailures++;
@@ -221,7 +232,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
           durationMs: Math.round(performance.now() - started) });
       });
     });
-    const summary = summarizeEvents(eventsFile, target.compiled);
+    const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled);
     return { ...result, firstFailingAssertion: summary.assertion ?? firstFailingAssertion(result.output), summary };
   } finally {
     closeSync(stdout);
