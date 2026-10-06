@@ -904,6 +904,8 @@ function sharedViolations(sql: string): string[] {
 function nonAtomic(branch: string): string[] {
   const sql = stripLiterals(branch);
   const hit: string[] = [];
+  // a double-quoted identifier can name or hide anything (a CTE "chain", an alias "ch"): refused, except the one COLLATE "C" the split uses
+  if (/""/.test(stripLiterals(branch.replace(/\bCOLLATE\s+"C"/gi, " ")))) hit.push("a quoted identifier");
   const has = (what: string, pattern: RegExp): void => {
     if (pattern.test(sql)) hit.push(what);
   };
@@ -1023,6 +1025,8 @@ test("the structural check refuses every ADV-22 variant of the scalar-subquery a
     ["a count subquery cast then compared with arithmetic", `${w}t.x > (SELECT count(*) FROM u)::bigint + 1`],
     ["a nested re-alias of ch", `SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND EXISTS (SELECT 1 FROM chain ch LEFT JOIN u ON true WHERE u.x IS NULL)`],
     ["a CTE chain redefined over a LEFT JOIN", `WITH chain AS (SELECT a.* FROM kauro.commission_adjustments a LEFT JOIN u ON true) SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END`],
+    ["a quoted CTE name", `WITH "chain" AS (SELECT a.* FROM u a LEFT JOIN v ON true) SELECT 1 FROM "chain" ch WHERE ch.x > 0`],
+    ["a quoted alias", `SELECT 1 FROM t JOIN u "ch" ON true WHERE "ch".x > 0`],
     ["a CTE split redefined", `WITH split AS (SELECT 1 AS k, 1 AS share) SELECT 1 FROM split WHERE true`],
   ];
   for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
