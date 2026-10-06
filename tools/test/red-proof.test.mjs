@@ -180,7 +180,7 @@ test("a diff that touches no reverted path is refused with exit 2", () => {
 const HEAD = "import assert from 'node:assert/strict'; import {test, describe, before} from 'node:test'; import {value} from '../src/value.js';\n";
 for (const [name, baseSource, headSource, body, redNames] of [
   ['an existing base symbol throwing is not a function is RED',
-    'export const value = 1; export const api = 1;', 'export const value = 2; export function api() {}',
+    'export const value = 1; export const api = () => { const step = undefined; return step(); };', 'export const value = 2; export function api() {}',
     "import {api} from '../src/value.js'; test('existing API regression', () => api());", ['existing API regression']],
   ['an assertion mentioning ECONNREFUSED is RED',
     'export const value = 1;', 'export const value = 2;',
@@ -206,6 +206,52 @@ for (const [name, baseSource, headSource, body, redNames] of [
     } finally { rmSync(f.parent, {recursive: true, force: true}); }
   });
 }
+// ADV-18: decide by where the TypeError was thrown. A test-code frame means the API is absent (INCONCLUSIVE);
+// a product frame is a genuine failure (RED).
+const LEDGER_BASE = 'export const value = 1; export class Ledger { post() { return "posted"; } } export function makeLedger() { return new Ledger(); }';
+const LEDGER_HEAD = 'export const value = 2; export class Ledger { post() { return "posted"; } cancel() { return "cancelled"; } } export function makeLedger() { return new Ledger(); }';
+const NO_VALUE = (body) => HEAD.replace(/import \{value\}[^\n]*\n/, '') + body;
+for (const [name, body, extra, reason] of [
+  ['a method called on a new expression is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; test('cancel', () => assert.equal(new Ledger().cancel(), 'cancelled'));", {}, /\(intermediate value\)\.cancel is not a function/],
+  ['a method called on a factory result is INCONCLUSIVE', "import {makeLedger} from '../src/value.js'; test('cancel', () => assert.equal(makeLedger().cancel(), 'cancelled'));", {}, /makeLedger\(\.\.\.\)\.cancel is not a function/],
+  ['a missing method whose name occurs elsewhere in the base build is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; test('cancel', () => { const l = new Ledger(); assert.equal(l.cancel(), 'cancelled'); });", {base: LEDGER_BASE + ' // cancel settle close reverse\nexport const cancel = "cancel";'}, /cancel is not a function/],
+  ['a computed missing method is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; test('cancel', () => { const l = new Ledger(); const k = 'cancel'; assert.equal(l[k](), 'cancelled'); });", {}, /is not a function/],
+  ['a missing method called through a call result is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; const f = () => new Ledger(); test('cancel', () => assert.equal(f().cancel(), 'cancelled'));", {}, /is not a function/],
+  ['a missing method called from a test helper file is INCONCLUSIVE', "import {run} from './helper.js'; test('cancel', () => assert.equal(run(), 'cancelled'));", {helper: "import {Ledger} from '../src/value.js'; export function run() { return new Ledger().cancel(); }\n"}, /is not a function/],
+  ['a missing method called from a test-support helper is INCONCLUSIVE', "import {run} from './test-support/helper.js'; test('cancel', () => assert.equal(run(), 'cancelled'));", {support: "import {Ledger} from '../../src/value.js'; export function run() { return new Ledger().cancel(); }\n"}, /is not a function/],
+]) {
+  test(name, () => {
+    const f = fixture(2, extra.base ?? LEDGER_BASE);
+    try {
+      f.put('packages/cell/src/value.ts', LEDGER_HEAD);
+      if (extra.helper) f.put('packages/cell/test/helper.ts', extra.helper);
+      if (extra.support) f.put('packages/cell/test/test-support/helper.ts', extra.support);
+      f.put(file, NO_VALUE(body));
+      f.git('add', '.'); f.git('commit', '-qm', name);
+      const result = command(process.execPath, [script, f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, {env: {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'}});
+      assert.equal(result.status, 2, result.output);
+      const report = JSON.parse(readFileSync(join(f.root, 'red-proof.json'), 'utf8'));
+      assert.equal(report.verdict, 'INCONCLUSIVE');
+      assert.equal(report.tests[0].failedWithoutFix, false);
+      assert.match(report.inconclusive.join('\n'), reason);
+    } finally { rmSync(f.parent, {recursive: true, force: true}); }
+  });
+}
+test('a TypeError thrown inside product code stays RED even when called from a helper', () => {
+  const f = fixture(2, 'export const value = 1; export class Ledger { post() { const hook = undefined; return hook(); } }');
+  try {
+    f.put('packages/cell/src/value.ts', 'export const value = 2; export class Ledger { post() { return "posted"; } }');
+    f.put('packages/cell/test/helper.ts', "import {Ledger} from '../src/value.js'; export function run() { return new Ledger().post(); }\n");
+    f.put(file, NO_VALUE("import {run} from './helper.js'; test('posts', () => assert.equal(run(), 'posted'));"));
+    f.git('add', '.'); f.git('commit', '-qm', 'product-internal TypeError');
+    const result = command(process.execPath, [script, f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, {env: {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'}});
+    assert.equal(result.status, 0, result.output);
+    const report = JSON.parse(readFileSync(join(f.root, 'red-proof.json'), 'utf8'));
+    assert.equal(report.verdict, 'PASS');
+    assert.deepEqual(report.tests[0].baseFailedNames, ['posts']);
+    assert.match(report.tests[0].firstFailingAssertion, /hook is not a function/);
+  } finally { rmSync(f.parent, {recursive: true, force: true}); }
+});
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGKILL']) {
   test(`interrupting red-proof gate with ${signal} kills its worker`, { skip: (signal === 'SIGKILL' ? process.platform !== 'win32' : process.platform !== 'linux') && (signal === 'SIGKILL' ? 'Windows job-object test; Linux signals are tested separately' : 'Linux signal test; Windows has its own gate-kill test') }, async () => {
     const f = fixture();

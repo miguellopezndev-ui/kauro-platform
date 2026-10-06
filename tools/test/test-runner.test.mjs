@@ -62,7 +62,7 @@ for (const kind of ['function', 'constructor']) {
         {event: 'fail', kind: 'test', nesting: 0, name: 'real regression', failureType: 'testCodeFailure', message: 'GENUINE RED'},
         {event: 'summary'},
       ].map((record) => JSON.stringify(record)).join('\n'));
-      const summary = summarizeEvents(events, compiled, 'packages/cell/test/value.test.ts', {baseSymbols: new Set(['value'])});
+      const summary = summarizeEvents(events, compiled, 'packages/cell/test/value.test.ts', {classifyMissingApi: true});
       assert.deepEqual(summary.inconclusiveFailures, [`TypeError: api is not a ${kind}`]);
       assert.deepEqual(summary.redFailedNames, ['real regression']);
       assert.deepEqual(summary.redFailedPaths, [['packages/cell/test/value.test.ts', 'real regression']]);
@@ -82,9 +82,42 @@ test('an indirect missing-API error in another file remains RED', () => {
       {event: 'error', errorName: 'TypeError', errorFrame: `    at helper (${pathToFileURL(other).href}:2:76)`},
       {event: 'fail', kind: 'test', nesting: 0, name: 'existing runtime regression', failureType: 'testCodeFailure', message: 'api is not a function'},
     ].map((record) => JSON.stringify(record)).join('\n'));
-    const summary = summarizeEvents(events, compiled, compiled, {baseSymbols: new Set()});
+    const summary = summarizeEvents(events, compiled, compiled, {classifyMissingApi: true});
     assert.deepEqual(summary.inconclusiveFailures, []);
     assert.deepEqual(summary.redFailedNames, ['existing runtime regression']);
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
+
+test('a missing-API TypeError is classified by the origin of its top frame, not by name', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-origin-'));
+  const compiled = join(root, 'packages', 'cell', 'dist', 'test', 'value.test.js');
+  mkdirSync(join(root, 'packages', 'cell', 'dist', 'test'), {recursive: true});
+  writeFileSync(compiled, '');
+  const events = join(root, 'events.jsonl');
+  const at = (...parts) => `    at f (${pathToFileURL(join(root, ...parts)).href}:1:1)`;
+  const cases = [
+    ['test file', at('packages', 'cell', 'dist', 'test', 'value.test.js'), 'inconclusive'],
+    ['helper under test/', at('packages', 'cell', 'dist', 'test', 'helper.js'), 'inconclusive'],
+    ['test-support', at('packages', 'cell', 'dist', 'test', 'test-support', 'h.js'), 'inconclusive'],
+    ['package dist src', at('packages', 'cell', 'dist', 'src', 'ledger.js'), 'red'],
+    ['package src', at('packages', 'cell', 'src', 'ledger.js'), 'red'],
+    ['app src', at('apps', 'api', 'dist', 'src', 'ledger.js'), 'red'],
+    ['no frame', undefined, 'inconclusive'],
+    ['native frame', '    at Array.map (<anonymous>)', 'inconclusive'],
+  ];
+  try {
+    for (const message of ['(intermediate value).cancel is not a function', 'makeLedger(...).cancel is not a function', 'obj[k] is not a function', 'X is not a constructor']) {
+      for (const [label, frame, expected] of cases) {
+        writeFileSync(events, [{event: 'error', errorName: 'TypeError', errorFrame: frame},
+          {event: 'fail', kind: 'test', nesting: 0, name: 't', failureType: 'testCodeFailure', message}].map((r) => JSON.stringify(r)).join('\n'));
+        const summary = summarizeEvents(events, compiled, compiled, {classifyMissingApi: true});
+        assert.equal(summary.inconclusiveFailures.length === 1, expected === 'inconclusive', label + ': ' + message);
+        assert.equal(summary.redFailedNames.length === 1, expected === 'red', label + ': ' + message);
+      }
+    }
+    writeFileSync(events, [{event: 'error', errorName: 'TypeError', errorFrame: at('packages', 'cell', 'dist', 'test', 'value.test.js')},
+      {event: 'fail', kind: 'test', nesting: 0, name: 't', failureType: 'testCodeFailure', message: 'x is not a function'}].map((r) => JSON.stringify(r)).join('\n'));
+    assert.equal(summarizeEvents(events, compiled, compiled).redFailedNames.length, 1, 'head runs never reclassify');
   } finally { rmSync(root, {recursive: true, force: true}); }
 });
 
