@@ -139,7 +139,7 @@ test("a hung iteration is killed by --timeout-min and fails with the reason", ()
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("a timed-out stress worker is dead before the next iteration and return", () => {
+test("a timed-out stress worker is dead before the next iteration and return", async () => {
   const root = fixture(`import {test} from 'node:test'; import {appendFileSync, readFileSync, existsSync} from 'node:fs';
 const path = new URL('./worker-pids', import.meta.url);
 if (existsSync(path)) for (const pid of readFileSync(path, 'utf8').trim().split('\\n').map(Number)) {
@@ -149,7 +149,7 @@ test('hang', () => { appendFileSync(path, process.pid + '\\n'); return new Promi
 `);
   let pids = [];
   const confirmed = new Set(); // a confirmed-dead pid may be reused by the OS and must not be signalled again
-  try {
+  await withCleanup(root, async () => { try {
     const result = command(process.execPath, [script, "fake.test.mjs", "2", "--timeout-min", "0.03"], root);
     assert.equal(result.status, 1, result.output);
     pids = readFileSync(join(root, "worker-pids"), "utf8").trim().split("\n").map(Number);
@@ -158,6 +158,5 @@ test('hang', () => { appendFileSync(path, process.pid + '\\n'); return new Promi
     assert.throws(() => readFileSync(join(root, "overlap")), { code: "ENOENT" });
   } finally {
     killUnconfirmed(pids, confirmed);
-    rmSync(root, { recursive: true, force: true });
-  }
+  } });
 });

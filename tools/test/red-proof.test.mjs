@@ -294,12 +294,12 @@ test('actual regression', () => assert.equal(value, 2, 'BODY REGRESSION'));
   } finally { rmSync(f.parent, { recursive: true, force: true }); }
 });
 
-test("a timed-out red-proof worker is dead before head runs and the gate returns", () => {
+test("a timed-out red-proof worker is dead before head runs and the gate returns", async () => {
   const f = fixture();
   const pidFile = join(f.parent, "worker-pid");
   let pid;
   let dead = false; // a confirmed-dead pid may be reused by the OS and must not be signalled again
-  try {
+  await withCleanup(f.parent, async () => { try {
     f.put(file, HEAD + `import {readFileSync, writeFileSync} from 'node:fs';
 const pidFile = ${JSON.stringify(pidFile)};
 test('hang at base', () => {
@@ -322,8 +322,7 @@ test('hang at base', () => {
     assert.deepEqual(readdirSync(f.scratch), []);
   } finally {
     if (pid && !dead) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
-    rmSync(f.parent, { recursive: true, force: true });
-  }
+  } });
 });
 
 for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason, expectedPaths] of [
