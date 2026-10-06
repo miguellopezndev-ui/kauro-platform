@@ -43,12 +43,13 @@ try {
     const sum = result.summary;
     // Green needs a real passing test and no failure of any kind (body, hook, cancelled, file-level).
     const passed = result.status === 0 && !result.timedOut && sum.complete && sum.leafPassed >= 1 && !sum.anyFailure && sum.cancelled === 0 && sum.otherFailures === 0;
-    const reason = passed ? null : result.timedOut ? `timed out after ${timeoutMin} min`
+    const reason = passed ? null : result.killFailure ?? (result.timedOut ? `timed out after ${timeoutMin} min`
       : sum.leafPassed < 1 && !sum.anyFailure ? "no tests ran (zero, all skipped, todo or suites only)"
-      : "failed, cancelled or unloadable tests reported";
+      : "failed, cancelled or unloadable tests reported");
     const tests = sum.leafPassed + sum.leafFailed;
     report.results.push({ iteration, passed, reason, tests, skipped: sum.skipped, exitCode: result.status, signal: result.signal, durationMs: result.durationMs, firstFailingAssertion: passed ? null : result.firstFailingAssertion ?? reason });
     console.log(`stress-cells: ${iteration}/${count} ${passed ? "PASS" : "FAIL"} (${result.durationMs} ms)`);
+    if (result.killFailure) break; // An unconfirmed stop must not overlap another iteration.
   }
   if (report.results.every((row) => row.passed)) report.verdict = "PASS";
 } catch (error) {

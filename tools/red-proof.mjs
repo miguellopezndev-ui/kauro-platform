@@ -115,6 +115,11 @@ try {
       try {
         const result = await runTest(targets[i], undefined, { timeoutMs });
         const row = report.tests[i];
+        if (result.killFailure) {
+          report.inconclusive.push(`${label}: ${targets[i].file}: ${result.killFailure}`);
+          exitCode = 2;
+          throw new Stop(result.killFailure);
+        }
         const sum = result.summary;
         const ran = sum.leafPassed + sum.leafFailed;
         if (withoutFix) {
@@ -146,7 +151,7 @@ try {
         if (result.status !== 0) console.log(result.output);
         if (result.timedOut && !withoutFix) report.errors.push(`${label}: ${targets[i].file} timed out after ${timeoutMin} min`);
         else if (result.status === null && !result.timedOut) report.errors.push(`${label}: ${targets[i].file} did not exit normally`);
-      } catch (error) { report.errors.push(`${label}: ${error.message}`); }
+      } catch (error) { if (error instanceof Stop) throw error; report.errors.push(`${label}: ${error.message}`); }
     }
   }
 

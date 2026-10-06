@@ -213,7 +213,7 @@ export function testTarget(root, file) {
   return { file: rel.split(sep).join("/"), dir, manifest, compiled, concurrency };
 }
 
-export async function runTest(target, concurrency = target.concurrency, { timeoutMs } = {}) {
+export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000 } = {}) {
   if (!existsSync(target.compiled)) throw new Error(`compiled test is missing: ${target.compiled}`);
   const eventsDir = mkdtempSync(join(tmpdir(), "kauro-events-"));
   const eventsFile = join(eventsDir, "events.jsonl");
@@ -249,17 +249,28 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       if (child.pid) runners.add(child.pid);
       let timedOut = false;
       let error;
+      let settled = false;
+      let postKillTimer;
+      const finish = (status, signal, killFailure = null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearTimeout(postKillTimer);
+        if (killFailure) child.unref(); // The bounded result must also allow the gate itself to exit.
+        resolveResult({ status, signal, timedOut, killFailure,
+          output: readFileSync(stdoutFile, 'utf8') + readFileSync(stderrFile, 'utf8') + (error ? `\nError: ${error.code ?? error.name}: ${error.message}` : ''),
+          durationMs: Math.round(performance.now() - started) });
+      };
       const timer = timeoutMs ? setTimeout(() => {
         timedOut = true;
-        try { killRunner(child.pid); } catch (cause) { if (cause.code !== 'ESRCH') error = cause; }
+        try { killer(child.pid); } catch (cause) { error = cause; }
+        postKillTimer = setTimeout(() => finish(null, null,
+          `${error ? `${error.code ?? error.name}: ${error.message}; ` : ''}runner did not close within ${postKillWaitMs} ms after kill`), postKillWaitMs);
       }, timeoutMs) : undefined;
       child.once("error", (cause) => { error = cause; });
       child.once("close", (status, signal) => {
         runners.delete(child.pid);
-        clearTimeout(timer);
-        resolveResult({ status, signal, timedOut,
-          output: readFileSync(stdoutFile, "utf8") + readFileSync(stderrFile, "utf8") + (error ? `\nError: ${error.message}` : ""),
-          durationMs: Math.round(performance.now() - started) });
+        finish(status, signal);
       });
     });
     const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled);

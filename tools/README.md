@@ -38,6 +38,8 @@ untouched, including when `.git` is read-only. Temporary clone and worktree clea
 Both gates track active runner groups and kill them on SIGINT, SIGTERM, SIGHUP and exit before red-proof removes its
 checkout. Unix runners own a detached process group; Windows runners stay attached to Node's kill-on-exit job object
 and timeout cleanup uses `taskkill /T /F`.
+After a timeout kill, the runner has at most ten seconds to close. A kill error or unconfirmed stop is recorded with
+its reason; red-proof returns INCONCLUSIVE and stress-cells fails, without starting another phase or iteration.
 
 Body failures reporting `TypeError` with “is not a function” or “is not a constructor”, `ERR_MODULE_NOT_FOUND`, or
 `ECONNREFUSED` are also INCONCLUSIVE (exit 2), with the error recorded as the reason: base may lack an API added by the fix,
