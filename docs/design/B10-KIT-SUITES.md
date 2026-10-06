@@ -53,8 +53,9 @@ back, or restore their rows, before the test ends (the kit converts the existing
 | S-14 completeness | a pool with no line; a claim-based entitlement whose claim is not CONVERTED, or a CONVERTED claim without one; a qualifying purchase with confirmation seq 1 without the `agency_recurrence` first designation naming its capture; `agencies.first_qualifying_capture_id` neither NULL nor equal to it; a paid purchase with two non-REVOKED authorizations; a CORRECTED statement with an intent not FAILED or RETURNED, a predecessor with two successors | each pair is written in one unit (CONS_PAR, CONV_PAR, D10-FIRST-1, REPL_*, D10-GAP-7); the agencies mirror is asynchronous, so only NULL or equal |
 
 Self-test `packages/persistence/test/invariants.test.ts`: **one forged control per atomic predicate** (ADV-11). Every UNION ALL branch of
-an invariant is ONE predicate with its own `why` (no OR inside a branch, no `<> 1` over a count, no IS DISTINCT FROM over a nullable side:
-the structural test refuses them); each `why` has a control whose forged state fires that predicate ALONE among the invariant's branches
+an invariant is ONE predicate with its own `why` (no OR inside a branch, no `<> 1` over a count, no IS DISTINCT FROM over a nullable side,
+no COALESCE, IFNULL, NULLIF or CASE WHEN ... IS NULL anywhere in a branch: the structural test refuses them; an absent case is its own branch
+with a control that forges the absent state, ADV-16); each `why` has a control whose forged state fires that predicate ALONE among the invariant's branches
 (the control declares any other branch the state cannot exist without: only S-12 "above the slots", which is also "on no slot"), so
 deleting any one predicate turns exactly its control RED. Other ids may also fire on a forged state; the test lists them
 including Codex's reproductions (r2 R3 chain to 1000 cents -> S-09 and S-08; r2 R4 item payable 200 on cumulative 100 -> S-01;

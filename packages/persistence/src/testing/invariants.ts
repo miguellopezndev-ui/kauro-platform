@@ -23,7 +23,9 @@ export interface Invariant {
   /**
    * The `why` text of each UNION ALL branch, in order. A branch is ONE atomic predicate of the invariant (a conjunction of the facts that
    * select its rows, never a disjunction: no OR, no `<> 1` over a count, which is "none" or "several", no IS DISTINCT FROM over a nullable
-   * side, which is "absent" or "different"): the self-test forges a state for EACH that fires that predicate alone among the invariant's
+   * side, which is "absent" or "different"; no COALESCE, IFNULL, NULLIF or CASE WHEN ... IS NULL anywhere in it, which hide an "absent"
+   * case inside a comparison: the absent case is its own branch, NOT EXISTS or a NULL test, with its own why and control) and the
+   * self-test forges a state for EACH that fires that predicate alone among the invariant's
    * branches, unless it declares the others the same state must also fire. Absent: the invariant is a single atomic predicate without a
    * `why` column.
    */
@@ -60,11 +62,22 @@ const CORRECTIONS = `SELECT line_id, sum(amount_cents) AS cents FROM kauro.commi
 export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   {
     id: "INV-L-01",
+    whys: ["debits and credits differ", "debits with no credit", "credits with no debit"],
     decision: "double entry: every posting set balances in its currency (B09; mig 0017 ledger_entries_balanced)",
-    sql: `SELECT e.event_id, e.currency, sum(e.amount_cents) FILTER (WHERE e.direction = 'DEBIT') AS debit, sum(e.amount_cents) FILTER (WHERE e.direction = 'CREDIT') AS credit
+    sql: `SELECT e.event_id, e.currency, sum(e.amount_cents) FILTER (WHERE e.direction = 'DEBIT') AS debit, sum(e.amount_cents) FILTER (WHERE e.direction = 'CREDIT') AS credit, 'debits and credits differ' AS why
             FROM kauro.ledger_entries e
            GROUP BY e.event_id, e.currency
-          HAVING coalesce(sum(e.amount_cents) FILTER (WHERE e.direction = 'DEBIT'), 0) <> coalesce(sum(e.amount_cents) FILTER (WHERE e.direction = 'CREDIT'), 0)`,
+          HAVING sum(e.amount_cents) FILTER (WHERE e.direction = 'DEBIT') <> sum(e.amount_cents) FILTER (WHERE e.direction = 'CREDIT')
+          UNION ALL
+          SELECT e.event_id, e.currency, sum(e.amount_cents), NULL, 'debits with no credit'
+            FROM kauro.ledger_entries e
+           GROUP BY e.event_id, e.currency
+          HAVING count(*) FILTER (WHERE e.direction = 'CREDIT') = 0 AND sum(e.amount_cents) <> 0
+          UNION ALL
+          SELECT e.event_id, e.currency, NULL, sum(e.amount_cents), 'credits with no debit'
+            FROM kauro.ledger_entries e
+           GROUP BY e.event_id, e.currency
+          HAVING count(*) FILTER (WHERE e.direction = 'DEBIT') = 0 AND sum(e.amount_cents) <> 0`,
   },
   {
     id: "INV-L-02",
@@ -91,21 +104,48 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-01",
-    whys: ["payable not derived", "derived payable negative", "HOLD item of a line the statement does not itemize"],
-    decision: "an item's payable is derived: cumulative - previously paid - held - same-statement HOLD items of its line - offset, never negative (D10-STMT-2, R2-102)",
+    whys: [
+      "payable not derived (its line has HOLD items)",
+      "payable not derived (its line has no HOLD item)",
+      "derived payable negative (its line has HOLD items)",
+      "derived payable negative (its line has no HOLD item)",
+      "PAYABLE line item without a cumulative",
+      "PAYABLE line item without its previously paid",
+      "HOLD item of a line the statement does not itemize",
+    ],
+    decision: "an item's payable is derived: cumulative - previously paid - held - same-statement HOLD items of its line - offset, never negative; a PAYABLE line item carries its cumulative and previously paid (D10-STMT-2, R2-102)",
     sql: `WITH w AS (
             SELECT hi.statement_id, h.line_id, sum(hi.held_cents) AS cents
               FROM kauro.statement_items hi JOIN kauro.commission_holds h ON h.hold_id = hi.hold_id
              WHERE hi.item_kind = 'HOLD' GROUP BY hi.statement_id, h.line_id
           ), d AS (
-            SELECT i.statement_id, i.item_id, i.line_id, i.payable_cents,
-                   coalesce(i.cumulative_cents, 0) - coalesce(i.previously_paid_cents, 0) - i.held_cents - coalesce(w.cents, 0) - i.offset_cents AS derived
-              FROM kauro.statement_items i LEFT JOIN w ON w.statement_id = i.statement_id AND w.line_id = i.line_id
+            SELECT i.statement_id, i.item_id, i.line_id, i.payable_cents, i.cumulative_cents - i.previously_paid_cents - i.held_cents - i.offset_cents AS base
+              FROM kauro.statement_items i
              WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE'
           )
-          SELECT statement_id, item_id, line_id, payable_cents, derived, 'payable not derived' AS why FROM d WHERE payable_cents <> derived
+          SELECT d.statement_id, d.item_id, d.line_id, d.payable_cents, d.base - w.cents AS derived, 'payable not derived (its line has HOLD items)' AS why
+            FROM d JOIN w ON w.statement_id = d.statement_id AND w.line_id = d.line_id
+           WHERE d.payable_cents <> d.base - w.cents
           UNION ALL
-          SELECT statement_id, item_id, line_id, payable_cents, derived, 'derived payable negative' FROM d WHERE derived < 0
+          SELECT d.statement_id, d.item_id, d.line_id, d.payable_cents, d.base, 'payable not derived (its line has no HOLD item)'
+            FROM d
+           WHERE NOT EXISTS (SELECT 1 FROM w WHERE w.statement_id = d.statement_id AND w.line_id = d.line_id) AND d.payable_cents <> d.base
+          UNION ALL
+          SELECT d.statement_id, d.item_id, d.line_id, d.payable_cents, d.base - w.cents, 'derived payable negative (its line has HOLD items)'
+            FROM d JOIN w ON w.statement_id = d.statement_id AND w.line_id = d.line_id
+           WHERE d.base - w.cents < 0
+          UNION ALL
+          SELECT d.statement_id, d.item_id, d.line_id, d.payable_cents, d.base, 'derived payable negative (its line has no HOLD item)'
+            FROM d
+           WHERE NOT EXISTS (SELECT 1 FROM w WHERE w.statement_id = d.statement_id AND w.line_id = d.line_id) AND d.base < 0
+          UNION ALL
+          SELECT i.statement_id, i.item_id, i.line_id, i.payable_cents, NULL, 'PAYABLE line item without a cumulative'
+            FROM kauro.statement_items i
+           WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.cumulative_cents IS NULL
+          UNION ALL
+          SELECT i.statement_id, i.item_id, i.line_id, i.payable_cents, NULL, 'PAYABLE line item without its previously paid'
+            FROM kauro.statement_items i
+           WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.previously_paid_cents IS NULL
           UNION ALL
           SELECT hi.statement_id, hi.item_id, h.line_id, hi.held_cents, NULL, 'HOLD item of a line the statement does not itemize'
             FROM kauro.statement_items hi LEFT JOIN kauro.commission_holds h ON h.hold_id = hi.hold_id
@@ -114,17 +154,25 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-02",
-    whys: ["payable total not its items' sum", "held total not its items' sum"],
-    decision: "a statement's payable and held totals are the sums of its items' (D10-STMT-2)",
-    sql: `SELECT s.statement_id, s.state, s.payable_cents AS cents, coalesce(sum(i.payable_cents), 0) AS items, 'payable total not its items'' sum' AS why
-            FROM kauro.commission_statements s LEFT JOIN kauro.statement_items i ON i.statement_id = s.statement_id
+    whys: ["payable total not its items' sum", "payable total of a statement with no item", "held total not its items' sum", "held total of a statement with no item"],
+    decision: "a statement's payable and held totals are the sums of its items' (zero when it has none) (D10-STMT-2)",
+    sql: `SELECT s.statement_id, s.state, s.payable_cents AS cents, sum(i.payable_cents) AS items, 'payable total not its items'' sum' AS why
+            FROM kauro.commission_statements s JOIN kauro.statement_items i ON i.statement_id = s.statement_id
            GROUP BY s.statement_id
-          HAVING s.payable_cents <> coalesce(sum(i.payable_cents), 0)
+          HAVING s.payable_cents <> sum(i.payable_cents)
           UNION ALL
-          SELECT s.statement_id, s.state, s.held_cents, coalesce(sum(i.held_cents), 0), 'held total not its items'' sum'
-            FROM kauro.commission_statements s LEFT JOIN kauro.statement_items i ON i.statement_id = s.statement_id
+          SELECT s.statement_id, s.state, s.payable_cents, NULL, 'payable total of a statement with no item'
+            FROM kauro.commission_statements s
+           WHERE NOT EXISTS (SELECT 1 FROM kauro.statement_items i WHERE i.statement_id = s.statement_id) AND s.payable_cents <> 0
+          UNION ALL
+          SELECT s.statement_id, s.state, s.held_cents, sum(i.held_cents), 'held total not its items'' sum'
+            FROM kauro.commission_statements s JOIN kauro.statement_items i ON i.statement_id = s.statement_id
            GROUP BY s.statement_id
-          HAVING s.held_cents <> coalesce(sum(i.held_cents), 0)`,
+          HAVING s.held_cents <> sum(i.held_cents)
+          UNION ALL
+          SELECT s.statement_id, s.state, s.held_cents, NULL, 'held total of a statement with no item'
+            FROM kauro.commission_statements s
+           WHERE NOT EXISTS (SELECT 1 FROM kauro.statement_items i WHERE i.statement_id = s.statement_id) AND s.held_cents <> 0`,
   },
   {
     id: "INV-S-03",
@@ -142,9 +190,21 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-05",
-    whys: ["SETTLED intent of a statement not PAID", "PAID statement without a SETTLED intent", "PAID statement with several SETTLED intents", "line paid cents not its paid items"],
-    decision: "paid conservation: a settled intent's statement is PAID, a PAID statement has exactly one settled intent, a line's paid cents are its paid statements' payable items (SETTLE_PAR)",
-    sql: `SELECT p.statement_id, p.intent_id AS ref, s.state AS detail, 'SETTLED intent of a statement not PAID' AS why
+    whys: [
+      "SETTLED intent of a statement not PAID",
+      "PAID statement without a SETTLED intent",
+      "PAID statement with several SETTLED intents",
+      "line paid cents not its paid items",
+      "line paid with no paid item",
+      "line never paid with paid items",
+    ],
+    decision: "paid conservation: a settled intent's statement is PAID, a PAID statement has exactly one settled intent, a line's paid cents are its paid statements' payable items (none: never paid or zero) (SETTLE_PAR)",
+    sql: `WITH x AS (
+            SELECT i.line_id, sum(i.payable_cents) AS cents
+              FROM kauro.statement_items i JOIN kauro.commission_statements s ON s.statement_id = i.statement_id
+             WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND s.state = 'PAID' GROUP BY i.line_id
+          )
+          SELECT p.statement_id, p.intent_id AS ref, s.state AS detail, 'SETTLED intent of a statement not PAID' AS why
             FROM kauro.payout_intents p JOIN kauro.commission_statements s ON s.statement_id = p.statement_id
            WHERE p.state = 'SETTLED' AND s.state <> 'PAID'
           UNION ALL
@@ -156,12 +216,17 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
             FROM kauro.commission_statements s
            WHERE s.state = 'PAID' AND (SELECT count(*) FROM kauro.payout_intents p WHERE p.statement_id = s.statement_id AND p.state = 'SETTLED') > 1
           UNION ALL
-          SELECT NULL, l.line_id, coalesce(l.paid_cents, 0) || ' paid, ' || coalesce(x.cents, 0) || ' in paid statements', 'line paid cents not its paid items'
+          SELECT NULL, l.line_id, l.paid_cents || ' paid, ' || x.cents || ' in paid statements', 'line paid cents not its paid items'
+            FROM kauro.commission_lines l JOIN x ON x.line_id = l.line_id
+           WHERE l.paid_cents <> x.cents
+          UNION ALL
+          SELECT NULL, l.line_id, l.paid_cents || ' paid, no paid item', 'line paid with no paid item'
             FROM kauro.commission_lines l
-            LEFT JOIN (SELECT i.line_id, sum(i.payable_cents) AS cents
-                         FROM kauro.statement_items i JOIN kauro.commission_statements s ON s.statement_id = i.statement_id
-                        WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND s.state = 'PAID' GROUP BY i.line_id) x ON x.line_id = l.line_id
-           WHERE coalesce(l.paid_cents, 0) <> coalesce(x.cents, 0)`,
+           WHERE l.paid_cents <> 0 AND NOT EXISTS (SELECT 1 FROM x WHERE x.line_id = l.line_id)
+          UNION ALL
+          SELECT NULL, l.line_id, 'never paid, ' || x.cents || ' in paid statements', 'line never paid with paid items'
+            FROM kauro.commission_lines l JOIN x ON x.line_id = l.line_id
+           WHERE l.paid_cents IS NULL AND x.cents <> 0`,
   },
   {
     id: "INV-S-06",
@@ -180,6 +245,7 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
       "offset agreement terms not SIGNED_FUTURE_OFFSET",
       "offset agreement never signed",
       "payable item offsets beyond the durable offsets against its line",
+      "payable item offsets a line no offset is against",
     ],
     decision: "offsets: an OFFSET item reports its durable offset, an offset names the negative line's agreement with signed SIGNED_FUTURE_OFFSET terms, a payable item offsets at most the durable offsets against its line (D10-NEG-1, KC017)",
     sql: `SELECT i.item_id AS ref, i.offset_id AS other, i.offset_cents || ' reported, ' || o.amount_cents || ' durable' AS detail, 'OFFSET item not its offset' AS why
@@ -204,26 +270,42 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
             FROM kauro.commission_offsets o JOIN kauro.seller_agreements g ON g.seller_id = o.seller_id AND g.agreement_id = o.agreement_id
            WHERE g.signed_at IS NULL
           UNION ALL
-          SELECT i.item_id, i.line_id, i.offset_cents || ' offset, ' || coalesce(x.cents, 0) || ' durable', 'payable item offsets beyond the durable offsets against its line'
+          SELECT i.item_id, i.line_id, i.offset_cents || ' offset, ' || x.cents || ' durable', 'payable item offsets beyond the durable offsets against its line'
             FROM kauro.statement_items i
-            LEFT JOIN (SELECT against_line_id, sum(amount_cents) AS cents FROM kauro.commission_offsets GROUP BY against_line_id) x ON x.against_line_id = i.line_id
-           WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.offset_cents > coalesce(x.cents, 0)`,
+            JOIN (SELECT against_line_id, sum(amount_cents) AS cents FROM kauro.commission_offsets GROUP BY against_line_id) x ON x.against_line_id = i.line_id
+           WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.offset_cents > x.cents
+          UNION ALL
+          SELECT i.item_id, i.line_id, i.offset_cents || ' offset, no durable offset', 'payable item offsets a line no offset is against'
+            FROM kauro.statement_items i
+           WHERE i.item_kind = 'LINE' AND i.disposition = 'PAYABLE' AND i.offset_cents > 0
+             AND NOT EXISTS (SELECT 1 FROM kauro.commission_offsets o WHERE o.against_line_id = i.line_id)`,
   },
   {
     id: "INV-S-08",
-    whys: ["pool not rounded once","line not its share of the pool"],
+    whys: ["pool not rounded once", "line not its share of the pool (no agreed correction)", "line not its share of the pool less its agreed corrections"],
     decision: "pool arithmetic: pool = basis x rate rounded once; each line = its largest-remainder share of the pool less its agreed corrections (D10-POOL-1, D10-ADJ-1)",
     sql: `WITH ${split(`SELECT p.pool_id AS k, p.pool_id, p.pool_cents AS total FROM kauro.commission_pools p`)}
           SELECT p.pool_id AS ref, p.basis_cents || ' x ' || p.rate_bps || ' bps' AS detail, p.pool_cents AS cents, ${rounded("p.basis_cents", "p.rate_bps")} AS expected, 'pool not rounded once' AS why
             FROM kauro.commission_pools p WHERE p.pool_cents <> ${rounded("p.basis_cents", "p.rate_bps")}
           UNION ALL
-          SELECT l.line_id, 'pool ' || l.pool_id, l.cumulative_entitlement_cents, sp.share - coalesce(c.cents, 0), 'line not its share of the pool'
-            FROM kauro.commission_lines l JOIN split sp ON sp.line_id = l.line_id LEFT JOIN (${CORRECTIONS}) c ON c.line_id = l.line_id
-           WHERE l.cumulative_entitlement_cents <> sp.share - coalesce(c.cents, 0)`,
+          SELECT l.line_id, 'pool ' || l.pool_id, l.cumulative_entitlement_cents, sp.share, 'line not its share of the pool (no agreed correction)'
+            FROM kauro.commission_lines l JOIN split sp ON sp.line_id = l.line_id
+           WHERE NOT EXISTS (SELECT 1 FROM (${CORRECTIONS}) c WHERE c.line_id = l.line_id) AND l.cumulative_entitlement_cents <> sp.share
+          UNION ALL
+          SELECT l.line_id, 'pool ' || l.pool_id, l.cumulative_entitlement_cents, sp.share - c.cents, 'line not its share of the pool less its agreed corrections'
+            FROM kauro.commission_lines l JOIN split sp ON sp.line_id = l.line_id JOIN (${CORRECTIONS}) c ON c.line_id = l.line_id
+           WHERE l.cumulative_entitlement_cents <> sp.share - c.cents`,
   },
   {
     id: "INV-S-09",
-    whys: ["agreed correction that increases","agreed corrections beyond the upheld holds","refund or reversal not the split at its new basis","SPLIT_CORRECTION has no B10 writer"],
+    whys: [
+      "agreed correction that increases",
+      "agreed corrections on a line with no upheld hold",
+      "agreed corrections beyond the upheld holds",
+      "refund or reversal not the split at its new basis (no earlier agreed correction)",
+      "refund or reversal not the split at its new basis less the earlier agreed corrections",
+      "SPLIT_CORRECTION has no B10 writer",
+    ],
     decision: "corrections evidenced: an agreed correction only decreases and never beyond the line's UPHELD holds; a refund or reversal lands on the split at its new basis; no SPLIT_CORRECTION (D10-ADJ-1, R2-102)",
     sql: `WITH ${split(`SELECT a.adjustment_id AS k, l.pool_id, ${rounded("a.new_basis_cents", "p.rate_bps")} AS total
                         FROM kauro.commission_adjustments a JOIN kauro.commission_lines l ON l.line_id = a.line_id JOIN kauro.commission_pools p ON p.pool_id = l.pool_id
@@ -231,15 +313,28 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
           SELECT a.adjustment_id AS ref, a.line_id AS line, a.reason || ' ' || a.direction AS detail, 'agreed correction that increases' AS why
             FROM kauro.commission_adjustments a WHERE a.reason = 'AGREED_ERROR_CORRECTION' AND a.direction = 'INCREASE'
           UNION ALL
-          SELECT NULL, c.line_id, c.cents || ' corrected, ' || coalesce((SELECT sum(h.amount_cents) FROM kauro.commission_holds h WHERE h.line_id = c.line_id AND h.state = 'UPHELD'), 0) || ' upheld', 'agreed corrections beyond the upheld holds'
+          SELECT NULL, c.line_id, c.cents || ' corrected, no upheld hold', 'agreed corrections on a line with no upheld hold'
             FROM (${CORRECTIONS}) c
-           WHERE c.cents > coalesce((SELECT sum(h.amount_cents) FROM kauro.commission_holds h WHERE h.line_id = c.line_id AND h.state = 'UPHELD'), 0)
+           WHERE c.cents > 0 AND NOT EXISTS (SELECT 1 FROM kauro.commission_holds h WHERE h.line_id = c.line_id AND h.state = 'UPHELD')
           UNION ALL
-          SELECT a.adjustment_id, a.line_id,
-                 a.new_cumulative_entitlement_cents || ' posted, ' || (sp.share - coalesce((SELECT sum(c.amount_cents) FROM kauro.commission_adjustments c WHERE c.line_id = a.line_id AND c.reason = 'AGREED_ERROR_CORRECTION' AND c.direction = 'DECREASE' AND c.adjustment_seq < a.adjustment_seq), 0)) || ' split at basis ' || a.new_basis_cents,
-                 'refund or reversal not the split at its new basis'
+          SELECT NULL, c.line_id, c.cents || ' corrected, ' || u.cents || ' upheld', 'agreed corrections beyond the upheld holds'
+            FROM (${CORRECTIONS}) c
+            JOIN (SELECT h.line_id, sum(h.amount_cents) AS cents FROM kauro.commission_holds h WHERE h.state = 'UPHELD' GROUP BY h.line_id) u ON u.line_id = c.line_id
+           WHERE c.cents > u.cents
+          UNION ALL
+          SELECT a.adjustment_id, a.line_id, a.new_cumulative_entitlement_cents || ' posted, ' || sp.share || ' split at basis ' || a.new_basis_cents,
+                 'refund or reversal not the split at its new basis (no earlier agreed correction)'
             FROM kauro.commission_adjustments a JOIN split sp ON sp.k = a.adjustment_id AND sp.line_id = a.line_id
-           WHERE a.new_cumulative_entitlement_cents <> sp.share - coalesce((SELECT sum(c.amount_cents) FROM kauro.commission_adjustments c WHERE c.line_id = a.line_id AND c.reason = 'AGREED_ERROR_CORRECTION' AND c.direction = 'DECREASE' AND c.adjustment_seq < a.adjustment_seq), 0)
+           WHERE NOT EXISTS (SELECT 1 FROM kauro.commission_adjustments c WHERE c.line_id = a.line_id AND c.reason = 'AGREED_ERROR_CORRECTION' AND c.direction = 'DECREASE' AND c.adjustment_seq < a.adjustment_seq)
+             AND a.new_cumulative_entitlement_cents <> sp.share
+          UNION ALL
+          SELECT a.adjustment_id, a.line_id, a.new_cumulative_entitlement_cents || ' posted, ' || (sp.share - e.cents) || ' split at basis ' || a.new_basis_cents || ' less ' || e.cents || ' corrected before',
+                 'refund or reversal not the split at its new basis less the earlier agreed corrections'
+            FROM kauro.commission_adjustments a JOIN split sp ON sp.k = a.adjustment_id AND sp.line_id = a.line_id
+            JOIN LATERAL (SELECT c.line_id, sum(c.amount_cents) AS cents FROM kauro.commission_adjustments c
+                           WHERE c.line_id = a.line_id AND c.reason = 'AGREED_ERROR_CORRECTION' AND c.direction = 'DECREASE' AND c.adjustment_seq < a.adjustment_seq
+                           GROUP BY c.line_id) e ON true
+           WHERE a.new_cumulative_entitlement_cents <> sp.share - e.cents
           UNION ALL
           SELECT a.adjustment_id, a.line_id, a.reason, 'SPLIT_CORRECTION has no B10 writer' FROM kauro.commission_adjustments a WHERE a.reason = 'SPLIT_CORRECTION'`,
   },
@@ -271,10 +366,16 @@ export const B10_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   },
   {
     id: "INV-S-11",
+    whys: ["frozen allocation shares not 10000 bps", "frozen allocation with no share"],
     decision: "a frozen allocation's shares sum to exactly 10000 bps, whatever its claims' states (R2-05; mig 0029)",
-    sql: `SELECT a.allocation_id, coalesce((SELECT sum(s.share_bps) FROM kauro.allocation_shares s WHERE s.allocation_id = a.allocation_id), 0) AS bps
+    sql: `SELECT a.allocation_id, s.bps, 'frozen allocation shares not 10000 bps' AS why
             FROM kauro.attribution_allocations a
-           WHERE a.frozen_at IS NOT NULL AND coalesce((SELECT sum(s.share_bps) FROM kauro.allocation_shares s WHERE s.allocation_id = a.allocation_id), 0) <> 10000`,
+            JOIN (SELECT allocation_id, sum(share_bps) AS bps FROM kauro.allocation_shares GROUP BY allocation_id) s ON s.allocation_id = a.allocation_id
+           WHERE a.frozen_at IS NOT NULL AND s.bps <> 10000
+          UNION ALL
+          SELECT a.allocation_id, NULL, 'frozen allocation with no share'
+            FROM kauro.attribution_allocations a
+           WHERE a.frozen_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM kauro.allocation_shares s WHERE s.allocation_id = a.allocation_id)`,
   },
   {
     id: "INV-S-12",
