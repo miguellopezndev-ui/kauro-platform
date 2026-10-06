@@ -36,3 +36,17 @@ DROP TRIGGER IF EXISTS identities_assurance_transition_lock ON kauro.identities;
 CREATE TRIGGER identities_assurance_transition_lock BEFORE UPDATE OF email_verified_at, mfa_enrolled_at ON kauro.identities
   FOR EACH ROW WHEN (OLD.email_verified_at IS DISTINCT FROM NEW.email_verified_at OR OLD.mfa_enrolled_at IS DISTINCT FROM NEW.mfa_enrolled_at)
   EXECUTE FUNCTION kauro.take_transition_lock('kauro.identities', 'user_id');
+
+-- --- AGREEMENT_EXP, CORP_REV: the seller's agreement changes under the seller's transition lock ------------------------------------------
+-- 0029 takes the writer's half of kauro.sellers on a state change only. The agreement a seller acts under is read under the seller's reader
+-- half by every command resting on it (the seller's authorizer for ClaimProspect, D10-CTX-1) and under the writer's half by ActivateSeller
+-- (lockSeller): a new version put in force (sellers.agreement_id) and the owner's withdrawal or re-dating of an agreement
+-- (seller_agreements.starts_at/ends_at) take the same writer's half, so a claim or an activation and the agreement change commit one after
+-- the other in both orders, never across each other.
+DROP TRIGGER IF EXISTS sellers_agreement_transition_lock ON kauro.sellers;
+CREATE TRIGGER sellers_agreement_transition_lock BEFORE UPDATE OF agreement_id ON kauro.sellers
+  FOR EACH ROW WHEN (OLD.agreement_id IS DISTINCT FROM NEW.agreement_id) EXECUTE FUNCTION kauro.take_transition_lock('kauro.sellers', 'seller_id');
+DROP TRIGGER IF EXISTS seller_agreements_transition_lock ON kauro.seller_agreements;
+CREATE TRIGGER seller_agreements_transition_lock BEFORE UPDATE OF starts_at, ends_at ON kauro.seller_agreements
+  FOR EACH ROW WHEN (OLD.starts_at IS DISTINCT FROM NEW.starts_at OR OLD.ends_at IS DISTINCT FROM NEW.ends_at)
+  EXECUTE FUNCTION kauro.take_transition_lock('kauro.sellers', 'seller_id');
