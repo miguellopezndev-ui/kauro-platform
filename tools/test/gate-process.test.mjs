@@ -19,9 +19,7 @@ test('cleanup failure is reported when the body succeeded, and removal is retrie
   await assert.rejects(withCleanup('x', async () => {}, () => { throw new Error('EPERM during cleanup'); }), /EPERM during cleanup/);
 });
 
-// A long-lived detached child spawned here would inherit handles of other test files' children on Windows
-// (libuv inherits handles) and keep their fixture directories locked: the very flake this guards. Linux only.
-test('the gate helper waits for the runner (ppid) as well as the worker, and fails if the runner survives', { skip: process.platform === 'win32' && 'a detached survivor leaks handles into concurrent Windows tests' }, async () => {
+test('the gate helper waits for the runner (ppid) as well as the worker, and fails if the runner survives', async () => {
   const root = mkdtempSync(join(tmpdir(), 'kauro-gate-helper-'));
   const signal = process.platform === 'win32' ? 'SIGKILL' : 'SIGTERM';
   // The "gate" writes "<worker pid> <runner pid>"; the runner is a detached process that outlives the gate.
