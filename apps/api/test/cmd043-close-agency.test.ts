@@ -25,6 +25,7 @@ import {
   type PaidPurchase,
 } from "@kauro/persistence/testing";
 import { apiIdleInTransaction, disarm, oneWaiterOn, otherWaitsExactlyOn, readerCell, soleApiBackend, track, until, waitsExactlyOnOther, type CellOutcome } from "./agency-lock-cells.js";
+import { execute } from "./execution-support.js";
 import { paymentRoutes, paymentsWorld, type PaymentsWorld } from "./commerce-support.js";
 import { SimulatedCrash, approveThroughRoute, asProblem, call, clock, completed, freshKey, ids, outcome, replayTextOf, routes, sha, waitForApiLockWait, type Person, type Reply } from "./support.js";
 
@@ -568,5 +569,36 @@ test("RACE (D10-AGY-6, D10-TX-1; adversary ADV-7 of 0ad4287): CloseAgency over a
     { projectWaitedForTheClosure: true, closure: "200", project: "409 PRECONDITION_FAILED AGENCY_NOT_OPEN" },
   );
   assert.equal(await w.count("projects", "agency_id = $1", [s.agency.agencyId]), 0, "no project exists beside the closure's inventory");
+  assert.equal((await agencyRow(s.agency.agencyId))?.state, "CLOSING");
+});
+
+test("RACE (D10-AGY-6, D10-TX-1; the job-start analogue of the ADV-7 cell, ADV-8 of b39b328): CloseAgency over an agency with two clients, paused after inspecting the first (the client of a paid, authorized project) and before the second; ExecuteProject of that project (CMD036, the agency's shared transition half) waits for exactly the closure's backend, the closure commits 200 and the job start is refused 409 AGENCY_NOT_ACTIVE — never a QUEUED job committed beside the closure and missing from its inventory (red at 0ad4287: the exclusive half only at the inventory read, so the job commits 202 inside the window)", async () => {
+  const { w } = pw;
+  const s = await sellingAgency("cmd043-job-start");
+  const authority = await w.h.processingAuthority(s.agency);
+  await w.h.endClient(s.agency, authority, "cmd043-job-start second client");
+  // the paid project belongs to the first (older) client, the one the closure inspects first
+  const purchase = await paidProject(s, "cmd043-job-start-plan");
+  const proof = await w.stepUp(s.owner);
+  const atFirst = w.holds.arm("collaborator");
+  const closing = track(close(s, { proof }));
+  await atFirst.reached;
+  const atSecond = w.holds.arm("collaborator");
+  atFirst.release();
+  await atSecond.reached;
+  const closurePid = await soleApiBackend(w, "the closure at its second client");
+  const starting = track(execute(pw, purchase, { token: s.operator.token, agency: s.agency.agencyId, key: freshKey("cmd043-job-start") }));
+  let jobWaited = false;
+  try {
+    await until("the job commits, or waits for exactly the closure's backend", async () => starting.done() || (jobWaited = await otherWaitsExactlyOn(w, closurePid)));
+  } finally {
+    atSecond.release();
+  }
+  const [started, closed] = await Promise.all([starting.settled, closing.settled]);
+  assert.deepEqual(
+    { jobWaitedForTheClosure: jobWaited, closure: settledAnswer(closed), job: settledAnswer(started) },
+    { jobWaitedForTheClosure: true, closure: "200", job: "409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE" },
+  );
+  assert.equal(await w.count("processing_jobs", "agency_id = $1", [s.agency.agencyId]), 0, "no job exists beside the closure's inventory");
   assert.equal((await agencyRow(s.agency.agencyId))?.state, "CLOSING");
 });
