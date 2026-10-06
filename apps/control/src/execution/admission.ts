@@ -83,7 +83,8 @@ export class JobAdmission implements ExecutionSweeper {
       const candidates = await this.deps.units.run(unboundSystem(EXECUTION_SERVICES.JOB_ADMISSION, this.deps.ids), (uow) => uow.execution.admissionCandidates(pageSize()));
       const next = candidates.find((c) => !deferred.has(c.jobId));
       if (next === undefined) break;
-      const one = await this.deps.units.run(boundSystem(EXECUTION_SERVICES.JOB_ADMISSION, next.agencyId, this.deps.ids.next() as never), (uow) => this.admitOne(uow, next.agencyId, deferred, pageSize()));
+      // R2-046: an older ledger waiter retries 40001 with a fresh transaction clock.
+      const one = await this.deps.units.run(boundSystem(EXECUTION_SERVICES.JOB_ADMISSION, next.agencyId, this.deps.ids.next() as never), (uow) => this.admitOne(uow, next.agencyId, deferred, pageSize()), { maxRetries: 2 });
       if (one.kind === "FULL" || one.kind === "NONE") break;
       if (one.kind === "ADMITTED") admitted.push(one.jobId);
       else if (one.kind === "CANCELLED") cancelled.push({ jobId: one.jobId, reason: one.reason });
