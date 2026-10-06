@@ -48,7 +48,8 @@ function cleanup() {
   }
   rmSync(work, { recursive: true, force: true });
 }
-for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { cleanup(); process.exit(signal === "SIGINT" ? 130 : 143); });
+// test-runner's exit hook kills tracked groups before this hook removes their checkout.
+process.once('exit', cleanup);
 let exitCode = 1;
 try {
   // A shared local clone reuses objects and keeps worktree metadata out of the caller's (possibly read-only) .git.

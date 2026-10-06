@@ -5,8 +5,21 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { command } from "../test-runner.mjs";
+import { interruptedWorker } from './gate-process.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../stress-cells.mjs");
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  test(`interrupting stress gate with ${signal} kills its worker`, { skip: process.platform !== 'linux' && 'Linux signal test; Windows has its own gate-kill test' }, async () => {
+    const root = fixture("import {test} from 'node:test'; import {writeFileSync} from 'node:fs'; test('hang', () => { writeFileSync('pid', String(process.pid)); return new Promise(() => setInterval(() => {}, 1000)); });");
+    try { await interruptedWorker(script, ['fake.test.mjs', '1'], root, join(root, 'pid'), signal); }
+    finally { rmSync(root, {recursive: true, force: true}); }
+  });
+}
+test('killing Windows stress gate kills its attached worker', { skip: process.platform !== 'win32' && 'Windows job-object test; Linux signals are tested separately' }, async () => {
+  const root = fixture("import {test} from 'node:test'; import {writeFileSync} from 'node:fs'; test('hang', () => { writeFileSync('pid', String(process.pid)); return new Promise(() => setInterval(() => {}, 1000)); });");
+  try { await interruptedWorker(script, ['fake.test.mjs', '1'], root, join(root, 'pid'), 'SIGKILL'); }
+  finally { rmSync(root, {recursive: true, force: true}); }
+});
 function fixture(contents) {
   const root = mkdtempSync(join(tmpdir(), "kauro-stress-test-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ type: "module", scripts: { test: 'node --test --test-reporter=spec --test-concurrency=3 "dist/test/**/*.test.js"' } }));

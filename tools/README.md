@@ -35,6 +35,9 @@ INCONCLUSIVE (exit 2). Green at head needs at least one passing leaf test, no fa
 at the same full path (file, all ancestor suite/test names, leaf name), recorded as `baseFailedPaths`. Preparation errors cannot count as a failing test. Added, removed and renamed source
 paths are restored correctly; emitted artifacts are cleared before each phase. The caller's worktree and Git metadata are
 untouched, including when `.git` is read-only. Temporary clone and worktree cleanup runs on success, errors and handled signals.
+Both gates track active runner groups and kill them on SIGINT, SIGTERM, SIGHUP and exit before red-proof removes its
+checkout. Unix runners own a detached process group; Windows runners stay attached to Node's kill-on-exit job object
+and timeout cleanup uses `taskkill /T /F`.
 
 Body failures reporting `TypeError` with “is not a function” or “is not a constructor”, `ERR_MODULE_NOT_FOUND`, or
 `ECONNREFUSED` are also INCONCLUSIVE (exit 2), with the error recorded as the reason: base may lack an API added by the fix,

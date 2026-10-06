@@ -7,6 +7,29 @@ import { performance } from "node:perf_hooks";
 import testEvents from "./test-events-reporter.mjs";
 
 const REPORTER = import.meta.url;
+const runners = new Set();
+const captures = new Set();
+
+function killRunner(pid) {
+  if (process.platform === 'win32') {
+    const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`taskkill exited ${result.status}`);
+  } else process.kill(-pid, 'SIGKILL');
+}
+
+function stopTestRunners() {
+  for (const pid of runners) {
+    try { killRunner(pid); } catch (error) {
+      if (error.code !== 'ESRCH') console.error(`runner ${pid} cleanup: ${error.message}`);
+    }
+  }
+  for (const cleanup of captures) cleanup();
+}
+process.once('exit', stopTestRunners);
+for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]]) {
+  process.once(signal, () => { stopTestRunners(); process.exit(code); });
+}
 
 // Preserve error identity alongside the existing reporter's bounded first message. In particular,
 // a missing module's message does not contain ERR_MODULE_NOT_FOUND, although its code does.
@@ -198,6 +221,16 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
   const stderrFile = join(eventsDir, "stderr");
   const stdout = openSync(stdoutFile, "w");
   const stderr = openSync(stderrFile, "w");
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    closeSync(stdout);
+    closeSync(stderr);
+    rmSync(eventsDir, { recursive: true, force: true });
+    captures.delete(cleanup);
+  };
+  captures.add(cleanup);
   const started = performance.now();
   try {
     // Default process isolation: a top-level throw or load error stays attributable to its file. The custom reporter
@@ -212,20 +245,17 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
     // A detached runner owns the process group containing its isolated per-file workers. Keep the outer
     // timer in this process so Windows taskkill can find the live runner and traverse its descendants.
     const result = await new Promise((resolveResult) => {
-      const child = spawn(process.execPath, args, { cwd: target.dir, env, detached: true, stdio: ["ignore", stdout, stderr] });
+      const child = spawn(process.execPath, args, { cwd: target.dir, env, detached: process.platform !== 'win32', stdio: ["ignore", stdout, stderr] });
+      if (child.pid) runners.add(child.pid);
       let timedOut = false;
       let error;
       const timer = timeoutMs ? setTimeout(() => {
         timedOut = true;
-        if (process.platform === "win32") {
-          const killed = spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
-          if (killed.error) error = killed.error;
-        } else {
-          try { process.kill(-child.pid, "SIGKILL"); } catch (cause) { if (cause.code !== "ESRCH") error = cause; }
-        }
+        try { killRunner(child.pid); } catch (cause) { if (cause.code !== 'ESRCH') error = cause; }
       }, timeoutMs) : undefined;
       child.once("error", (cause) => { error = cause; });
       child.once("close", (status, signal) => {
+        runners.delete(child.pid);
         clearTimeout(timer);
         resolveResult({ status, signal, timedOut,
           output: readFileSync(stdoutFile, "utf8") + readFileSync(stderrFile, "utf8") + (error ? `\nError: ${error.message}` : ""),
@@ -235,9 +265,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
     const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled);
     return { ...result, firstFailingAssertion: summary.assertion ?? firstFailingAssertion(result.output), summary };
   } finally {
-    closeSync(stdout);
-    closeSync(stderr);
-    rmSync(eventsDir, { recursive: true, force: true });
+    cleanup();
   }
 }
 
