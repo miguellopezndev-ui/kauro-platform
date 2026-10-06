@@ -109,6 +109,9 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0046_bank_routes.sql",
     // PV1 L-ROUTE PV1R-07 r4: the session fence (lock-only privileges of kauro_app on the presented session; provisional number)
     "0047_session_fence.sql",
+    // package B10 (failure-matrix lane 6c): sales and attribution changes ordered with the commands resting on them (tail vs designation,
+    // identity assurance, agreement changes, the activation's step-up at COMMIT)
+    "0048_b10g6c_sales_ordering.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
