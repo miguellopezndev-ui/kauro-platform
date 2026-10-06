@@ -28,14 +28,26 @@ export const writeLateFailure: LateFailureSink = (late) => {
 };
 
 /**
+ * Whether a failure of the lift says the database ended the session itself: the transaction limit (25P04), an administrator's termination
+ * (57P01), a connection-exception class (08xxx), or the driver's code-less "connection terminated" error. Nothing else: any other failure
+ * (an aborted transaction 25P02, a programming error) is deterministic and must surface as the internal error it is, not as endless 503s.
+ */
+export function sessionEndedByTheDatabase(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string") return code === "25P04" || code === "57P01" || code.startsWith("08");
+  return error instanceof Error && /connection terminated|not queryable|connection error/i.test(error.message);
+}
+
+/**
  * Lifts the unit's limit after an in-time answer. When the answer was delayed past the limit's margin (a long pause of the process) the
  * database has already ended the session and the lift fails: nothing of the unit committed, so the caller gets the retriable refusal of a
- * call that did not answer in time, not an internal error (D10-GAP-6a).
+ * call that did not answer in time, not an internal error (D10-GAP-6a). Any other failure of the lift is rethrown unchanged.
  */
 async function liftLimit(limit: (ms: number | null) => Promise<void>): Promise<void> {
   try {
     await limit(null);
   } catch (cause) {
+    if (!sessionEndedByTheDatabase(cause)) throw cause;
     const failure = new DomainFailure("CAPACITY_UNAVAILABLE", "the unit of work was ended by its time limit before the call's answer was taken; nothing changed, retry with the same key", { retryAfterSeconds: 5 }, true);
     failure.cause = cause;
     throw failure;

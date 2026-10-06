@@ -53,3 +53,27 @@ test("an in-time answer whose limit can no longer be lifted (the database ended 
     (e: unknown) => isDomainFailure(e) && e.code === "CAPACITY_UNAVAILABLE" && e.retryable && e.cause === ended,
   );
 });
+
+const liftFailing = (error: unknown) => withinCallBound(timerElapsing().timer, async () => 1, { call: "T.call", limit: async (ms) => (ms === null ? Promise.reject(error) : undefined) });
+
+test("every sign that the database ended the session is the retriable 503: 25P04, 57P01, class 08 and the driver's code-less connection terminated", async () => {
+  for (const error of [
+    Object.assign(new Error("terminating connection due to transaction timeout"), { code: "25P04" }),
+    Object.assign(new Error("terminating connection due to administrator command"), { code: "57P01" }),
+    Object.assign(new Error("connection failure"), { code: "08006" }),
+    new Error("Connection terminated unexpectedly"),
+    new Error("Client has encountered a connection error and is not queryable"),
+  ]) {
+    await assert.rejects(liftFailing(error), (e: unknown) => isDomainFailure(e) && e.code === "CAPACITY_UNAVAILABLE" && e.retryable && e.cause === error, String(error));
+  }
+});
+
+test("any other failure of the lift is rethrown unchanged (a deterministic bug is a 500, never endless 503s): 25P02 and a plain error", async () => {
+  for (const error of [
+    Object.assign(new Error("current transaction is aborted, commands ignored until end of transaction block"), { code: "25P02" }),
+    Object.assign(new Error("syntax error"), { code: "42601" }),
+    new TypeError("limit is not a function"),
+  ]) {
+    await assert.rejects(liftFailing(error), (e: unknown) => e === error, String(error));
+  }
+});
