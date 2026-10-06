@@ -28,7 +28,7 @@ The status of each case with every mandate landed (recomputed at `b10/integratio
 when one does, named with its package and registry case (or "no registry case" with the gate). The check keeps the counts equal to
 the section's rows and the status consistent with the later column.
 
-Totals: 64 cases — 54 EXECUTED_LOCAL, 10 PARTIAL.
+Totals: 64 cases — 53 EXECUTED_LOCAL, 11 PARTIAL.
 
 | case | planned status | rows | later package and case |
 |---|---|---|---|
@@ -52,7 +52,7 @@ Totals: 64 cases — 54 EXECUTED_LOCAL, 10 PARTIAL.
 | R2-101 | PARTIAL | 2 EXECUTED_LOCAL, 1 SIMULATED — the eligibility clock; the database guard; stage then final completion through the fake | B13 — the stages of a staged purchase through PreparationCompletionSource (CMD039-OK nearest); B08 — the DELIVERED edge of a single-stage purchase (G-JOB, no registry case) |
 | R2-102 | EXECUTED_LOCAL | 4 EXECUTED_LOCAL, 0 SIMULATED — the partial hold; the statement; the payout of the undisputed part; the seller's read | none (B12 serves the seller's dispute and statement screens) |
 | R2-103 | PARTIAL | 2 EXECUTED_LOCAL, 1 SIMULATED — the destination guard; the refusal and the bound intent; evidence of the new destination refused | B12 — the step-up destination change and the owner's verification in the seller and owner application (G-UX_PRIVATE, no registry case); B15 — the real transfer and its bank evidence (G-INTEGRATION, no registry case) |
-| R2-104 | EXECUTED_LOCAL | 3 EXECUTED_LOCAL, 0 SIMULATED — the negative position; the offset guard; examples 7 and 25 end to end | offset capacity gaps open until lane B10-OFFSET (B10-KIT-SUITES 2.3: ADV-3/9/10/14/15/17; recordOffset has no production caller); must close before B10 acceptance |
+| R2-104 | PARTIAL | 3 EXECUTED_LOCAL, 0 SIMULATED — the negative position; the offset guard; examples 7 and 25 end to end | offset capacity gaps open until lane B10-OFFSET (B10-KIT-SUITES 2.3: ADV-3/9/10/14/15/17; recordOffset has no production caller; B10 lane B10-OFFSET, no registry case); must close before B10 acceptance |
 | R2-105 | EXECUTED_LOCAL | 2 EXECUTED_LOCAL, 0 SIMULATED — the guard arithmetic; the owner's review at the close | none |
 | R2-127 | EXECUTED_LOCAL | 3 EXECUTED_LOCAL, 0 SIMULATED — the reservation lifetime; supersession and no revival; expiry and uncertain capture in the sweep | none |
 | R2-136 | EXECUTED_LOCAL | 2 EXECUTED_LOCAL, 0 SIMULATED — the discount rounded once; the quote row | none |
