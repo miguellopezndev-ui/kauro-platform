@@ -103,8 +103,6 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0043_payout_funds_fence.sql",
     // P0 R2-046: an older ledger waiter retries with a fresh transaction instant.
     "0044_admission_instants.sql",
-    // package B10 (kit PR1, adversary ADV-3, D10-NEG-2 with D10-STMT-2): an offset is within the receiving line's unpaid amount less its OPEN holds
-    "0045_offset_capacity_holds.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
