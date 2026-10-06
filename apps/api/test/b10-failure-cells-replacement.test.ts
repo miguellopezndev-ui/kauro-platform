@@ -646,7 +646,7 @@ faultCell(
     step: "CMD027 included-replacement protocol / TIMEOUT: S2 PurchaseRebinder held past its bound, its unit abandoned",
     fault: "timeout",
     expect:
-      "RACE (replacement): a re-binding that outlives its bound answers the retriable 202 with the replacement ISSUED and the journal entry open, and the abandoned SERVICE unit still ends: its late COMMIT before the retry, or racing it, or its late failure (reported, not swallowed) before the retry or under a retry already waiting on its locks, leaves the same key observing the final state by identity: exactly one re-binding, allowance ordinal 1, never re-bound twice",
+      "RACE (replacement): a re-binding that outlives its bound answers the retriable 202 with the replacement ISSUED and the journal entry open, and the abandoned SERVICE unit still ends: its late COMMIT before the retry, or racing it, or its late failure (reported, not swallowed) before the retry or under a retry already waiting on its locks, or its late COMMIT landing between the retry's ordinary reads (a refusal over a re-bound purchase is REBOUND by identity), leaves the same key observing the final state by identity: exactly one re-binding, allowance ordinal 1, never re-bound twice",
   },
   async (ctx) => {
     // 1. the abandoned unit commits after the 202, then the same key retries: the re-binding it made is observed by its identity
@@ -710,6 +710,33 @@ faultCell(
       const resumed = view(await quoteCall(x.a, x.plan, key));
       assert.equal(resumed.replacement?.outcome, "REBOUND");
       reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+    }
+    // 5. the abandoned unit COMMITs between the retry's ordinary reads (Codex F1): the retry read the replacement ISSUED and the purchase intact,
+    //    then the late COMMIT lands, and its allowance read sees the re-binding. The rebinder answers REFUSED (ALLOWANCE_USED): the same key
+    //    must still answer REBOUND, observed by the replacement's identity, never journal WITHDRAWN over a re-bound purchase
+    {
+      const x = await fixture("repl-tmo-commit-between-reads");
+      const key = freshKey("repl-tmo-commit-between-reads");
+      const { pause } = await abandonedRebinding(ctx, x, key, "late commit between the retry's reads");
+      const between = ctx.points.pause("pay.rebindings.listForCapture.before");
+      const retry = ctx.operation("the same key retried, held between the rebinder's reads", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key))).then(
+        (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+        (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+      );
+      await between.reachedBy(retry);
+      pause.release();
+      await until("the abandoned re-binding committed between the retry's reads", async () => (await stateOf(x, key)).rebindings.length === 1);
+      between.release();
+      const answer = await retry;
+      assert.equal(answer.status, "fulfilled");
+      if (answer.status === "fulfilled" && answer.value.status !== 201) assert.fail(`the retry answered ${answer.value.status} ${answer.value.text}`);
+      const resumed = view(answer.status === "fulfilled" ? answer.value : (undefined as never));
+      assert.equal(resumed.replacement?.outcome, "REBOUND", `the purchase was re-bound by the late commit: the answer is REBOUND, never ${resumed.replacement?.outcome} (${resumed.replacement?.reason ?? "no reason"})`);
+      const after = await stateOf(x, key);
+      reboundOnce(x, after, resumed.quote.quoteId);
+      assert.equal(after.journal, "COMMITTED");
+      assert.deepEqual(after.replacements, ["ACCEPTED_FOR_CHECKOUT"], "the replacement stays accepted for checkout, never withdrawn");
+      assert.equal(view(await quoteCall(x.a, x.plan, key)).replacement?.outcome, "REBOUND", "and the replay says so");
     }
     // 4. the retry waits on the abandoned unit's locks and the unit ROLLS BACK (member 2 is the COMMIT): the retry re-binds exactly once, ordinal 1,
     //    and never enters the observation branch (nothing was re-bound by the abandoned unit); the late failure is reported once
