@@ -812,33 +812,92 @@ function chBoundToChain(sql: string): boolean {
   return bound && !outer && !otherTable && !nullsTheChain;
 }
 
-/** Scalar subqueries ("(SELECT ...)") that are an operand of a comparison or of arithmetic, other than a bare count(...) which is never NULL: a subquery over an absent row is NULL and the comparison silently false. */
-function nullableScalarComparisons(sql: string): string[] {
+/** The balanced "( ... )" starting at sql[open] === "(": its inside, or undefined when unclosed. */
+function balanced(sql: string, open: number): string | undefined {
+  let depth = 0;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")" && --depth === 0) return sql.slice(open + 1, i);
+  }
+  return undefined;
+}
+
+/**
+ * Scalar subqueries, as an ALLOWLIST (ADV-22): a "(SELECT" is permitted only (a) directly after EXISTS, IN, FROM, JOIN, LATERAL or AS (a CTE
+ * body), where it is a row source and not a value, or (b) when its WHOLE text is exactly one count: count(...) [FILTER (WHERE ...)] FROM
+ * <table> [alias] [WHERE ...] (never NULL; no LIMIT, OFFSET, FETCH, set operation, GROUP BY, HAVING, WINDOW or nested parenthesis), optionally
+ * cast directly (")::text", ")::bigint"), and then not an operand of arithmetic. Everything else is a value that can be NULL or rewritten.
+ */
+const COUNT_ONLY = /^SELECT\s+count\s*\([^()]*\)(?:\s+FILTER\s*\(\s*WHERE\s+[^()]*\))?\s+FROM\s+[\w.]+(?:\s+(?:AS\s+)?(?!WHERE\b)\w+)?(?:\s+WHERE\s+[^()]*)?$/i;
+const COUNT_FORBIDDEN = /\b(?:LIMIT|OFFSET|FETCH|UNION|EXCEPT|INTERSECT|GROUP|HAVING|WINDOW|SELECT)\b/i;
+function scalarSubqueryHits(sql: string): string[] {
   const found: string[] = [];
   for (const m of sql.matchAll(/\(\s*SELECT\b/gi)) {
-    let depth = 0;
-    let end = -1;
-    for (let i = m.index; i < sql.length; i++) {
-      if (sql[i] === "(") depth++;
-      else if (sql[i] === ")" && --depth === 0) {
-        end = i;
-        break;
-      }
+    const inner = balanced(sql, m.index);
+    const text = (inner ?? sql.slice(m.index + 1)).trim();
+    const before = sql.slice(0, m.index).trimEnd();
+    if (/\b(?:EXISTS|IN|FROM|JOIN|LATERAL|AS)$/i.test(before) && !/\bNOT\s+IN$/i.test(before)) continue;
+    const countOnly = inner !== undefined && COUNT_ONLY.test(text) && !COUNT_FORBIDDEN.test(text.replace(/^SELECT\b/i, ""));
+    if (!countOnly) {
+      found.push(text.slice(0, 40));
+      continue;
     }
-    const inner = sql.slice(m.index + 1, end < 0 ? sql.length : end).replace(/^\s*SELECT\s+(DISTINCT\s+)?/i, "");
-    let before = sql.slice(0, m.index).trimEnd();
-    let after = end < 0 ? "" : sql.slice(end + 1).trimStart();
-    // redundant parentheses around the subquery do not change what it is an operand of
-    while (before.endsWith("(") && after.startsWith(")")) {
-      before = before.slice(0, -1).trimEnd();
+    let b = before;
+    let after = sql.slice(m.index + inner.length + 2).trimStart();
+    while (b.endsWith("(") && after.startsWith(")")) {
+      b = b.slice(0, -1).trimEnd();
       after = after.slice(1).trimStart();
     }
-    const arithmetic = /[-+*/%]$/.test(before) || /^[-+*/%]/.test(after);
-    const comparison = new RegExp(`${COMPARISON.source}$`).test(before) || new RegExp(`^${COMPARISON.source}`).test(after);
-    const bareCount = /^count\s*\([^()]*\)(?:\s+FILTER\s*\([^()]*\))?\s+FROM\b/i.test(inner) && !/\b(?:GROUP\s+BY|HAVING)\b/i.test(inner);
-    if ((comparison || arithmetic) && !(bareCount && !arithmetic)) found.push(inner.slice(0, 40));
+    after = after.replace(/^::\s*(?:text|bigint|integer|int|numeric)\b/i, "").trimStart();
+    if (/[-+*/%]$/.test(b) || /^[-+*/%]/.test(after)) found.push(text.slice(0, 40));
   }
   return found;
+}
+
+/** Pinned shared CTEs (whitespace-collapsed, literals blanked). The CASE allowlists above rely on their columns being NOT NULL, which holds only
+ *  because each comes from a NOT NULL column read through an INNER join (migration 0030: commission_adjustments.direction / amount_cents /
+ *  line_id / adjustment_seq, commission_lines.seller_id / share_bps / pool_id, commission_pools.pool_cents / basis / rate are all NOT NULL):
+ *  any edit of these texts fails the lint until the new text is reviewed and re-pinned here. */
+const SHARED_CTES: Readonly<Record<string, string>> = {
+  split_in: "SELECT b.k, l.line_id, l.seller_id, b.total::bigint AS total, l.share_bps::bigint AS w, (sum(l.share_bps) OVER (PARTITION BY b.k))::bigint AS ws FROM (<bases>) b JOIN kauro.commission_lines l ON l.pool_id = b.pool_id",
+  split_fl: "SELECT k, line_id, seller_id, total, (total * w) / ws AS fl, (total * w) % ws AS rem FROM split_in",
+  split: "SELECT k, line_id, seller_id, fl + CASE WHEN row_number() OVER (PARTITION BY k ORDER BY rem DESC, seller_id::text COLLATE \"\") <= total - sum(fl) OVER (PARTITION BY k) THEN 1 ELSE 0 END AS share FROM split_fl",
+  chain: "SELECT a.*, lag(a.new_cumulative_entitlement_cents) OVER (PARTITION BY a.line_id ORDER BY a.adjustment_seq) AS prior_new, lag(a.adjustment_seq) OVER (PARTITION BY a.line_id ORDER BY a.adjustment_seq) AS prior_seq, max(a.adjustment_seq) OVER (PARTITION BY a.line_id) AS last_seq FROM kauro.commission_adjustments a",
+};
+/** The bases the oracle feeds the split (each selects k, pool_id and a NOT NULL total from NOT NULL columns through inner joins). */
+const SPLIT_BASES: ReadonlyArray<string> = [
+  "SELECT p.pool_id AS k, p.pool_id, p.pool_cents AS total FROM kauro.commission_pools p",
+  "SELECT a.adjustment_id AS k, l.pool_id, ((a.new_basis_cents)::bigint * (p.rate_bps)::bigint + 5000) / 10000 AS total FROM kauro.commission_adjustments a JOIN kauro.commission_lines l ON l.line_id = a.line_id JOIN kauro.commission_pools p ON p.pool_id = l.pool_id WHERE a.reason IN ('', '')",
+  "SELECT p.pool_id AS k, p.pool_id, ((p.initial_basis_cents)::bigint * (p.rate_bps)::bigint + 5000) / 10000 AS total FROM kauro.commission_pools p",
+];
+function sharedCtes(sql: string): Array<{ name: string; body: string; bases?: string }> {
+  const out: Array<{ name: string; body: string; bases?: string }> = [];
+  const norm = (t: string): string => t.replace(/\s+/g, " ").trim();
+  for (const m of sql.matchAll(/\b(chain|split_in|split_fl|split)\s*(?:\([^()]*\)\s*)?AS\b(?:\s+(?:NOT\s+)?MATERIALIZED)?\s*\(/gi)) {
+    const name = m[1]!.toLowerCase();
+    const body = balanced(sql, m.index + m[0].length - 1);
+    if (body === undefined) {
+      out.push({ name, body: "<unclosed>" });
+      continue;
+    }
+    const from = name === "split_in" ? /\bFROM\s*\(/i.exec(body) : null;
+    const bases = from === null ? undefined : balanced(body, from.index + from[0].length - 1);
+    if (bases !== undefined) out.push({ name, body: norm(body.replace(bases, "<bases>")), bases: norm(bases) });
+    else out.push({ name, body: norm(body) });
+  }
+  return out;
+}
+
+/** A CTE named chain or split* defined anywhere other than as its exact pinned text; a second ch alias in one branch. */
+function sharedViolations(sql: string): string[] {
+  const hit: string[] = [];
+  for (const c of sharedCtes(sql)) {
+    if (SHARED_CTES[c.name] !== c.body) hit.push(`CTE ${c.name} is not its pinned text`);
+    if (c.bases !== undefined && !SPLIT_BASES.includes(c.bases)) hit.push("split basis is not one of the pinned bases");
+  }
+  const aliases = [...sql.matchAll(/(?:\b[\w.]+|\))\s+(?:AS\s+)?ch\b(?!\s*\.)/gi)].filter((m) => !/^(?:AS|ON|AND|OR|WHERE|SELECT|THEN|ELSE|WHEN|BY|IS|NOT|NULL|FROM|JOIN)\s/i.test(m[0]));
+  if (aliases.length > 1) hit.push("a second ch alias in one branch");
+  return hit;
 }
 
 /** The forms that make a branch more than one atomic predicate, or read an absent case as a value (template rule 12): token-based, case-insensitive, on the SQL without its literals. */
@@ -866,7 +925,9 @@ function nonAtomic(branch: string): string[] {
     const allowed = (DIRECTION_CASE.test(body) && chBoundToChain(sql)) || SPLIT_ONE_CENT_CASE.test(body);
     if (!allowed) hit.push("CASE ... ELSE as a default");
   }
-  if (nullableScalarComparisons(sql).length > 0) hit.push("a scalar subquery as a comparison operand");
+  has("LIMIT / OFFSET / FETCH / EXCEPT / INTERSECT", /(?:LIMIT|OFFSET|FETCH|EXCEPT|INTERSECT)/i);
+  if (scalarSubqueryHits(sql).length > 0) hit.push("a scalar subquery that is not a row source or one exact count");
+  hit.push(...sharedViolations(sql));
   return hit;
 }
 
@@ -943,4 +1004,56 @@ test("the structural check refuses the six residual bypasses of the allowlists (
     ["the alias ch on a table other than the chain CTE", "SELECT 1 FROM u ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END"],
   ];
   for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
+});
+
+test("the structural check refuses every ADV-22 variant of the scalar-subquery and alias bypasses: one forged snippet each (allowlist, not denylist)", () => {
+  const w = "SELECT 1 FROM t WHERE ";
+  const bypasses: ReadonlyArray<readonly [string, string]> = [
+    ["a count subquery with LIMIT 0", `${w}t.x > (SELECT count(*) FROM u LIMIT 0)`],
+    ["a count subquery with OFFSET 1", `${w}t.x > (SELECT count(*) FROM u OFFSET 1)`],
+    ["a count subquery with FETCH FIRST 0 ROWS", `${w}t.x > (SELECT count(*) FROM u FETCH FIRST 0 ROWS ONLY)`],
+    ["a count subquery with EXCEPT", `${w}t.x > (SELECT count(*) FROM u EXCEPT SELECT count(*) FROM v)`],
+    ["a non-count subquery cast and compared (the ::bigint <)", `${w}(SELECT max(u.x) FROM u WHERE u.k = t.k)::bigint < t.x`],
+    ["a scalar subquery inside a function (abs((SELECT)))", `${w}t.x > abs((SELECT max(u.x) FROM u WHERE u.k = t.k))`],
+    ["a scalar subquery as a BETWEEN bound", `${w}t.x BETWEEN (SELECT max(u.a) FROM u) AND (SELECT max(u.b) FROM u)`],
+    ["a scalar subquery inside an IN list", `${w}t.x IN ((SELECT max(u.x) FROM u), 1)`],
+    ["= ANY (SELECT", `${w}t.x = ANY (SELECT u.x FROM u WHERE u.k = t.k)`],
+    ["a scalar subquery after ||", `${w}t.x::text = 'a' || (SELECT max(u.x) FROM u WHERE u.k = t.k)`],
+    ["NOT (SELECT", `${w}NOT (SELECT bool_and(u.ok) FROM u WHERE u.k = t.k)`],
+    ["a count subquery cast then compared with arithmetic", `${w}t.x > (SELECT count(*) FROM u)::bigint + 1`],
+    ["a nested re-alias of ch", `SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND EXISTS (SELECT 1 FROM chain ch LEFT JOIN u ON true WHERE u.x IS NULL)`],
+    ["a CTE chain redefined over a LEFT JOIN", `WITH chain AS (SELECT a.* FROM kauro.commission_adjustments a LEFT JOIN u ON true) SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END`],
+    ["a CTE split redefined", `WITH split AS (SELECT 1 AS k, 1 AS share) SELECT 1 FROM split WHERE true`],
+  ];
+  for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
+  // the oracle's own forms stay permitted
+  const ok = [
+    `${w}NOT EXISTS (SELECT 1 FROM u WHERE u.k = t.k)`,
+    `${w}t.k IN (SELECT u.k FROM u)`,
+    `${w}t.x > (SELECT count(*) FROM u WHERE u.k = t.k)`,
+    `${w}t.x > (SELECT count(*) FILTER (WHERE u.s = 'a') FROM kauro.u u WHERE u.k = t.k)`,
+    `SELECT (SELECT count(*) FROM u WHERE u.k = t.k)::text FROM t`,
+    `SELECT count(*)::text || ' live, ' || (SELECT count(*) FROM kauro.u f WHERE f.k = t.k) || ' slots' FROM t`,
+    `SELECT 1 FROM t JOIN LATERAL (SELECT c.line_id, sum(c.amount_cents) AS cents FROM u c GROUP BY c.line_id) e ON true`,
+  ];
+  for (const sql of ok) assert.deepEqual(nonAtomic(sql), [], `permitted: ${sql}`);
+});
+
+test("the shared chain and split CTEs the CASE allowlists rely on are the pinned text (their columns are NOT NULL by construction), in every invariant that reads them (ADV-22)", () => {
+  let users = 0;
+  for (const inv of B10_INVARIANTS) {
+    const sql = stripLiterals(inv.sql);
+    const defined = new Set(sharedCtes(sql).map((c) => c.name));
+    for (const name of ["chain", "split"]) {
+      if ((name === "chain" ? /\b(?:FROM|JOIN)\s+chain\b/i : /\b(?:FROM|JOIN)\s+split\b/i).test(sql)) {
+        users++;
+        assert.ok(defined.has(name), `${inv.id} reads ${name} without defining it`);
+      }
+    }
+    for (const c of sharedCtes(sql)) assert.equal(SHARED_CTES[c.name], c.body, `${inv.id}: CTE ${c.name} differs from its pinned text: review its NOT NULL columns, then re-pin`);
+  }
+  assert.ok(users >= 2, "the oracle reads both shared CTEs");
+  assert.deepEqual(Object.keys(SHARED_CTES).sort(), ["chain", "split", "split_fl", "split_in"]);
+  assert.match(SHARED_CTES["chain"]!, /^SELECT a\.\*, .* FROM kauro\.commission_adjustments a$/, "chain is a bare read of the adjustments table: no join that could null a column");
+  assert.doesNotMatch(Object.values(SHARED_CTES).join(" "), /\b(?:LEFT|RIGHT|FULL|OUTER)\b/i, "no outer join in a shared CTE");
 });
