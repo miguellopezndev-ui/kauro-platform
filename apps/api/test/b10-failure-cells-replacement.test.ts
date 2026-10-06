@@ -183,7 +183,7 @@ faultCell(
     step: "CMD027 included-replacement protocol / RACE: S2 settle, the same key's recovery against the first request",
     fault: "race",
     expect:
-      "RACE (replacement): the same key recovered concurrently, held before the first intent commits and while the first completes, makes exactly one re-binding and one allowance ordinal and answers REBOUND",
+      "RACE (replacement): the same key recovered concurrently, held before the first intent commits, while the first completes, and between its own ordinary reads while the first commits (a refusal over a re-bound purchase is REBOUND by identity), makes exactly one re-binding and one allowance ordinal and answers REBOUND",
   },
   async (ctx) => {
     // 1. the first request held before its intent COMMIT (its journal entry inserted): the recovery waits on that entry, then both settle
@@ -224,6 +224,44 @@ faultCell(
       assert.equal(view(first).replacement?.outcome, "REBOUND");
       assert.equal(second.text, replayTextOf(first), "the recovery replays the committed answer byte for byte");
       reboundOnce(x, await stateOf(x, key), view(first).quote.quoteId);
+    }
+    // 3. the first request live (its bound not crossed), held after its allowance record; the same key's recovery runs its ordinary reads up to its
+    //    allowance read and is held there; the first's SERVICE unit COMMITs and the first is held right after that COMMIT, before its completion;
+    //    the recovery then reads the allowance spent (Codex F1): its rebinder refuses (ALLOWANCE_USED) over a purchase that IS re-bound, and it
+    //    completes the still-open journal entry itself: the key must converge to REBOUND, exactly one re-binding, never WITHDRAWN
+    {
+      const x = await fixture("repl-race-recover-between-reads");
+      const key = freshKey("repl-race-recover-between-reads");
+      const hold = ctx.points.pause("pay.rebindings.record.after");
+      const first = ctx.operation("the first request, held after its allowance record", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key)));
+      first.catch(() => undefined);
+      await hold.reachedBy(first);
+      const between = ctx.points.pause("pay.rebindings.listForCapture.before");
+      const recovery = ctx.operation("the same key's recovery, held between its reads", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key))).then(
+        (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+        (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+      );
+      await between.reachedBy(recovery);
+      const committed = ctx.points.pause("uow.after-commit");
+      hold.release();
+      await committed.reachedBy(first);
+      assert.equal((await stateOf(x, key)).rebindings.length, 1, "the first's SERVICE unit committed the re-binding; its journal entry is still open");
+      assert.equal((await stateOf(x, key)).journal, "RESERVED");
+      between.release();
+      const answer = await recovery;
+      assert.equal(answer.status, "fulfilled");
+      if (answer.status === "fulfilled" && answer.value.status !== 201) assert.fail(`the recovery answered ${answer.value.status} ${answer.value.text}`);
+      const resumed = view(answer.status === "fulfilled" ? answer.value : (undefined as never));
+      assert.equal(resumed.replacement?.outcome, "REBOUND", `the recovery converged to the re-binding, never ${resumed.replacement?.outcome} (${resumed.replacement?.reason ?? "no reason"})`);
+      assert.equal((await stateOf(x, key)).journal, "COMMITTED", "the recovery completed the entry itself");
+      committed.release();
+      const firstReply = await first;
+      assert.equal(firstReply.status, 201, `the first request then answers the committed entry: ${firstReply.text}`);
+      assert.equal(view(firstReply).replacement?.outcome, "REBOUND");
+      const s = await stateOf(x, key);
+      reboundOnce(x, s, resumed.quote.quoteId);
+      assert.deepEqual(s.replacements, ["ACCEPTED_FOR_CHECKOUT"], "one replacement quote, never withdrawn");
+      assert.equal(s.journal, "COMMITTED");
     }
   },
 );
