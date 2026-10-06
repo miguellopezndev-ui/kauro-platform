@@ -1,6 +1,6 @@
 # ACH bank-transfer route — owner amendment A8
 
-Design only, revision **r4**: Phase 1 ships ACH receiving with owner-executed, platform-recorded outbound returns
+Design only, revision **r5** (r4 plus Codex design r4 fixes and the phase-1 Wise port, §6.1): Phase 1 ships ACH receiving with owner-executed, platform-recorded outbound returns
 (D-ACH-20, coordinator decision after Codex design rounds r1–r3); automated Wise outbound is Appendix A (Phase 2, not designed
 here). Inbound decisions and payer verification are as accepted in r1–r3. Owner decision supplied **2026-10-05**.
 Subject `ach/domain-design`, base `main` `61ab903b0e0f24526ac5a3ca1cf6a2f9f1de97ca`. No adapter, command, migration, registry
@@ -308,13 +308,19 @@ restricted Wise transfer evidence artifact (classified by the pure `classifyOutb
 | Command (row) | Guard at the effect | One-COMMIT footprint |
 |---|---|---|
 | RecordExecutedReturn (G2) | Refund APPROVED; amount, currency USD and destination digest equal the approval; amount ≤ current refundable balance; evidence shows a completed/sent outbound debit from the route's account | `manual_outbound_records` row, Refund APPROVED→COMPLETED (proposed edge `manual_return_recorded`, BANK_TRANSFER only), `refund.completed` with frozen discharge and observed fee, journal, audit/events/outbox |
-| RecordOverReturn (G5) | Used only when money already left Wise but RecordExecutedReturn is refused (e.g. a reversal observed after approval); reason and evidence required | Record row (kind OVER_RETURN), OVER_RETURN case, `outbound.over_returned` with frozen `e`; when a refund was APPROVED, its APPROVED→COMPLETED with `refund.completed` (B09 members, returned components `d`), journal, events |
+| RecordOverReturn (G5) | Original return path only: money already left Wise as the source's return but RecordExecutedReturn is refused (e.g. a reversal observed after approval); **refused while the source has an open REFUND_PAYABLE (`O > 0`)**; reason and evidence required | Record row (kind OVER_RETURN), OVER_RETURN case, `outbound.over_returned` with frozen `e`; when a refund was APPROVED, its APPROVED→COMPLETED with `refund.completed` (B09 members, returned components `d`), journal, events |
 | RecordReturnBounce (G3) | A recorded transfer, Wise evidence that it came back, returned cash `B ≤ P` | Bounce row on the record (once per transfer), `outbound.bounced` with frozen allocation, RETURN_BOUNCED case, journal, events; the Refund stays COMPLETED |
-| RecordResend (G4) | A bounced record of the same source; amount ≤ open REFUND_PAYABLE of that record less other resends; new Wise transfer ID; destination digest rule of D-ACH-13 | Record row (kind RESEND, parent bounce FK), `outbound.resent` settling REFUND_PAYABLE, journal, events |
+| RecordResend (G4) | A bounced record of the same source; amount ≤ open REFUND_PAYABLE of that record less other resends, **otherwise REFUSED** (`RESEND_EXCEEDS_PAYABLE`, nothing written); new Wise transfer ID; destination digest rule of D-ACH-13 | Record row (kind RESEND, parent bounce FK), `outbound.resent` settling REFUND_PAYABLE, journal, events |
 
 RecordExecutedReturn refuses any amount above the refundable balance, so the platform never classifies an over-return as a
 refund. If the owner had already sent the money, the refusal does not hide it: statement reconciliation lists outgoing debits
-whose transfer ID has no record and cannot mark the statement balanced, and the owner books it with RecordOverReturn. An
+whose transfer ID has no record and cannot mark the statement balanced, and the owner books it with RecordOverReturn **only when
+it is a return on the original return path** (the source has no open REFUND_PAYABLE). **A manual resend is REFUSED when its
+principal exceeds the open REFUND_PAYABLE of its bounce; there is no RecordOverReturn fallback for resends.** G5 allocates only
+refundable components `d` and receivable `e = P − d`; it cannot settle a bounce payable, so it is also refused while `O > 0`,
+which keeps `X = max(0, R − Q)`. A transfer refused by both commands (an oversized resend already sent) stays an unrecorded
+statement debit: reconciliation stays open and surfaces it, no posting is made, and Phase 1 has no ledger repair for it (a repayment credit is an ordinary unassigned receipt,
+D-ACH-18); the resend instruction shows the open payable `O` so the owner sends no more than it. An
 incoming reversal observed while a refund of its source is APPROVED opens a DOUBLE_RETURN_RISK case so the owner does not send.
 In-flight transfers are not modelled: the owner records only a transfer Wise shows as sent from the balance; a later bounce or
 return-before-delivery is recorded with RecordReturnBounce (cash back, liability reopened). Manual readiness, evidence capture
@@ -345,10 +351,10 @@ both scopes: `X = max(0, R − Q)`.**
 | Event (posting source key; producing row → posting row) | DEBIT | CREDIT |
 |---|---|---|
 | `refund.completed` via RecordExecutedReturn (transfer ID; G2→P3) | CONTRACT_LIABILITY/TAX_PAYABLE/CUSTOMER_OVERPAYMENT approved components `a`; PROCESSOR_EXPENSE observed fee `f` | provider balances `a + f` |
-| `outbound.over_returned` (transfer ID; G5→P3); its refundable part `d` posts through the same COMMIT's `refund.completed` | RETURN_RECOVERY_RECEIVABLE `e = P − d`; PROCESSOR_EXPENSE `f` | provider balances `e + f` |
+| `outbound.over_returned` (transfer ID; G5→P3; only with `O = 0`); its refundable part `d` posts through the same COMMIT's `refund.completed` | RETURN_RECOVERY_RECEIVABLE `e = P − d`; PROCESSOR_EXPENSE `f` | provider balances `e + f` |
 | `capture.reversed` / `bank_credit.reversed` (credit ID; G6→P3) | discharge `d` (B09 unreturned components); REFUND_PAYABLE `o = min(P − d, O)`; RETURN_RECOVERY_RECEIVABLE `e = P − d − o` | provider balances `P` |
 | `outbound.bounced` (transfer ID; G3→P3) | PSP_AVAILABLE `B`; PROCESSOR_EXPENSE `P − B` | RETURN_RECOVERY_RECEIVABLE then RETURN_LOSS by `ΔX = X − max(0, R − P − Q)`; REFUND_PAYABLE `P − ΔX` |
-| `outbound.resent` (new transfer ID; G4→P3) | REFUND_PAYABLE `s`; PROCESSOR_EXPENSE `f` | provider balances `s + f` |
+| `outbound.resent` (new transfer ID; G4→P3; `s ≤ O` else refused) | REFUND_PAYABLE `s`; PROCESSOR_EXPENSE `f` | provider balances `s + f` |
 | `reconciliation_case.resolved.v1` write-off (case ID; P4) | RETURN_LOSS `w ≤` open receivable | RETURN_RECOVERY_RECEIVABLE `w` |
 
 Provider balances are the source's PSP account up to its movable balance (amount − fee − principal already debited), the rest
@@ -372,6 +378,8 @@ the +1,000 receipt; obligation = remaining service/tax/excess liability of the s
 | M4: refund recorded → bounce | +1,000 | 0 | 0 | 1,000 | 0 |
 | M4a: M4 → resend 1,000 | 0 | 0 | 0 | 0 | 0 |
 | M4b: M4 → reversal (resend then refused: `O` = 0) | 0 | 0 | 0 | 0 | 0 |
+| M4d: M4 → resend 400 → resend 700 REFUSED (`O` = 600; no record, no posting) | +600 | 0 | 0 | 600 | 0 |
+| M4e: M4d → resend 600 | 0 | 0 | 0 | 0 | 0 |
 | M4c: M4 → resend → reversal | −1,000 | 1,000 | 0 | 0 | 0 |
 | M5: refund recorded → bounce `B` = 990 | +990 (PROCESSOR_EXPENSE 10) | 0 | 0 | 1,000 | 0 |
 | M6: approved, not recorded | +1,000 | 0 | 0 | 0 | 1,000 |
@@ -508,6 +516,61 @@ memos, payer names, destination bank fields, raw statements or credential values
 error bodies or evidence bundles. Keep originals encrypted in the restricted evidence store, accessed through audited finance
 reads; use refs/digests and masked displays.
 
+### 6.1 Wise adapter port (for S-B, phase 1)
+
+S-B implements, in phase 1, only the **read/classify** subset of `WiseBankTransferPort` (D-ACH-15) plus one statement-debit read. The
+port type has no create/fund/cancel/resend methods; their absence is part of the contract (D-ACH-20). Types below reuse D-ACH-15's
+`Evidence`, `Outcome<T>`, `Cursor`, `WiseAccountRef`, `IncomingCredit`, `UsdAchAccountDetails` and `OutboundEvidence`.
+
+```ts
+interface StatementDebit extends Evidence {          // outgoing line on the route's Wise USD balance
+  readonly accountRef: WiseAccountRef; readonly debitId: string;     // statement-line identity, stable
+  readonly transferId: string | null;                // Wise transfer ID when the line carries one
+  readonly amountCents: bigint; readonly currency: string; readonly feeCents: bigint | null;
+  readonly destinationDigest: Sha256Hex | null;
+  readonly status: "SENT" | "COMPLETED" | "RETURNED" | "UNRECOGNIZED"; readonly returnedCents: bigint | null;
+  readonly bookedAt: UtcInstant | null; readonly observedAt: UtcInstant;
+}
+interface DebitPage { readonly debits: ReadonlyArray<StatementDebit>; readonly nextCursor: Cursor; readonly complete: boolean;
+  readonly coverageStart: UtcInstant; readonly coverageEnd: UtcInstant; }
+interface WiseReadPortPhase1 extends Pick<WiseBankTransferPort, "provider" | "environment" | "integrationClass"
+  | "getAccountDetails" | "listIncomingCredits" | "getCreditById" | "classifyCredit" | "classifyOutbound"> {
+  listStatementDebits(input: { readonly accountRef: WiseAccountRef; readonly since: Cursor | null;
+    readonly limit: number; readonly deadline: UtcInstant }): Promise<Outcome<DebitPage>>;
+}
+```
+
+**Outcomes and refusals** are exactly those of D-ACH-15: COMPLETED (conclusive port evidence; inspect inner status), PENDING,
+AMBIGUOUS with only TIMEOUT/CONNECTION_RESET/PROVIDER_5XX/UNREADABLE_RESPONSE/OBSERVATION_LOST, UNRECOGNIZED (never success or
+failure), and `REFUSED` carrying `Operational` (AUTH_FAILED, PERMISSION_DENIED, SCA_REQUIRED, RATE_LIMITED, CAPABILITY_UNAVAILABLE,
+VALIDATION_REJECTED) bound to the refused request's hash. Read-list absence is never PROVED_NO_EFFECT; a missing credit is PENDING or
+AMBIGUOUS/OBSERVATION_LOST. No vendor prose or secret leaves the adapter.
+
+**Idempotency and cursor semantics.** All methods are pure reads: repeating one with the same input has no effect and returns the
+same identities. A credit is identified only by `(accountRef, creditId)`, a debit by `(accountRef, debitId)`; amount/date/reference
+never identify. Pages are at least once and may overlap or reorder; a repeat of an item with the same immutable fields is
+identical evidence, and a changed immutable field (amount, currency, payee, reference, transfer ID) is surfaced unchanged for the
+caller to raise BODY_CONFLICT; status/fee/returned fields may legitimately change between reads. `Cursor` is opaque and bound to
+account, environment and normalizer version; a foreign or stale cursor yields `REFUSED` VALIDATION_REJECTED, never a silent
+restart. `nextCursor` is returned for every page but the caller advances its stored cursor only after persisting the complete page
+(`complete=true`); `complete=false` or any refusal means the previous cursor stays and a coverage gap is recorded. Coverage
+bounds are reported so the observer re-reads overlap windows (D-ACH-07). `since=null` starts from the earliest covered range.
+Reconciliation (D-ACH-21) lists debits whose `transferId` has no `manual_outbound_records` row; a null `transferId` is an
+unrecorded debit by definition. The adapter never decides matching, authority or money allocation.
+
+**Contract fake S-B must ship** (`integrationClass = CONTRACT_FAKE`, which never qualifies LIVE; deterministic, fixed clock, seeded
+fixtures; the same shared contract suite runs against it and, when available, the real adapter, in
+`packages/application/test/ach-wise-port.test.ts`). It must script: duplicate, overlapping and reordered pages; an incomplete
+page (`complete=false`) and a page with the next cursor lost; PENDING→COMPLETED→REVERSED credit with `reversedCents`; fee null
+versus observed zero and a gross−fee≠net conflict; wrong currency and rail OTHER/UNKNOWN; missing reference and null payer;
+changed immutable field on re-read; an unknown credit and unknown status (PENDING/AMBIGUOUS/UNRECOGNIZED, never PROVED_NO_EFFECT);
+each AmbiguityReason; each Operational code with request-bound hash (SCA_REQUIRED on a statement read keeps the cursor);
+foreign-account/environment/version cursor; a statement debit with and without a matching record, a SENT then RETURNED debit
+with `returnedCents`, a debit with a null transfer ID, and an oversized-resend debit; a CONTRACT_FAKE account details artifact;
+and the assertion that the port exposes no outbound method and that evidence/fixtures contain no raw routing/account numbers
+outside the restricted details type. Fake results prove orchestration only; S-B separately freezes the real API profile and which
+observations can prove absence (D-ACH-15).
+
 ## 7. Failure-mode matrices
 
 The matrices follow [FAILURE-MATRIX-TEMPLATE](FAILURE-MATRIX-TEMPLATE.md) and [FAULT-HARNESS](FAULT-HARNESS.md), including all ten
@@ -599,7 +662,7 @@ capture source, RECEIVING_ROUTE bank-credit source) inside the one titled test, 
 ### 7.15 Record over-return command (D-ACH-21)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **G5** `Krecordoverreturn`: record row (OVER_RETURN), OVER_RETURN case, frozen `d`/`e`, refund completion when APPROVED, journal, events | **GAP ACH-M-G5-RACE**: `d`/`e` from the position at effect. Invariant: `X = max(0, R − Q)`; M2 equal in both orders. Inject: hold source booking lock; Kreversal/Krecordreturn/Krecordbounce both orders. | **GAP ACH-M-G5-TIMEOUT**: Recover by transfer ID. Invariant: one record. Inject: COMMIT response timeout. | **GAP ACH-M-G5-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity. | **GAP ACH-M-G5-CRASH-BEFORE**: Nothing recorded; statement debit stays unresolved. Invariant: record, case and events atomic. Inject: crash after last write before Krecordoverreturn COMMIT. | **GAP ACH-M-G5-CRASH-AFTER**: Replay. Invariant: one receivable. Inject: lose answer after COMMIT. | **GAP ACH-M-G5-RETRY**: Replay or conflict; refused when the normal record would succeed. Invariant: transfer ID unique. Inject: same ID, changed amount; amount within refundable. | **GAP ACH-M-G5-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up, reason, evidence. Inject: withdraw each. | **GAP ACH-M-G5-PARTIAL**: Rollback. Invariant: no receivable without case and record. Inject: fail case/event/journal write; assert exact cents. |
+| **G5** `Krecordoverreturn`: record row (OVER_RETURN), OVER_RETURN case, frozen `d`/`e`, refund completion when APPROVED, journal, events | **GAP ACH-M-G5-RACE**: `d`/`e` from the position at effect. Invariant: `X = max(0, R − Q)`; M2 equal in both orders. Inject: hold source booking lock; Kreversal/Krecordreturn/Krecordbounce both orders. | **GAP ACH-M-G5-TIMEOUT**: Recover by transfer ID. Invariant: one record. Inject: COMMIT response timeout. | **GAP ACH-M-G5-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity. | **GAP ACH-M-G5-CRASH-BEFORE**: Nothing recorded; statement debit stays unresolved. Invariant: record, case and events atomic. Inject: crash after last write before Krecordoverreturn COMMIT. | **GAP ACH-M-G5-CRASH-AFTER**: Replay. Invariant: one receivable. Inject: lose answer after COMMIT. | **GAP ACH-M-G5-RETRY**: Replay or conflict; refused when the normal record would succeed, and refused while `O > 0` (an oversized resend never becomes an over-return; nothing written). Invariant: transfer ID unique; `X = max(0, R − Q)`. Inject: same ID, changed amount; amount within refundable; amount above open REFUND_PAYABLE after a bounce (M4d). | **GAP ACH-M-G5-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up, reason, evidence. Inject: withdraw each. | **GAP ACH-M-G5-PARTIAL**: Rollback. Invariant: no receivable without case and record. Inject: fail case/event/journal write; assert exact cents. |
 ### 7.16 Record return bounce command (D-ACH-21)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
@@ -607,7 +670,7 @@ capture source, RECEIVING_ROUTE bank-credit source) inside the one titled test, 
 ### 7.17 Record resend command (D-ACH-21)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **G4** `Krecordresend`: record row (RESEND, parent bounce), REFUND_PAYABLE settlement, journal, events | **GAP ACH-M-G4-RACE**: Amount ≤ open REFUND_PAYABLE at effect. Invariant: M4a/M4b/M4c. Inject: hold source booking lock; Kreversal/second resend/Krecordbounce both orders. | **GAP ACH-M-G4-TIMEOUT**: Recover by transfer ID. Invariant: one settlement. Inject: COMMIT response timeout. | **GAP ACH-M-G4-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity. | **GAP ACH-M-G4-CRASH-BEFORE**: Payable stays open. Invariant: atomic. Inject: crash after last write before Krecordresend COMMIT. | **GAP ACH-M-G4-CRASH-AFTER**: Replay. Invariant: one debit of REFUND_PAYABLE. Inject: lose answer after COMMIT. | **GAP ACH-M-G4-RETRY**: Replay or conflict; refused when `O` no longer covers it (then RecordOverReturn). Invariant: transfer ID unique. Inject: same ID changed amount; resend after reversal. | **GAP ACH-M-G4-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up, destination evidence rule. Inject: withdraw each. | **GAP ACH-M-G4-PARTIAL**: Rollback. Invariant: no settlement without record. Inject: fail event/journal write; assert exact cents. |
+| **G4** `Krecordresend`: record row (RESEND, parent bounce), REFUND_PAYABLE settlement, journal, events | **GAP ACH-M-G4-RACE**: Amount ≤ open REFUND_PAYABLE at effect, else refused (two resends racing for one payable: one commits, the other is refused). Invariant: M4a–M4e. Inject: hold source booking lock; Kreversal/second resend/Krecordbounce both orders. | **GAP ACH-M-G4-TIMEOUT**: Recover by transfer ID. Invariant: one settlement. Inject: COMMIT response timeout. | **GAP ACH-M-G4-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity. | **GAP ACH-M-G4-CRASH-BEFORE**: Payable stays open. Invariant: atomic. Inject: crash after last write before Krecordresend COMMIT. | **GAP ACH-M-G4-CRASH-AFTER**: Replay. Invariant: one debit of REFUND_PAYABLE. Inject: lose answer after COMMIT. | **GAP ACH-M-G4-RETRY**: Replay or conflict; amount above open `O` REFUSED (`RESEND_EXCEEDS_PAYABLE`; no RecordOverReturn fallback; same refusal on replay). Invariant: transfer ID unique; refusal writes nothing. Inject: same ID changed amount; resend after reversal; 700 after a 400 resend of a 1,000 bounce (M4d). | **GAP ACH-M-G4-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up, destination evidence rule. Inject: withdraw each. | **GAP ACH-M-G4-PARTIAL**: Rollback; a refusal leaves record, case, journal and ledger untouched. Invariant: no settlement without record; partial resend (400) settles exactly 400 and leaves 600 open. Inject: fail event/journal write; assert exact cents. |
 ### 7.18 Apply incoming-credit reversal (D-ACH-09/18)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
@@ -615,7 +678,7 @@ capture source, RECEIVING_ROUTE bank-credit source) inside the one titled test, 
 ### 7.19 FINANCE return-booking consumer (D-ACH-18)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **P3** `Kreturnbook`: posting sets of `refund.completed`, `outbound.*` and reversal events from their frozen payloads, delivery markers | **GAP ACH-M-P3-RACE**: Any delivery order gives the same balances. Invariant: payload amounts only; oracle M1–M6. Inject: hold ledger lock; deliver G2–G6 and P4 events in every order. | **GAP ACH-M-P3-TIMEOUT**: Recover by source key. Invariant: no repost on unknown COMMIT. Inject: ledger lock/COMMIT timeout. | **GAP ACH-M-P3-EXPIRY**: Stale fence cannot book; current fence books original dates. Invariant: fenced consumer. Inject: cross worker fence deadline. | **GAP ACH-M-P3-CRASH-BEFORE**: No set fragment. Invariant: set and marker atomic. Inject: crash after last write before Kreturnbook COMMIT. | **GAP ACH-M-P3-CRASH-AFTER**: Replay as posted. Invariant: one set per source key. Inject: lose settle after COMMIT. | **GAP ACH-M-P3-RETRY**: Identical events no-op; conflicting payload rejected to a case. Invariant: source uniqueness. Inject: redeliver concurrently; alter payload. | **GAP ACH-M-P3-REVOCATION**: Fence stale worker; postings stay. Invariant: service scope/fence required. Inject: revoke service/fence/scope. | **GAP ACH-M-P3-PARTIAL**: Rollback all lines. Invariant: balanced set. Inject: fail each later line/marker; assert exact cents per account. |
+| **P3** `Kreturnbook`: posting sets of `refund.completed`, `outbound.*` and reversal events from their frozen payloads, delivery markers | **GAP ACH-M-P3-RACE**: Any delivery order gives the same balances. Invariant: payload amounts only; oracle M1–M6 incl. M4d/M4e. Inject: hold ledger lock; deliver G2–G6 and P4 events in every order. | **GAP ACH-M-P3-TIMEOUT**: Recover by source key. Invariant: no repost on unknown COMMIT. Inject: ledger lock/COMMIT timeout. | **GAP ACH-M-P3-EXPIRY**: Stale fence cannot book; current fence books original dates. Invariant: fenced consumer. Inject: cross worker fence deadline. | **GAP ACH-M-P3-CRASH-BEFORE**: No set fragment. Invariant: set and marker atomic. Inject: crash after last write before Kreturnbook COMMIT. | **GAP ACH-M-P3-CRASH-AFTER**: Replay as posted. Invariant: one set per source key. Inject: lose settle after COMMIT. | **GAP ACH-M-P3-RETRY**: Identical events no-op; conflicting payload rejected to a case, including `outbound.resent` with `s` above open REFUND_PAYABLE and `outbound.over_returned` with open REFUND_PAYABLE. Invariant: source uniqueness; payable never driven negative. Inject: redeliver concurrently; alter payload. | **GAP ACH-M-P3-REVOCATION**: Fence stale worker; postings stay. Invariant: service scope/fence required. Inject: revoke service/fence/scope. | **GAP ACH-M-P3-PARTIAL**: Rollback all lines. Invariant: balanced set. Inject: fail each later line/marker; assert exact cents per account. |
 ### 7.20 Write off over-return command (D-ACH-18)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
@@ -653,15 +716,15 @@ registry. The matrix and acceptance cases below are proposals for that implement
 | ACH-05 | Manual/API duplicates and immutable conflicts; overlapping/reordered pages, incomplete coverage and takeover; no skipped or twice-booked receipt | C1–C8, P2 |
 | ACH-06 | Exact reference/account/rail/currency/payee/payer; missing/foreign/truncated reference, approved third-party payer and controlled attribution | M1–M2, P1 |
 | ACH-07 | One real exact USD receipt applied while valid: one capture, CAPTURED/PAID, one authorization, exact ledger/fee/funds, normal consumer delivery | P1–P2 |
-| ACH-08 | Partial 400+600 against 1,000 and overpayment 1,010 against 1,000: exact allocations, REVIEW/no authority, owner return, no fabricated aggregate capture | P1–P2, F1–O3 |
-| ACH-09 | Two distinct exact full receipts plus repeated delivery: one authorization, all money, excess liability/owner return, service basis capped | P1–P2, F2, O2 |
+| ACH-08 | Partial 400+600 against 1,000 and overpayment 1,010 against 1,000: exact allocations, REVIEW/no authority, owner return, no fabricated aggregate capture | P1–P2, F1–F2, G1–G2, P3 |
+| ACH-09 | Two distinct exact full receipts plus repeated delivery: one authorization, all money, excess liability/owner return, service basis capped | P1–P2, F1–F2, G1–G2, P3 |
 | ACH-10 | Before/exact/after expiry, delayed bank observation, source/approval/route revocation and late credit: recorded money, no resurrection, reviewed remedy | I1–I3, P1, E1 |
 | ACH-11 | Explicit ACH retirement→PayPal: one open checkout/purchase; old reference stays bound; late ACH is return-only; no automatic second charge | I2, M2, P1, E1 |
 | ACH-12 | Unassigned booked receipt in shared treasury ledger; attribution reverses treasury and posts agency capture atomically; a return claim excludes attribution; treasury refund approved and recorded in route scope | M1–M2, P2, F1–F2, G2, G6 |
 | ACH-13 | Versioned source/access-date fees, null versus observed zero, gross/net equality, later fees/conflicts and recorded outbound fees | R2, C3, P1–P2, G2–G5, P3 |
 | ACH-14 | Owner approval: source/components, refundable-balance reservation, destination digest equal to payer evidence or ownership evidence, requester segregation, proof expiry/revocation | F1–F2, V3 |
-| ACH-15 | Phase 1 manual outbound: no provider outbound call or attempt exists; records idempotent by Wise transfer ID across scopes; amount above refundable refused; unrecorded statement debits keep reconciliation open; refusals of reads carry safe operational codes | G1–G2, G5, C2 |
-| ACH-16 | Record, reversal, bounce, resend and write-off in every order with exact cents: oracle M1–M6 in both scopes; credit notes/commissions only from capture refund completion | G2–G6, P3–P4 |
+| ACH-15 | Phase 1 manual outbound: no provider outbound call or attempt exists; records idempotent by Wise transfer ID across scopes; amount above refundable refused; resend above the bounce's open REFUND_PAYABLE refused with no over-return fallback (M4d); unrecorded statement debits keep reconciliation open; refusals of reads carry safe operational codes | G1–G2, G4–G5, C2 |
+| ACH-16 | Record, reversal, bounce, resend and write-off in every order with exact cents: oracle M1–M6 plus M4d/M4e (partial then oversized resend refused) in both scopes; credit notes/commissions only from capture refund completion | G2–G6, P3–P4 |
 | ACH-17 | Every matrix cell injected at its own boundary; security/log/evidence minimization and service fencing verified | All 248 GAP cells |
 | ACH-18 | Payer authorization lifecycle: verify/replace/revoke with evidence, step-up and both-order races against matching, apply and refund approval | V1–V3, M2, P1, F2 |
 | ACH-19 | D-ACH-20 boundary: with ACH ENABLED no automated outbound path is reachable; Appendix A requirements are listed and unchanged | G2, review of code paths |
