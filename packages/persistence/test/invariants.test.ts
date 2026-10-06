@@ -8,6 +8,8 @@
 // (session_replication_role = replica, a unique index dropped where one stands in the
 // way) inside a transaction that is rolled back, in which that id must fire; the other ids the forged state also violates are listed.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { after, before, test, type TestContext } from "node:test";
 import type { Client } from "pg";
 import { allocatePool, recomputePool, type AdjustmentReason, type BasisChange, type CommissionLineId, type EventId, type NewCommissionAdjustment } from "@kauro/domain";
@@ -830,13 +832,33 @@ function balanced(sql: string, open: number): string | undefined {
  */
 const COUNT_ONLY = /^SELECT\s+count\s*\([^()]*\)(?:\s+FILTER\s*\(\s*WHERE\s+[^()]*\))?\s+FROM\s+[\w.]+(?:\s+(?:AS\s+)?(?!WHERE\b)\w+)?(?:\s+WHERE\s+[^()]*)?$/i;
 const COUNT_FORBIDDEN = /\b(?:LIMIT|OFFSET|FETCH|UNION|EXCEPT|INTERSECT|GROUP|HAVING|WINDOW|SELECT)\b/i;
+/** A select whose top level has an aggregate with neither GROUP BY nor OVER: one row, NULL over an absent input (a scalar in disguise). */
+function ungroupedAggregate(text: string): boolean {
+  let skeleton = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "(") {
+      const inner = balanced(text, i);
+      if (inner === undefined) return true;
+      skeleton += "(~)";
+      i += inner.length + 1;
+    } else skeleton += text[i];
+  }
+  if (/\bGROUP\s+BY\b/i.test(skeleton)) return false;
+  for (const m of skeleton.matchAll(/\b(?:count|sum|avg|min|max|bool_and|bool_or|every|array_agg|string_agg|json_agg|jsonb_agg|xmlagg)\s*\(~\)(\s*FILTER\s*\(~\))?(\s*OVER\b)?/gi)) {
+    if (m[2] === undefined) return true;
+  }
+  return false;
+}
 function scalarSubqueryHits(sql: string): string[] {
   const found: string[] = [];
   for (const m of sql.matchAll(/\(\s*SELECT\b/gi)) {
     const inner = balanced(sql, m.index);
     const text = (inner ?? sql.slice(m.index + 1)).trim();
     const before = sql.slice(0, m.index).trimEnd();
-    if (/\b(?:EXISTS|IN|FROM|JOIN|LATERAL|AS)$/i.test(before) && !/\bNOT\s+IN$/i.test(before)) continue;
+    if (/\b(?:EXISTS|IN|FROM|JOIN|LATERAL|AS)$/i.test(before) && !/\bNOT\s+IN$/i.test(before)) {
+      if (ungroupedAggregate(text)) found.push("a row source that is an ungrouped aggregate: " + text.slice(0, 40));
+      continue;
+    }
     const countOnly = inner !== undefined && COUNT_ONLY.test(text) && !COUNT_FORBIDDEN.test(text.replace(/^SELECT\b/i, ""));
     if (!countOnly) {
       found.push(text.slice(0, 40));
@@ -910,6 +932,7 @@ function nonAtomic(branch: string): string[] {
     if (pattern.test(sql)) hit.push(what);
   };
   has("OR", /\bOR\b/i);
+  has("an outer join (a nullable column reaches a comparison)", /\b(?:LEFT|RIGHT|FULL|OUTER)\s+(?:OUTER\s+)?JOIN\b/i);
   has("a count compared with <> 1 or != 1", /(<>|!=)\s*1(?![0-9])/);
   has("!=", /!=/);
   has("IS DISTINCT FROM", /\bIS\s+(NOT\s+)?DISTINCT\s+FROM\b/i);
@@ -927,7 +950,7 @@ function nonAtomic(branch: string): string[] {
     const allowed = (DIRECTION_CASE.test(body) && chBoundToChain(sql)) || SPLIT_ONE_CENT_CASE.test(body);
     if (!allowed) hit.push("CASE ... ELSE as a default");
   }
-  has("LIMIT / OFFSET / FETCH / EXCEPT / INTERSECT", /(?:LIMIT|OFFSET|FETCH|EXCEPT|INTERSECT)/i);
+  has("LIMIT / OFFSET / FETCH / EXCEPT / INTERSECT", /\b(?:LIMIT|OFFSET|FETCH|EXCEPT|INTERSECT)\b/i);
   if (scalarSubqueryHits(sql).length > 0) hit.push("a scalar subquery that is not a row source or one exact count");
   hit.push(...sharedViolations(sql));
   return hit;
@@ -1023,9 +1046,9 @@ test("the structural check refuses every ADV-22 variant of the scalar-subquery a
     ["a scalar subquery after ||", `${w}t.x::text = 'a' || (SELECT max(u.x) FROM u WHERE u.k = t.k)`],
     ["NOT (SELECT", `${w}NOT (SELECT bool_and(u.ok) FROM u WHERE u.k = t.k)`],
     ["a count subquery cast then compared with arithmetic", `${w}t.x > (SELECT count(*) FROM u)::bigint + 1`],
-    ["a nested re-alias of ch", `SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND EXISTS (SELECT 1 FROM chain ch LEFT JOIN u ON true WHERE u.x IS NULL)`],
-    ["a CTE chain redefined over a LEFT JOIN", `WITH chain AS (SELECT a.* FROM kauro.commission_adjustments a LEFT JOIN u ON true) SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END`],
-    ["a quoted CTE name", `WITH "chain" AS (SELECT a.* FROM u a LEFT JOIN v ON true) SELECT 1 FROM "chain" ch WHERE ch.x > 0`],
+    ["a nested re-alias of ch", `SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND EXISTS (SELECT 1 FROM chain ch JOIN u ON true WHERE u.x IS NULL)`],
+    ["a CTE chain redefined over a join", `WITH chain AS (SELECT a.* FROM kauro.commission_adjustments a JOIN u ON true) SELECT 1 FROM chain ch WHERE 1 > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END`],
+    ["a quoted CTE name", `WITH "chain" AS (SELECT a.* FROM u a JOIN v ON true) SELECT 1 FROM "chain" ch WHERE ch.x > 0`],
     ["a quoted alias", `SELECT 1 FROM t JOIN u "ch" ON true WHERE "ch".x > 0`],
     ["a CTE split redefined", `WITH split AS (SELECT 1 AS k, 1 AS share) SELECT 1 FROM split WHERE true`],
   ];
@@ -1060,4 +1083,29 @@ test("the shared chain and split CTEs the CASE allowlists rely on are the pinned
   assert.deepEqual(Object.keys(SHARED_CTES).sort(), ["chain", "split", "split_fl", "split_in"]);
   assert.match(SHARED_CTES["chain"]!, /^SELECT a\.\*, .* FROM kauro\.commission_adjustments a$/, "chain is a bare read of the adjustments table: no join that could null a column");
   assert.doesNotMatch(Object.values(SHARED_CTES).join(" "), /\b(?:LEFT|RIGHT|FULL|OUTER)\b/i, "no outer join in a shared CTE");
+});
+
+test("the structural check refuses a LIMIT, OFFSET, FETCH or set operation anywhere, a row source that is an ungrouped aggregate, and an outer join (ADV-23, ADV-24)", () => {
+  const bypasses: ReadonlyArray<readonly [string, string]> = [
+    ["OFFSET in EXISTS", "SELECT 1 FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.k = t.k AND u.x > t.cap OFFSET 1)"],
+    ["LIMIT in a LATERAL row source", "SELECT 1 FROM t JOIN LATERAL (SELECT u.x FROM u WHERE u.k = t.k ORDER BY u.seq LIMIT 1) s ON true WHERE s.x > t.cap"],
+    ["FETCH FIRST in IN", "SELECT 1 FROM t WHERE t.k IN (SELECT u.k FROM u FETCH FIRST 1 ROWS ONLY)"],
+    ["EXCEPT in EXISTS", "SELECT 1 FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.k = t.k EXCEPT SELECT 1 FROM v WHERE v.k = t.k)"],
+    ["top-level LIMIT 0", "SELECT 1 FROM t WHERE t.x > 0 LIMIT 0"],
+    ["a LATERAL max() row source", "SELECT 1 FROM t JOIN LATERAL (SELECT max(u.x) AS m FROM u WHERE u.k = t.k) s ON true WHERE t.x > s.m"],
+    ["a CTE max() row source", "WITH s AS (SELECT max(u.x) AS m FROM u) SELECT 1 FROM t, s WHERE t.x > s.m"],
+    ["IN (SELECT max(...))", "SELECT 1 FROM t WHERE t.x IN (SELECT max(u.x) FROM u WHERE u.k = t.k)"],
+    ["a LEFT JOIN compared", "SELECT 1 FROM t LEFT JOIN u ON u.k = t.k WHERE t.x > u.x"],
+  ];
+  for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
+  assert.deepEqual(nonAtomic("SELECT 1 FROM t JOIN (SELECT u.k, sum(u.x) AS s FROM u GROUP BY u.k) g ON g.k = t.k WHERE t.x > g.s"), [], "a grouped aggregate row source is permitted");
+  assert.deepEqual(nonAtomic("WITH w AS (SELECT u.k, sum(u.x) OVER (PARTITION BY u.k) AS s FROM u) SELECT 1 FROM w WHERE w.s > 0"), [], "a windowed aggregate is permitted");
+});
+
+test("the lint source files contain no control bytes other than tab, newline and carriage return (ADV-23: a backspace had replaced a regex word boundary)", () => {
+  for (const url of [new URL(import.meta.url), new URL("../../src/testing/invariants.js", import.meta.url)]) {
+    const path = fileURLToPath(url).replace(/[\\/]dist[\\/]/, "/").replace(/\.js$/, ".ts");
+    const bytes = readFileSync(path);
+    for (const [i, b] of bytes.entries()) if (b < 32 && b !== 9 && b !== 10 && b !== 13) assert.fail(`${path}: control byte 0x${b.toString(16)} at offset ${i}`);
+  }
 });
