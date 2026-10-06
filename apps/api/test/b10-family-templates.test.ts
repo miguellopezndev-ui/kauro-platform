@@ -336,6 +336,41 @@ test("5.5 forged: a `blocks` receipt that is not B's last dispatched statement i
   await assert.rejects(run(twice("TPL_TWICE_BLOCKS", "[tpltwiceb]", CASH_LOCK)), /B's last dispatched statement in its target unit is cash_lock/);
 });
 
+test("5.5 forged: a `holdAfter` receipt whose identity params are not the member's is refused (the paused statement must carry the identity; B10-KIT-PR1-02)", async () => {
+  const m = twice("TPL_TWICE_HOLDID", "[tpltwicehi]", JOURNAL);
+  const p = m.point as Extract<M["point"], { kind: "twice" }>;
+  await assert.rejects(run({ ...m, point: { ...p, holder: { ...p.holder, holdAfter: { ...STMT_LOCK, identity: () => () => false } } } }), /TPL_TWICE_HOLDID: A paused after stmt_lock in its target unit 1 with the member's identity params/);
+});
+test("5.5 forged: a holder paused at the right label in ANOTHER unit than its declared target is refused (B10-KIT-PR1-02)", async () => {
+  // A approves another statement first (unit 1, the declared target: it carries the cash-lock witness), then the member's (unit 2), where it
+  // pauses after the member's statement lock (`when`: the first approval's lock is not instrumented); B approves the member's only
+  let other: Fix | null = null;
+  let mine: Fix | null = null;
+  let first = true;
+  const m = twice("TPL_TWICE_HOLDUNIT", "[tpltwicehu]", JOURNAL);
+  const p = m.point as Extract<M["point"], { kind: "twice" }>;
+  const forged: M = {
+    ...m,
+    fixture: async (label) => {
+      other = await fixture(`${label}-other`);
+      const f = await fixture(label);
+      mine = f;
+      // cash for both approvals
+      await bankCash(sw, (await claimedCents(sw)) + 2n * PAYABLE);
+      return f;
+    },
+    act: async (_ctx, f) => {
+      if (first) {
+        first = false;
+        await approve(other!, other!.key);
+      }
+      return approve(f, f.key);
+    },
+    point: { ...p, holder: { unit: unit1(CASH_LOCK), holdAfter: { ...STMT_LOCK, when: (params) => params[0] === mine?.statementId } } },
+  };
+  await assert.rejects(run(forged), /TPL_TWICE_HOLDUNIT: A paused after stmt_lock in its target unit 1 with the member's identity params/);
+});
+
 // 5.6 membership --------------------------------------------------------------------------------------------------------------------
 test("5.6 membership: an honest member passes (the revocation first refuses and writes nothing; the act holding the grant commits first; every act after is refused)", async () => {
   const m = member({
@@ -375,6 +410,9 @@ test("5.6 forged: a revocation that never blocks the act (it locks nothing the a
 });
 test("5.6 forged: a member whose declared refusal is not the act's is refused (the act that waited must be refused as the member declares)", async () => {
   await assert.rejects(run(membershipMember("TPL_REV_REFUSAL", "[tplrevr]", { refusal: (e) => e instanceof Refused && e.code === "NOT_THE_REFUSAL" })), /TPL_REV_REFUSAL: the act that waited is refused as the member declares/);
+});
+test("5.6 forged: a `holdAfter` receipt whose identity params are not the member's is refused (the paused statement must carry the identity; B10-KIT-PR1-02)", async () => {
+  await assert.rejects(run(membershipMember("TPL_REV_HOLDID", "[tplrevhi]", { holdAfter: { ...STMT_LOCK, identity: () => () => false } })), /TPL_REV_HOLDID: the act paused after stmt_lock with the member's identity params/);
 });
 
 // 5.7 step-up expiry (last: it moves the api's process clock past a proof's expiry) -----------------------------------------------

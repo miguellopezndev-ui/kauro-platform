@@ -534,6 +534,16 @@ function targetUnit<F>(log: ReadonlyArray<UnitLog>, unit: UnitTarget<F>, f: F, c
   }
   return u;
 }
+/**
+ * The statement a holder is paused after (`db.<holdAfter>.after`): the last statement the act dispatched (it is stopped right after it). It
+ * must carry the receipt's label and the member's identity params and, when the member declares one, belong to its target unit
+ * (B10-KIT-PR1-02: a valid witness elsewhere proves nothing about the paused statement).
+ */
+function pausedAt<F>(log: ReadonlyArray<UnitLog>, holdAfter: Receipt<F>, f: F, what: string, ordinal?: number): void {
+  const unit = log[log.length - 1];
+  const held = unit?.statements[unit.statements.length - 1];
+  assert.ok(unit !== undefined && held !== undefined && held.label === holdAfter.label && holdAfter.identity(f)(held.params) && (ordinal === undefined || unit.ordinal === ordinal), `${what} (paused in unit ${unit?.ordinal ?? "none"} after ${held?.label ?? "no step"})`);
+}
 /** The statements of a unit carrying a receipt's label with the member's identity params. */
 const receipts = <F>(u: UnitLog, r: Receipt<F>, f: F): LoggedStatement[] => u.statements.filter((s) => s.label === r.label && r.identity(f)(s.params));
 
@@ -792,6 +802,7 @@ async function twice<F>(ctx: FaultContext, m: Member<F, unknown>, point: Extract
     const a = settledOf(ctx.operation(`${m.code} A (holder)`, () => routedAct(ctx, m, f, keyOf(m as Member<unknown, unknown>), ca.conns, [point.holder.holdAfter], { target: point.holder.unit.ordinal, log: logA })));
     await pause.reachedBy(a.then((r) => (r.status === "fulfilled" ? r.value : Promise.reject(r.reason))));
     targetUnit(logA, point.holder.unit, f, `${m.code} A`);
+    pausedAt(logA, point.holder.holdAfter, f, `${m.code}: A paused after ${point.holder.holdAfter.label} in its target unit ${point.holder.unit.ordinal} with the member's identity params`, point.holder.unit.ordinal);
     let blocked: LoggedStatement | undefined;
     const waiting = await ctx.mustWait(fam.oracle, { waiter: cb.first, holder: connectionPid(ca.conns[Object.keys(m.roles)[0] as RouteRole]!) }, (conn) => routedAct(ctx, m, f, keyOf(m as Member<unknown, unknown>), cb.conns, [point.waiter.blocks], { target: point.waiter.unit.ordinal, log: logB }, conn), `${m.code}: B while A holds after ${point.holder.holdAfter.label}`);
     const unitB = logB.find((u) => u.ordinal === point.waiter.unit.ordinal);
@@ -842,8 +853,10 @@ async function membership<F>(ctx: FaultContext, m: Member<F, unknown>, point: Ex
   const rc2 = await fam.open("kauro_control_test");
   try {
     const pause = ctx.points.pause(`db.${point.holdAfter.label}.after`);
-    const act = settledOf(ctx.operation(`${m.code} holding the membership`, () => routedAct(ctx, m, f2, keyOf(m as Member<unknown, unknown>), c2.conns, [point.holdAfter], {})));
+    const log2: UnitLog[] = [];
+    const act = settledOf(ctx.operation(`${m.code} holding the membership`, () => routedAct(ctx, m, f2, keyOf(m as Member<unknown, unknown>), c2.conns, [point.holdAfter], { log: log2 })));
     await pause.reachedBy(act.then((r) => (r.status === "fulfilled" ? r.value : Promise.reject(r.reason))));
+    pausedAt(log2, point.holdAfter, f2, `${m.code}: the act paused after ${point.holdAfter.label} with the member's identity params`);
     const revocation = settledOf(
       (async () => {
         await rc2.query("BEGIN");
