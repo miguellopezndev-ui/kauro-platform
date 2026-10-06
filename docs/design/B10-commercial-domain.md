@@ -429,12 +429,21 @@ commercial authorization → refund → **agency recurrence → qualifying purch
 → ledger; the corporate ledger after it: **prospect → claim → allocation → sales account → entitlement → commission period →
 statement → payout intent → commission line → hold**. New transition subjects: `kauro.agency_recurrence` (agency), `kauro.sellers`
 (seller), `kauro.attribution_claims` (prospect: claims of one prospect serialize), `kauro.commission_entitlements` (entitlement).
-Readers take shared halves, writers the row lock and, through the subject's trigger, the exclusive half (B06 D-TX-2). The concurrency
+Readers take shared halves, writers the row lock and, through the subject's trigger, the exclusive half (B06 D-TX-2). **A writer's row
+lock on a subject that other rows reference is `FOR NO KEY UPDATE` unless the writer changes a key column** (a state transition never
+does): every insert that references the row takes its KEY SHARE, which `FOR UPDATE` blocks, and a reader takes its shared half and its
+KEY SHARE in either order (the continuation of CMD028: shared half, then its events; every journaled tenant command: the journal
+reservation's agency foreign key, then the shared half), so a `FOR UPDATE` writer deadlocks with one order or the other whichever half
+it takes first (40P01; B10 kit, Windows CI of c9f7f95, adversary ADV-1 of 593c47f). CMD002 and CMD043 lock the agency row
+`FOR NO KEY UPDATE` (AgencyLifecycleRepository.lockAgencyRow) and then take the exclusive half (the trigger; closureObligations); the
+lock-order cells cover both reader orders in both interleavings. The concurrency
 cases fix interleavings with hold points and observe waits in `pg_stat_activity`, never a sleep: the last founding slot (R2-090),
 simultaneous first captures (R2-137, both orders), a snapshot against a designation (CMD027-RACE), claims of two sellers
 (CMD046-RACE), two acceptances for one agency (CMD047-RACE), a termination against an acceptance (CMD050-RACE, end to end in
 B10-INTEGRATION because the two commands are built in parallel lanes), a close against an adjustment (CMD051-RACE), a closure against
-a payment order (CMD043-RACE: B09's CreatePaymentOrder takes the agency's shared half, CloseAgency its row and exclusive half).
+a payment order (CMD043-RACE: B09's CreatePaymentOrder takes the agency's shared half and, through its inserts, the row's KEY SHARE;
+CloseAgency the row FOR NO KEY UPDATE and then the exclusive half), an activation or a closure against a reader of the agency in both
+lock orders (CMD002-RACE, CMD043-RACE lock-order cells).
 
 ## 11. Ports, fakes and implementers
 
