@@ -70,6 +70,9 @@ import { requireMembershipOf } from "../agency/shared.js";
 import { completeReplacement, issueReplacement, replacementContextOf, settleReplacement, type ReplacementContext } from "./replacement.js";
 import type { QuoteCollaborators } from "./runtime.js";
 
+/** The seconds a caller waits before it retries a replacement whose re-binding did not answer (the 202's polling guidance). */
+const REPLACEMENT_POLL_AFTER_SECONDS = 5;
+
 /** What a first execution leaves to do after its transaction: nothing (the journaled answer), or the rest of a replacement. */
 type First = { readonly kind: "REPLAY"; readonly view: CreateQuoteView } | { readonly kind: "FINAL"; readonly view: CreateQuoteView } | { readonly kind: "REPLACEMENT"; readonly replacement: ReplacementContext; readonly resumed: boolean };
 
@@ -248,6 +251,10 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
         if (!first.resumed) await co.hold?.("AFTER_INTENT");
         const role = held.membership === null ? null : held.membership.role;
         const settled = await settleReplacement(runtime, co, first.replacement, envelope.correlationId);
+        // the re-binding did not answer within its bound: the intent stays durable and the entry open; the same key resumes (202, D10-GAP-6)
+        if (settled.kind === "PENDING") {
+          return { kind: "ACCEPTED", status: 202, operationId: first.replacement.toQuoteId, state: "ISSUED", statusPath: `/api/v1/quotes/${first.replacement.toQuoteId}`, pollAfterSeconds: REPLACEMENT_POLL_AFTER_SECONDS };
+        }
         await co.hold?.("AFTER_SETTLE");
         const view = await completeReplacement(runtime, co, first.replacement, settled, { context, identity, role });
         return { kind: "COMPLETED", status: 201, view: view.view, version: versionOfView(view.view), replayed: view.replayed };

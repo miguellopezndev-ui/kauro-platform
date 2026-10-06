@@ -529,6 +529,13 @@ export function generateOpenApi(sources) {
         content: { "application/json": { schema: { $ref: `${COMPONENTS}${spec.name}Completed` } } },
       },
     };
+    if (reply.accepted) {
+      responses["202"] = {
+        description: "ACCEPTED: the included replacement's re-binding did not answer within its bound; the replacement quote stays ISSUED with its journal entry open — the operation (the replacement quote), its state, the quote's status path and the polling guidance; retry with the same key (package B10 D10-GAP-6)",
+        headers: REPLY_HEADERS,
+        content: { "application/json": { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
+      };
+    }
     Object.assign(responses, problemResponses(application.COMMERCIAL_COMMAND_OUTCOMES[spec.id]));
     const contract = application.commercialCommandRouteResponses(spec.id);
     const documented = Object.keys(responses).filter((status) => Number(status) < 400);

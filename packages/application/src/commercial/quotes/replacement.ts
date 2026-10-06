@@ -41,6 +41,7 @@ import type { CommandEnvelope } from "../../api/envelope.js";
 import { quoteViewOf } from "../../commerce/request/checkout.js";
 import { providerServicesUnavailable, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { applied } from "../agency/shared.js";
+import { withinCallBound } from "../call-bound.js";
 import type { CreateQuoteBody } from "../contracts.js";
 import type { CreateQuoteView } from "../views.js";
 import type { QuotedSubject } from "./create-quote.js";
@@ -58,7 +59,9 @@ export interface ReplacementContext {
   readonly membershipId: MembershipId;
 }
 
-export type SettledReplacement = { readonly kind: "REBOUND" } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<string> };
+/** What the payment service concluded; PENDING: its re-binding did not answer within its bound (nothing concluded, answer 202). */
+export type Concluded = { readonly kind: "REBOUND" } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<string> };
+export type SettledReplacement = Concluded | { readonly kind: "PENDING" };
 
 const refuse = (reason: NonNullable<DomainFailure["details"]["reason"]>, message: string, details: Partial<DomainFailure["details"]> = {}): DomainFailure =>
   new DomainFailure("PRECONDITION_FAILED", message, { reason, ...details });
@@ -205,15 +208,20 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
   const factory = co.request.payment;
   const rebinder = co.rebinder;
   if (factory === null || rebinder === null) throw providerServicesUnavailable();
-  return factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<SettledReplacement> => {
-    if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
-    const to = await svc.commerce.quotes.get(ctx.toQuoteId);
-    if (to === null) throw new NotFoundFailure("quote");
-    if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
-    if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
-    const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
-    return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
-  });
+  // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
+  // open (nothing is concluded), and the request answers the retriable 202 — the same key resumes and observes the re-binding by its identity
+  const bounded = await withinCallBound(runtime.clock, () =>
+    factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
+      if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
+      const to = await svc.commerce.quotes.get(ctx.toQuoteId);
+      if (to === null) throw new NotFoundFailure("quote");
+      if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
+      if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
+      const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
+      return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
+    }),
+  );
+  return bounded.timedOut ? { kind: "PENDING" } : bounded.value;
 }
 
 /**
@@ -224,7 +232,7 @@ export async function completeReplacement(
   runtime: CommerceRequestRuntime,
   co: QuoteCollaborators,
   ctx: ReplacementContext,
-  settled: SettledReplacement,
+  settled: Concluded,
   input: { readonly context: TenantContext; readonly identity: IdempotencyIdentity; readonly role: MembershipRole | null },
 ): Promise<{ readonly view: CreateQuoteView; readonly replayed: boolean }> {
   return runtime.unitOfWork.run(input.context, async (uow) => {
