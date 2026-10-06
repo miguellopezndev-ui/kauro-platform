@@ -107,7 +107,6 @@ const DRAFTED_EVENT: SqlStep = { label: "drafted_event", match: /INSERT INTO kau
 const ISSUED_EVENT: SqlStep = { label: "issued_event", match: /INSERT INTO kauro\.domain_events/, when: (p) => p.includes("quote.issued.v1") };
 const ISSUANCE: SqlStep = { label: "issuance", match: /INSERT INTO kauro\.quote_issuances/ };
 const JOURNAL_COMMIT: SqlStep = { label: "journal_commit", match: /UPDATE kauro\.command_journal SET state = 'COMMITTED'/ };
-const UNITS_READ: SqlStep = { label: "units", match: /billable_source_units::text AS units/ };
 
 /** One member of a QUOTE_PAR cell: the issuance fails at `at`, the footprint is unchanged, the same key then issues once. */
 async function issuanceFailsAt(ctx: FaultContext, label: string, what: string, at: string, steps: ReadonlyArray<SqlStep>, setup?: (a: Agent, plan: PlanFixture) => Promise<void>): Promise<{ readonly a: Agent; readonly plan: PlanFixture; readonly issued: CreateQuoteView }> {
@@ -287,46 +286,55 @@ faultCell(
 
 // --- TOCTOU_SOURCE ---------------------------------------------------------------------------------------------------------------------
 
+const SERVER_NOW_READ: SqlStep = { label: "server_now", match: /SELECT to_char\(kauro\.server_now\(\)/ };
+
+/**
+ * CreateQuote whose issuance instant (kauro.server_now(), read once the shared halves are taken, create-quote.ts) the cell puts exactly
+ * AT the source's effective deadline or one millisecond before it: the unit is held before that read and its open transaction's server
+ * clock (kauro_test.clock_offset_seconds) is set on the controlled clock, so the instant the deadline check compares is the controlled one.
+ */
+async function createQuoteAt(ctx: FaultContext, a: Agent, plan: PlanFixture, key: string, position: "one instant before" | "at", instant: () => void): Promise<Reply> {
+  const conn = await open("kauro_app_test");
+  try {
+    return await ctx.operation(`CreateQuote issued ${position} the source's deadline`, async (op) => {
+      instant();
+      // held with the shared halves taken, before the issuance instant is read: the transaction's clock then stands at the controlled instant
+      const pause = ctx.points.pause("db.server_now.before");
+      const running = quoteOn(ctx, conn, a, plan, key, [SERVER_NOW_READ]);
+      await pause.reachedBy(running);
+      await op.clock.onServer(conn);
+      pause.release();
+      return running;
+    });
+  } finally {
+    await conn.end();
+  }
+}
+
 faultCell(
   {
     id: "TOCTOU_SOURCE",
-    step: "CMD027 CreateQuote (issuance) / EXPIRY: W1 the source's retention deadline crossed while CreateQuote holds its locks",
+    step: "CMD027 CreateQuote (issuance) / EXPIRY: W1 the source's retention deadline at the quote's issuance instant",
     fault: "expiry",
-    expect: "RACE: the source deadline passing while CreateQuote holds its locks: the quote's availability is never later than the deadline, or the quote is SOURCE_EXPIRED, never an ISSUED quote past it",
+    expect: "RACE: a CreateQuote issued one millisecond before the source deadline is ISSUED and promises the source no later than it; one issued exactly at the deadline is SOURCE_EXPIRED with nothing written, never an ISSUED quote at or past it",
   },
   async (ctx) => {
     const { a, plan } = await fresh("toctou-source");
     const availability = await iw.h.commerce.run(iw.h.tenant(a.s.agency.agencyId, a.s.agency.ownerUserId), (uow) => commercialSourceReadsOf(uow).availabilityOf({ agencyId: a.s.agency.agencyId, projectId: plan.projectId, revisionHash: plan.revisionHash } as never));
-    assert.ok(availability !== null, "the sealed source is available");
+    assert.ok(availability !== null && availability.state === "SEALED", "the sealed source is available");
     const deadline = ctx.deadline(availability.effectiveDeadline, "the source's effective retention deadline");
-    const key = freshKey("toctou-source");
+    // one instant before the deadline: issued, and its promise never reaches past the deadline
+    const early = view(await createQuoteAt(ctx, a, plan, freshKey("toctou-source-before"), "one instant before", () => ctx.clock.before(deadline, 1)));
+    assert.equal(Date.parse(early.quote.issuedAt), Date.parse(deadline) - 1, "issued at the controlled instant, one millisecond before the deadline");
+    assert.ok(Date.parse(early.quote.sourceAvailableUntil) <= Date.parse(deadline), `the quote promises the source no later than its deadline: ${early.quote.sourceAvailableUntil} > ${deadline}`);
+    // exactly at the deadline: the source is expired, nothing is written (the quote of the first member stays the project's live quote)
+    const key = freshKey("toctou-source-at");
     const before = await footprint(a, plan, key);
-    const conn = await open("kauro_app_test");
-    let reply: Reply;
-    try {
-      reply = await ctx.operation("CreateQuote across the source's deadline", async (op) => {
-        // held with every shared half taken (agency, capability, approval, revision, target, profile) and the units read
-        const pause = ctx.points.pause("db.units.after");
-        const running = quoteOn(ctx, conn, a, plan, key, [UNITS_READ]);
-        await pause.reachedBy(running);
-        // the deadline passes while the locks are held: the open transaction's server clock now stands past it
-        ctx.clock.past(deadline);
-        await op.clock.onServer(conn);
-        pause.release();
-        return running;
-      });
-    } finally {
-      await conn.end();
-    }
-    if (reply.status === 201) {
-      const q = view(reply).quote;
-      assert.ok(Date.parse(q.sourceAvailableUntil) <= Date.parse(deadline), `the quote promises the source no later than its deadline: ${q.sourceAvailableUntil} > ${deadline}`);
-      assert.ok(Date.parse(q.issuedAt) < Date.parse(deadline), "issued before the deadline it states");
-      if (view(reply).eligibility.foundingOffer === "RESERVED") await giveSlotBack(a, plan);
-    } else {
-      assert.equal(outcome(iw.w, reply), "422 SOURCE_EXPIRED -");
-      assert.deepEqual(await footprint(a, plan, key), before, "nothing written");
-    }
+    const reply = await createQuoteAt(ctx, a, plan, key, "at", () => ctx.clock.set(deadline));
+    assert.equal(reply.status, 422, `issued at the deadline instant ... the source is expired: ${reply.status} ${reply.text}`);
+    assert.equal(outcome(iw.w, reply), "422 SOURCE_EXPIRED -");
+    assert.deepEqual(await footprint(a, plan, key), before, "nothing written");
+    if (early.eligibility.foundingOffer === "RESERVED") await giveSlotBack(a, plan);
   },
 );
 
