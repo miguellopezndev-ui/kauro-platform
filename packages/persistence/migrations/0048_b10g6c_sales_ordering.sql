@@ -27,3 +27,12 @@ BEGIN
   RETURN NEW;
 END
 $$;
+
+-- --- SELLER_IDENT_RACE: the identity's transition lock on its assurance facts ------------------------------------------------------------
+-- 0002 takes the writer's half of kauro.identities on a state change only; a verified e-mail or an MFA enrolment withdrawn (the identity's
+-- own sync, identities_self_sync) is as much a withdrawal of the authority an activation rests on (17 "Activation prerequisites", KC005):
+-- the activation's reader half (activationFacts, sellers_activation_guard) and the withdrawal now serialize in both orders.
+DROP TRIGGER IF EXISTS identities_assurance_transition_lock ON kauro.identities;
+CREATE TRIGGER identities_assurance_transition_lock BEFORE UPDATE OF email_verified_at, mfa_enrolled_at ON kauro.identities
+  FOR EACH ROW WHEN (OLD.email_verified_at IS DISTINCT FROM NEW.email_verified_at OR OLD.mfa_enrolled_at IS DISTINCT FROM NEW.mfa_enrolled_at)
+  EXECUTE FUNCTION kauro.take_transition_lock('kauro.identities', 'user_id');
