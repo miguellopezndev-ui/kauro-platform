@@ -28,6 +28,7 @@ import { agencyView } from "../../api/projections.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { CommerceAccessDenied, runCommerceCommand, tenantContextOf, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION } from "../../ports/authorizer.js";
+import { withinCallBound } from "../call-bound.js";
 import { CLOSE_AGENCY, type CloseAgencyBody } from "../contracts.js";
 import type { AgencyClosureView } from "../views.js";
 import { commercialAdmissionSpecOf, type AgencyLifecycleCollaborators, type CommercialCommandHandler } from "./runtime.js";
@@ -37,6 +38,8 @@ import { applied, checkExpectedVersion, requireMembershipOf } from "./shared.js"
 export const CLOSURE_DELETION_DELAY_HOURS = 720;
 const HOUR_MS = 3_600_000;
 const CLIENT_PAGE = 100;
+/** The seconds a refused closure waits before it retries an inspector that did not answer within PROVIDER_CALL_TIMEOUT_MS. */
+const INSPECTOR_RETRY_AFTER_SECONDS = 5;
 
 /** The agencies a closure may request from: DRAFT (owner_abandons_setup), ACTIVE and RESTRICTED (owner_requests_closure). */
 const CLOSABLE: ReadonlySet<string> = new Set(["DRAFT", "ACTIVE", "RESTRICTED"]);
@@ -83,7 +86,10 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           for (;;) {
             const page: ReadonlyArray<EndClientRecord> = await uow.endClients.list(agencyId, { ...(after !== undefined ? { after } : {}), limit: CLIENT_PAGE });
             for (const client of page) {
-              const work = await co.activeWork.inspectClient(uow, client.clientId);
+              // bounded (D10-GAP-6): an inspector that does not answer is no inventory, never zero work — the closure is refused, retriably
+              const inspected = await withinCallBound(runtime.clock, () => co.activeWork.inspectClient(uow, client.clientId));
+              if (inspected.timedOut) throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency's active work could not be inspected in time; nothing changed, retry with the same key", { retryAfterSeconds: INSPECTOR_RETRY_AFTER_SECONDS }, true);
+              const work = inspected.value;
               activeWork += work.openProjects + work.activeJobs;
             }
             if (page.length < CLIENT_PAGE) break;
