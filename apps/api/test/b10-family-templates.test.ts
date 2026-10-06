@@ -5,7 +5,7 @@
 // answered); 5.2 no application bound is RED and a path that calls another binding is refused; 5.3 the target unit carries its witness with
 // the member's identity (another phase); 5.4 the completed step answered in the target unit with the identity params; 5.5 B's last statement
 // is the declared `blocks` receipt; the footprint is EXACTLY the rows the earlier units committed. Titles say the duty.
-import { invariantsAfterEach, instrumentPort, runCell, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { crashedAt, invariantsAfterEach, instrumentPort, runCell, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { openConnection } from "@kauro/persistence/testing";
@@ -200,7 +200,14 @@ const crash = (code: string, tag: string, kind: "crash-before" | "crash-after", 
     code,
     tag,
     point: { kind, unit: unit1(witness) },
-    ...(kind === "crash-after" ? { committed: async (f: Fix) => approvedOnce(f) } : {}),
+    ...(kind === "crash-after"
+      ? {
+          committed: async (f: Fix, outcome: { readonly lost: unknown }) => {
+            assert.ok(crashedAt("target.after-commit")(outcome.lost), `the answer was lost to the crash after the target's COMMIT (${String(outcome.lost)})`);
+            await approvedOnce(f);
+          },
+        }
+      : {}),
     ...over,
   });
 test("5.3 crash-before: an honest member passes (the crash at the target unit's COMMIT leaves nothing; the same key approves once)", async () => {

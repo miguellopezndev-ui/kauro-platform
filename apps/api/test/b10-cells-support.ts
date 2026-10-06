@@ -321,8 +321,11 @@ export interface Member<F, A> {
   earlier(f: F): Promise<RowSet>;
   /** The refusal and what survives it. */
   failed(f: F, failure: unknown): Promise<void>;
-  /** What a unit that committed before its answer was lost leaves (REQUIRED for crash-after). */
-  committed?(f: F, answer: A): Promise<void>;
+  /**
+   * What a unit that committed before its answer was lost leaves (REQUIRED for crash-after). The act has no answer then: `lost` is what the
+   * act failed with (the simulated crash at the target's after-commit), kept apart from the type A of an answer it never gave.
+   */
+  committed?(f: F, outcome: { readonly lost: unknown }): Promise<void>;
   /** The recovery: the same key, a redelivery, the next pass or a takeover. */
   recover(ctx: FaultContext, f: F, key: string): Promise<unknown>;
   /** Exactly once by durable identity; the earlier commits preserved. */
@@ -710,7 +713,7 @@ async function crash<F, A>(ctx: FaultContext, m: Member<F, A>, point: Extract<Fa
       await m.failed(f, failure);
       await assertFootprint(`${m.code} after the crash before the target's COMMIT`, before, m.tables, await m.earlier(f));
     } else {
-      await m.committed!(f, failure as A);
+      await m.committed!(f, { lost: failure });
     }
   } finally {
     await c.end();
