@@ -65,7 +65,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { PgWebSessionStore } from "@kauro/persistence";
-import { ROLES, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   activeWorkInspector,
@@ -610,7 +610,7 @@ export const RECENT_SEAL_MS = 3_600_000;
 export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
-    database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: 10_000 },
+    database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
     migrateOnStart: null,
     ...(options.sessions === true ? { identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 2 } } } : {}),
   });
@@ -1118,8 +1118,18 @@ export function outcome(w: World, reply: Reply): string {
 }
 
 /** Waits until a backend of the api pool is blocked on a lock while running a statement containing `fragment`. */
-export function waitForApiLockWait(w: World, fragment: string): Promise<number> {
-  return waitForLockWait(w.h.oracle, API_APPLICATION_NAME, fragment);
+export async function waitForApiLockWait(w: World, fragment: string): Promise<number> {
+  const pid = await waitForLockWait(w.h.oracle, API_APPLICATION_NAME, fragment);
+  // Reproduction only: keep the already-observed holder paused longer than the former statement timeout.
+  // The real pg_stat_activity observation above always runs, with the same bounds and rejection semantics.
+  const delay = Number(process.env["KAURO_TEST_LOCK_RELEASE_DELAY_MS"] ?? 0);
+  if (!Number.isSafeInteger(delay) || delay < 0) throw new RangeError("KAURO_TEST_LOCK_RELEASE_DELAY_MS must be a nonnegative integer");
+  if (delay > 0) {
+    const evidence = await w.h.oracle.query("SELECT pid, query, wait_event_type, wait_event, pg_blocking_pids(pid) AS blockers, extract(epoch FROM (clock_timestamp() - query_start)) * 1000 AS statement_age_ms FROM pg_stat_activity WHERE pid = $1", [pid]);
+    process.stderr.write(`kauro-test lock-release-delay=${delay}ms statement-timeout=${raceStatementTimeoutMs()}ms ${JSON.stringify(evidence.rows)}\n`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  return pid;
 }
 
 /**

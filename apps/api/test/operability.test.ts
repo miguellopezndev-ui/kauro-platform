@@ -14,7 +14,7 @@ import { compileSchemaBundle } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 import type { PoolErrorEvent } from "@kauro/persistence";
 import { classifyError, listMigrations } from "@kauro/persistence";
-import { ROLES, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   ConfigError,
@@ -76,6 +76,9 @@ async function envOf(cluster: TemporaryPostgres, overrides: Record<string, strin
     KAURO_HTTP_HOST: "127.0.0.1",
     KAURO_HTTP_PORT: String(await freePort()),
     KAURO_AUTH_BEARER_TOKENS_FILE: tokenFile(),
+    // R35's lock races hold kauro.agencies while waitForLockWait observes (up to 10 s): the waiting command must outlive the
+    // observation (harness-derived test timeout, cmd043 family); production keeps its 10 s default.
+    KAURO_DB_STATEMENT_TIMEOUT_MS: String(raceStatementTimeoutMs()),
     ...overrides,
   };
 }
