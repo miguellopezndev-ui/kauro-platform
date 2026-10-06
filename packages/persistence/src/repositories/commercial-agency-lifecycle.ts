@@ -272,6 +272,10 @@ export class PgAgencyLifecycleRepository implements AgencyLifecycleRepository {
     return r.rows.length > 0;
   }
 
+  async lockAgencyTransition(agencyId: AgencyId): Promise<void> {
+    await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agencies', $1))", [agencyId]);
+  }
+
   async closureObligations(agencyId: AgencyId, activeWork: number): Promise<ClosureObligations> {
     // the agency's exclusive half before any read: a checkout or capture in flight holds the shared half, so the closure waits for it,
     // and reads what it committed; one arriving after waits behind the closure and reads the agency CLOSING (D10-TX-1)

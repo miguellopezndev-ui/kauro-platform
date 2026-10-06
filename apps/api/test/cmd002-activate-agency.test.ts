@@ -10,7 +10,7 @@ import type { AgencyActivationView } from "@kauro/application";
 import type { AgencyId, FiscalIssuerRef, FiscalProfileId, UserId } from "@kauro/domain";
 import { publishAgreementVersions, recordReviewedFiscalProfile, type AgencyFixture, type PublishedAgreements } from "@kauro/persistence/testing";
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, routes, sha, waitForApiLockWait, world, type Person, type Reply, type World } from "./support.js";
-import { apiIdleInTransaction, blockersOf, disarm, readerCell, track, until, waitersOn, type CellOutcome } from "./agency-lock-cells.js";
+import { apiIdleInTransaction, disarm, otherWaitsExactlyOn, readerCell, track, until, waitsExactlyOnOther, type CellOutcome } from "./agency-lock-cells.js";
 
 let w: World;
 let versions: PublishedAgreements;
@@ -241,12 +241,12 @@ test("RACE (D10-TX-1, 40P01) reader KEY_SHARE_THEN_SHARED, production: CreateCli
   let activationWaited = false;
   let clientWaited = false;
   try {
-    await until("the activation reaches its commit, or waits for CreateClient's backend", async () => committing.done() || activating.done() || (activationWaited = (await waitersOn(w, clientPid)).length > 0));
+    await until("the activation reaches its commit, or waits for CreateClient's backend", async () => committing.done() || activating.done() || (activationWaited = await otherWaitsExactlyOn(w, clientPid)));
   } finally {
     reserved.release();
   }
   try {
-    await until("CreateClient finishes, or its backend waits", async () => creating.done() || (clientWaited = (await blockersOf(w, clientPid)).length > 0));
+    await until("CreateClient finishes, or its backend waits", async () => creating.done() || (clientWaited = await waitsExactlyOnOther(w, clientPid)));
   } finally {
     commit.release();
   }
@@ -259,7 +259,7 @@ test("RACE (D10-TX-1, 40P01) reader KEY_SHARE_THEN_SHARED, production: CreateCli
   assert.equal((await agencyRow(d.agency.agencyId))?.state, "ACTIVE");
 });
 
-test("RACE (D10-TX-1, 40P01) lock-order matrix: ActivateAgency against a reader of the DRAFT agency in both orders (SHARED_THEN_KEY_SHARE — no DRAFT reader of production has this order today, the cell guards one; KEY_SHARE_THEN_SHARED — CMD009, CMD011) and both interleavings (the activation first, holding the row and the exclusive half at its commit; the reader first, holding its first lock) — every cell completes: the activation 200, the reader's statements succeed, and who waited for whom (by backend pid) is the NO KEY row lock's (red at c9f7f95 in the SHARED_THEN_KEY_SHARE reader-first cell and at 593c47f in the KEY_SHARE_THEN_SHARED reader-first cell, 40P01)", async () => {
+test("RACE (D10-TX-1, 40P01) lock-order matrix: ActivateAgency against a reader of the DRAFT agency in both orders (SHARED_THEN_KEY_SHARE — no DRAFT reader of production has this order today, the cell guards one; KEY_SHARE_THEN_SHARED — CMD009, CMD011) and both interleavings (the activation first, holding the row and the exclusive half at its commit; the reader first, holding its first lock) — every cell completes: the activation 200, the reader's statements succeed, and who waited for whom (both backend pids) is the NO KEY row lock's (red at c9f7f95 in the SHARED_THEN_KEY_SHARE reader-first cell and at 593c47f in the KEY_SHARE_THEN_SHARED reader-first cell, 40P01)", async () => {
   const cells: Record<string, CellOutcome> = {};
   const states: Array<string | undefined> = [];
   for (const shape of ["SHARED_THEN_KEY_SHARE", "KEY_SHARE_THEN_SHARED"] as const) {
