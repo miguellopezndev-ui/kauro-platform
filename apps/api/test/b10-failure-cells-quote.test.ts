@@ -247,13 +247,17 @@ faultCell(
       const [reservation] = await reservationsOf(a.s.agency.agencyId);
       assert.ok(reservation !== undefined && reservation.state === "RESERVED" && reservation.quote_id === first.quote.quoteId);
       const key = freshKey("slot-release");
-      const sweep = { login: "kauro_commission_test" as const, run: (c: HarnessConnection) => expiryPassOn(ctx, c, reservation.ends_at, [SLOT_FREE]) };
+      const sweep = { login: "kauro_commission_test" as const, run: (c: HarnessConnection) => expiryPassOn(ctx, c, reservation.ends_at, [SLOT_FREE], true) };
       const supersede = { login: "kauro_app_test" as const, run: (c: HarnessConnection) => quoteOn(ctx, c, a, plan, key) };
       const raced: Raced =
         order === "sweep first"
           ? await holdAndWait(ctx, "the superseding CreateQuote while the sweep holds the expired quote and its released slot", sweep, supersede, "db.slot_free.after")
           : await holdAndWait(ctx, "the QUOTE_EXPIRY pass while the superseding CreateQuote holds the quote", supersede, sweep, "uow.before-commit");
-      const report = value(order === "sweep first" ? raced.held : raced.waited) as { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> };
+      const report = value(order === "sweep first" ? raced.held : raced.waited) as Report;
+      for (const item of report.items.filter((i) => i.outcome.startsWith("FAILED"))) {
+        const e = failureOf(item.subject);
+        assert.fail(`${order}: the raced QUOTE_EXPIRY pass failed its item ${item.subject} (${item.outcome}): ${e instanceof Error ? e.message : String(e)}`);
+      }
       const next = view(value(order === "sweep first" ? raced.waited : raced.held) as Reply);
       const after = await reservationsOf(a.s.agency.agencyId);
       assert.equal(after.length, 1, "no second reservation for the agency");
