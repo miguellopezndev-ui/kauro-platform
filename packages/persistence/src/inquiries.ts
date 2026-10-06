@@ -54,7 +54,8 @@ async function secondsUntilRoom(client: PoolClient, kind: "ADDRESS" | "EMAIL", k
 }
 
 export class PgInquiryStore implements InquiryStore {
-  constructor(private readonly pool: KauroPool) {}
+  /** Production admission statements keep the 10 s default; test races may configure an allowance for a paused holder. */
+  constructor(private readonly pool: KauroPool, private readonly statementTimeoutMs = 10_000) {}
 
   admit(request: InquiryAdmissionRequest): Promise<InquiryAdmission> {
     const nowMs = Date.parse(request.now);
@@ -99,7 +100,7 @@ export class PgInquiryStore implements InquiryStore {
         );
         return { kind: "ACCEPTED", inquiryId: request.inquiryId, receivedAt: request.now };
       },
-      { statementTimeoutMs: 10_000 },
+      { statementTimeoutMs: this.statementTimeoutMs },
     );
   }
 }

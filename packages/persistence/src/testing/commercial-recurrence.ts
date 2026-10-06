@@ -30,12 +30,13 @@ import type { QualifiedRoute } from "./commerce-fixtures.js";
 import { paidPurchase, type PaidPurchase } from "./commerce-purchases.js";
 import { clock, sha, type AgencyFixture, type Harness } from "./harness.js";
 import { TEST_CLOCK_OFFSET_SETTING } from "./temporary-postgres.js";
+import { raceStatementTimeoutMs } from "./faults/bounds.js";
 
 /** The commercial unit-of-work factory over the harness's verified pools (request handlers, payment, control, commission). */
 export function commercialUnits(h: Harness, options: { readonly pricePolicies?: ReadonlyArray<PricePolicy> } = {}): PgCommercialUnitOfWorkFactory {
   return createCommercialUnitOfWorkFactory(
     { app: h.appPool, payment: h.paymentPool, control: h.controlPool, commission: h.commissionPool },
-    { clock, ...(options.pricePolicies === undefined ? {} : { pricePolicies: options.pricePolicies }) },
+    { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs(), ...(options.pricePolicies === undefined ? {} : { pricePolicies: options.pricePolicies }) },
   );
 }
 
@@ -50,7 +51,7 @@ class AheadFactory extends PgCommercialUnitOfWorkFactory {
   readonly #seconds: number;
 
   constructor(h: Harness, seconds: number) {
-    super({ commission: h.commissionPool }, { clock });
+    super({ commission: h.commissionPool }, { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() });
     this.#seconds = seconds;
   }
 

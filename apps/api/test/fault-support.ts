@@ -13,7 +13,7 @@ import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ExecutionContext } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
-import { crashableFactory, instrumentPort, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
+import { crashableFactory, instrumentPort, raceStatementTimeoutMs, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
 export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control";
@@ -87,7 +87,7 @@ function poolOf(route: Route, role: RouteRole): unknown {
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
   constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null) {
-    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), ...(statementTimeoutMs === null ? {} : { defaultStatementTimeoutMs: statementTimeoutMs }) });
+    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
   }
 
   protected override createUnitOfWork(client: PoolClient, context: ExecutionContext, idsOf: never, clockOf: never): PgCommercialUnitOfWork {
@@ -184,7 +184,7 @@ export class FaultRouting {
    * the bound elapses, after moving its controlled clock past the bound's deadline (B10G-R4).
    */
   timer: ((ms: number) => { readonly elapsed: Promise<void>; cancel(): void }) | null = null;
-  /** The statement_timeout of the routed units of work (null: the factory's own default, 10 s): a cell that proves a lock wait ends in the database's own timeout shortens it. */
+  /** The statement_timeout of the routed units (null: the harness-derived race allowance): explicit timeout cells shorten it. */
   statementTimeoutMs: number | null = null;
   /**
    * The step clock of the operation a cell runs: while set, every SERVICE unit of work the routed units and the payment service's traced units

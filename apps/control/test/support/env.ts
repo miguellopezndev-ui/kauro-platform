@@ -18,7 +18,7 @@ import { ContractFakeAuthorityJournal, ContractFakeObjectStorage, ContractFakeSe
 import { ContractFakeMalwareScanner, type ContractFakeScannerOptions } from "@kauro/data-plane/testing";
 import { createIdGenerator, toUtcInstant, type Clock, type CorrelationId, type IdGenerator } from "@kauro/domain";
 import { createPool, createUnitOfWorkFactory, type KauroPool, type PgUnitOfWorkFactory } from "@kauro/persistence";
-import { ROLES, TEST_CLOCK_OFFSET_SETTING, startHarness, type Harness } from "@kauro/persistence/testing";
+import { ROLES, TEST_CLOCK_OFFSET_SETTING, raceStatementTimeoutMs, startHarness, type Harness } from "@kauro/persistence/testing";
 import { assembleControlPlane, platformParsers, type ControlPlane } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -118,7 +118,7 @@ async function unitsAhead(env: ControlEnv, user: string, applicationName: string
   } finally {
     c.release();
   }
-  const units = createUnitOfWorkFactory(pool, { clock });
+  const units = createUnitOfWorkFactory(pool, { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() });
   return {
     units,
     serverNow: () => units.runSource({ kind: "SYSTEM", serviceId: "test-clock-ahead", correlationId: ids.next() as CorrelationId }, (uow) => uow.serverInstant()),

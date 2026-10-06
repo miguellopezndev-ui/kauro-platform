@@ -51,6 +51,7 @@ import {
   recordClaim,
   recordProspect,
   serverNow,
+  raceStatementTimeoutMs,
   type AgencyFixture,
   type Harness,
   type RecordedSeller,
@@ -153,7 +154,7 @@ export async function commissionWorld(): Promise<CommissionWorld> {
   const pw = await paymentWorld();
   const h = pw.w.h;
   const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
-  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
+  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
   const dispatcherClock = movableClock();
   const completions = new ContractFakePreparationCompletion({ clock });
   const holds = new CommissionHolds();
