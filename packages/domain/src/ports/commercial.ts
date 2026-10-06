@@ -265,12 +265,13 @@ export interface AgencyLifecycleRepository {
   recordAcceptance(acceptance: NewAgreementAcceptance): Promise<AgreementAcceptanceRecord>;
   acceptancesOf(agencyId: AgencyId): Promise<ReadonlyArray<AgreementAcceptanceRecord>>;
   /**
-   * The agency's exclusive transition half, held to COMMIT, taken by a transition writer BEFORE the agency's row lock (D10-TX-1: the
-   * transition subject, then its row). A reader holds the shared half and then takes the agency row's KEY SHARE through each foreign
-   * key it inserts; a writer holding the row FOR UPDATE that only then asks for the exclusive half closes a cycle with it (40P01:
-   * CMD043 against the continuation of CMD028). Re-entrant within the transaction.
+   * The agency transition writer's row lock (CMD002, CMD043): SELECT ... FOR NO KEY UPDATE, held to COMMIT; the caller reads the row
+   * in its next statement. A transition changes no key column, and FOR UPDATE would conflict with the KEY SHARE every insert
+   * referencing the agency takes (a journal reservation, an order, an event): with the shared/exclusive transition halves that closes a
+   * cycle in either half order (40P01; D10-TX-1, template rule 11a "row locks are FOR NO KEY UPDATE unless the key changes"). Writers
+   * still serialize on it; readers serialize with writers through the transition halves only. False when the agency is not visible.
    */
-  lockTransition(agencyId: AgencyId): Promise<void>;
+  lockAgencyRow(agencyId: AgencyId): Promise<boolean>;
   /**
    * The obligations inventory of a closure, read after the agency's exclusive transition half (taken here, so a payment order or refund
    * committing meanwhile is wholly seen; D10-AGY-2, D10-AGY-4). `activeWork` is B06's ActiveWorkInspector count of the agency (the
@@ -465,7 +466,7 @@ export interface AttributionRepository {
   /** Inserts the claim; a second live claim of the seller on the prospect fails attribution_claims_one_live_per_seller (CLAIM_EXISTS). */
   submitClaim(claim: NewAttributionClaim): Promise<AttributionClaimRecord>;
   getClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
-  /** The claim FOR UPDATE, after its prospect's claims lock (CMD047, CMD050). */
+  /** The claim FOR NO KEY UPDATE (rule 11a), after its prospect's claims lock (CMD047, CMD050). */
   lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
   claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>>;
   /** The seller's open claims (SUBMITTED, DISPUTED, ACCEPTED): CMD050 expires the unlisted ones. */
@@ -590,7 +591,7 @@ export interface CommissionLedgerRepository {
   /** Accrues a pool with its lines once per (purchase, source); `created` is false for the existing pool (a replay accrues nothing). */
   accrue(pool: NewCommissionPool): Promise<{ readonly created: boolean; readonly pool: CommissionPoolRecord; readonly lines: ReadonlyArray<CommissionLineRecord> }>;
   poolsOfPurchase(purchaseId: QualifyingPurchaseId): Promise<ReadonlyArray<CommissionPoolRecord>>;
-  /** The pools of a capture FOR UPDATE, with their lines, before a basis change (commercial recomputePool). */
+  /** The pools of a capture FOR NO KEY UPDATE (rule 11a), with their lines, before a basis change (commercial recomputePool). */
   lockPoolsOfCapture(captureId: CaptureId): Promise<ReadonlyArray<{ readonly pool: CommissionPoolRecord; readonly lines: ReadonlyArray<CommissionLineRecord> }>>;
   /**
    * Applies one basis change to a pool: its new basis and cents, one adjustment per changed line UNIQUE (line, source event) — a
@@ -681,7 +682,7 @@ export interface StatementRepository {
   getCalendar(calendarVersionId: BankingCalendarVersionId): Promise<BankingCalendarRecord | null>;
   recordCalendar(calendar: BankingCalendarRecord): Promise<BankingCalendarRecord>;
   getPeriod(periodId: CommissionPeriodId): Promise<CommissionPeriodRecord | null>;
-  /** The period FOR UPDATE (CMD051: a close and an adjustment serialize on it). */
+  /** The period FOR NO KEY UPDATE (CMD051: a close and an adjustment serialize on it). */
   lockPeriod(periodId: CommissionPeriodId): Promise<CommissionPeriodRecord | null>;
   periodOfMonth(month: string): Promise<CommissionPeriodRecord | null>;
   /** Opens a month's period once (the PERIODS sweep), dated or not; `created` is false for the existing one. */
@@ -697,7 +698,7 @@ export interface StatementRepository {
   /** Issues a statement with its items, DRAFT → ISSUED in one transaction; one per period and seller (the replayed row otherwise). */
   issueStatement(statement: NewCommissionStatement): Promise<{ readonly issued: boolean; readonly record: CommissionStatementRecord }>;
   getStatement(statementId: CommissionStatementId): Promise<CommissionStatementRecord | null>;
-  /** The statement FOR UPDATE (CMD052, CMD053: approvals and settlements of one statement serialize). */
+  /** The statement FOR NO KEY UPDATE (CMD052, CMD053: approvals and settlements of one statement serialize). */
   lockStatement(statementId: CommissionStatementId): Promise<CommissionStatementRecord | null>;
   statementsOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionStatementRecord>>;
   itemsOf(statementId: CommissionStatementId): Promise<ReadonlyArray<StatementItemRecord>>;

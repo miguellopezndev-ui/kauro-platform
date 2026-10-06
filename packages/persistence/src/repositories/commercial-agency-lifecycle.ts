@@ -265,10 +265,11 @@ export class PgAgencyLifecycleRepository implements AgencyLifecycleRepository {
     return r.rows.map((row) => acceptanceRecord(row, undefined));
   }
 
-  async lockTransition(agencyId: AgencyId): Promise<void> {
-    // the exclusive half before the agency's row lock: a reader holding the shared half may wait for the row's KEY SHARE (a foreign
-    // key it inserts), so a writer that held the row first and asked for this half after would wait for that reader (D10-TX-1)
-    await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agencies', $1))", [agencyId]);
+  async lockAgencyRow(agencyId: AgencyId): Promise<boolean> {
+    // NO KEY: the transition changes no key column, and a FOR UPDATE here would make every insert referencing the agency (its KEY SHARE)
+    // wait for this writer, which itself waits for those readers' shared half (40P01; D10-TX-1)
+    const r = await execute(this.db, "SELECT 1 FROM kauro.agencies WHERE agency_id = $1 FOR NO KEY UPDATE", [agencyId]);
+    return r.rows.length > 0;
   }
 
   async closureObligations(agencyId: AgencyId, activeWork: number): Promise<ClosureObligations> {

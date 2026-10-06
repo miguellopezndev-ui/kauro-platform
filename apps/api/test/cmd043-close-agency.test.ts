@@ -24,6 +24,7 @@ import {
   type IssuedQuote,
   type PaidPurchase,
 } from "@kauro/persistence/testing";
+import { apiIdleInTransaction, blockersOf, disarm, readerCell, track, until, waitersOn, type CellOutcome } from "./agency-lock-cells.js";
 import { paymentRoutes, paymentsWorld, type PaymentsWorld } from "./commerce-support.js";
 import { SimulatedCrash, approveThroughRoute, asProblem, call, clock, completed, freshKey, ids, outcome, replayTextOf, routes, sha, waitForApiLockWait, type Person, type Reply } from "./support.js";
 
@@ -396,8 +397,8 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.equal((await w.row<{ state: string }>("quotes", "quote_id = $1", [quote.quoteId]))?.state, "WITHDRAWN");
 
   // the order commits first: the order's intent holds the agency (its shared half, and its row's KEY SHARE through the rows it inserts)
-  // and waits before its commit; CloseAgency waits for the agency's exclusive half, which it takes before its row lock (D10-TX-1;
-  // observed in pg_stat_activity), reads the order once it commits and refuses
+  // and waits before its commit; CloseAgency locks the row FOR NO KEY UPDATE beside that KEY SHARE and waits for the agency's
+  // exclusive half (D10-TX-1; observed in pg_stat_activity), reads the order once it commits and refuses
   const a = await sellingAgency("cmd043-race-order-first");
   const quoteA = await issuedQuote(a, "cmd043-race-order-first-quote");
   const proofA = await w.stepUp(a.owner);
@@ -417,8 +418,9 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.equal(await w.count("payment_orders", "quote_id = $1", [quoteA.quoteId]), 1);
   assert.equal(await w.count("agency_closures", "agency_id = $1", [a.agency.agencyId]), 0);
 
-  // the closure commits first: it holds the agency's row and exclusive half until its commit; the order's journal reservation waits for
-  // the agency (observed), reads it CLOSING and is refused
+  // the closure commits first: it holds the agency's row (NO KEY) and exclusive half until its commit; the order's journal reservation
+  // (the agency's KEY SHARE) passes beside the row lock and its subject read waits for the agency's shared half (observed), reads it
+  // CLOSING and is refused
   const b = await sellingAgency("cmd043-race-close-first");
   const quoteB = await issuedQuote(b, "cmd043-race-close-first-quote");
   const proofB = await w.stepUp(b.owner);
@@ -427,7 +429,7 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   await commit.reached;
   const ordersAfter = call(w, { url: paymentRoutes.createPaymentOrder(quoteB.quoteId), token: b.billing.token, agency: b.agency.agencyId, key: freshKey("cmd043-race-late-order"), body: { termsHash: quoteB.termsHash } });
   try {
-    await waitForApiLockWait(w, "INSERT INTO kauro.command_journal");
+    await waitForApiLockWait(w, "await_transition('kauro.agencies'");
   } finally {
     commit.release();
   }
@@ -438,48 +440,102 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.equal((await agencyRow(b.agency.agencyId))?.state, "CLOSING");
 });
 
-test("RACE (D10-TX-1, 40P01): CloseAgency against the continuation of the agency's payment order — the order paused at each point of its protocol after its intent committed (before the claim, after the claim, after the provider call, after the settlement), the closure holding the agency until its inventory — the closure takes the agency's exclusive half before its row, so the order's next unit of work, whose shared half and inserts (the row's KEY SHARE) need the agency, is observed waiting on the closure or finishes without it; the closure is 409 CLOSURE_OBLIGATIONS_UNRECONCILED and the order 201, never a deadlock", async () => {
+const closeAnswer = (reply: Reply): string => (reply.status < 300 ? String(reply.status) : outcome(pw.w, reply));
+const settledAnswer = (r: PromiseSettledResult<Reply>): string => (r.status === "fulfilled" ? closeAnswer(r.value) : `threw ${String(r.reason)}`);
+
+test("RACE (D10-TX-1, 40P01) reader SHARED_THEN_KEY_SHARE, production: CloseAgency against the continuation of the agency's payment order — the order paused at each point of its protocol after its intent committed (before the claim, after the claim, after the provider call, after the settlement) while the closure holds the agency's row (FOR NO KEY UPDATE) at its active-work inspection; the order's next units of work (the claim and the payment service's settlement: the agency's shared half, then inserts taking the row's KEY SHARE) finish without waiting for the closure's backend, then the closure takes its exclusive half and is 409 CLOSURE_OBLIGATIONS_UNRECONCILED and the order 201 — never a deadlock (red at c9f7f95: the closure's FOR UPDATE blocks the continuation's insert and the closure's exclusive half then waits for the continuation's shared half, 40P01)", async () => {
   const { w } = pw;
-  // AFTER_SETTLE: the order's last unit of work (the journal's answer) needs nothing of the agency's; every earlier point must wait
-  const points = [
-    { point: "AFTER_INTENT", waits: true },
-    { point: "AFTER_CLAIM", waits: true },
-    { point: "AFTER_CALL", waits: true },
-    { point: "AFTER_SETTLE", waits: false },
-  ] as const;
-  for (const { point, waits } of points) {
+  const rows: string[] = [];
+  for (const point of ["AFTER_INTENT", "AFTER_CLAIM", "AFTER_CALL", "AFTER_SETTLE"] as const) {
     const s = await sellingAgency(`cmd043-cont-${point}`);
     const quote = await issuedQuote(s, `cmd043-cont-${point}-quote`);
     const proof = await w.stepUp(s.owner);
     const paused = pw.holds.arm("CMD028", point, "PAUSE");
     const ordering = call(w, { url: paymentRoutes.createPaymentOrder(quote.quoteId), token: s.billing.token, agency: s.agency.agencyId, key: freshKey(`cmd043-cont-${point}`), body: { termsHash: quote.termsHash } });
     await paused.reached;
-    // the closure holds the agency (its exclusive half and its row) and pauses at the active-work inspection, before its inventory
+    // the closure holds the agency's row and pauses at the active-work inspection, before its exclusive half and its inventory; the
+    // order is between units of work, so the closure is the one api backend inside a transaction
     const inspecting = w.holds.arm("collaborator");
     const closing = close(s, { proof });
     await inspecting.reached;
+    const idle = await apiIdleInTransaction(w);
+    assert.equal(idle.length, 1, `${point}: only the paused closure is inside a transaction`);
+    const closurePid = idle[0]!;
     paused.release();
-    let settled = false;
-    const order = ordering.finally(() => {
-      settled = true;
-    });
-    let waited = false;
+    const order = track(ordering);
+    let blocked = false;
     try {
-      for (let i = 0; i < 400 && !settled && !waited; i++) {
-        await w.h.oracle.query("SELECT pg_stat_clear_snapshot()");
-        const r = await w.h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'");
-        waited = r.rows.length > 0;
-        if (!waited) await new Promise((resolve) => setTimeout(resolve, 25));
-      }
+      await until(`${point}: the order's continuation finishes, or waits for the closure's backend`, async () => order.done() || (blocked = (await waitersOn(w, closurePid)).length > 0));
     } finally {
       inspecting.release();
     }
-    assert.equal(waited, waits, `${point}: the order's continuation ${waits ? "waits for" : "finishes without"} the closure (pg_stat_activity)`);
-    const [ordered, closed] = await Promise.all([order, closing]);
-    assert.equal(ordered.status, 201, `${point}: ${ordered.text}`);
-    assert.equal(outcome(w, closed), "409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED", `${point}: ${closed.text}`);
-    assert.equal((await agencyRow(s.agency.agencyId))?.state, "ACTIVE");
+    const [ordered, closed] = await Promise.all([order.settled, closing]);
+    rows.push(`${point}: order ${settledAnswer(ordered)}, blocked by the closure ${blocked}; closure ${closeAnswer(closed)}`);
     assert.equal(await w.count("payment_orders", "quote_id = $1", [quote.quoteId]), 1);
     assert.equal(await w.count("agency_closures", "agency_id = $1", [s.agency.agencyId]), 0);
+    assert.equal((await agencyRow(s.agency.agencyId))?.state, "ACTIVE");
   }
+  assert.deepEqual(rows, [
+    "AFTER_INTENT: order 201, blocked by the closure false; closure 409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED",
+    "AFTER_CLAIM: order 201, blocked by the closure false; closure 409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED",
+    "AFTER_CALL: order 201, blocked by the closure false; closure 409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED",
+    "AFTER_SETTLE: order 201, blocked by the closure false; closure 409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED",
+  ]);
+});
+
+test("RACE (D10-TX-1, 40P01) reader KEY_SHARE_THEN_SHARED, production: CreatePaymentOrder reserved its journal entry (the agency's KEY SHARE) and pauses before its subject read; CloseAgency then locks the row FOR NO KEY UPDATE beside that KEY SHARE, takes the exclusive half and reaches its commit without waiting for the order's backend; the order's subject read waits for the closure's backend (the shared half), the closure commits 200 and the order reads the agency CLOSING: 409 AGENCY_NOT_ACTIVE — never a deadlock (red at 593c47f: the exclusive half first, then the row FOR UPDATE waits for the KEY SHARE while the order's shared half waits for the exclusive half, 40P01)", async () => {
+  const { w } = pw;
+  const s = await sellingAgency("cmd043-reserved-order");
+  const quote = await issuedQuote(s, "cmd043-reserved-order-quote");
+  const proof = await w.stepUp(s.owner);
+  const reserved = w.holds.arm("journal.reserved");
+  const ordering = track(call(w, { url: paymentRoutes.createPaymentOrder(quote.quoteId), token: s.billing.token, agency: s.agency.agencyId, key: freshKey("cmd043-reserved-order"), body: { termsHash: quote.termsHash } }));
+  await reserved.reached;
+  const idle = await apiIdleInTransaction(w);
+  assert.equal(idle.length, 1, "only the order's reserved unit of work is inside a transaction");
+  const orderPid = idle[0]!;
+  const commit = w.holds.arm("journal.commit");
+  const committing = track(commit.reached);
+  const closing = track(close(s, { proof }));
+  let closureWaited = false;
+  let orderWaited = false;
+  try {
+    await until("the closure reaches its commit, or waits for the order's backend", async () => committing.done() || closing.done() || (closureWaited = (await waitersOn(w, orderPid)).length > 0));
+  } finally {
+    reserved.release();
+  }
+  try {
+    await until("the order finishes, or its backend waits", async () => ordering.done() || (orderWaited = (await blockersOf(w, orderPid)).length > 0));
+  } finally {
+    commit.release();
+  }
+  const [ordered, closed] = await Promise.all([ordering.settled, closing.settled]);
+  await disarm(w, "journal.commit", committing.done());
+  assert.deepEqual(
+    { closureWaitedForTheOrder: closureWaited, orderWaitedForTheClosure: orderWaited, closure: settledAnswer(closed), order: settledAnswer(ordered) },
+    { closureWaitedForTheOrder: false, orderWaitedForTheClosure: true, closure: "200", order: "409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE" },
+  );
+  assert.equal(await w.count("payment_orders", "quote_id = $1", [quote.quoteId]), 0);
+  assert.equal((await agencyRow(s.agency.agencyId))?.state, "CLOSING");
+});
+
+test("RACE (D10-TX-1, 40P01) lock-order matrix: CloseAgency against a reader of the agency in both production orders (SHARED_THEN_KEY_SHARE, KEY_SHARE_THEN_SHARED) and both interleavings (the closure first, holding the row at its active-work inspection; the reader first, holding its first lock) — every cell completes: the closure 200, the reader's statements succeed, and who waited for whom (by backend pid) is the NO KEY row lock's (red at c9f7f95 in the SHARED_THEN_KEY_SHARE cells and at 593c47f in the KEY_SHARE_THEN_SHARED reader-first cell, 40P01)", async () => {
+  const { w } = pw;
+  const cells: Record<string, CellOutcome> = {};
+  for (const shape of ["SHARED_THEN_KEY_SHARE", "KEY_SHARE_THEN_SHARED"] as const) {
+    for (const first of ["WRITER_FIRST", "READER_FIRST"] as const) {
+      const s = await sellingAgency(`cmd043-cell-${shape}-${first}`);
+      const proof = await w.stepUp(s.owner);
+      cells[`${shape} ${first}`] = await readerCell(w, { agency: s.agency, start: () => close(s, { proof }), rowHold: "collaborator" }, shape, first, closeAnswer);
+    }
+  }
+  assert.deepEqual(cells, {
+    // the closure holds only the row (NO KEY) at its inspection: the reader's shared half and KEY SHARE both pass
+    "SHARED_THEN_KEY_SHARE WRITER_FIRST": { writer: "200", reader: "OK", readerWaited: false, writerWaited: false },
+    // the closure's exclusive half waits for the reader's shared half; the reader's insert passes beside the NO KEY row lock
+    "SHARED_THEN_KEY_SHARE READER_FIRST": { writer: "200", reader: "OK", readerWaited: false, writerWaited: true },
+    "KEY_SHARE_THEN_SHARED WRITER_FIRST": { writer: "200", reader: "OK", readerWaited: false, writerWaited: false },
+    // the closure passes beside the reader's KEY SHARE to its commit; the reader's shared half waits for the closure
+    "KEY_SHARE_THEN_SHARED READER_FIRST": { writer: "200", reader: "OK", readerWaited: true, writerWaited: false },
+  });
 });
