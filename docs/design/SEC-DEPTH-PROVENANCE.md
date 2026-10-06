@@ -1,7 +1,7 @@
 # SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r5
 
 Target path: `docs/design/SEC-DEPTH-PROVENANCE.md`. Base: kauro-platform `main` 21b310f. Closes Codex p0-admission-r2 (on 0217109)
-findings 1-3 and the 0015 analogue. r2-r5 answer design reviews 062a982, 9cc894e, 56c873b, a6ccbf7. r5 steps back on the identity
+findings 1-3 and the 0015 analogue. r2-r6 answer design reviews 062a982, 9cc894e, 56c873b, a6ccbf7, 00a19e3 (r6: SDP-15 parameter/routine authority, SDP-16 credential adoption, SDP-13 provisioning recovery; nothing else changed). r5 steps back on the identity
 family (SDP-02/07/11/12/13/14, four rounds): section A is redesigned as a closed allowlist of SHAPES built only by our own tools,
 instead of an audit of arbitrary PostgreSQL roles. Sections B (bindings) and the FIXED rows are unchanged.
 
@@ -48,6 +48,19 @@ A1 Shapes (the only thing the audit checks; anything else is a violation, nothin
 - Privileges of a group or login (each checked with `has_database_privilege`, `has_schema_privilege`, `has_table_privilege`,
   which resolve NULL ACL defaults and include PUBLIC): no TEMPORARY or CREATE on the database, no CREATE on any schema, no TRIGGER
   on any relation of any schema, no EXECUTE on any function in schema kauro returning `trigger`.
+- Configuration and routine authority (SDP-15): no row of `pg_parameter_acl` may grant SET or ALTER SYSTEM on ANY parameter to a
+  runtime group, a runtime login or PUBLIC (`aclexplode(paracl)`; the shape needs none, so the rule is absolute, not a list of
+  dangerous parameters); no `pg_db_role_setting` row for the database (setrole 0) or for a runtime group or login may set
+  `session_replication_role`; and outside schemas kauro and kauro_meta a runtime group or login holds NO direct ACL entry on any
+  function, relation, schema, large object or foreign object (only CONNECT on the database and USAGE on kauro/kauro_meta), while
+  PUBLIC holds no EXECUTE on the superuser-default file routines (`lo_import(text)`, `lo_import(text,oid)`, `lo_export(oid,text)`,
+  `pg_read_file`, `pg_read_binary_file`, `pg_ls_dir`, `pg_stat_file`, every overload; `has_function_privilege` per overload).
+  Why replica mode is the whole family: `session_replication_role` is superuser-context, so a non-superuser changes it only through
+  a SET grant in pg_parameter_acl (PG 15+) or an admin-made database/role setting, both now shape violations; the pool also asserts
+  `current_setting('session_replication_role') = 'origin'` per connection. The other trigger bypasses need ownership or superuser,
+  which the shapes forbid: `ALTER TABLE ... DISABLE TRIGGER` (table owner; all kauro tables are migrator-owned, 0001:28),
+  `ALTER SYSTEM` (superuser or an ALTER SYSTEM parameter grant, covered above), dropping or replacing a trigger/function (owner).
+  `SET CONSTRAINTS ... IMMEDIATE` only moves a deferred check earlier; it cannot skip it.
 Why this closes the family by construction: from a runtime login the reachable identities are {login, its group, PUBLIC}; none can
 create a session object, create or attach a trigger, or grant itself anything (no ADMIN edge leaves a runtime identity, SDP-14).
 Logins outside a runtime group are not runtime and are irrelevant: no runtime session can reach them and no runtime caller is
@@ -57,8 +70,10 @@ A2 Migration `0045_runtime_no_session_objects.sql` (migrator): `REVOKE TEMPORARY
 each group; `REVOKE CREATE ON SCHEMA public FROM PUBLIC`; `REVOKE EXECUTE ... FROM PUBLIC` on every kauro function returning trigger
 (owner-resolved: `aclexplode(coalesce(proacl, acldefault('f', proowner)))`). The migration runner (src/migrations/runner.ts, apply
 loop; `applyMigrationsAs` :298) repeats that kauro trigger-function revoke at the end of EVERY later migration, in the migration's
-own transaction, so new trigger functions (B4/B5 recounts included) never keep PUBLIC EXECUTE. 0045 then calls the audit and
-RAISEs on any row.
+own transaction, so new trigger functions (B4/B5 recounts included) never keep PUBLIC EXECUTE. 0045 also revokes every
+`pg_parameter_acl` grant to PUBLIC or a runtime role (`REVOKE SET, ALTER SYSTEM ON PARAMETER <p> FROM ...`, loop over aclexplode;
+only the database owner or a superuser can, so a remaining row makes the self-check fail), then calls the audit and RAISEs on any
+row.
 A3 Declared triggers (SDP-11): `kauro_meta.declared_triggers (relation text, tgname text, definition text, enabled char, migration
 int)`, PK (relation, tgname), written ONLY by migrations, each in the same transaction as its CREATE TRIGGER. Bootstrap for
 0001-0044 (already applied, checksums frozen): 0045 inserts literal rows from `migrations/declared-triggers-0044.sql`, a generated
@@ -74,23 +89,46 @@ no arguments, read-only (FIXED r3). EXECUTE revoked from PUBLIC, granted to the 
 No other caller exists: the platform admin runs only termination and the backend check (A5), as plain SQL on pg_stat_activity, so
 no admin needs USAGE on kauro (SDP-07). Pool (src/pool.ts:100-105, 159-190): VERIFY_SQL refuses a connection whose `current_user`
 is not a RUNTIME LOGIN of A1 shape (calls the audit restricted to itself); `maxLifetimeSeconds: 600`.
-A5 Credentials. Runtime logins are created ONLY by `tools/deploy/provision-login.mjs` (migrator connection + AWS deploy principal),
-with this order under a session advisory lock `pg_advisory_lock(hashtext('kauro.provision:' || login))` held for the WHOLE run
-(revoke takes the same lock; one run per login at a time, SDP-13):
-1. if the role is absent: `CREATE ROLE <login> LOGIN INHERIT PASSWORD <random> IN ROLE <group>` (A1 shape), COMMIT;
-2. if the stored secret is absent or does not authenticate (the tool connects with it): `ALTER ROLE <login> PASSWORD <new>`, COMMIT,
-   then `PutSecretValue`; a secret that authenticates is never rotated by provisioning (rotation is a separate B14 procedure);
-3. audit gate: `runtime_identity_audit()` in a fresh transaction must return no row, else stop before exposure;
-4. publish the Data API caller's IAM policy with resource set exactly the registered runtime secret ARNs (`deploy/runtime-
-   secrets.json`; a non-runtime secret ARN is refused), then release the lock.
-States: crash after 1 or within 2 before PutSecretValue = role with a password nobody holds, nothing exposed; rerun does 2-4.
-Crash after the secret = a working secret no runtime caller can read; rerun skips 2 (it authenticates), does 3-4. A completed login
-rerun only re-audits and re-publishes. Database created `OWNER <migrator>` at provisioning.
+A5 Credentials. Runtime logins are created ONLY by `tools/deploy/provision-login.mjs` (migrator connection + AWS deploy principal).
+Serialization: the run sets `lock_timeout = '10s'` and takes the session advisory lock `pg_advisory_lock(hashtext('kauro.provision:'
+|| login))` for the WHOLE run (revoke takes the same lock); a wait past 10 s fails 55P03 and the run exits BUSY having changed
+nothing. Every AWS call is bounded (10 s) and an unanswered call is treated as possibly applied (recovered below, never assumed).
+Durable generation (SDP-13): `kauro_meta.provisioning_generations (role_oid PK, login, grp, generation bigint, op_id uuid,
+updated_at)`, migrator-only. Each secret value carries `{username, host, dbname, generation, op_id}`.
+0. bind (SDP-16): read the role by name; if it EXISTS it must already be a RUNTIME LOGIN of A1 shape for the REQUESTED group,
+   checked by `kauro.runtime_login_shape(oid, group)` (migrator-owned SECURITY DEFINER, same predicates as A1 restricted to that
+   role, EXECUTE to the migrator only), else refuse with no password change and nothing written or published; a login outside every
+   group, in another group, or with any extra grant is never adopted. Record (name, oid, group); every later step re-reads
+   name -> oid and refuses if it changed (dropped and recreated);
+1. if the role is absent: `CREATE ROLE <login> LOGIN INHERIT PASSWORD <random> IN ROLE <group>` (A1 shape) and its generation row
+   (generation 0), one COMMIT; record its oid;
+2. recover or rotate. Read the secret's versions. If AWSCURRENT authenticates and its generation equals the DB generation: no change.
+   Else if a version labelled AWSPENDING has generation = DB generation and authenticates: go to 3 with it (recovery after a crash
+   between write and promotion; no rotation). Else rotate: in ONE transaction `ALTER ROLE <login> PASSWORD <new>` and
+   `generation = generation + 1, op_id = <new uuid>` (row locked), COMMIT; then `PutSecretValue(ClientRequestToken = op_id,
+   VersionStages = ['AWSPENDING'])`. A retry of an unanswered PutSecretValue re-sends the same token and value (idempotent by
+   AWS's ClientRequestToken). A write NEVER targets AWSCURRENT directly;
+3. promote by compare-and-swap, still holding the lock in a live session: re-read the DB generation (must equal the pending
+   version's generation, else stop) and the version id currently labelled AWSCURRENT, then `UpdateSecretVersionStage(AWSCURRENT,
+   MoveToVersionId = op_id, RemoveFromVersionId = <that id>)`; AWS refuses the move if AWSCURRENT has moved meanwhile, so a stale
+   run cannot replace a newer published value. A late PutSecretValue of a dead run only adds or relabels an AWSPENDING version; its
+   generation is below the DB's, so no later step promotes it;
+4. audit gate in a fresh transaction: `runtime_identity_audit()` returns no row AND `runtime_login_shape(oid, group)` returns no
+   row; the AWSCURRENT JSON names exactly that username, the cluster endpoint, the database and the DB generation; connecting with
+   it yields `session_user` = login and `(SELECT oid FROM pg_roles WHERE rolname = session_user)` = the recorded oid; else stop;
+5. publish: ONE IAM policy per login, inline policy `kauro-secret-<login>` on that runtime service's own role (`PutRolePolicy`
+   replaces by name, idempotent), resource = exactly this login's secret ARN, bound to (login, oid, group) in
+   `deploy/runtime-secrets.json`. No policy lists two logins, so provisioning and revoke of different logins touch disjoint
+   policies; then release the lock. Revoke: under the lock, delete the login's policy, then the secret, then the role.
+States: crash after 1 or in 2 before PutSecretValue = role whose password nobody holds, nothing exposed; rerun rotates. Crash after
+PutSecretValue = AWSPENDING at the DB generation; rerun recovers it in 2 and promotes in 3. Crash after 3 = working AWSCURRENT, no
+policy; rerun does 4-5. A completed login rerun changes nothing and re-publishes the same policy. Database created
+`OWNER <migrator>` at provisioning.
 A6 Cutover (B14 runbook, `tools/deploy/runtime-cutover.mjs`; FIXED r3): stop runtime work; as a role holding pg_signal_backend +
 pg_read_all_stats (RDS master; tests: superuser oracle) `pg_terminate_backend(pid, 5000)` every backend of a runtime login and
 poll `pg_stat_activity` every 250 ms for at most 30 s, else stop fail-closed; record T; migrator applies migrations; migrator calls
 the audit (it owns it) and the admin checks no runtime backend has `backend_start < T`; start runtime; readiness re-runs the audit
-every 5 minutes (detection only; exposure is gated by A5 step 3 and the pool).
+every 5 minutes (detection only; exposure is gated by A5 step 4 and the pool).
 A7 Existing tests keep their assertions (FIXED): admission-instants :218-250/:266-286 via the kit's `nestedAs` (oracle-made invoker
 probe, original runtime connection and context, `current_user`/depth asserted, cleanup in finally); aggregate-kinds :445-470 part
 (1) on a separate login granted TEMPORARY by the oracle, revoked and closed in finally, plus a 42501 assertion on the pooled login;
@@ -148,9 +186,9 @@ crash/retry/timeout behaviour, which is the caller package's matrix and NOT clai
 | Row | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | R1 cutover A6 | GAP SEC-01 R :: "RACE SEC-DEPTH (retained session): a runtime connection opened before the revoke keeps a pg_temp nested writer; the cutover terminates it and the audit reports nothing after" | GAP SEC-02 R :: "RACE SEC-DEPTH (cutover timeout): a backend that outlives the 30 s termination bound stops the cutover fail-closed and runtime stays down" | N/A no deadline | GAP SEC-03 R :: "DENY SEC-DEPTH (release): 0045 aborts and records no ledger row when a runtime group keeps TEMPORARY" | GAP SEC-04 R :: "RACE SEC-DEPTH (cutover crash after migrate): a re-run cutover terminates, skips applied migrations and audits clean" | N/A covered by SEC-04 | GAP SEC-05 R :: "DENY SEC-DEPTH (readiness): a privilege granted to a live login fails readiness and the next verification of its connection" | N/A guard |
-| R2 shapes A1 | N/A per-connection check | N/A | N/A | N/A read-only | N/A | N/A | GAP SEC-06a-h R, one test each, each refused by the pool and reported: "DENY SEC-DEPTH (shape): a login with a direct TEMPORARY grant" / "... a group with CREATE on an extra schema" / "... PUBLIC with database CREATE" / "... a login owning a schema" / "... a login with a second membership (SET ROLE into a NOINHERIT role)" / "... a group holding ADMIN on another role (Codex SDP-14 repro)" / "... TRIGGER on a table of an extra schema" / "... EXECUTE on a kauro trigger function" | N/A |
+| R2 shapes A1 | N/A per-connection check | N/A | N/A | N/A read-only | N/A | N/A | GAP SEC-06a-n R, one test each, each refused by the pool and reported: "DENY SEC-DEPTH (shape): a login with a direct TEMPORARY grant" / "... a group with CREATE on an extra schema" / "... PUBLIC with database CREATE" / "... a login owning a schema" / "... a login with a second membership (SET ROLE into a NOINHERIT role)" / "... a group holding ADMIN on another role (Codex SDP-14 repro)" / "... TRIGGER on a table of an extra schema" / "... EXECUTE on a kauro trigger function" / i "... SET ON PARAMETER session_replication_role granted to a group" / j "... granted to a login" / k "... granted to PUBLIC" / l "... ALTER SYSTEM on any parameter granted to a runtime identity" / m "... a database or role setting of session_replication_role" / n "... EXECUTE on lo_export granted to a login"; supplemental SEC-59 R :: "DENY SEC-DEPTH: a runtime role cannot SET session_replication_role (42501) and the pool sees origin" | N/A |
 | R3 healthy shape + callers | N/A | N/A | N/A | N/A | N/A | N/A | GAP SEC-07 R :: "OK SEC-DEPTH: a clean cluster built by the CREATEROLE migrator, with its ADMIN-only creator edges and PUBLIC-executable pg_catalog trigger functions, audits clean when called by each of the seven runtime logins and the migrator"; SEC-07b R :: "OK SEC-DEPTH: a trigger function created by a later migration has no PUBLIC EXECUTE after the runner applies it" | N/A |
-| R4 provisioning A5 | GAP SEC-09 P :: "RACE SEC-DEPTH (provisioning): two runs for one login, the second held on the advisory lock, end with one role whose password the published secret authenticates" ; SEC-09b P :: "RACE SEC-DEPTH: a revoke and a provisioning of one login serialize on the lock" | GAP SEC-10 P :: "RACE SEC-DEPTH (provisioning timeout): a Secrets Manager call past its bound leaves no IAM entry and a rerun completes with a working credential" | N/A | GAP SEC-11 P :: "DENY SEC-DEPTH (provisioning): a login whose audit gate fails is never published in IAM" | GAP SEC-12 P :: "RACE SEC-DEPTH (crash after role COMMIT): nothing is exposed; a rerun sets a password, writes the secret, audits and publishes, and the secret authenticates"; SEC-13 P :: "RACE SEC-DEPTH (crash after secret write): a rerun does not rotate, publishes, and the secret authenticates" | GAP SEC-14 P :: "OK SEC-DEPTH: a rerun of a completed provisioning keeps the published secret valid and creates no second role, secret or IAM statement" | GAP SEC-15 P :: "DENY SEC-DEPTH: an IAM resource set naming a non-runtime secret is refused" | GAP SEC-17 P :: "RACE SEC-DEPTH (partial): an IAM publication failure leaves role and secret unexposed and --revoke removes all three" |
+| R4 provisioning A5 | GAP SEC-09 P :: "RACE SEC-DEPTH (provisioning): two runs for one login, the second held on the advisory lock, end with one role whose password the published secret authenticates"; SEC-67 P :: "RACE SEC-DEPTH: provisioning one login and revoking another concurrently change only their own IAM policies" ; SEC-09b P :: "RACE SEC-DEPTH: a revoke and a provisioning of one login serialize on the lock" | GAP SEC-10 P :: "RACE SEC-DEPTH (provisioning timeout): a Secrets Manager call past its bound leaves no IAM entry and a rerun completes with a working credential"; SEC-63 P :: "RACE SEC-DEPTH (lock timeout): a run waiting more than lock_timeout on the provisioning lock exits BUSY and changes no role, generation, secret or policy" | N/A | GAP SEC-11 P :: "DENY SEC-DEPTH (provisioning): a login whose audit gate fails is never published in IAM" | GAP SEC-12 P :: "RACE SEC-DEPTH (crash after role COMMIT): nothing is exposed; a rerun sets a password, writes the secret, audits and publishes, and the secret authenticates"; SEC-13 P :: "RACE SEC-DEPTH (crash after pending write): a rerun promotes the pending version of the current generation without rotating, and the secret authenticates"; SEC-64 P :: "RACE SEC-DEPTH (late write): a dead run's PutSecretValue completing after a newer run published leaves AWSCURRENT at the newer generation, which still authenticates"; SEC-65 P :: "DENY SEC-DEPTH (stale promotion): a promotion whose RemoveFromVersionId is no longer AWSCURRENT is refused" | GAP SEC-14 P :: "OK SEC-DEPTH: a rerun of a completed provisioning keeps the published secret valid and creates no second role, secret or IAM statement"; SEC-66 P :: "OK SEC-DEPTH: a re-sent PutSecretValue with the same ClientRequestToken creates no second version" | GAP SEC-15 P :: "DENY SEC-DEPTH: an IAM resource set naming a non-runtime secret is refused"; SEC-60 P :: "DENY SEC-DEPTH (adoption): an existing LOGIN outside every group, in another group or with an extra grant is refused before any password change and nothing is published"; SEC-61 P :: "DENY SEC-DEPTH (secret binding): a registered ARN whose secret names the migrator, another runtime login or another database is refused before IAM"; SEC-62 P :: "DENY SEC-DEPTH: a login dropped and recreated under the same name during the run is refused (oid changed)" | GAP SEC-17 P :: "RACE SEC-DEPTH (partial): an IAM publication failure leaves role and secret unexposed and --revoke removes all three" |
 | R5 root routes | N/A | N/A | N/A | N/A | N/A | N/A | GAP SEC-18 R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a temporary table or a pg_temp function (42501)"; supplemental SEC-18s R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a schema or an object in public, kauro or kauro_meta" | N/A |
 | R6 declared triggers A3 | N/A | N/A | N/A | N/A | N/A | N/A | GAP SEC-19 R :: "OK SEC-DEPTH: every user trigger of a fresh cluster equals its declared row and the internal RI_FKey triggers audit clean"; SEC-20 R :: "DENY SEC-DEPTH: record_commercial_transition attached to a table of another schema before cutover (TRIGGER revoked afterwards) is reported"; SEC-21 R :: "DENY SEC-DEPTH: a declared trigger with altered definition or enabled state, or a missing one, is reported"; SEC-22 R :: "DENY SEC-DEPTH: a foreign key with ON DELETE CASCADE is reported"; SEC-22b :: "the generated declared-triggers-0044.sql equals a fresh cluster at 0044" | N/A |
 | R7 attempt insert -> attempt_count (0021:684) | GAP SEC-23 S :: "RACE SEC-DEPTH: two attempts for ordinal n+1, both orders held at the job's FOR SHARE, leave attempt_count = n+1 naming the committed attempt" | N/A guard | N/A no deadline read | N/A guard | N/A guard | GAP SEC-24 S :: "DENY SEC-DEPTH (nested attempt_count): a depth-2 attempt_count of n+1 with no attempt of that ordinal born now is refused KA080" | GAP SEC-25 S :: "DENY SEC-DEPTH (nested current_attempt_id): a depth-2 current_attempt_id naming another job's or an older attempt is refused KA080" | N/A guard |
@@ -171,7 +209,8 @@ declared row inserted by the fixture), expecting SQLSTATE 57014 and the complete
 
 C1 Baseline proof. Must FAIL on 21b310f by showing the forbidden behaviour through base SQL only (attack paths use no new helper,
 function or signature; `nestedAs` and grants are oracle setup of base objects; shape tests grant the route and show the pool
-accepts the connection and the route works): SEC-01, SEC-06a-h, SEC-18, SEC-20 (the attached writer records a fabricated history
+accepts the connection and the route works; SEC-06i/j/k show replica mode raising a pool's reserved_cents with no hold event):
+SEC-01, SEC-06a-n, SEC-18, SEC-20 (the attached writer records a fabricated history
 row), SEC-24, SEC-25, SEC-28, SEC-28b, SEC-29, SEC-30, SEC-32, SEC-34, SEC-36, SEC-39, SEC-40, SEC-40b, SEC-48, SEC-52, SEC-56.
 Supplemental checks that already pass on main (SEC-18s, SEC-36s), OK, RACE and P tests of new tooling are not baseline failures.
 
