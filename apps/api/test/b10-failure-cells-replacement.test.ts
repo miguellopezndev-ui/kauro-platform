@@ -747,7 +747,9 @@ faultCell(
       const { pause } = await abandonedRebinding(ctx, x, key, "retry waits, abandoned unit rolls back");
       const holder = await oracleRows<{ pid: number }>(iw, "SELECT pid FROM pg_stat_activity WHERE application_name LIKE 'kauro-api-payment%' AND state = 'idle in transaction'");
       assert.equal(holder.length, 1, "the abandoned SERVICE unit stands open with its writes");
-      const retry = ctx.operation("the same key retried while the abandoned re-binding is in flight and about to roll back", () => quoteCall(x.a, x.plan, key)).then(
+      const passes = (point: string): number => ctx.points.passed.filter((p) => p === point).length;
+      const [reads0, observed0] = [passes("pay.rebindings.listForCapture.before"), passes("pay.rebindings.findTo.before")];
+      const retry = ctx.operation("the same key retried while the abandoned re-binding is in flight and about to roll back", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key))).then(
         (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
         (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
       );
@@ -759,6 +761,9 @@ faultCell(
       if (answer.status === "fulfilled" && answer.value.status !== 201) assert.fail(`the retry answered ${answer.value.status} ${answer.value.text}: ${JSON.stringify(iw.w.internalErrors.slice(-2).map((e) => String((e.error as Error)?.message ?? e.error)))}`);
       const resumed = view(answer.status === "fulfilled" ? answer.value : (undefined as never));
       assert.equal(resumed.replacement?.outcome, "REBOUND", "the retry re-bound the purchase itself");
+      // by itself, not by observation: the retry's rebinder ran exactly once (one allowance read) and the identity observation (findTo) never ran
+      assert.equal(passes("pay.rebindings.listForCapture.before") - reads0, 1, "the retry's rebinder ran exactly once");
+      assert.equal(passes("pay.rebindings.findTo.before") - observed0, 0, "the observation branch was not entered: nothing was re-bound by the abandoned unit");
       const after = await stateOf(x, key);
       reboundOnce(x, after, resumed.quote.quoteId);
       assert.equal(after.journal, "COMMITTED");
