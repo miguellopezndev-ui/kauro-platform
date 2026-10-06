@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { runTest, testTarget } from "./test-runner.mjs";
+import { normalizePath, runTest, testTarget } from "./test-runner.mjs";
 
 function usage(message) {
   console.error(`${message}\nUsage: node tools/stress-cells.mjs <compiled test file> [N=20] [--concurrency <n>] [--timeout-min 30]`);
@@ -25,18 +25,19 @@ while (args.length) {
   args.splice(0, 2);
 }
 let target;
+const absolute = normalizePath(resolve(file));
 try {
   // Discover the nearest manifest even for an absolute path outside the current workspace.
-  let packageDir = dirname(resolve(file));
+  let packageDir = dirname(absolute);
   while (!existsSync(join(packageDir, "package.json"))) {
     const parent = dirname(packageDir);
     if (parent === packageDir) throw new Error(`no package.json for ${file}`);
     packageDir = parent;
   }
-  target = testTarget(packageDir, resolve(file));
+  target = testTarget(packageDir, absolute);
 } catch (error) { usage(error.message); }
 concurrency ??= target.concurrency;
-const report = { file: resolve(file), iterations: count, concurrency: concurrency ?? "node-default", results: [], verdict: "FAIL" };
+const report = { file: absolute, iterations: count, concurrency: concurrency ?? "node-default", results: [], verdict: "FAIL" };
 try {
   for (let iteration = 1; iteration <= count; iteration++) {
     const result = await runTest(target, concurrency, { timeoutMs: timeoutMin * 60_000 });

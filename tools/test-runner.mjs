@@ -1,14 +1,38 @@
 // Shared single-file Node test execution and workspace dependency ordering for the builder gates.
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, closeSync, existsSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import testEvents from "./test-events-reporter.mjs";
 
 const REPORTER = import.meta.url;
 const runners = new Set();
 const captures = new Set();
+
+// Compare filesystem identities, including Node's URL stack locations and Windows TEMP aliases.
+// Keep repository-relative test identities relative; only absolute paths have a filesystem identity.
+export function normalizePath(file, { platform = process.platform, realpath = realpathSync.native } = {}) {
+  const paths = platform === 'win32' ? win32 : posix;
+  let path;
+  if (/^file:\/\//i.test(file)) path = fileURLToPath(file, { windows: platform === 'win32' });
+  else {
+    try { path = decodeURIComponent(file); } catch { path = file; } // A literal or incomplete '%' is valid in a filename.
+  }
+  if (paths.isAbsolute(path)) {
+    try { path = realpath(path); } catch { /* A not-yet-emitted or unavailable file still needs lexical normalisation. */ }
+  }
+  path = paths.normalize(path);
+  return platform === 'win32' ? path.toLowerCase() : path;
+}
+
+function frameMatchesFile(frame, file) {
+  // Strip the frame wrapper and line/column before converting the URL, including a drive's colon.
+  const location = /\((.+):\d+:\d+\)$/.exec(frame ?? '') ?? /^\s*at (.+):\d+:\d+$/.exec(frame ?? '');
+  if (!location) return false;
+  try { return normalizePath(location[1]) === file; } catch { return false; }
+}
 
 function killRunner(pid) {
   if (process.platform === 'win32') {
@@ -96,7 +120,9 @@ export function firstFailingAssertion(output) {
 export function summarizeEvents(path, file, identityFile = file, { baseSymbols } = {}) {
   let records = [];
   try { records = readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch { /* an absent or torn file means "no evidence" */ }
-  const base = file.split(/[\\/]/).pop();
+  const normalizedFile = normalizePath(file);
+  const base = normalizedFile.split(/[\\/]/).pop();
+  const identity = normalizePath(identityFile).replaceAll('\\', '/');
   const summary = {
     complete: records.some((record) => record.event === "summary"),
     passedNames: [], failedNames: [], bodyFailedNames: [], hookFailures: 0, cancelled: 0, otherFailures: 0, fileFailures: 0,
@@ -130,13 +156,17 @@ export function summarizeEvents(path, file, identityFile = file, { baseSymbols }
   const component = (record) => siblingCounts.get(record.ancestors.at(-1)).get(record.name) > 1
     ? [record.name, record.ordinal] : record.name;
   for (const record of completed) {
-    record.path = [identityFile.replaceAll('\\', '/'), ...record.ancestors.map(component), component(record)];
+    record.path = [identity, ...record.ancestors.map(component), component(record)];
   }
   for (let index = 0; index < completed.length; index++) {
     const record = completed[index];
     const hasSubtests = completed[index - 1]?.nesting > record.nesting;
+    let recordFile;
+    if (record.nesting === 0) {
+      try { recordFile = normalizePath(record.name); } catch { /* Test titles need not be valid file URLs. */ }
+    }
     // A file with no tests is reported as one passing node named after the file; that is not an executed test either.
-    if (record.nesting === 0 && (record.name === base || record.name === file)) { if (record.event === "fail") summary.fileFailures++; continue; }
+    if (record.nesting === 0 && (recordFile === base || recordFile === normalizedFile)) { if (record.event === "fail") summary.fileFailures++; continue; }
     if (record.kind !== "test") {
       if (record.event === "fail" && record.failureType === "hookFailed") summary.hookFailures++;
       continue; // a suite never counts as an executed test; its children are reported on their own
@@ -163,7 +193,7 @@ export function summarizeEvents(path, file, identityFile = file, { baseSymbols }
       // Error text identifies that symbol, but never substitutes for the error's type or code.
       const symbol = /^(?:[A-Za-z_$][\w$]*\.)*([A-Za-z_$][\w$]*) is not a (?:function|constructor)\b/.exec(record.message ?? '')?.[1];
       const missingApi = record.errorName === 'TypeError' && symbol && baseSymbols && !baseSymbols.has(symbol)
-        && record.errorFrame?.replaceAll('\\', '/').includes(file.replaceAll('\\', '/') + ':');
+        && frameMatchesFile(record.errorFrame, normalizedFile);
       if (missingApi || ['ERR_MODULE_NOT_FOUND', 'ECONNREFUSED'].includes(record.errorCode)) {
         summary.inconclusiveFailures.push(assertion);
       } else {
@@ -233,7 +263,8 @@ export function dependencyOrder(packages, selected = packages) {
 }
 
 export function testTarget(root, file) {
-  const absolute = resolve(root, file);
+  root = normalizePath(resolve(root));
+  const absolute = normalizePath(resolve(root, file));
   const rel = relative(root, absolute);
   if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || !existsSync(absolute)) {
     throw new Error(`test file must exist inside the repository: ${file}`);
@@ -241,7 +272,7 @@ export function testTarget(root, file) {
   if (!/\.test\.(?:[cm]?[jt]s|tsx)$/.test(absolute)) throw new Error(`expected a single .test.js/.test.mjs/.test.ts file: ${file}`);
   let dir = dirname(absolute);
   while (!existsSync(join(dir, "package.json"))) {
-    if (dir === root) throw new Error(`no package.json for ${file}`);
+    if (dir === root || dirname(dir) === dir) throw new Error(`no package.json for ${file}`);
     dir = dirname(dir);
   }
   const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));

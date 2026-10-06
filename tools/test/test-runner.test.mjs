@@ -1,9 +1,134 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { command } from '../test-runner.mjs';
+import { pathToFileURL } from 'node:url';
+import { command, normalizePath, summarizeEvents, testTarget } from '../test-runner.mjs';
+
+test('path normalisation decodes file URLs and percent-encoded paths before resolving Windows aliases', () => {
+  const calls = [];
+  const options = {platform: 'win32', realpath(path) {
+    calls.push(path);
+    return path.replace(/MIGUEL~1/i, 'Miguel Lopez');
+  }};
+  const expected = normalizePath('C:\\Users\\Miguel Lopez\\Temp\\value.test.js', options);
+  assert.equal(normalizePath('file:///C:/Users/MIGUEL%7E1/Temp/value.test.js', options), expected);
+  assert.equal(normalizePath('C:/Users/MIGUEL%7E1/Temp/value.test.js', options), expected);
+  assert.deepEqual(calls, [
+    'C:\\Users\\Miguel Lopez\\Temp\\value.test.js',
+    'C:\\Users\\MIGUEL~1\\Temp\\value.test.js',
+    'C:/Users/MIGUEL~1/Temp/value.test.js',
+  ], 'both comparison sides must pass through realpath, after decoding');
+});
+
+test('Windows path normalisation reconciles slashes, dot segments and drive-letter case', () => {
+  const options = {platform: 'win32', realpath(path) { return path; }};
+  assert.equal(normalizePath('C:\\Temp\\tests\\..\\value.test.js', options), normalizePath('c:/temp/value.test.js', options));
+  assert.notEqual(normalizePath('C:/temp/value.test.js', options), normalizePath('D:/temp/value.test.js', options));
+});
+
+test('missing paths use lexical normalisation and POSIX paths retain case', () => {
+  const options = {platform: 'linux', realpath() { throw Object.assign(new Error('missing'), {code: 'ENOENT'}); }};
+  assert.equal(normalizePath('file:///tmp/a%20b/../value.test.js', options), '/tmp/value.test.js');
+  assert.notEqual(normalizePath('/tmp/Value.test.js', options), normalizePath('/tmp/value.test.js', options));
+  assert.equal(normalizePath('/tmp/100%.test.js', options), '/tmp/100%.test.js');
+  assert.equal(normalizePath('packages/cell/test/../test/value.test.ts', options), 'packages/cell/test/value.test.ts');
+});
+
+test('the default path normaliser resolves both filesystem paths and encoded file URLs', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-normalise-'));
+  const file = join(root, 'value test~.test.mjs');
+  writeFileSync(file, '');
+  try {
+    const canonical = realpathSync.native(file);
+    assert.equal(normalizePath(file), process.platform === 'win32' ? canonical.toLowerCase() : canonical);
+    assert.equal(normalizePath(pathToFileURL(file).href.replaceAll('~', '%7E')), normalizePath(file));
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
+
+for (const kind of ['function', 'constructor']) {
+  test(`an encoded file URL attributes a missing ${kind} to its test and preserves genuine red`, () => {
+    const root = mkdtempSync(join(tmpdir(), 'kauro-frame-'));
+    const compiled = join(root, 'value test~.test.mjs');
+    const events = join(root, 'events.jsonl');
+    writeFileSync(compiled, '');
+    const frame = pathToFileURL(compiled).href.replaceAll('~', '%7E');
+    try {
+      writeFileSync(events, [
+        {event: 'error', errorName: 'TypeError', errorFrame: `    at TestContext.<anonymous> (${frame}:2:76)`},
+        {event: 'fail', kind: 'test', nesting: 0, name: 'missing API', failureType: 'testCodeFailure', message: `api is not a ${kind}`},
+        {event: 'error', errorName: 'AssertionError', errorCode: 'ERR_ASSERTION', errorFrame: `    at TestContext.<anonymous> (${frame}:3:10)`},
+        {event: 'fail', kind: 'test', nesting: 0, name: 'real regression', failureType: 'testCodeFailure', message: 'GENUINE RED'},
+        {event: 'summary'},
+      ].map((record) => JSON.stringify(record)).join('\n'));
+      const summary = summarizeEvents(events, compiled, 'packages/cell/test/value.test.ts', {baseSymbols: new Set(['value'])});
+      assert.deepEqual(summary.inconclusiveFailures, [`TypeError: api is not a ${kind}`]);
+      assert.deepEqual(summary.redFailedNames, ['real regression']);
+      assert.deepEqual(summary.redFailedPaths, [['packages/cell/test/value.test.ts', 'real regression']]);
+      assert.equal(summary.redAssertion, 'AssertionError [ERR_ASSERTION]: GENUINE RED');
+    } finally { rmSync(root, {recursive: true, force: true}); }
+  });
+}
+
+test('an indirect missing-API error in another file remains RED', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-frame-'));
+  const compiled = join(root, 'value.test.mjs');
+  const other = join(root, 'other', 'value.test.mjs');
+  const events = join(root, 'events.jsonl');
+  writeFileSync(compiled, '');
+  try {
+    writeFileSync(events, [
+      {event: 'error', errorName: 'TypeError', errorFrame: `    at helper (${pathToFileURL(other).href}:2:76)`},
+      {event: 'fail', kind: 'test', nesting: 0, name: 'existing runtime regression', failureType: 'testCodeFailure', message: 'api is not a function'},
+    ].map((record) => JSON.stringify(record)).join('\n'));
+    const summary = summarizeEvents(events, compiled, compiled, {baseSymbols: new Set()});
+    assert.deepEqual(summary.inconclusiveFailures, []);
+    assert.deepEqual(summary.redFailedNames, ['existing runtime regression']);
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
+
+test('file-level events and full test identities recognise encoded file URLs', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-identity-'));
+  const compiled = join(root, 'value test~.test.mjs');
+  const events = join(root, 'events.jsonl');
+  writeFileSync(compiled, '');
+  const url = pathToFileURL(compiled).href.replaceAll('~', '%7E');
+  try {
+    writeFileSync(events, JSON.stringify({event: 'fail', kind: 'test', nesting: 0, name: url, failureType: 'testCodeFailure', message: 'top-level failure'}));
+    const failed = summarizeEvents(events, compiled);
+    assert.equal(failed.fileFailures, 1);
+    assert.equal(failed.leafFailed, 0);
+    assert.deepEqual(failed.redFailedPaths, []);
+
+    writeFileSync(events, JSON.stringify({event: 'pass', kind: 'test', nesting: 0, name: 'green'}));
+    assert.deepEqual(summarizeEvents(events, compiled, url).passedPaths, summarizeEvents(events, compiled, compiled).passedPaths);
+    assert.deepEqual(summarizeEvents(events, compiled, 'packages/cell/test/../test/value.test.ts').passedPaths,
+      [['packages/cell/test/value.test.ts', 'green']]);
+    writeFileSync(events, JSON.stringify({event: 'pass', kind: 'test', nesting: 0, name: 'file://service/test title'}));
+    assert.equal(summarizeEvents(events, compiled).leafPassed, 1, 'a test title need not be a valid local file URL');
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
+
+test('testTarget canonicalises repository and test paths without allowing a sibling prefix', () => {
+  const root = mkdtempSync(join(tmpdir(), 'kauro-target-'));
+  const compiled = join(root, 'value.test.mjs');
+  const sibling = root + '-sibling';
+  mkdirSync(sibling);
+  writeFileSync(compiled, '');
+  writeFileSync(join(root, 'package.json'), JSON.stringify({scripts: {test: 'node --test'}}));
+  writeFileSync(join(sibling, 'value.test.mjs'), '');
+  try {
+    const target = testTarget(root, compiled);
+    assert.equal(target.dir, normalizePath(realpathSync.native(root)));
+    assert.equal(target.compiled, normalizePath(realpathSync.native(compiled)));
+    assert.equal(target.file, 'value.test.mjs');
+    assert.throws(() => testTarget(root, join(sibling, 'value.test.mjs')), /must exist inside the repository/);
+  } finally {
+    rmSync(root, {recursive: true, force: true});
+    rmSync(sibling, {recursive: true, force: true});
+  }
+});
 
 for (const code of ['EPERM', 'ESRCH']) {
   test(`a ${code} killer cannot leave runTest waiting forever`, () => {

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Negative control: source/migrations at base, tests at head, all in a disposable Git worktree.
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { baseBuildSymbols, buildPackage, command, dependencyOrder, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
+import { baseBuildSymbols, buildPackage, command, dependencyOrder, normalizePath, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
 
 function usage(message) {
   console.error(`${message}\nUsage: node tools/red-proof.mjs <base> <head> --tests <file>[,<file>...] [--out red-proof.json] [--timeout-min 30]`);
@@ -27,13 +27,13 @@ if (!files?.length || files.some((file) => !file.trim()) || new Set(files).size 
 
 let root, base, head;
 try {
-  root = realpathSync.native(requireCommand("git", ["rev-parse", "--show-toplevel"], process.cwd()).output.trim());
+  root = normalizePath(requireCommand("git", ["rev-parse", "--show-toplevel"], process.cwd()).output.trim());
   base = requireCommand("git", ["rev-parse", "--verify", "--end-of-options", `${baseRef}^{commit}`], root).output.trim();
   head = requireCommand("git", ["rev-parse", "--verify", "--end-of-options", `${headRef}^{commit}`], root).output.trim();
 } catch (error) { usage(error.message); }
 const timeoutMs = timeoutMin * 60_000;
-// 8.3 short TEMP paths and long paths must compare equal: normalise both sides of relative().
-files = files.map((file) => { const absolute = resolve(process.cwd(), file); try { return realpathSync.native(absolute); } catch { return absolute; } });
+// Canonicalise both sides before containment/relative-path checks, including Windows TEMP aliases.
+files = files.map((file) => normalizePath(resolve(process.cwd(), file)));
 const report = { base, head, revertedPaths: [], tests: [], errors: [], inconclusive: [], verdict: "FAIL" };
 class Stop extends Error {}
 const work = mkdtempSync(join(tmpdir(), "kauro-red-proof-"));
@@ -87,7 +87,7 @@ try {
     requireCommand("pnpm", installArgs, checkout);
   }
   const packages = workspacePackages(checkout);
-  const selected = targets.map((target) => packages.find((pkg) => pkg.dir === target.dir) ?? target);
+  const selected = targets.map((target) => packages.find((pkg) => normalizePath(pkg.dir) === normalizePath(target.dir)) ?? target);
   const buildOrder = dependencyOrder(packages, selected);
   const manifest = JSON.parse(readFileSync(join(checkout, "package.json"), "utf8"));
   if (manifest.scripts?.generate) requireCommand("pnpm", ["run", "generate"], checkout);
