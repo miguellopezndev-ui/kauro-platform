@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -32,7 +32,7 @@ setInterval(() => {}, 1000);
 `);
   let runnerPid;
   let failure;
-  try {
+  await withCleanup(root, async () => { try {
     failure = await interruptedWorker(join(root, 'gate.mjs'), [tmpdir()], root, join(root, 'pid'), signal).then(() => null, (error) => error);
     runnerPid = Number((await import('node:fs')).readFileSync(join(root, 'pid'), 'utf8').split(' ')[1]);
     assert.ok(failure, 'a surviving runner must fail the helper');
@@ -40,8 +40,7 @@ setInterval(() => {}, 1000);
   } finally {
     // Only a runner the helper reported as surviving is known alive; never signal an id that may have been reused.
     if (runnerPid && failure?.message.includes(`${runnerPid} survived`)) { try { process.kill(runnerPid, 'SIGKILL'); } catch { /* already gone */ } }
-    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
-  }
+  } });
 });
 
 test('cleanup kills only ids that are not yet confirmed dead (the OS reuses pids)', () => {
@@ -69,5 +68,7 @@ test('cleanup retries a transient EPERM/EBUSY itself (rmSync does not on Node 24
   let persistent = 0;
   await assert.rejects(withCleanup('x', async () => {}, () => { persistent++; throw Object.assign(new Error('EPERM forever'), { code: 'EPERM' }); }), /EPERM forever/);
   assert.equal(persistent, 11, 'one attempt plus ten retries, then the error surfaces');
-  await assert.rejects(withCleanup('x', async () => {}, () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
+  let denied = 0;
+  await assert.rejects(withCleanup('x', async () => {}, () => { denied++; throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
+  assert.equal(denied, 1, 'a non-transient error is not retried');
 });
