@@ -183,7 +183,7 @@ export function convertedFor(c: { readonly att: Attribution }, shares: ReadonlyA
  * (for a cell whose waiter is already running, paused before its lock, so `ctx.mustWait` — which starts its operation — cannot be used).
  */
 export async function observeBlocked(waiter: HarnessConnection, holder: HarnessConnection, what: string, limitMs = 10_000): Promise<void> {
-  const oracle = iwOf().h.oracle;
+  const oracle = familyOf().oracle;
   const deadline = Date.now() + limitMs;
   for (;;) {
     const r = await oracle.query<{ blocked: boolean; state: string | null }>(
@@ -310,7 +310,8 @@ export interface Member<F, A> {
   readonly tag: string;
   /** The login of each role whose units the act opens (one connection per role, one counter: onRoles). */
   readonly roles: Partial<Record<RouteRole, Login>>;
-  fixture(label: string): Promise<F>;
+  /** `after`: the fixture of the previous phase of a membership member (phase 3 acts as the principal revoked in phase 2). */
+  fixture(label: string, after?: F): Promise<F>;
   /** The act under the fault; a non-2xx answer throws Refused(status, code). */
   act(ctx: FaultContext, f: F, key: string): Promise<A>;
   readonly point: FaultPoint<F>;
@@ -804,7 +805,7 @@ async function membership<F>(ctx: FaultContext, m: Member<F, unknown>, point: Ex
       assert.equal(r.status, "fulfilled", `${m.code}: the revocation lands after the act`);
     });
     // (3) every act after the revocation is refused
-    const f3 = await m.fixture(`${label}-3`);
+    const f3 = await m.fixture(`${label}-3`, f2);
     const c3 = await connectionsOf(m as Member<unknown, unknown>);
     try {
       await ctx.fenced(`${m.code}: an act after the revocation`, () => routedAct(ctx, m, f3, keyOf(m as Member<unknown, unknown>), c3.conns, [], {}), point.refusal);
