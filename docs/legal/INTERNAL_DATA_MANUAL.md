@@ -5,12 +5,12 @@ principio de responsabilidad demostrada). Documento INTERNO: no se publica ni fo
 se remite a él. Borrador del constructor sin abogado (decisión D-08b, opción 1).
 Trazabilidad: `auth:` = authority/r2; `law:` = fila de CHECKLIST.md; `prod:` = elemento del registro del producto
 (packages/contracts/registry) o código de Intelligence Core. Fuentes consultadas el 2026-10-06 (CHECKLIST §1 y §5).
-Marcadores: los de LAWYER_LATER F-01..F-05 y [representante legal] (F-06).
+Marcadores: solo los de LAWYER_LATER F-01..F-05. El nombre del representante legal se anota al firmar (decisión D-16).
 -->
 
 # Manual interno de políticas y procedimientos de tratamiento de datos personales
 
-**Versión:** 1.0 · **Adoptado por:** [representante legal] · **Vigente desde:** [fecha de vigencia] · **Próxima revisión:** doce
+**Versión:** 1.1 · **Adoptado por:** el representante legal de Kauro Data S.A.S. · **Vigente desde:** [fecha de vigencia] · **Próxima revisión:** doce
 (12) meses después de la vigencia (sección 9)
 
 ## 1. Objeto, alcance y marco
@@ -66,10 +66,10 @@ finalidad, un dato, un sistema o un encargado.
 
 | Código | Base (POL) | Titulares | Datos | Sistema y ubicación | Encargados | Conservación (POL §15) | Auto |
 |---|---|---|---|---|---|---|---|
-| R-01 | Clientes y usuarios (§6.1) | Administradores y usuarios de agencias y empresas cliente | Identificación y contacto de trabajo, rol, verificación de correo y segundo factor, aceptación de documentos, actividad y eventos de seguridad, tipo de comprador | Base de datos de la plataforma en AWS (EE. UU.) | AWS; Resend (avisos) | Cuenta activa + 6 meses | MANUAL hasta que exista barrido automático |
+| R-01 | Clientes y usuarios (§6.1) | Administradores y usuarios de agencias y empresas cliente | Identificación y contacto de trabajo, rol, verificación de correo y segundo factor, aceptación de documentos, autorización comercial separada con sus canales, actividad y eventos de seguridad, tipo de comprador | Base de datos de la plataforma en AWS (EE. UU.) | AWS; Resend (avisos) | Cuenta activa + 6 meses | MANUAL hasta que exista barrido automático |
 | R-02 | Facturación, pagos y contabilidad (§6.2) | Representantes y contactos de facturación; ordenantes de transferencias | Razón social, NIT, dirección y contacto de facturación, pedidos, pagos, reembolsos, disputas | Plataforma (AWS); proveedor de facturación electrónica; libros contables | AWS; proveedor de facturación | ≥ 10 años | MANUAL (plazo legal; no se borra antes) |
-| R-03 | Interesados del formulario (§6.3) | Personas que llenan el formulario de contacto | Nombre, correo, empresa, tipo de comprador, destino, banda de registros, fecha deseada | Plataforma (AWS); correo corporativo | AWS; Google | 12 meses sin interacción | MANUAL |
-| R-04 | Prospectos (§6.3) | Contactos de negocio de agencias | Agencia, dominio, país, persona y cargo, canal, fuente pública y fecha, notas acotadas, estado de baja | Plataforma (AWS) | AWS; Resend o correo corporativo para envíos | Baja o 24 meses sin interacción; la baja se conserva | MANUAL |
+| R-03 | Interesados del formulario (§6.3) | Personas que llenan el formulario de contacto | Nombre, correo, empresa, tipo de comprador, destino, banda de registros, fecha deseada, autorización comercial separada con sus canales | Plataforma (AWS); correo corporativo | AWS; Google | 12 meses sin interacción | MANUAL |
+| R-04 | Prospectos (§6.3) | Agencias (datos de la organización) y personas de agencias que autorizaron el contacto | Organización: agencia, dominio, país, buzones genéricos o de función, teléfono público de la empresa, fuente y fecha, notas acotadas, estado de baja. Persona: nombre, cargo, correo y teléfono de trabajo **solo con registro de autorización** | Plataforma (AWS) | AWS; Resend o correo corporativo para envíos | Baja, revocatoria o 24 meses sin interacción; la baja se conserva | MANUAL (borrado); PRODUCTO (bloqueo de datos de persona sin autorización, A-13) |
 | R-05 | Colaboradores comerciales y proveedores (§6.4) | Vendedores, candidatos, proveedores personas naturales | Identificación, contacto, contrato, documentos tributarios y de seguridad social, datos bancarios, comisiones | Plataforma (AWS, acceso restringido a finanzas); correo corporativo | AWS; Google | Relación + plazos tributarios y contables | MANUAL |
 | R-06 | Solicitudes, consultas y reclamos (§6.5) | Quienes ejercen derechos ante Kauro | Identificación del solicitante, tipo, fechas, verificación, alcance, respuesta | Registro de solicitudes (sección 8) en el espacio de Google Workspace de Kauro | Google | 5 años desde el cierre | MANUAL |
 | R-07 | Seguridad y registros técnicos (§6.6) | Usuarios y operadores | Actor, alcance, acción, resultado, fecha; sin contenido de CRM ni secretos | Plataforma y registros de AWS (EE. UU.) | AWS | Registros de aplicación 30 días; evidencia de seguridad 180 días | PRODUCTO (09 §Retention schedule) |
@@ -100,8 +100,8 @@ correo** (ToS §12.2); si llega, se trata como incidente de dato prohibido (secc
 | 4b | **Reclamo incompleto:** pedir que se complete | Dentro de los 5 días siguientes al recibo; desistido a los 2 meses sin respuesta | MANUAL |
 | 4c | **Reclamo de otro competente:** trasladar e informar al interesado | 2 días hábiles | MANUAL |
 | 4d | **Reclamo completo:** marcar el dato con la leyenda "reclamo en trámite" y su motivo | 2 días hábiles desde el recibo completo | MANUAL (nota en el registro y en la base afectada) |
-| 4e | Resolver el reclamo | 15 días hábiles desde el día siguiente al recibo; prórroga máx. 8 días hábiles avisando | MANUAL |
-| 5 | Si se suprime: borrar de R-01..R-08 y explicar por escrito los registros residuales que la ley obliga a conservar (p. ej. facturas, R-02) | Dentro del término de 4e | MANUAL |
+| 4e | Resolver el reclamo. Si no es posible a tiempo, informar los motivos y la nueva fecha **antes del vencimiento del término inicial** | 15 días hábiles desde el día siguiente al recibo; prórroga máx. 8 días hábiles siguientes al vencimiento del primero | MANUAL |
+| 5 | Supresión o revocatoria: proceden en cualquier momento sin que el titular alegue un incumplimiento. Borrar de R-01..R-08, o dejar de usar los datos para las finalidades no necesarias (p. ej., comerciales), y explicar por escrito los registros residuales que un deber legal o contractual obliga a conservar (p. ej. facturas, R-02). Una baja de comunicaciones comerciales se aplica de inmediato, no al cierre del caso | Dentro del término de 4e | MANUAL; la baja, PRODUCTO |
 | 6 | Cerrar el caso con respuesta, fecha y evidencia mínima, sin copiar los datos suprimidos | — | MANUAL |
 
 Reglas: el acceso es gratuito al menos una vez por mes calendario y con cada cambio sustancial de la POL; los "días hábiles" son de
@@ -109,17 +109,24 @@ lunes a viernes sin festivos de Colombia; el representante legal revisa el regis
 la fecha de vencimiento de cada caso al abrirlo.
 <!-- law: C-08, C-09, C-10, C-11 (Ley 1581 arts. 14 y 15; Decreto 1074 arts. 2.2.2.25.2.6 y 2.2.2.25.4.2) · auth: 19 §Rights requests and privacy complaints; 11 §Billing, team, settings and help ("privacy requests") · prod: UI46 (DESIGN_NOT_RENDERED_PRODUCT); el registro no tiene comando de producto: es MANUAL (CHECKLIST A-02) · texto: POL §9, §10 -->
 
-### 5.2. Solicitudes sobre Datos del Cliente (Kauro como encargado)
+### 5.2. Consultas y reclamos sobre Datos del Cliente (Kauro como encargado)
 
-1. Si un titular pide algo sobre datos que están en un archivo de CRM de un Cliente, Kauro **no responde en el fondo ni revela
-   datos**: identifica al Cliente responsable, le traslada la solicitud y avisa al titular que la trasladó, **dentro de los 2 días
-   hábiles** siguientes al recibo. MANUAL.
-2. Las correcciones, exclusiones y eliminaciones las hace el Cliente en la plataforma (nueva Revisión, exclusión, eliminación
-   anticipada). PRODUCTO: `RequestDeletion` (CMD042, B16) revoca accesos, cancela intentos y emite el comprobante de eliminación.
-3. Si el Cliente instruye una actualización que Kauro debe aplicar, Kauro la aplica **dentro de los 5 días hábiles** siguientes
-   al recibo. MANUAL hasta que exista en el producto.
-4. Si el titular no dice el Cliente y Kauro ya no tiene los datos (plazos cortos de E-01), se le informa así por escrito.
-<!-- law: C-13 (Ley 1581 art. 18 lit. c, d, e), C-17 (art. 15 num. 1) · auth: 19 §Rights requests and privacy complaints; 09 §Early deletion; 09 §Deletion receipts and restoration · prod: CMD042 RequestDeletion (B16) · texto: DPA §5(d), §12; POL §12.2 -->
+Kauro tiene deberes propios de encargado (Ley 1581 art. 18): tramitar consultas y reclamos, registrar leyendas, no hacer circular
+información bloqueada. No basta con reenviar.
+
+| Paso | Qué | Plazo legal | Quién |
+|---|---|---|---|
+| 1 | Recibir y abrir el caso en el registro de solicitudes, marcado "encargado"; verificar identidad y delimitar la solicitud | — | MANUAL |
+| 2 | Identificar el proyecto (E-01) y el **responsable real** con la cadena registrada (DPA §1.2): en la cadena de dos partes, el Cliente; en la cadena agencia–cliente final, el Cliente Final, al que se llega por medio de la agencia. Si Kauro ya no conserva los datos, informarlo al titular | — | MANUAL con la referencia de autoridad de tratamiento (R2-111) |
+| 3 | Reclamo incompleto: pedir que se complete | 5 días desde el recibo | MANUAL |
+| 4 | **Reclamo completo: registrar la leyenda "reclamo en trámite" y su motivo** en el proyecto o revisión afectados, visible para el Cliente y en el Paquete, y mantenerla hasta la decisión | 2 días hábiles | PRODUCTO (A-17) o, hasta entonces, control MANUAL equivalente: anotación en el registro y retención del Paquete afectado |
+| 5 | Trasladar al responsable lo que solo él puede decidir (fondo de la corrección o supresión) e informar al titular del traslado | 2 días hábiles desde el recibo | MANUAL |
+| 6 | Ejecutar lo que decida el responsable y responder o hacer responder al titular. Si no alcanza el término, avisar la prórroga **antes del vencimiento del término inicial** | Consultas 10 + 5 días hábiles; reclamos 15 + 8 días hábiles | MANUAL; ejecución por PRODUCTO (nueva Revisión, exclusión, `RequestDeletion` CMD042, B16) |
+| 7 | Actualizar la información que reporte el responsable | 5 días hábiles desde su recibo | MANUAL hasta que exista en el producto |
+| 8 | **"Información en discusión judicial"**: insertar la leyenda en el alcance afectado cuando una autoridad notifique a Kauro, o el Cliente informe que fue notificado, de un proceso judicial sobre la calidad del dato | Al recibir la notificación | PRODUCTO (A-17) o MANUAL equivalente |
+| 9 | **Bloqueo ordenado por la SIC**: impedir la circulación del alcance afectado (descargas, publicación de Paquetes, envíos al modelo, nuevo procesamiento) mientras dure la orden, sin eliminar salvo que la orden lo disponga; registrar la orden y su levantamiento | Al recibir la orden | PRODUCTO (A-17: bloqueo por alcance) o MANUAL equivalente: contención por alcance de la sección 5.4 paso 2 |
+| 10 | Cerrar el caso con evidencia mínima | — | MANUAL |
+<!-- law: C-13, C-13b (Ley 1581 art. 18 lit. c, d, e, g, h, i), C-17 (art. 15 num. 1 y 2) · auth: 19 §Rights requests and privacy complaints ("The agency/controller chain is identified"); 09 §Early deletion; 09 §Deletion receipts and restoration; 14 §Incident containment · prod: CMD042 RequestDeletion (B16); registry R2-111 (cadena) · texto: DPA §5(d), (j), §12.2, §12.4; POL §12.2 · CHECKLIST A-17 -->
 
 ### 5.3. Autorización, aviso y prueba
 
@@ -128,9 +135,15 @@ la fecha de vencimiento de cada caso al abrirlo.
 2. MANUAL: cada versión publicada de POL, AVISO, ToS y DPA se conserva con su fecha de vigencia en el repositorio de documentos de
    Kauro (sin datos personales) para probar qué aceptó cada titular.
 3. MANUAL: para colaboradores comerciales, la autorización es un documento firmado al contratar (R-05).
+3a. PRODUCTO (A-14): la autorización para comunicaciones comerciales es separada, opcional, con casilla no marcada y elección de
+   canales; se guarda con finalidad, canales, fecha y versión; no condiciona la cuenta, la compra ni el formulario.
+3b. PRODUCTO (A-13): un prospecto solo guarda datos de la organización (nombre, dominio, país, buzones genéricos o de función,
+   teléfono público de la empresa, fuente y fecha). Los datos de una persona solo se guardan con un registro de autorización:
+   la persona llenó el formulario, o respondió por escrito a un primer mensaje enviado a un canal genérico de la agencia que le
+   pedía esa autorización. Nadie copia nombres, correos nominativos ni teléfonos directos de sitios web, directorios ni redes.
 4. Antes de usar datos para una finalidad nueva, se actualiza la POL, se avisa antes de aplicar el cambio y, si cambia la
    finalidad, se pide nueva autorización.
-<!-- law: C-04, C-05, C-18, C-26 · texto: POL §8, §20; AVISO -->
+<!-- law: C-04, C-05, C-06, C-18, C-19, C-26, C-51, C-52 (SIC Circular Externa 002 de 2024, instrucción IX: accesible al público no es naturaleza pública) · texto: POL §6.3, §8, §20; AVISO · CHECKLIST A-13, A-14, S-22 -->
 
 ### 5.4. Incidentes de seguridad
 
@@ -143,7 +156,7 @@ en el correo.
 | 1 | **Detectar y abrir el registro de incidentes**: hora de detección, quién o qué alertó | Al detectar | PRODUCTO (alertas de 14 §Monitoring; `RecordIncident` CMD056, UI42, B16) o MANUAL |
 | 2 | **Contener por alcance**: pausar cargas, revisiones, compras, procesamiento, publicación o descargas del alcance afectado; terminar trabajadores comprometidos; sin abrir registros de clientes salvo acceso de soporte con motivo registrado | Inmediato | PRODUCTO (controles de contención, B16/B18 `RestrictCapability` CMD059) + MANUAL (decisión) |
 | 3 | **Evaluar**: tipo de incidente, fecha en que ocurrió y en que se conoció, causa, tipo de datos, número de titulares, bases (sección 4) y Clientes afectados | Continuo | MANUAL |
-| 4 | **Avisar al Cliente** (datos de E-01/E-02): alcance, hechos conocidos, acción recomendada, contención y próxima actualización; sin esperar la causa raíz y sin afirmar que no hubo exposición antes de comprobarlo | **Dentro de 72 horas** desde confirmar el incidente | MANUAL (mensaje autorizado; borrador y envío son registros separados) |
+| 4 | **Avisar al Cliente** (datos de E-01/E-02): alcance, hechos conocidos, acción recomendada, contención y próxima actualización; sin esperar a confirmar ni a la causa raíz y sin afirmar que no hubo exposición antes de comprobarlo; actualizar a medida que avanza | **De inmediato y sin demora injustificada** desde que se descubre el incidente o hay motivos razonables para creer que ocurrió; **nunca más de 72 horas** desde ese momento; si una ley exige antes, ese plazo | MANUAL (mensaje autorizado; borrador y envío son registros separados) |
 | 5 | **Reportar a la SIC** por el aplicativo o canal que disponga | **Dentro de 15 días hábiles** desde la detección | MANUAL, coordinado con el Cliente cuando son Datos del Cliente |
 | 6 | **Avisar a los titulares** de las bases R-01..R-08 cuando corresponda, con medidas para reducir el daño. Para E-01/E-02 la decisión es del Cliente (responsable), salvo que la ley obligue a Kauro | Sin demora | MANUAL |
 | 7 | **Reparar y recuperar**; preservar evidencia mínima; toda retención por incidente lleva motivo y fecha de revisión | — | PRODUCTO + MANUAL |
@@ -151,7 +164,7 @@ en el correo.
 
 Contenido mínimo del registro: base y datos comprometidos, titulares, fecha del incidente y de su descubrimiento, causa, acciones
 correctivas y responsable. El representante legal es el único autorizado a enviar avisos externos.
-<!-- law: C-14, C-15 (Ley 1581 arts. 17 lit. n y 18 lit. k; Circular Única Título V num. 2.1 lit. f(ii): 15 días hábiles) · auth: 14 §Incident containment; 14 §Monitoring and service health; 18 §Incident communication; 19 §Incident and breach obligations; 19 §Data categories and excluded use (dato prohibido: cuarentena, notificar, no copiar a soporte ni a un modelo) · prod: CMD056 RecordIncident, UI42 Incidents, CMD054/CMD055 break-glass (B16), CMD059 RestrictCapability (B18) · texto: DPA §11 (72 horas: resolución de silencio S-02); POL §18 · fuente: Guía SIC, III.2.4 (registro de incidentes: base y datos comprometidos, titulares, fecha del incidente y de su descubrimiento, acciones correctivas, responsables) y III.2.6 (al reportar: tipo, fecha de ocurrencia y de conocimiento, causa, tipo de datos y cantidad de titulares) -->
+<!-- law: C-14, C-15 (Ley 1581 arts. 17 lit. n y 18 lit. k; Circular Única Título V num. 2.1 lit. f(ii): 15 días hábiles) · auth: 14 §Incident containment; 14 §Monitoring and service health; 18 §Incident communication; 19 §Incident and breach obligations; 19 §Data categories and excluded use (dato prohibido: cuarentena, notificar, no copiar a soporte ni a un modelo) · prod: CMD056 RecordIncident, UI42 Incidents, CMD054/CMD055 break-glass (B16), CMD059 RestrictCapability (B18) · texto: DPA §11 (desde el descubrimiento o la creencia razonable, máximo 72 horas: resolución de silencio S-02, r2; Cal. Civ. Code §1798.82(b) y Va. Code §18.2-186.6(D), CHECKLIST C-67); POL §18 · fuente: Guía SIC, III.2.4 (registro de incidentes: base y datos comprometidos, titulares, fecha del incidente y de su descubrimiento, acciones correctivas, responsables) y III.2.6 (al reportar: tipo, fecha de ocurrencia y de conocimiento, causa, tipo de datos y cantidad de titulares) -->
 
 ### 5.5. Gestión de encargados y subencargados
 
@@ -163,11 +176,14 @@ correctivas y responsable. El representante legal es el único autorizado a envi
    tener plan de salida y eliminación; si es un modelo de IA, **actualizar PIA_BEDROCK.md antes** del primer uso.
 3. **Avisar a los Clientes** con al menos **30 días** de anticipación (plataforma y correo a administradores) con entidad, función,
    datos y ubicación; atender objeciones (DPA §8.2). Actualizar POL §13.1 y DPA Anexo III antes de que el cambio rija.
-4. **Aceptar y archivar** los contratos estándar bajo la compañía (AWS Service Terms y su DPA, DPA de Resend, términos de Google
-   Workspace) (CHECKLIST A-07).
+4. **Calificar cada encargado antes de entregarle datos** (CHECKLIST A-07): aceptar los contratos bajo la compañía y hacer, con
+   fecha, una tabla por proveedor que muestre dónde está cada cláusula obligatoria (contenido del contrato de transmisión del
+   Decreto 1074 art. 2.2.2.25.5.2; obligaciones de subencargado de 11 CCR §7051(b) y de VA/CO; aviso de incidentes; ubicación;
+   supresión; subencargados), qué servicios cubre, qué rol tiene el proveedor y las excepciones; para AWS incluye los AWS CCPA
+   Terms. Archivar los contratos no basta. Si falta una cláusula obligatoria, ese proveedor no recibe datos hasta resolverlo.
 5. **Revisión anual** de cada encargado: ¿cambió su DPA, su ubicación, su retención o sus subencargados? (sección 9).
 Todo este procedimiento es MANUAL.
-<!-- law: C-12 (art. 17 lit. i: exigir seguridad al encargado), C-21, C-63, C-65, C-66 · auth: 19 §Subprocessor register; A9 §1 y §3 · texto: DPA §8, Anexo III; POL §13 · fuente: Guía SIC, III.2.7 (requisitos para los encargados y mecanismos para que reporten incidentes) · ver LAWYER_LATER L-01 -->
+<!-- law: C-12 (art. 17 lit. i: exigir seguridad al encargado), C-21, C-63 (incluye AWS CCPA Terms, CHECKLIST V-12), C-65, C-66 · auth: 19 §Subprocessor register; A9 §1 y §3 · texto: DPA §8, Anexo III; POL §13 · fuente: Guía SIC, III.2.7 (requisitos para los encargados y mecanismos para que reporten incidentes) · ver LAWYER_LATER L-01 -->
 
 ### 5.6. Conservación y supresión
 
@@ -175,10 +191,12 @@ Todo este procedimiento es MANUAL.
    ausencia contra el inventario del proveedor y emite el comprobante de eliminación (sin valores de registros). Una eliminación
    PARCIAL queda visible con su próximo reintento. MANUAL: el representante legal revisa **cada semana** la métrica de
    eliminaciones vencidas (14 §Monitoring: "overdue deletion") y actúa sobre cualquiera.
-2. **Datos propios (R-01..R-06, R-08): MANUAL** mientras no exista barrido automático. El **primer día hábil de cada mes** el
-   representante legal: elimina cuentas cerradas hace más de 6 meses (salvo lo que pertenece a R-02); prospectos sin interacción
-   por 24 meses (conserva solo la baja); interesados del formulario sin interacción por 12 meses; casos de solicitudes cerrados
-   hace más de 5 años; y correos que contengan archivos de CRM. Anota en el registro de supresión: base, criterio, cantidad y
+2. **Datos propios (R-01..R-06, R-08): MANUAL** mientras no exista barrido automático. Los plazos publicados son máximos, así que
+   se borra **antes** de que venzan: **cada lunes** (o el día hábil siguiente) el representante legal elimina todo registro cuyo
+   plazo venza antes del lunes siguiente: cuentas que cumplen 6 meses de cerradas (salvo lo que pertenece a R-02); prospectos que
+   cumplen 24 meses sin interacción (conserva solo la baja); interesados del formulario que cumplen 12 meses sin interacción; y
+   casos de solicitudes que cumplen 5 años de cerrados. Los correos que contengan archivos de CRM se eliminan el mismo día en que
+   se detectan, y una baja o revocatoria se aplica de inmediato. Anota en el registro de supresión: base, criterio, cantidad y
    fecha, sin los datos borrados.
 3. **R-02** se conserva al menos 10 años (Código de Comercio art. 60); nunca contiene contenido de CRM.
 4. **R-07: PRODUCTO** (30 días registros de aplicación; 180 días evidencia de seguridad).
@@ -212,10 +230,15 @@ Todo este procedimiento es MANUAL.
 
 ### 5.9. Comunicaciones comerciales y bajas
 
-La baja se aplica de inmediato, no exige iniciar sesión y sobrevive a reimportaciones y cambios de proveedor (PRODUCTO, registro
-de supresión de mensajería). MANUAL: antes de cada campaña, el representante legal verifica que la lista excluye las bajas y que
-para destinatarios en Colombia el envío cae en el horario de la Ley 2300 de 2023.
-<!-- law: C-50, C-51 · auth: 18 §Communication compliance; reference/MESSAGING_AND_SENDER_OPERATIONS.md · texto: POL §17 -->
+| Paso | Qué | Quién |
+|---|---|---|
+| 1 | Destinatarios permitidos: usuarios e interesados con autorización comercial para **ese canal**; canales genéricos de agencias prospecto; personas de agencias con registro de autorización (POL §17.1) | PRODUCTO (puerta de envío, A-14) |
+| 2 | Para destinatarios en Colombia, consultar el **Registro de Números Excluidos** de la CRC en las 24 horas anteriores al envío y excluir los canales inscritos; si la inscripción es posterior a la autorización, la autorización se tiene por revocada salvo una nueva | MANUAL (consulta en la plataforma de trámites de la CRC con la cuenta de Kauro) + PRODUCTO (marca la exclusión) |
+| 3 | Plantilla: remitente y asunto veraces, identificación clara como publicidad, dirección postal real, baja sin iniciar sesión | PRODUCTO (validación de plantilla, A-14) |
+| 4 | Horario para Colombia: lunes a viernes 7:00–19:00, sábados 8:00–15:00, nunca domingos ni festivos | PRODUCTO (ventana de envío) |
+| 5 | La baja se aplica de inmediato y sobrevive a reimportaciones y cambios de proveedor | PRODUCTO (registro de supresión de mensajería) |
+| 6 | Registrar la campaña: fecha, lista, resultado de la consulta al RNE, plantilla | MANUAL |
+<!-- law: C-50, C-51 (Ley 2300 de 2023 arts. 2, 3 y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 7356 de 2024, art. 2.1.18.1) · auth: 18 §Communication compliance; reference/MESSAGING_AND_SENDER_OPERATIONS.md · texto: POL §8.3, §17 · CHECKLIST A-14 -->
 
 ### 5.10. Formación
 
@@ -236,9 +259,10 @@ la SIC (evidencia de configuración y de pruebas).
 
 ## 7. Registro Nacional de Bases de Datos
 
-En la revisión anual, con el balance del año cerrado, el representante legal compara los activos totales con 100.000 UVT del año.
-Si los supera, inscribe las bases de la sección 4.1 en el plazo que fije la SIC y revisa si la resolución pendiente del Título V
-ya fue adoptada.
+Antes de iniciar operaciones (CHECKLIST A-16), y luego en cada revisión anual con el balance del año cerrado, el representante
+legal compara los activos totales de la sociedad, según su balance, con 100.000 UVT del año y archiva el balance usado y la fecha.
+No se presume que una sociedad recién constituida está por debajo. Si los supera, inscribe las bases de la sección 4.1 en el plazo
+que fije la SIC y revisa si la resolución pendiente del Título V ya fue adoptada.
 <!-- law: C-16 · CHECKLIST §6 (proyecto de resolución SIC de 2026-05-26) · ver LAWYER_LATER L-14 -->
 
 ## 8. Registros del programa
@@ -280,5 +304,5 @@ plataforma. Ninguno contiene contenido de CRM.
 
 Adoptado por el representante legal de Kauro Data S.A.S., que asume la función de oficial de protección de datos.
 
-Nombre: [representante legal] · Firma: ______________________ · Fecha: [fecha de vigencia]
-<!-- ver CHECKLIST A-03 y LAWYER_LATER F-06 -->
+Representante legal de Kauro Data S.A.S. (nombre al firmar, decisión D-16) · Firma: ______________________ · Fecha: [fecha de vigencia]
+<!-- ver CHECKLIST A-03 -->

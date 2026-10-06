@@ -96,8 +96,10 @@ supresiones que el Cliente le instruya y actualiza la información que el Client
 siguientes a su recibo; (e) permite el acceso solo a las personas autorizadas; (f) adopta un manual interno de políticas y
 procedimientos; (g) informa a la Superintendencia de Industria y Comercio las violaciones a los códigos de seguridad conforme a la
 sección 11; (h) cumple los requerimientos de la autoridad; y (i) cumple las obligaciones aplicables de las leyes de Estados Unidos
-de la sección 14 y otorga a los Datos del Cliente el mismo nivel de protección que esas leyes exigen.
-<!-- law: C-13 (Ley 1581 art. 18), C-21 (Decreto 1074 art. 2.2.2.25.5.2 numerales 1–3), C-62 -->
+de la sección 14 y otorga a los Datos del Cliente el mismo nivel de protección que esas leyes exigen; y (j) tramita los reclamos
+de los titulares, registra las leyendas "reclamo en trámite" e "información en discusión judicial" y se abstiene de hacer circular
+la información cuyo bloqueo ordene la Superintendencia de Industria y Comercio, conforme a la sección 12.
+<!-- law: C-13, C-13b (Ley 1581 art. 18 lit. e, g, h, i), C-21 (Decreto 1074 art. 2.2.2.25.5.2 numerales 1–3), C-62 -->
 
 ## 6. Confidencialidad del personal
 
@@ -126,7 +128,7 @@ de anticipación, la incorporación o el reemplazo de un subencargado que trate 
 datos y ubicación. El Cliente puede objetar por escrito, con motivos razonables de protección de datos, dentro de ese plazo. Si
 las partes no resuelven la objeción, el Cliente puede terminar los Pedidos afectados que no se hayan ejecutado y recibir el
 reembolso de lo pagado por ellos.
-<!-- auth: 19 §Subprocessor register ("Provider changes require data-flow and contract review, customer notice where applicable, technical qualification and an exit/deletion plan") · law: C-65 (Va. Code §59.1-579 B.5), C-66 (C.R.S. 6-1-1305(3)(b)) · resolución de silencio S-07 -->
+<!-- auth: 19 §Subprocessor register ("Provider changes require data-flow and contract review, customer notice where applicable, technical qualification and an exit/deletion plan") · law: C-66 (C.R.S. 6-1-1305(3)(b), texto 2026: oportunidad de objetar; Virginia B.5 exige solo contrato escrito, la objeción va más allá) · resolución de silencio S-07 -->
 
 8.3. **Lo que no son subencargados.** Los proveedores de pagos (PayPal, Wise) y el banco de Kauro actúan como responsables
 independientes de los datos de pago que tratan para sus propios fines regulados y no reciben Datos del Cliente. Los
@@ -160,12 +162,14 @@ de Estados Unidos, se aplicará la sección 8.2.
 
 ## 11. Incidentes de seguridad
 
-11.1. **Aviso al Cliente.** Kauro avisará al Cliente sin demora injustificada, y en todo caso dentro de las **setenta y dos (72)
-horas** siguientes a confirmar un incidente de seguridad que afecte Datos del Cliente (violación de los códigos de seguridad, o
-pérdida, robo o acceso no autorizado). El aviso inicial incluye lo que se sepa: alcance afectado, hechos conocidos, acción
-inmediata recomendada al Cliente, contención en curso y la fecha de la siguiente actualización. Kauro no espera a conocer la causa
-raíz completa para dar el aviso inicial y no afirma que no hubo exposición antes de comprobarlo.
-<!-- auth: 19 §Incident and breach obligations; 18 §Incident communication; 14 §Incident containment · resolución de silencio S-02 -->
+11.1. **Aviso al Cliente.** Kauro avisará al Cliente de inmediato y sin demora injustificada desde que descubra un incidente de
+seguridad que afecte Datos del Cliente (violación de los códigos de seguridad, o pérdida, robo, adquisición o acceso no
+autorizado) o tenga motivos razonables para creer que ocurrió, sin esperar a confirmarlo, y en todo caso dentro de las **setenta
+y dos (72) horas** siguientes a ese momento. Si una ley aplicable exige un aviso más temprano, ese plazo prevalece. El aviso
+inicial incluye lo que se sepa: alcance afectado, hechos conocidos, acción inmediata recomendada al Cliente, contención en curso
+y la fecha de la siguiente actualización; Kauro lo actualiza a medida que avanza la investigación. Kauro no espera a conocer la
+causa raíz para dar el aviso inicial y no afirma que no hubo exposición antes de comprobarlo.
+<!-- auth: 19 §Incident and breach obligations ("Do not wait for complete root cause if the applicable deadline requires action"); 18 §Incident communication; 14 §Incident containment · law: C-67 (Cal. Civ. Code §1798.82(b): "immediately following discovery"; Va. Code §18.2-186.6(D): "without unreasonable delay following discovery") · resolución de silencio S-02 (r2) -->
 
 11.2. **Asistencia.** Kauro entrega al Cliente la información razonablemente disponible (cronología, datos y titulares afectados
 en cuanto se conozcan, medidas adoptadas) para que el Cliente y el Cliente Final cumplan sus propias obligaciones de notificación
@@ -188,22 +192,38 @@ excepción permanente a la conservación.
 12.1. La Plataforma permite al Cliente consultar, corregir mediante una nueva Revisión, excluir y eliminar Datos del Cliente
 dentro de los plazos de conservación.
 
-12.2. Si Kauro recibe directamente una consulta, reclamo o solicitud de un titular sobre Datos del Cliente, no la responde en el
-fondo ni revela datos: la traslada al Cliente dentro de los dos (2) días hábiles siguientes, e informa al titular que la
-trasladó al responsable, salvo que el Cliente haya indicado otra cosa o que la ley obligue directamente a Kauro. Kauro autentica
-y delimita cualquier solicitud antes de revelar o eliminar algo.
-<!-- auth: 19 §Rights requests and privacy complaints · law: C-13 (art. 18 lit. e), C-17 (art. 15 num. 1: traslado en máximo dos días hábiles cuando quien recibe no es competente), C-62 (11 CCR §7051(a)(9)) -->
+12.2. **Consultas y reclamos recibidos por Kauro.** Si un titular presenta a Kauro una consulta o un reclamo sobre Datos del
+Cliente, Kauro: (a) autentica al solicitante y delimita la solicitud antes de revelar o eliminar algo; (b) identifica el proyecto
+y el responsable según la cadena registrada (sección 1.2) y, en la cadena agencia–cliente final, hace llegar la solicitud al
+Cliente Final por medio del Cliente; (c) recibido un reclamo completo, registra en los datos afectados la leyenda "reclamo en
+trámite" y su motivo dentro de los dos (2) días hábiles siguientes y la mantiene hasta que se decida; (d) traslada al responsable,
+dentro de los dos (2) días hábiles siguientes al recibo, lo que solo el responsable puede decidir, e informa del traslado al
+titular; (e) cumple sus propios deberes de encargado sin esperar al responsable, y ejecuta lo que el responsable decida dentro de
+los plazos legales (consultas: diez (10) días hábiles más cinco; reclamos: quince (15) días hábiles más ocho, avisando la prórroga
+antes del vencimiento del término inicial); y (f) si ya no conserva los datos, lo informa. Kauro no responde en el fondo por el
+responsable salvo instrucción del Cliente o deber legal propio.
+<!-- auth: 19 §Rights requests and privacy complaints · law: C-10, C-13, C-17 (Ley 1581 arts. 14, 15 y 18 lit. e, g) · CHECKLIST A-02, A-17 -->
 
 12.3. Kauro ayuda al Cliente, con medidas técnicas y organizativas apropiadas y en la medida de la información de que dispone, a
 responder las solicitudes de los titulares, a cumplir sus deberes de seguridad y a realizar evaluaciones de impacto o de riesgo
 que el Cliente deba documentar, entregándole la información necesaria sobre el tratamiento.
 <!-- law: C-62 (11 CCR §7051(a)(5), (9)), C-65 (Va. Code §59.1-579 A.1–A.3), C-66 (C.R.S. 6-1-1305(2)(a)–(c)) -->
 
+12.4. **Leyendas y bloqueo.** Cuando una autoridad competente notifique a Kauro, o el Cliente le informe que fue notificado, de un
+proceso judicial sobre la calidad de un dato, Kauro inserta en los datos afectados la leyenda "información en discusión judicial".
+Cuando la Superintendencia de Industria y Comercio ordene bloquear información controvertida por el titular, Kauro impide su
+circulación mientras dure la orden: bloquea descargas, publicación de Paquetes, envíos al modelo y nuevo procesamiento del alcance
+afectado, sin eliminar la información salvo que la orden lo disponga.
+<!-- auth: 19 §Rights requests and privacy complaints ("The agency/controller chain is identified"); 09 §Early deletion (bloqueos por alcance); 14 §Incident containment (controles independientes por alcance) · law: C-13, C-13b (Ley 1581 arts. 15 y 18 lit. e, g, h, i), C-17, C-62 (11 CCR §7051(a)(9)) · CHECKLIST A-02, A-17 -->
+
 ## 13. Supresión y devolución al terminar
 
-13.1. Kauro elimina los Datos del Cliente según el calendario de conservación del Anexo IV, al vencer cada plazo, cuando el
-Cliente pide la eliminación anticipada o cuando termina el contrato, lo que ocurra primero, salvo que una ley exija conservarlos.
-La devolución consiste en poner a disposición del Cliente la descarga de los Paquetes antes de su eliminación.
+13.1. Al terminar la prestación del servicio, o antes cuando lo pida, el Cliente, por su cuenta o por instrucción documentada del
+Cliente Final, elige si Kauro **devuelve** o **elimina** todos los Datos del Cliente que todavía conserve, incluidos los Archivos
+de origen aceptados y los derivados que contengan datos personales, salvo que una ley exija conservarlos. La devolución se hace
+por descarga segura en la Plataforma antes de la eliminación. Además, Kauro elimina los Datos del Cliente según el calendario de
+conservación del Anexo IV al vencer cada plazo, o cuando el Cliente pide la eliminación anticipada, lo que ocurra primero; la
+Plataforma avisa antes de cada eliminación para que el Cliente pueda descargar.
 
 13.2. Kauro emite un comprobante de eliminación por el alcance que controla, con el alcance pedido, la versión de la política,
 los plazos, la revocación de accesos, las generaciones de objetos enumeradas y los resultados de eliminación y de ausencia. El
@@ -212,7 +232,7 @@ Cliente.
 
 13.3. Cuando la ley obliga a conservar algún dato, Kauro lo conserva solo para ese fin, separado y sin contenido de CRM. Los
 registros financieros y de seguridad de Kauro no contienen Datos del Cliente.
-<!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I)) -->
+<!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule; 09 §Notifications and customer action · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I), texto 2026) · CHECKLIST A-15 -->
 
 ## 14. Términos para Clientes sujetos a leyes de privacidad de Estados Unidos
 
@@ -243,16 +263,23 @@ por su rol.
 
 ## 15. Información, auditoría y verificación
 
-15.1. Kauro pone a disposición del Cliente, a solicitud, la información necesaria para demostrar el cumplimiento de este
-Acuerdo: descripción vigente de medidas, lista de subencargados, comprobantes de eliminación, registro de accesos de soporte del
-Cliente y un cuestionario de seguridad respondido, una vez cada doce (12) meses o después de un incidente que afecte al Cliente.
+15.1. **Información.** A solicitud razonable del Cliente, Kauro pone a su disposición toda la información en su poder necesaria
+para demostrar el cumplimiento de este Acuerdo y de las leyes de la sección 14: entre otras, la descripción vigente de medidas,
+la lista de subencargados, los comprobantes de eliminación, el registro de accesos de soporte a los datos del Cliente y un
+cuestionario de seguridad respondido. No hay un límite fijo de solicitudes.
 
-15.2. Si esa información no basta razonablemente, el Cliente (o un auditor independiente obligado a confidencialidad que el
-Cliente designe y que no sea competidor de Kauro) puede realizar una evaluación razonable, con aviso de treinta (30) días, en
-horario hábil, a costo del Cliente, hasta una vez cada doce (12) meses salvo después de un incidente, y sin acceso a datos de
-otros clientes ni a secretos. Kauro puede, con consentimiento del Cliente, ofrecer en su lugar el informe de un auditor
-independiente calificado que use un marco de control aceptado.
-<!-- law: C-60 (§1798.100(d)(3)), C-61 (§1798.140(ag)(1)(D), evaluaciones al menos cada 12 meses), C-62 (11 CCR §7051(a)(6)), C-65 (Va. Code §59.1-579 B.3–B.4), C-66 (C.R.S. 6-1-1305(5)(d)(II)) -->
+15.2. **Auditorías e inspecciones.** Kauro permite y colabora con auditorías e inspecciones razonables del Cliente o del auditor
+que el Cliente designe. Por regla general se programan con treinta (30) días de aviso y en horario hábil, pero ese aviso se acorta
+a lo razonable cuando la auditoría responde a un requerimiento de una autoridad, a sospechas fundadas de incumplimiento, a un
+cambio material del tratamiento o a un incidente. Para proteger a otros clientes y la información confidencial de Kauro, el
+acceso se limita al alcance necesario y el auditor se obliga a confidencialidad; la información confidencial que se necesite como
+evidencia se entrega bajo esa confidencialidad, no se niega. Cada parte asume sus propios costos.
+
+15.3. **Auditoría independiente alternativa.** Con el consentimiento del Cliente, Kauro puede en su lugar contratar, al menos una
+vez al año y a su propio costo, a un auditor calificado e independiente que audite sus políticas y medidas técnicas y
+organizativas con un marco de control y un procedimiento de auditoría apropiados y aceptados, y entregará el informe al Cliente
+cuando lo pida.
+<!-- law: C-60 (§1798.100(d)(3)), C-61 (§1798.140(ag)(1)(D)), C-62 (11 CCR §§7050(h), 7051(a)(6)), C-65 (Va. Code §59.1-579 B.3–B.4), C-66 (C.R.S. 6-1-1305(5)(d)(II), texto 2026: auditoría alternativa anual a costo del encargado, con consentimiento) -->
 
 ## 16. Responsabilidad, vigencia y ley aplicable
 
@@ -333,11 +360,12 @@ Medidas existentes en el diseño aprobado del servicio. Kauro no declara certifi
 | Subencargado | Función | Datos del Cliente que recibe | Ubicación |
 |---|---|---|---|
 | Amazon Web Services, Inc. | Infraestructura de nube: cómputo, base de datos, almacenamiento de objetos, colas, gestión de secretos, identidad, registros y modelos de lenguaje mediante Amazon Bedrock. | Todos los Datos del Cliente que la Plataforma almacena o procesa; en Bedrock, solo el contexto minimizado del Anexo I, punto 2.4. | Regiones de AWS en Estados Unidos. |
-| Resend (proveedor de correo transaccional) | Envío de avisos del servicio a los usuarios del Cliente. | Ningún registro de CRM. Recibe datos de los usuarios del Cliente (correo, nombre) y el contenido mínimo del aviso; el proveedor conserva los datos de envío por un periodo propio (30 días en el plan observado). | Estados Unidos. |
 <!-- auth: amendments/A9_CLOUD_AWS.md §3 (servicios AWS) y §1 (Resend sin cambio); 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md (Resend: datos mínimos, retención de 30 días del plan observado) · fuentes: CHECKLIST V-01, V-05 -->
 
-Proveedores de Kauro que **no** son subencargados de Datos del Cliente: Google LLC (Google Workspace: correo corporativo de Kauro;
-el Cliente no debe enviar registros por correo), Cloudflare, Inc. (registro de dominio y DNS), PayPal y Wise (responsables
+Proveedores de Kauro que **no** son subencargados de Datos del Cliente: Resend (correo transaccional; es encargado de Kauro para
+los datos de los usuarios del Cliente —correo, nombre y contenido mínimo del aviso—, que según la sección 1.3 no son Datos del
+Cliente; no recibe registros de CRM y conserva los datos de envío por un periodo propio, 30 días en el plan observado), Google LLC
+(Google Workspace: correo corporativo de Kauro; el Cliente no debe enviar registros por correo), Cloudflare, Inc. (registro de dominio y DNS), PayPal y Wise (responsables
 independientes de datos de pago), Bancolombia (banco de Kauro) y el proveedor de facturación electrónica de Kauro (datos de
 facturación del Cliente, no Datos del Cliente). Google Cloud no se usa en producción.
 <!-- auth: A9 §1 (Google Workspace, Cloudflare, Resend sin cambio; GCP fuera del camino crítico); A4 §Owner acts (Cloudflare registrar y DNS); A8 §1; 15 §Accounting integration decision -->

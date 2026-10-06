@@ -172,8 +172,9 @@ que puede mostrarse a la SIC.
 
 ## 6. Información y derechos de los titulares (instrucción VII)
 
-Los titulares de E-01/E-02 ejercen sus derechos ante el Cliente (responsable); Kauro traslada en 2 días hábiles lo que reciba
-(INTERNAL_DATA_MANUAL §5.2). Kauro entrega al Cliente, a solicitud, este estudio y la descripción del tratamiento para que informe
+Los titulares de E-01/E-02 pueden ejercer sus derechos ante el Cliente (responsable) o ante Kauro; Kauro tramita lo que reciba
+como encargado, con sus leyendas y plazos, y traslada al responsable lo que solo él puede decidir (INTERNAL_DATA_MANUAL §5.2; DPA
+§12.2). Kauro entrega al Cliente, a solicitud, este estudio y la descripción del tratamiento para que informe
 a sus titulares y haga su propia evaluación (DPA §12.3).
 <!-- law: C-17, C-27 (instrucción VII) · texto: DPA §12 -->
 
@@ -199,5 +200,5 @@ Decisión: **APROBADO CON CONDICIONES** (sección 7).
 
 Representante legal y oficial de protección de datos de Kauro Data S.A.S.
 
-Nombre: [representante legal] · Firma: ______________________ · Fecha: ____________
-<!-- ver CHECKLIST A-04 y LAWYER_LATER F-06 -->
+Representante legal de Kauro Data S.A.S. (nombre al firmar, decisión D-16) · Firma: ______________________ · Fecha: ____________
+<!-- ver CHECKLIST A-04 -->

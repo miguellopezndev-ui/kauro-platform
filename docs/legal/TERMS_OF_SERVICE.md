@@ -199,8 +199,9 @@ sitio web modifica un Pedido existente.
 <!-- auth: 19 §Customer instrument hierarchy ("durable record"; "A later website edit does not silently amend an existing order") · law: C-30..C-34 (Ley 527 arts. 5, 14, 15; C. Co. arts. 824, 845, 864; Decreto 2364 de 2012) -->
 
 6.4. **Requisitos de compra.** Para comprar se requieren una aprobación vigente del Plan, datos disponibles, capacidad de
-procesamiento financiada, identidad de facturación y un medio de pago utilizable.
-<!-- auth: 02 §7 -->
+procesamiento financiada, identidad de facturación, la declaración del tipo de comprador de la sección 25.1 y un medio de pago
+utilizable.
+<!-- auth: 02 §7 · law: C-37 · CHECKLIST A-05 -->
 
 6.5. **Cambios de alcance.** Un nuevo alcance requiere un nuevo Pedido o una enmienda aceptada. Por defecto se permite un único
 reemplazo de origen antes de la ejecución, previa revalidación, si no ha empezado ninguna ejecución pagada y el nuevo alcance
@@ -310,7 +311,8 @@ procesamiento y recibe el reembolso del valor pagado. Las comisiones del proveed
 10.2. **Después del inicio del procesamiento.** La cancelación detiene el trabajo futuro y bloquea nuevas publicaciones, pero no
 puede deshacer trabajo ya transmitido ni una importación que el Cliente ya haya hecho. Kauro evalúa de buena fe la solicitud según
 la fase registrada y, cuando proceda, abona el valor a una nueva Revisión o lo reembolsa, y explica por escrito su decisión. Kauro
-no impone penalidades que no estén en estos Términos.
+no impone penalidades que no estén en estos Términos. Si el Cliente es consumidor, sus derechos legales de la sección 25
+(retracto, entrega y reversión del pago) prevalecen sobre esta evaluación y sobre cualquier abono.
 <!-- auth: 19 §Service terms (párrafo de cancelación); 01 CH-005; 15 §Refund policy and calculation ("does not invent a penalty"); 16 §Scope changes and credits ("Prior payment is credited or refunded through the ledger where appropriate") · resolución de silencio S-08 -->
 
 10.3. **Defecto de Kauro.** El remedio por defecto de Kauro se rige por la sección 11.
@@ -384,10 +386,15 @@ por un usuario autorizado antes de que venza, con propósito indicado; nunca sup
 contactar soporte o recibir recordatorios no extiende la conservación.
 <!-- auth: 09 §Quotes, reuploads and retention; registry/policy.json retention.softExtensionsPerProject = 1, softExtensionMaximumSeconds = 259200, extendHardCap = false -->
 
-13.3. **Devolución.** La devolución de los datos al Cliente se hace poniendo a su disposición la descarga del Paquete dentro de
-los plazos anteriores. Kauro no devuelve los Archivos de origen, que el Cliente ya tiene. Cada enlace de descarga firmado vence
-a los quince (15) minutos.
-<!-- auth: 09 §Notifications and customer action; 09 §Early deletion; registry/policy.json retention.signedDownloadSeconds = 900 · resolución de silencio S-11 -->
+13.3. **Devolución o eliminación a elección del responsable.** Al terminar la prestación del servicio, o antes cuando lo pida,
+el Cliente (por su propia cuenta o por instrucción de su Cliente Final) elige si Kauro le **devuelve** o **elimina** todos los
+datos personales de los Datos del Cliente que Kauro todavía conserve: los Archivos de origen aceptados, los Paquetes y los demás
+derivados que contengan datos personales (perfiles, excepciones, linaje, comprobantes de importación). La devolución se hace por
+descarga segura dentro de la Plataforma antes de la eliminación; después, Kauro elimina y entrega el comprobante de la sección
+13.4. Si el Cliente no elige, se aplica el calendario de la sección 13.1, que elimina los datos en plazos cortos; la Plataforma
+avisa la fecha de eliminación para que el Cliente pueda descargar antes. Lo que la ley obligue a conservar se conserva solo para
+ese fin. Cada enlace de descarga firmado vence a los quince (15) minutos.
+<!-- auth: 09 §Notifications and customer action; 09 §Early deletion; 09 §Deletion receipts and restoration; 19 §Data processing agreement ("return/deletion"); registry/policy.json retention.signedDownloadSeconds = 900 · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I), texto 2026) · resolución S-11 (r2) · CHECKLIST A-15 -->
 
 13.4. **Eliminación anticipada.** El Cliente puede pedir la eliminación anticipada de un proyecto o de un alcance. Kauro bloquea
 primero nuevas cargas, envíos al modelo, procesamientos, publicaciones y descargas, cancela los intentos activos y elimina todas
@@ -490,7 +497,7 @@ pagados y en curso al momento del aviso sin causa se terminan de prestar o se re
 
 19.4. **Efectos.** Al terminar, los datos del Cliente se eliminan según la sección 13 y el DPA, y se conservan solo los
 registros financieros, legales y de seguridad mínimos, separados y sin contenido de CRM. "Cuenta eliminada" no significa que
-desaparezcan las facturas que la ley obliga a conservar. Las secciones 13, 15, 16, 18, 22 y 23 sobreviven.
+desaparezcan las facturas que la ley obliga a conservar. Las secciones 13, 15, 16, 18, 22, 23 y 25 sobreviven.
 <!-- auth: 16 §Agency lifecycle ("Closing an agency stops new orders..."); 19 §Rights requests and privacy complaints (último párrafo); 09 §Retention schedule · resolución de silencio S-10 (plazos de aviso de terminación) -->
 
 ## 20. Vendedores y comunicaciones
@@ -502,9 +509,11 @@ emitida por la Plataforma. Los vendedores no reciben los informes con registros 
 
 20.2. Kauro envía al Cliente avisos transaccionales del servicio (cuenta, invitaciones, estado del pago, entrega, avisos de
 eliminación, soporte) a los usuarios registrados. Esos avisos no incluyen registros de CRM ni enlaces de descarga firmados; enlazan
-a la Plataforma. Las comunicaciones comerciales se envían solo con un mecanismo de baja que funciona, y la baja se respeta de
-inmediato.
-<!-- auth: 09 §Notifications and customer action; reference/MESSAGING_AND_SENDER_OPERATIONS.md (Resend, solo transaccional; suppression); 18 §Communication compliance · law: C-50, C-51 -->
+a la Plataforma. Las comunicaciones comerciales a los Usuarios autorizados se envían solo a quienes las autorizaron por separado
+y por los canales que autorizaron, con las reglas de la sección 17 de la Política de Tratamiento (identificación como
+publicidad, consulta del Registro de Números Excluidos para destinatarios en Colombia, horario legal y baja inmediata). Aceptar
+estos Términos no implica aceptar publicidad.
+<!-- auth: 09 §Notifications and customer action; reference/MESSAGING_AND_SENDER_OPERATIONS.md (Resend, solo transaccional; suppression); 18 §Communication compliance · law: C-50, C-51, C-52 · CHECKLIST A-14 -->
 
 ## 21. Cambios a estos Términos
 
@@ -519,12 +528,13 @@ su cuenta sin costo antes de que rija.
 22.1. Estos Términos y cada Pedido se rigen por las leyes de la República de Colombia.
 
 22.2. Las partes intentarán resolver cualquier controversia mediante negociación directa durante treinta (30) días calendario
-desde el aviso escrito de una de ellas. Si no la resuelven, la controversia se someterá a los jueces competentes de la República
-de Colombia con sede en la ciudad del domicilio de Kauro, [domicilio].
+desde el aviso escrito de una de ellas. Esa etapa no impide pedir medidas urgentes ni presentar una acción antes de que caduque o
+prescriba. Si no la resuelven, la controversia se someterá a los jueces competentes conforme a las reglas legales de jurisdicción
+y competencia aplicables.
 
 22.3. Nada de lo anterior impide a un titular de datos o a una autoridad ejercer los derechos o competencias que la ley les
 otorga, ni al Cliente acudir a la Superintendencia de Industria y Comercio cuando la ley lo permita.
-<!-- auth: 19 §Service terms ("Liability limits, exclusions, governing law, forum, dispute procedure and any indemnity require application to the actual operator..."; "no ... invented foreign jurisdiction") · ver LAWYER_LATER L-05 -->
+<!-- auth: 19 §Service terms ("Liability limits, exclusions, governing law, forum, dispute procedure and any indemnity require application to the actual operator..."; "no ... invented foreign jurisdiction") · law: C-42 (Código General del Proceso art. 28 num. 3: la estipulación de domicilio contractual para efectos judiciales se tiene por no escrita) · ver LAWYER_LATER L-05 (arbitraje o reconocimiento en EE. UU.) -->
 
 ## 23. Notificaciones
 
@@ -552,6 +562,51 @@ versión en español, salvo para el DPA, cuya versión en inglés tiene el mismo
 24.5. **Integridad y divisibilidad.** Los documentos de la sección 1.3 son el acuerdo completo entre las partes sobre su objeto.
 Si una disposición resulta inválida, las demás conservan su efecto y la inválida se reemplaza por la válida más cercana a su
 propósito.
+
+## 25. Clientes que son consumidores
+
+25.1. **Declaración del tipo de comprador.** Antes de pagar, el Cliente declara en la Plataforma si adquiere el servicio para una
+necesidad intrínsecamente ligada a su actividad económica (por ejemplo, una agencia que prepara datos para los proyectos de sus
+clientes) o como destinatario final para una necesidad que no lo está. Kauro no presume que un Cliente no es consumidor. Si el
+Cliente es consumidor según el artículo 5, numeral 3, de la Ley 1480 de 2011, se aplica esta sección cualquiera que haya sido su
+declaración, y ninguna otra disposición de estos Términos limita los derechos que esa ley le da.
+
+25.2. **Información antes de comprar.** La Plataforma informa, antes de la compra y en el mismo medio: la identidad de Kauro
+(sección 1.1); la descripción del servicio (secciones 3 y 7.6, el Plan y la Cotización); el precio total con todos los impuestos
+y costos; los medios de pago; el plazo de prestación del servicio que indica la Cotización; la vigencia de la oferta; y el
+derecho de retracto con el procedimiento para ejercerlo. Estos Términos y los demás documentos del contrato pueden consultarse,
+imprimirse y descargarse en todo momento, antes y después de la compra.
+
+25.3. **Resumen y aceptación.** Antes de terminar la compra, la Plataforma muestra un resumen del Pedido (servicio, modo, unidades,
+precio, impuestos y total) que el Cliente puede corregir o cancelar y descargar. La aceptación es expresa y queda registrada.
+
+25.4. **Acuse de recibo.** A más tardar el día calendario siguiente al Pedido, Kauro envía un acuse de recibo con el plazo de
+prestación, el precio exacto con impuestos y la forma de pago.
+
+25.5. **Retracto.** El consumidor puede retractarse dentro de los cinco (5) días hábiles siguientes a la celebración del contrato,
+desde la Plataforma o escribiendo a [correo de notificaciones] con la referencia del Pedido. El contrato se resuelve y Kauro
+devuelve todo lo pagado, sin descuentos, por el mismo medio de pago o por el que acuerden, dentro de los quince (15) días
+calendario siguientes al ejercicio del derecho, una vez el consumidor entregue los datos correctos que se le pidan para hacerlo.
+El retracto no procede si la prestación del servicio ya comenzó con el acuerdo del consumidor: por eso, dentro de esos cinco días
+Kauro solo empieza el procesamiento pagado si el consumidor lo pide de forma expresa en la Plataforma después de ser informado de
+que con ello pierde el retracto; si no lo pide, Kauro espera a que venza el plazo.
+
+25.6. **Plazo de prestación.** Kauro presta el servicio dentro del plazo aceptado en la Cotización o, si no se indicó, dentro de los
+treinta (30) días calendario siguientes al Pedido. Si lo supera, el consumidor puede terminar el contrato y recibir la devolución
+de todo lo pagado dentro de los quince (15) días calendario siguientes.
+
+25.7. **Reversión del pago.** En los casos y condiciones del artículo 51 de la Ley 1480 de 2011 (pago electrónico, fraude,
+operación no solicitada, servicio no recibido o que no corresponde a lo pedido o es defectuoso), el consumidor puede pedir la
+reversión del pago presentando queja a Kauro y avisando al emisor del instrumento de pago dentro de los cinco (5) días hábiles
+siguientes a la fecha en que tuvo noticia del hecho.
+
+25.8. **Peticiones, quejas y reclamos.** La Plataforma ofrece un canal de atención que entrega un número de radicado con la fecha y
+la hora de cada petición, queja o reclamo y permite hacerle seguimiento. El sitio y la Plataforma muestran un enlace visible a la
+Superintendencia de Industria y Comercio (www.sic.gov.co).
+
+25.9. **Garantía y remedios.** La sección 11 no reduce la garantía legal de los servicios ni los demás derechos irrenunciables del
+consumidor; los derechos de esta sección prevalecen sobre cualquier abono o evaluación discrecional de la sección 10.
+<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024— y 51) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
 
 ## Anexo A. Tarifa de referencia (USD, antes de impuestos)
 

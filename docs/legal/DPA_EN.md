@@ -89,8 +89,11 @@ Annex II; (c) keeps confidentiality; (d) carries out in time the updates, rectif
 updates information reported by the Customer within five (5) business days of receipt; (e) allows access only to authorized
 persons; (f) maintains an internal manual of policies and procedures; (g) reports breaches of security codes to the Colombian
 Superintendence of Industry and Commerce (SIC) under section 11; (h) complies with the authority's requests; and (i) complies with
-the applicable US obligations in section 14 and gives Customer Data the same level of protection those laws require.
-<!-- law: C-13, C-21, C-62 -->
+the applicable US obligations in section 14 and gives Customer Data the same level of protection those laws require; and (j)
+handles data subjects' claims, records the "reclamo en trámite" (claim in progress) and "información en discusión judicial"
+(information under judicial dispute) legends and refrains from circulating information whose blocking the SIC has ordered, as set
+out in section 12.
+<!-- law: C-13, C-13b, C-21, C-62 -->
 
 ## 6. Personnel confidentiality
 
@@ -117,7 +120,7 @@ equivalent to this Agreement, including those required by section 14, and remain
 advance of adding or replacing a sub-processor that processes Customer Data, stating the entity, function, data and location. The
 Customer may object in writing, on reasonable data-protection grounds, within that period. If the parties cannot resolve the
 objection, the Customer may terminate the affected Orders not yet executed and receive a refund of what it paid for them.
-<!-- auth: 19 §Subprocessor register · law: C-65, C-66 -->
+<!-- auth: 19 §Subprocessor register · law: C-66 (C.R.S. 6-1-1305(3)(b), 2026 text: opportunity to object; Virginia B.5 requires only a written contract, the objection right goes further) -->
 
 8.3. **Who is not a sub-processor.** Payment providers (PayPal, Wise) and Kauro's bank act as independent controllers of the
 payment data they process for their own regulated purposes and do not receive Customer Data. Kauro's sales collaborators do not
@@ -150,12 +153,14 @@ United States, section 8.2 applies.
 
 ## 11. Security incidents
 
-11.1. **Notice to the Customer.** Kauro will notify the Customer without undue delay, and in any case within **seventy-two (72)
-hours** of confirming a security incident affecting Customer Data (breach of security codes, or loss, theft or unauthorized
-access). The initial notice includes what is known: affected scope, known facts, immediate action recommended to the Customer,
-containment under way and the date of the next update. Kauro does not wait for a complete root cause before the initial notice
-and does not claim there was no exposure before checking.
-<!-- auth: 19 §Incident and breach obligations; 18 §Incident communication; 14 §Incident containment -->
+11.1. **Notice to the Customer.** Kauro will notify the Customer immediately and without undue delay after it discovers a
+security incident affecting Customer Data (breach of security codes, or loss, theft, unauthorized acquisition or access) or has a
+reasonable belief that one occurred, without waiting for confirmation, and in any case within **seventy-two (72) hours** of that
+moment. If an applicable law requires earlier notice, that deadline prevails. The initial notice includes what is known: affected
+scope, known facts, immediate action recommended to the Customer, containment under way and the date of the next update; Kauro
+updates it as the investigation progresses. Kauro does not wait for a root cause before the initial notice and does not claim
+there was no exposure before checking.
+<!-- auth: 19 §Incident and breach obligations; 18 §Incident communication; 14 §Incident containment · law: C-67 · resolution S-02 (r2) -->
 
 11.2. **Assistance.** Kauro gives the Customer the information reasonably available (timeline, affected data and data subjects as
 they become known, measures taken) so that the Customer and the End Client can meet their own obligations to notify data
@@ -178,22 +183,38 @@ exception to retention.
 12.1. The Platform lets the Customer view, correct (through a new Revision), exclude and delete Customer Data within the
 retention periods.
 
-12.2. If Kauro receives a request or complaint from a data subject about Customer Data, it does not answer it on the merits or
-disclose data: it forwards it to the Customer within two (2) business days and tells the data subject that it was forwarded to
-the controller, unless the Customer has instructed otherwise or the law obliges Kauro directly. Kauro authenticates and scopes any
-request before disclosing or deleting anything.
-<!-- auth: 19 §Rights requests and privacy complaints · law: C-13, C-17, C-62 -->
+12.2. **Queries and claims received by Kauro.** If a data subject submits a query or claim about Customer Data to Kauro, Kauro:
+(a) authenticates the requester and scopes the request before disclosing or deleting anything; (b) identifies the project and the
+controller from the registered chain (section 1.2) and, in the agency–end client chain, routes the request to the End Client
+through the Customer; (c) once a complete claim is received, records the legend "reclamo en trámite" (claim in progress) and its
+reason on the affected data within two (2) business days and keeps it until the claim is decided; (d) forwards to the controller,
+within two (2) business days of receipt, whatever only the controller can decide, and informs the data subject of the referral;
+(e) performs its own duties as processor without waiting for the controller, and executes the controller's decision within the
+statutory periods (queries: ten (10) business days plus five; claims: fifteen (15) business days plus eight, notifying any
+extension before the initial period expires); and (f) if it no longer holds the data, says so. Kauro does not answer on the merits
+for the controller unless the Customer instructs it or the law obliges Kauro directly.
+<!-- auth: 19 §Rights requests and privacy complaints · law: C-10, C-13, C-17 · CHECKLIST A-02, A-17 -->
 
 12.3. Kauro helps the Customer, through appropriate technical and organizational measures and to the extent of the information
 available to it, to respond to data-subject requests, to meet its security obligations and to carry out impact or risk
 assessments the Customer must document, by giving it the necessary information about the processing.
 <!-- law: C-62, C-65, C-66 -->
 
+12.4. **Legends and blocking.** When a competent authority notifies Kauro, or the Customer informs Kauro that it has been
+notified, of judicial proceedings about the quality of a datum, Kauro inserts the legend "información en discusión judicial"
+(information under judicial dispute) on the affected data. When the SIC orders the blocking of information disputed by the data
+subject, Kauro prevents its circulation while the order lasts: it blocks downloads, Package publication, model dispatch and new
+processing of the affected scope, without deleting the information unless the order says so.
+<!-- auth: 19 §Rights requests and privacy complaints; 09 §Early deletion; 14 §Incident containment · law: C-13, C-13b, C-17, C-62 · CHECKLIST A-02, A-17 -->
+
 ## 13. Deletion and return at the end
 
-13.1. Kauro deletes Customer Data according to the retention schedule in Annex IV, when each period ends, when the Customer
-requests early deletion or when the contract ends, whichever comes first, unless a law requires retention. Return consists of
-making the Packages available for the Customer to download before deletion.
+13.1. At the end of the provision of services, or earlier on request, the Customer, on its own behalf or on the End Client's
+documented instruction, chooses whether Kauro **returns** or **deletes** all Customer Data it still holds, including the accepted
+source Files and any derivatives that contain personal data, unless a law requires retention. Return is by secure download in the
+Platform before deletion. In addition, Kauro deletes Customer Data according to the retention schedule in Annex IV when each
+period ends, or when the Customer requests early deletion, whichever comes first; the Platform gives notice before each deletion
+so the Customer can download.
 
 13.2. Kauro issues a deletion receipt for the scope it controls, with the requested scope, policy version, deadlines, access
 revocation, enumerated object generations and deletion and absence results. The receipt contains no values of deleted records and
@@ -201,7 +222,7 @@ does not cover copies already downloaded or imports made by the Customer.
 
 13.3. Where the law requires keeping some data, Kauro keeps it only for that purpose, separately and without CRM content. Kauro's
 financial and security records contain no Customer Data.
-<!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule · law: C-65, C-66 -->
+<!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule; 09 §Notifications and customer action · law: C-65, C-66 · CHECKLIST A-15 -->
 
 ## 14. Terms for Customers subject to US privacy laws
 
@@ -232,16 +253,23 @@ virtue of their role.
 
 ## 15. Information, audit and verification
 
-15.1. On request, Kauro makes available to the Customer the information needed to demonstrate compliance with this Agreement:
-current description of measures, sub-processor list, deletion receipts, the log of support access to the Customer's data and a
-completed security questionnaire, once every twelve (12) months or after an incident affecting the Customer.
+15.1. **Information.** Upon the Customer's reasonable request, Kauro makes available all information in its possession necessary
+to demonstrate compliance with this Agreement and with the laws in section 14, including the current description of measures, the
+sub-processor list, deletion receipts, the log of support access to the Customer's data and a completed security questionnaire.
+There is no fixed limit on the number of requests.
 
-15.2. If that information is not reasonably sufficient, the Customer (or an independent auditor bound by confidentiality,
-appointed by the Customer and not a competitor of Kauro) may carry out a reasonable assessment, on thirty (30) days' notice,
-during business hours, at the Customer's cost, up to once every twelve (12) months except after an incident, and without access to
-other customers' data or to secrets. With the Customer's consent, Kauro may instead provide the report of a qualified independent
-auditor using an accepted control framework.
-<!-- law: C-60, C-61, C-62, C-65, C-66 -->
+15.2. **Audits and inspections.** Kauro allows for and contributes to reasonable audits and inspections by the Customer or the
+Customer's designated auditor. As a routine arrangement they are scheduled on thirty (30) days' notice during business hours, but
+the notice is shortened to what is reasonable when the audit responds to a regulator's request, credible suspicion of
+non-compliance, a material change in processing or an incident. To protect other customers and Kauro's confidential information,
+access is limited to the necessary scope and the auditor is bound by confidentiality; confidential information needed as evidence
+is provided under that confidentiality, not withheld. Each party bears its own costs.
+
+15.3. **Alternative independent audit.** With the Customer's consent, Kauro may instead arrange for a qualified and independent
+auditor to audit, at least annually and at Kauro's expense, its policies and technical and organizational measures using an
+appropriate and accepted control standard or framework and audit procedure, and will provide the audit report to the Customer upon
+request.
+<!-- law: C-60, C-61, C-62 (11 CCR §§7050(h), 7051(a)(6)), C-65, C-66 (C.R.S. 6-1-1305(5)(d)(II), 2026 text) -->
 
 ## 16. Liability, term and governing law
 
@@ -320,10 +348,11 @@ Measures that exist in the approved service design. Kauro does not claim certifi
 | Sub-processor | Function | Customer Data received | Location |
 |---|---|---|---|
 | Amazon Web Services, Inc. | Cloud infrastructure: compute, database, object storage, queues, secrets management, identity, logging and language models through Amazon Bedrock. | All Customer Data the Platform stores or processes; on Bedrock, only the minimized context of Annex I, item 2.4. | AWS regions in the United States. |
-| Resend (transactional email provider) | Sending service notices to the Customer's users. | No CRM records. Receives the Customer's users' data (email, name) and the minimal notice content; the provider keeps sending data for its own period (30 days on the observed plan). | United States. |
 
-Kauro providers that are **not** sub-processors of Customer Data: Google LLC (Google Workspace: Kauro's corporate email; the
-Customer must not send records by email), Cloudflare, Inc. (domain registration and DNS), PayPal and Wise (independent controllers
+Kauro providers that are **not** sub-processors of Customer Data: Resend (transactional email; Kauro's processor for the
+Customer's users' data —email, name and minimal notice content—, which under section 1.3 is not Customer Data; it receives no CRM
+records and keeps sending data for its own period, 30 days on the observed plan), Google LLC (Google Workspace: Kauro's corporate
+email; the Customer must not send records by email), Cloudflare, Inc. (domain registration and DNS), PayPal and Wise (independent controllers
 of payment data), Bancolombia (Kauro's bank) and Kauro's e-invoicing provider (Customer billing data, not Customer Data). Google
 Cloud is not used in production.
 
