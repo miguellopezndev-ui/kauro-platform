@@ -219,7 +219,7 @@ faultCell(
     id: "INSPECT_FAIL",
     step: "CMD043 CloseAgency / TIMEOUT: W0 ActiveWorkInspector waiting on a lock another session holds",
     fault: "timeout",
-    expect: "RACE (timeout): an inspector whose read waits on a lock another session holds ends, once the call bound elapses, in a retriable refusal within the bound, nothing withdrawn and no closure, and its abandoned call fails late instead of running on a pooled connection; a timed-out inventory is never read as zero",
+    expect: "RACE (timeout): an inspector whose read waits on a lock another session holds ends, once the call bound elapses, in a retriable refusal within the bound, nothing withdrawn and no closure, and the abandoned call's late failure reaches the late-failure sink instead of being swallowed (the destroy of the abandoned unit's connection is proved on a real pool by packages/persistence/test/adapters-unit-of-work.test.ts: routed connections are harness-owned); a timed-out inventory is never read as zero",
   },
   async (ctx) => {
     const x = await twoClients("inspect-fail-timeout");
@@ -245,8 +245,10 @@ faultCell(
       });
       assert.equal(reply.status, 503, `a retriable refusal: ${reply.text}`);
       assert.equal(outcome(iw.w, reply), "503 CAPACITY_UNAVAILABLE -");
-      // the pool destroys the abandoned unit's connection (client.release(error), proved on a real pool in adapters-unit-of-work.test.ts): here the
-      // harness connection is ended, so the inspector's statement still waiting on the lock fails there and is reported, never answered
+      // this cell does NOT exercise the destroy: the routed release is a no-op (fault-support.ts) and the harness owns the connection. The destroy of
+      // an abandoned unit's connection (client.release(error)) is proved on a real pool in adapters-unit-of-work.test.ts. Here the cell ends the
+      // connection itself, to cause the late failure of the statement still waiting on the lock; what it asserts is that the failure is reported
+      // to the sink (not swallowed) and that the skipped ROLLBACK did not queue behind the abandoned read (the 503 above came within the bound)
       await conn.end();
       for (let i = 0; iw.lateFailures.length === lateBefore; i++) {
         assert.ok(i < 1_000, "the abandoned inspector call failed and was reported");
