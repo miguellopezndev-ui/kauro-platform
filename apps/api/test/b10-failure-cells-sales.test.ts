@@ -17,7 +17,7 @@ import { bindCells, contend, converting, open, runConsumer, type Actor } from ".
 import type { SqlStep } from "./fault-support.js";
 import { prepareAllocation, recordClaimEvidence, recordSourceEvidence } from "./sales-support.js";
 import { candidateSeller } from "./sellers-support.js";
-import { call, completed, freshKey, outcome, type Person, type Reply } from "./support.js";
+import { call, completed, freshKey, ids, outcome, type Person, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -37,6 +37,14 @@ const said = (reply: Reply): string => (reply.status < 300 ? String(reply.status
 const valueOf = <T>(r: PromiseSettledResult<T>, what: string): T => {
   if (r.status === "rejected") throw new Error(`${what} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`, { cause: r.reason });
   return r.value;
+};
+/** Runs `fn`, then `then` whatever it did (a pause released after its waiter was observed, or failed to be). */
+const afterward = async <T>(fn: () => Promise<T>, then: () => void): Promise<T> => {
+  try {
+    return await fn();
+  } finally {
+    then();
+  }
 };
 const journalState = async (key: string): Promise<string | null> => (await iw.w.journal(key))?.state ?? null;
 const routed = (ctx: Pick<FaultContext, "points">, conn: HarnessConnection, steps: ReadonlyArray<SqlStep>, request: () => Promise<Reply>): Promise<Reply> => iw.faults.on(conn, "kauro_app", ctx.points, steps, request);
@@ -177,7 +185,8 @@ faultCell(
 // TERM_ACCEPT: TerminateSeller racing AcceptAttribution of the seller's claim, in both orders
 // =====================================================================================================================================
 
-const REFUSED_ACCEPTANCE = /^409 PRECONDITION_FAILED (SELLER_NOT_ACTIVE|CLAIM_NOT_REVIEWABLE|CLAIM_EXPIRED)$/;
+/** A refused acceptance: the claim moved on (its expected version is stale), the seller is not ACTIVE, or the claim is no longer under review. */
+const REFUSED_ACCEPTANCE = /^409 (PRECONDITION_FAILED (SELLER_NOT_ACTIVE|CLAIM_NOT_REVIEWABLE|CLAIM_EXPIRED)|STALE_VERSION -)$/;
 
 faultCell(
   {
@@ -185,7 +194,7 @@ faultCell(
     step: "CMD047 AcceptAttribution / REVOCATION: W allocation + shares + claims state + pools terms (one COMMIT)",
     fault: "revocation",
     expect:
-      "RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders with the lock wait observed: an acceptance that committed first is ruled by the termination (its claim, not in the manifest, EXPIRED with the seller: no live share, no tail, no entitlement for the TERMINATED seller); an acceptance that waited on the termination is refused 409 (SELLER_NOT_ACTIVE or the claim no longer under review) with the allocation unfrozen; every acceptance after the termination is refused the same way",
+      "RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders with the lock wait observed: an acceptance that committed first is ruled by the termination (its claim, not in the manifest, EXPIRED with the seller: no live share, no tail, no entitlement for the TERMINATED seller); an acceptance that waited on the termination is refused 409 (STALE_VERSION of the claim the termination moved on, SELLER_NOT_ACTIVE or the claim no longer under review) with the allocation unfrozen; every acceptance after the termination is refused the same way",
   },
   async (ctx) => {
     for (const order of ["ACCEPT_FIRST", "TERMINATION_FIRST"] as const) {
@@ -313,12 +322,7 @@ faultCell(
       try {
         await pause.reachedBy(delivering);
         const holder = await designationHolder(x.agencyId);
-        let waiting: { readonly pending: Promise<PromiseSettledResult<Reply>> } | undefined;
-        try {
-          waiting = await ctx.mustWait(iw.h.oracle, { waiter: wc, holder }, (conn) => routed(ctx, conn, [], () => terminate(x.s.sellerId, freshKey("tail-race-1"), x.body)), "TerminateSeller while the designation holds the agency");
-        } finally {
-          pause.release();
-        }
+        const waiting = await afterward(() => ctx.mustWait(iw.h.oracle, { waiter: wc, holder }, (conn) => routed(ctx, conn, [], () => terminate(x.s.sellerId, freshKey("tail-race-1"), x.body)), "TerminateSeller while the designation holds the agency"), () => pause.release());
         assert.equal(completed<WebhookAck>((await delivering).reply, 200).data.inboxState, "APPLIED");
         assert.equal(said(valueOf(await waiting.pending, "TerminateSeller")), "409 PRECONDITION_FAILED TAIL_NOT_ENUMERATED", "a manifest entry of an agency that bought is not enumerable");
       } finally {
@@ -443,12 +447,7 @@ async function holdAndWait<W>(ctx: FaultContext, what: string, holder: { readonl
     const pause = ctx.points.pause(at);
     const holding = ctx.operation(`${what} (holder)`, () => holder.run(hc));
     await pause.reachedBy(holding);
-    let waiting: { readonly pending: Promise<PromiseSettledResult<W>> };
-    try {
-      waiting = await ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(hc) }, waiter, what);
-    } finally {
-      pause.release();
-    }
+    const waiting = await afterward(() => ctx.mustWait(iw.h.oracle, { waiter: waiterConn, holder: connectionPid(hc) }, waiter, what), () => pause.release());
     const held = await holding;
     return { held, waited: await waiting.pending };
   } finally {
@@ -477,7 +476,7 @@ faultCell(
         await pc.end();
       }
       assert.equal((await sellerRow(c.sellerId)).state, "ACTIVE");
-      const after = await registerProspect(c.person, freshKey("ident-race-1-after"), { organizationLabel: "ident-race-after.example", businessContactRef: "x", sourceEvidenceHash: "0".repeat(64), jurisdiction: "United States" });
+      const after = await registerProspect(c.person, freshKey("ident-race-1-after"), { organizationLabel: "ident-race-after.example", businessContactRef: ids.next(), sourceEvidenceHash: "0".repeat(64), jurisdiction: "United States" });
       assert.equal(said(after), "403 NOT_AUTHORIZED IDENTITY_DISABLED", "the activated seller of a disabled identity acts on nothing");
     }
     // identity disabled first (uncommitted): the activation waits on the identity's lock, then is refused

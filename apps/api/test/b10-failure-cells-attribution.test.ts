@@ -38,6 +38,14 @@ const valueOf = <T>(r: PromiseSettledResult<T>, what: string): T => {
   if (r.status === "rejected") throw new Error(`${what} failed: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`, { cause: r.reason });
   return r.value;
 };
+/** Runs `fn`, then `then` whatever it did (a pause released after its waiter was observed, or failed to be). */
+const afterward = async <T>(fn: () => Promise<T>, then: () => void): Promise<T> => {
+  try {
+    return await fn();
+  } finally {
+    then();
+  }
+};
 const journalState = async (key: string): Promise<string | null> => (await iw.w.journal(key))?.state ?? null;
 
 /** Runs `run` as the cell's partial operation: a 500 of the route is the failure it hid (a crash is not a DomainFailure). */
@@ -186,8 +194,8 @@ faultCell(
     const evidenceHash = await recordClaimEvidence(iw.h, s, prospect.prospectId);
     const body = { evidenceHash, agreementVersion: s.agreementVersion };
     const key = freshKey("pros-par-claim");
-    const claims = async (): Promise<ReadonlyArray<{ state: string; version: string; hours: string }>> =>
-      oracleRows(iw, "SELECT state, version::text, (extract(epoch FROM review_deadline_at - submitted_at) / 3600)::text AS hours FROM kauro.attribution_claims WHERE prospect_id = $1 AND seller_id = $2", [prospect.prospectId, s.sellerId]);
+    const claims = async (): Promise<ReadonlyArray<{ state: string; version: string; exact: boolean }>> =>
+      oracleRows(iw, "SELECT state, version::text, (review_deadline_at - submitted_at = interval '2160 hours') AS exact FROM kauro.attribution_claims WHERE prospect_id = $1 AND seller_id = $2", [prospect.prospectId, s.sellerId]);
 
     await failsAt(ctx, "ClaimProspect failing after its claim insert and before its journal's COMMITTED write", "db.journal_commit.before", (conn) =>
       routed(ctx, conn, [CLAIM_INSERT, JOURNAL_COMMIT], () => claimProspect(s.person, prospect.prospectId, key, body)),
@@ -198,7 +206,7 @@ faultCell(
 
     const retried = completed<{ state: string }>(await claimProspect(s.person, prospect.prospectId, key, body), 201);
     assert.deepEqual([retried.replayed, retried.data.state], [false, "SUBMITTED"]);
-    assert.deepEqual(await claims(), [{ state: "SUBMITTED", version: "1", hours: "2160" }], "exactly one SUBMITTED claim, its review deadline 2160 hours after its submission");
+    assert.deepEqual(await claims(), [{ state: "SUBMITTED", version: "1", exact: true }], "exactly one SUBMITTED claim, its review deadline 2160 hours after its submission");
   },
 );
 
@@ -405,41 +413,43 @@ faultCell(
 
 const LAPSE_UPDATE = (claimId: string): SqlStep => ({ label: "lapse_update", match: /UPDATE kauro\.attribution_claims AS c SET/, when: (params) => params[0] === claimId });
 
-/**
- * The two orders of the race. Lapse first: the claim's deadline passed a second ago, the sweep holds the claim right after writing it
- * EXPIRED and the acceptance is observed waiting on the claims lock. Acceptance first: the claim is due 30 s from now, the acceptance (now,
- * inside the review window) holds at its COMMIT and the sweep, standing a second past the deadline, is observed waiting on the claim.
- */
-async function lapseRace(ctx: FaultContext, label: string): Promise<{
-  readonly lapseFirst: { readonly accept: string; readonly item: string | undefined; readonly claim: ClaimRow; readonly frozen: boolean };
-  readonly acceptFirst: { readonly accept: string; readonly item: string | undefined; readonly claim: ClaimRow; readonly frozen: boolean };
-}> {
+interface LapseOutcome {
+  readonly accept: string;
+  readonly item: string | undefined;
+  readonly claim: ClaimRow;
+  readonly frozen: boolean;
+}
+type Itemized = { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> };
+const sweepOf = (ctx: FaultContext, claimId: string, at?: string): Actor => ({ name: "the CLAIM_WINDOWS pass", login: "kauro_commission_test", holdAt: "db.lapse_update.after", run: (conn) => sweepOn(ctx, conn, "CLAIM_WINDOWS", [LAPSE_UPDATE(claimId)], at) });
+const acceptOf = (ctx: FaultContext, label: string, o: { readonly claimId: string; readonly allocationId: string }): Actor => ({
+  name: "AcceptAttribution",
+  login: "kauro_app_test",
+  holdAt: "uow.before-commit",
+  run: (conn) => routed(ctx, conn, [], () => acceptClaim(o.claimId, o.allocationId, freshKey(label))),
+});
+
+/** Lapse first: the claim's deadline passed a second ago, the sweep holds the claim right after writing it EXPIRED and the acceptance is observed waiting on the claims lock. */
+async function lapseFirst(ctx: FaultContext, label: string): Promise<LapseOutcome> {
   const lapsed = await dueOpportunity(`${label}-lapse-first`, -1);
-  const sweepOf = (claimId: string, at?: string): Actor => ({ name: "the CLAIM_WINDOWS pass", login: "kauro_commission_test", holdAt: "db.lapse_update.after", run: (conn) => sweepOn(ctx, conn, "CLAIM_WINDOWS", [LAPSE_UPDATE(claimId)], at) });
-  const acceptOf = (o: { readonly claimId: string; readonly allocationId: string }): Actor => ({
-    name: "AcceptAttribution",
-    login: "kauro_app_test",
-    holdAt: "uow.before-commit",
-    run: (conn) => routed(ctx, conn, [], () => acceptClaim(o.claimId, o.allocationId, freshKey(label))),
-  });
-  const one = await contend(ctx, sweepOf(lapsed.claimId), acceptOf(lapsed), "the lapse holds the claim, the acceptance waits");
-  const lapseFirst = {
+  const one = await contend(ctx, sweepOf(ctx, lapsed.claimId), acceptOf(ctx, label, lapsed), "the lapse holds the claim, the acceptance waits");
+  return {
     accept: said(valueOf(one.waiter as PromiseSettledResult<Reply>, "the acceptance")),
-    item: itemOf(mustHaveSettled(one.holder, "the CLAIM_WINDOWS pass") as { items: ReadonlyArray<{ subject: string; outcome: string }> }, lapsed.claimId),
+    item: itemOf(mustHaveSettled(one.holder, "the CLAIM_WINDOWS pass") as Itemized, lapsed.claimId),
     claim: await claimOf(lapsed.claimId),
     frozen: (await allocationOf(lapsed.allocationId)).frozen,
   };
-
+}
+/** Acceptance first: the claim is due 30 s from now, the acceptance (now, inside the review window) holds at its COMMIT and the sweep, standing a second past the deadline, is observed waiting on the claim. */
+async function acceptFirst(ctx: FaultContext, label: string): Promise<LapseOutcome> {
   const due = await dueOpportunity(`${label}-accept-first`, 30);
   const standing = new Date(msOf(due.deadline) + 1_000).toISOString();
-  const two = await contend(ctx, acceptOf(due), sweepOf(due.claimId, standing), "the acceptance holds the claim, the lapse waits");
-  const acceptFirst = {
+  const two = await contend(ctx, acceptOf(ctx, label, due), sweepOf(ctx, due.claimId, standing), "the acceptance holds the claim, the lapse waits");
+  return {
     accept: said(valueOf(two.holder as PromiseSettledResult<Reply>, "the acceptance")),
-    item: itemOf(mustHaveSettled(two.waiter, "the CLAIM_WINDOWS pass") as { items: ReadonlyArray<{ subject: string; outcome: string }> }, due.claimId),
+    item: itemOf(mustHaveSettled(two.waiter, "the CLAIM_WINDOWS pass") as Itemized, due.claimId),
     claim: await claimOf(due.claimId),
     frozen: (await allocationOf(due.allocationId)).frozen,
   };
-  return { lapseFirst, acceptFirst };
 }
 
 faultCell(
@@ -451,10 +461,11 @@ faultCell(
       "RACE: AcceptAttribution racing the CLAIM_WINDOWS lapse of the same claim at its deadline: one wins in both orders with the lock wait observed; accepting a lapsed claim is 409 CLAIM_EXPIRED and writes no allocation (the claim EXPIRED, the allocation unfrozen); an acceptance that committed inside the review window keeps the claim ACCEPTED with its allocation frozen",
   },
   async (ctx) => {
-    const r = await lapseRace(ctx, "lapse-accept-cmd047");
-    assert.deepEqual([r.lapseFirst.claim.state, r.lapseFirst.frozen], ["EXPIRED", false], "lapse first: the claim EXPIRED, no allocation frozen");
-    assert.equal(r.lapseFirst.accept, "409 PRECONDITION_FAILED CLAIM_EXPIRED", "lapse first: accepting the lapsed claim is CLAIM_EXPIRED");
-    assert.deepEqual([r.acceptFirst.accept, r.acceptFirst.claim.state, r.acceptFirst.frozen], ["200", "ACCEPTED", true], "acceptance first: the claim ACCEPTED under its frozen allocation");
+    const one = await lapseFirst(ctx, "lapse-accept-cmd047");
+    assert.deepEqual([one.claim.state, one.frozen], ["EXPIRED", false], "lapse first: the claim EXPIRED, no allocation frozen");
+    assert.equal(one.accept, "409 PRECONDITION_FAILED CLAIM_EXPIRED", "lapse first: accepting the lapsed claim is CLAIM_EXPIRED");
+    const two = await acceptFirst(ctx, "lapse-accept-cmd047");
+    assert.deepEqual([two.accept, two.claim.state, two.frozen], ["200", "ACCEPTED", true], "acceptance first: the claim ACCEPTED under its frozen allocation");
   },
 );
 
@@ -467,9 +478,10 @@ faultCell(
       "RACE: the CLAIM_WINDOWS lapse racing AcceptAttribution of the same claim at its deadline, in both orders with the lock wait observed: the lapse that committed first leaves the claim EXPIRED (item EXPIRED); a lapse that waited on an acceptance committed inside the review window finds the claim ACCEPTED and no longer due and settles it without failing (item SETTLED, no failure handed to the background sink), the claim staying ACCEPTED",
   },
   async (ctx) => {
-    const r = await lapseRace(ctx, "lapse-accept-sweep");
-    assert.deepEqual([r.lapseFirst.item, r.lapseFirst.claim.state], ["EXPIRED", "EXPIRED"], "lapse first: EXPIRED once");
-    assert.deepEqual([r.acceptFirst.item, r.acceptFirst.claim.state], ["SETTLED", "ACCEPTED"], "acceptance first: the waiting lapse settles the accepted claim, never fails on it");
+    const one = await lapseFirst(ctx, "lapse-accept-sweep");
+    assert.deepEqual([one.item, one.claim.state], ["EXPIRED", "EXPIRED"], "lapse first: EXPIRED once");
+    const two = await acceptFirst(ctx, "lapse-accept-sweep");
+    assert.deepEqual([two.item, two.claim.state], ["SETTLED", "ACCEPTED"], "acceptance first: the waiting lapse settles the accepted claim, never fails on it");
   },
 );
 
@@ -521,12 +533,7 @@ faultCell(
       try {
         const holding = ctx.operation("ClaimProspect (holder)", () => routed(ctx, hc, [], () => claimProspect(s.person, prospect.prospectId, freshKey("agreement-exp-1"), { evidenceHash, agreementVersion: s.agreementVersion })));
         await pause.reachedBy(holding);
-        let waiting: Awaited<ReturnType<FaultContext["mustWait"]>> | undefined;
-        try {
-          waiting = await ctx.mustWait(iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (conn) => supersedeAgreement(conn, s, { commit: true }), "the agreement supersession while the claim holds its locks");
-        } finally {
-          pause.release();
-        }
+        const waiting = await afterward(() => ctx.mustWait(iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (conn) => supersedeAgreement(conn, s, { commit: true }), "the agreement supersession while the claim holds its locks"), () => pause.release());
         const claim = completed<{ state: string; agreementVersion?: string }>(await holding, 201);
         assert.equal(claim.data.state, "SUBMITTED");
         await waiting.pending;
