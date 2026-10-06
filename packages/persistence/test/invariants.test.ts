@@ -746,47 +746,131 @@ test("the oracle runs once more in the file's after hook: an effect that settles
   await assert.rejects(registered.after[0]!(), /B10 state invariants violated after the end of the file/);
 });
 
-/** The forms that make a branch more than one atomic predicate (template rule 12). */
-const NON_ATOMIC: ReadonlyArray<readonly [string, RegExp]> = [
-  ["OR", /\bOR\b/],
-  ["a count compared with <> 1", /<>\s*1(?![0-9])/],
-  ["IS DISTINCT FROM", /\bIS\s+(NOT\s+)?DISTINCT\s+FROM\b/i],
-  ["COALESCE", /\bCOALESCE\s*\(/i],
-  ["IFNULL", /\bIFNULL\s*\(/i],
-  ["NULLIF", /\bNULLIF\s*\(/i],
-  ["CASE WHEN ... IS NULL", /\bCASE\b(?:(?!\bEND\b)[\s\S])*?\bIS\s+(NOT\s+)?NULL\b/i],
-];
+/** The comparison operators a scalar subquery may stand beside (longest first). */
+const COMPARISON = /(<>|!=|<=|>=|=|<|>)/;
+/** The only CASE operands that are NOT NULL columns, so a CASE over one has no absent case for ELSE to swallow. */
+const NOT_NULL_CASE_OPERANDS: ReadonlySet<string> = new Set(["ch.direction"]);
+
+/** The one searched CASE the oracle uses: the split's one-cent-each bit, 1 for the rows whose rank is within the remainder, over NOT NULL operands (INV-S-08 split CTE). */
+const SPLIT_ONE_CENT = /^\s*WHEN\s+row_number\(\)\s+OVER\s*\(/i;
+
+/** The SQL with comments, quoted literals and quoted identifiers blanked: only keywords and operators are left to match, whatever their case or spacing. */
+function stripLiterals(sql: string): string {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/"(?:[^"]|"")*"/g, '""');
+}
+
+/** Scalar subqueries ("(SELECT ...)") used as an operand of a comparison, other than count(...) which is never NULL: a subquery over an absent row is NULL and the comparison silently false. */
+function nullableScalarComparisons(sql: string): string[] {
+  const found: string[] = [];
+  for (const m of sql.matchAll(/\(\s*SELECT\b/gi)) {
+    let depth = 0;
+    let end = -1;
+    for (let i = m.index; i < sql.length; i++) {
+      if (sql[i] === "(") depth++;
+      else if (sql[i] === ")" && --depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    const inner = sql.slice(m.index + 1, end < 0 ? sql.length : end).replace(/^\s*SELECT\s+(DISTINCT\s+)?/i, "");
+    const before = sql.slice(0, m.index).trimEnd();
+    const after = end < 0 ? "" : sql.slice(end + 1).trimStart();
+    const operand = new RegExp(`${COMPARISON.source}$`).test(before) || new RegExp(`^${COMPARISON.source}`).test(after);
+    if (operand && !/^count\s*\(/i.test(inner)) found.push(inner.slice(0, 40));
+  }
+  return found;
+}
+
+/** The forms that make a branch more than one atomic predicate, or read an absent case as a value (template rule 12): token-based, case-insensitive, on the SQL without its literals. */
+function nonAtomic(branch: string): string[] {
+  const sql = stripLiterals(branch);
+  const hit: string[] = [];
+  const has = (what: string, pattern: RegExp): void => {
+    if (pattern.test(sql)) hit.push(what);
+  };
+  has("OR", /\bOR\b/i);
+  has("a count compared with <> 1 or != 1", /(<>|!=)\s*1(?![0-9])/);
+  has("!=", /!=/);
+  has("IS DISTINCT FROM", /\bIS\s+(NOT\s+)?DISTINCT\s+FROM\b/i);
+  has("COALESCE", /\bCOALESCE\s*\(/i);
+  has("IFNULL", /\bIFNULL\s*\(/i);
+  has("NULLIF", /\bNULLIF\s*\(/i);
+  has("GREATEST", /\bGREATEST\s*\(/i);
+  has("LEAST", /\bLEAST\s*\(/i);
+  has("postfix ISNULL / NOTNULL", /\b(ISNULL|NOTNULL)\b/i);
+  has("CASE WHEN ... IS NULL", /\bCASE\b(?:(?!\bEND\b)[\s\S])*?\bIS\s+(NOT\s+)?NULL\b/i);
+  has("NOT IN (SELECT", /\bNOT\s+IN\s*\(\s*SELECT\b/i);
+  // a CASE with an ELSE is a default for the absent case unless its operand is a NOT NULL column
+  for (const m of sql.matchAll(/\bCASE\b((?:(?!\bEND\b)[\s\S])*)\bEND\b/gi)) {
+    if (!/\bELSE\b/i.test(m[1] ?? "")) continue;
+    const operand = /^\s*([A-Za-z_][\w.]*)\s+WHEN\b/i.exec(m[1] ?? "")?.[1];
+    if (SPLIT_ONE_CENT.test(m[1] ?? "")) continue;
+    if (operand === undefined || !NOT_NULL_CASE_OPERANDS.has(operand)) hit.push("CASE ... ELSE as a default");
+  }
+  if (nullableScalarComparisons(sql).length > 0) hit.push("a scalar subquery as a comparison operand");
+  return hit;
+}
 
 test("every UNION ALL branch of an invariant is named in its whys and is ONE atomic predicate (a disjunction inside a branch would let a control pass on a neighbour's predicate)", () => {
   // a disjunction: OR; a count compared with exactly one ("none" or "several"); IS DISTINCT FROM ("absent" or "different"); COALESCE,
   // IFNULL, NULLIF or CASE WHEN ... IS NULL ("absent" read as a value): the absent case is its own branch (ADV-16). Anywhere in the branch,
   // its CTEs and select list included: a coalesced value computed in a CTE still decides the predicate that reads it.
-  const disjunctions = NON_ATOMIC;
   let predicates = 0;
   for (const inv of B10_INVARIANTS) {
     const branches = inv.sql.split(/\bUNION ALL\b/);
     assert.equal(inv.whys?.length ?? 1, branches.length, `${inv.id}: ${branches.length} branch(es) in its SQL`);
     if (inv.whys !== undefined) assert.equal(new Set(inv.whys).size, inv.whys.length, `${inv.id}: the names are distinct`);
     for (const [i, branch] of branches.entries()) {
-      for (const [what, pattern] of disjunctions) assert.ok(!pattern.test(branch), `${inv.id} branch ${i + 1} (${inv.whys?.[i] ?? "sole"}) contains ${what}: split it into one branch per predicate, each with its why and its control`);
+      assert.deepEqual(nonAtomic(branch), [], `${inv.id} branch ${i + 1} (${inv.whys?.[i] ?? "sole"}) is not one atomic predicate: split it into one branch per predicate, each with its why and its control`);
     }
     predicates += branches.length;
   }
   assert.equal(predicates, B10_INVARIANTS.reduce((n, inv) => n + (inv.whys?.length ?? 1), 0), "one why (or sole condition) per atomic predicate");
 });
 
-test("the structural check refuses a branch that joins two predicates with OR, compares a count with <> 1, uses IS DISTINCT FROM or reads an absent case as a value (COALESCE, IFNULL, NULLIF, CASE WHEN ... IS NULL)", () => {
-  const atomic = (sql: string) => !NON_ATOMIC.some(([, p]) => p.test(sql));
+test("the structural check refuses a branch that joins two predicates with OR, compares a count with <> 1, uses IS DISTINCT FROM or reads an absent case as a value (COALESCE, IFNULL, NULLIF, GREATEST, LEAST, ISNULL, NOTNULL, CASE ... ELSE, NOT IN (SELECT, a nullable scalar subquery)", () => {
+  const atomic = (sql: string) => nonAtomic(sql).length === 0;
   assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x > coalesce(u.x, 0)"), false);
   assert.equal(atomic("SELECT 1 FROM t GROUP BY t.k HAVING COALESCE (sum(t.x), 0) <> 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE ifnull(t.x, 0) > 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE nullif(t.x, 0) > 0"), false);
   assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x > CASE WHEN u.x IS NULL THEN 0 ELSE u.x END"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE t.x IS NULL AND NOT EXISTS (SELECT 1 FROM u)"), true, "a NULL test of its own is one predicate");
-  assert.equal(atomic("SELECT 1 FROM t WHERE t.y > CASE t.d WHEN 'INCREASE' THEN 1 ELSE -1 END AND t.z IS NULL"), true, "a CASE over a value is not an absent case");
+  assert.equal(atomic("SELECT 1 FROM t WHERE t.y > CASE ch.direction WHEN 'INCREASE' THEN 1 ELSE -1 END AND t.z IS NULL"), true, "a CASE over a NOT NULL column is not an absent case");
   assert.equal(atomic("SELECT 1 FROM t WHERE a <> b OR c < 0"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE (SELECT count(*) FROM u) <> 1"), false);
   assert.equal(atomic("SELECT 1 FROM t LEFT JOIN u ON true WHERE t.x IS DISTINCT FROM u.x"), false);
   assert.equal(atomic("SELECT 1 FROM t WHERE a <> b ORDER BY a"), true, "ORDER is not OR");
   assert.equal(atomic("SELECT 1 FROM t WHERE (SELECT count(*) FROM u) <> 10"), true);
+  assert.equal(atomic("SELECT 1 FROM t WHERE t.x > (SELECT count(*) FROM u)"), true, "a count is never NULL");
+  assert.equal(atomic("SELECT 1 FROM t WHERE t.k = 'a or b' AND t.j <> 'GREATEST('"), true, "words inside a quoted literal are not operators");
+});
+
+test("the structural check refuses every bypass of the ban found by the adversary (ADV-19): one forged snippet each, in any case and spacing", () => {
+  const bypasses: ReadonlyArray<readonly [string, string]> = [
+    ["lowercase or", "SELECT 1 FROM t WHERE a <> b or c < 0"],
+    ["mixed-case Or across a newline", "SELECT 1 FROM t WHERE a <> b\n  Or\n c < 0"],
+    ["or in a CTE", "WITH w AS (SELECT 1 FROM t WHERE a = 1 or b = 2) SELECT 1 FROM w WHERE true"],
+    ["or behind a comment", "SELECT 1 FROM t WHERE a = 1 /* x */ or b = 2"],
+    ["!= on a scalar count", "SELECT 1 FROM t WHERE (SELECT count(*) FROM u) != 1"],
+    ["!= alone", "SELECT 1 FROM t WHERE a != b"],
+    ["<> 1 without spacing", "SELECT 1 FROM t GROUP BY k HAVING count(*)<>1"],
+    ["GREATEST", "SELECT 1 FROM t JOIN u ON true WHERE t.x > GREATEST(t.a, u.x)"],
+    ["lowercase least", "SELECT 1 FROM t JOIN u ON true WHERE t.x > least (t.a, u.x)"],
+    ["postfix ISNULL", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN u.x ISNULL THEN 0 ELSE u.x END"],
+    ["postfix NOTNULL", "SELECT 1 FROM t WHERE u.x NOTNULL AND t.y > 0"],
+    ["bare lowercase isnull", "SELECT 1 FROM t WHERE u.x isnull"],
+    ["CASE WHEN ... ELSE default", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE WHEN u.x > 0 THEN u.x ELSE 0 END"],
+    ["simple CASE over a nullable column with ELSE", "SELECT 1 FROM t LEFT JOIN u ON true WHERE t.y > CASE u.x WHEN 1 THEN 5 ELSE 0 END"],
+    ["NOT IN (SELECT", "SELECT 1 FROM t WHERE t.x NOT IN (SELECT u.n FROM u)"],
+    ["lowercase not in ( select", "SELECT 1 FROM t WHERE t.x not in ( select u.n FROM u)"],
+    ["scalar subquery on the right of a comparison", "SELECT 1 FROM t WHERE t.x <> (SELECT u.amount FROM u WHERE u.k = t.k)"],
+    ["scalar subquery on the left of a comparison", "SELECT 1 FROM t WHERE (SELECT max(u.amount) FROM u WHERE u.k = t.k) < t.x"],
+    ["scalar subquery inside HAVING", "SELECT 1 FROM t GROUP BY k HAVING sum(t.x) >= (SELECT u.cap FROM u WHERE u.k = t.k)"],
+  ];
+  for (const [what, sql] of bypasses) assert.notDeepEqual(nonAtomic(sql), [], `refused: ${what}`);
 });
