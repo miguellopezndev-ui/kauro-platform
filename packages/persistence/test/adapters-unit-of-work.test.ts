@@ -316,13 +316,22 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
   const answered = await Promise.race([given.then(() => "committed", (e: unknown) => failure(e).code), new Promise<string>((resolve) => setTimeout(() => resolve("still waiting for the abandoned call"), 5_000))]);
   assert.equal(answered, "CAPACITY_UNAVAILABLE");
   await assert.rejects(late, "the abandoned call fails on its destroyed connection, it never reads on a pooled one");
-  release.open();
-  await holder;
-  // the backend of the abandoned unit is gone, and no pooled connection is it
-  for (let alive = true; alive; ) {
-    await h.oracle.query("SELECT pg_stat_clear_snapshot()");
-    alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+  // ADV-8: the backend of the abandoned unit ends WHILE the holder still holds the lock it waited on (release is not open yet): the abandon
+  // cancelled and terminated it, it did not wait for the lock to be granted or for its statement to time out, and its locks went with it
+  try {
+    const gone = Date.now() + 5_000;
+    let alive = true;
+    while (alive && Date.now() < gone) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+      if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(alive, false, "the abandoned backend is gone from pg_stat_activity before the holder releases its lock");
+    assert.equal((await h.oracle.query("SELECT 1 FROM pg_locks WHERE pid = $1", [abandonedPid])).rows.length, 0, "no lock is held or awaited by the abandoned backend");
+  } finally {
+    release.open();
   }
+  await holder;
   for (let i = 0; i < 4; i++) {
     const { client } = await h.appPool.acquire();
     try {

@@ -436,6 +436,9 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
     }
     let destroy: Error | undefined;
     let unit: U | undefined;
+    // the backend this unit runs on, captured when the unit opens (the startup message's key data, no round trip): an abandoned unit's
+    // backend is ended explicitly once its client is destroyed (ADV-8)
+    const backendPid = (client as PoolClient & { processID?: number }).processID;
     try {
       await execute(client, `BEGIN ISOLATION LEVEL ${ISOLATION_SQL[isolation]}`);
       await execute(client, `SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
@@ -470,8 +473,37 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       throw asFailure(e, context.correlationId);
     } finally {
       client.release(destroy);
+      if (unit?.abandonedWork != null && typeof backendPid === "number") await endBackend(pool, backendPid);
     }
   }
+}
+
+/** The longest an abandoned unit's answer waits for its backend to be ended: the answer never waits on a busy pool. */
+const END_BACKEND_WAIT_MS = 1_000;
+
+/**
+ * ADV-8: destroying the client of an abandoned unit closes the socket, but a backend blocked in a lock wait does not read its socket, so
+ * it would keep every lock of the abandoned transaction until its statement ends (the lock is granted, or statement_timeout fires). A
+ * pooled side connection of the same login role cancels the statement and then terminates the backend, so the locks go at once.
+ * Best effort: the backend ends by itself at the latest when its statement does, so a failure here is never the unit's failure.
+ */
+async function endBackend(pool: KauroPool, pid: number): Promise<void> {
+  // a pool that does not expose its pg pool does not own the connections it hands out (a test harness routes its own connection through a
+  // stand-in pool): the unit never ends a backend it does not own
+  const raw = (pool as { readonly raw?: KauroPool["raw"] }).raw;
+  if (raw === undefined) return;
+  const ended = Promise.resolve()
+    .then(() => raw.query("SELECT pg_cancel_backend($1) AS cancelled, pg_terminate_backend($1) AS terminated", [pid]))
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+  let timer: NodeJS.Timeout | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, END_BACKEND_WAIT_MS);
+  });
+  await Promise.race([ended, bound]);
+  clearTimeout(timer);
 }
 
 export function createUnitOfWorkFactory(pool: KauroPool, deps: UnitOfWorkDependencies): PgUnitOfWorkFactory {
