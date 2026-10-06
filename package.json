@@ -21,7 +21,8 @@
     "openapi:generate": "node tools/openapi.mjs generate",
     "web-client": "node tools/web-client.mjs check",
     "web-client:generate": "node tools/web-client.mjs generate",
-    "verify": "pnpm run generate && pnpm run build && pnpm run typecheck && pnpm run test && pnpm run arch && pnpm run lint:fixture-clock && pnpm run openapi && pnpm run web-client && pnpm run matrix && pnpm run clean-consume",
+    "verify:fast": "pnpm run generate && node tools/prepare-fast.mjs && pnpm run typecheck && node --test \"tools/test/**/*.test.mjs\" && pnpm run arch && pnpm run lint:fixture-clock && pnpm run openapi && pnpm run web-client && pnpm run matrix",
+    "verify": "pnpm run verify:fast && node tools/build-generated.mjs && pnpm -r run test && pnpm run clean-consume",
     "matrix": "node tools/matrix.mjs check",
     "matrix:generate": "node tools/matrix.mjs generate",
     "evidence": "node tools/evidence.mjs run"
