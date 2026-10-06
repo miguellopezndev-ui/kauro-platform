@@ -54,7 +54,12 @@ before(async () => {
   october26 = await september(w, calendarId, "TEST_FIXTURE", ["2026-11-06", "2026-11-13"], "2026-10-01");
 });
 after(async () => {
-  await closeWorld(w);
+  try {
+    // derived from the negative controls that actually RAN in this file (forged() records them), not from a list written beside them
+    assertEveryBranchControlled();
+  } finally {
+    await closeWorld(w);
+  }
 });
 
 /** The ids of every invariant firing on a session. */
@@ -253,10 +258,23 @@ test("positive controls: R2-102 partial hold, R2-104 negative balance with examp
  * requires `id` among the invariants firing on it; the others the forgery also violates are reported. `why`: the branch of a multi-branch
  * invariant the forgery is for — the rows the invariant returns must carry that branch's own text (not just fire on some other branch).
  */
+/** The branches (an invariant's `whys`, or the sole condition) whose negative control ran to its assertion, by invariant id. */
+const controlled = new Map<string, Set<string>>();
+const SOLE = "(sole condition)";
+function assertEveryBranchControlled(): void {
+  const missing: string[] = [];
+  for (const inv of B10_INVARIANTS) {
+    for (const branch of inv.whys ?? [SOLE]) if (!(controlled.get(inv.id)?.has(branch) ?? false)) missing.push(`${inv.id} [${branch}]`);
+  }
+  assert.deepEqual(missing, [], "every branch of every B10 invariant has a negative control that ran in this file");
+  assert.deepEqual([...controlled.keys()].filter((id) => !B10_INVARIANTS.some((i) => i.id === id)), [], "no control for an invariant that does not exist");
+}
+
 async function forged(t: TestContext, id: string, forge: (c: Client) => Promise<void>, why?: string): Promise<void> {
   const o = w.h.oracle;
   const inv = B10_INVARIANTS.find((i) => i.id === id);
   assert.ok(inv !== undefined, `${id} is a B10 invariant`);
+  assert.ok(why === undefined ? inv.whys === undefined : true, `${id} has several branches: the control names the one it is for`);
   await o.query("BEGIN");
   try {
     await o.query("SET LOCAL session_replication_role = replica");
@@ -268,6 +286,7 @@ async function forged(t: TestContext, id: string, forge: (c: Client) => Promise<
       const branch = await o.query(`SELECT * FROM (${inv.sql}) violation WHERE violation.why = $1 LIMIT 1`, [why]);
       assert.equal(branch.rows.length, 1, `${id} returns its branch "${why}" on its forged state (fired: ${fired.join(", ")})`);
     }
+    controlled.set(id, (controlled.get(id) ?? new Set<string>()).add(why ?? SOLE));
     t.diagnostic(`${id}${why !== undefined ? ` [${why}]` : ""} fires; also firing on the same forged state: ${fired.filter((f) => f !== id).join(", ") || "none"}`);
   } finally {
     await o.query("ROLLBACK");
@@ -518,7 +537,10 @@ test("INV-S-14 fires on a predecessor statement with two successors", (t) =>
     await exec(c, "UPDATE kauro.commission_statements SET corrects_statement_id = (SELECT min(statement_id::text)::uuid FROM kauro.commission_statements WHERE statement_id NOT IN ($1, $2)) WHERE statement_id IN ($1, $2)", [b().r102.statementId, b().r104.laterStatement], 2);
   }, "predecessor with two successors"));
 
-test("every invariant has a negative control in this file", () => {
-  const covered = ["INV-L-01", "INV-L-02", "INV-S-01", "INV-S-02", "INV-S-03", "INV-S-04", "INV-S-05", "INV-S-06", "INV-S-07", "INV-S-08", "INV-S-09", "INV-S-10", "INV-S-11", "INV-S-12", "INV-S-13", "INV-S-14"];
-  assert.deepEqual(B10_INVARIANTS.map((i) => i.id), covered);
+test("every UNION ALL branch of an invariant is named in its whys (a branch added without its name and control would escape)", () => {
+  for (const inv of B10_INVARIANTS) {
+    const branches = (inv.sql.match(/UNION ALL/g) ?? []).length + 1;
+    assert.equal(inv.whys?.length ?? 1, branches, `${inv.id}: ${branches} branch(es) in its SQL`);
+    if (inv.whys !== undefined) assert.equal(new Set(inv.whys).size, inv.whys.length, `${inv.id}: the names are distinct`);
+  }
 });
