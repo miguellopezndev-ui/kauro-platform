@@ -13,13 +13,16 @@ import type { UserId } from "@kauro/domain";
 import { connectionPid, faultCell, openConnection, recordClaim, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller } from "@kauro/persistence/testing";
 import { deliver } from "./payment-support.js";
 import { agentOf, assignedThrough, claimed, integrationWorld, opportunityOf, oracleRows, orderedThrough, planOf, quoted, seller, terminationBody, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, contend, converting, open, runConsumer, type Actor } from "./b10-cells-support.js";
+import { bindCells, contend, converting, runConsumer, type Actor } from "./b10-cells-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { prepareAllocation, recordClaimEvidence, recordSourceEvidence } from "./sales-support.js";
 import { candidateSeller } from "./sellers-support.js";
 import { call, completed, freshKey, ids, outcome, type Person, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+/** Every harness connection of these cells waits for a lock at most 60 s (lock_timeout): an ordering defect fails its cell, never hangs the file. */
+const bounded = (login: Parameters<IntegrationWorld["h"]["pg"]["clientConfig"]>[0]): Promise<HarnessConnection> => openConnection({ ...iw.h.pg.clientConfig(login), options: "-c lock_timeout=60000" });
+const open = bounded;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
@@ -438,7 +441,7 @@ async function withdrawMfa(conn: HarnessConnection, userId: string): Promise<voi
   const r = await conn.query("UPDATE kauro.identities SET mfa_enrolled_at = NULL, updated_at = now() WHERE user_id = $1", [userId]);
   assert.equal(r.rowCount, 1);
 }
-const platformConn = (): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig("postgres"));
+const platformConn = (): Promise<HarnessConnection> => bounded("postgres");
 
 /** The holder held at `at`, the waiter observed waiting on it, then both settle (the waiter's operation on a harness connection of its own). */
 async function holdAndWait<W>(ctx: FaultContext, what: string, holder: { readonly login: "kauro_app_test"; run(conn: HarnessConnection): Promise<Reply> }, waiterConn: HarnessConnection, waiter: (conn: HarnessConnection) => Promise<W>, at = "uow.before-commit"): Promise<{ readonly held: Reply; readonly waited: PromiseSettledResult<W> }> {
@@ -608,7 +611,7 @@ faultCell(
       const early = await ownerWithGrant("corp-rev-early");
       const c = await candidate("corp-rev-early-seller", early.person);
       const body = await c.body();
-      const rc = await openConnection(iw.h.pg.clientConfig("kauro_control_test"));
+      const rc = await bounded("kauro_control_test");
       const wc = await open("kauro_app_test");
       try {
         await rc.query("BEGIN");
@@ -627,7 +630,7 @@ faultCell(
       const late = await ownerWithGrant("corp-rev-late");
       const c = await candidate("corp-rev-late-seller", late.person);
       const body = await c.body();
-      const rc = await openConnection(iw.h.pg.clientConfig("kauro_control_test"));
+      const rc = await bounded("kauro_control_test");
       try {
         const r = await holdAndWait(ctx, "the grant revocation while the owner's activation is held", { login: "kauro_app_test", run: (conn) => routed(ctx, conn, [], () => activate(c.sellerId, freshKey("corp-rev-2"), body, late.person)) }, rc, (conn) => conn.query(REVOKE_GRANT, [late.grantId]));
         assert.equal(said(r.held), "200");

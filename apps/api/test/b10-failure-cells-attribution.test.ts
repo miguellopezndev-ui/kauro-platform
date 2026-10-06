@@ -11,14 +11,17 @@ import { after, before } from "node:test";
 import type { AttributionView, ProspectView, SalesAccountView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { organizationKeyOf } from "@kauro/domain";
-import { connectionPid, faultCell, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller } from "@kauro/persistence/testing";
+import { connectionPid, faultCell, openConnection, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller } from "@kauro/persistence/testing";
 import { agentOf, assignedThrough, claimed, integrationWorld, oracleRows, seller, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, contend, itemOf, mustHaveSettled, open, sweepOn, type Actor } from "./b10-cells-support.js";
+import { bindCells, contend, itemOf, mustHaveSettled, sweepOn, type Actor } from "./b10-cells-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { asOperator, prepareAllocation, recordClaimEvidence, recordSourceEvidence } from "./sales-support.js";
 import { call, completed, freshKey, ids, outcome, sha, type Person, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+/** Every harness connection of these cells waits for a lock at most 60 s (lock_timeout): an ordering defect fails its cell, never hangs the file. */
+const bounded = (login: Parameters<IntegrationWorld["h"]["pg"]["clientConfig"]>[0]): Promise<HarnessConnection> => openConnection({ ...iw.h.pg.clientConfig(login), options: "-c lock_timeout=60000" });
+const open = bounded;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
