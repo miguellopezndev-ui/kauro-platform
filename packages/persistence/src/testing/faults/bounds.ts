@@ -9,7 +9,7 @@ export const LOCK_WAIT_OBSERVATION_MS = LOCK_WAIT_POLL_ATTEMPTS * LOCK_WAIT_POLL
  * mustWait / observeBlocked also allow 10 s. Their evidence and rejection bounds stay unchanged; a test statement must outlive them.
  * This config is exported only through /testing. Production units keep their own defaults and explicit timeout cells override it.
  */
-export const RACE_STATEMENT_TIMEOUT_MS = 3 * LOCK_WAIT_OBSERVATION_MS;
+export const RACE_STATEMENT_TIMEOUT_MS = 3 * LOCK_WAIT_OBSERVATION_MS; // >= 2x every harness window: tools/test/race-timeout-bounds.test.mjs
 
 /** Reproduction-only override: restore the old 10 s test config while delaying the holder's release. */
 export function raceStatementTimeoutMs(): number {

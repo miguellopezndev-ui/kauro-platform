@@ -137,7 +137,7 @@ DB results remain for the builder to establish; they are not claimed here.**
   was obtained. The reproduction script must run on the builder as above.
 
 Logs in `/tmp/cmd043-*.log` record the commands' output. No test was skipped
-or quarantined in the executed files; none of the existing assertions changed.
+or quarantined; none of the existing assertions changed.
 
 ## Family search
 
@@ -145,8 +145,13 @@ The following are lock-observation/contend call sites (source lines). API,
 control and fixture units involved now share the derived test configuration.
 Some persistence rows also exercise raw clients with no statement timeout;
 those raw clients need no timeout change. Harness self-tests retain their
-rejection behavior. Operability's deliberately bounded failures and the
-explicit cancellation cells are excluded from the repair.
+rejection behavior. The explicit cancellation cells are excluded from the
+repair. Operability's R35 lock races (`apps/api/test/operability.test.ts`, the
+drain and deadline cases that hold `kauro.agencies` while `waitForLockWait`
+observes) are NOT bounded failures: their api env now sets
+`KAURO_DB_STATEMENT_TIMEOUT_MS` from `raceStatementTimeoutMs()` (adversary
+ADV-1). `AheadUnits` (commission-support) and `standAhead`
+(cmd027-create-quote) keep the 10 s default: they run in no lock race today.
 
 | File | Lines |
 | --- | --- |
