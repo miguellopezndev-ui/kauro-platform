@@ -343,6 +343,38 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
   assert.notEqual(await h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.agencies.lock(A.agencyId)), null, "a later request on the pool runs unaffected");
 });
 
+test("work that returns normally after the caller gave it up is refused INTEGRITY_FAILURE before COMMIT: nothing is committed and its backend ends (D10-GAP-6a, ADV-12)", async () => {
+  const authority = await h.processingAuthority(A);
+  const before = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  let abandonedPid = 0;
+  let outcome: unknown;
+  try {
+    outcome = await h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+      abandonedPid = Number((await (uow as unknown as { client: PoolClient }).client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+      const clientId = uow.ids.next() as ClientId;
+      await uow.endClients.insert({ clientId, agencyId: A.agencyId, displayName: "Written by abandoned work", processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId, createdAt: clock.now() });
+      // the write is complete (state and its event, as h.endClient writes it): without the refusal the unit WOULD commit it
+      await uow.events.publish({ aggregateKind: "end_client", aggregateId: clientId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "end_client.created.v1", actor: { kind: "USER", userId: owner }, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { clientId, agencyId: A.agencyId, processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId } });
+      abandonWorkOf(uow, "the bound of the call elapsed");
+      return "returned normally";
+    });
+  } catch (e) {
+    outcome = e;
+  }
+  assert.equal(failure(outcome).code, "INTEGRITY_FAILURE", `an abandoned unit never answers the work's result: ${String(outcome)}`);
+  const after = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  assert.equal(after.rows[0].n, before.rows[0].n, "the write of the abandoned unit was never committed");
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients WHERE display_name = 'Written by abandoned work'")).rows[0].n, 0);
+  const gone = Date.now() + 5_000;
+  let alive = true;
+  while (alive && Date.now() < gone) {
+    await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+    alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+    if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.equal(alive, false, "the abandoned unit's backend ended (its client was destroyed, never returned to the pool)");
+});
+
 test("compare-and-swap writes: a stale expected version applies nothing and returns the current safe version and state; an invisible row is NOT_FOUND", async () => {
   const authority = await h.processingAuthority(A);
   const clientId = await h.endClient(A, authority, "CAS client");
