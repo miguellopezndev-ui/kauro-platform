@@ -1,8 +1,18 @@
-# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r10
+# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r11
 
 Target path: `docs/design/SEC-DEPTH-PROVENANCE.md`. Base: kauro-platform `main` 21b310f. Closes Codex p0-admission-r2 (on 0217109)
 findings 1-3 and the 0015 analogue. r2-r9 answered design reviews 062a982 .. 84ef1e6. r8 stepped back to P1 (below).
-r10 answers Codex design r9 (84ef1e6, REJECT: SDP-20/22/23/24/25/27/28 FIXED, SDP-21/26 PARTIAL, SDP-29/30 new):
+r11 answers Codex design r10 (7e9174c, REJECT: SDP-21/29 FIXED, SDP-26/30 PARTIAL, SDP-31/32/33 new) by changing the METHOD: section 3
+is a per-table LIFETIME matrix (birth, every guarded transition, DELETE, TRUNCATE, identity, deferred queue per parent and child)
+over every table a G1-G14 guard or a B binding reads or protects; the R27 cells are generated from it (rule 15).
+- SDP-31: both capacity ledgers refuse DELETE/TRUNCATE, the platform singleton refuses INSERT after its seed (its only birth), the
+  agency ledger's agency_id is immutable and is born empty (B9, section 3 rows 22-23). F13 corrected.
+- SDP-32: a lease's cancel_version moves only by +1 in a statement that changes nothing else, and a JOB_ATTEMPT lease only while
+  its job carries a cancel request (B2).
+- SDP-33: 55P03 has a named owner: no automatic retry; the caller's next run retries (B3); startAudit's pool lock joins the lock
+  protocol and lane L2b (audit/store.ts:198).
+- SDP-26/30 remainder: every row of section 3 yields its DENY cells (R27, R28) with OK siblings or a stated reason none exists.
+r10 answered Codex design r9 (84ef1e6, REJECT: SDP-20/22/23/24/25/27/28 FIXED, SDP-21/26 PARTIAL, SDP-29/30 new):
 - SDP-30 (and the SDP-21 remainder): every derived/bookkeeping column is bound at BIRTH as well as at UPDATE (grant ledger_seq,
   order allocation, agency last admission, lease cancel_version), and every deferred relation is queued per PARENT row on INSERT and
   UPDATE as well as per child, so an empty relation is checked too (B2, B3, B4, B5, B9; section 2 BIRTH row; rule 11).
@@ -66,10 +76,18 @@ update" and rule 14 is new (`docs/design/FAILURE-MATRIX-TEMPLATE.md`). Section 2
   (0023:245) takes KEY SHARE on the grant in an AFTER trigger of the insert.
 - F13 Birth of derived columns: bound today for agencies (0002:140), processing_jobs (0021:451), processing_attempts (initial
   CREATED 0021:237 + CHECK fence NULL), audits (0023:439), audit_steps (0023:581), agency_recurrence (0028:450), founding
-  reservations (initial RESERVED + CHECK 0028:195) and the platform capacity row (singleton, seeded 0021:294). NOT bound at birth:
+  reservations (initial RESERVED + CHECK 0028:195). NOT bound at birth (r10 wrongly listed the platform capacity row as having no
+  birth path: DELETE then INSERT of the seeded singleton is one, and nothing refuses either, SDP-31):
   payment_orders.allocated_cents (guard UPDATE-only 0015:108; RLS 0015:829-834 is no value guard), agency_execution_capacity
   .last_admitted_at (guard BEFORE UPDATE 0021:403/0044:88; the INSERT column grant 0021:964 is no value guard), leases.cancel_version
   (guard BEFORE UPDATE 0006:229), and the new cost_grants.ledger_seq (INSERT guard 0023:133-137 predates it).
+- F14 No production writer DELETEs or TRUNCATEs any table of section 3 (grep `DELETE FROM kauro.` over packages/*/src, apps/*/src
+  and migrations: only upload_session_secrets, src/source/uploads.ts:460, not in section 3); no test deletes one either (the only
+  test DELETE of a kauro table is aggregate_kinds, aggregate-kinds.test.ts:341, not in section 3). TRUNCATE fires no row trigger.
+- F15 cancel_lease (0006:324-337) has one production caller, ExecutionStore.mirrorCancellation (src/execution/store.ts:626-627), for
+  JOB_ATTEMPT after cancel_command (job cancel_version +1, 0021:471); PgLeaseStore.cancel (src/lease-store.ts:100) is the generic
+  port. 55P03 maps to retryable CAPACITY_UNAVAILABLE (src/sqlstate.ts:169) but is not transient (src/unit-of-work.ts:305-307).
+  startAudit locks the funded pools FOR UPDATE ordered by (expires_at, grant_id) (src/audit/store.ts:194-198).
 - F11 Checkpoint-free live operations: same-holder re-claim (0006:262-276), heartbeat (0006:279-292), S090 heartbeat of a NULL-
   checkpoint JOB_ATTEMPT (journals-leases.test.ts:312-316); SWEEP and OUTBOX_DISPATCH never store a checkpoint.
 
@@ -114,9 +132,49 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | CACHE: an immediate decision reads a value checked only at commit, or a derived row is partly bound (11) | SDP-20, SDP-28 | KA001 counter; founding birth 0002:219; allocation decision 0015:437; designation seq from the recurrence count 0028:515; RESERVE room 0023:285; EXHAUSTED->AUTHORIZED room 0023:176-179; 0023:436 room; derived rows: recurrence, ledger events, history, purchases, leases, admission instants | fixed: KA001 (B5a), 0015:437 (B4), 0002:219 (B5a); bound already: seq (immediate +1 shape, a decrease is refused, so a transient inflation cannot be restored before the KC001 recount), grant rooms (money moves only with an immediate event, B3, nothing deferred); every derived row now lists all columns (B3, B5b, B7, B8) |
 | RECIPROCAL: a source->derived relation checked one way, or evidence mutable after use (12) | SDP-21, SDP-26 | ledger; reservation <=> purchase; job ADMITTED <=> authorization CONSUMED (0021:700, :740); job READY <=> package AVAILABLE <=> DELIVERED (0022:580, :606); history <=> subject; allocation, owner count, recurrence | fixed: ledger (B3), reservation<=>purchase (B8); the two 0021/0022 pairs are both-way already and bind every role after B10; history: writer is an AFTER trigger of the subject (structural) + B7; recounts are complete relations. Frozen: usage after RECONCILED, CLOSED grant money, carve spend after CLOSED; ledger, history, purchases append-only; journal and grants undeletable |
 | VALID WRITER: a new predicate rejects an unchanged production writer (13) | SDP-22, SDP-24, SDP-25 | RESERVE visibility; corporate scope; checkpoint-free renewal; renewal with a shorter TTL; B1 retry attempts; B8 basis NONE/UNBACKED; CLOSED-needs-reconciled vs the sweep; multi-row RESERVE; recurrence instants | fixed: B3 AFTER phase, B7 scope, B2 checkpoint, B2 TTL (functions take GREATEST, the guard refuses only a direct shortening); each has an OK sibling in C2 |
-| BIRTH: a derived column bound at UPDATE only, or a deferred relation queued only per child (11, at birth) | SDP-30 (after SDP-20/28) | every derived/bookkeeping column of section 1 and the capacity ledgers: F13 | fixed: ledger_seq (B3), allocated_cents (B4), last_admitted_at (B9), cancel_version (B2); deferred relations queued per parent on INSERT and UPDATE and per child: ledger (B3), allocation (B4), owner count, recurrence (B5), capacity (0021:406-413, already both); bound already: the F13 list |
+| BIRTH: a derived column bound at UPDATE only, or a deferred relation queued only per child (11, at birth) | SDP-30 (after SDP-20/28) | every derived/bookkeeping column of section 1 and the capacity ledgers: F13 | fixed: ledger_seq (B3), allocated_cents (B4), last_admitted_at (B9), cancel_version (B2); deferred relations queued per parent on INSERT and UPDATE and per child: ledger (B3), allocation (B4), owner count, recurrence (B5), capacity (0021:406-413, plus the platform INSERT queue, B9); bound already: the F13 list |
+| LIFETIME: birth or transitions bound, but DELETE/TRUNCATE, replacement or identity change left open; a counter bound only by "no decrease" (15) | SDP-31, SDP-32 (third round) | every table of section 3, enumerated row by row | fixed by section 3 + B11 (uniform DELETE/TRUNCATE refusal, config freeze), B9 (capacity identity, singleton birth), B2 (cancel +1 by its operation) |
 | LOCK ORDER: an added lock that reverses an existing actor's order, or upgrades a weaker lock (14) | SDP-29 (after SEC-109) | sweep (grant -> requests), reservation (grant -> upstream requests), HOLD/RELEASE (carve -> pool), every reconciling writer, FK KEY SHARE | fixed: one global order and one grant lock mode (B3 lock protocol); a writer outside it fails fast with NOWAIT, never waits; R12e covers each pair in both orders |
 | IDENTITY exemption (single; P1) | SDP-23 | grep of F1 | only G14 (removed) and G5 (authorisation, kept) |
+
+## 3. Lifetime matrix (rule 15): every table a G1-G14 guard or a B binding reads or protects
+
+One row per table (the 10 corporate history subjects share row 17). Cells name the guard (existing file:line or the B section) or
+say why none is needed. "frozen" = BEFORE DELETE FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing forbid_change (F14:
+no production writer needs either). UPDATE lists only the columns a guard of this lane protects or reads as a fact, each with its
+exact permitted transition. Queue = the deferred relation checks and what queues them (parent row / child row).
+
+| # | Table | INSERT (birth) | UPDATE: column -> permitted transition | DELETE | TRUNCATE | Identity | Queue (parent / child) |
+|---|---|---|---|---|---|---|---|
+| 1 | agencies | DRAFT (0002:93); active_owner_count = 0 (0002:140) | active_owner_count: +-1 by the membership trigger, = ACTIVE OWNER memberships at COMMIT (B5a); state: listed edge by an owner (0002:91, :126) | frozen (B11) | frozen (B11) | agency_id, created_by_user_id, created_at (0002:89) | INSERT/UPDATE OF active_owner_count / memberships INSERT, DELETE, UPDATE OF role, state (B5a) |
+| 2 | memberships | INVITED, or the founding ACTIVE OWNER on membership facts (0002:227, B5a) | role, state: listed edge + team authority (0002:192, :307); a removal of the last ACTIVE OWNER refused on facts (B5a) | frozen (B11) | frozen (B11) | membership_id, agency_id, user_id (0002:190) | child of row 1 |
+| 3 | payment_orders | INTENT_CREATED (0015:112); allocated_cents = 0 (B4) | allocated_cents: + the applied amount of a capture completing now, = sum of COMPLETED/REVERSED captures at COMMIT (B4); state: listed (0015:110) | frozen (B11) | frozen (B11) | order_id, agency_id, amounts (0015:87) | INSERT/UPDATE OF allocated_cents / capture INSERT, UPDATE OF status (B4) |
+| 4 | capture_facts | observed birth (0015:404); allocation 0 unless COMPLETED, parts = amount (CHECK 0015:364-365) | allocated_service/tax, excess: fixed at PENDING->COMPLETED only (0015:388); status: listed (0015:402) | frozen (B11) | frozen (B11) | capture_id, agency_id, order_id, amount (0015:377) | child of row 3 |
+| 5 | processing_jobs | QUEUED, BACKLOG, attempt_count 0, no attempt, fence 0, cancel_version 0 (0021:451) | attempt_count +1 with that attempt born now, current_attempt_id = it, fence = its fence claimed now (B1); cancel_version +1 by cancel_command (0021:471); holds from state (0021:529); state: listed | frozen (B11) | frozen (B11) | job_id, agency_id, authorization_id (0021:149) | capacity per job (0021:406-408); admission/ready bounds per job (0021:730, 0022:594) |
+| 6 | processing_attempts | CREATED (0021:237), fence NULL (CHECK), ordinal = attempt_count + 1 (0021:599) | fence: once, at CREATED->CLAIMED (0021:235, :613), the lease fence it owns (B1); state: listed | frozen (B11) | frozen (B11) | attempt_id, job_id, ordinal (0021:233) | none: B1 is immediate |
+| 7 | leases | fence 1, cancel_version 0, instants := now (B2) | owner/fence: +1 only after expiry; heartbeat/expiry: now, never shortened; checkpoint: kept once stored; cancel_version: +1 alone, JOB_ATTEMPT only with a job cancel request (B2) | refused, DELETE revoked (B2) | frozen (B2) | kind, resource, deadline, subject, cost authority (0006:190) | none: immediate |
+| 8 | cost_grants | PREPARED v1, money 0, ledger_seq 0, server stamps (0023:133-150, B3) | money, ledger_seq: seq +1 with its event; frozen at CLOSED; state: listed, CLOSED needs every request RECONCILED (B3) | frozen (B3) | frozen (B3) | grant_id, agency, kind, pool, ceiling (0023:106) | INSERT/UPDATE OF money, ledger_seq, state / event INSERT; carve AUTHORIZED/CLOSED -> HOLD/RELEASE (B3) |
+| 9 | cost_grant_ledger_events | every column from its source (B3); OPENING only in 0048 | refused (B3) | refused (B3) | refused (B3) | append-only | child of row 8 |
+| 10 | request_journal | usage not RECONCILED, reconciled_at NULL; reservation authorised (B3, 0023:292) | usage_state, actual_cents, reconciled_at: frozen once RECONCILED (B3); state (0006:159) | frozen (B3) | frozen (B3) | request_id, agency, reserved_cents, cost_grant_id (0006:100) | INSERT -> RESERVE, UPDATE OF usage_state -> RECONCILE (B3) |
+| 11 | model_tasks | current step (0023:710) | refused (0023:675) | refused (0023:675) | frozen (B11) | append-only | none |
+| 12 | audits | fence 0, cancel_version 0 (0023:439) | fence +1 with a step claimed at it now (B6); state: listed (0023:401) | frozen (B11) | frozen (B11) | audit_id, agency_id (0023:395) | none: immediate |
+| 13 | audit_steps | fence = audit fence + 1, claimed_at := now, nothing recorded (0023:581-591) | outcome, evidence: once (0023:561) | frozen (B11) | frozen (B11) | step_id, audit_id, fence, claimed_at (0023:559) | none |
+| 14 | commercial_transitions | every column from registry + subject (B7) | refused (0028:125) | refused (0028:125) | refused (0028:127) | append-only | none: writer is the subject's AFTER trigger |
+| 15 | commercial_machines, state_machines, state_transitions | seeded by migrations only; INSERT refused after the seed (B11; a later migration seeds under ALTER TABLE ... DISABLE TRIGGER, owner = TCB, P2) | refused (B11) | refused (B11) | refused (B11) | n/a (frozen) | none |
+| 16 | founding_slot_reservations | RESERVED (0028:212), no consumption (CHECK 0028:195), snapshot (0028:321) | state: listed; CONSUMED only by its purchase now (B8); hold/release guards (0028:237, :290) | refused (0028:216) | refused (0028:218) | reservation_id, agency, quote (0028:206) | purchase <-> reservation per purchase (B8) |
+| 17 | the 10 corporate subjects of B7 (sellers ... payout_intents) | each `_initial_state`; history row v1 (B7) | version +1 (enforce_version_bump); state: listed; history per state change (B7) | refused (0029:699 and siblings) | refused (0029:700 and siblings) | each `_immutable` (id, agency where present) | none: structural writer |
+| 18 | agency_recurrence | count 1, instants = now (0028:450, B5b) | count +1, last_confirmed_at = now >= old, first_* fixed (B5b) | refused (0028:462) | refused (0028:464) | agency_id fixed (0028:454) | INSERT/UPDATE / purchase INSERT (B5b) |
+| 19 | qualifying_purchases | all 14 columns from facts (B8) | refused (0028:478) | refused (0028:478) | refused (0028:480) | insert-only | child of row 18; reservation reverse (B8) |
+| 20 | commercial_authorizations | ACTIVE (0015:634), capture required (0015:616) | CONSUMED only with its job ADMITTED now; DELIVERED only with READY + AVAILABLE now; every role (B10); job_ref, consumed_at, delivered_at once (0015:551) | frozen (B11) | frozen (B11) | ids (0015:549) | per authorization (0021:753, 0022:619) / per job (0021:730, 0022:594) |
+| 21 | price_eligibility_snapshots | projects bound (0014:417) | refused (0014:400) | refused (0014:400) | frozen (B11) | append-only | none |
+| 22 | execution_capacity | the migration seed (0021:294) is its only birth; INSERT refused after 0046 (B9) | active/waiting = recount (0021:410); last_admission_at = now, later, with an admission now (G11) | frozen (B9) | frozen (B9) | ledger_id CHECK = 1 (0021:287) | AFTER INSERT (new) and UPDATE (0021:410) / per job (0021:406-408) |
+| 23 | agency_execution_capacity | live_jobs 0, last_admitted_at NULL (B9) | live_jobs = recount (0021:412); last_admitted_at = now, later, with an admission of this agency now (G12) | frozen (B9) | frozen (B9) | agency_id immutable (B9, new) | INSERT/UPDATE (0021:412) / per job (0021:406-408) |
+| 24 | package_versions | initial state (0022:223), workflow (0022:509) | state: listed; available_at once (0022:221); publication guard (0022:576) | frozen (B11) | frozen (B11) | ids (0022:219) | per job READY (0022:594) / per authorization (0022:619) |
+
+Scope and completeness: the matrix is complete for the 35 tables that a G1-G14 guard or a B binding reads or protects. Tables
+read only by guards outside this inventory are NOT in it and stay with their owners: retention_anchors, retention_records,
+dataset_revisions (read by B08's admission bound 0021:700), domain_events and aggregate_kinds (B06 event binding 0005), identities,
+quotes and approvals (FK targets). Residual, lane B-LIFETIME-2 (a later lifetime pass over the whole schema with this rule).
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
@@ -148,7 +206,10 @@ B1 processing_jobs (G3), `0046_job_fence_provenance.sql`, 0021:465-468 replaced:
 `NEW.attempt_count = OLD.attempt_count + 1` and an attempt (agency, job, `attempt_id = NEW.current_attempt_id`, `ordinal =
 NEW.attempt_count`, created_at = now); fence change needs `NEW.current_attempt_id = OLD.current_attempt_id`, `NEW.fence > OLD.fence`,
 that attempt CLAIMED at `fence = NEW.fence` with claimed_at = now, and `attempt_owns_lease`. jobRecord stays fail-closed.
-B2 leases (G13), `0047_lease_server_clock.sql`: INSERT fence 1, cancel_version 0, heartbeat/created/updated := now, `now < expires_at <= deadline_at`;
+B2 leases (G13), `0047_lease_server_clock.sql`: cancel_version (SDP-32): a change is exactly +1 in an UPDATE that changes no owner,
+fence, expiry, heartbeat or checkpoint (cancel_lease's shape, 0006:331), and for JOB_ATTEMPT only while its job (resource_id) has
+cancel_version >= 1 (cancel_command, 0021:471); other kinds have no production cancellation source (F15), so +1 per statement makes
+the safe-integer cap unreachable. INSERT fence 1, cancel_version 0, heartbeat/created/updated := now, `now < expires_at <= deadline_at`;
 DELETE/TRUNCATE refused and DELETE revoked from kauro_control. UPDATE of heartbeat/expiry/checkpoint/owner/fence needs
 `heartbeat_at = now` and `expires_at > now`. Same holder (owner and fence unchanged): `OLD.expires_at > now`; `NEW.expires_at >=
 OLD.expires_at`; `OLD.checkpoint_hash IS NOT NULL => NEW.checkpoint_hash IS NOT NULL` (a stored checkpoint is never cleared; a NULL
@@ -174,7 +235,12 @@ B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
   grantUsage locks requests. Database side: the accountants that run after a request or carve lock (RECONCILE, RELEASE) take the
   grant with NOWAIT: a follower already holds it, so NOWAIT never fails for it; a writer outside the protocol gets 55P03 at once and
   its transaction rolls back whole (no money moved, retriable, tier 3), so it never waits while holding a request and no cycle can
-  run through a grant. HOLD (carve -> pool) and RESERVE (grant first) acquire in order and wait normally.
+  run through a grant. HOLD (carve -> pool) and RESERVE (grant first) acquire in order and wait normally. Pools among themselves:
+  (expires_at, grant_id) order; startAudit (src/audit/store.ts:194-198) keeps that order with FOR NO KEY UPDATE; the carve it
+  inserts is invisible to others until COMMIT, so pool -> new carve creates no cycle. 55P03 contract (SDP-33): no automatic retry
+  is added (it stays non-transient in unit-of-work.ts:305-307); the unit of work returns CAPACITY_UNAVAILABLE and the CALLER owns the
+  retry (the sweep's next run, the dispatcher's next tick). Progress under continuous contention is not claimed for a writer
+  outside the protocol; every production writer follows it, so NOWAIT never refuses one of them.
 - Writers, each a trigger of its source row (no source change escapes them outside the TCB), in the order above:
   HOLD/RELEASE `cost_grants_pool_hold` (0023:212-227, AFTER UPDATE OF state): event, then pool UPDATE. RESERVE: the BEFORE INSERT
   `request_journal_reserves_grant` keeps its authorisation checks (model task, audit, lease fence, grant AUTHORIZED, unexpired,
@@ -252,13 +318,19 @@ founding_reservation_id = it; UNBACKED otherwise. Deferred reverse (KC001): a RE
 consumed_by_authorization_id = the purchase's authorization.
 B9 admission instants (G11, G12), in `0046`: copies of 0044:64-81 and 0044:88-103 with only the `pg_trigger_depth() < 2 OR` removed;
 the agency guard also fires BEFORE INSERT and requires `last_admitted_at IS NULL` at birth (the upsert 0021:318 births NULL and the
-admission then UPDATEs it; SDP-30). live_jobs is already recounted per ledger row and per job (0021:406-413). The platform row is a
-seeded singleton (no birth path).
+admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen against DELETE/TRUNCATE; agency_execution_capacity is born
+with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0046 (its seed is its only birth; a
+replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
+(0021:406-413).
+B11 lifetime freeze (rule 15), `0052_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
+INSERT and UPDATE. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
 B10 authorization bounds (G14), in `0046`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
 0022:606-608). The fact checks themselves are unchanged and now bind every role, the oracle included.
 
 ## C. Failure matrix. S = `packages/persistence/test/sec-depth-provenance.test.ts`, M = `.../sec-depth-money.test.ts`,
-H = `.../sec-depth-hardening.test.ts`, R = `.../sec-depth-root.test.ts`. All GAP cells are tier 1 (rule 9).
+H = `.../sec-depth-hardening.test.ts`, R = `.../sec-depth-root.test.ts`, T = `.../sec-depth-lifetime.test.ts` (table-driven from
+section 3). All GAP cells are tier 1 (rule 9).
 
 Independence proof (P1): every "superuser nested" title uses the kit's `nestedAsSuperuser(sql)`: the superuser oracle creates a
 SECURITY DEFINER function it owns plus a probe table and AFTER INSERT trigger in schema `depth_probe`, grants INSERT on the probe to
@@ -285,7 +357,7 @@ race proof (rule 1).
 | R12b RESERVE (request insert) | GAP SEC-70 M :: "RACE SEC-DEPTH: two dispatch reservations on one grant, both orders held at the grant lock, two events and reserved = sum"; SEC-109 M :: "RACE SEC-DEPTH (lock order): a reservation naming upstream U and the reconciliation of U on the same grant, both orders held at the grant lock, commit without deadlock and with exact totals" | N/A same lock and bound as SEC-38 | N/A grant expiry read unchanged (0023:283-284) | GAP SEC-97 M :: "RACE SEC-DEPTH (commit): a ledger relation failure at COMMIT leaves no request, event, money or RECONCILED usage of the transaction" | N/A guard | GAP SEC-71 M :: "DENY SEC-DEPTH (superuser nested reserve): reserved_cents moved by a request's amount without its RESERVE event, or twice for one request, is refused KA083" | N/A | GAP SEC-88 M :: "DENY SEC-DEPTH (multi-row reserve): an INSERT of two requests whose second exceeds the ceiling at its AFTER re-check rolls back both rows, both events and the grant (KA083)" |
 | R12c RECONCILE (request usage) | GAP SEC-72 M :: "RACE SEC-DEPTH: two reconciliations of different requests of one grant, both orders held at the grant lock, exact totals" | GAP SEC-96t M :: "RACE SEC-DEPTH (commit timeout): a ledger relation check slowed past statement_timeout at COMMIT rolls back request, events and grant, and a retry commits" | N/A | covered by SEC-97 | GAP SEC-98 M :: "RACE SEC-DEPTH (crash after COMMIT): reconcileRequest whose response is lost and is retried refuses PRECONDITION_FAILED and the grant moved once" | GAP SEC-73 M :: "DENY SEC-DEPTH (superuser nested reconcile): a control-session UPDATE releasing reserve or adding spend with no RECONCILE event is refused KA083 (was accepted for kauro_control)"; SEC-74 M :: "DENY SEC-DEPTH: a second RECONCILE of one request is refused"; SEC-90 M :: "DENY SEC-DEPTH (frozen usage): after reconciliation, a change of actual_cents, usage_state or reconciled_at is refused KA004"; SEC-92 M :: "DENY SEC-DEPTH (orphan event): a correct RECONCILE event at seq n+1 without the grant advancing is refused at COMMIT KA083 and the next reservation commits at n+1" | GAP SEC-94 M :: "DENY SEC-DEPTH (close): a grant with a KNOWN unreconciled request cannot reach CLOSED (KA083)" | GAP SEC-89p M :: "RACE SEC-DEPTH (partial reconcile): a reconciliation whose actual exceeds the room under the ceiling fails at the grant write and leaves the request KNOWN with no event (design §9 ceiling, 0023:92)" |
 | R12d ledger evidence | N/A | N/A | N/A | N/A | N/A | N/A | GAP SEC-95 M :: "DENY SEC-DEPTH (superuser nested delete): DELETE or UPDATE of a ledger event, DELETE of a request_journal or cost_grants row is refused" | N/A (DENY SEC-95) |
-| R12e lock protocol (SDP-29) | GAP SEC-120 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and reconcileUsage of one request of its grant, both orders held at the grant lock, finish without deadlock, the request reconciled once and the totals exact"; SEC-121 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and storeResponse with RECONCILED, both orders held at the grant lock, finish without deadlock with exact totals"; SEC-123 M :: "RACE SEC-DEPTH (FK lock mode): two reservations on one grant, held after the first's FK KEY SHARE and before its accountant, both orders, finish without deadlock with two events and reserved = sum"; SEC-124 M :: "RACE SEC-DEPTH (carve close): the sweep closing an AUDIT carve and a pool reservation naming a request of that carve as upstream, both orders held at the pool lock, finish without deadlock and the RELEASE is exact" | N/A same lock and bound as SEC-38 | N/A | N/A guard | N/A guard | GAP SEC-122 M :: "RACE SEC-DEPTH (nonconforming writer): a request UPDATE to RECONCILED without the grant pre-lock while the sweep holds the grant fails 55P03 at once with no event and no change, and its retry after the sweep commits" | N/A | N/A guard |
+| R12e lock protocol (SDP-29) | GAP SEC-120 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and reconcileUsage of one request of its grant, both orders held at the grant lock, finish without deadlock, the request reconciled once and the totals exact"; SEC-121 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and storeResponse with RECONCILED, both orders held at the grant lock, finish without deadlock with exact totals"; SEC-123 M :: "RACE SEC-DEPTH (FK lock mode): two reservations on one grant, held after the first's FK KEY SHARE and before its accountant, both orders, finish without deadlock with two events and reserved = sum"; SEC-124 M :: "RACE SEC-DEPTH (carve close): the sweep closing an AUDIT carve and a pool reservation naming a request of that carve as upstream, both orders held at the pool lock, finish without deadlock and the RELEASE is exact" | N/A same lock and bound as SEC-38 | N/A | N/A guard | N/A guard | GAP SEC-122 M :: "RACE SEC-DEPTH (nonconforming writer): a reconciliation through the unit of work without the grant pre-lock while the sweep holds the grant returns CAPACITY_UNAVAILABLE without an automatic retry, moves nothing, and the caller's next run after the sweep commits"; SEC-132 M :: "RACE SEC-DEPTH (startAudit pool lock): startAudit and the pool's sweep, both orders held at the pool lock, finish without deadlock with exact totals" | N/A | N/A guard |
 | R14 capture -> allocated_cents | GAP SEC-46 M :: "RACE SEC-DEPTH: two captures of one order in two transactions, both orders held at the order lock, allocated = recount" | GAP SEC-46t M :: "RACE SEC-DEPTH (commit timeout): a deferred allocation recount slowed past statement_timeout at COMMIT rolls back captures, allocation and events, and a retry commits" | N/A | GAP SEC-47 M :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves no capture, allocation or event of the transaction" | N/A guard | GAP SEC-48 M :: "DENY SEC-DEPTH (superuser nested allocation): allocated_cents above the recount at commit is refused KP002"; SEC-113 M :: "DENY SEC-DEPTH (superuser nested inflate before capture): an allocation raised before a capture does not shrink the capture's applied amount and is refused at commit KP002" | N/A | SEC-49 M :: "OK SEC-DEPTH (multi-row): two captures completed by one statement allocate 40 + 60 to a 100-cent order" |
 | R15 owner count | GAP SEC-50 H :: "RACE SEC-DEPTH: removals of the last two ACTIVE owners, both orders held at the agency row; the second is refused KA001 by the membership count" | GAP SEC-50t H :: "RACE SEC-DEPTH (commit timeout): an owner recount slowed past statement_timeout at COMMIT rolls back the membership change, and a retry commits" | N/A | GAP SEC-51 H :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves the membership change unapplied" | N/A guard | GAP SEC-85 H :: "DENY SEC-DEPTH (founding owner): a founding OWNER birth with the counter zeroed while an ACTIVE OWNER membership exists is refused KA008" | GAP SEC-52 H :: "DENY SEC-DEPTH (superuser nested owner count): an inflated active_owner_count is refused at commit KA004"; SEC-82 H :: "DENY SEC-DEPTH (inflate, remove, restore): a superuser-owned nested count raise, the demotion of the sole ACTIVE owner, and a nested restore are refused KA001 at the demotion" | SEC-53 H :: "OK SEC-DEPTH (multi-row): one statement adding two owners commits count + 2" |
 | R16 recurrence | GAP SEC-54 H :: "RACE SEC-DEPTH: two first captures of one agency, both orders held at the recurrence advisory lock, count = purchases"; SEC-110 H :: "RACE SEC-DEPTH (older transaction): a designation in a transaction older than a committed designation is refused KC001 and its retry commits with seq n+1" | GAP SEC-54t H :: "RACE SEC-DEPTH (commit timeout): a recurrence recount slowed past statement_timeout at COMMIT rolls back purchase, recurrence and consumption, and a retry commits" | N/A | GAP SEC-55 H :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves no purchase, recurrence or consumption" | N/A guard | GAP SEC-56 H :: "DENY SEC-DEPTH (superuser nested recurrence): a confirmation_count not equal to the purchases at commit is refused KC001"; SEC-86 H :: "DENY SEC-DEPTH (recurrence instant): a nested future last_confirmed_at in an otherwise valid designation is refused KC001 and the next designation commits" | N/A | SEC-57 H :: "OK SEC-DEPTH: the first designation (upsert before purchase insert) commits" |
@@ -295,6 +367,8 @@ race proof (rule 1).
 | R21 qualifying purchase (G10) | N/A covered by SEC-54 | N/A guard | N/A | GAP SEC-111 H :: "DENY SEC-DEPTH (reservation reverse): a RESERVED_SLOT purchase whose reservation is not CONSUMED by its authorization at COMMIT is refused KC001" | N/A guard | GAP SEC-80 H :: "DENY SEC-DEPTH (superuser nested purchase): a purchase whose authorization was not born now, or whose amount, instant or basis differs from its facts, is refused KC001" | N/A | N/A guard |
 | R22 admission instants (G11/G12) | N/A guard (0044 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-81 S :: "DENY SEC-DEPTH (superuser nested admission): a future, past or unadmitted last_admission_at / last_admitted_at is refused KA082" | N/A | N/A guard |
 | R26 birth of derived columns (SDP-30) | N/A single statement | N/A | N/A | GAP SEC-118 M :: "RACE SEC-DEPTH (commit, empty ledger): a grant born and authorized with no money has its relation checked at COMMIT per grant; a failure there rolls the grant back"; SEC-119 M :: "RACE SEC-DEPTH (commit, empty allocation): an order born with no capture has its recount checked at COMMIT per order; a failure there rolls the order back" | N/A guard | GAP SEC-114 M :: "DENY SEC-DEPTH (superuser nested grant birth): a zero-money PREPARED pool born with ledger_seq = 9007199254740991 and no event is refused KA083"; SEC-115 M :: "DENY SEC-DEPTH (superuser nested order birth): an INTENT_CREATED order born with allocated_cents = 1, no capture and its event is refused KP002" | GAP SEC-116 S :: "DENY SEC-DEPTH (superuser nested lease birth): a lease born with cancel_version above 0 is refused KA005"; SEC-117 S :: "DENY SEC-DEPTH (superuser nested capacity birth): an agency ledger born with a last_admitted_at is refused KA082" | N/A (DENY SEC-114..117) |
+| R27 lifetime: DELETE/TRUNCATE (section 3, all rows) | N/A single statement | N/A | N/A | N/A | N/A | N/A | GAP SEC-L01..SEC-L24 T :: "DENY SEC-DEPTH (lifetime <table>): a superuser-owned nested DELETE of a row and a TRUNCATE are refused and the row survives", one title per section 3 row (row 17 iterates its 10 tables, row 15 its 3); OK sibling: none, no production writer deletes (F14) | N/A (DENY) |
+| R28 lifetime: replacement, identity, counters (SDP-31/32, config) | N/A covered by SEC-50/54/70 locks | N/A | N/A | N/A | N/A | GAP SEC-125 S :: "DENY SEC-DEPTH (platform ledger replacement): a nested DELETE and re-INSERT of execution_capacity with matching counts and last_admission_at = infinity is refused, and the next admission commits"; SEC-126 S :: "DENY SEC-DEPTH (agency ledger replacement): a nested DELETE and re-INSERT of an agency ledger with matching live_jobs and NULL last_admitted_at is refused"; SEC-127 S :: "DENY SEC-DEPTH (agency ledger reparent): a nested UPDATE of a zero-live ledger's agency_id to another agency is refused KA004" | GAP SEC-128 S :: "DENY SEC-DEPTH (lease cancel jump): kauro_control setting a live lease's cancel_version to 9007199254740991 with heartbeat_at = server_now is refused KA005"; SEC-129 S :: "DENY SEC-DEPTH (lease cancel source): cancel_lease on a JOB_ATTEMPT lease whose job has no cancel request is refused KA005"; SEC-130 S :: "DENY SEC-DEPTH (config freeze): a nested INSERT of a state_transitions edge or a commercial_machines row, and an UPDATE of a registry scope, are refused" | N/A (DENY) |
 | R23 authorization bounds (G14) | N/A guard (B08's 0021/0022 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-106 S :: "DENY SEC-DEPTH (superuser definer flush): a superuser-owned definer consuming an ACTIVE authorization with no admission, with its event and SET CONSTRAINTS ALL IMMEDIATE, is refused KA081"; SEC-107 S :: "DENY SEC-DEPTH (superuser definer flush): CONSUMED to DELIVERED with no READY job and AVAILABLE package is refused KA081" | GAP SEC-108 S :: "OK SEC-DEPTH (real execution facts): consumption through queueJob and admitJob and delivery through publishJob commit for the oracle-free fixtures" | N/A guard |
 | R17 catalog gate | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A; S :: "SEC-DEPTH catalog: no kauro function reads pg_trigger_depth() or rolsuper, is_control_session() guards no value, no kauro function is SECURITY DEFINER, and the 11 history attachments equal kauro.commercial_machines" |
 
@@ -303,8 +377,10 @@ Timeout bound for SEC-38/46t/50t/54t/96t: the transaction's `SET LOCAL statement
 
 C1 Baseline proof. Must FAIL on 21b310f through base SQL only (the superuser-owned probe uses no new function or signature):
 SEC-24, 25, 28, 28b, 29, 30, 32, 34, 36, 39, 40, 40b, 48, 52, 56, 71, 73, 76, 78, 80, 18, and new in r9: SEC-82, 86, 90, 93, 94,
-95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117. New-ledger-only (no baseline object; fail with the B3
-checks reverted): SEC-92, SEC-96t, SEC-97, SEC-114, SEC-118. SEC-119 fails with B4's per-order queue reverted. SEC-120/121/122/124
+95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117, and in r11 SEC-125, 126, 127, 128, 130 and every
+SEC-Lnn whose row says "frozen (B11)" or "frozen (B9)". New-ledger-only (no baseline object; fail with the B3
+checks reverted): SEC-92, SEC-96t, SEC-97, SEC-114, SEC-118. SEC-119 fails with B4's per-order queue reverted; SEC-129 fails with B2's source rule
+reverted. SEC-Lnn of rows already refused on main (11 DELETE, 14, 16-19, 21 DELETE) are supplemental. SEC-120/121/122/124
 fail (deadlock 40P01 or a held wait past the bound) with the B3 lock protocol reverted to the r9 order. Supplemental (already refuse on main): SEC-79, SEC-81, SEC-85, SEC-88, SEC-59. OK siblings, RACE titles and R1/R2
 checks other than SEC-18 are not baseline failures; SEC-103 additionally FAILS against the r8 literal B2 predicate (regression proof).
 
@@ -323,14 +399,18 @@ the step claimed now"; SEC-78/100/101 -> SEC-99; SEC-79 -> SEC-57; SEC-80/111 ->
 RESERVED_SLOT and UNBACKED commit with every column equal to its facts"; SEC-81 -> "OK SEC-DEPTH: an admission stamps
 last_admission_at and last_admitted_at with server_now"; SEC-106/107 -> SEC-108; SEC-114/115 -> "OK SEC-DEPTH (birth): a pool, a carve and an order born through their production writers
 commit with ledger_seq 0 and allocated_cents 0"; SEC-116 -> SEC-27b; SEC-117 -> "OK SEC-DEPTH (birth): an agency's first job
-creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
+creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-125/126 -> "OK SEC-DEPTH (capacity): an admission and a job end move both ledgers and
+the admission instants"; SEC-127 -> the same; SEC-128/129 -> "OK SEC-DEPTH (lease cancel): cancel_command then
+mirrorCancellation advances the JOB_ATTEMPT lease's cancel_version by one"; SEC-130 -> "OK SEC-DEPTH (config): a fresh migration
+run seeds every machine and registry row"; SEC-132 -> SEC-120; SEC-Lnn -> none (F14); SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
 clean runtime login and 0045 passes on a clean cluster".
 
 ## D. Accepted packages touched (A6: re-verify only these titles)
 
 B06: S090/B06-R1 (journals-leases.test.ts:268, :312-316, :335; adapters-leases.test.ts:32, :123, :158, :217, :242), pool
 verification, aggregate-kinds.test.ts:445, adapters-journals-outbox.test.ts:265 (reconcileUsage now accounts; its grant must have
-room), S050/R2-043 via L3. B08: S056 (execution-migrations.test.ts:261; callers execution-adapters :331, execution-migrations :150),
+room), S050/R2-043 via L3, adapters-leases cancel (:217, :242: generic port, +1 alone). B08: cancellation mirroring
+(cmd037-cancel-job.test.ts, execution-adapters mirrorCancellation), startAudit (audit-adapters), S056 (execution-migrations.test.ts:261; callers execution-adapters :331, execution-migrations :150),
 R2-046 (admission-instants.test.ts:218-286), R2-044/S041/IC-12 (audit-migrations.test.ts:89, audit-adapters :286,
 grant-reconciliation.test.ts:31 (sweep lock mode), b08-end-to-end.test.ts:306), the D8-PEX-8 test (execution-migrations.test.ts:783-795, inverted),
 FH-R2; audit fence (G6), admission instants (G11/G12). B09: R2-140, S058/S057 (b09-migrations.test.ts:278, :307), B09-F2
@@ -356,14 +436,15 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | K kit | src/testing/depth-probe.ts (`nestedAsSuperuser`, `slowCheckHook`), src/testing/execution-delivery.ts (`consumeThroughExecution`, `deliverThroughExecution`), src/testing/index.ts | - | 45 min, 90k | claude-sonnet-5-5 |
 | L0 fixtures | b09-critique.test.ts, apps/api/test/b09-scenarios.test.ts, apps/api/test/commission-support.ts | D1 | 40 min, 100k | claude-sonnet-5-5 |
 | L1 hardening | migrations/0045, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
-| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117) | 170 min, 400k | Opus |
-| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119) | 200 min, 480k | Opus |
+| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129) | 190 min, 440k | Opus |
+| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119) | 215 min, 510k | Opus |
 | L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21 | 140 min, 330k | Opus |
+| L4 lifetime | migrations/0052, T | R27, SEC-130 | 110 min, 240k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
-L2b) -> L3; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
+L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
 shown failing on 21b310f (log) and passing on the branch; C2 siblings green; full suites green in ci-local (WSL + Windows). Total
-about 11.1 h agent time, 1.56M tokens.
+about 13.5 h agent time, 1.87M tokens (r10: 11.1 h, 1.56M).
 
 ## F. Decisions and open questions
 
@@ -373,6 +454,7 @@ about 11.1 h agent time, 1.56M tokens.
 - Q2 (accepted) the port keeps `now`; every SQL `p_now` overload removed; SEC-33 keeps clock independence; port removal is a
   follow-up (B06 domain + 3 dispatchers).
 - Q3 withdrawn: per-source events, no SUM.
+- Q7 Section 3 is complete for this lane's 35 tables; the rest of the schema is residual B-LIFETIME-2 (section 3 note).
 - Q4 Section A is hardening; P2 states the guard-execution boundary and enforces the runtime half.
 - Q5 answered by the B7 registry table (11 attachments, scope, stamps).
 - Q6 REVERSED by the coordinator in r9: both `rolsuper` skips are removed (B10); D1 lists the fixture moves.
