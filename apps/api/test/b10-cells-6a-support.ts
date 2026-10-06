@@ -13,6 +13,10 @@ import { PgRecurrenceRepository } from "@kauro/persistence";
  * registry policy the deployment binds — the same object the production factory hands it, nothing more; a repository that has its policies
  * (every unrouted unit) is untouched.
  */
+// TODO(b10/kit 64741e0): delete this workaround and its call sites (b10-failure-cells-quote/agency/replacement before hooks) once the kit
+// commit that fixes fault-support.ts at the source (the routed unit binds the registry price policy) is in main: after it the patch is a
+// no-op (`policies.size > 0`). It monkeypatches the production class prototype for the whole test process, which is why it must not outlive
+// the kit.
 export function routedUnitsIssueWithTheRegistryPolicy(): void {
   const proto = PgRecurrenceRepository.prototype as unknown as { issueQuote: (...a: unknown[]) => Promise<unknown>; __b10g6a?: true };
   if (proto.__b10g6a === true) return;
