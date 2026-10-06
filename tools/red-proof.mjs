@@ -131,7 +131,7 @@ try {
               : sum.cancelled || sum.otherFailures ? "tests were cancelled or failed without a test-body failure" : "no failing test body was identified";
             report.inconclusive.push(`without fix: ${targets[i].file}: ${why}`);
           }
-          row.firstFailingAssertion = result.firstFailingAssertion;
+          row.firstFailingAssertion = row.failedWithoutFix ? sum.assertion : result.firstFailingAssertion;
           row.durations.withoutFixMs = result.durationMs;
         } else {
           const recovered = row.baseFailedNames.every((name) => sum.passedNames.includes(name));

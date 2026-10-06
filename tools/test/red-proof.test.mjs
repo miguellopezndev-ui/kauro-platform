@@ -177,6 +177,28 @@ test("a diff that touches no reverted path is refused with exit 2", () => {
 });
 
 const HEAD = "import assert from 'node:assert/strict'; import {test, describe, before} from 'node:test'; import {value} from '../src/value.js';\n";
+test("red proof records the deciding body assertion ahead of a failing hook", () => {
+  const f = fixture();
+  try {
+    f.put(file, HEAD + `describe('fixture with a broken hook', () => {
+  before(() => { if (value === 1) assert.fail('HOOK DECOY'); });
+  test('blocked by hook', () => {});
+});
+test('actual regression', () => assert.equal(value, 2, 'BODY REGRESSION'));
+`);
+    f.git("add", ".");
+    f.git("commit", "-qm", "hook and assertion regression");
+    const head = f.git("rev-parse", "HEAD");
+    const result = command(process.execPath, [script, f.base, head, "--tests", file], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
+    assert.equal(result.status, 0, result.output);
+    const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
+    assert.equal(report.verdict, "PASS");
+    assert.deepEqual(report.tests[0].baseFailedNames, ["actual regression"]);
+    assert.match(report.tests[0].firstFailingAssertion, /AssertionError.*BODY REGRESSION/);
+    assert.doesNotMatch(report.tests[0].firstFailingAssertion, /HOOK DECOY/);
+  } finally { rmSync(f.parent, { recursive: true, force: true }); }
+});
+
 test("a timed-out red-proof worker is dead before head runs and the gate returns", () => {
   const f = fixture();
   const pidFile = join(f.parent, "worker-pid");

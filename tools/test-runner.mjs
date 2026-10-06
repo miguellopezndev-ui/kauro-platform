@@ -109,7 +109,9 @@ export function summarizeEvents(path, file) {
     if (record.event === "pass") { summary.leafPassed++; summary.passedNames.push(record.name); continue; }
     summary.failedNames.push(record.name);
     if (record.failureType === "testCodeFailure") {
-      summary.leafFailed++; summary.bodyFailedNames.push(record.name); summary.assertion ??= record.message;
+      summary.leafFailed++; summary.bodyFailedNames.push(record.name);
+      summary.assertion ??= record.message == null ? null : record.errorName
+        ? `${record.errorName}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}` : record.message;
     } else if (record.failureType === "hookFailed") summary.hookFailures++;
     else if (record.failureType === "cancelledByParent") summary.cancelled++;
     else summary.otherFailures++;
@@ -220,7 +222,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       });
     });
     const summary = summarizeEvents(eventsFile, target.compiled);
-    return { ...result, firstFailingAssertion: firstFailingAssertion(result.output) ?? summary.assertion, summary };
+    return { ...result, firstFailingAssertion: summary.assertion ?? firstFailingAssertion(result.output), summary };
   } finally {
     closeSync(stdout);
     closeSync(stderr);
