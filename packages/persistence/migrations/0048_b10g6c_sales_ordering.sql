@@ -32,9 +32,12 @@ $$;
 -- 0002 takes the writer's half of kauro.identities on a state change only; a verified e-mail or an MFA enrolment withdrawn (the identity's
 -- own sync, identities_self_sync) is as much a withdrawal of the authority an activation rests on (17 "Activation prerequisites", KC005):
 -- the activation's reader half (activationFacts, sellers_activation_guard) and the withdrawal now serialize in both orders.
+-- Only a withdrawal (a fact going from set to NULL) takes it: the sync refreshes the facts while its own command holds the identity's
+-- reader half (TenancyRepository.syncOwn), so a refresh that took the writer's half would deadlock two concurrent requests of one person
+-- (cmd001 RACE, 40P01); a refresh to another set value withdraws nothing an activation rests on.
 DROP TRIGGER IF EXISTS identities_assurance_transition_lock ON kauro.identities;
 CREATE TRIGGER identities_assurance_transition_lock BEFORE UPDATE OF email_verified_at, mfa_enrolled_at ON kauro.identities
-  FOR EACH ROW WHEN (OLD.email_verified_at IS DISTINCT FROM NEW.email_verified_at OR OLD.mfa_enrolled_at IS DISTINCT FROM NEW.mfa_enrolled_at)
+  FOR EACH ROW WHEN ((OLD.email_verified_at IS NOT NULL AND NEW.email_verified_at IS NULL) OR (OLD.mfa_enrolled_at IS NOT NULL AND NEW.mfa_enrolled_at IS NULL))
   EXECUTE FUNCTION kauro.take_transition_lock('kauro.identities', 'user_id');
 
 -- --- AGREEMENT_EXP, CORP_REV: the seller's agreement changes under the seller's transition lock ------------------------------------------
