@@ -7,11 +7,13 @@
 // contract (status, COMPLETED envelope) before a test reads it; the superuser only reads. A leg of a scenario that stands at another
 // instant (a purchase after a window's end) runs through the labelled TEST CLOCK of the support it reuses (D10-CLOCK-1).
 import assert from "node:assert/strict";
+import type { ProviderCallTimer } from "@kauro/application";
+import { realProviderCallTimer } from "@kauro/application";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
 import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
 import { toUtcInstant } from "@kauro/domain";
 import type { ProjectId, UserId } from "@kauro/domain";
-import { recordClaim, recordProspect, serverNow, type RecordedSeller } from "@kauro/persistence/testing";
+import { FaultPoints, instrumentPort, operationClock, recordClaim, recordProspect, serverNow, type RecordedSeller } from "@kauro/persistence/testing";
 import { prepareAllocation } from "./sales-support.js";
 import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { captureOf, claimsOn, linesOf, oracleRows, poolsOf, quoteFactsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
@@ -42,9 +44,41 @@ export interface IntegrationWorld extends StatementsWorld {
   readonly buyers: ContractFakeBuyerTypeReader;
 }
 
+/**
+ * The provider-call bound the world's commands run on (B10G-R4; ApiAssembly.commercial.providerTimer). Outside a cell operation it is the
+ * deployment's own timer. Inside one (ctx.operation) it elapses when the cell's controlled clock — the step clock the operation received —
+ * reads the bound's duration past the instant the bound started; the instant that crossed it is then handed to an instrumented sink inside
+ * the operation, so the harness proves the cell's deadline was crossed AND consumed by the operation (never by the test body).
+ */
+const POLL_MS = 20;
+const crossing = instrumentPort({ async elapsed(r: { readonly at: string }): Promise<string> { return r.at; } }, new FaultPoints(), "provider-timer");
+const cellProviderTimer: ProviderCallTimer = {
+  start(ms) {
+    const op = operationClock();
+    if (op === undefined) return realProviderCallTimer.start(ms);
+    const startedAt = op.nowMs();
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const elapsed = new Promise<void>((resolve) => {
+      poll = setInterval(() => {
+        try {
+          if (op.nowMs() - startedAt < ms) return;
+          const at = op.now();
+          clearInterval(poll);
+          void crossing.elapsed({ at }).then(() => resolve());
+        } catch {
+          // the operation settled: its bound is moot
+          clearInterval(poll);
+        }
+      }, POLL_MS);
+      poll.unref();
+    });
+    return { elapsed, cancel: () => clearInterval(poll) };
+  },
+};
+
 export async function integrationWorld(): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
-  const sw = await statementsWorld({ commercial: { buyerTypes: buyers } });
+  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer } });
   return Object.assign(sw, { buyers });
 }
 

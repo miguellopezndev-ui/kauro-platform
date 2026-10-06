@@ -87,7 +87,7 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
             const page: ReadonlyArray<EndClientRecord> = await uow.endClients.list(agencyId, { ...(after !== undefined ? { after } : {}), limit: CLIENT_PAGE });
             for (const client of page) {
               // bounded (D10-GAP-6): an inspector that does not answer is no inventory, never zero work — the closure is refused, retriably
-              const inspected = await withinCallBound(runtime.clock, () => co.activeWork.inspectClient(uow, client.clientId));
+              const inspected = await withinCallBound(co.providerTimer,() => co.activeWork.inspectClient(uow, client.clientId));
               if (inspected.timedOut) throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency's active work could not be inspected in time; nothing changed, retry with the same key", { retryAfterSeconds: INSPECTOR_RETRY_AFTER_SECONDS }, true);
               const work = inspected.value;
               activeWork += work.openProjects + work.activeJobs;
