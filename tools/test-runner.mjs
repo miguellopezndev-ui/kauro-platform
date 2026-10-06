@@ -50,7 +50,7 @@ export function firstFailingAssertion(output) {
 }
 
 // Summarises the structured events written by tools/test-events-reporter.mjs. Nothing here reads spec text.
-// A "leaf" is a real test (details.type "test", not a suite, skipped or todo). The synthetic failure node:test
+// A "leaf" is a real test with no subtests (details.type "test", not a suite, skipped or todo). The synthetic failure node:test
 // reports for a file that fails to load or throws at top level is named after the file and is never a leaf.
 export function summarizeEvents(path, file) {
   let records = [];
@@ -61,8 +61,12 @@ export function summarizeEvents(path, file) {
     passedNames: [], failedNames: [], bodyFailedNames: [], hookFailures: 0, cancelled: 0, otherFailures: 0, fileFailures: 0,
     leafPassed: 0, leafFailed: 0, skipped: 0, todo: 0, assertion: null,
   };
-  for (const record of records) {
-    if (record.event !== "pass" && record.event !== "fail") continue;
+  // Completion events are in postorder: a parent's last child completes immediately before the parent,
+  // at a deeper nesting level. This also covers parents made with test()/t.test(), not just describe().
+  const completed = records.filter((record) => record.event === "pass" || record.event === "fail");
+  for (let index = 0; index < completed.length; index++) {
+    const record = completed[index];
+    const hasSubtests = completed[index - 1]?.nesting > record.nesting;
     // A file with no tests is reported as one passing node named after the file; that is not an executed test either.
     if (record.nesting === 0 && (record.name === base || record.name === file)) { if (record.event === "fail") summary.fileFailures++; continue; }
     if (record.kind !== "test") {
@@ -71,6 +75,14 @@ export function summarizeEvents(path, file) {
     }
     if (record.skip) { summary.skipped++; continue; }
     if (record.todo) { summary.todo++; continue; }
+    if (hasSubtests) {
+      if (record.event === "fail") {
+        if (record.failureType === "hookFailed") summary.hookFailures++;
+        else if (record.failureType === "cancelledByParent") summary.cancelled++;
+        else if (record.failureType !== "subtestsFailed") summary.otherFailures++;
+      }
+      continue;
+    }
     if (record.event === "pass") { summary.leafPassed++; summary.passedNames.push(record.name); continue; }
     summary.failedNames.push(record.name);
     if (record.failureType === "testCodeFailure") {
@@ -79,7 +91,7 @@ export function summarizeEvents(path, file) {
     else if (record.failureType === "cancelledByParent") summary.cancelled++;
     else summary.otherFailures++;
   }
-  summary.anyFailure = summary.failedNames.length > 0 || summary.fileFailures > 0 || summary.hookFailures > 0;
+  summary.anyFailure = summary.failedNames.length > 0 || summary.fileFailures > 0 || summary.hookFailures > 0 || summary.cancelled > 0 || summary.otherFailures > 0;
   return summary;
 }
 

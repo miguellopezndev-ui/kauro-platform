@@ -103,6 +103,20 @@ test("a green file with a skipped and a todo sibling still passes", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+for (const option of ["skip", "todo"]) {
+  test(`a parent test with only a ${option} subtest is not an executed leaf`, () => {
+    const root = fixture(`import {test} from 'node:test'; test('parent', async (t) => { await t.test('child', {${option}: true}, () => {}); });\n`);
+    try {
+      const result = command(process.execPath, [script, "fake.test.mjs", "1"], root);
+      assert.equal(result.status, 1, result.output);
+      const report = JSON.parse(readFileSync(join(root, "stress-cells.json"), "utf8"));
+      assert.equal(report.verdict, "FAIL");
+      assert.equal(report.results[0].tests, 0);
+      assert.match(report.results[0].reason, /no tests ran/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
 test("a hung iteration is killed by --timeout-min and fails with the reason", () => {
   const root = fixture("import {test} from 'node:test'; test('hang', () => new Promise(() => setInterval(() => {}, 1000)));\n");
   try {
