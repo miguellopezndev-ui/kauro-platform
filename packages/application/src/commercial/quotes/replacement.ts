@@ -210,7 +210,7 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
   if (factory === null || rebinder === null) throw providerServicesUnavailable();
   // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
   // open (nothing is concluded), and the request answers the retriable 202 — the same key resumes and observes the re-binding by its identity
-  const bounded = await withinCallBound(co.providerTimer,() =>
+  const bounded = await withinCallBound(co.providerTimer, () =>
     factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
       if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
       const to = await svc.commerce.quotes.get(ctx.toQuoteId);
