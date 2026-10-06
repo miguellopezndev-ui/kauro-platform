@@ -277,6 +277,12 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0]?.ok === true;
   }
 
+  /** The review deadline judged by the database (kauro.server_now(), D10-CLOCK-1) with the lapse's comparison: the deadline instant itself is past. */
+  async reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ reached: boolean }>(this.db, "SELECT review_deadline_at <= kauro.server_now() AS reached FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]);
+    return r.rows[0]?.reached === true;
+  }
+
   async claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>> {
     const r = await execute<ClaimRow>(this.db, `SELECT ${CLAIM} FROM kauro.attribution_claims WHERE prospect_id = $1 ORDER BY submitted_at, claim_id`, [prospectId]);
     return r.rows.map(claimRecord);

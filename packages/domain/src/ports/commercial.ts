@@ -478,6 +478,11 @@ export interface AttributionRepository {
   getClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
   /** The claim FOR UPDATE, after its prospect's claims lock (CMD047, CMD050). */
   lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
+  /**
+   * Whether the claim's review deadline is reached on the database clock (review_deadline_at <= kauro.server_now(), the CLAIM_WINDOWS
+   * lapse's own comparison at its microsecond grain): CMD047 refuses such a claim CLAIM_EXPIRED whether or not the sweep lapsed it.
+   */
+  reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean>;
   claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>>;
   /** The seller's open claims (SUBMITTED, DISPUTED, ACCEPTED): CMD050 expires the unlisted ones. */
   openClaimsOf(sellerId: SellerId): Promise<ReadonlyArray<AttributionClaimRecord>>;
