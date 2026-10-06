@@ -145,7 +145,9 @@ Colombian law, this Agreement and Kauro's contracts with its sub-processors serv
 
 10.2. The United States of America is on the SIC's list of countries with an adequate level of protection (Circular Única, Title
 V, Chapter 3, numeral 3.2). That status does not relieve Kauro from demonstrating the appropriate and effective measures it
-applies; this Agreement and Annex II are that demonstration as far as Kauro is concerned.
+applies. This Agreement and Annex II describe the commitments and the measures; their implementation and effectiveness are
+demonstrated by evidence: the current configuration, tests and operational records required by the activation checks, which Kauro
+makes available to the Customer under section 15.
 <!-- law: C-22, C-23 -->
 
 10.3. Kauro does not transfer Customer Data to third-party controllers. If a sub-processor ever needed to process data outside the

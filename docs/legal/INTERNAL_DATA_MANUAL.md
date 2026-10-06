@@ -69,7 +69,7 @@ finalidad, un dato, un sistema o un encargado.
 | R-01 | Clientes y usuarios (§6.1) | Administradores y usuarios de agencias y empresas cliente | Identificación y contacto de trabajo, rol, verificación de correo y segundo factor, aceptación de documentos, autorización comercial separada con sus canales, actividad y eventos de seguridad, tipo de comprador | Base de datos de la plataforma en AWS (EE. UU.) | AWS; Resend (avisos) | Cuenta activa + 6 meses | MANUAL hasta que exista barrido automático |
 | R-02 | Facturación, pagos y contabilidad (§6.2) | Representantes y contactos de facturación; ordenantes de transferencias | Razón social, NIT, dirección y contacto de facturación, pedidos, pagos, reembolsos, disputas | Plataforma (AWS); proveedor de facturación electrónica; libros contables | AWS; proveedor de facturación | ≥ 10 años | MANUAL (plazo legal; no se borra antes) |
 | R-03 | Interesados del formulario (§6.3) | Personas que llenan el formulario de contacto | Nombre, correo, empresa, tipo de comprador, destino, banda de registros, fecha deseada, autorización comercial separada con sus canales | Plataforma (AWS); correo corporativo | AWS; Google | 12 meses sin interacción | MANUAL |
-| R-04 | Prospectos (§6.3) | Agencias (datos de la organización) y personas de agencias que autorizaron el contacto | Organización: agencia, dominio, país, buzones genéricos o de función, teléfono público de la empresa, fuente y fecha, notas acotadas, estado de baja. Persona: nombre, cargo, correo y teléfono de trabajo **solo con registro de autorización** | Plataforma (AWS) | AWS; Resend o correo corporativo para envíos | Baja, revocatoria o 24 meses sin interacción; la baja se conserva | MANUAL (borrado); PRODUCTO (bloqueo de datos de persona sin autorización, A-13) |
+| R-04 | Prospectos (§6.3) | Agencias (datos de la organización) y personas de agencias que autorizaron el contacto | Organización: agencia, dominio, país, fuente y fecha, notas acotadas sin datos de personas, estado de baja y canales que cumplen los tres hechos de POL §6.3.1 con su evidencia (URL, fecha, captura) y fecha de última verificación. Persona: nombre, cargo, correo y teléfono de trabajo **solo con registro de autorización** | Plataforma (AWS) | AWS; Resend o correo corporativo para envíos | Baja, revocatoria o 24 meses sin interacción; la baja se conserva | MANUAL (borrado); PRODUCTO (bloqueo de datos de persona sin autorización, A-13) |
 | R-05 | Colaboradores comerciales y proveedores (§6.4) | Vendedores, candidatos, proveedores personas naturales | Identificación, contacto, contrato, documentos tributarios y de seguridad social, datos bancarios, comisiones | Plataforma (AWS, acceso restringido a finanzas); correo corporativo | AWS; Google | Relación + plazos tributarios y contables | MANUAL |
 | R-06 | Solicitudes, consultas y reclamos (§6.5) | Quienes ejercen derechos ante Kauro | Identificación del solicitante, tipo, fechas, verificación, alcance, respuesta | Registro de solicitudes (sección 8) en el espacio de Google Workspace de Kauro | Google | 5 años desde el cierre | MANUAL |
 | R-07 | Seguridad y registros técnicos (§6.6) | Usuarios y operadores | Actor, alcance, acción, resultado, fecha; sin contenido de CRM ni secretos | Plataforma y registros de AWS (EE. UU.) | AWS | Registros de aplicación 30 días; evidencia de seguridad 180 días | PRODUCTO (09 §Retention schedule) |
@@ -137,13 +137,18 @@ información bloqueada. No basta con reenviar.
 3. MANUAL: para colaboradores comerciales, la autorización es un documento firmado al contratar (R-05).
 3a. PRODUCTO (A-14): la autorización para comunicaciones comerciales es separada, opcional, con casilla no marcada y elección de
    canales; se guarda con finalidad, canales, fecha y versión; no condiciona la cuenta, la compra ni el formulario.
-3b. PRODUCTO (A-13): un prospecto solo guarda datos de la organización (nombre, dominio, país, buzones genéricos o de función,
-   teléfono público de la empresa, fuente y fecha). Los datos de una persona solo se guardan con un registro de autorización:
-   la persona llenó el formulario, o respondió por escrito a un primer mensaje enviado a un canal genérico de la agencia que le
-   pedía esa autorización. Nadie copia nombres, correos nominativos ni teléfonos directos de sitios web, directorios ni redes.
+3b. PRODUCTO (A-13) + MANUAL: un prospecto solo guarda datos de la organización. Un correo o teléfono cuenta como dato de la
+   organización **solo por hechos, nunca por su forma**: (a) la organización, persona jurídica, lo publica como su canal de
+   contacto comercial y Kauro guarda la evidencia (URL, fecha, captura); (b) no identifica ni se atribuye a una persona natural
+   (sin nombre de persona; la agencia no es comerciante persona natural ni negocio de una sola persona; no es celular ni línea
+   personal); (c) se verifica de nuevo cada vez que se usa. Quien lo registra (el representante legal o un vendedor) marca cada
+   hecho con su evidencia; si alguno falla o no se puede determinar, es dato personal. Los datos de una persona solo se guardan
+   con un registro de autorización: la persona llenó el formulario, o respondió por escrito a un primer mensaje enviado a un canal
+   que cumple (a)–(c) y que le pedía esa autorización. La regla cubre cada campo importado, la referencia de la fuente y las notas.
+   Nadie copia nombres, correos nominativos ni teléfonos de personas de sitios web, directorios ni redes.
 4. Antes de usar datos para una finalidad nueva, se actualiza la POL, se avisa antes de aplicar el cambio y, si cambia la
    finalidad, se pide nueva autorización.
-<!-- law: C-04, C-05, C-06, C-18, C-19, C-26, C-51, C-52 (SIC Circular Externa 002 de 2024, instrucción IX: accesible al público no es naturaleza pública) · texto: POL §6.3, §8, §20; AVISO · CHECKLIST A-13, A-14, S-22 -->
+<!-- law: C-04, C-05, C-06, C-18, C-19, C-26, C-51, C-52 (SIC Circular Externa 002 de 2024, instrucción IX: accesible al público no es naturaleza pública; SIC, concepto radicado 23-571469 (datos corporativos de una persona jurídica)) · texto: POL §6.3, §8, §20; AVISO · CHECKLIST A-13, A-14, S-22 -->
 
 ### 5.4. Incidentes de seguridad
 
@@ -192,10 +197,12 @@ Todo este procedimiento es MANUAL.
    PARCIAL queda visible con su próximo reintento. MANUAL: el representante legal revisa **cada semana** la métrica de
    eliminaciones vencidas (14 §Monitoring: "overdue deletion") y actúa sobre cualquiera.
 2. **Datos propios (R-01..R-06, R-08): MANUAL** mientras no exista barrido automático. Los plazos publicados son máximos, así que
-   se borra **antes** de que venzan: **cada lunes** (o el día hábil siguiente) el representante legal elimina todo registro cuyo
-   plazo venza antes del lunes siguiente: cuentas que cumplen 6 meses de cerradas (salvo lo que pertenece a R-02); prospectos que
+   se borra **antes** de que venzan: **cada lunes** (o, si es festivo, el día hábil siguiente) el representante legal calcula la
+   fecha real de la próxima ejecución (el lunes siguiente o, si es festivo, el primer día hábil después) y elimina **todo registro
+   cuyo plazo venza en esa fecha o antes**: cuentas que cumplen 6 meses de cerradas (salvo lo que pertenece a R-02); prospectos que
    cumplen 24 meses sin interacción (conserva solo la baja); interesados del formulario que cumplen 12 meses sin interacción; y
-   casos de solicitudes que cumplen 5 años de cerrados. Los correos que contengan archivos de CRM se eliminan el mismo día en que
+   casos de solicitudes que cumplen 5 años de cerrados. Si una ejecución se salta por cualquier motivo, se hace el siguiente día
+   hábil con el mismo cálculo y se registra el incidente. Los correos que contengan archivos de CRM se eliminan el mismo día en que
    se detectan, y una baja o revocatoria se aplica de inmediato. Anota en el registro de supresión: base, criterio, cantidad y
    fecha, sin los datos borrados.
 3. **R-02** se conserva al menos 10 años (Código de Comercio art. 60); nunca contiene contenido de CRM.
@@ -232,13 +239,14 @@ Todo este procedimiento es MANUAL.
 
 | Paso | Qué | Quién |
 |---|---|---|
-| 1 | Destinatarios permitidos: usuarios e interesados con autorización comercial para **ese canal**; canales genéricos de agencias prospecto; personas de agencias con registro de autorización (POL §17.1) | PRODUCTO (puerta de envío, A-14) |
-| 2 | Para destinatarios en Colombia, consultar el **Registro de Números Excluidos** de la CRC en las 24 horas anteriores al envío y excluir los canales inscritos; si la inscripción es posterior a la autorización, la autorización se tiene por revocada salvo una nueva | MANUAL (consulta en la plataforma de trámites de la CRC con la cuenta de Kauro) + PRODUCTO (marca la exclusión) |
+| 1 | Destinatarios permitidos: usuarios e interesados con autorización comercial para **ese canal**; canales de agencias prospecto que cumplen los tres hechos de POL §6.3.1, **verificados de nuevo** antes del envío; personas de agencias con registro de autorización (POL §17.1) | PRODUCTO (puerta de envío, A-13, A-14) + MANUAL (re-verificación con evidencia) |
+| 2 | Para destinatarios en Colombia, consultar el **Registro de Números Excluidos** de la CRC **el mismo día calendario del envío** (hora de Bogotá; un resultado de un día anterior nunca se reutiliza, porque las inscripciones se hacen efectivas el día hábil siguiente) y excluir los canales inscritos; si la inscripción es posterior a la autorización, la autorización se tiene por revocada salvo una nueva | MANUAL (consulta en la plataforma de trámites de la CRC con la cuenta de Kauro) + PRODUCTO (marca la exclusión y rechaza un resultado de otro día) |
+| 2a | **Frecuencia** para destinatarios en Colombia, después de un contacto directo por cualquier canal o persona (incluidos vendedores y llamadas): como máximo un contacto comercial por día y un solo canal por semana. Todo contacto directo (llamada, mensaje, respuesta) se registra en el registro de contactos del destinatario | PRODUCTO (registro de contactos y bloqueo por destinatario en todas las campañas, canales y vendedores, A-14) + MANUAL (registro de llamadas y contactos fuera de la plataforma) |
 | 3 | Plantilla: remitente y asunto veraces, identificación clara como publicidad, dirección postal real, baja sin iniciar sesión | PRODUCTO (validación de plantilla, A-14) |
 | 4 | Horario para Colombia: lunes a viernes 7:00–19:00, sábados 8:00–15:00, nunca domingos ni festivos | PRODUCTO (ventana de envío) |
 | 5 | La baja se aplica de inmediato y sobrevive a reimportaciones y cambios de proveedor | PRODUCTO (registro de supresión de mensajería) |
 | 6 | Registrar la campaña: fecha, lista, resultado de la consulta al RNE, plantilla | MANUAL |
-<!-- law: C-50, C-51 (Ley 2300 de 2023 arts. 2, 3 y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 7356 de 2024, art. 2.1.18.1) · auth: 18 §Communication compliance; reference/MESSAGING_AND_SENDER_OPERATIONS.md · texto: POL §8.3, §17 · CHECKLIST A-14 -->
+<!-- law: C-50, C-51 (Ley 2300 de 2023 arts. 2, 3 —horario y frecuencia— y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 5050 de 2016, art. 2.1.18.1, modificado por las Resoluciones CRC 7356 de 2024 y 8308 de 2026 (art. 4, vigente desde el 30-jul-2026)) · auth: 18 §Communication compliance; reference/MESSAGING_AND_SENDER_OPERATIONS.md · texto: POL §8.3, §17 · CHECKLIST A-14 -->
 
 ### 5.10. Formación
 

@@ -344,7 +344,8 @@ hitos informados antes de la compra.
 
 11.3. **Remedio.** Para un defecto material verificado de Kauro, el remedio principal es investigar y reparar o regenerar el
 Paquete, con un objetivo inicial de **cinco (5) días hábiles**. Si la reparación no es razonable o no es posible, Kauro reembolsa
-el valor del proyecto afectado en lo que corresponda. Esto no limita los derechos que la ley no permite excluir.
+el valor del proyecto afectado en lo que corresponda. Esto no limita los derechos que la ley no permite excluir; para un Cliente
+que sea consumidor, el remedio lo elige él según la sección 25.9.
 <!-- auth: 18 §Support coverage and service targets; registry/policy.json support.defectRepairTargetBusinessDays = 5; 15 §Refund policy and calculation (tercer párrafo); 19 §Service terms ("preserves rights that cannot legally be excluded") -->
 
 ## 12. Soporte
@@ -591,22 +592,35 @@ El retracto no procede si la prestación del servicio ya comenzó con el acuerdo
 Kauro solo empieza el procesamiento pagado si el consumidor lo pide de forma expresa en la Plataforma después de ser informado de
 que con ello pierde el retracto; si no lo pide, Kauro espera a que venza el plazo.
 
-25.6. **Plazo de prestación.** Kauro presta el servicio dentro del plazo aceptado en la Cotización o, si no se indicó, dentro de los
-treinta (30) días calendario siguientes al Pedido. Si lo supera, el consumidor puede terminar el contrato y recibir la devolución
-de todo lo pagado dentro de los quince (15) días calendario siguientes.
+25.6. **Plazo de prestación y falta de disponibilidad.** Kauro presta el servicio dentro del plazo aceptado en la Cotización o, si
+no se indicó, dentro de los treinta (30) días calendario siguientes al día en que el consumidor hizo el Pedido. Si en cualquier
+momento antes de ese plazo Kauro sabe que no podrá prestar el servicio (por ejemplo, por falta de capacidad o porque el alcance
+no se puede atender), se lo informa **de inmediato**; el consumidor puede entonces terminar el contrato y recibir la devolución de
+todo lo pagado, sin retenciones ni descuentos, dentro de los quince (15) días calendario siguientes, o pedir una segunda fecha. Si
+Kauro supera el plazo, el consumidor tiene el mismo derecho de terminar y recibir la devolución en quince (15) días calendario.
 
-25.7. **Reversión del pago.** En los casos y condiciones del artículo 51 de la Ley 1480 de 2011 (pago electrónico, fraude,
-operación no solicitada, servicio no recibido o que no corresponde a lo pedido o es defectuoso), el consumidor puede pedir la
-reversión del pago presentando queja a Kauro y avisando al emisor del instrumento de pago dentro de los cinco (5) días hábiles
-siguientes a la fecha en que tuvo noticia del hecho.
+25.7. **Reversión del pago.** Se aplica cuando el consumidor pagó por comercio electrónico con tarjeta de crédito, débito u otro
+instrumento de pago electrónico y tanto Kauro como el emisor del instrumento están domiciliados en Colombia. Causales: fraude,
+operación no solicitada, servicio no recibido, o servicio que no corresponde a lo pedido o es defectuoso. El consumidor presenta
+queja a Kauro por la Plataforma, por correo a [correo de notificaciones] o verbalmente, **dentro de los cinco (5) días hábiles
+siguientes** a: la fecha en que tuvo noticia de la operación fraudulenta o no solicitada; la fecha en que debió recibir el
+servicio (el Paquete, según el plazo de la sección 25.6), si no lo recibió; o la fecha en que lo recibió, si no corresponde a lo
+pedido o es defectuoso. La queja indica las razones, la causal, el valor por el que se pide la reversión y el instrumento al que se
+cargó la operación. Por cualquier medio que se presente, Kauro entrega de inmediato una constancia descargable con la fecha y la
+causal. Dentro del mismo plazo de cinco (5) días hábiles, el consumidor (o el titular del instrumento) notifica al emisor, con esa
+constancia. Si una autoridad decide a favor de Kauro, la transacción puede volver a cargarse al consumidor.
 
 25.8. **Peticiones, quejas y reclamos.** La Plataforma ofrece un canal de atención que entrega un número de radicado con la fecha y
-la hora de cada petición, queja o reclamo y permite hacerle seguimiento. El sitio y la Plataforma muestran un enlace visible a la
-Superintendencia de Industria y Comercio (www.sic.gov.co).
+la hora de cada petición, queja o reclamo y permite hacerle seguimiento. Si el consumidor reclama de forma verbal o telefónica,
+Kauro le entrega constancia escrita con la fecha y el objeto del reclamo. Kauro responde cada reclamación directa **dentro de los
+quince (15) días hábiles** siguientes a su recepción, con las pruebas en que se basa. El sitio y la Plataforma muestran un enlace
+visible a la Superintendencia de Industria y Comercio (www.sic.gov.co).
 
-25.9. **Garantía y remedios.** La sección 11 no reduce la garantía legal de los servicios ni los demás derechos irrenunciables del
-consumidor; los derechos de esta sección prevalecen sobre cualquier abono o evaluación discrecional de la sección 10.
-<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024— y 51) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
+25.9. **Garantía y remedios.** Si Kauro incumple la prestación del servicio, el consumidor **elige** entre que se le preste el
+servicio en las condiciones contratadas o que se le devuelva el precio pagado; la sección 11 (remedio a elección de Kauro) no se le
+aplica en lo que reduzca esa elección. Ninguna disposición de las secciones 10 y 11 limita los derechos de esta sección ni los
+demás derechos irrenunciables del consumidor.
+<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 11 num. 3, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024—, 51 y 58 num. 5 lit. b y c; Decreto 1074 de 2015 arts. 2.2.2.51.1, 2.2.2.51.2, 2.2.2.51.4 a 2.2.2.51.7 y 2.2.2.51.12) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
 
 ## Anexo A. Tarifa de referencia (USD, antes de impuestos)
 

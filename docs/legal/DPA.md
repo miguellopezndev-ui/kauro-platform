@@ -154,7 +154,9 @@ contrato de transmisión del artículo 2.2.2.25.5.2 del Decreto 1074 de 2015.
 
 10.2. Estados Unidos de América figura en la lista de países con nivel adecuado de protección de la Superintendencia de
 Industria y Comercio (Circular Única, Título V, Capítulo 3, numeral 3.2). Esa calificación no exime a Kauro de demostrar las
-medidas apropiadas y efectivas que aplica; este Acuerdo y el Anexo II son esa demostración en lo que corresponde a Kauro.
+medidas apropiadas y efectivas que aplica. Este Acuerdo y el Anexo II describen los compromisos y las medidas; su implementación y
+su efectividad se demuestran con evidencia: la configuración vigente, las pruebas y los registros de operación que exigen las
+comprobaciones de activación, que Kauro pone a disposición del Cliente según la sección 15.
 <!-- law: C-22, C-23 -->
 
 10.3. Kauro no transfiere Datos del Cliente a terceros responsables. Si en el futuro un subencargado debiera tratar datos fuera

@@ -87,17 +87,25 @@ repositorios ni servicios de modelos no pagados.
   contactarlas.
 - **Datos:** del formulario: nombre, correo y empresa, tipo de comprador, destino, banda aproximada de registros y fecha deseada
   (el formulario no acepta archivos de CRM). De agencias prospecto, **solo datos de la organización**: nombre de la agencia,
-  dominio, país, buzones genéricos o de función (por ejemplo info@ o ventas@), teléfono público de la empresa, fuente y fecha de
-  observación, notas comerciales acotadas y estado de baja. Los datos de una persona de contacto (nombre, cargo, correo y teléfono
-  de trabajo) se tratan **solo después de que esa persona autoriza** el tratamiento, y Kauro guarda la prueba de esa autorización.
+  dominio, país, fuente y fecha de observación, notas comerciales acotadas sin datos de personas, estado de baja y, como canal de
+  contacto, solo un correo o teléfono que cumpla **los tres hechos** de la sección 6.3.1. Cualquier dato de una persona (nombre,
+  cargo, correo, teléfono) se trata **solo después de que esa persona autoriza** el tratamiento, y Kauro guarda la prueba.
+- **6.3.1. Cuándo un canal es de la organización.** Un correo o teléfono es dato de la organización, y no dato personal, solo si
+  se cumplen los tres hechos siguientes, verificados y registrados, nunca deducidos de la forma del correo o del número: (a) la
+  propia organización, que es una persona jurídica, lo publica como su canal de contacto comercial, y Kauro guarda la evidencia
+  (dirección web, fecha y captura); (b) no identifica a una persona natural ni se le puede atribuir: no contiene el nombre de una
+  persona, la agencia no es un comerciante persona natural ni un negocio de una sola persona, y el número no es un celular ni una
+  línea personal; y (c) Kauro vuelve a verificar (a) y (b) cada vez que lo va a usar. Si alguno de los tres falla o no se puede
+  determinar, el canal es **dato personal** y requiere autorización previa. La misma regla se aplica a cada campo importado, a la
+  referencia de la fuente y a las notas.
 - **Finalidades:** responder solicitudes; evaluar si el proyecto encaja con el servicio; contactar a la agencia por sus canales
-  genéricos para presentarle el servicio y, si una persona quiere seguir la conversación, pedirle su autorización; enviar
+  de organización (sección 6.3.1) para presentarle el servicio y, si una persona quiere seguir la conversación, pedirle su autorización; enviar
   comunicaciones comerciales solo según la sección 17; y registrar las bajas para respetarlas siempre.
 - **Límites:** Kauro solo prospecta agencias. Nunca investiga, registra como prospecto ni contacta para venta a empresas que no
   son agencias ni a sus equipos internos, ni a los clientes finales de sus agencias clientes. **No recoge de sitios web,
   directorios ni redes sociales nombres, correos nominativos ni teléfonos directos de personas para prospectarlas.** No usa los
   datos de los archivos de CRM de sus clientes para fines comerciales.
-<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (persona de contacto "where appropriate": restringida por la decisión del coordinador de 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 · law: C-04, C-06, C-19 (SIC Circular 002 de 2024, instrucción IX) -->
+<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (persona de contacto "where appropriate": restringida por las decisiones del coordinador de 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 · law: C-04, C-06, C-19 (Ley 1581 arts. 3 lit. c, 9 y 10; SIC Circular 002 de 2024, instrucción IX; SIC, concepto radicado 23-571469 (datos corporativos de una persona jurídica)) · CHECKLIST A-13 -->
 
 ### 6.4. Colaboradores comerciales y proveedores
 
@@ -141,7 +149,7 @@ autorización.
 y la información requerida por una autoridad en ejercicio de sus funciones. Un dato accesible al público, por ejemplo en un sitio
 web, no es por eso de naturaleza pública; por eso Kauro no trata datos de personas de contacto para prospección sin su
 autorización (sección 6.3). La autorización de una persona de una agencia prospecto se obtiene cuando ella misma llena el
-formulario de contacto, o cuando responde por escrito a un primer mensaje enviado a un canal genérico de la agencia que le pide
+formulario de contacto, o cuando responde por escrito a un primer mensaje enviado a un canal de la organización que cumple la sección 6.3.1 y que le pide
 esa autorización; Kauro guarda la respuesta como prueba.
 <!-- law: C-04, C-05, C-06, C-19 (Ley 1581 arts. 9 y 10; Decreto 1074 arts. 2.2.2.25.2.2, 2.2.2.25.2.4 y 2.2.2.25.2.5; SIC Circular Externa 002 de 2024, instrucción IX) · CHECKLIST A-13, S-22 -->
 
@@ -276,20 +284,27 @@ actualizará esta Política antes de usarlas.
 ## 17. Comunicaciones comerciales
 
 17.1. **A quién.** Kauro envía comunicaciones comerciales solo (a) a usuarios e interesados que las autorizaron por separado
-(sección 8.3), por los canales que autorizaron; (b) a los canales genéricos de una agencia prospecto (sección 6.3); y (c) a
-personas de una agencia que autorizaron ese contacto. Nunca obliga a nadie a aceptar publicidad para obtener el servicio.
+(sección 8.3), por los canales que autorizaron; (b) a los canales de una agencia prospecto que cumplen los tres hechos de la
+sección 6.3.1, verificados de nuevo antes del envío; y (c) a personas de una agencia que autorizaron ese contacto. Nunca obliga a
+nadie a aceptar publicidad para obtener el servicio.
 
 17.2. **Registro de Números Excluidos.** Antes de cada envío comercial por correo electrónico, llamada, SMS o mensajería a
-destinatarios en Colombia, Kauro consulta el Registro de Números Excluidos (RNE) de la Comisión de Regulación de Comunicaciones y
-excluye los canales inscritos. Una autorización anterior a la inscripción de un canal en el RNE se tiene por revocada, salvo que
-el titular dé una nueva autorización después de inscribirse.
+destinatarios en Colombia, Kauro consulta el Registro de Números Excluidos (RNE) de la Comisión de Regulación de Comunicaciones
+**el mismo día calendario del envío (hora de Bogotá)** y excluye los canales inscritos. Como una inscripción se hace efectiva el
+día hábil siguiente, un resultado de un día anterior nunca se reutiliza. Una autorización anterior a la inscripción de un canal en
+el RNE se tiene por revocada, salvo que el titular dé una nueva autorización después de inscribirse.
+
+17.2A. **Frecuencia después de un contacto directo.** Una vez establecido un contacto directo con un destinatario en Colombia, por
+cualquier canal y por cualquier persona que actúe por Kauro (incluidos los vendedores), Kauro no vuelve a contactarlo con fines
+comerciales más de una vez en el mismo día, ni por más de un canal en la misma semana. Kauro lleva un registro de contactos por
+destinatario que cubre todas las campañas, canales y vendedores.
 
 17.3. **Forma y horario.** Cada mensaje identifica de forma veraz al remitente y el asunto, se identifica claramente como
 publicidad cuando lo es, incluye la dirección postal real de Kauro y un mecanismo de baja que no exige iniciar sesión. La baja se
 aplica de inmediato y sobrevive a reasignaciones, reimportaciones de listas y cambios de proveedor. Los avisos transaccionales del
 servicio no incluyen publicidad encubierta. Para destinatarios en Colombia, Kauro envía mensajes comerciales solo de lunes a
 viernes de 7:00 a. m. a 7:00 p. m. y sábados de 8:00 a. m. a 3:00 p. m., nunca domingos ni festivos.
-<!-- auth: 18 §Communication compliance ("required commercial identification"; "Publicly available contact details do not automatically authorize every use"); reference/MESSAGING_AND_SENDER_OPERATIONS.md (baja sin login, supresión inmediata) · law: C-50 (CAN-SPAM, FTC), C-51 (Ley 2300 de 2023 arts. 2, 3 y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 7356 de 2024, art. 2.1.18.1) · CHECKLIST A-14 -->
+<!-- auth: 18 §Communication compliance ("required commercial identification"; "Publicly available contact details do not automatically authorize every use"); reference/MESSAGING_AND_SENDER_OPERATIONS.md (baja sin login, supresión inmediata) · law: C-50 (CAN-SPAM, FTC), C-51 (Ley 2300 de 2023 arts. 2, 3 —horario y frecuencia— y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 5050 de 2016, art. 2.1.18.1, modificado por las Resoluciones CRC 7356 de 2024 y 8308 de 2026 (art. 4, vigente desde el 30-jul-2026)) · CHECKLIST A-14 -->
 
 ## 18. Incidentes de seguridad
 
