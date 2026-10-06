@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { FaultPoints } from "@kauro/persistence/testing";
 import { integrationWorld, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, memberCell, open, runSweepPass, settled, validateMembers, type Member } from "./b10-cells-support.js";
+import { bindCells, memberCell, open, registerFamily, runSweepPass, settled, validateMembers, type Member } from "./b10-cells-support.js";
 import type { UnitLog } from "./fault-support.js";
 
 let iw: IntegrationWorld;
@@ -52,6 +52,11 @@ test("registration refuses an incomplete or ambiguous family, naming every reaso
   assert.throws(() => validateMembers([member({ point: { kind: "lease", obligation: { row: "L1", column: "TIMEOUT" } } })]), /LEASE family's runner/);
   assert.throws(() => validateMembers([member({ point: { kind: "crash-before", unit: { ordinal: 0, phase: "x", witness: step, identity: () => () => true } } })]), /ordinal is a positive integer/);
   assert.throws(() => validateMembers([member({ point: { kind: "port-timeout", port: "BuyerTypeReader", boundMs: 0 } })]), /declares the application's bound/);
+});
+
+test("registration refuses an empty family (a filtered list that comes out empty registers no cell and would pass silently)", () => {
+  assert.throws(() => validateMembers([]), /the family has no member/);
+  assert.throws(() => registerFamily([]), /the family has no member/);
 });
 
 test("a member registers as a cell of its code, matrix reference, variant and tag, its crash at the target unit's commit boundary", () => {

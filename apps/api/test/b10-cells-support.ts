@@ -385,6 +385,7 @@ export function memberCell(m: Member<never, never>): MatrixCell {
 /** Refuses an incomplete or ambiguous family at registration (section 4): every reason, not the first. */
 export function validateMembers(members: ReadonlyArray<Member<never, never>>): void {
   const problems: string[] = [];
+  if (members.length === 0) problems.push("the family has no member: an empty (or wrongly filtered) member list registers no cell and would pass silently");
   const seen = new Set<string>();
   const tags = new Set<string>();
   for (const m of members) {
