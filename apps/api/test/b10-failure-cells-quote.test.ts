@@ -270,7 +270,8 @@ faultCell(
       const taker = await fresh(`slot-release-taker-${order === "sweep first" ? "sweep" : "quote"}`);
       const taken = await quoted(iw, taker.a, taker.plan);
       assert.equal(taken.eligibility.foundingOffer, "RESERVED");
-      const takenSlots = (await slots()).filter((s) => s.held && s.live_reservation_id === (await reservationsOf(taker.a.s.agency.agencyId))[0]!.reservation_id);
+      const takerReservation = (await reservationsOf(taker.a.s.agency.agencyId))[0]!.reservation_id;
+      const takenSlots = (await slots()).filter((s) => s.held && s.live_reservation_id === takerReservation);
       assert.equal(takenSlots.length, 1, "one slot, one reservation");
       await giveSlotBack(taker.a, taker.plan);
     }
