@@ -1,17 +1,13 @@
 # ACH bank-transfer route — owner amendment A8
 
-Design only; owner decision supplied on **2026-10-05**. Subject: `ach/domain-design`, base `main` at
-`61ab903b0e0f24526ac5a3ca1cf6a2f9f1de97ca`. No adapter, command, migration, registry change or live qualification is delivered
-by this document. The `ACH-` cases and all matrix tests below are proposed, not executed evidence. S-B implements the Wise
-adapter later; the domain/application/persistence changes require their own implementation and review gates.
-
-Read alongside [B09 payments](B09-payments-fiscal.md), [B09 cases](B09-case-map.md), the existing
-[`provider.ts`](../../packages/domain/src/commerce/provider.ts), [`capture.ts`](../../packages/domain/src/commerce/capture.ts),
-[`records.ts`](../../packages/domain/src/commerce/records.ts), [`ledger.ts`](../../packages/domain/src/commerce/ledger.ts),
-[`provider-effect protocol`](../../packages/application/src/commerce/protocol.ts) and migrations
-[`0015`](../../packages/persistence/migrations/0015_orders_attempts_captures_authorizations.sql),
-[`0016`](../../packages/persistence/migrations/0016_refunds_cases_exceptions.sql) and
-[`0017`](../../packages/persistence/migrations/0017_tax_documents_ledger_settlements.sql).
+Design only, revision **r2**: answers Codex design review r1 of `9d5aa04` (F1 → D-ACH-18, F2 → D-ACH-19, F3 → D-ACH-17 and
+matrix rows V1–V3/D1–D4, F4 → the operational channel of D-ACH-15; new rows W1, P3, P4). Owner decision supplied **2026-10-05**.
+Subject `ach/domain-design`, base `main` `61ab903b0e0f24526ac5a3ca1cf6a2f9f1de97ca`. No adapter, command, migration, registry
+change or live qualification is delivered here; `ACH-` cases and matrix tests are proposed, not executed evidence. S-B implements
+the Wise adapter later; domain/application/persistence changes need their own implementation and review gates. Read alongside
+[B09 payments](B09-payments-fiscal.md), [B09 cases](B09-case-map.md), `packages/domain/src/commerce/{provider,capture,records,
+ledger}.ts`, `packages/application/src/commerce/{protocol,ports}.ts`, `core/{provider-effects,observation,postings}.ts` and
+migrations 0013 and 0015–0017.
 
 ## 1. Scope and decisions
 
@@ -40,28 +36,26 @@ not a second route registry. Its machine is:
 | ENABLED | disable | VERIFIED | Owner step-up or service safety stop; no new details served, existing receipts still observed |
 | VERIFIED or ENABLED | verification withdrawn/details changed | PENDING_VERIFICATION | Preserve old snapshots; invalidate new issuance; require new verification |
 
-An initially unqualified B09 route stays `PaymentRoute.state=CONFIGURED` while PENDING_VERIFICATION or VERIFIED; it becomes
-`QUALIFIED` only when ENABLED and all B09 legal, fiscal and integration guards pass. A previously enabled route instead stays
-SUSPENDED while disabled or awaiting renewed verification. Disable from QUALIFIED uses that existing SUSPENDED state. Re-enablement proposes an explicit
-versioned SUSPENDED→QUALIFIED edge; it is not currently supported. The route-specific guard AND the B09 qualification guard
-are required. Never alias VERIFIED to QUALIFIED. These transitions share the provider/environment route lock; qualification
-events, aggregate registration, event bindings and constraints must be added together in a later migration.
-
-Versioned configuration freezes: route/version, environment, integration class, legal owner evidence, merchant/account/profile/
-USD balance refs, payee digest, encrypted account-details artifact/version/hash, ACH rail capability evidence, verification actor
-and date, credential reference if any, fee-policy version, instruction lifetime seconds, observation overlap policy, manual/API
-mode, enabled flag and outbound capabilities. `CONTRACT_FAKE` never qualifies LIVE. Account or payee replacement is a new route
-version, not reassignment of old orders. Poll old account versions until every receipt/refund is resolved. API credentials are
-optional for the first manual route and are never account-ownership proof.
-
+An initially unqualified B09 route stays `PaymentRoute.state=CONFIGURED` while PENDING_VERIFICATION or VERIFIED and becomes
+`QUALIFIED` only when ENABLED and all B09 legal, fiscal and integration guards pass. A previously enabled route stays SUSPENDED
+while disabled or awaiting renewed verification; re-enablement proposes an explicit versioned SUSPENDED→QUALIFIED edge (not
+currently supported). Both the route-specific and the B09 qualification guards are required; never alias VERIFIED to QUALIFIED.
+These transitions share the provider/environment route lock; qualification events, aggregate registration, bindings and
+constraints are added together in a later migration. Versioned configuration freezes route/version, environment, integration
+class, legal owner evidence, merchant/account/profile/USD balance refs, payee digest, encrypted account-details
+artifact/version/hash, ACH rail capability evidence, verifier and date, credential reference if any, fee-policy version,
+instruction lifetime, observation overlap policy, manual/API mode, enabled flag and outbound capabilities. `CONTRACT_FAKE` never
+qualifies LIVE. Account or payee replacement is a new route version, never reassignment of old orders; old account versions are
+polled until every receipt/refund is resolved. API credentials are optional for the first manual route and never ownership proof.
 Production enablement has two stages: owner verification plus operational guards enables a controlled real-credit exercise;
-broader customer exposure requires that exercise to pass (§8). A failed exercise disables ACH. This does not gate PayPal launch.
+broader exposure requires that exercise to pass (§8). A failed exercise disables ACH. This does not gate PayPal launch.
 
-**D-ACH-03 — Reuse boundary.** Use the existing quote, project PaymentOrder, PaymentAttempt for **outbound effects**, CaptureFact,
-CommercialAuthorization, Refund, observation/reconciliation records, FINANCE/FISCAL/COMMISSIONS consumers and append-only
-commerce ledger. Do not invent a Wise “order created” API response, provider approval URL or synthetic charge attempt to issue
-instructions. The inbound credit itself is the provider capture identity; `CaptureFact` already permits an absent attempt.
-An ACH bank-credit record tracks observation identity, matching and evidence, not another payable order or monetary ledger.
+**D-ACH-03 — Reuse boundary.** Use the existing quote, project PaymentOrder, CaptureFact, CommercialAuthorization, Refund,
+observation/reconciliation records, FINANCE/FISCAL/COMMISSIONS consumers and append-only commerce ledger. Outbound effects use
+PaymentAttempt with new transfer operations (agency scope) or its route-scope sibling (D-ACH-19). Do not invent a Wise “order
+created” response, approval URL or synthetic charge attempt to issue instructions. The inbound credit itself is the provider
+capture identity; `CaptureFact` already permits an absent attempt. The bank-credit register tracks observation identity,
+matching and evidence, not another payable order or monetary ledger.
 
 ## 2. Instructions and order states
 
@@ -152,6 +146,8 @@ a verified unassigned return; its Refund workflow is then the source of return s
 fee/funds/return observations. PENDING or UNRECOGNIZED bank status never counts as completed money. A terminal return remains
 linked to the original receipt; it is not a negative new incoming credit. Pending and denied observations have no receipt
 posting until provider evidence proves an actual booked credit.
+`MATCHED→MATCH_REVIEW` (proposed) returns a matched, unapplied credit to review when its bound payer authorization is no longer
+current at apply (D-ACH-17); no capture is written.
 
 The first operational mode is manual: an owner enters the **bank's stable transaction identifier**, not a locally invented
 one, plus a restricted bank statement/export artifact and structured facts. Separate confirmation reads that artifact and
@@ -178,12 +174,11 @@ from a manual/API payload. Under the account-credit uniqueness lock then B09 pur
 2. Require **USD** with separately evidenced gross/net/fee. Currency mismatch is WRONG_CURRENCY; do not convert it or accept a
    tolerance. Amount match is exact to one cent; compare gross receipt with the order obligation. If only net is known and an
    unproven fee is needed to explain the difference, hold review. Known merchant fees reduce net, not the customer's paid gross.
-3. Require the payer to agree with the order's accepted legal billing identity or an owner-verified payer alias/third-party
-   payment authorization (e.g. the agency's client). Compare normalized verified identity and evidence, not a speculative name
-   similarity score. Missing payer data and a changed/unapproved payer both require MATCH_REVIEW; reference knowledge is not
-   permission. Manual override records which verified alias/authorization version was used and why. Route/payee/environment/
-   currency mismatches cannot be overridden. Reattribution after APPLIED requires reversal/correction, never a new capture for
-   the same credit.
+3. Require the payer to agree with the order's accepted legal billing identity or a current VERIFIED PayerAuthorization version
+   (payer alias or third-party payer such as the agency's client; D-ACH-17). Compare normalized verified identity and evidence,
+   not a name-similarity score. Missing payer data and a changed/unapproved payer both require MATCH_REVIEW; reference knowledge
+   is not permission. The match records the authorization version used and why. Route/payee/environment/currency mismatches
+   cannot be overridden. Reattribution after APPLIED requires reversal/correction, never a new capture for the same credit.
 4. A matched amount mismatch still is real money: apply a capture and normal capped allocation, open AMOUNT_MISMATCH and/or
    EXCESS_CAPTURE and the appropriate owner-review return requests. Matching approval does not waive D-ACH-06 or deadlines.
 
@@ -229,41 +224,34 @@ No incoming credit makes BANK_CASH; later withdrawals/settlements require their 
 recognition, tax documents, refund tax and commissions retain their existing policies; only allocated service is commission
 basis. Never subtract a receiving fee from the quote, invent tax from USD or count an excess return as service revenue.
 
-Unknown-reference/payer credits cannot satisfy today's non-null CaptureFact order FK. **Do not create dummy orders or hide
-real booked money indefinitely in a second balance register.** Propose an additive treasury receipt source `bank_credit` in
-the **same ledger tables, account catalogue, balancing rules and FINANCE consumer**. Only confirmed/authenticated booked
-credits can source it. Initially debit PSP_RECEIVABLE / credit CUSTOMER_OVERPAYMENT (unattributed liability). For an unattributed
-credit, observed fee/availability are booked from credit-version events with the same arithmetic. It carries a restricted
-receiving-route treasury scope, because an agency is not yet known. This requires a versioned extension to existing agency-only
-ledger scope/source guards, not a fabricated customer agency and not a separate Wise ledger. Tenant RLS cannot read this scope;
-only a fenced payment/finance service and active owner finance authority can access it. Existing agency sources remain unchanged.
+Unknown-reference/payer credits cannot satisfy CaptureFact's non-null order FK. **No dummy orders and no second balance
+register.** Propose an additive treasury receipt source `bank_credit` in the **same ledger tables, account catalogue, balancing
+rules and FINANCE consumer**, sourced only by confirmed/authenticated booked credits: DEBIT PSP_RECEIVABLE / CREDIT
+CUSTOMER_OVERPAYMENT (unattributed liability); observed fee/availability are booked from credit-version events with the same
+arithmetic. Its scope is the closed union member `{kind: RECEIVING_ROUTE, routeId, environment, accountRef}` beside
+`{kind: AGENCY, agencyId}`, with source-ownership FKs and service-only cross-scope booking — a versioned extension of the
+agency-only ledger scope/source guards, not a fabricated agency, a nullable-tenant RLS bypass or a separate Wise ledger. Tenant
+RLS cannot read it; only the fenced payment/finance service and active owner finance authority can.
 
-At application, freeze a credit-version cutoff and its fee/funds/status snapshot under the credit lock, alongside the APPLIED
-capture link. That immutable handoff decides posting ownership: credit versions through the cutoff belong to the treasury
-receipt group; later observations become capture versions and cannot also source treasury postings. Attribution is refused
-after an unassigned return claim; a provider reversal still may be attributed as historical completion+reversal with no authority.
-The treasury scope is explicitly `{kind: RECEIVING_ROUTE, routeId, environment, accountRef}`; agency scope remains
-`{kind: AGENCY, agencyId}`. New scope checks are closed unions with source ownership FKs and service-only cross-scope booking,
-not a nullable-tenant bypass of RLS.
+At application, freeze a credit-version cutoff and its fee/funds/status snapshot under the credit lock with the APPLIED capture
+link. Versions through the cutoff belong to the treasury receipt group; later observations become capture versions and cannot
+also source treasury postings. At attribution FINANCE, under the credit's booking lock, reverses the treasury receipt's cutoff
+postings (fee/funds/return versions included) in route scope — each reversing set its own immutable `bank_credit.assigned`
+source/version linked to the original — and posts the standard capture/fee/funds sets, with their existing sources, in agency
+scope. A unique credit booking group binds reversal and capture sources so ordinary capture delivery cannot book an
+already-accounted credit; it drains pending credit-version events through the cutoff in version order, checks the destination
+capture snapshot agrees (including completion+reversal if already returned) and commits all sets plus delivery markers together.
+Later capture versions wait for the group. Direct matched receipts use the same group (receipt+reversal+capture may post in one
+transaction). Balances after the group equal ordinary B09 capture postings with zero residual treasury receipt; duplicate or
+reordered events cannot double cash, fees or liabilities. Corrections are reversal plus new reviewed entries, never edits. The
+credit register stores evidence/workflow; **only the ledger stores balances**.
 
-At attribution, FINANCE atomically reverses the treasury receipt's **cutoff-version** postings (including its fee/funds/return versions) into
-the route scope and posts the standard capture/fee/funds sets into the target agency scope, under the credit's booking lock.
-Each reversing set has its own immutable `bank_credit.assigned` source/version linked to the original posting set; each capture
-set retains its own existing event/source. A unique credit booking group binds the reversal and capture sources, so ordinary
-capture delivery cannot independently book an already-accounted bank credit. The group drains pending credit-version events
-through that cutoff in version order, checks the destination capture's snapshot agrees (including completion+reversal if
-already returned), and commits all sets plus delivery markers together. Later capture versions wait for this handoff group;
-fees, funds and returns are neither omitted nor booked twice when delivery order changes.
-Direct matched receipts use the same group and may post receipt+reversal+capture in one transaction. Balances after the group
-equal the ordinary B09 capture postings, with zero residual treasury receipt. Duplicate/reordered events cannot double cash,
-fees or liabilities. Monetary corrections are reversal plus new reviewed entries, never an edit. The credit register stores
-evidence/workflow status; **only the existing ledger stores financial balances**.
-
-This treasury extension is a required implementation gate, not claimed as existing functionality. Wrong-currency or non-ACH
-activity remains an exception with bank evidence; an owner must route it to a separately reviewed treasury accounting workflow
-in that same ledger. It cannot source USD ACH captures or refunds. Account reconciliation must expose unresolved activity and
-cannot mark the statement balanced while any real receipt is unbooked. Unassigned USD ACH returns use the Refund source extension
-in §5. Attribution and a return claim serialize: after a return is claimed, the credit cannot migrate to a project.
+This treasury extension is an implementation gate, not existing functionality. Wrong-currency or non-ACH activity remains an
+exception with bank evidence that an owner routes to a separately reviewed treasury workflow in the same ledger; it cannot
+source USD ACH captures or refunds. Reconciliation exposes unresolved activity and never marks a statement balanced while a real
+receipt is unbooked. Attribution and a return claim serialize on the credit lock: after a return claim the credit cannot migrate
+to a project (its return stays route-scoped, D-ACH-19); a provider reversal may still be attributed as historical
+completion+reversal with no authority.
 
 **D-ACH-12 — Fees (A8 rule 7).** Store append-only fee-policy versions, with provider, legal account registration country,
 environment, receiving/sending rail, currency, fixed cents/rate/rounding where actually applicable, source URL/document,
@@ -285,174 +273,227 @@ checks the provider for the real account. Per credit store observed gross, fee, 
 gross from net plus an illustrative rate. Capture amount is evidenced gross and `providerFeeCents` is the evidenced merchant
 fee. A later fee gets `capture.fee_observed.v1`, not another completion. Conflicting observations open PROVIDER_INCONSISTENCY;
 observed-versus-policy discrepancies open fee review without mutating the credit or customer obligation. Customer sender-bank
-fees are not merchant provider fees. An outbound fee is separate from returned principal, owner-bounded, evidenced and posted
-as processor expense using an additive transfer-fee event in the same ledger, not deducted from Refund components.
+fees are not merchant provider fees. Outbound fees and principal are accounted by D-ACH-18, never inside Refund components.
 
 ## 5. Owner-approved outbound returns
 
-**D-ACH-13 — Refund source and authority.** Reuse Refund's REQUESTED→APPROVED→SUBMITTING→UNCERTAIN/COMPLETED/FAILED and REJECTED
-states and its service/tax/excess components. Matched credits use `captureId` as today. For a booked unassigned USD ACH credit,
-propose an explicit mutually exclusive source `bankCreditId` instead of capture/order/project FKs, treasury-scoped and with
-**excess-only** components. Add the corresponding source ceilings, evidence, scope and ledger guards; no fake CaptureFact.
-An approval must reserve the remaining unreturned cents against *all* pending/completed refunds and reversals. Attribution,
-return claims and provider reversals use one source lock; B09 capture refunds retain their existing per-capture completion lock.
+**D-ACH-13 — Refund source and authority.** Reuse Refund's REQUESTED→APPROVED→SUBMITTING→UNCERTAIN/COMPLETED/FAILED and
+REJECTED states and its service/tax/excess components. The source is a closed union: **CAPTURE** (a matched credit's capture,
+agency scope, the existing `refunds` row), **BANK_CREDIT** (a booked unassigned USD ACH credit, route scope, **excess-only**
+components, D-ACH-19) or **BOUNCED_REFUND** (a resend, D-ACH-18). No fake CaptureFact, order or agency. An approval reserves the
+remaining dischargeable cents against *all* pending/completed refunds and reversals of its source. Attribution, return claims
+and provider reversals of a bank credit share one source lock; B09 capture refunds keep their per-capture completion lock.
 
 Every ACH outbound return, including excess/expiry/unassigned remedies, requires an **active KAURO_OWNER**, verified active
-identity, fresh step-up at approval after locks, immutable approval/effects hashes and reason. No standing-policy auto-approval
-for this route in the first release. Preserve existing customer requester/approver segregation (KP008). An agency BILLING member
-may request a refund but cannot approve or dispatch. An unassigned return additionally needs payer provenance and verified
-destination ownership before approval; knowledge of a reference never proves a refund destination.
+identity, fresh step-up at approval after locks, immutable approval/effects hashes and reason; no standing-policy auto-approval
+in the first release. Preserve customer requester/approver segregation (KP008). An agency BILLING member may request a refund
+but cannot approve or dispatch. Bind source, exact USD principal/components, the current VERIFIED RefundDestination version and
+digest (D-ACH-17), verified payer evidence, quote terms if applicable, delivery phase, owner approval proof, fee-policy version
+and maximum outbound fee into the prepared intent/hash. Knowledge of a reference never proves a destination; no arbitrary
+third-party destination or silent conversion. Changing amount/destination/fee ceiling voids the undispatched intent and needs a
+new approval. Returning allocated service affects tax/commissions/authorization under existing B09 rules (D-LEDGER-B7, R2-081).
 
-Bind source, exact USD principal/components, destination reference/version/digest, verified payer evidence, quote terms if
-applicable, delivery phase, owner approval proof, fee-policy version and maximum outbound fee into the prepared intent/hash.
-Destination verification is a control-plane fact, not raw bank fields from a customer request. No arbitrary third-party
-destination or silent currency conversion. Changing amount/destination/fee ceiling voids the undispatched intent and requires
-another owner approval. Review how returning allocated service affects tax/commissions/authorization using existing B09 rules.
+**D-ACH-17 — Payer and destination verification facts.** Two new versioned aggregates. Consumers bind an exact version and
+re-read it under lock at their effect (M2, P1, F2, F3, F6); validity expiry is checked there, with no sweep.
+
+| Machine: edge | Actor and guard | One-COMMIT footprint (row) |
+|---|---|---|
+| PayerAuthorization: absent→VERIFIED `payer_authorization_verified` | KAURO_OWNER, verified identity, fresh step-up; agency BILLING request evidence plus payer identity evidence; kind PAYER_ALIAS or THIRD_PARTY_PAYER; validity bound | Version, evidence refs/digests, assurance, agency journal, audit/events/outbox (V2) |
+| PayerAuthorization: VERIFIED→SUPERSEDED `payer_authorization_replaced` | As verify, atomically with the successor's VERIFIED | Both versions in V2 |
+| PayerAuthorization: VERIFIED→REVOKED `payer_authorization_revoked` | KAURO_OWNER, or agency OWNER/BILLING (revocation only narrows authority) | State, review case naming MATCHED-unapplied credits bound to it, journal, events (V3) |
+| RefundDestination: absent→PENDING_VERIFICATION `destination_recorded` | KAURO_OWNER from restricted evidence; customer-typed bank fields are evidence, never the fact; scope AGENCY (capture source) or RECEIVING_ROUTE (bank-credit source) | Version, encrypted artifact ref/digest, provenance, scope, journal, events (D2) |
+| RefundDestination: PENDING_VERIFICATION→VERIFIED `destination_verified` | KAURO_OWNER step-up; ownership evidence ties the account to the verified payer (e.g. the originating account in the credit's bank evidence) plus the Wise recipient ref | State, prior VERIFIED→SUPERSEDED, assurance, journal, events (D3) |
+| RefundDestination: PENDING_VERIFICATION/VERIFIED→REVOKED `destination_revoked` | KAURO_OWNER; payment service on authenticated recipient-deactivation evidence; agency BILLING for agency-scope destinations | State, case naming APPROVED unclaimed returns bound to it, journal, events (D4) |
+
+Revocation never rewrites an applied capture or a claimed phase: P1 returns a MATCHED credit whose authorization is no longer
+current to MATCH_REVIEW; F3/F6 deny unclaimed phases; claimed phases reconcile (D-ACH-14). The first release records the Wise
+recipient manually; API recipient or quote creation are provider effects that S-B must add as attempt operations with their own
+matrix rows before automation.
 
 **D-ACH-14 — Dispatch and observe.** Keep B09's durable intent→claim→call outside transaction→SERVICE settle→journal completion
-protocol and uncertainty vocabulary. A return is a new **outbound transfer**, not a PayPal capture-refund API call. If Wise needs
-separate create and funding effects, a versioned saga under the same REFUND PaymentAttempt records `CREATE_PREPARED`,
-`CREATE_CLAIMED`, `CREATED`, `FUND_PREPARED`, `FUND_CLAIMED`, `FUNDED_OR_PENDING`, `TERMINAL_OR_UNCERTAIN`. Each phase has its
-own prepared request hash, stable idempotency identity, bounded claim/fence, external ID and durable settle. Never claim funding
-before the created transfer ID is durably learned. Every independently durable provider call and local COMMIT is inventoried
-in §7. Do not make the adapter hide create+fund behind an apparently atomic retry.
+protocol and uncertainty vocabulary. A return is a new **outbound transfer**, not a PayPal capture-refund call. CREATE and FUND
+are separate attempts (D-ACH-19), each with its own prepared request hash, idempotency identity, bounded claim/fence, external ID
+and durable settle; FUND can be prepared only after the created transfer ID is durable. Every provider call and local COMMIT is a
+§7 row; the adapter never hides create+fund behind an apparently atomic retry. Funding retries are allowed only with documented
+same-transfer idempotency for the exact endpoint/profile; otherwise observe/escalate, never blind-fund again. Provider “sent” or
+accepted/pending is not recipient completion. COMPLETED requires the qualified completion mapping, USD principal, exact
+transfer/source/destination identities and the local refund reference. Unknown status is UNRECOGNIZED_PROVIDER_STATE;
+timeout/reset/5xx/lost response is UNCERTAIN, not FAILED; lookup absence never proves no transfer.
 
-The creating phase gets a stable UUID mapping from `kauro-<attemptId>` where the provider requires a UUID; persist it before
-dispatch. Funding retries are allowed only with documented same-transfer idempotency for the exact endpoint/profile. Without
-that proof, observe/escalate, never blind-fund again. Provider “sent” or accepted/pending is not proven recipient completion.
-COMPLETED requires the qualified completion evidence/status mapping for the endpoint, USD principal, exact transfer/source/
-destination identities and the local refund reference. Unknown status is UNRECOGNIZED_PROVIDER_STATE; timeout/reset/5xx/lost
-response means UNCERTAIN, not FAILED. Absence of a lookup result is not proof no transfer was created or funded.
+After a claim, role, destination or payer revocation, credential loss, lease expiry or source reversal cannot erase a possible
+external effect. Stop every unclaimed phase whose prerequisites lapse — in particular, a source reversed before the FUND claim
+denies funding — and reconcile claimed phases by identity. Never describe a funded return as “cancelled with no effect”; its money
+is accounted by D-ACH-18. Refund state: SUBMITTING from the CREATE claim until a result; UNCERTAIN while either phase is
+uncertain; an unfunded created transfer whose FUND proved no effect returns to APPROVED for a bounded new FUND attempt or FAILED.
+Failed/proved-no-effect permits only a deliberate bounded new attempt after ceilings and authority are rechecked. Approval
+duration and claim windows are versioned; a stored expired approval is not dispatch permission.
 
-After a claim, role revocation, destination revocation, service credential loss, lease expiry or source reversal cannot erase a
-possible external effect. Stop every unclaimed phase, including funding after creation, when its prerequisites lapse; reconcile
-already claimed phases by the same identity. If funding already happened, observe completion or evidenced compensation and
-open an incident. Never describe that return as “cancelled with no effect”. Reversal+refund net against a source once using B09
-D-LEDGER-B7; no second refund, negative refundable balance or service entitlement revival. Failed/proved-no-effect permits
-only a deliberate bounded new attempt after ceilings and authority are rechecked. Owner approval duration and dispatch claim
-window are versioned; a stored expired approval is not dispatch permission. A completed refund keeps its historical approval.
+In manual mode, approval and a durable execution claim of the phase attempt precede the owner's action in Wise's UI; the owner
+confirms with restricted provider evidence through the same normalized observation/settle path. A crash after a manual claim is
+a possible external effect: observe before doing anything again. UI/API modes are mutually exclusive per attempt and share
+transfer IDs, ceilings and register. Manual readiness, destination checking and recovery suffice for the controlled credit
+gate; automated outbound transfers may stay disabled until S-B qualifies them.
 
-In manual mode, approval and a durable execution claim precede the owner's action in Wise's UI. The owner confirms completion
-with restricted provider transaction evidence through the same normalized observation/settle path. A crash after the manual
-claim is a possible external effect: observe the account/transfer before doing anything again. UI/API modes are mutually
-exclusive per attempt and share transfer IDs, ceilings and the register. Manual execution never bypasses approval or pretends
-to supply undocumented provider idempotency. Manual readiness, destination checking and recovery are sufficient for the
-controlled credit gate; automated outbound transfers may remain disabled until S-B qualifies them.
+**D-ACH-18 — Cash accounting of outbound transfers and reversals (answers F1).** B09 netting (`refundReturnOf`,
+`capture.reversed.v1` reversed*Cents) answers only which obligation components a return **discharges**: each component once,
+whichever of refund completion and reversal is observed first. It keeps that role, and with it credit notes (D-FISC-B2: one per
+refund, from its approved components), commission basis and authorization consequences (D-LEDGER-B7). It is not the cash fact:
+a PayPal refund cannot follow its chargeback, but a Wise outbound transfer is independent of the incoming credit's ACH return,
+so both can debit the account. For every bank-transfer source (both scopes):
+
+1. Every provider debit is a cash fact at its full observed principal: outbound completion (`principalCents` = transferred USD)
+   and incoming-credit reversal (`principalCents` = returned amount). An ACH return is of the whole entry; a reversal amount that
+   differs from the credit's gross opens PROVIDER_INCONSISTENCY and posts nothing until reviewed.
+2. Its discharge `d` is the B09 netting result; `excessReturnCents = principalCents − d` (never negative; negative is an
+   integrity failure).
+3. Posting set: DEBIT CONTRACT_LIABILITY/TAX_PAYABLE/CUSTOMER_OVERPAYMENT by `d`, DEBIT **RETURN_RECOVERY_RECEIVABLE** by
+   `excessReturnCents`, CREDIT provider balances by `principalCents` through `takenFromProvider`, whose movable balance is
+   amount − fee − Σ principal already debited (not `returnedCentsOf`'s cap); the rest comes from PSP_AVAILABLE.
+4. Outbound fees: a separate `transfer.fee_observed` set (DEBIT PROCESSOR_EXPENSE), never inside components or principal.
+5. A COMPLETED outbound transfer later returned by the receiving bank: DEBIT provider balance / CREDIT REFUND_PAYABLE by the
+   returned principal and a RETURN_BOUNCED case; discharge, credit note and commissions are not reversed (the customer is still
+   owed). A resend is a new owner-approved Refund of source BOUNCED_REFUND: zero components, principal ceiling = bounced
+   principal less earlier resends; its completion debits REFUND_PAYABLE. A bounce before COMPLETED is not completion.
+6. An excess return is resolved only through a reviewed RETURN_RECOVERY case (P4): payer repayment is a confirmed bank credit
+   attributed to the case (DEBIT provider receivable / CREDIT RETURN_RECOVERY_RECEIVABLE) or an owner write-off by
+   `reconciliation_case.resolved.v1` correction (DEBIT RETURN_LOSS / CREDIT RETURN_RECOVERY_RECEIVABLE). Never revenue, tax,
+   commission or authority.
+
+Obligations: additive account catalogue OPS-2 (RETURN_RECOVERY_RECEIVABLE asset, RETURN_LOSS expense); registered additive
+`principalCents`/`excessReturnCents` members (or v2 types) on refund completion and reversal events of bank-transfer sources
+only, plus `transfer.returned` and `transfer.fee_observed`; PayPal events and arithmetic unchanged. Oracle for Codex r1's
+reproduction (USD 1,000, zero fees; same result for a matched capture and an unassigned credit):
+
+| Order | Event | Discharged | Excess return | Wise movement | Wise net |
+|---|---|---|---|---|---|
+| A, B | credit booked | — | — | +1,000 | +1,000 |
+| A | reversal, then outbound completion | 1,000, then 0 | 0, then 1,000 | −1,000, −1,000 | −1,000 |
+| B | outbound completion, then reversal | 1,000, then 0 | 0, then 1,000 | −1,000, −1,000 | −1,000 |
+
+Both orders end with obligation liabilities 0, RETURN_RECOVERY_RECEIVABLE 1,000, provider balances −1,000 against the ledger's
+receipt, one credit note/commission effect and an open RETURN_RECOVERY case.
+
+**D-ACH-19 — Executing a return through attempts and recovery (answers F2).** Closed scope union, no nullable tenant:
+
+- **AGENCY** (CAPTURE source): existing `refunds` and agency/order-bound `payment_attempts` with the 0016 refund FK unchanged.
+- **RECEIVING_ROUTE** (BANK_CREDIT source): sibling tables `treasury_refunds` and `treasury_attempts`, registered as aggregate
+  kinds of the existing **Refund** and **PaymentAttempt** machines (same states, edges and transition triggers), keyed by
+  `(route_id, environment, account_ref)` with a `bank_credit_id` FK to the credit register and a composite attempt→refund FK
+  mirroring `payment_attempts_refund_fk`. No tenant RLS policy: only `kauro_payment` and active KAURO_OWNER finance access. A
+  treasury refund never migrates to agency scope.
+- **Operations:** `TRANSFER_CREATE` and `TRANSFER_FUND` (new values; `REFUND` stays PayPal's capture refund). Each phase is its
+  own attempt with `provider_request_id = 'kauro-' || attempt_id`, ordinal ≤ 3, dispatch deadline and outcome code; Wise's UUID
+  idempotency key is the attempt's own UUIDv7. Per-refund live/confirmed/ordinal indexes are keyed by `(refund_id, operation)`
+  for these operations; the existing REFUND indexes are restricted to `operation = 'REFUND'`. The CREATE settle records an
+  `outbound_transfers` row (scope, refund, account, transfer ID, destination version, principal; transfer ID unique per
+  account/environment across both scopes) and prepares the FUND attempt in the same COMMIT.
+- **Code:** `TransferAttemptSubject = {scope: AGENCY, order, refund, capture} | {scope: RECEIVING_ROUTE, credit, refund}` with
+  `transferAttemptRequest()` over `WiseBankTransferPort.prepareOutboundTransfer`; PayPal's `AttemptSubject`/`attemptRequest`
+  stay unchanged. The B09 prepare→claim→dispatch→settle helpers are parameterized by a per-scope attempt store; no path builds an
+  order for a credit.
+- **Journal, scope index, observations:** route-scope owner commands and service settles journal in a closed
+  `journal_scope = RECEIVING_ROUTE` (route ref, NULL agency) — a check-constrained extension of `command_journal`, whose only
+  NULL-agency case today is CreateAgency — and attempts' `intent_entry_id` FKs follow their scope. `commerce_scopes` stays
+  agency-only; a sibling `treasury_scopes` (TREASURY_REFUND, BANK_CREDIT, PROVIDER_TRANSFER, PROVIDER_CREDIT) holds route-scope
+  identities, and one shared provider-identity uniqueness index across both prevents an ID resolving to two scopes. Outbound
+  observations carry subject TRANSFER in their attempt's scope.
+- **Recovery:** a new watchdog `watchTransferAttempt(scopeRef, attemptId)` adopts `REFUND` or `TREASURY_REFUND` scope — never
+  PAYMENT_ORDER — waits for the dispatch deadline, observes by transfer ID (or by idempotency key for a CREATE whose answer was
+  lost), stores PROVIDER_QUERY evidence and applies it through a new service command **ReconcileOutboundTransfer** (registry id
+  assigned at implementation; CMD034's analogue) with journal key `watchdog-<observationRef>`. Unclaimed PREPARED attempts may be
+  cancelled before dispatch; a claimed attempt without conclusive evidence stays UNCERTAIN.
+- **Idempotency:** approve binds the owner key to the effects hash; execute binds refund, phase and request hash; reconcile
+  binds the observation ref. Same key/different body conflicts; replay returns the durable attempt/refund state.
 
 ## 6. Wise bank-transfer port and security
 
-**D-ACH-15 — Proposed TypeScript sketch.** This is a new bank-transfer port alongside the existing PaymentProviderAdapter.
-It follows `provider.ts`'s normalized shapes and `application/commerce/ports.ts`'s prepare/dispatch/observe discipline. Vendor
-payloads stay inside S-B. These type names are proposals, not exports in this commit.
+**D-ACH-15 — Proposed TypeScript sketch.** A new bank-transfer port alongside PaymentProviderAdapter, following `provider.ts`'s
+normalized shapes and `ports.ts`'s prepare/dispatch/observe discipline. Vendor payloads stay inside S-B. Names are proposals,
+not exports in this commit.
 
 ```ts
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type {
-  ProviderOutcomeKind, AmbiguityReason, ProviderRequest,
-} from "./provider.js";
+import type { ProviderOutcomeKind, AmbiguityReason, ProviderRequest } from "./provider.js";
 import type { PaymentEnvironment, IntegrationClass, FundsState } from "./records.js";
 
 type WiseAccountRef = string; // immutable account/profile/balance mapping; no credentials
-type CreditId = string;      // account-scoped provider identity, never the memo/reference
-type Cursor = string;        // opaque, account/environment/normalizer-version-bound
+type CreditId = string;       // account-scoped provider identity, never the memo/reference
+type Cursor = string;         // opaque, account/environment/normalizer-version-bound
 type Evidence = { readonly evidenceHash: Sha256Hex; readonly artifactRef: string };
+// Safe operational condition of exactly one request (F4). Not evidence of any money effect; not an AmbiguityReason.
+type OperationalCode = "AUTH_FAILED" | "PERMISSION_DENIED" | "SCA_REQUIRED" | "RATE_LIMITED"
+  | "CAPABILITY_UNAVAILABLE" | "VALIDATION_REJECTED";
+type Operational = { readonly code: OperationalCode; readonly requestHash: Sha256Hex; readonly retryAfterSeconds?: number };
 
 type Outcome<T> =
   | ({ readonly kind: Extract<ProviderOutcomeKind, "COMPLETED">; readonly value: T } & Evidence)
   | ({ readonly kind: "PENDING"; readonly retryAfterSeconds?: number } & Evidence)
-  | ({ readonly kind: "PROVED_NO_EFFECT"; readonly outcomeCode: string;
-       readonly absenceIsProof: true } & Evidence)
+  | ({ readonly kind: "PROVED_NO_EFFECT"; readonly outcomeCode: string; readonly absenceIsProof: true } & Evidence)
   | { readonly kind: "AMBIGUOUS"; readonly reason: AmbiguityReason }
-  | ({ readonly kind: "UNRECOGNIZED"; readonly safeStatusCode: string } & Evidence);
+  | ({ readonly kind: "UNRECOGNIZED"; readonly safeStatusCode: string } & Evidence)
+  // The provider refused this request. Read: not served. Dispatch: `proof` present only when S-B qualified that this code
+  // rejects before any effect (settles FAILED_NO_EFFECT); otherwise the attempt settles UNCERTAIN and is observed.
+  | { readonly kind: "REFUSED"; readonly operational: Operational;
+      readonly proof: (Evidence & { readonly absenceIsProof: true }) | null };
 
 interface UsdAchAccountDetails {
-  readonly accountRef: WiseAccountRef;
-  readonly detailsVersion: string;
-  readonly currency: "USD";
-  readonly rail: "ACH";
+  readonly accountRef: WiseAccountRef; readonly detailsVersion: string; readonly currency: "USD"; readonly rail: "ACH";
   readonly payeeDigest: Sha256Hex;
-  readonly beneficiaryName: string; // restricted instruction data, never telemetry
-  readonly bankName: string;
-  readonly routingNumber: string;
-  readonly accountNumber: string;
-  readonly accountType: "CHECKING" | "SAVINGS";
-  readonly additionalAchFields: Readonly<Record<string, string>>;
-  readonly verifiedAt: UtcInstant;
+  readonly beneficiaryName: string; readonly bankName: string; // restricted instruction data, never telemetry
+  readonly routingNumber: string; readonly accountNumber: string; readonly accountType: "CHECKING" | "SAVINGS";
+  readonly additionalAchFields: Readonly<Record<string, string>>; readonly verifiedAt: UtcInstant;
 }
 interface IncomingCredit extends Evidence {
-  readonly accountRef: WiseAccountRef;
-  readonly creditId: CreditId;
-  readonly environment: PaymentEnvironment;
+  readonly accountRef: WiseAccountRef; readonly creditId: CreditId; readonly environment: PaymentEnvironment;
   readonly rail: "ACH" | "OTHER" | "UNKNOWN";
-  readonly currency: string; // observed currency, not silently constrained to USD
+  readonly currency: string;          // observed, not silently constrained to USD
   readonly grossCents: bigint | null; // null blocks exact-payment application
-  readonly netCents: bigint | null;
-  readonly feeCents: bigint | null;
-  readonly payeeDigest: Sha256Hex;
-  readonly reference: string | null;
-  readonly payerDigest: Sha256Hex | null;
-  readonly payerEvidenceRef: string | null;
+  readonly netCents: bigint | null; readonly feeCents: bigint | null;
+  readonly payeeDigest: Sha256Hex; readonly reference: string | null;
+  readonly payerDigest: Sha256Hex | null; readonly payerEvidenceRef: string | null;
   readonly status: "PENDING" | "COMPLETED" | "DENIED" | "REVERSED" | "UNRECOGNIZED";
-  readonly fundsState: FundsState;
-  readonly bookedAt: UtcInstant | null;
-  readonly observedAt: UtcInstant;
+  readonly reversedCents: bigint | null; // D-ACH-18 principal of a return of this credit
+  readonly fundsState: FundsState; readonly bookedAt: UtcInstant | null; readonly observedAt: UtcInstant;
 }
 interface CreditPage {
-  readonly credits: ReadonlyArray<IncomingCredit>;
-  readonly nextCursor: Cursor;
-  readonly complete: boolean;
-  readonly coverageStart: UtcInstant;
-  readonly coverageEnd: UtcInstant;
+  readonly credits: ReadonlyArray<IncomingCredit>; readonly nextCursor: Cursor; readonly complete: boolean;
+  readonly coverageStart: UtcInstant; readonly coverageEnd: UtcInstant;
 }
+type OutboundSource =
+  | { readonly kind: "CAPTURE"; readonly agencyId: string; readonly captureId: string }
+  | { readonly kind: "BANK_CREDIT"; readonly routeId: string; readonly bankCreditId: string }
+  | { readonly kind: "BOUNCED_REFUND"; readonly bouncedRefundId: string };
 interface OutboundIntent {
   readonly refundId: string;
-  readonly attemptId: string;
-  readonly accountRef: WiseAccountRef;
-  readonly source: { readonly captureId: string } | { readonly bankCreditId: string };
-  readonly destinationRef: string;
-  readonly destinationVersion: string;
-  readonly destinationDigest: Sha256Hex;
-  readonly amountCents: bigint;
-  readonly currency: "USD";
-  readonly maxFeeCents: bigint;
-  readonly feePolicyVersion: string;
-  readonly approvalHash: Sha256Hex;
+  readonly attemptId: string; // the phase's own attempt (D-ACH-19); Wise UUID idempotency key = this UUIDv7
+  readonly accountRef: WiseAccountRef; readonly source: OutboundSource;
+  readonly destination: { readonly ref: string; readonly version: string; readonly digest: Sha256Hex;
+    readonly providerRecipientRef: string };
+  readonly amountCents: bigint; readonly currency: "USD"; readonly maxFeeCents: bigint;
+  readonly feePolicyVersion: string; readonly approvalHash: Sha256Hex;
 }
-type OutboundPhase =
-  | { readonly phase: "CREATE" }
-  | { readonly phase: "FUND"; readonly transferId: string };
+type OutboundPhase = { readonly phase: "CREATE" } | { readonly phase: "FUND"; readonly transferId: string };
 interface OutboundObservation extends Evidence {
-  readonly transferId: string;
-  readonly platformRefundRef: string | null;
-  readonly accountRef: WiseAccountRef;
-  readonly destinationDigest: Sha256Hex;
-  readonly amountCents: bigint;
-  readonly currency: string;
+  readonly transferId: string; readonly platformRefundRef: string | null; readonly accountRef: WiseAccountRef;
+  readonly destinationDigest: Sha256Hex; readonly amountCents: bigint; readonly currency: string;
   readonly feeCents: bigint | null;
-  readonly status: "CREATED" | "PENDING" | "COMPLETED" | "FAILED" | "UNRECOGNIZED";
+  readonly status: "CREATED" | "PENDING" | "COMPLETED" | "FAILED" | "RETURNED" | "UNRECOGNIZED";
   readonly observedAt: UtcInstant;
 }
 interface WiseBankTransferPort {
-  readonly provider: "wise";
-  readonly environment: PaymentEnvironment;
-  readonly integrationClass: IntegrationClass;
-  getAccountDetails(account: WiseAccountRef, deadline: UtcInstant):
-    Promise<Outcome<UsdAchAccountDetails>>;
-  listIncomingCredits(input: { readonly accountRef: WiseAccountRef;
-    readonly since: Cursor | null; readonly limit: number; readonly deadline: UtcInstant }):
-    Promise<Outcome<CreditPage>>;
+  readonly provider: "wise"; readonly environment: PaymentEnvironment; readonly integrationClass: IntegrationClass;
+  getAccountDetails(account: WiseAccountRef, deadline: UtcInstant): Promise<Outcome<UsdAchAccountDetails>>;
+  listIncomingCredits(input: { readonly accountRef: WiseAccountRef; readonly since: Cursor | null;
+    readonly limit: number; readonly deadline: UtcInstant }): Promise<Outcome<CreditPage>>;
   getCreditById(input: { readonly accountRef: WiseAccountRef; readonly creditId: CreditId;
     readonly deadline: UtcInstant }): Promise<Outcome<IncomingCredit>>;
   // Pure. Exact method/profile/body/semantic headers, credentialRef only; hash before claim.
-  prepareOutboundTransfer(intent: OutboundIntent, phase: OutboundPhase,
-    idempotencyKey: string): ProviderRequest;
-  // One separately journalled phase per call; never concealed create+fund calls.
-  initiateOutboundTransfer(input: { readonly request: ProviderRequest;
-    readonly phase: OutboundPhase; readonly idempotencyKey: string; readonly deadline: UtcInstant }):
-    Promise<Outcome<OutboundObservation>>;
-  observeOutboundTransfer(input: { readonly accountRef: WiseAccountRef;
-    readonly transferId?: string; readonly idempotencyKey: string; readonly deadline: UtcInstant }):
-    Promise<Outcome<OutboundObservation>>;
+  prepareOutboundTransfer(intent: OutboundIntent, phase: OutboundPhase): ProviderRequest;
+  // One separately journalled phase attempt per call; never concealed create+fund calls.
+  initiateOutboundTransfer(input: { readonly request: ProviderRequest; readonly phase: OutboundPhase;
+    readonly attemptId: string; readonly deadline: UtcInstant }): Promise<Outcome<OutboundObservation>>;
+  observeOutboundTransfer(input: { readonly accountRef: WiseAccountRef; readonly transferId?: string;
+    readonly attemptId: string; readonly deadline: UtcInstant }): Promise<Outcome<OutboundObservation>>;
   // Pure classification of authenticated stored evidence, including manual bank artifacts.
   classifyCredit(evidence: Evidence): IncomingCredit;
   classifyOutbound(evidence: Evidence): OutboundObservation;
@@ -460,12 +501,15 @@ interface WiseBankTransferPort {
 ```
 
 An Outcome COMPLETED means the **port operation** returned conclusive evidence; inspect the inner credit/transfer status before
-asserting money completion. `PENDING` is a recognized nonterminal response. Preserve the existing AmbiguityReason values
-TIMEOUT, CONNECTION_RESET, PROVIDER_5XX, UNREADABLE_RESPONSE and OBSERVATION_LOST. Authentication/permission/rate-limit/validation
-errors use safe outcome codes; a refusal proves no effect only for that exact request when endpoint evidence warrants it,
-and cannot resolve an earlier ambiguous dispatch. Read-list absence is never PROVED_NO_EFFECT. Missing credit/status lookup
-is PENDING or AMBIGUOUS/OBSERVATION_LOST unless authoritative absence support has been qualified. UNRECOGNIZED never becomes
-success/failure. The adapter returns evidence hashes and restricted refs, no provider prose in public problems.
+asserting money completion. `PENDING` is a recognized nonterminal response. AmbiguityReason keeps exactly TIMEOUT,
+CONNECTION_RESET, PROVIDER_5XX, UNREADABLE_RESPONSE and OBSERVATION_LOST. Authentication, permission, SCA, rate-limit,
+unavailable-capability and validation refusals travel only as `REFUSED` with an `Operational` code bound to the refused
+request's hash: the settle stores the code as that attempt's `outcome_code` (an existing token column) or, for reads, as a
+coverage-gap/route-operational event; it is surfaced to the owner as a safe code, never provider prose. A refusal resolves
+nothing but its own request: it cannot settle an earlier ambiguous dispatch, and without qualified `proof` a refused dispatch is
+UNCERTAIN and observed. An SCA/permission refusal of a statement read keeps the cursor, records the coverage gap and leaves the
+owner-manual route available. Read-list absence is never PROVED_NO_EFFECT; a missing credit/status lookup is PENDING or
+AMBIGUOUS/OBSERVATION_LOST unless authoritative absence has been qualified. UNRECOGNIZED never becomes success/failure.
 
 `listIncomingCredits` is observational, idempotent and at least once; repeated/overlapping pages and changed statuses for the
 same credit are expected. `getCreditById` is a logical port capability, not a claim that Wise offers a direct endpoint with
@@ -481,10 +525,11 @@ evidence for the actual account, independently qualifies each phase and records 
 
 **D-ACH-16 — Authority and audit.** Manual entry **and confirmation** require an active corporate `KAURO_OWNER`, active verified
 identity, live session and fresh step-up proof at their respective effects. Agency OWNER/BILLING is not corporate KAURO_OWNER.
-Use the existing identity-owned operator journal and adopted finance scope; pending unattributed records use the restricted
-route treasury scope, not a customer-provided agency. Service ingestion/apply requires authenticated PAYMENT_SERVICE bound to
-the same environment. Preserve the `kauro_app` versus `kauro_payment` boundary: the owner writes draft/confirmation decisions;
-only a service-authorized consumption of those decisions can write captures, observations and CommercialAuthorization.
+Agency-scope facts use the agency's command journal and adopted finance scope; route-scope facts (unattributed credits, treasury
+refunds, route-scope destinations) use the RECEIVING_ROUTE journal scope of D-ACH-19, never a customer-provided agency. Service
+ingestion/apply requires authenticated PAYMENT_SERVICE bound to the same environment. Preserve the `kauro_app` versus
+`kauro_payment` boundary: the owner writes draft/confirmation/verification decisions; only a service-authorized consumption of
+those decisions writes captures, observations, attempts and CommercialAuthorization.
 
 Entry and confirmation are separate idempotent commands with immutable evidence and audit. The same corporate owner may do
 both (single-owner operation is allowed), but confirmation performs a new evidence comparison and fresh effect-time assurance;
@@ -495,179 +540,146 @@ session/proof, account/details/fee verification, payer alias, destination and se
 interleaving orders. Separate locks from evidence reads; revalidate before writing after any await.
 
 Audit events proposed: route configured/verified/enabled/disabled/verification withdrawn; instructions issued/read denied;
-credit entered/confirmed/rejected/observed/duplicate/conflict; match accepted/reviewed/overridden; credit applied and authority
-granted/blocked; order expired/retired; refund requested/approved/claimed/ambiguous/observed/completed/failed; cursor advanced/
-coverage gap and treasury posting/correction. Each has actor/service, environment, scope, entity/version IDs, reason token,
-correlation/journal key digest, proof/evidence refs and decision/effects hashes. Commit ALLOW facts with the authorized effect;
-durably record DENY facts through the existing separate security-fact path after rollback. Events per aggregate version and
-registered subscribers remain mandatory. No routing/account numbers, tokens, raw memos, payer names, destination bank fields,
-raw statements or credential values appear in logs, outbox payloads, analytics, error bodies or evidence bundles. Keep originals
-encrypted in the restricted evidence store, accessed through audited finance reads; use refs/digests and masked displays.
+credit entered/confirmed/rejected/observed/duplicate/conflict; payer authorization verified/replaced/revoked; destination
+recorded/verified/revoked; match accepted/reviewed/overridden/returned to review; credit applied and authority granted/blocked;
+order expired/retired; refund requested/approved/claimed/ambiguous/refused/observed/completed/failed/bounced; excess return
+booked/recovered/written off; cursor advanced/coverage gap and treasury posting/correction. Each has actor/service, environment,
+scope, entity/version IDs, reason token, correlation/journal key digest, proof/evidence refs and decision/effects hashes. Commit
+ALLOW facts with the authorized effect; durably record DENY facts through the existing separate security-fact path after
+rollback. Events per aggregate version and registered subscribers remain mandatory. No routing/account numbers, tokens, raw
+memos, payer names, destination bank fields, raw statements or credential values appear in logs, outbox payloads, analytics,
+error bodies or evidence bundles. Keep originals encrypted in the restricted evidence store, accessed through audited finance
+reads; use refs/digests and masked displays.
 
 ## 7. Failure-mode matrices
 
-The matrices below follow [FAILURE-MATRIX-TEMPLATE](FAILURE-MATRIX-TEMPLATE.md) and [FAULT-HARNESS](FAULT-HARNESS.md), including
-all ten family rules. All cells are **GAP** because this is pre-code design. Codes `ACH-M-<row>-<column>` uniquely identify
-unwritten tests. Every cell states an expected result, invariant and injection. Money/authority GAPs are tier 1; transport
-GAPs with no incorrect money/authority outcome are tier 3. All are required before implementing/enabling the affected path.
+The matrices follow [FAILURE-MATRIX-TEMPLATE](FAILURE-MATRIX-TEMPLATE.md) and [FAULT-HARNESS](FAULT-HARNESS.md), including all ten
+family rules. All cells are **GAP** (pre-code). `ACH-M-<row>-<column>` codes identify unwritten tests; every cell states expected
+result, invariant and injection. Money/authority GAPs are tier 1; transport GAPs with no wrong money/authority outcome are tier 3;
+all are required before implementing/enabling the affected path. Rows are one call/read or one independently durable
+transaction; the Step cell names its `K…` COMMIT and footprint. PARTIAL injects at **each** second/later write, including
+deferred guards and journal/event/outbox writes. BEFORE is after the row's last write before its COMMIT; AFTER is after that
+COMMIT before response/outbox settlement; read/call rows use their own before/after await boundary. No call-out runs inside a
+transaction; external effects name the provider's own durable boundary.
 
-Rows inventory one call/read or independently durable transaction; a transaction's listed multi-write footprint is one atomic
-step, with PARTIAL injected at **each** second/later write, including deferred guards and journal/event/outbox writes. Every
-provider phase and every separate local durable write/COMMIT has its own row. No call-out runs inside a database transaction.
-For transaction rows, BEFORE is after that row's last write before its named COMMIT; AFTER is after that same COMMIT before
-response/outbox settlement. Read/call rows use their own exact before/after await boundary, labelled explicitly rather than
-pretending a read has a COMMIT. External side effects name the provider's own durable boundary.
-
-Test closure convention: proposed file `packages/persistence/test/ach-failure-matrix.test.ts` for DB/command rows and
-`packages/application/test/ach-wise-port.test.ts` for instrumented call/read rows. Until real qualification, label adapter
-fixtures CONTRACT_FAKE, not Wise evidence. Each test title is `RACE ACH-M-<row>-<column> (<family>): <row label>`; use
-`DENY` for expiry/revocation refusals and `OK` for pure read invariants. Register each cell with `faultMatrix`/`faultCell` and
-its exact unique title in the implementation case map. Test bodies must prove operation-owned fault evidence. RACE always
-holds the named lock/await and runs **every named competing actor in both orders**. RETRY tests separately cover same key/same
-body, same key/different body, identical event redelivery and concurrent recovery where applicable. AFTER tests inject lost
-answers; ordinary sequential retries are not that proof. Deadline tests consume the effect clock before, exactly at and after
-the named boundary. REVOCATION tests withdraw each listed prerequisite independently, not just a role. PARTIAL asserts the
-entire footprint and exact cents, including journals, events, scopes, delivery markers and already-committed other actors.
-
-The following table fixes transaction boundaries and the artifacts each row must assert; numbered identifiers are shared with
-the matrix rows. Expiry/retirement and matched/unassigned refunds retain receipt identities forever within financial retention.
-
-| Row | Boundary / footprint |
-|---|---|
-| R1 | Account-details fetch/classification await, no route write |
-| R2 | `Kroute`: route/config version, assurance fact, journal, events/outbox |
-| I1 | Purchased-subject/capacity/route locked readiness read |
-| I2 | `Kinstructions`: journal, accepted quote, order, reference/snapshot, scopes, events/outbox |
-| I3 | Authorized sensitive-instructions projection read |
-| C1 | `Kscanclaim`: account scan lease/fence and bounded deadline |
-| C2 | listIncomingCredits await, no cursor mutation |
-| C3 | getCreditById await, including known-credit return/status rescans |
-| C4 | Restricted evidence read and pure classifyCredit/manual comparison await |
-| C5 | `Kdraft`: owner manual draft/evidence refs, journal, audit events |
-| C6 | `Kconfirm`: owner confirmation decision, normalized observation/inbox, journal, assurance/events |
-| C7 | `Kpage`: complete page inbox/credit versions, exceptions and audit events; no cursor yet |
-| C8 | `Kcursor`: coverage/cursor CAS plus lease renewal/settle and events after Kpage |
-| M1 | Reference/account/payer binding lookup read, no scope adoption from payload |
-| M2 | `Kmatch`: attribution/review decision, target binding/alias version, case, journal/events |
-| P1 | `Kapply`: capture/allocation + credit APPLIED + order/authorization or cases/refund requests + observation/events/outbox |
-| P2 | `Kbook`: receipt/fee/funds posting or atomic attribution reversal+capture group, delivery markers |
-| E1 | `Kexpiry`: locked order expiry/retirement, cases/refund requests and events (retirement also journals) |
-| F1 | Outbound destination/evidence read and pure prepare/classify await |
-| F2 | `Krefundintent`: refund/source ceiling reservation, owner approval, CREATE_PREPARED attempt/saga, journal/events |
-| F3 | `Kcreateclaim`: attempt DISPATCHING, CREATE_CLAIMED fence/deadline, refund SUBMITTING, events |
-| F4 | initiateOutboundTransfer CREATE await, or claimed manual create; provider create durable boundary |
-| F5 | `Kcreatesettle`: created transfer identity/evidence, saga CREATED/FUND_PREPARED or uncertainty, observation/events |
-| F6 | `Kfundclaim`: FUND_CLAIMED fence/deadline and events; created identity already durable |
-| F7 | initiateOutboundTransfer FUND await, or claimed manual funding; provider funding durable boundary |
-| F8 | `Kfundsettle`: funding evidence/status, saga/attempt/refund result or UNCERTAIN, return components/consequences/events |
-| O1 | observeOutboundTransfer/classifyOutbound await (manual evidence through F1), no new dispatch |
-| O2 | `Kreturnobserve`: status/fee/reversal normalization, source ceilings, refund completion/authority consequences/events |
-| O3 | `Kanswer`: operator/service journal finalization from durable saga/refund result only |
-
+Tests: `packages/persistence/test/ach-failure-matrix.test.ts` (DB/command rows) and `packages/application/test/ach-wise-port.test.ts`
+(call/read rows), titled `RACE ACH-M-<row>-<column> (<family>): <row label>` (`DENY` for expiry/revocation refusals, `OK` for pure
+read invariants), registered with `faultMatrix`/`faultCell` in the implementation case map. Adapter fixtures are CONTRACT_FAKE.
+Tests prove operation-owned fault evidence. RACE holds the named lock/await and runs **every named actor in both orders**. RETRY
+covers same key/same body, same key/different body, identical event redelivery and concurrent recovery where applicable. AFTER
+tests inject lost answers. Deadline tests consume the effect clock before, at and after the boundary. REVOCATION withdraws each
+listed prerequisite independently. PARTIAL asserts the entire footprint and exact cents, including journals, events, scopes,
+delivery markers and other actors' commits. Rows D1–D4, F1–O3, W1 and P3 run each cell in **both source scopes** (AGENCY capture
+source, RECEIVING_ROUTE bank-credit source) inside the one titled test and assert the scope-specific footprint.
 
 ### 7.1 Route configuration and qualification command (D-ACH-02)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| R1 Account details read | **GAP ACH-M-R1-RACE**: Discard stale details. Invariant: enable binds current account version. Inject: pause fetch; replace account/disable in both orders. | **GAP ACH-M-R1-TIMEOUT**: Leave verification pending. Invariant: timeout never qualifies route. Inject: delay details response past port deadline. | **GAP ACH-M-R1-EXPIRY**: Reject expired evidence. Invariant: details validity required at enable. Inject: advance details validity during fetch. | **GAP ACH-M-R1-CRASH-BEFORE**: Fetch retry is read-only. Invariant: no route fact exists. Inject: crash immediately before details await. | **GAP ACH-M-R1-CRASH-AFTER**: Refetch after lost answer. Invariant: no automatic qualification. Inject: crash after fetch before Kroute. | **GAP ACH-M-R1-RETRY**: Same read is harmless. Invariant: only current evidence may qualify. Inject: repeat fetch and conflicting account binding. | **GAP ACH-M-R1-REVOCATION**: Discard withdrawn evidence. Invariant: KYC/account/credential authority all required. Inject: withdraw each at held fetch. | **GAP ACH-M-R1-PARTIAL**: Reject incomplete details. Invariant: no partial instruction snapshot. Inject: fail field parsing after account number read. |
-| R2 Kroute configuration commit | **GAP ACH-M-R2-RACE**: One version wins; loser rechecks. Invariant: only current verified config enables. Inject: hold route lock; enable/disable/details replacement both orders. | **GAP ACH-M-R2-TIMEOUT**: Recover config by journal. Invariant: no assumed enabling. Inject: lock/COMMIT timeout then read version with same key. | **GAP ACH-M-R2-EXPIRY**: Refuse stale verification/step-up. Invariant: fresh facts at effect. Inject: move evidence/proof/fee validity over boundary after locks. | **GAP ACH-M-R2-CRASH-BEFORE**: Rollback all config writes. Invariant: no enable without evidence/audit. Inject: crash after final write before Kroute COMMIT. | **GAP ACH-M-R2-CRASH-AFTER**: Replay committed route version. Invariant: one enabling event. Inject: lose answer after Kroute COMMIT. | **GAP ACH-M-R2-RETRY**: Replay or body conflict. Invariant: same key binds exact config. Inject: concurrent same key then changed account/version body. | **GAP ACH-M-R2-REVOCATION**: Block enable; retain any disable. Invariant: all qualification prerequisites required. Inject: revoke identity/grant/proof/KYC/details/fee evidence separately under route lock. | **GAP ACH-M-R2-PARTIAL**: Rollback full footprint. Invariant: no enabled half-config. Inject: fail second/later config/journal/assurance/event/outbox writes. |
-
+| **R1** Account-details fetch/classification await; no route write | **GAP ACH-M-R1-RACE**: Discard stale details. Invariant: enable binds current account version. Inject: pause fetch; replace account/disable in both orders. | **GAP ACH-M-R1-TIMEOUT**: Leave verification pending. Invariant: timeout never qualifies route. Inject: delay details response past port deadline. | **GAP ACH-M-R1-EXPIRY**: Reject expired evidence. Invariant: details validity required at enable. Inject: advance details validity during fetch. | **GAP ACH-M-R1-CRASH-BEFORE**: Fetch retry is read-only. Invariant: no route fact exists. Inject: crash immediately before details await. | **GAP ACH-M-R1-CRASH-AFTER**: Refetch after lost answer. Invariant: no automatic qualification. Inject: crash after fetch before Kroute. | **GAP ACH-M-R1-RETRY**: Same read is harmless. Invariant: only current evidence may qualify. Inject: repeat fetch and conflicting account binding. | **GAP ACH-M-R1-REVOCATION**: Discard withdrawn evidence. Invariant: KYC/account/credential authority all required. Inject: withdraw each at held fetch. | **GAP ACH-M-R1-PARTIAL**: Reject incomplete details. Invariant: no partial instruction snapshot. Inject: fail field parsing after account number read. |
+| **R2** `Kroute`: route/config version, assurance fact, journal, events/outbox | **GAP ACH-M-R2-RACE**: One version wins; loser rechecks. Invariant: only current verified config enables. Inject: hold route lock; enable/disable/details replacement both orders. | **GAP ACH-M-R2-TIMEOUT**: Recover config by journal. Invariant: no assumed enabling. Inject: lock/COMMIT timeout then read version with same key. | **GAP ACH-M-R2-EXPIRY**: Refuse stale verification/step-up. Invariant: fresh facts at effect. Inject: move evidence/proof/fee validity over boundary after locks. | **GAP ACH-M-R2-CRASH-BEFORE**: Rollback all config writes. Invariant: no enable without evidence/audit. Inject: crash after final write before Kroute COMMIT. | **GAP ACH-M-R2-CRASH-AFTER**: Replay committed route version. Invariant: one enabling event. Inject: lose answer after Kroute COMMIT. | **GAP ACH-M-R2-RETRY**: Replay or body conflict. Invariant: same key binds exact config. Inject: concurrent same key then changed account/version body. | **GAP ACH-M-R2-REVOCATION**: Block enable; retain any disable. Invariant: all qualification prerequisites required. Inject: revoke identity/grant/proof/KYC/details/fee evidence separately under route lock. | **GAP ACH-M-R2-PARTIAL**: Rollback full footprint. Invariant: no enabled half-config. Inject: fail second/later config/journal/assurance/event/outbox writes. |
 ### 7.2 Issue transfer instructions command (D-ACH-04)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| I1 Locked readiness read | **GAP ACH-M-I1-RACE**: Read consistent locked subject. Invariant: one purchase and valid prerequisites. Inject: hold subject locks; PayPal checkout/sweep/approval withdrawal/source deletion both orders. | **GAP ACH-M-I1-TIMEOUT**: Refuse instructions retryably. Invariant: unknown capacity is not permission. Inject: delay capacity/read statement past bound. | **GAP ACH-M-I1-EXPIRY**: Refuse stale checkout. Invariant: source/price/capacity deadlines independent. Inject: advance each deadline during read; consume effect clock. | **GAP ACH-M-I1-CRASH-BEFORE**: Release read locks; no issue. Invariant: no instruction state exists. Inject: crash before readiness await returns. | **GAP ACH-M-I1-CRASH-AFTER**: Repeat checks on recovery. Invariant: a prior read grants no authority. Inject: crash after read before Kinstructions. | **GAP ACH-M-I1-RETRY**: Read again under current guards. Invariant: no stale readiness replay. Inject: repeat read after prerequisites change. | **GAP ACH-M-I1-REVOCATION**: Refuse issuance. Invariant: identity/membership/approval/source/target/capability/routes all bind. Inject: withdraw each at held readiness boundary. | **GAP ACH-M-I1-PARTIAL**: No writable footprint. Invariant: all readiness facts required. Inject: fail second reader after first succeeded. |
-| I2 Kinstructions issue commit | **GAP ACH-M-I2-RACE**: One checkout/ref wins. Invariant: no cross-route open duplicate. Inject: hold project/route lock; issue/PayPal/retire/sweep both orders. | **GAP ACH-M-I2-TIMEOUT**: Recover by intent journal. Invariant: no second reference/order. Inject: inject statement or lost COMMIT response timeout. | **GAP ACH-M-I2-EXPIRY**: Refuse at expired effect. Invariant: no extension of price/source lifetime. Inject: advance transfer/quote/source/proof validity after lock wait. | **GAP ACH-M-I2-CRASH-BEFORE**: All instructions disappear. Invariant: quote/order/reference/journal atomic. Inject: crash after last write before Kinstructions COMMIT. | **GAP ACH-M-I2-CRASH-AFTER**: Return same frozen instructions if still enabled. Invariant: no regenerated reference. Inject: lose response after Kinstructions COMMIT. | **GAP ACH-M-I2-RETRY**: Replay exact order or conflict. Invariant: intent binds route/terms/amount. Inject: concurrent identical key and changed route/body; force reference collision. | **GAP ACH-M-I2-REVOCATION**: Refuse new issuance. Invariant: billing and qualified route facts required. Inject: revoke identity/membership/approval/source/target/capability/route/fee facts separately. | **GAP ACH-M-I2-PARTIAL**: Rollback complete footprint. Invariant: no orphan reference or accepted quote. Inject: fail each later snapshot/scope/event/outbox/journal write. |
-
+| **I1** Purchased-subject/capacity/route locked readiness read | **GAP ACH-M-I1-RACE**: Read consistent locked subject. Invariant: one purchase and valid prerequisites. Inject: hold subject locks; PayPal checkout/sweep/approval withdrawal/source deletion both orders. | **GAP ACH-M-I1-TIMEOUT**: Refuse instructions retryably. Invariant: unknown capacity is not permission. Inject: delay capacity/read statement past bound. | **GAP ACH-M-I1-EXPIRY**: Refuse stale checkout. Invariant: source/price/capacity deadlines independent. Inject: advance each deadline during read; consume effect clock. | **GAP ACH-M-I1-CRASH-BEFORE**: Release read locks; no issue. Invariant: no instruction state exists. Inject: crash before readiness await returns. | **GAP ACH-M-I1-CRASH-AFTER**: Repeat checks on recovery. Invariant: a prior read grants no authority. Inject: crash after read before Kinstructions. | **GAP ACH-M-I1-RETRY**: Read again under current guards. Invariant: no stale readiness replay. Inject: repeat read after prerequisites change. | **GAP ACH-M-I1-REVOCATION**: Refuse issuance. Invariant: identity/membership/approval/source/target/capability/routes all bind. Inject: withdraw each at held readiness boundary. | **GAP ACH-M-I1-PARTIAL**: No writable footprint. Invariant: all readiness facts required. Inject: fail second reader after first succeeded. |
+| **I2** `Kinstructions`: journal, accepted quote, order, reference/snapshot, scopes, events/outbox | **GAP ACH-M-I2-RACE**: One checkout/ref wins. Invariant: no cross-route open duplicate. Inject: hold project/route lock; issue/PayPal/retire/sweep both orders. | **GAP ACH-M-I2-TIMEOUT**: Recover by intent journal. Invariant: no second reference/order. Inject: inject statement or lost COMMIT response timeout. | **GAP ACH-M-I2-EXPIRY**: Refuse at expired effect. Invariant: no extension of price/source lifetime. Inject: advance transfer/quote/source/proof validity after lock wait. | **GAP ACH-M-I2-CRASH-BEFORE**: All instructions disappear. Invariant: quote/order/reference/journal atomic. Inject: crash after last write before Kinstructions COMMIT. | **GAP ACH-M-I2-CRASH-AFTER**: Return same frozen instructions if still enabled. Invariant: no regenerated reference. Inject: lose response after Kinstructions COMMIT. | **GAP ACH-M-I2-RETRY**: Replay exact order or conflict. Invariant: intent binds route/terms/amount. Inject: concurrent identical key and changed route/body; force reference collision. | **GAP ACH-M-I2-REVOCATION**: Refuse new issuance. Invariant: billing and qualified route facts required. Inject: revoke identity/membership/approval/source/target/capability/route/fee facts separately. | **GAP ACH-M-I2-PARTIAL**: Rollback complete footprint. Invariant: no orphan reference or accepted quote. Inject: fail each later snapshot/scope/event/outbox/journal write. |
 ### 7.3 Read sensitive instructions (D-ACH-04/16)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| I3 Sensitive projection read | **GAP ACH-M-I3-RACE**: Hide details if disable wins. Invariant: only ENABLED serves sensitive data. Inject: hold projection guard; disable/account replacement/expiry both orders. | **GAP ACH-M-I3-TIMEOUT**: Return no sensitive partial response. Invariant: unknown guard never exposes details. Inject: delay authorization/artifact read past bound. | **GAP ACH-M-I3-EXPIRY**: Hide expired instruction details. Invariant: live deadline and session required. Inject: move order/session expiry during guarded read. | **GAP ACH-M-I3-CRASH-BEFORE**: No response or state change. Invariant: no logged account data. Inject: crash before projection await; inspect logs. | **GAP ACH-M-I3-CRASH-AFTER**: Client may refetch under guards. Invariant: responses never cache details. Inject: lose read response; inspect cache headers and refetch. | **GAP ACH-M-I3-RETRY**: Reauthorize every read. Invariant: idempotency cannot bypass visibility. Inject: repeat reads after disable and from foreign agency. | **GAP ACH-M-I3-REVOCATION**: Suppress sensitive response. Invariant: membership/session/route/details remain valid. Inject: withdraw each while projection is held. | **GAP ACH-M-I3-PARTIAL**: Fail closed without body fragments. Invariant: all authorized fields come from one snapshot. Inject: fail artifact decrypt after authorization; inspect response/logs. |
-
+| **I3** Authorized sensitive-instructions projection read | **GAP ACH-M-I3-RACE**: Hide details if disable wins. Invariant: only ENABLED serves sensitive data. Inject: hold projection guard; disable/account replacement/expiry both orders. | **GAP ACH-M-I3-TIMEOUT**: Return no sensitive partial response. Invariant: unknown guard never exposes details. Inject: delay authorization/artifact read past bound. | **GAP ACH-M-I3-EXPIRY**: Hide expired instruction details. Invariant: live deadline and session required. Inject: move order/session expiry during guarded read. | **GAP ACH-M-I3-CRASH-BEFORE**: No response or state change. Invariant: no logged account data. Inject: crash before projection await; inspect logs. | **GAP ACH-M-I3-CRASH-AFTER**: Client may refetch under guards. Invariant: responses never cache details. Inject: lose read response; inspect cache headers and refetch. | **GAP ACH-M-I3-RETRY**: Reauthorize every read. Invariant: idempotency cannot bypass visibility. Inject: repeat reads after disable and from foreign agency. | **GAP ACH-M-I3-REVOCATION**: Suppress sensitive response. Invariant: membership/session/route/details remain valid. Inject: withdraw each while projection is held. | **GAP ACH-M-I3-PARTIAL**: Fail closed without body fragments. Invariant: all authorized fields come from one snapshot. Inject: fail artifact decrypt after authorization; inspect response/logs. |
 ### 7.4 Incoming-credit observer and cursor sweep (D-ACH-07)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| C1 Kscanclaim lease commit | **GAP ACH-M-C1-RACE**: One fenced scanner wins. Invariant: stale lease cannot advance cursor. Inject: hold account lease; concurrent scan/takeover both orders. | **GAP ACH-M-C1-TIMEOUT**: Read durable lease before work. Invariant: uncertain claim is not call permission. Inject: inject claim lock/COMMIT response timeout. | **GAP ACH-M-C1-EXPIRY**: Reject expired claim. Invariant: bounded server lease only. Inject: advance lease/claim deadline at effect. | **GAP ACH-M-C1-CRASH-BEFORE**: No lease survives. Invariant: no orphan scanner claim. Inject: crash after final write before Kscanclaim COMMIT. | **GAP ACH-M-C1-CRASH-AFTER**: Recover same fence or wait. Invariant: no duplicate ownership assumption. Inject: lose claim answer after Kscanclaim COMMIT. | **GAP ACH-M-C1-RETRY**: Same holder resumes; stale holder loses. Invariant: fence monotonically increases. Inject: concurrent same key and conflicting holder body. | **GAP ACH-M-C1-REVOCATION**: Stop new scan claims. Invariant: service/account/environment authority required. Inject: revoke service identity/account binding/lease fence individually. | **GAP ACH-M-C1-PARTIAL**: Rollback claim and events. Invariant: lease metadata atomic. Inject: fail later deadline/fence/event writes. |
-| C2 List credits port await | **GAP ACH-M-C2-RACE**: Persist duplicates safely; reject stale cursor claim. Invariant: at-least-once never double-books. Inject: pause list; second poll/manual confirmation/account replacement both orders. | **GAP ACH-M-C2-TIMEOUT**: Keep old cursor; retry observation. Invariant: no absence inferred from timeout. Inject: delay or lose list response past bound. | **GAP ACH-M-C2-EXPIRY**: Stale lease cannot checkpoint. Invariant: coverage advances only under live fence. Inject: advance lease deadline while listing. | **GAP ACH-M-C2-CRASH-BEFORE**: No local observation yet. Invariant: cursor unchanged. Inject: crash before list await dispatch. | **GAP ACH-M-C2-CRASH-AFTER**: Repeat overlapping scan. Invariant: lost page cannot skip money. Inject: crash after list response before Kpage. | **GAP ACH-M-C2-RETRY**: Identical/reordered pages dedupe. Invariant: identity not amount defines receipt. Inject: repeat page and event; mutate immutable credit body. | **GAP ACH-M-C2-REVOCATION**: Stop calls; retain old coverage. Invariant: service/credential/account/fence validated. Inject: revoke each at list await; permit identical evidence only. | **GAP ACH-M-C2-PARTIAL**: Retain previous cursor. Invariant: partial page is never complete coverage. Inject: truncate page or fail second-page classification. |
-| C3 Credit by ID/rescan await | **GAP ACH-M-C3-RACE**: Merge monotonically or open conflict. Invariant: returns cannot be rolled back by pending. Inject: hold observation; manual/API completion/return/attribution both orders. | **GAP ACH-M-C3-TIMEOUT**: Keep pending/uncertain. Invariant: missing response proves no absence. Inject: timeout/reset/5xx during lookup. | **GAP ACH-M-C3-EXPIRY**: Store evidence; no expired service right. Invariant: late receipt remains real. Inject: cross order/lease deadline during lookup. | **GAP ACH-M-C3-CRASH-BEFORE**: No new local fact. Invariant: stored credit survives. Inject: crash before getCreditById await. | **GAP ACH-M-C3-CRASH-AFTER**: Repeat exact identity lookup. Invariant: no recreated incoming transaction. Inject: crash after response before Kpage/Kapply. | **GAP ACH-M-C3-RETRY**: Duplicate status has no second effect. Invariant: terminal progression monotonic. Inject: redeliver status then conflicting immutable fields. | **GAP ACH-M-C3-REVOCATION**: No newly trusted response without auth. Invariant: account/environment/credential/fence bind query. Inject: revoke each at lookup; preserve previously verified facts. | **GAP ACH-M-C3-PARTIAL**: Quarantine incomplete evidence. Invariant: no guessed gross/reference/payer. Inject: fail normalization after reading status. |
-| C7 Kpage observation persistence commit | **GAP ACH-M-C7-RACE**: Deduplicate or record conflict. Invariant: one receipt identity across sources. Inject: hold credit lock; manual entry/API rescan/return both orders. | **GAP ACH-M-C7-TIMEOUT**: Do not advance cursor yet. Invariant: lost page commit recoverable. Inject: inject statement or COMMIT response timeout. | **GAP ACH-M-C7-EXPIRY**: Persist authenticated receipts; block stale settlement. Invariant: expiry cannot erase real credits. Inject: cross lease/order deadline after fetch before write. | **GAP ACH-M-C7-CRASH-BEFORE**: No page fragment persists. Invariant: page durability precedes cursor. Inject: crash after last write before Kpage COMMIT. | **GAP ACH-M-C7-CRASH-AFTER**: Repeat page before checkpoint. Invariant: duplicate evidence changes no balance. Inject: lose page answer after Kpage COMMIT. | **GAP ACH-M-C7-RETRY**: Replay page/events or conflict. Invariant: dedupe by account-scoped bank ID. Inject: repeat identical/reordered page then changed immutable body. | **GAP ACH-M-C7-REVOCATION**: Reject unauthenticated ingress; keep prior facts. Invariant: service/account/evidence auth cannot be invented. Inject: withdraw each ingress prerequisite; stale fence never advances coverage. | **GAP ACH-M-C7-PARTIAL**: Rollback entire bounded page. Invariant: no cursor claims missing observations. Inject: fail second credit/exception/version/event write. |
-| C8 Kcursor coverage commit | **GAP ACH-M-C8-RACE**: CAS winner advances; loser rescans. Invariant: cursor bound to durable page/fence. Inject: hold cursor lock; second scanner/takeover both orders. | **GAP ACH-M-C8-TIMEOUT**: Read checkpoint and recover. Invariant: uncertain checkpoint never skips gap. Inject: inject cursor lock/COMMIT response timeout. | **GAP ACH-M-C8-EXPIRY**: Reject expired fence. Invariant: no stale checkpoint owner. Inject: advance lease deadline just before cursor effect. | **GAP ACH-M-C8-CRASH-BEFORE**: Keep previous cursor; page remains durable. Invariant: Kpage independent of checkpoint. Inject: crash after last write before Kcursor COMMIT. | **GAP ACH-M-C8-CRASH-AFTER**: Resume committed coverage. Invariant: no page skipped on lost answer. Inject: lose checkpoint response after Kcursor COMMIT. | **GAP ACH-M-C8-RETRY**: Repeat checkpoint no-op or conflict. Invariant: cursor hash/page binding fixed. Inject: same key/page duplicates then changed coverage body. | **GAP ACH-M-C8-REVOCATION**: Refuse cursor advance. Invariant: service/environment/account/live fence required. Inject: revoke each while CAS is held. | **GAP ACH-M-C8-PARTIAL**: Rollback cursor/coverage/lease settlement. Invariant: checkpoint footprint atomic. Inject: fail later coverage/event/lease write; assert durable Kpage retained. |
-
+| **C1** `Kscanclaim`: account scan lease/fence and bounded deadline | **GAP ACH-M-C1-RACE**: One fenced scanner wins. Invariant: stale lease cannot advance cursor. Inject: hold account lease; concurrent scan/takeover both orders. | **GAP ACH-M-C1-TIMEOUT**: Read durable lease before work. Invariant: uncertain claim is not call permission. Inject: inject claim lock/COMMIT response timeout. | **GAP ACH-M-C1-EXPIRY**: Reject expired claim. Invariant: bounded server lease only. Inject: advance lease/claim deadline at effect. | **GAP ACH-M-C1-CRASH-BEFORE**: No lease survives. Invariant: no orphan scanner claim. Inject: crash after final write before Kscanclaim COMMIT. | **GAP ACH-M-C1-CRASH-AFTER**: Recover same fence or wait. Invariant: no duplicate ownership assumption. Inject: lose claim answer after Kscanclaim COMMIT. | **GAP ACH-M-C1-RETRY**: Same holder resumes; stale holder loses. Invariant: fence monotonically increases. Inject: concurrent same key and conflicting holder body. | **GAP ACH-M-C1-REVOCATION**: Stop new scan claims. Invariant: service/account/environment authority required. Inject: revoke service identity/account binding/lease fence individually. | **GAP ACH-M-C1-PARTIAL**: Rollback claim and events. Invariant: lease metadata atomic. Inject: fail later deadline/fence/event writes. |
+| **C2** listIncomingCredits await; no cursor mutation; REFUSED records a coverage gap | **GAP ACH-M-C2-RACE**: Persist duplicates safely; reject stale cursor claim. Invariant: at-least-once never double-books. Inject: pause list; second poll/manual confirmation/account replacement both orders. | **GAP ACH-M-C2-TIMEOUT**: Keep old cursor; retry observation. Invariant: no absence inferred from timeout. Inject: delay or lose list response past bound. | **GAP ACH-M-C2-EXPIRY**: Stale lease cannot checkpoint. Invariant: coverage advances only under live fence. Inject: advance lease deadline while listing. | **GAP ACH-M-C2-CRASH-BEFORE**: No local observation yet. Invariant: cursor unchanged. Inject: crash before list await dispatch. | **GAP ACH-M-C2-CRASH-AFTER**: Repeat overlapping scan. Invariant: lost page cannot skip money. Inject: crash after list response before Kpage. | **GAP ACH-M-C2-RETRY**: Identical/reordered pages dedupe. Invariant: identity not amount defines receipt. Inject: repeat page and event; mutate immutable credit body. | **GAP ACH-M-C2-REVOCATION**: Stop calls; retain old coverage. Invariant: service/credential/account/fence validated. Inject: revoke each at list await; permit identical evidence only. | **GAP ACH-M-C2-PARTIAL**: Retain previous cursor. Invariant: partial page is never complete coverage. Inject: truncate page or fail second-page classification. |
+| **C3** getCreditById await, including known-credit return/status rescans | **GAP ACH-M-C3-RACE**: Merge monotonically or open conflict. Invariant: returns cannot be rolled back by pending. Inject: hold observation; manual/API completion/return/attribution both orders. | **GAP ACH-M-C3-TIMEOUT**: Keep pending/uncertain. Invariant: missing response proves no absence. Inject: timeout/reset/5xx during lookup. | **GAP ACH-M-C3-EXPIRY**: Store evidence; no expired service right. Invariant: late receipt remains real. Inject: cross order/lease deadline during lookup. | **GAP ACH-M-C3-CRASH-BEFORE**: No new local fact. Invariant: stored credit survives. Inject: crash before getCreditById await. | **GAP ACH-M-C3-CRASH-AFTER**: Repeat exact identity lookup. Invariant: no recreated incoming transaction. Inject: crash after response before Kpage/Kapply. | **GAP ACH-M-C3-RETRY**: Duplicate status has no second effect. Invariant: terminal progression monotonic. Inject: redeliver status then conflicting immutable fields. | **GAP ACH-M-C3-REVOCATION**: No newly trusted response without auth. Invariant: account/environment/credential/fence bind query. Inject: revoke each at lookup; preserve previously verified facts. | **GAP ACH-M-C3-PARTIAL**: Quarantine incomplete evidence. Invariant: no guessed gross/reference/payer. Inject: fail normalization after reading status. |
+| **C7** `Kpage`: complete page inbox/credit versions, exceptions, audit events; no cursor yet | **GAP ACH-M-C7-RACE**: Deduplicate or record conflict. Invariant: one receipt identity across sources. Inject: hold credit lock; manual entry/API rescan/return both orders. | **GAP ACH-M-C7-TIMEOUT**: Do not advance cursor yet. Invariant: lost page commit recoverable. Inject: inject statement or COMMIT response timeout. | **GAP ACH-M-C7-EXPIRY**: Persist authenticated receipts; block stale settlement. Invariant: expiry cannot erase real credits. Inject: cross lease/order deadline after fetch before write. | **GAP ACH-M-C7-CRASH-BEFORE**: No page fragment persists. Invariant: page durability precedes cursor. Inject: crash after last write before Kpage COMMIT. | **GAP ACH-M-C7-CRASH-AFTER**: Repeat page before checkpoint. Invariant: duplicate evidence changes no balance. Inject: lose page answer after Kpage COMMIT. | **GAP ACH-M-C7-RETRY**: Replay page/events or conflict. Invariant: dedupe by account-scoped bank ID. Inject: repeat identical/reordered page then changed immutable body. | **GAP ACH-M-C7-REVOCATION**: Reject unauthenticated ingress; keep prior facts. Invariant: service/account/evidence auth cannot be invented. Inject: withdraw each ingress prerequisite; stale fence never advances coverage. | **GAP ACH-M-C7-PARTIAL**: Rollback entire bounded page. Invariant: no cursor claims missing observations. Inject: fail second credit/exception/version/event write. |
+| **C8** `Kcursor`: coverage/cursor CAS plus lease renewal/settle and events after Kpage | **GAP ACH-M-C8-RACE**: CAS winner advances; loser rescans. Invariant: cursor bound to durable page/fence. Inject: hold cursor lock; second scanner/takeover both orders. | **GAP ACH-M-C8-TIMEOUT**: Read checkpoint and recover. Invariant: uncertain checkpoint never skips gap. Inject: inject cursor lock/COMMIT response timeout. | **GAP ACH-M-C8-EXPIRY**: Reject expired fence. Invariant: no stale checkpoint owner. Inject: advance lease deadline just before cursor effect. | **GAP ACH-M-C8-CRASH-BEFORE**: Keep previous cursor; page remains durable. Invariant: Kpage independent of checkpoint. Inject: crash after last write before Kcursor COMMIT. | **GAP ACH-M-C8-CRASH-AFTER**: Resume committed coverage. Invariant: no page skipped on lost answer. Inject: lose checkpoint response after Kcursor COMMIT. | **GAP ACH-M-C8-RETRY**: Repeat checkpoint no-op or conflict. Invariant: cursor hash/page binding fixed. Inject: same key/page duplicates then changed coverage body. | **GAP ACH-M-C8-REVOCATION**: Refuse cursor advance. Invariant: service/environment/account/live fence required. Inject: revoke each while CAS is held. | **GAP ACH-M-C8-PARTIAL**: Rollback cursor/coverage/lease settlement. Invariant: checkpoint footprint atomic. Inject: fail later coverage/event/lease write; assert durable Kpage retained. |
 ### 7.5 Enter manual credit command (D-ACH-07/16)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| C5 Kdraft manual entry commit | **GAP ACH-M-C5-RACE**: One draft/version wins. Invariant: manual/API share bank identity. Inject: hold credit lock; two owners/API entry both orders. | **GAP ACH-M-C5-TIMEOUT**: Recover draft only. Invariant: entry is not confirmation. Inject: inject write/COMMIT acknowledgement timeout. | **GAP ACH-M-C5-EXPIRY**: Reject stale proof/session. Invariant: owner assurance fresh at write. Inject: advance proof/session boundary after wait. | **GAP ACH-M-C5-CRASH-BEFORE**: No draft or journal persists. Invariant: entry atomic. Inject: crash after final write before Kdraft COMMIT. | **GAP ACH-M-C5-CRASH-AFTER**: Replay draft without capture. Invariant: one immutable entry. Inject: lose answer after Kdraft COMMIT. | **GAP ACH-M-C5-RETRY**: Replay same body or conflict. Invariant: bank ID/hash fixed. Inject: same key duplicates and changed bank ID/amount/artifact. | **GAP ACH-M-C5-REVOCATION**: Refuse entry. Invariant: corporate owner not agency billing. Inject: revoke identity verification/grant/session/proof/account access separately. | **GAP ACH-M-C5-PARTIAL**: Rollback draft/audit/journal. Invariant: no unaudited entry. Inject: fail later evidence-ref/event/journal writes. |
-
+| **C5** `Kdraft`: owner manual draft/evidence refs, journal, audit events | **GAP ACH-M-C5-RACE**: One draft/version wins. Invariant: manual/API share bank identity. Inject: hold credit lock; two owners/API entry both orders. | **GAP ACH-M-C5-TIMEOUT**: Recover draft only. Invariant: entry is not confirmation. Inject: inject write/COMMIT acknowledgement timeout. | **GAP ACH-M-C5-EXPIRY**: Reject stale proof/session. Invariant: owner assurance fresh at write. Inject: advance proof/session boundary after wait. | **GAP ACH-M-C5-CRASH-BEFORE**: No draft or journal persists. Invariant: entry atomic. Inject: crash after final write before Kdraft COMMIT. | **GAP ACH-M-C5-CRASH-AFTER**: Replay draft without capture. Invariant: one immutable entry. Inject: lose answer after Kdraft COMMIT. | **GAP ACH-M-C5-RETRY**: Replay same body or conflict. Invariant: bank ID/hash fixed. Inject: same key duplicates and changed bank ID/amount/artifact. | **GAP ACH-M-C5-REVOCATION**: Refuse entry. Invariant: corporate owner not agency billing. Inject: revoke identity verification/grant/session/proof/account access separately. | **GAP ACH-M-C5-PARTIAL**: Rollback draft/audit/journal. Invariant: no unaudited entry. Inject: fail later evidence-ref/event/journal writes. |
 ### 7.6 Confirm manual credit command (D-ACH-07/16)
-
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| C4 Evidence/classification read | **GAP ACH-M-C4-RACE**: Reject changed artifact or draft. Invariant: confirmation hashes immutable evidence. Inject: hold evidence read; draft correction/artifact revocation/API observation both orders. | **GAP ACH-M-C4-TIMEOUT**: Leave draft unconfirmed. Invariant: unread evidence cannot mint money. Inject: delay artifact/decrypt/compare beyond bound. | **GAP ACH-M-C4-EXPIRY**: Require new assurance/check. Invariant: proof and evidence current at effect. Inject: advance evidence/proof validity while reading. | **GAP ACH-M-C4-CRASH-BEFORE**: No confirmed fact. Invariant: draft alone grants nothing. Inject: crash before evidence comparison await. | **GAP ACH-M-C4-CRASH-AFTER**: Reread/compare on resume. Invariant: old read is not confirmation. Inject: crash after classification before Kconfirm. | **GAP ACH-M-C4-RETRY**: Same evidence stable; changed body conflicts. Invariant: hash binds bytes and source identity. Inject: repeat classification then substitute artifact/hash. | **GAP ACH-M-C4-REVOCATION**: Refuse confirmation. Invariant: owner/proof/account/artifact authority required. Inject: revoke each at held evidence read. | **GAP ACH-M-C4-PARTIAL**: No partial normalized credit accepted. Invariant: all identity and amount fields required. Inject: fail second field check/decrypt step after first success. |
-| C6 Kconfirm manual confirmation commit | **GAP ACH-M-C6-RACE**: One normalized receipt wins. Invariant: manual/API duplicates share identity. Inject: hold credit/owner guard; API confirmation/draft rejection both orders. | **GAP ACH-M-C6-TIMEOUT**: Recover confirmed decision by key. Invariant: timeout never confirms twice. Inject: inject statement/lost COMMIT response timeout. | **GAP ACH-M-C6-EXPIRY**: Refuse stale proof; late money still reviewable. Invariant: fresh confirmation does not waive order expiry. Inject: cross proof and transfer deadlines independently. | **GAP ACH-M-C6-CRASH-BEFORE**: All confirmation writes roll back. Invariant: no trusted orphan observation. Inject: crash after last write before Kconfirm COMMIT. | **GAP ACH-M-C6-CRASH-AFTER**: Replay committed observation. Invariant: no new money/authorization. Inject: lose answer after Kconfirm COMMIT. | **GAP ACH-M-C6-RETRY**: Same key/evidence replays; conflict quarantines. Invariant: confirmed body immutable. Inject: concurrent replay and event redelivery; change amount/payer body. | **GAP ACH-M-C6-REVOCATION**: Refuse new confirmation; retain prior confirmed money. Invariant: owner/identity/proof/account/evidence all guarded. Inject: revoke each before/after confirmation guard. | **GAP ACH-M-C6-PARTIAL**: Rollback complete decision footprint. Invariant: confirmation/inbox/assurance atomic. Inject: fail each later observation/event/ALLOW/journal write. |
-
-### 7.7 Match or review credit command (D-ACH-08)
-
+| **C4** Restricted evidence read and pure classifyCredit/manual comparison await | **GAP ACH-M-C4-RACE**: Reject changed artifact or draft. Invariant: confirmation hashes immutable evidence. Inject: hold evidence read; draft correction/artifact revocation/API observation both orders. | **GAP ACH-M-C4-TIMEOUT**: Leave draft unconfirmed. Invariant: unread evidence cannot mint money. Inject: delay artifact/decrypt/compare beyond bound. | **GAP ACH-M-C4-EXPIRY**: Require new assurance/check. Invariant: proof and evidence current at effect. Inject: advance evidence/proof validity while reading. | **GAP ACH-M-C4-CRASH-BEFORE**: No confirmed fact. Invariant: draft alone grants nothing. Inject: crash before evidence comparison await. | **GAP ACH-M-C4-CRASH-AFTER**: Reread/compare on resume. Invariant: old read is not confirmation. Inject: crash after classification before Kconfirm. | **GAP ACH-M-C4-RETRY**: Same evidence stable; changed body conflicts. Invariant: hash binds bytes and source identity. Inject: repeat classification then substitute artifact/hash. | **GAP ACH-M-C4-REVOCATION**: Refuse confirmation. Invariant: owner/proof/account/artifact authority required. Inject: revoke each at held evidence read. | **GAP ACH-M-C4-PARTIAL**: No partial normalized credit accepted. Invariant: all identity and amount fields required. Inject: fail second field check/decrypt step after first success. |
+| **C6** `Kconfirm`: confirmation decision, normalized observation/inbox, journal, assurance/events | **GAP ACH-M-C6-RACE**: One normalized receipt wins. Invariant: manual/API duplicates share identity. Inject: hold credit/owner guard; API confirmation/draft rejection both orders. | **GAP ACH-M-C6-TIMEOUT**: Recover confirmed decision by key. Invariant: timeout never confirms twice. Inject: inject statement/lost COMMIT response timeout. | **GAP ACH-M-C6-EXPIRY**: Refuse stale proof; late money still reviewable. Invariant: fresh confirmation does not waive order expiry. Inject: cross proof and transfer deadlines independently. | **GAP ACH-M-C6-CRASH-BEFORE**: All confirmation writes roll back. Invariant: no trusted orphan observation. Inject: crash after last write before Kconfirm COMMIT. | **GAP ACH-M-C6-CRASH-AFTER**: Replay committed observation. Invariant: no new money/authorization. Inject: lose answer after Kconfirm COMMIT. | **GAP ACH-M-C6-RETRY**: Same key/evidence replays; conflict quarantines. Invariant: confirmed body immutable. Inject: concurrent replay and event redelivery; change amount/payer body. | **GAP ACH-M-C6-REVOCATION**: Refuse new confirmation; retain prior confirmed money. Invariant: owner/identity/proof/account/evidence all guarded. Inject: revoke each before/after confirmation guard. | **GAP ACH-M-C6-PARTIAL**: Rollback complete decision footprint. Invariant: confirmation/inbox/assurance atomic. Inject: fail each later observation/event/ALLOW/journal write. |
+### 7.7 Verify or replace payer authorization command (D-ACH-17)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| M1 Reference/payer lookup read | **GAP ACH-M-M1-RACE**: Recheck target binding before decision. Invariant: reference/account never reassigned. Inject: hold lookup; attribution/retirement/payer-alias withdrawal both orders. | **GAP ACH-M-M1-TIMEOUT**: Keep MATCH_REVIEW. Invariant: no guessed agency from timeout. Inject: delay reference/alias/evidence lookup beyond bound. | **GAP ACH-M-M1-EXPIRY**: Resolve identity but flag late. Invariant: lookup never extends deadline. Inject: cross transfer/alias validity during read. | **GAP ACH-M-M1-CRASH-BEFORE**: No attribution written. Invariant: observation remains recoverable. Inject: crash before lookup await. | **GAP ACH-M-M1-CRASH-AFTER**: Repeat guarded lookup. Invariant: read alone binds no order. Inject: crash after lookup before Kmatch. | **GAP ACH-M-M1-RETRY**: Stable lookup; altered input conflicts later. Invariant: canonical reference only. Inject: repeat exact lookup then truncated/foreign-account/payer variant. | **GAP ACH-M-M1-REVOCATION**: Refuse override/expired alias. Invariant: payer/account/owner authority independent. Inject: withdraw each prerequisite while lookup held. | **GAP ACH-M-M1-PARTIAL**: Keep review with no partial binding. Invariant: all identity dimensions required. Inject: fail second reference/payee/payer lookup after first result. |
-| M2 Kmatch attribution commit | **GAP ACH-M-M2-RACE**: One attribution or return claim wins. Invariant: credit cannot pay two orders. Inject: hold credit/order locks; other owner/return claim/expiry/route switch both orders. | **GAP ACH-M-M2-TIMEOUT**: Recover decision; never auto-apply twice. Invariant: ambiguous COMMIT not new match. Inject: inject decision lock/COMMIT response timeout. | **GAP ACH-M-M2-EXPIRY**: Commit late review; no entitlement promise. Invariant: transfer/alias/proof deadlines checked independently. Inject: move each boundary at decision effect. | **GAP ACH-M-M2-CRASH-BEFORE**: No binding/case/journal survives. Invariant: attribution decision atomic. Inject: crash after last write before Kmatch COMMIT. | **GAP ACH-M-M2-CRASH-AFTER**: Recover same decision and apply later. Invariant: MATCHED is not PAID. Inject: lose answer after Kmatch COMMIT. | **GAP ACH-M-M2-RETRY**: Replay or immutable-body conflict. Invariant: one target/evidence decision. Inject: repeat key/event then changed target/amount/alias. | **GAP ACH-M-M2-REVOCATION**: Deny override; retain trusted receipt. Invariant: identity/grant/proof/account/payer authorization required. Inject: revoke each under match guard; service still sees prior credit. | **GAP ACH-M-M2-PARTIAL**: Rollback target/case/assurance/events/journal. Invariant: no unreviewed scope adoption. Inject: fail each second/later write and assert prior observation intact. |
-
-### 7.8 Apply matched credit / order-paid transition (D-ACH-06/09)
-
+| **V1** Payer identity/authorization evidence read and classification await; no write | **GAP ACH-M-V1-RACE**: Revalidate before Kpayerauth. Invariant: the version binds the evidence actually read. Inject: hold read; agency billing-identity change/second verification/revocation both orders. | **GAP ACH-M-V1-TIMEOUT**: No authorization from unread evidence. Invariant: unknown payer is not permission. Inject: delay artifact/decrypt past bound. | **GAP ACH-M-V1-EXPIRY**: Require fresh evidence/proof. Invariant: evidence and step-up validity checked at effect. Inject: advance each validity during read. | **GAP ACH-M-V1-CRASH-BEFORE**: No fact. Invariant: read writes nothing. Inject: crash before evidence await. | **GAP ACH-M-V1-CRASH-AFTER**: Reread on resume. Invariant: an old read verifies nothing. Inject: crash after read before Kpayerauth. | **GAP ACH-M-V1-RETRY**: Same bytes, same digest; substituted artifact conflicts. Invariant: digest binds bytes and source. Inject: repeat read then swap artifact. | **GAP ACH-M-V1-REVOCATION**: Refuse. Invariant: owner identity/grant/proof, agency billing identity and artifact access each required. Inject: withdraw each at held read. | **GAP ACH-M-V1-PARTIAL**: Reject partial evidence. Invariant: payer identity and agency request both required. Inject: fail second evidence decode after first. |
+| **V2** `Kpayerauth`: new VERIFIED version, prior VERIFIED→SUPERSEDED, evidence refs, assurance, agency journal, audit/events/outbox | **GAP ACH-M-V2-RACE**: One current version per agency/payer. Invariant: no two current authorizations; a match binds exactly one. Inject: hold authorization lock; second verification/replacement/revocation/Kmatch both orders. | **GAP ACH-M-V2-TIMEOUT**: Recover by journal key. Invariant: no duplicate version. Inject: lock/COMMIT response timeout. | **GAP ACH-M-V2-EXPIRY**: Refuse stale proof/evidence; validity bound frozen. Invariant: effect-time assurance. Inject: cross proof/evidence validity after lock wait. | **GAP ACH-M-V2-CRASH-BEFORE**: Rollback new and superseded versions. Invariant: replacement atomic. Inject: crash after last write before Kpayerauth COMMIT. | **GAP ACH-M-V2-CRASH-AFTER**: Replay committed version. Invariant: one VERIFIED event. Inject: lose answer after Kpayerauth COMMIT. | **GAP ACH-M-V2-RETRY**: Same key/body replays; changed evidence/payer/kind conflicts. Invariant: version immutable. Inject: concurrent same key, then changed evidence digest, payer and kind. | **GAP ACH-M-V2-REVOCATION**: Refuse; prior version unchanged. Invariant: KAURO_OWNER grant, identity, step-up, agency active, billing identity all required. Inject: withdraw each under lock. | **GAP ACH-M-V2-PARTIAL**: Rollback whole footprint. Invariant: no supersession without successor. Inject: fail supersede/assurance/journal/event/outbox write after the new version insert. |
+### 7.8 Revoke payer authorization command (D-ACH-17)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| P1 Kapply credit/order paid commit | **GAP ACH-M-P1-RACE**: Serialize receipts, returns and checkout closure. Invariant: one capture/entitlement; allocation capped. Inject: hold credit/subject/order locks; duplicate/distinct credit/expiry/refund/reversal/PayPal/retire both orders. | **GAP ACH-M-P1-TIMEOUT**: Recover APPLIED link by credit ID. Invariant: timeout cannot grant twice. Inject: inject lock/statement/lost COMMIT response timeout. | **GAP ACH-M-P1-EXPIRY**: Record money; block authority; request return. Invariant: expired order never resurrects. Inject: move price/source/transfer deadline exactly across apply effect. | **GAP ACH-M-P1-CRASH-BEFORE**: Rollback full money/authority footprint. Invariant: no capture without consequences. Inject: crash after final write before Kapply COMMIT. | **GAP ACH-M-P1-CRASH-AFTER**: Recover committed capture/order outcome. Invariant: no duplicate authorization or completion event. Inject: lose answer/outbox settlement after Kapply COMMIT. | **GAP ACH-M-P1-RETRY**: Replay credit/event; conflict opens incident. Invariant: one identity one capture. Inject: concurrent recovery/redelivery then immutable body conflict; distinct full credit proves excess. | **GAP ACH-M-P1-REVOCATION**: Record verified money; deny authority/remedy. Invariant: revocation cannot discard receipt. Inject: withdraw agency/approval/revision/target/capability/route/fiscal/legal facts individually; revoke owner after confirmation. | **GAP ACH-M-P1-PARTIAL**: All apply writes roll back. Invariant: exact cents and authority atomic. Inject: fail second/later allocation/order/authorization/case/refund/observation/event/outbox writes. |
-
-### 7.9 FINANCE receipt and attribution consumer (D-ACH-11)
-
+| **V3** `Kpayerrevoke`: version REVOKED, review case naming MATCHED-unapplied credits, journal, audit/events | **GAP ACH-M-V3-RACE**: Apply first keeps its capture (money real, authority per P1); revoke first sends the credit to MATCH_REVIEW at P1. Invariant: no capture newly applied under a revoked version. Inject: hold authorization lock; Kapply/Kmatch/replacement both orders. | **GAP ACH-M-V3-TIMEOUT**: Recover state; consumers re-read. Invariant: uncertain revocation never treated as still valid by a consumer. Inject: COMMIT response timeout, then concurrent Kapply. | **GAP ACH-M-V3-EXPIRY**: Revoking an expired version records the revocation. Invariant: expired version unusable either way. Inject: validity boundary exactly at revoke effect. | **GAP ACH-M-V3-CRASH-BEFORE**: Version stays VERIFIED; no case. Invariant: state and case atomic. Inject: crash after last write before Kpayerrevoke COMMIT. | **GAP ACH-M-V3-CRASH-AFTER**: Replay. Invariant: one REVOKED event. Inject: lose answer after Kpayerrevoke COMMIT. | **GAP ACH-M-V3-RETRY**: Duplicate is a no-op; revoking a superseded version returns current state. Invariant: monotonic. Inject: repeat key and event; same key with another version ID. | **GAP ACH-M-V3-REVOCATION**: Revoker loses authority: deny, version stays VERIFIED. Invariant: identity/membership or grant/step-up checked at effect. Inject: withdraw each. | **GAP ACH-M-V3-PARTIAL**: Rollback. Invariant: revocation and its case together. Inject: fail case/journal/event write. |
+### 7.9 Match or review credit command (D-ACH-08)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| P2 Kbook shared-ledger commit | **GAP ACH-M-P2-RACE**: One posting group orders sources. Invariant: no duplicate receipt/fee/return across scopes. Inject: hold booking/source locks; FINANCE redelivery/attribution/fee/return/reversal both orders. | **GAP ACH-M-P2-TIMEOUT**: Recover group by source IDs. Invariant: unknown COMMIT never reposts. Inject: inject ledger lock/statement/COMMIT acknowledgement timeout. | **GAP ACH-M-P2-EXPIRY**: Book historical evidence despite order expiry. Invariant: lease expiry cannot authorize stale delivery. Inject: cross worker fence deadline; retry under current fence with original event dates. | **GAP ACH-M-P2-CRASH-BEFORE**: No posting group fragment survives. Invariant: balanced source sets and markers atomic. Inject: crash after last write before Kbook COMMIT. | **GAP ACH-M-P2-CRASH-AFTER**: Replay group as already posted. Invariant: receipt and reclassification counted once. Inject: lose consumer settle after Kbook COMMIT. | **GAP ACH-M-P2-RETRY**: Identical events no-op; conflicting source rejected. Invariant: event/line and group uniqueness. Inject: redeliver each source concurrently and corrupt linked receipt/capture body. | **GAP ACH-M-P2-REVOCATION**: Fence stale worker; preserve postings. Invariant: service scope/fence required; owner loss never erases money. Inject: revoke service/fence/account scope independently during booking. | **GAP ACH-M-P2-PARTIAL**: Rollback every group set/marker. Invariant: no residual treasury or double balance. Inject: fail second/later receipt/reversal/capture/fee/funds/marker writes; assert exact account cents. |
-
-### 7.10 Expiry sweep / retire-checkout transition (D-ACH-05/10)
-
+| **M1** Reference/account/payer-authorization lookup read; no scope adoption from payload | **GAP ACH-M-M1-RACE**: Recheck target binding before decision. Invariant: reference/account never reassigned. Inject: hold lookup; attribution/retirement/payer-alias withdrawal both orders. | **GAP ACH-M-M1-TIMEOUT**: Keep MATCH_REVIEW. Invariant: no guessed agency from timeout. Inject: delay reference/alias/evidence lookup beyond bound. | **GAP ACH-M-M1-EXPIRY**: Resolve identity but flag late. Invariant: lookup never extends deadline. Inject: cross transfer/alias validity during read. | **GAP ACH-M-M1-CRASH-BEFORE**: No attribution written. Invariant: observation remains recoverable. Inject: crash before lookup await. | **GAP ACH-M-M1-CRASH-AFTER**: Repeat guarded lookup. Invariant: read alone binds no order. Inject: crash after lookup before Kmatch. | **GAP ACH-M-M1-RETRY**: Stable lookup; altered input conflicts later. Invariant: canonical reference only. Inject: repeat exact lookup then truncated/foreign-account/payer variant. | **GAP ACH-M-M1-REVOCATION**: Refuse override/expired alias. Invariant: payer/account/owner authority independent. Inject: withdraw each prerequisite while lookup held. | **GAP ACH-M-M1-PARTIAL**: Keep review with no partial binding. Invariant: all identity dimensions required. Inject: fail second reference/payee/payer lookup after first result. |
+| **M2** `Kmatch`: attribution/review decision, target binding, payer-authorization version, case, journal/events | **GAP ACH-M-M2-RACE**: One attribution or return claim wins. Invariant: credit cannot pay two orders. Inject: hold credit/order locks; other owner/return claim/expiry/route switch both orders. | **GAP ACH-M-M2-TIMEOUT**: Recover decision; never auto-apply twice. Invariant: ambiguous COMMIT not new match. Inject: inject decision lock/COMMIT response timeout. | **GAP ACH-M-M2-EXPIRY**: Commit late review; no entitlement promise. Invariant: transfer/alias/proof deadlines checked independently. Inject: move each boundary at decision effect. | **GAP ACH-M-M2-CRASH-BEFORE**: No binding/case/journal survives. Invariant: attribution decision atomic. Inject: crash after last write before Kmatch COMMIT. | **GAP ACH-M-M2-CRASH-AFTER**: Recover same decision and apply later. Invariant: MATCHED is not PAID. Inject: lose answer after Kmatch COMMIT. | **GAP ACH-M-M2-RETRY**: Replay or immutable-body conflict. Invariant: one target/evidence decision. Inject: repeat key/event then changed target/amount/alias. | **GAP ACH-M-M2-REVOCATION**: Deny override; retain trusted receipt. Invariant: identity/grant/proof/account/payer authorization required. Inject: revoke each under match guard; service still sees prior credit. | **GAP ACH-M-M2-PARTIAL**: Rollback target/case/assurance/events/journal. Invariant: no unreviewed scope adoption. Inject: fail each second/later write and assert prior observation intact. |
+### 7.10 Apply matched credit / order-paid transition (D-ACH-06/09)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| E1 Kexpiry close checkout commit | **GAP ACH-M-E1-RACE**: Payment first preserves CAPTURED; expiry first is return-only. Invariant: no reopened order or duplicate entitlement. Inject: hold order/project locks; apply/partial credit/PayPal switch/refund both orders. | **GAP ACH-M-E1-TIMEOUT**: Recover state; rerun sweep safely. Invariant: timeout cannot release uncertain money. Inject: inject lock/statement/lost COMMIT response timeout. | **GAP ACH-M-E1-EXPIRY**: Only expire at effectNow >= deadline. Invariant: price/source clocks never extended. Inject: test before/exact/after deadline after held lock; route retirement separately. | **GAP ACH-M-E1-CRASH-BEFORE**: Rollback closure and return requests. Invariant: no orphan expiry consequence. Inject: crash after final write before Kexpiry COMMIT. | **GAP ACH-M-E1-CRASH-AFTER**: Replay committed closure. Invariant: old reference remains bound. Inject: lose sweep settle/retirement response after Kexpiry COMMIT. | **GAP ACH-M-E1-RETRY**: Repeated sweep/events do not duplicate requests. Invariant: expiry monotonic; quote release guarded. Inject: redeliver sweep and retirement key; change target/body. | **GAP ACH-M-E1-REVOCATION**: Stale service cannot sweep; money remains. Invariant: service/fence/retirement-member authority checked. Inject: withdraw service/fence or billing identity/membership independently. | **GAP ACH-M-E1-PARTIAL**: Rollback state/case/refund/events/journal. Invariant: partial received cents preserved. Inject: fail later consequence/event writes; assert existing captures and quote reservations unchanged. |
-
-### 7.11 Approve outbound return command (D-ACH-13)
-
+| **P1** `Kapply`: capture/allocation, credit APPLIED, order/authorization or cases/refund requests, observation/events/outbox | **GAP ACH-M-P1-RACE**: Serialize receipts, returns and checkout closure. Invariant: one capture/entitlement; allocation capped. Inject: hold credit/subject/order locks; duplicate/distinct credit/expiry/refund/reversal/PayPal/retire both orders. | **GAP ACH-M-P1-TIMEOUT**: Recover APPLIED link by credit ID. Invariant: timeout cannot grant twice. Inject: inject lock/statement/lost COMMIT response timeout. | **GAP ACH-M-P1-EXPIRY**: Record money; block authority; request return. Invariant: expired order never resurrects. Inject: move price/source/transfer deadline exactly across apply effect. | **GAP ACH-M-P1-CRASH-BEFORE**: Rollback full money/authority footprint. Invariant: no capture without consequences. Inject: crash after final write before Kapply COMMIT. | **GAP ACH-M-P1-CRASH-AFTER**: Recover committed capture/order outcome. Invariant: no duplicate authorization or completion event. Inject: lose answer/outbox settlement after Kapply COMMIT. | **GAP ACH-M-P1-RETRY**: Replay credit/event; conflict opens incident. Invariant: one identity one capture. Inject: concurrent recovery/redelivery then immutable body conflict; distinct full credit proves excess. | **GAP ACH-M-P1-REVOCATION**: Record verified money; deny authority/remedy. Invariant: revocation cannot discard receipt. Inject: withdraw agency/approval/revision/target/capability/route/fiscal/legal facts individually; revoke owner after confirmation; revoke/supersede the bound payer authorization after Kmatch (credit returns to MATCH_REVIEW, no capture). | **GAP ACH-M-P1-PARTIAL**: All apply writes roll back. Invariant: exact cents and authority atomic. Inject: fail second/later allocation/order/authorization/case/refund/observation/event/outbox writes. |
+### 7.11 FINANCE receipt and attribution consumer (D-ACH-11)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| F1 Destination/prepare evidence read | **GAP ACH-M-F1-RACE**: Revalidate frozen destination/remaining source. Invariant: request hash binds exact approved effect. Inject: hold reader; destination replacement/source reversal/approval withdrawal both orders. | **GAP ACH-M-F1-TIMEOUT**: No intent/call from incomplete read. Invariant: unknown destination is not permission. Inject: delay evidence/fee quote/prepare reader beyond bound. | **GAP ACH-M-F1-EXPIRY**: Require renewed proof/fee quote. Invariant: intent expiry checked at effect. Inject: advance proof/destination/quote validity during preparation. | **GAP ACH-M-F1-CRASH-BEFORE**: No prepared durable intent. Invariant: pure preparation sends no transfer. Inject: crash before prepare/evidence await. | **GAP ACH-M-F1-CRASH-AFTER**: Repeat preparation with same frozen inputs. Invariant: no external effect from hash computation. Inject: crash after prepare before Krefundintent. | **GAP ACH-M-F1-RETRY**: Same normalized bytes or conflict. Invariant: request identity excludes secrets. Inject: repeat prepare; change amount/destination/fee ceiling and compare hashes. | **GAP ACH-M-F1-REVOCATION**: Deny preparation for revoked prerequisite. Invariant: owner/proof/destination/source/account all required. Inject: revoke each at held reader. | **GAP ACH-M-F1-PARTIAL**: Reject partial request. Invariant: no omitted destination/fee/source binding. Inject: fail second evidence/hash input normalization; assert no call. |
-| F2 Krefundintent approval commit | **GAP ACH-M-F2-RACE**: One reserved refundable total. Invariant: sum pending/completed returns capped. Inject: hold source/refund locks; second approval/attribution/reversal/customer request both orders. | **GAP ACH-M-F2-TIMEOUT**: Recover approved intent by key. Invariant: no second reservation. Inject: inject approval lock/statement/COMMIT response timeout. | **GAP ACH-M-F2-EXPIRY**: Deny expired proof/destination/fee quote. Invariant: effect-time owner assurance. Inject: cross each validity boundary after waiting. | **GAP ACH-M-F2-CRASH-BEFORE**: Rollback approval and prepared saga. Invariant: reservation/authority/journal atomic. Inject: crash after last write before Krefundintent COMMIT. | **GAP ACH-M-F2-CRASH-AFTER**: Return same approved intent. Invariant: approval alone is not sent refund. Inject: lose answer after Krefundintent COMMIT. | **GAP ACH-M-F2-RETRY**: Replay or changed-body conflict. Invariant: effects hash immutable. Inject: concurrent same key then changed source/destination/amount/fee ceiling. | **GAP ACH-M-F2-REVOCATION**: Refuse approval; preserve existing other returns. Invariant: grant/identity/proof/source/destination/account verification required. Inject: withdraw each; test KP008 requester/approver segregation. | **GAP ACH-M-F2-PARTIAL**: Rollback full approval footprint. Invariant: no funds reservation without authority. Inject: fail later attempt/saga/scope/ALLOW/event/journal writes. |
-
-### 7.12 Initiate outbound transfer CREATE phase (D-ACH-14)
-
+| **P2** `Kbook`: receipt/fee/funds posting or atomic attribution reversal+capture group, delivery markers | **GAP ACH-M-P2-RACE**: One posting group orders sources. Invariant: no duplicate receipt/fee/return across scopes. Inject: hold booking/source locks; FINANCE redelivery/attribution/fee/return/reversal both orders. | **GAP ACH-M-P2-TIMEOUT**: Recover group by source IDs. Invariant: unknown COMMIT never reposts. Inject: inject ledger lock/statement/COMMIT acknowledgement timeout. | **GAP ACH-M-P2-EXPIRY**: Book historical evidence despite order expiry. Invariant: lease expiry cannot authorize stale delivery. Inject: cross worker fence deadline; retry under current fence with original event dates. | **GAP ACH-M-P2-CRASH-BEFORE**: No posting group fragment survives. Invariant: balanced source sets and markers atomic. Inject: crash after last write before Kbook COMMIT. | **GAP ACH-M-P2-CRASH-AFTER**: Replay group as already posted. Invariant: receipt and reclassification counted once. Inject: lose consumer settle after Kbook COMMIT. | **GAP ACH-M-P2-RETRY**: Identical events no-op; conflicting source rejected. Invariant: event/line and group uniqueness. Inject: redeliver each source concurrently and corrupt linked receipt/capture body. | **GAP ACH-M-P2-REVOCATION**: Fence stale worker; preserve postings. Invariant: service scope/fence required; owner loss never erases money. Inject: revoke service/fence/account scope independently during booking. | **GAP ACH-M-P2-PARTIAL**: Rollback every group set/marker. Invariant: no residual treasury or double balance. Inject: fail second/later receipt/reversal/capture/fee/funds/marker writes; assert exact account cents. |
+### 7.12 Expiry sweep / retire-checkout transition (D-ACH-05/10)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| F3 Kcreateclaim dispatch commit | **GAP ACH-M-F3-RACE**: Only one creator/manual executor wins. Invariant: UI/API cannot dispatch same attempt. Inject: hold claim/source locks; second claimant/reversal/revocation both orders. | **GAP ACH-M-F3-TIMEOUT**: Do not dispatch until claim recovered. Invariant: ambiguous claim is not duplicate permission. Inject: inject claim statement/COMMIT acknowledgement timeout. | **GAP ACH-M-F3-EXPIRY**: Cancel undispatched expired intent. Invariant: bounded fresh claim deadline. Inject: cross approval/claim window after locks; assert no port call. | **GAP ACH-M-F3-CRASH-BEFORE**: No claim survives; no call permitted. Invariant: claim precedes external effect. Inject: crash after last write before Kcreateclaim COMMIT. | **GAP ACH-M-F3-CRASH-AFTER**: Observe possible effect before recovery dispatch. Invariant: committed claim may already have called. Inject: lose answer after Kcreateclaim COMMIT and before dispatch. | **GAP ACH-M-F3-RETRY**: CAS loser observes only. Invariant: one logical creation key. Inject: concurrent replay/changed request hash and manual/API competing modes. | **GAP ACH-M-F3-REVOCATION**: Before claim deny; after claim reconcile. Invariant: identity/source/destination/account/fence lapse cannot erase effect. Inject: revoke each on both sides of claim guard. | **GAP ACH-M-F3-PARTIAL**: Rollback attempt/saga/refund/events. Invariant: no SUBMITTING without claim. Inject: fail second/later claim footprint writes. |
-| F4 Outbound CREATE port await | **GAP ACH-M-F4-RACE**: Same provider identity; recover possible created transfer. Invariant: no second logical transfer. Inject: hold create await; observer/watchdog/manual/API recovery both orders. | **GAP ACH-M-F4-TIMEOUT**: UNCERTAIN; observe by stable key. Invariant: timeout never proves no transfer. Inject: accept provider create then lose/delay response. | **GAP ACH-M-F4-EXPIRY**: Expired claim forbids new phase; reconcile possible create. Invariant: no blind redispatch after deadline. Inject: advance dispatch deadline during create. | **GAP ACH-M-F4-CRASH-BEFORE**: Recover by identity, not presumed absence. Invariant: local claim already durable. Inject: crash just before provider create durable boundary; lookup required. | **GAP ACH-M-F4-CRASH-AFTER**: Find same created transfer. Invariant: one provider create effect. Inject: crash after provider CREATE persistence before return/Kcreatesettle. | **GAP ACH-M-F4-RETRY**: Reuse qualified create key or observe. Invariant: provider idempotency bound to exact body. Inject: replay identical create and changed-body key; simulate lost idempotency support. | **GAP ACH-M-F4-REVOCATION**: Stop unclaimed follow-up funding; observe create. Invariant: revocation after claim preserves possible effect. Inject: revoke owner/destination/account/source/service/fence while call held. | **GAP ACH-M-F4-PARTIAL**: No funding hidden inside creation. Invariant: create phase only creates. Inject: provider persists transfer then response parsing fails; assert no FUND call. |
-| F5 Kcreatesettle created-ID commit | **GAP ACH-M-F5-RACE**: Merge conclusive create once; reversal blocks funding. Invariant: one learned transfer ID. Inject: hold saga/source locks; observer/reversal/fund claimant both orders. | **GAP ACH-M-F5-TIMEOUT**: Retain uncertainty or recover created ID. Invariant: unknown settle cannot create again. Inject: inject settle lock/COMMIT response timeout. | **GAP ACH-M-F5-EXPIRY**: Store evidence; do not fund expired approval. Invariant: durability independent of dispatch eligibility. Inject: cross claim/approval/destination validity while settling. | **GAP ACH-M-F5-CRASH-BEFORE**: Claim remains uncertain; provider transfer still exists. Invariant: local rollback does not undo provider create. Inject: crash after last write before Kcreatesettle COMMIT. | **GAP ACH-M-F5-CRASH-AFTER**: Resume from durable CREATED/FUND_PREPARED. Invariant: never re-create transfer. Inject: lose settle answer after Kcreatesettle COMMIT. | **GAP ACH-M-F5-RETRY**: Repeated create evidence no-op; conflict quarantined. Invariant: transfer ID learned once. Inject: redeliver response/event then another transfer ID/body. | **GAP ACH-M-F5-REVOCATION**: Record creation; block unclaimed funding. Invariant: revocation never removes provider identity. Inject: withdraw source/destination/owner/account/service fence individually. | **GAP ACH-M-F5-PARTIAL**: Rollback settle; observe same provider ID. Invariant: identity/saga/observation/events atomic. Inject: fail later FUND_PREPARED/evidence/event write; assert claim remains. |
-
-### 7.13 Initiate outbound transfer FUND phase (D-ACH-14)
-
+| **E1** `Kexpiry`: locked order expiry/retirement, cases/refund requests, events (retirement also journals) | **GAP ACH-M-E1-RACE**: Payment first preserves CAPTURED; expiry first is return-only. Invariant: no reopened order or duplicate entitlement. Inject: hold order/project locks; apply/partial credit/PayPal switch/refund both orders. | **GAP ACH-M-E1-TIMEOUT**: Recover state; rerun sweep safely. Invariant: timeout cannot release uncertain money. Inject: inject lock/statement/lost COMMIT response timeout. | **GAP ACH-M-E1-EXPIRY**: Only expire at effectNow >= deadline. Invariant: price/source clocks never extended. Inject: test before/exact/after deadline after held lock; route retirement separately. | **GAP ACH-M-E1-CRASH-BEFORE**: Rollback closure and return requests. Invariant: no orphan expiry consequence. Inject: crash after final write before Kexpiry COMMIT. | **GAP ACH-M-E1-CRASH-AFTER**: Replay committed closure. Invariant: old reference remains bound. Inject: lose sweep settle/retirement response after Kexpiry COMMIT. | **GAP ACH-M-E1-RETRY**: Repeated sweep/events do not duplicate requests. Invariant: expiry monotonic; quote release guarded. Inject: redeliver sweep and retirement key; change target/body. | **GAP ACH-M-E1-REVOCATION**: Stale service cannot sweep; money remains. Invariant: service/fence/retirement-member authority checked. Inject: withdraw service/fence or billing identity/membership independently. | **GAP ACH-M-E1-PARTIAL**: Rollback state/case/refund/events/journal. Invariant: partial received cents preserved. Inject: fail later consequence/event writes; assert existing captures and quote reservations unchanged. |
+### 7.13 Record refund destination command (D-ACH-17)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| F6 Kfundclaim funding commit | **GAP ACH-M-F6-RACE**: One funding claimant; return/reversal ceilings rechecked. Invariant: created ID required; no double funding. Inject: hold source/saga lock; other worker/manual executor/reversal/destination revoke both orders. | **GAP ACH-M-F6-TIMEOUT**: Recover claim before funding. Invariant: ambiguous claim cannot trigger extra debit. Inject: inject fund-claim statement/COMMIT acknowledgement timeout. | **GAP ACH-M-F6-EXPIRY**: Do not fund expired authority. Invariant: own phase deadline and approval validity. Inject: cross approval/fee quote/claim boundary at effect. | **GAP ACH-M-F6-CRASH-BEFORE**: Keep CREATED; no funding permitted. Invariant: fund claim atomic. Inject: crash after last write before Kfundclaim COMMIT. | **GAP ACH-M-F6-CRASH-AFTER**: Observe transfer before recovery. Invariant: committed FUND_CLAIMED is possible debit. Inject: lose answer after Kfundclaim COMMIT. | **GAP ACH-M-F6-RETRY**: Claim loser only observes. Invariant: same immutable transfer/key. Inject: concurrent same claim then changed transfer/destination/body. | **GAP ACH-M-F6-REVOCATION**: Deny unclaimed funding; reconcile claimed funding. Invariant: all source/owner/destination/account/service/fence facts bind. Inject: withdraw each before/after fund guard. | **GAP ACH-M-F6-PARTIAL**: Rollback fence/deadline/saga/events. Invariant: no partly authorized fund phase. Inject: fail later fund claim writes; assert created provider identity remains. |
-| F7 Outbound FUND port await | **GAP ACH-M-F7-RACE**: Observe competing funding/reversal. Invariant: one logical debit and return cap. Inject: hold funding await; watchdog/manual/API observer/source return both orders. | **GAP ACH-M-F7-TIMEOUT**: UNCERTAIN; observe same transfer. Invariant: no blind funding retry. Inject: provider debits then loses/delays response. | **GAP ACH-M-F7-EXPIRY**: Stop new calls; observe claimed effect. Invariant: claim expiry never means no debit. Inject: advance fund deadline while response pending. | **GAP ACH-M-F7-CRASH-BEFORE**: Observe even if funding may not have happened. Invariant: local claim cannot prove provider absence. Inject: crash immediately before provider funding durable boundary. | **GAP ACH-M-F7-CRASH-AFTER**: Recover funded transfer status. Invariant: one debit survives local crash. Inject: crash after provider FUND debit before response/Kfundsettle. | **GAP ACH-M-F7-RETRY**: Only qualified same-transfer retry; otherwise observe. Invariant: no new funding identity. Inject: replay with/without documented idempotency; conflict key/body. | **GAP ACH-M-F7-REVOCATION**: Reconcile effect; block other phases. Invariant: post-claim revocation cannot undo debit. Inject: withdraw source/owner/destination/account/service/fence during call. | **GAP ACH-M-F7-PARTIAL**: Persisted debit remains uncertain. Invariant: do not call FAILED after parsing failure. Inject: debit succeeds then fee/status parse fails; assert no new debit. |
-| F8 Kfundsettle refund result commit | **GAP ACH-M-F8-RACE**: Serialize completed refund with all returns. Invariant: return nets source once. Inject: hold capture-refund/credit locks; observer/reversal/second completion both orders. | **GAP ACH-M-F8-TIMEOUT**: Recover status; remain UNCERTAIN if unknown. Invariant: no refund completion guessed. Inject: inject settle lock/statement/COMMIT response timeout. | **GAP ACH-M-F8-EXPIRY**: Store claimed-effect outcome despite old approval. Invariant: expired approval never permits new phase. Inject: cross approval/fence deadline before completion evidence settles. | **GAP ACH-M-F8-CRASH-BEFORE**: No local completion; external debit retained. Invariant: provider effect recovered by identity. Inject: crash after last write before Kfundsettle COMMIT. | **GAP ACH-M-F8-CRASH-AFTER**: Recover same terminal/uncertain result. Invariant: no second return/event. Inject: lose settle answer/outbox response after Kfundsettle COMMIT. | **GAP ACH-M-F8-RETRY**: Same status/event no-op; terminal contradiction reviewed. Invariant: completion monotonic. Inject: redeliver identical event and conflicting amount/destination/status. | **GAP ACH-M-F8-REVOCATION**: Keep actual return; revoke authority by phase. Invariant: revocation never erases money/history. Inject: withdraw owner/source/destination/account/service/fence independently; recover with valid service. | **GAP ACH-M-F8-PARTIAL**: Rollback whole result footprint. Invariant: refund/source/authorization/events atomic. Inject: fail later ceiling/revocation/fee/observation/event writes; assert exact returned cents. |
-
-### 7.14 Observe outbound return command (D-ACH-14)
-
+| **D2** `Kdestrecord`: destination version PENDING_VERIFICATION, encrypted artifact ref/digest, provenance, scope, journal, events | **GAP ACH-M-D2-RACE**: Versions append; none is usable before D3. Invariant: one version per (scope, digest) chain; no approval binds PENDING. Inject: hold destination lock; second record/verify/revoke/Krefundintent both orders. | **GAP ACH-M-D2-TIMEOUT**: Recover by journal. Invariant: no duplicate version. Inject: COMMIT response timeout. | **GAP ACH-M-D2-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity after lock wait. | **GAP ACH-M-D2-CRASH-BEFORE**: Nothing persists, artifact unreferenced. Invariant: record atomic. Inject: crash after last write before Kdestrecord COMMIT. | **GAP ACH-M-D2-CRASH-AFTER**: Replay same version. Invariant: one recorded event. Inject: lose answer after Kdestrecord COMMIT. | **GAP ACH-M-D2-RETRY**: Replay or conflict. Invariant: digest/provenance/scope immutable. Inject: same key, changed account digest or scope. | **GAP ACH-M-D2-REVOCATION**: Refuse. Invariant: owner identity/grant/proof, source scope and artifact access each required. Inject: withdraw each at effect. | **GAP ACH-M-D2-PARTIAL**: Rollback. Invariant: no version without provenance/journal. Inject: fail provenance/journal/event write. |
+### 7.14 Verify refund destination command (D-ACH-17)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| O1 Outbound observation await | **GAP ACH-M-O1-RACE**: Merge strongest consistent evidence. Invariant: old pending cannot reverse completion. Inject: hold query; create/fund settle/reversal/manual confirmation both orders. | **GAP ACH-M-O1-TIMEOUT**: Keep UNCERTAIN/PENDING; never repeat send. Invariant: lookup absence not proof. Inject: delay/reset/5xx/unreadable/missing transfer lookup. | **GAP ACH-M-O1-EXPIRY**: Continue identity-only observation. Invariant: old approval need not authorize historical read. Inject: advance approval/dispatch deadline during query; reject expired service fence. | **GAP ACH-M-O1-CRASH-BEFORE**: No local fact change. Invariant: existing claim/result retained. Inject: crash before observeOutboundTransfer await. | **GAP ACH-M-O1-CRASH-AFTER**: Re-observe same identity. Invariant: no new transfer from lost read. Inject: crash after response before Kreturnobserve. | **GAP ACH-M-O1-RETRY**: Idempotent observation; conflicting evidence reviewed. Invariant: binding uses transfer ID/refund ref not amount. Inject: repeat lookup/status event then foreign transfer/body. | **GAP ACH-M-O1-REVOCATION**: Pause untrusted query; preserve durable effects. Invariant: service/credential/account/fence required. Inject: revoke each at held observation boundary. | **GAP ACH-M-O1-PARTIAL**: Keep uncertainty. Invariant: incomplete status/amount/destination cannot complete. Inject: fail second normalization field after transfer ID read. |
-| O2 Kreturnobserve outcome commit | **GAP ACH-M-O2-RACE**: Serialize all source returns and assignments. Invariant: no over-return or attribution after return claim. Inject: hold source/refund locks; refund/reversal/fee/assignment/second observer both orders. | **GAP ACH-M-O2-TIMEOUT**: Recover durable result by transfer ID. Invariant: timeout never sends again. Inject: inject observe-settle lock/COMMIT response timeout. | **GAP ACH-M-O2-EXPIRY**: Record real completion with original approval. Invariant: expired right cannot reopen service. Inject: cross source/order/approval/fence deadlines independently. | **GAP ACH-M-O2-CRASH-BEFORE**: All observation consequences roll back. Invariant: no partial completed refund. Inject: crash after last write before Kreturnobserve COMMIT. | **GAP ACH-M-O2-CRASH-AFTER**: Replay one completion/fee fact. Invariant: event sourced money once. Inject: lose settle after Kreturnobserve COMMIT. | **GAP ACH-M-O2-RETRY**: Duplicate no-op; conflicting terminal facts incident. Invariant: monotonic net-return history. Inject: redeliver completion/fee/reversal in every order; change immutable identity/body. | **GAP ACH-M-O2-REVOCATION**: Record authenticated historical money under valid service. Invariant: owner/destination loss cannot delete return. Inject: withdraw owner/destination/source/account/service/fence separately; recover service. | **GAP ACH-M-O2-PARTIAL**: Rollback result/authority/case/events. Invariant: exact remaining principal and tax conserved. Inject: fail second/later observation/refund/revocation/case/outbox writes. |
-
-### 7.15 Complete recovered command journal (D-ACH-14)
-
+| **D1** Ownership evidence read (originating-account evidence, Wise recipient ref) and pure classification await; no write | **GAP ACH-M-D1-RACE**: Revalidate before Kdestverify. Invariant: verification binds the evidence read. Inject: hold read; new destination version/revocation/source reversal both orders. | **GAP ACH-M-D1-TIMEOUT**: Stay PENDING_VERIFICATION. Invariant: unknown ownership is not permission. Inject: delay artifact/decrypt past bound. | **GAP ACH-M-D1-EXPIRY**: Require fresh evidence/proof. Invariant: validity at effect. Inject: advance evidence/proof validity during read. | **GAP ACH-M-D1-CRASH-BEFORE**: No fact. Invariant: read writes nothing. Inject: crash before await. | **GAP ACH-M-D1-CRASH-AFTER**: Reread on resume. Invariant: an old read verifies nothing. Inject: crash after read before Kdestverify. | **GAP ACH-M-D1-RETRY**: Stable digest; substituted evidence conflicts. Invariant: ownership evidence bound to account digest and payer. Inject: repeat, then foreign-account evidence. | **GAP ACH-M-D1-REVOCATION**: Refuse. Invariant: owner/proof/payer evidence/artifact access each required. Inject: withdraw each at held read. | **GAP ACH-M-D1-PARTIAL**: Reject. Invariant: account digest and payer link both required. Inject: fail second evidence field after first. |
+| **D3** `Kdestverify`: VERIFIED, prior VERIFIED→SUPERSEDED, ownership evidence, recipient ref, assurance, journal, events | **GAP ACH-M-D3-RACE**: One current VERIFIED version per scope/payer. Invariant: an approval binds exactly one current version. Inject: hold destination lock; second verify/revoke/Krefundintent/Kcreateclaim both orders. | **GAP ACH-M-D3-TIMEOUT**: Recover by journal. Invariant: no double verification. Inject: COMMIT response timeout. | **GAP ACH-M-D3-EXPIRY**: Refuse stale proof/evidence. Invariant: effect-time assurance. Inject: cross each validity after lock wait. | **GAP ACH-M-D3-CRASH-BEFORE**: Stays PENDING; prior VERIFIED unchanged. Invariant: verification and supersession atomic. Inject: crash after last write before Kdestverify COMMIT. | **GAP ACH-M-D3-CRASH-AFTER**: Replay. Invariant: one verified event. Inject: lose answer after Kdestverify COMMIT. | **GAP ACH-M-D3-RETRY**: Replay or conflict. Invariant: evidence digest immutable. Inject: same key with changed evidence/recipient ref. | **GAP ACH-M-D3-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up, payer authorization and evidence each required. Inject: withdraw each under lock. | **GAP ACH-M-D3-PARTIAL**: Rollback. Invariant: no supersession without successor. Inject: fail supersede/assurance/journal/event write. |
+### 7.15 Revoke refund destination command (D-ACH-17)
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| O3 Kanswer journal completion commit | **GAP ACH-M-O3-RACE**: One result wins from durable saga. Invariant: journal cannot invent provider outcome. Inject: hold journal; second recovery and concurrent status settle both orders. | **GAP ACH-M-O3-TIMEOUT**: Recover journal or return operation reference. Invariant: no external redispatch. Inject: inject journal lock/COMMIT acknowledgement timeout. | **GAP ACH-M-O3-EXPIRY**: Reauthorize requester; historical outcome remains. Invariant: expired session never grants new action. Inject: cross session/step-up/claim window before answer effect. | **GAP ACH-M-O3-CRASH-BEFORE**: Saga/refund survives; journal unfinished. Invariant: Kanswer distinct from provider settle. Inject: crash after final journal write before Kanswer COMMIT. | **GAP ACH-M-O3-CRASH-AFTER**: Replay committed answer after access check. Invariant: one command result; no send. Inject: lose answer after Kanswer COMMIT. | **GAP ACH-M-O3-RETRY**: Replay same digest or conflict. Invariant: key binds immutable approved effect. Inject: concurrent same-key recovery then changed destination/amount body. | **GAP ACH-M-O3-REVOCATION**: Deny caller; service can finish reconciliation. Invariant: identity/grant/session/service authority checked. Inject: withdraw each at journal boundary; verify no financial deletion. | **GAP ACH-M-O3-PARTIAL**: Rollback answer only. Invariant: earlier provider/result commits retained. Inject: fail later journal/audit write; assert durable refund and exact cents unchanged. |
+| **D4** `Kdestrevoke`: REVOKED, case naming APPROVED unclaimed returns, journal, events | **GAP ACH-M-D4-RACE**: Revoke first denies the unclaimed phase; claim first reconciles the possible effect. Invariant: no new phase on a revoked destination; no erased claimed effect. Inject: hold destination lock; Kcreateclaim/Kfundclaim/Kdestverify both orders. | **GAP ACH-M-D4-TIMEOUT**: Recover; claimants re-read. Invariant: uncertain revocation never treated as valid. Inject: COMMIT response timeout, then concurrent Kfundclaim. | **GAP ACH-M-D4-EXPIRY**: Records revocation of an expired version. Invariant: expired unusable either way. Inject: boundary exactly at revoke. | **GAP ACH-M-D4-CRASH-BEFORE**: Stays VERIFIED; no case. Invariant: state and case atomic. Inject: crash after last write before Kdestrevoke COMMIT. | **GAP ACH-M-D4-CRASH-AFTER**: Replay. Invariant: one revoked event. Inject: lose answer after Kdestrevoke COMMIT. | **GAP ACH-M-D4-RETRY**: Duplicate no-op. Invariant: monotonic. Inject: repeat key/event; same key, other version. | **GAP ACH-M-D4-REVOCATION**: Revoker loses authority: deny. Invariant: actor authority checked at effect (owner, service fence, agency billing). Inject: withdraw each. | **GAP ACH-M-D4-PARTIAL**: Rollback. Invariant: revocation and case together. Inject: fail case/journal/event write. |
+### 7.16 Approve outbound return command (D-ACH-13)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **F1** Destination-version/source/evidence read and pure prepare/classify await | **GAP ACH-M-F1-RACE**: Revalidate frozen destination/remaining source. Invariant: request hash binds exact approved effect. Inject: hold reader; destination replacement/source reversal/approval withdrawal both orders. | **GAP ACH-M-F1-TIMEOUT**: No intent/call from incomplete read. Invariant: unknown destination is not permission. Inject: delay evidence/fee quote/prepare reader beyond bound. | **GAP ACH-M-F1-EXPIRY**: Require renewed proof/fee quote. Invariant: intent expiry checked at effect. Inject: advance proof/destination/quote validity during preparation. | **GAP ACH-M-F1-CRASH-BEFORE**: No prepared durable intent. Invariant: pure preparation sends no transfer. Inject: crash before prepare/evidence await. | **GAP ACH-M-F1-CRASH-AFTER**: Repeat preparation with same frozen inputs. Invariant: no external effect from hash computation. Inject: crash after prepare before Krefundintent. | **GAP ACH-M-F1-RETRY**: Same normalized bytes or conflict. Invariant: request identity excludes secrets. Inject: repeat prepare; change amount/destination/fee ceiling and compare hashes. | **GAP ACH-M-F1-REVOCATION**: Deny preparation for revoked prerequisite. Invariant: owner/proof/destination/source/account all required. Inject: revoke each at held reader. | **GAP ACH-M-F1-PARTIAL**: Reject partial request. Invariant: no omitted destination/fee/source binding. Inject: fail second evidence/hash input normalization; assert no call. |
+| **F2** `Krefundintent`: refund or treasury refund APPROVED, source ceiling reservation, owner approval, destination/payer versions, TRANSFER_CREATE attempt PREPARED, journal/events | **GAP ACH-M-F2-RACE**: One reserved refundable total. Invariant: sum pending/completed returns capped. Inject: hold source/refund locks; second approval/attribution/reversal/customer request/destination or payer revocation both orders. | **GAP ACH-M-F2-TIMEOUT**: Recover approved intent by key. Invariant: no second reservation. Inject: inject approval lock/statement/COMMIT response timeout. | **GAP ACH-M-F2-EXPIRY**: Deny expired proof/destination/fee quote. Invariant: effect-time owner assurance. Inject: cross each validity boundary after waiting. | **GAP ACH-M-F2-CRASH-BEFORE**: Rollback approval and prepared saga. Invariant: reservation/authority/journal atomic. Inject: crash after last write before Krefundintent COMMIT. | **GAP ACH-M-F2-CRASH-AFTER**: Return same approved intent. Invariant: approval alone is not sent refund. Inject: lose answer after Krefundintent COMMIT. | **GAP ACH-M-F2-RETRY**: Replay or changed-body conflict. Invariant: effects hash immutable. Inject: concurrent same key then changed source/destination/amount/fee ceiling. | **GAP ACH-M-F2-REVOCATION**: Refuse approval; preserve existing other returns. Invariant: grant/identity/proof/source/destination/account verification required. Inject: withdraw each; test KP008 requester/approver segregation. | **GAP ACH-M-F2-PARTIAL**: Rollback full approval footprint. Invariant: no funds reservation without authority. Inject: fail later attempt/saga/scope/ALLOW/event/journal writes. |
+### 7.17 Initiate outbound transfer CREATE phase (D-ACH-14/19)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **F3** `Kcreateclaim`: CREATE attempt DISPATCHING with fence/deadline, refund SUBMITTING, events | **GAP ACH-M-F3-RACE**: Only one creator/manual executor wins. Invariant: UI/API cannot dispatch same attempt. Inject: hold claim/source locks; second claimant/reversal/revocation both orders. | **GAP ACH-M-F3-TIMEOUT**: Do not dispatch until claim recovered. Invariant: ambiguous claim is not duplicate permission. Inject: inject claim statement/COMMIT acknowledgement timeout. | **GAP ACH-M-F3-EXPIRY**: Cancel undispatched expired intent. Invariant: bounded fresh claim deadline. Inject: cross approval/claim window after locks; assert no port call. | **GAP ACH-M-F3-CRASH-BEFORE**: No claim survives; no call permitted. Invariant: claim precedes external effect. Inject: crash after last write before Kcreateclaim COMMIT. | **GAP ACH-M-F3-CRASH-AFTER**: Observe possible effect before recovery dispatch. Invariant: committed claim may already have called. Inject: lose answer after Kcreateclaim COMMIT and before dispatch. | **GAP ACH-M-F3-RETRY**: CAS loser observes only. Invariant: one logical creation key. Inject: concurrent replay/changed request hash and manual/API competing modes. | **GAP ACH-M-F3-REVOCATION**: Before claim deny; after claim reconcile. Invariant: identity/source/destination/account/fence lapse cannot erase effect. Inject: revoke each on both sides of claim guard. | **GAP ACH-M-F3-PARTIAL**: Rollback attempt/saga/refund/events. Invariant: no SUBMITTING without claim. Inject: fail second/later claim footprint writes. |
+| **F4** initiateOutboundTransfer CREATE await, or claimed manual create; provider create durable boundary | **GAP ACH-M-F4-RACE**: Same provider identity; recover possible created transfer. Invariant: no second logical transfer. Inject: hold create await; observer/watchdog/manual/API recovery both orders. | **GAP ACH-M-F4-TIMEOUT**: UNCERTAIN; observe by stable key. Invariant: timeout never proves no transfer. Inject: accept provider create then lose/delay response. | **GAP ACH-M-F4-EXPIRY**: Expired claim forbids new phase; reconcile possible create. Invariant: no blind redispatch after deadline. Inject: advance dispatch deadline during create. | **GAP ACH-M-F4-CRASH-BEFORE**: Recover by identity, not presumed absence. Invariant: local claim already durable. Inject: crash just before provider create durable boundary; lookup required. | **GAP ACH-M-F4-CRASH-AFTER**: Find same created transfer. Invariant: one provider create effect. Inject: crash after provider CREATE persistence before return/Kcreatesettle. | **GAP ACH-M-F4-RETRY**: Reuse qualified create key or observe. Invariant: provider idempotency bound to exact body. Inject: replay identical create and changed-body key; simulate lost idempotency support. | **GAP ACH-M-F4-REVOCATION**: Stop unclaimed follow-up funding; observe create. Invariant: revocation after claim preserves possible effect. Inject: revoke owner/destination/account/source/service/fence while call held; credential/permission REFUSED without qualified proof settles UNCERTAIN. | **GAP ACH-M-F4-PARTIAL**: No funding hidden inside creation. Invariant: create phase only creates. Inject: provider persists transfer then response parsing fails; assert no FUND call. |
+| **F5** `Kcreatesettle`: CREATE attempt result/uncertainty, `outbound_transfers` row with transfer ID/evidence, TRANSFER_FUND attempt PREPARED, observation/events | **GAP ACH-M-F5-RACE**: Merge conclusive create once; reversal blocks funding. Invariant: one learned transfer ID. Inject: hold saga/source locks; observer/reversal/fund claimant both orders. | **GAP ACH-M-F5-TIMEOUT**: Retain uncertainty or recover created ID. Invariant: unknown settle cannot create again. Inject: inject settle lock/COMMIT response timeout. | **GAP ACH-M-F5-EXPIRY**: Store evidence; do not fund expired approval. Invariant: durability independent of dispatch eligibility. Inject: cross claim/approval/destination validity while settling. | **GAP ACH-M-F5-CRASH-BEFORE**: Claim remains uncertain; provider transfer still exists. Invariant: local rollback does not undo provider create. Inject: crash after last write before Kcreatesettle COMMIT. | **GAP ACH-M-F5-CRASH-AFTER**: Resume from durable CREATED/FUND_PREPARED. Invariant: never re-create transfer. Inject: lose settle answer after Kcreatesettle COMMIT. | **GAP ACH-M-F5-RETRY**: Repeated create evidence no-op; conflict quarantined. Invariant: transfer ID learned once. Inject: redeliver response/event then another transfer ID/body. | **GAP ACH-M-F5-REVOCATION**: Record creation; block unclaimed funding. Invariant: revocation never removes provider identity. Inject: withdraw source/destination/owner/account/service fence individually. | **GAP ACH-M-F5-PARTIAL**: Rollback settle; observe same provider ID. Invariant: identity/saga/observation/events atomic. Inject: fail later FUND_PREPARED/evidence/event write; assert claim remains. |
+### 7.18 Initiate outbound transfer FUND phase (D-ACH-14/19)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **F6** `Kfundclaim`: FUND attempt DISPATCHING with fence/deadline, events; transfer ID already durable | **GAP ACH-M-F6-RACE**: One funding claimant; a source reversed before the claim denies funding (D-ACH-18). Invariant: created ID required; no double funding. Inject: hold source/saga lock; other worker/manual executor/reversal/destination revoke both orders. | **GAP ACH-M-F6-TIMEOUT**: Recover claim before funding. Invariant: ambiguous claim cannot trigger extra debit. Inject: inject fund-claim statement/COMMIT acknowledgement timeout. | **GAP ACH-M-F6-EXPIRY**: Do not fund expired authority. Invariant: own phase deadline and approval validity. Inject: cross approval/fee quote/claim boundary at effect. | **GAP ACH-M-F6-CRASH-BEFORE**: Keep CREATED; no funding permitted. Invariant: fund claim atomic. Inject: crash after last write before Kfundclaim COMMIT. | **GAP ACH-M-F6-CRASH-AFTER**: Observe transfer before recovery. Invariant: committed FUND_CLAIMED is possible debit. Inject: lose answer after Kfundclaim COMMIT. | **GAP ACH-M-F6-RETRY**: Claim loser only observes. Invariant: same immutable transfer/key. Inject: concurrent same claim then changed transfer/destination/body. | **GAP ACH-M-F6-REVOCATION**: Deny unclaimed funding; reconcile claimed funding. Invariant: all source/owner/destination/account/service/fence facts bind. Inject: withdraw each before/after fund guard. | **GAP ACH-M-F6-PARTIAL**: Rollback fence/deadline/saga/events. Invariant: no partly authorized fund phase. Inject: fail later fund claim writes; assert created provider identity remains. |
+| **F7** initiateOutboundTransfer FUND await, or claimed manual funding; provider funding durable boundary | **GAP ACH-M-F7-RACE**: Observe competing funding/reversal. Invariant: one logical debit and return cap. Inject: hold funding await; watchdog/manual/API observer/source return both orders. | **GAP ACH-M-F7-TIMEOUT**: UNCERTAIN; observe same transfer. Invariant: no blind funding retry. Inject: provider debits then loses/delays response. | **GAP ACH-M-F7-EXPIRY**: Stop new calls; observe claimed effect. Invariant: claim expiry never means no debit. Inject: advance fund deadline while response pending. | **GAP ACH-M-F7-CRASH-BEFORE**: Observe even if funding may not have happened. Invariant: local claim cannot prove provider absence. Inject: crash immediately before provider funding durable boundary. | **GAP ACH-M-F7-CRASH-AFTER**: Recover funded transfer status. Invariant: one debit survives local crash. Inject: crash after provider FUND debit before response/Kfundsettle. | **GAP ACH-M-F7-RETRY**: Only qualified same-transfer retry; otherwise observe. Invariant: no new funding identity. Inject: replay with/without documented idempotency; conflict key/body. | **GAP ACH-M-F7-REVOCATION**: Reconcile effect; block other phases. Invariant: post-claim revocation cannot undo debit. Inject: withdraw source/owner/destination/account/service/fence during call; credential/permission REFUSED without qualified proof settles UNCERTAIN. | **GAP ACH-M-F7-PARTIAL**: Persisted debit remains uncertain. Invariant: do not call FAILED after parsing failure. Inject: debit succeeds then fee/status parse fails; assert no new debit. |
+| **F8** `Kfundsettle`: FUND attempt result, refund result or UNCERTAIN, discharge/principal members (D-ACH-18), consequences/events | **GAP ACH-M-F8-RACE**: Serialize completed refund with all returns. Invariant: discharge nets once; every principal debit is booked (D-ACH-18). Inject: hold capture-refund/credit locks; observer/reversal/second completion both orders. | **GAP ACH-M-F8-TIMEOUT**: Recover status; remain UNCERTAIN if unknown. Invariant: no refund completion guessed. Inject: inject settle lock/statement/COMMIT response timeout. | **GAP ACH-M-F8-EXPIRY**: Store claimed-effect outcome despite old approval. Invariant: expired approval never permits new phase. Inject: cross approval/fence deadline before completion evidence settles. | **GAP ACH-M-F8-CRASH-BEFORE**: No local completion; external debit retained. Invariant: provider effect recovered by identity. Inject: crash after last write before Kfundsettle COMMIT. | **GAP ACH-M-F8-CRASH-AFTER**: Recover same terminal/uncertain result. Invariant: no second return/event. Inject: lose settle answer/outbox response after Kfundsettle COMMIT. | **GAP ACH-M-F8-RETRY**: Same status/event no-op; terminal contradiction reviewed. Invariant: completion monotonic. Inject: redeliver identical event and conflicting amount/destination/status. | **GAP ACH-M-F8-REVOCATION**: Keep actual return; revoke authority by phase. Invariant: revocation never erases money/history. Inject: withdraw owner/source/destination/account/service/fence independently; recover with valid service. | **GAP ACH-M-F8-PARTIAL**: Rollback whole result footprint. Invariant: refund/source/authorization/events atomic. Inject: fail later ceiling/revocation/fee/observation/event writes; assert exact returned cents. |
+### 7.19 Observe outbound return command (D-ACH-14/18)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **O1** observeOutboundTransfer/classifyOutbound await (manual evidence through F1); no dispatch | **GAP ACH-M-O1-RACE**: Merge strongest consistent evidence. Invariant: old pending cannot reverse completion. Inject: hold query; create/fund settle/reversal/manual confirmation both orders. | **GAP ACH-M-O1-TIMEOUT**: Keep UNCERTAIN/PENDING; never repeat send. Invariant: lookup absence not proof. Inject: delay/reset/5xx/unreadable/missing transfer lookup. | **GAP ACH-M-O1-EXPIRY**: Continue identity-only observation. Invariant: old approval need not authorize historical read. Inject: advance approval/dispatch deadline during query; reject expired service fence. | **GAP ACH-M-O1-CRASH-BEFORE**: No local fact change. Invariant: existing claim/result retained. Inject: crash before observeOutboundTransfer await. | **GAP ACH-M-O1-CRASH-AFTER**: Re-observe same identity. Invariant: no new transfer from lost read. Inject: crash after response before Kreturnobserve. | **GAP ACH-M-O1-RETRY**: Idempotent observation; conflicting evidence reviewed. Invariant: binding uses transfer ID/refund ref not amount. Inject: repeat lookup/status event then foreign transfer/body. | **GAP ACH-M-O1-REVOCATION**: Pause untrusted query; preserve durable effects. Invariant: service/credential/account/fence required. Inject: revoke each at held observation boundary. | **GAP ACH-M-O1-PARTIAL**: Keep uncertainty. Invariant: incomplete status/amount/destination cannot complete. Inject: fail second normalization field after transfer ID read. |
+| **O2** `Kreturnobserve`: status/fee/bounce normalization, source ceilings, refund completion, discharge/principal members, authority consequences/events | **GAP ACH-M-O2-RACE**: Serialize all source returns and assignments. Invariant: no over-discharge, no dropped excess return, no attribution after return claim. Inject: hold source/refund locks; refund/reversal/fee/assignment/second observer both orders. | **GAP ACH-M-O2-TIMEOUT**: Recover durable result by transfer ID. Invariant: timeout never sends again. Inject: inject observe-settle lock/COMMIT response timeout. | **GAP ACH-M-O2-EXPIRY**: Record real completion with original approval. Invariant: expired right cannot reopen service. Inject: cross source/order/approval/fence deadlines independently. | **GAP ACH-M-O2-CRASH-BEFORE**: All observation consequences roll back. Invariant: no partial completed refund. Inject: crash after last write before Kreturnobserve COMMIT. | **GAP ACH-M-O2-CRASH-AFTER**: Replay one completion/fee fact. Invariant: event sourced money once. Inject: lose settle after Kreturnobserve COMMIT. | **GAP ACH-M-O2-RETRY**: Duplicate no-op; conflicting terminal facts incident. Invariant: monotonic net-return history. Inject: redeliver completion/fee/reversal in every order; change immutable identity/body. | **GAP ACH-M-O2-REVOCATION**: Record authenticated historical money under valid service. Invariant: owner/destination loss cannot delete return. Inject: withdraw owner/destination/source/account/service/fence separately; recover service. | **GAP ACH-M-O2-PARTIAL**: Rollback result/authority/case/events. Invariant: exact remaining principal and tax conserved. Inject: fail second/later observation/refund/revocation/case/outbox writes. |
+### 7.20 Transfer-attempt watchdog sweep (D-ACH-19; then O1–O2 under the service journal key)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **W1** Due-attempt scan, scope adoption (REFUND or TREASURY_REFUND, never PAYMENT_ORDER) and live-attempt read; no write | **GAP ACH-M-W1-RACE**: Act only on the attempt still live after the read. Invariant: a settled attempt is not re-observed into a second result. Inject: hold scan; settle/second watchdog/manual confirmation both orders. | **GAP ACH-M-W1-TIMEOUT**: Retry later. Invariant: unread attempt is neither dispatched nor failed. Inject: delay scan past bound. | **GAP ACH-M-W1-EXPIRY**: Not due before deadline+1 ms; due after. Invariant: database dispatch deadline governs. Inject: effect clock before/at/after deadline. | **GAP ACH-M-W1-CRASH-BEFORE**: Nothing changes. Invariant: attempt keeps its state. Inject: crash before scan await. | **GAP ACH-M-W1-CRASH-AFTER**: Next run repeats. Invariant: read grants nothing. Inject: crash after read before O1. | **GAP ACH-M-W1-RETRY**: Two watchdogs converge on one journal key. Invariant: `watchdog-<observationRef>` applies once. Inject: concurrent runs, same attempt. | **GAP ACH-M-W1-REVOCATION**: Stop without service identity/fence. Invariant: service authority, never an owner session. Inject: revoke service/fence/scope binding each. | **GAP ACH-M-W1-PARTIAL**: Unresolved scope: skip and alert. Invariant: no attempt observed under a wrong scope. Inject: attempt found but scope row missing. |
+### 7.21 FINANCE return-booking consumer (D-ACH-18)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **P3** `Kreturnbook`: posting sets of outbound completion, incoming reversal, bounce and resend (discharge, principal, RETURN_RECOVERY lines), fee sets, delivery markers | **GAP ACH-M-P3-RACE**: Each debit booked at full principal; discharge once. Invariant: Codex r1 oracle (D-ACH-18 table) in both orders. Inject: hold booking lock; reversal/outbound completion/fee/bounce delivery both orders. | **GAP ACH-M-P3-TIMEOUT**: Recover by source IDs. Invariant: no repost on unknown COMMIT. Inject: ledger lock/COMMIT timeout. | **GAP ACH-M-P3-EXPIRY**: Book historical facts despite expired approval/order. Invariant: stale fence cannot book; current fence books original dates. Inject: cross worker fence deadline. | **GAP ACH-M-P3-CRASH-BEFORE**: No set fragment. Invariant: balanced sets and markers atomic. Inject: crash after last write before Kreturnbook COMMIT. | **GAP ACH-M-P3-CRASH-AFTER**: Replay as posted. Invariant: each debit counted once. Inject: lose settle after COMMIT. | **GAP ACH-M-P3-RETRY**: Identical events no-op; conflicting principal opens case. Invariant: source uniqueness. Inject: redeliver each event concurrently; alter principal. | **GAP ACH-M-P3-REVOCATION**: Fence stale worker; postings stay. Invariant: service scope/fence required. Inject: revoke service/fence/scope independently. | **GAP ACH-M-P3-PARTIAL**: Rollback all lines. Invariant: no discharge without principal or receivable line. Inject: fail receivable/provider/fee/marker write; assert exact cents per account. |
+### 7.22 Resolve excess-return case command (D-ACH-18)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **P4** `Krecovery`: RETURN_RECOVERY case resolution — recovery credit attribution or RETURN_LOSS write-off correction, assurance, journal, events | **GAP ACH-M-P4-RACE**: One resolution per receivable cent. Invariant: recovered + written off ≤ receivable. Inject: hold case lock; second resolution/recovery credit attribution/Kreturnbook both orders. | **GAP ACH-M-P4-TIMEOUT**: Recover by journal. Invariant: no double resolution. Inject: COMMIT response timeout. | **GAP ACH-M-P4-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity after lock wait. | **GAP ACH-M-P4-CRASH-BEFORE**: Case stays open; no posting. Invariant: resolution atomic. Inject: crash after last write before Krecovery COMMIT. | **GAP ACH-M-P4-CRASH-AFTER**: Replay. Invariant: one correction. Inject: lose answer after COMMIT. | **GAP ACH-M-P4-RETRY**: Replay or conflict. Invariant: amount/kind immutable. Inject: same key, changed amount or write-off↔recovery. | **GAP ACH-M-P4-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up; recovery credit still confirmed and unattributed. Inject: withdraw each; attribute credit elsewhere first. | **GAP ACH-M-P4-PARTIAL**: Rollback. Invariant: no revenue/tax/commission/authority line. Inject: fail correction/journal/event write; assert exact cents. |
+### 7.23 Complete recovered command journal (D-ACH-14)
+| Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
+|---|---|---|---|---|---|---|---|---|
+| **O3** `Kanswer`: operator/service journal finalization from the durable attempt/refund result only | **GAP ACH-M-O3-RACE**: One result wins from durable saga. Invariant: journal cannot invent provider outcome. Inject: hold journal; second recovery and concurrent status settle both orders. | **GAP ACH-M-O3-TIMEOUT**: Recover journal or return operation reference. Invariant: no external redispatch. Inject: inject journal lock/COMMIT acknowledgement timeout. | **GAP ACH-M-O3-EXPIRY**: Reauthorize requester; historical outcome remains. Invariant: expired session never grants new action. Inject: cross session/step-up/claim window before answer effect. | **GAP ACH-M-O3-CRASH-BEFORE**: Saga/refund survives; journal unfinished. Invariant: Kanswer distinct from provider settle. Inject: crash after final journal write before Kanswer COMMIT. | **GAP ACH-M-O3-CRASH-AFTER**: Replay committed answer after access check. Invariant: one command result; no send. Inject: lose answer after Kanswer COMMIT. | **GAP ACH-M-O3-RETRY**: Replay same digest or conflict. Invariant: key binds immutable approved effect. Inject: concurrent same-key recovery then changed destination/amount body. | **GAP ACH-M-O3-REVOCATION**: Deny caller; service can finish reconciliation. Invariant: identity/grant/session/service authority checked. Inject: withdraw each at journal boundary; verify no financial deletion. | **GAP ACH-M-O3-PARTIAL**: Rollback answer only. Invariant: earlier provider/result commits retained. Inject: fail later journal/audit write; assert durable refund and exact cents unchanged. |
 
 ## 8. Cases and gates
 
@@ -706,19 +718,22 @@ registry. The matrix and acceptance cases below are proposals for that implement
 | ACH-09 | Two distinct exact full receipts plus repeated delivery: one authorization, all money, excess liability/owner return, service basis capped | P1–P2, F2, O2 |
 | ACH-10 | Before/exact/after expiry, delayed bank observation, source/approval/route revocation and late credit: recorded money, no resurrection, reviewed remedy | I1–I3, P1, E1 |
 | ACH-11 | Explicit ACH retirement→PayPal: one open checkout/purchase; old reference stays bound; late ACH is return-only; no automatic second charge | I2, M2, P1, E1 |
-| ACH-12 | Unassigned booked receipt in shared treasury ledger; attribution reverses treasury and posts agency capture atomically; return claim excludes attribution | M1–M2, P2, F2–O2 |
+| ACH-12 | Unassigned booked receipt in shared treasury ledger; attribution reverses treasury and posts agency capture atomically; return claim excludes attribution; treasury refund executes through route-scope attempts and watchdog | M1–M2, P2, D2–D4, F1–O3, W1 |
 | ACH-13 | Versioned source/access-date fees, null versus observed zero, gross/net equality, later fees/conflicts and outbound fee ceiling | R2, C3, P1–P2, F1–O2 |
-| ACH-14 | Owner-approved source/destination/components, requester segregation, destination/proof expiry/revocation and every pending-return ceiling | F1–F3, F6 |
-| ACH-15 | CREATE and FUND losses separately: stable identities, durable created ID before funding, no blind retries, unknown status remains uncertain | F3–F8, O1–O3 |
-| ACH-16 | Manual outbound claim/evidence and UI/API exclusion; completion and reversal in every order, kept fees, remaining cents/tax and phased authority | F3–O3, P2 |
-| ACH-17 | Every matrix cell injected at its own boundary; security/log/evidence minimization and service fencing verified | All 232 GAP cells |
+| ACH-14 | Owner-approved source/destination/components, requester segregation, destination/proof expiry/revocation and every pending-return ceiling | D1–D4, F1–F3, F6 |
+| ACH-15 | CREATE and FUND as separate attempts: stable identities, durable created ID before funding, no blind retries, unknown status uncertain, refusals carry safe operational codes and resolve nothing else | F3–F8, O1–O3, W1, C2 |
+| ACH-16 | Manual outbound claim/evidence and UI/API exclusion; completion, reversal and bounce in every order, kept fees, remaining cents/tax and phased authority | F3–O3, P2–P3 |
+| ACH-17 | Every matrix cell injected at its own boundary; security/log/evidence minimization and service fencing verified | All 312 GAP cells |
+| ACH-18 | Payer authorization and destination lifecycle: verify/replace/revoke with evidence, step-up and both-order races against matching and dispatch | V1–V3, D1–D4, M2, P1, F2–F6 |
+| ACH-19 | Codex r1 double-debit oracle in both orders and both scopes; excess return booked to RETURN_RECOVERY_RECEIVABLE; recovery and write-off; bounce and resend | F8, O2, P3, P4 |
 | ACH-LIVE-01 | One legitimate real USD ACH credit to the verified Wise Business details, reconciled end to end with duplicate replay adding nothing | I2, C4–C6 or C1–C8, M1–M2, P1–P2 |
 
 Implementation gate: all money/authority matrix GAPs closed with fault-harness evidence on real PostgreSQL; remaining applicable
 transport GAPs closed before their path is enabled. Review schema/type/state/event equivalence and backstop guards, not only
 handler examples. Required additive work includes route qualification/config versions; ACH order states/index/identity guard;
 bank-credit evidence/matching/cursor/fences and manual command contracts; owner/service privileges and assurance; ledger treasury
-scope, source guards and atomic posting groups; unassigned Refund source ceilings; outbound saga/destination/fee events;
+scope, source guards and atomic posting groups; treasury refund/attempt tables, journal and scope extensions (D-ACH-19); per-phase transfer operations and
+watchdog; payer-authorization and destination aggregates (D-ACH-17); OPS-2 accounts and return-accounting events (D-ACH-18);
 DTO redaction/projections and consumer subscriptions. Add migrations **after the highest existing migration at implementation
 time** (the inspected baseline already includes 0038); do not edit/re-number 0015–0017 or weaken PayPal constraints. The existing
 PayPal suite and provider-neutral ledger/authority/refund cases must still pass. Fake adapter results prove local orchestration
@@ -726,8 +741,7 @@ only; API automation remains off until S-B verifies real endpoint capabilities a
 
 **ACH activation gate / ACH-LIVE-01:** after actual owner KYC and verified account details, ENABLE the configured route for a
 controlled participant, issue a legitimate project quote/order at its accepted USD price under the qualified pricing policy
-(no test-only price override), and send **one real ACH
-credit** using its unique reference. Reconcile via the initial owner-entry/confirmation path (or a qualified Wise adapter),
+(no test-only price override), and send **one real ACH credit** using its unique reference. Reconcile via the initial owner-entry/confirmation path (or a qualified Wise adapter),
 then verify bank evidence, stable credit ID, reference/payer fidelity, gross/observed fee/net, one capture/order/authorization,
 ledger source sets with exact balances and normal downstream delivery. Replay the observation and demonstrate zero added money
 or entitlement. Record exact code/config/environment subject, source/access-date fee version, provider IDs, proof/evidence refs,
