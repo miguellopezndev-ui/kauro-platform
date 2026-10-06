@@ -27,11 +27,11 @@ export function normalizePath(file, { platform = process.platform, realpath = re
   return platform === 'win32' ? path.toLowerCase() : path;
 }
 
-// Where was the error thrown? 'test': the test file, or a file under a test/ or test-support directory.
+// Where was the error thrown? 'test': the test file, or a file under a test/, tests/, __tests__/, test-support/, test-utils/ or testing/ directory (including src/testing).
 // 'product': under src/ (packages/*/src, apps/*/src, or their dist equivalents). 'unlocated': the frame has no file location.
 // 'other': anything else (node_modules, unrelated paths). The nearest path segment decides, so dist/test/x.js is test code
 // and dist/src/x.js is product code.
-const TEST_SEGMENTS = new Set(['test', 'tests', '__tests__', 'test-support', 'test-utils']);
+const TEST_SEGMENTS = new Set(['test', 'tests', '__tests__', 'test-support', 'test-utils', 'testing']);
 export function frameOrigin(frame, file) {
   const location = /\((.+):\d+:\d+\)$/.exec(frame ?? '') ?? /^\s*at (.+):\d+:\d+$/.exec(frame ?? '');
   if (!location) return 'unlocated';
