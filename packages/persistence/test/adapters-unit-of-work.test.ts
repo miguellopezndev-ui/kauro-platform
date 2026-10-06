@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { Client, type PoolClient } from "pg";
 import { after, before, test } from "node:test";
 import { DomainFailure, abandonWorkOf, isDomainFailure, limitWorkOf, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
-import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
+import { PrivilegedRoleError, createPool, listMigrations, translateDatabaseError } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
 import { END_BACKEND_WAIT_MS, endAbandonedBackend } from "../src/unit-of-work.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
@@ -479,6 +479,25 @@ test("a unit limited as a whole is ended by the database at its limit although e
     await second.end();
     await first.end();
     await given.catch(() => undefined);
+  }
+});
+
+test("a session the database ended at its transaction limit answers the retriable CAPACITY_UNAVAILABLE, never INTERNAL_ERROR, and commits nothing (D10-GAP-6a, ADV-6)", async () => {
+  const before = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  const authority = await h.processingAuthority(A);
+  await assert.rejects(
+    h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+      await uow.endClients.insert({ clientId: uow.ids.next() as ClientId, agencyId: A.agencyId, displayName: "Never committed", processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId, createdAt: clock.now() });
+      await limitWorkOf(uow, 200);
+      await (uow as unknown as { client: PoolClient }).client.query("SELECT pg_sleep(5)");
+    }),
+    (e: unknown) => failure(e).code === "CAPACITY_UNAVAILABLE" && failure(e).retryable,
+  );
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients")).rows[0].n, before.rows[0].n, "nothing committed");
+  // the SQLSTATEs themselves
+  for (const code of ["25P04", "57P01"]) {
+    const translated = translateDatabaseError(Object.assign(new Error("terminating connection"), { code, severity: "FATAL" }));
+    assert.ok(translated !== null && translated.code === "CAPACITY_UNAVAILABLE" && translated.retryable, code);
   }
 });
 

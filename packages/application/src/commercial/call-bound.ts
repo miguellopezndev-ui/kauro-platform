@@ -2,7 +2,7 @@
  * The bound of a collaborator call a B10 command makes (D10-GAP-6, D10-GAP-6a, B10G-R4): PROVIDER_CALL_TIMEOUT_MS on the ProviderCallTimer
  * the command's collaborators bind (realProviderCallTimer in a deployment; a fault cell binds a timer its controlled clock drives).
  */
-import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import { DomainFailure, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { realProviderCallTimer } from "./bindings.js";
 import type { ProviderCallTimer } from "./ports.js";
 
@@ -26,6 +26,21 @@ function safeCause(error: unknown): string {
 export const writeLateFailure: LateFailureSink = (late) => {
   process.stderr.write(`kauro-api call bound: abandoned call failed late call=${late.call} cause=${safeCause(late.error)}\n`);
 };
+
+/**
+ * Lifts the unit's limit after an in-time answer. When the answer was delayed past the limit's margin (a long pause of the process) the
+ * database has already ended the session and the lift fails: nothing of the unit committed, so the caller gets the retriable refusal of a
+ * call that did not answer in time, not an internal error (D10-GAP-6a).
+ */
+async function liftLimit(limit: (ms: number | null) => Promise<void>): Promise<void> {
+  try {
+    await limit(null);
+  } catch (cause) {
+    const failure = new DomainFailure("CAPACITY_UNAVAILABLE", "the unit of work was ended by its time limit before the call's answer was taken; nothing changed, retry with the same key", { retryAfterSeconds: 5 }, true);
+    failure.cause = cause;
+    throw failure;
+  }
+}
 
 export interface CallBoundOptions {
   /** The safe token naming the call in the late-failure line (e.g. "CMD043.inspectClient"). */
@@ -67,7 +82,7 @@ export async function withinCallBound<T>(timer: ProviderCallTimer | undefined, c
       }),
     ]);
     if (outcome.timedOut) options.abandon?.();
-    else await options.limit?.(null);
+    else if (options.limit !== undefined) await liftLimit(options.limit);
     return outcome;
   } finally {
     bound.cancel();
