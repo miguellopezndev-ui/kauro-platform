@@ -14,7 +14,8 @@ Este Acuerdo forma parte de los Términos de Servicio de Kauro (los "Términos")
 no definidos aquí tienen el significado de los Términos.
 
 Este Acuerdo es el **contrato de transmisión de datos personales** del artículo 2.2.2.25.5.2 del Decreto 1074 de 2015 (antes
-artículo 25 del Decreto 1377 de 2013) y, para los Clientes sujetos a leyes estatales de privacidad de Estados Unidos, el contrato
+artículo 25 del Decreto 1377 de 2013) y, para los Clientes sujetos a las leyes de privacidad de California, Virginia o Colorado, el
+contrato
 de "service provider" o "processor" que esas leyes exigen (sección 14).
 <!-- law: C-20, C-21, C-60..C-66 -->
 
@@ -236,13 +237,15 @@ Cliente.
 registros financieros y de seguridad de Kauro no contienen Datos del Cliente.
 <!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule; 09 §Notifications and customer action · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I), texto 2026) · CHECKLIST A-15 -->
 
-## 14. Términos para Clientes sujetos a leyes de privacidad de Estados Unidos
+## 14. Términos para Clientes sujetos a leyes de privacidad de California, Virginia o Colorado
 
 14.1. **Finalidades limitadas y especificadas.** El Cliente revela Datos del Cliente a Kauro solo para las finalidades
 comerciales específicas del Anexo I, sección 3 ("business purposes"). Kauro actúa como "service provider" en el sentido del
-Código Civil de California §1798.140(ag) y como "processor" en el sentido de leyes como la Virginia Consumer Data Protection Act
-(Va. Code §59.1-579) y la Colorado Privacy Act (C.R.S. 6-1-1305).
-<!-- law: C-60, C-61, C-64, C-65, C-66 -->
+Código Civil de California §1798.140(ag) y como "processor" en el sentido de la Virginia Consumer Data Protection Act (Va. Code
+§59.1-579) y de la Colorado Privacy Act (C.R.S. 6-1-1305). Kauro solo ha verificado los términos de encargado de esas tres leyes.
+Si al Cliente o al Cliente Final le aplica la ley de privacidad de otro estado, el Cliente lo informa antes de cargar los datos y
+Kauro califica los términos obligatorios de esa ley antes de aceptar el proyecto; sin esa calificación, ese proyecto no se acepta.
+<!-- law: C-60, C-61, C-64, C-65, C-66, C-68 · CHECKLIST A-19 · ver LAWYER_LATER L-08 -->
 
 14.2. **Compromisos de Kauro.** Además de la sección 3.3, Kauro: (a) cumple las obligaciones que le resultan aplicables de la
 California Consumer Privacy Act y su reglamento y otorga a los Datos del Cliente el mismo nivel de protección que esa ley exige a

@@ -167,7 +167,8 @@ modelo no aprobado).
 <!-- auth: 19 §Service terms: required operative content; 19 §Data processing agreement (tercer párrafo) -->
 
 5.5. **Datos sujetos a leyes de otras jurisdicciones.** El servicio inicial se ofrece para clientes y datos cuyo tratamiento se
-rige por la ley colombiana y por leyes de Estados Unidos. Kauro no ofrece en esta versión los instrumentos de transferencia del
+rige por la ley colombiana y por leyes de Estados Unidos; de las leyes estatales de privacidad, Kauro solo ha verificado las de
+California, Virginia y Colorado, y un proyecto sujeto a otra se acepta solo según la sección 14.1 del DPA. Kauro no ofrece en esta versión los instrumentos de transferencia del
 Reglamento General de Protección de Datos de la Unión Europea ni del Reino Unido. Si los Archivos contienen datos cuyo
 tratamiento esté sujeto a esas normas, el Cliente debe informarlo antes de cargarlos para que Kauro evalúe si puede admitir el
 proyecto; sin esa evaluación, no deben cargarse.
@@ -216,8 +217,9 @@ multiplicación de relaciones. Kauro no puede cambiar la interpretación despué
 unidades elegibles no generan una venta de precio mínimo.
 <!-- auth: 16 §Billable unit and fairness; 16 §Price schedule -->
 
-7.2. **Tarifa.** Los precios de referencia vigentes figuran en el Anexo A y en la página de precios. Toda cifra mostrada antes de
-la Cotización es una banda indicativa; el precio que obliga es el de la Cotización emitida sobre el alcance sellado.
+7.2. **Tarifa.** Para Clientes que no son consumidores, los precios de referencia vigentes figuran en el Anexo A y en la página de
+precios; toda cifra mostrada antes de la Cotización es una banda indicativa y el precio que obliga es el de la Cotización emitida
+sobre el alcance sellado. Para un Cliente que sea consumidor rige la sección 7.7, que prevalece sobre este párrafo.
 <!-- auth: A3 §3.4; 16 §Price schedule -->
 
 7.3. **Descuentos.** (a) Descuento por recurrencia, calculado al emitir la Cotización sobre los proyectos calificados del Cliente
@@ -230,10 +232,12 @@ futuras, no un Pedido ya aceptado.
 
 7.4. **Moneda.** Los precios para clientes fuera de Colombia se expresan y cobran en dólares de los Estados Unidos (USD). A los
 clientes extranjeros no se les muestran pesos colombianos. Los clientes colombianos pagan en pesos colombianos por la ruta que
-Kauro indique en su Cotización, separada del cobro internacional en USD.
+Kauro indique en su Cotización, separada del cobro internacional en USD. A un consumidor siempre se le informa y se le cobra el
+precio en pesos colombianos (sección 7.7).
 <!-- auth: amendments/A8_PAYMENT_ROUTING.md §2 regla 6; 16 §Price schedule (USD) -->
 
-7.5. **Impuestos.** Los precios de la tarifa no incluyen impuestos. La Cotización muestra, antes del pago, los impuestos que
+7.5. **Impuestos.** Los precios de la tarifa del Anexo A, para Clientes que no son consumidores, no incluyen impuestos. La
+Cotización muestra, antes del pago, los impuestos que
 correspondan según el tratamiento tributario validado para esa operación, y el total. Kauro emite la factura electrónica de venta
 conforme a la regulación de la DIAN. Si una retención en la fuente es legalmente exigible al Cliente, este la practica y entrega
 el certificado correspondiente.
@@ -245,6 +249,15 @@ continuación por etapas necesaria para la estrategia de relaciones comprada y l
 Una importación por etapas, con su acción adicional y su ventana de conservación, se informa antes de la compra y no genera un
 segundo cobro por el solo hecho de que los identificadores de destino aparezcan después de una etapa anterior.
 <!-- auth: 16 §What the price includes -->
+
+7.7. **Precios para consumidores.** A un Cliente que sea consumidor (sección 25.1), todo precio que Kauro le informe o anuncie
+—en la página de precios, en ejemplos, en la Plataforma y en la Cotización— se le muestra visualmente, junto a la descripción del
+servicio, como **precio total en pesos colombianos que incluye el IVA cuando aplique y todos los demás impuestos y costos
+adicionales** que deba pagar, con el impuesto que calcule el proveedor de facturación electrónica de Kauro para esa operación.
+La página de precios muestra esos totales, o una pestaña para consumidores claramente identificada que los muestra para cada
+banda. Ninguna cifra indicativa sin impuestos o en dólares es el único precio que ve un consumidor, y la Cotización muestra el
+mismo total. El precio informado coincide con el cobrado; si aparecen dos precios, el consumidor paga el menor.
+<!-- law: C-37b (Ley 1480 de 2011 art. 26; SIC Circular Única, Título II, numerales 2.3 y 2.3.1) · CHECKLIST A-18 · ver LAWYER_LATER L-07 (tarifa y exenciones de IVA) -->
 
 ## 8. Pagos
 
@@ -573,8 +586,8 @@ Cliente es consumidor según el artículo 5, numeral 3, de la Ley 1480 de 2011, 
 declaración, y ninguna otra disposición de estos Términos limita los derechos que esa ley le da.
 
 25.2. **Información antes de comprar.** La Plataforma informa, antes de la compra y en el mismo medio: la identidad de Kauro
-(sección 1.1); la descripción del servicio (secciones 3 y 7.6, el Plan y la Cotización); el precio total con todos los impuestos
-y costos; los medios de pago; el plazo de prestación del servicio que indica la Cotización; la vigencia de la oferta; y el
+(sección 1.1); la descripción del servicio (secciones 3 y 7.6, el Plan y la Cotización); el precio total en pesos colombianos
+con todos los impuestos y costos (sección 7.7); los medios de pago; el plazo de prestación del servicio que indica la Cotización; la vigencia de la oferta; y el
 derecho de retracto con el procedimiento para ejercerlo. Estos Términos y los demás documentos del contrato pueden consultarse,
 imprimirse y descargarse en todo momento, antes y después de la compra.
 
@@ -607,8 +620,23 @@ siguientes** a: la fecha en que tuvo noticia de la operación fraudulenta o no s
 servicio (el Paquete, según el plazo de la sección 25.6), si no lo recibió; o la fecha en que lo recibió, si no corresponde a lo
 pedido o es defectuoso. La queja indica las razones, la causal, el valor por el que se pide la reversión y el instrumento al que se
 cargó la operación. Por cualquier medio que se presente, Kauro entrega de inmediato una constancia descargable con la fecha y la
-causal. Dentro del mismo plazo de cinco (5) días hábiles, el consumidor (o el titular del instrumento) notifica al emisor, con esa
-constancia. Si una autoridad decide a favor de Kauro, la transacción puede volver a cargarse al consumidor.
+causal.
+
+Dentro del mismo plazo de cinco (5) días hábiles se notifica al emisor del instrumento de pago, por los canales que el emisor
+disponga. Si el consumidor no es el titular del instrumento (por ejemplo, pagó con la tarjeta de otra persona), **esa
+notificación la debe presentar el titular del producto financiero**; el consumidor sigue presentando su queja a Kauro. La
+notificación al emisor contiene como mínimo: (1) las razones de la solicitud; (2) la causal; (3) el valor; (4) la identificación
+de la transacción con su número, fecha y hora, si es el caso; (5) la cuenta, tarjeta o instrumento al que se cargó; y (6) la
+constancia de la queja presentada a Kauro. Los participantes del proceso de pago deben tener un formulario de solicitud de
+reversión, pero el consumidor puede usar cualquier otro documento que cumpla estos requisitos.
+
+Presentada la solicitud al emisor, los participantes del proceso de pago tienen **quince (15) días hábiles** para hacer efectiva
+la reversión. Si la cuenta de Kauro no tiene fondos suficientes y la reversión es parcial, **Kauro reembolsa directamente al
+consumidor** el valor o el monto faltante. Si Kauro ya había devuelto el precio directamente y la reversión también procede, el
+consumidor devuelve esos recursos a Kauro. Kauro **no vuelve a cobrar ni pide volver a cargar** la transacción mientras la
+reversión no esté resuelta: solo si una autoridad jurisdiccional o administrativa determina, mediante decisión **en firme**, que
+la reversión no era procedente, y una vez notificada esa decisión, el emisor puede cargar definitivamente la transacción al
+consumidor.
 
 25.8. **Peticiones, quejas y reclamos.** La Plataforma ofrece un canal de atención que entrega un número de radicado con la fecha y
 la hora de cada petición, queja o reclamo y permite hacerle seguimiento. Si el consumidor reclama de forma verbal o telefónica,
@@ -620,11 +648,12 @@ visible a la Superintendencia de Industria y Comercio (www.sic.gov.co).
 servicio en las condiciones contratadas o que se le devuelva el precio pagado; la sección 11 (remedio a elección de Kauro) no se le
 aplica en lo que reduzca esa elección. Ninguna disposición de las secciones 10 y 11 limita los derechos de esta sección ni los
 demás derechos irrenunciables del consumidor.
-<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 11 num. 3, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024—, 51 y 58 num. 5 lit. b y c; Decreto 1074 de 2015 arts. 2.2.2.51.1, 2.2.2.51.2, 2.2.2.51.4 a 2.2.2.51.7 y 2.2.2.51.12) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
+<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 11 num. 3, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024—, 51 y 58 num. 5 lit. b y c; Decreto 1074 de 2015 arts. 2.2.2.51.1, 2.2.2.51.2, 2.2.2.51.4 a 2.2.2.51.10 y 2.2.2.51.12) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
 
-## Anexo A. Tarifa de referencia (USD, antes de impuestos)
+## Anexo A. Tarifa de referencia para Clientes que no son consumidores (USD, antes de impuestos)
 
-Aplica solo a los modos que la Plataforma muestre como disponibles al emitir la Cotización. Las bandas superiores a 500.000
+Esta tabla **no es un precio para consumidores**: a un consumidor se le informa el total en pesos colombianos con impuestos
+incluidos (sección 7.7). Aplica solo a los modos que la Plataforma muestre como disponibles al emitir la Cotización. Las bandas superiores a 500.000
 unidades no están disponibles hasta que se acepte el envoltorio mayor.
 
 | Unidades facturables | CLEAN | HUBSPOT | SALESFORCE |

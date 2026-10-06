@@ -14,8 +14,8 @@ Data S.A.S.**, Colombian tax ID (NIT) [NIT], registered address [domicilio], ema
 Capitalized terms not defined here have the meaning given in the Terms.
 
 This Agreement is the **personal-data transmission contract** required by article 2.2.2.25.5.2 of Colombian Decree 1074 of 2015
-(formerly article 25 of Decree 1377 of 2013) and, for Customers subject to US state privacy laws, the service-provider or
-processor contract those laws require (section 14).
+(formerly article 25 of Decree 1377 of 2013) and, for Customers subject to the privacy laws of California, Virginia or Colorado,
+the service-provider or processor contract those laws require (section 14).
 <!-- law: C-20, C-21, C-60..C-66 -->
 
 ## 1. Roles and processing chain
@@ -226,13 +226,15 @@ does not cover copies already downloaded or imports made by the Customer.
 financial and security records contain no Customer Data.
 <!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration; 09 §Retention schedule; 09 §Notifications and customer action · law: C-65, C-66 · CHECKLIST A-15 -->
 
-## 14. Terms for Customers subject to US privacy laws
+## 14. Terms for Customers subject to the privacy laws of California, Virginia or Colorado
 
 14.1. **Limited and specified purposes.** The Customer discloses Customer Data to Kauro only for the specific business purposes in
 Annex I, section 3. Kauro acts as a "service provider" within the meaning of California Civil Code §1798.140(ag) and as a
-"processor" within the meaning of laws such as the Virginia Consumer Data Protection Act (Va. Code §59.1-579) and the Colorado
-Privacy Act (C.R.S. 6-1-1305).
-<!-- law: C-60, C-61, C-64, C-65, C-66 -->
+"processor" within the meaning of the Virginia Consumer Data Protection Act (Va. Code §59.1-579) and the Colorado Privacy Act
+(C.R.S. 6-1-1305). Kauro has verified the processor terms of those three laws only. If another state's privacy law applies to the
+Customer or the End Client, the Customer says so before uploading and Kauro qualifies that law's mandatory terms before accepting
+the project; without that qualification, the project is not accepted.
+<!-- law: C-60, C-61, C-64, C-65, C-66, C-68 · CHECKLIST A-19 · see LAWYER_LATER L-08 -->
 
 14.2. **Kauro commitments.** In addition to section 3.3, Kauro: (a) complies with the obligations applicable to it under the
 California Consumer Privacy Act and its regulations and provides Customer Data the same level of privacy protection the Act
