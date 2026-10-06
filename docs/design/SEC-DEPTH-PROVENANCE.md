@@ -1,8 +1,16 @@
-# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r9
+# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r10
 
 Target path: `docs/design/SEC-DEPTH-PROVENANCE.md`. Base: kauro-platform `main` 21b310f. Closes Codex p0-admission-r2 (on 0217109)
-findings 1-3 and the 0015 analogue. r2-r8 answered design reviews 062a982 .. 8cb7299. r8 stepped back to P1 (below). r9 answers
-Codex design r8 (8cb7299, REJECT, SDP-20..28), one line each:
+findings 1-3 and the 0015 analogue. r2-r9 answered design reviews 062a982 .. 84ef1e6. r8 stepped back to P1 (below).
+r10 answers Codex design r9 (84ef1e6, REJECT: SDP-20/22/23/24/25/27/28 FIXED, SDP-21/26 PARTIAL, SDP-29/30 new):
+- SDP-30 (and the SDP-21 remainder): every derived/bookkeeping column is bound at BIRTH as well as at UPDATE (grant ledger_seq,
+  order allocation, agency last admission, lease cancel_version), and every deferred relation is queued per PARENT row on INSERT and
+  UPDATE as well as per child, so an empty relation is checked too (B2, B3, B4, B5, B9; section 2 BIRTH row; rule 11).
+- SDP-29: one global lock order (grants before requests, a carve before its pool, every grant lock FOR NO KEY UPDATE); the sweep,
+  the reservation and every reconciling writer follow it; the accountants that run after a request or carve lock use NOWAIT (B3
+  lock protocol; rule 14).
+- SDP-26 remainder: birth DENY cells, per-parent commit cells and the sweep-actor RACE cells in both orders (R12e, R26).
+r9 answered Codex design r8 (8cb7299, REJECT, SDP-20..28), one line each:
 - SDP-20: KA001 and every other immediate decision read the membership facts under the agency lock, never the counter (B5a).
 - SDP-21: the grant ledger is checked both ways plus its complete final relation; reconciliation facts are frozen; the ledger, the
   request journal and the grants cannot be deleted (B3).
@@ -14,8 +22,9 @@ Codex design r8 (8cb7299, REJECT, SDP-20..28), one line each:
 - SDP-26: compositional cells added to C; every DENY has a named OK sibling (C2).
 - SDP-27: B14-R1 states the login shape itself (appendix).
 - SDP-28: agency_recurrence is bound column by column, last_confirmed_at included (B5b).
-Root cause: three families were seen twice in r8 (SDP-20/28, SDP-21/26, SDP-22/24/25): they are template rules 11-13
-(`docs/design/FAILURE-MATRIX-TEMPLATE.md`) and section 2 sweeps every analogous path in the inventory.
+Root cause: three families were seen twice in r8 (SDP-20/28, SDP-21/26, SDP-22/24/25): template rules 11-13. r9 showed the birth
+half of rule 11 (SDP-30 after SDP-20/28) and a lock-order family (SDP-29 after SEC-109): rules 11-13 now say "at birth and
+update" and rule 14 is new (`docs/design/FAILURE-MATRIX-TEMPLATE.md`). Section 2 sweeps every analogous path in the inventory.
 
 ## 0. Facts established from the code
 
@@ -51,6 +60,16 @@ Root cause: three families were seen twice in r8 (SDP-20/28, SDP-21/26, SDP-22/2
   support.ts:707-730 `deliveredByTheExecutionPackage` (callers b10-commission-service.test.ts:211, b10-failure-cells-accrual.test.ts
   :507, :766). Real writers exist in src/testing/execution-fixtures.ts: queueJob :87, admitJob :121, launchJob :147, stageJob :185,
   verifyJob :207, publishJob :270, endJob :297.
+- F12 Grant lock order today: the sweep locks the grant (GrantReconciliation.settle apps/control/src/audit/grants.ts:62 ->
+  lockGrant src/audit/discovery.ts:161-162, FOR UPDATE), then its requests (grantUsage :174-184, FOR UPDATE OF r); the reservation
+  locks the grant in BEFORE INSERT (0023:282-283) before the upstream FOR SHARE (0006:128); request_journal's FK to cost_grants
+  (0023:245) takes KEY SHARE on the grant in an AFTER trigger of the insert.
+- F13 Birth of derived columns: bound today for agencies (0002:140), processing_jobs (0021:451), processing_attempts (initial
+  CREATED 0021:237 + CHECK fence NULL), audits (0023:439), audit_steps (0023:581), agency_recurrence (0028:450), founding
+  reservations (initial RESERVED + CHECK 0028:195) and the platform capacity row (singleton, seeded 0021:294). NOT bound at birth:
+  payment_orders.allocated_cents (guard UPDATE-only 0015:108; RLS 0015:829-834 is no value guard), agency_execution_capacity
+  .last_admitted_at (guard BEFORE UPDATE 0021:403/0044:88; the INSERT column grant 0021:964 is no value guard), leases.cancel_version
+  (guard BEFORE UPDATE 0006:229), and the new cost_grants.ledger_seq (INSERT guard 0023:133-137 predates it).
 - F11 Checkpoint-free live operations: same-holder re-claim (0006:262-276), heartbeat (0006:279-292), S090 heartbeat of a NULL-
   checkpoint JOB_ATTEMPT (journals-leases.test.ts:312-316); SWEEP and OUTBOX_DISPATCH never store a checkpoint.
 
@@ -74,9 +93,9 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | # | Guard (file:line) | Protected value | Today | r9 fact binding (depth and role tests removed) |
 |---|---|---|---|---|
 | G1 | 0002:143, KA001 0002:349 | agencies.active_owner_count; last-owner decision | depth >= 2; KA001 reads the counter | B5a: KA001 = no ACTIVE OWNER membership left, read after the agency row lock; counter = deferred recount (KA004); 0002:219 conjunct replaced by the membership fact |
-| G2 | 0015:98, decision 0015:437 | payment_orders.allocated_cents | depth >= 2 (+ monotone) | B4: still-owed computed from captures, not the counter; deferred recount; monotone kept |
+| G2 | 0015:98, decision 0015:437 | payment_orders.allocated_cents | depth >= 2 (+ monotone) | B4: born 0; still-owed computed from captures, not the counter; deferred recount per order (INSERT/UPDATE) and per capture; monotone kept |
 | G3 | 0021:466 | attempt_count, current_attempt_id, fence | depth >= 2 | B1 (unchanged from r8) |
-| G4 | 0023:158 | cost_grants.reserved_cents, reconciled_spend_cents | depth >= 2 OR `is_control_session()` | B3: two-way ledger (event->source immediate, source->event and complete relation deferred), frozen evidence |
+| G4 | 0023:158 | cost_grants.reserved_cents, reconciled_spend_cents | depth >= 2 OR `is_control_session()` | B3: ledger_seq born 0; two-way ledger (event->source immediate, source->event and complete relation deferred per grant and per event), frozen evidence, one lock order |
 | G5 | 0023:162-165 | pool state/version/authorization_ref | `is_control_session()` | authorisation of pool edges, not value provenance; values fact-checked (0023:170-190, 0023:112); kept |
 | G6 | 0023:453 | audits.fence | depth >= 2 | B6 (unchanged from r8) |
 | G7 | 0028:117 | commercial_transitions rows | depth >= 2 | B7: registry of the 11 attachments with scope; subject facts; from != to; recorded_at/actor normalised |
@@ -84,8 +103,8 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | G9 | 0028:447 | agency_recurrence (all 9 columns) | depth >= 2 (+ shape) | B5b: every column bound immediately to server_now/shape and at commit to the purchases |
 | G10 | 0028:472 | qualifying_purchases rows | depth >= 2 | B8: all 14 columns from facts; three founding-basis cases |
 | G11 | 0044:73 | execution_capacity.last_admission_at | depth AND facts | facts already; depth conjunct removed |
-| G12 | 0044:96 | agency_execution_capacity.last_admitted_at | same | same |
-| G13 | 0006:202 | leases fence, owner, heartbeat, expiry, checkpoint | caller instants | B2: server clock; same holder keeps a stored checkpoint, never needs one |
+| G12 | 0044:96 | agency_execution_capacity.last_admitted_at | same (UPDATE only) | facts; depth removed; born NULL (B9) |
+| G13 | 0006:202 | leases fence, owner, heartbeat, expiry, checkpoint | caller instants | B2: server clock; born fence 1, cancel_version 0; same holder keeps a stored checkpoint, never needs one |
 | G14 | 0021:740, 0022:606 | authorization CONSUMED / DELIVERED | `rolsuper` skips the fact check | B10: skip removed; the existing fact checks bind every role |
 
 ## 2. Family sweep (root cause; template rules 11-13)
@@ -95,6 +114,8 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | CACHE: an immediate decision reads a value checked only at commit, or a derived row is partly bound (11) | SDP-20, SDP-28 | KA001 counter; founding birth 0002:219; allocation decision 0015:437; designation seq from the recurrence count 0028:515; RESERVE room 0023:285; EXHAUSTED->AUTHORIZED room 0023:176-179; 0023:436 room; derived rows: recurrence, ledger events, history, purchases, leases, admission instants | fixed: KA001 (B5a), 0015:437 (B4), 0002:219 (B5a); bound already: seq (immediate +1 shape, a decrease is refused, so a transient inflation cannot be restored before the KC001 recount), grant rooms (money moves only with an immediate event, B3, nothing deferred); every derived row now lists all columns (B3, B5b, B7, B8) |
 | RECIPROCAL: a source->derived relation checked one way, or evidence mutable after use (12) | SDP-21, SDP-26 | ledger; reservation <=> purchase; job ADMITTED <=> authorization CONSUMED (0021:700, :740); job READY <=> package AVAILABLE <=> DELIVERED (0022:580, :606); history <=> subject; allocation, owner count, recurrence | fixed: ledger (B3), reservation<=>purchase (B8); the two 0021/0022 pairs are both-way already and bind every role after B10; history: writer is an AFTER trigger of the subject (structural) + B7; recounts are complete relations. Frozen: usage after RECONCILED, CLOSED grant money, carve spend after CLOSED; ledger, history, purchases append-only; journal and grants undeletable |
 | VALID WRITER: a new predicate rejects an unchanged production writer (13) | SDP-22, SDP-24, SDP-25 | RESERVE visibility; corporate scope; checkpoint-free renewal; renewal with a shorter TTL; B1 retry attempts; B8 basis NONE/UNBACKED; CLOSED-needs-reconciled vs the sweep; multi-row RESERVE; recurrence instants | fixed: B3 AFTER phase, B7 scope, B2 checkpoint, B2 TTL (functions take GREATEST, the guard refuses only a direct shortening); each has an OK sibling in C2 |
+| BIRTH: a derived column bound at UPDATE only, or a deferred relation queued only per child (11, at birth) | SDP-30 (after SDP-20/28) | every derived/bookkeeping column of section 1 and the capacity ledgers: F13 | fixed: ledger_seq (B3), allocated_cents (B4), last_admitted_at (B9), cancel_version (B2); deferred relations queued per parent on INSERT and UPDATE and per child: ledger (B3), allocation (B4), owner count, recurrence (B5), capacity (0021:406-413, already both); bound already: the F13 list |
+| LOCK ORDER: an added lock that reverses an existing actor's order, or upgrades a weaker lock (14) | SDP-29 (after SEC-109) | sweep (grant -> requests), reservation (grant -> upstream requests), HOLD/RELEASE (carve -> pool), every reconciling writer, FK KEY SHARE | fixed: one global order and one grant lock mode (B3 lock protocol); a writer outside it fails fast with NOWAIT, never waits; R12e covers each pair in both orders |
 | IDENTITY exemption (single; P1) | SDP-23 | grep of F1 | only G14 (removed) and G5 (authorisation, kept) |
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
@@ -127,7 +148,7 @@ B1 processing_jobs (G3), `0046_job_fence_provenance.sql`, 0021:465-468 replaced:
 `NEW.attempt_count = OLD.attempt_count + 1` and an attempt (agency, job, `attempt_id = NEW.current_attempt_id`, `ordinal =
 NEW.attempt_count`, created_at = now); fence change needs `NEW.current_attempt_id = OLD.current_attempt_id`, `NEW.fence > OLD.fence`,
 that attempt CLAIMED at `fence = NEW.fence` with claimed_at = now, and `attempt_owns_lease`. jobRecord stays fail-closed.
-B2 leases (G13), `0047_lease_server_clock.sql`: INSERT fence 1, heartbeat/created/updated := now, `now < expires_at <= deadline_at`;
+B2 leases (G13), `0047_lease_server_clock.sql`: INSERT fence 1, cancel_version 0, heartbeat/created/updated := now, `now < expires_at <= deadline_at`;
 DELETE/TRUNCATE refused and DELETE revoked from kauro_control. UPDATE of heartbeat/expiry/checkpoint/owner/fence needs
 `heartbeat_at = now` and `expires_at > now`. Same holder (owner and fence unchanged): `OLD.expires_at > now`; `NEW.expires_at >=
 OLD.expires_at`; `OLD.checkpoint_hash IS NOT NULL => NEW.checkpoint_hash IS NOT NULL` (a stored checkpoint is never cleared; a NULL
@@ -141,18 +162,30 @@ B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
 - request_journal: `reconciled_at timestamptz`, CHECK `(usage_state = 'RECONCILED') = (reconciled_at IS NOT NULL)`. Birth with
   usage_state <> 'RECONCILED'. Entering RECONCILED sets `reconciled_at := now`; once RECONCILED, usage_state, actual_cents and
   reconciled_at never change (KA004). DELETE/TRUNCATE refused on request_journal and cost_grants.
-- cost_grants: `ledger_seq bigint NOT NULL DEFAULT 0`; `GRANT UPDATE (ledger_seq)` to kauro_app and kauro_control;
+- cost_grants: `ledger_seq bigint NOT NULL DEFAULT 0`, and the INSERT guard (0023:133-137) requires `NEW.ledger_seq = 0` next to
+  zero money (KA083; a default is no binding, SDP-30); `GRANT UPDATE (ledger_seq)` to kauro_app and kauro_control;
   `cost_grants_version` exempts `reserved_cents,reconciled_spend_cents,ledger_seq`.
-- Writers, each a trigger of its source row (no source change escapes them outside the TCB), lock order source row -> grant row:
+- Lock protocol (SDP-29), one global order for every actor: grant rows before request rows; an AUDIT carve before its pool. Every
+  explicit grant lock is FOR NO KEY UPDATE, the mode the money UPDATE itself takes, so the FK's KEY SHARE (compatible) never has to
+  be upgraded. Followers: the reservation locks its grant in BEFORE INSERT, before its upstream FOR SHARE; reconcileRequest,
+  reconcileUsage and storeResponse with usage RECONCILED lock the request's grant (`SELECT ... FROM cost_grants WHERE grant_id =
+  (SELECT cost_grant_id FROM request_journal WHERE request_id = $1) FOR NO KEY UPDATE`) before their request UPDATE; the sweep's
+  lockGrant (discovery.ts:161-162) takes FOR NO KEY UPDATE instead of FOR UPDATE and, for an AUDIT grant, its pool next, before
+  grantUsage locks requests. Database side: the accountants that run after a request or carve lock (RECONCILE, RELEASE) take the
+  grant with NOWAIT: a follower already holds it, so NOWAIT never fails for it; a writer outside the protocol gets 55P03 at once and
+  its transaction rolls back whole (no money moved, retriable, tier 3), so it never waits while holding a request and no cycle can
+  run through a grant. HOLD (carve -> pool) and RESERVE (grant first) acquire in order and wait normally.
+- Writers, each a trigger of its source row (no source change escapes them outside the TCB), in the order above:
   HOLD/RELEASE `cost_grants_pool_hold` (0023:212-227, AFTER UPDATE OF state): event, then pool UPDATE. RESERVE: the BEFORE INSERT
-  `request_journal_reserves_grant` keeps only its authorisation checks (model task, audit, lease fence, grant AUTHORIZED, unexpired,
-  scope, room) WITHOUT a row lock and loses its UPDATE (0023:288); new `request_journal_reserve_account` AFTER INSERT FOR EACH ROW
-  locks the grant, re-checks state, expiry, scope and room (earlier rows of a multi-row INSERT are already accounted: AFTER ROW events
+  `request_journal_reserves_grant` keeps its authorisation checks (model task, audit, lease fence, grant AUTHORIZED, unexpired,
+  scope, room) under its grant lock (FOR NO KEY UPDATE) and loses its UPDATE (0023:288); new `request_journal_reserve_account` AFTER
+  INSERT FOR EACH ROW (lock already held) re-checks state, expiry, scope and room (earlier rows of a multi-row INSERT are already accounted: AFTER ROW events
   run in row order at statement end), inserts the RESERVE event (its guard now sees the request row, SDP-22), updates the grant;
   failure raises KA083 and the statement rolls back whole. RECONCILE: new `request_journal_reconcile_account` AFTER UPDATE OF
-  usage_state WHEN (OLD.usage_state <> 'RECONCILED' AND NEW.usage_state = 'RECONCILED'): locks the grant, refuses a CLOSED grant,
+  usage_state WHEN (OLD.usage_state <> 'RECONCILED' AND NEW.usage_state = 'RECONCILED'): takes the grant NOWAIT, refuses a CLOSED grant,
   inserts RECONCILE (-reserved_cents, +actual_cents), updates the grant. reconcileRequest (store.ts:582-600) keeps its request
-  UPDATE, drops its grant UPDATE and re-reads the grant; reconcileUsage and storeResponse thereby account too.
+  UPDATE after its grant lock, drops its grant UPDATE and re-reads the grant; reconcileUsage and storeResponse lock the grant first
+  when they reconcile, and thereby account too.
 - Event INSERT guard (event -> source, immediate): HOLD = carve of this pool AUTHORIZED with authorized_at = now, +ceiling;
   RELEASE = that carve CLOSED with closed_at = now, -ceiling, +its reconciled_spend_cents; RESERVE = request row with request_id =
   source_id and cost_grant_id = grant, +reserved_cents (once per request by PK; reserved_at is caller data and is not used);
@@ -162,26 +195,30 @@ B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
   reconciled_spend_cents or ledger_seq needs `NEW.ledger_seq = OLD.ledger_seq + 1` and the event (grant, NEW.ledger_seq) with deltas
   = NEW - OLD; refused when OLD.state = 'CLOSED'. The CLOSED edge (0023:187) additionally needs every request naming the grant
   RECONCILED and reserved_cents = 0.
-- Deferred, read-only, final rows re-selected (KA083): (i) per inserted event, its grant's ledger_seq = max(seq) = count(events),
+- Deferred, read-only, final rows re-selected (KA083): (i) queued per grant (AFTER INSERT OR UPDATE OF reserved_cents,
+  reconciled_spend_cents, ledger_seq, state ON cost_grants) and per inserted event, the grant's ledger_seq = max(seq) = count(events),
   reserved_cents = sum(reserved_delta), reconciled_spend_cents = sum(spend_delta): an unconsumed or orphan event fails its own
   transaction and never blocks the next writer; (ii) per inserted request its RESERVE event, per request entering RECONCILED its
   RECONCILE event, per carve entering AUTHORIZED/CLOSED its HOLD/RELEASE event.
 - Data step in 0048 before the guards exist: each existing grant with money gets one OPENING event (seq 1, current values) and
   ledger_seq = 1; each existing RECONCILED request gets reconciled_at = updated_at.
-B4 allocation (G2), `0049_allocation_recount.sql`: capture_facts_allocate (0015:437) computes still owed as `expected_amount_cents -
+B4 allocation (G2), `0049_allocation_recount.sql`: an order is born with `allocated_cents = 0` (BEFORE INSERT, KP002; SDP-30);
+capture_facts_allocate (0015:437) computes still owed as `expected_amount_cents -
 coalesce(sum(allocated_service + allocated_tax) of the order's other COMPLETED/REVERSED captures, 0)`, not `o.allocated_cents`;
-immediate monotone kept; DEFERRABLE INITIALLY DEFERRED trigger AFTER UPDATE OF allocated_cents re-selects the order and requires
-the same sum over all its COMPLETED/REVERSED captures, KP002. Read-only.
+immediate monotone kept; DEFERRABLE INITIALLY DEFERRED triggers queued per order (AFTER INSERT OR UPDATE OF allocated_cents ON
+payment_orders) and per capture (AFTER INSERT OR UPDATE OF status ON capture_facts) re-select the order and require the same sum
+over all its COMPLETED/REVERSED captures (0 for none), KP002. Read-only.
 B5a owner count (G1), `0050_owner_recurrence_recount.sql`: `maintain_active_owner_count` (0002:329-355) on delta <> 0: `SELECT state
 FROM agencies WHERE agency_id = target FOR UPDATE` (lock order membership row -> agency row, as today), then KA001 when delta < 0,
 state NOT IN (CLOSING, CLOSED) and NOT EXISTS an ACTIVE OWNER membership of target (a fresh statement snapshot after the lock sees a
 removal committed while waiting; under REPEATABLE READ the counter UPDATE below raises 40001), then the counter UPDATE. The counter
-decides nothing; deferred recount = ACTIVE OWNER memberships (KA004). 0002:219: `a.active_owner_count = 0` becomes NOT EXISTS an
+decides nothing; deferred recount = ACTIVE OWNER memberships (KA004), queued per agency (AFTER INSERT OR UPDATE OF
+active_owner_count) and per membership (AFTER INSERT, DELETE or UPDATE OF role, state). 0002:219: `a.active_owner_count = 0` becomes NOT EXISTS an
 ACTIVE OWNER membership. CLOSING never returns to ACTIVE (0002:154-160), so a transient closing cannot be restored.
 B5b recurrence (G9), in `0050`: immediate (0028:447-460 without depth): INSERT count = 1, first_confirmed_at = last_confirmed_at =
 created_at = updated_at = now; UPDATE count = OLD + 1, first_* and created_at fixed, last_confirmed_at = updated_at = now and >= OLD
-(an older transaction designating after a newer one is refused KC001 and retried, unchanged 0028:458, SEC-110). Deferred (KC001):
-count = number of the agency's purchases = max(confirmation_seq); first_* = the seq-1 purchase (FK 0028:438); last_confirmed_at =
+(an older transaction designating after a newer one is refused KC001 and retried, unchanged 0028:458, SEC-110). Deferred (KC001), queued per
+recurrence row (AFTER INSERT OR UPDATE) and per purchase (AFTER INSERT): count = number of the agency's purchases = max(confirmation_seq); first_* = the seq-1 purchase (FK 0028:438); last_confirmed_at =
 max(confirmed_at) of the purchases.
 B6 audit fence (G6), in `0046`: copy of `audits_workflow` (0023:409-525) with 0023:453-455 replaced: fence change needs
 `NEW.fence = OLD.fence + 1` and an audit_steps row of this audit with fence = NEW.fence and claimed_at = now.
@@ -213,7 +250,10 @@ provider_completed_at, allocated_service_cents = its capture; order_created_at =
 founding_discount_bps = 0; RESERVED_SLOT iff a RESERVED/RECONCILIATION_HOLD reservation of (agency, quote, founding_slot_ref) exists,
 founding_reservation_id = it; UNBACKED otherwise. Deferred reverse (KC001): a RESERVED_SLOT purchase's reservation is CONSUMED with
 consumed_by_authorization_id = the purchase's authorization.
-B9 admission instants (G11, G12), in `0046`: copies of 0044:64-81 and 0044:88-103 with only the `pg_trigger_depth() < 2 OR` removed.
+B9 admission instants (G11, G12), in `0046`: copies of 0044:64-81 and 0044:88-103 with only the `pg_trigger_depth() < 2 OR` removed;
+the agency guard also fires BEFORE INSERT and requires `last_admitted_at IS NULL` at birth (the upsert 0021:318 births NULL and the
+admission then UPDATEs it; SDP-30). live_jobs is already recounted per ledger row and per job (0021:406-413). The platform row is a
+seeded singleton (no birth path).
 B10 authorization bounds (G14), in `0046`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
 0022:606-608). The fact checks themselves are unchanged and now bind every role, the oracle included.
 
@@ -245,6 +285,7 @@ race proof (rule 1).
 | R12b RESERVE (request insert) | GAP SEC-70 M :: "RACE SEC-DEPTH: two dispatch reservations on one grant, both orders held at the grant lock, two events and reserved = sum"; SEC-109 M :: "RACE SEC-DEPTH (lock order): a reservation naming upstream U and the reconciliation of U on the same grant, both orders held at the grant lock, commit without deadlock and with exact totals" | N/A same lock and bound as SEC-38 | N/A grant expiry read unchanged (0023:283-284) | GAP SEC-97 M :: "RACE SEC-DEPTH (commit): a ledger relation failure at COMMIT leaves no request, event, money or RECONCILED usage of the transaction" | N/A guard | GAP SEC-71 M :: "DENY SEC-DEPTH (superuser nested reserve): reserved_cents moved by a request's amount without its RESERVE event, or twice for one request, is refused KA083" | N/A | GAP SEC-88 M :: "DENY SEC-DEPTH (multi-row reserve): an INSERT of two requests whose second exceeds the ceiling at its AFTER re-check rolls back both rows, both events and the grant (KA083)" |
 | R12c RECONCILE (request usage) | GAP SEC-72 M :: "RACE SEC-DEPTH: two reconciliations of different requests of one grant, both orders held at the grant lock, exact totals" | GAP SEC-96t M :: "RACE SEC-DEPTH (commit timeout): a ledger relation check slowed past statement_timeout at COMMIT rolls back request, events and grant, and a retry commits" | N/A | covered by SEC-97 | GAP SEC-98 M :: "RACE SEC-DEPTH (crash after COMMIT): reconcileRequest whose response is lost and is retried refuses PRECONDITION_FAILED and the grant moved once" | GAP SEC-73 M :: "DENY SEC-DEPTH (superuser nested reconcile): a control-session UPDATE releasing reserve or adding spend with no RECONCILE event is refused KA083 (was accepted for kauro_control)"; SEC-74 M :: "DENY SEC-DEPTH: a second RECONCILE of one request is refused"; SEC-90 M :: "DENY SEC-DEPTH (frozen usage): after reconciliation, a change of actual_cents, usage_state or reconciled_at is refused KA004"; SEC-92 M :: "DENY SEC-DEPTH (orphan event): a correct RECONCILE event at seq n+1 without the grant advancing is refused at COMMIT KA083 and the next reservation commits at n+1" | GAP SEC-94 M :: "DENY SEC-DEPTH (close): a grant with a KNOWN unreconciled request cannot reach CLOSED (KA083)" | GAP SEC-89p M :: "RACE SEC-DEPTH (partial reconcile): a reconciliation whose actual exceeds the room under the ceiling fails at the grant write and leaves the request KNOWN with no event (design §9 ceiling, 0023:92)" |
 | R12d ledger evidence | N/A | N/A | N/A | N/A | N/A | N/A | GAP SEC-95 M :: "DENY SEC-DEPTH (superuser nested delete): DELETE or UPDATE of a ledger event, DELETE of a request_journal or cost_grants row is refused" | N/A (DENY SEC-95) |
+| R12e lock protocol (SDP-29) | GAP SEC-120 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and reconcileUsage of one request of its grant, both orders held at the grant lock, finish without deadlock, the request reconciled once and the totals exact"; SEC-121 M :: "RACE SEC-DEPTH (sweep lock order): the grant sweep and storeResponse with RECONCILED, both orders held at the grant lock, finish without deadlock with exact totals"; SEC-123 M :: "RACE SEC-DEPTH (FK lock mode): two reservations on one grant, held after the first's FK KEY SHARE and before its accountant, both orders, finish without deadlock with two events and reserved = sum"; SEC-124 M :: "RACE SEC-DEPTH (carve close): the sweep closing an AUDIT carve and a pool reservation naming a request of that carve as upstream, both orders held at the pool lock, finish without deadlock and the RELEASE is exact" | N/A same lock and bound as SEC-38 | N/A | N/A guard | N/A guard | GAP SEC-122 M :: "RACE SEC-DEPTH (nonconforming writer): a request UPDATE to RECONCILED without the grant pre-lock while the sweep holds the grant fails 55P03 at once with no event and no change, and its retry after the sweep commits" | N/A | N/A guard |
 | R14 capture -> allocated_cents | GAP SEC-46 M :: "RACE SEC-DEPTH: two captures of one order in two transactions, both orders held at the order lock, allocated = recount" | GAP SEC-46t M :: "RACE SEC-DEPTH (commit timeout): a deferred allocation recount slowed past statement_timeout at COMMIT rolls back captures, allocation and events, and a retry commits" | N/A | GAP SEC-47 M :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves no capture, allocation or event of the transaction" | N/A guard | GAP SEC-48 M :: "DENY SEC-DEPTH (superuser nested allocation): allocated_cents above the recount at commit is refused KP002"; SEC-113 M :: "DENY SEC-DEPTH (superuser nested inflate before capture): an allocation raised before a capture does not shrink the capture's applied amount and is refused at commit KP002" | N/A | SEC-49 M :: "OK SEC-DEPTH (multi-row): two captures completed by one statement allocate 40 + 60 to a 100-cent order" |
 | R15 owner count | GAP SEC-50 H :: "RACE SEC-DEPTH: removals of the last two ACTIVE owners, both orders held at the agency row; the second is refused KA001 by the membership count" | GAP SEC-50t H :: "RACE SEC-DEPTH (commit timeout): an owner recount slowed past statement_timeout at COMMIT rolls back the membership change, and a retry commits" | N/A | GAP SEC-51 H :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves the membership change unapplied" | N/A guard | GAP SEC-85 H :: "DENY SEC-DEPTH (founding owner): a founding OWNER birth with the counter zeroed while an ACTIVE OWNER membership exists is refused KA008" | GAP SEC-52 H :: "DENY SEC-DEPTH (superuser nested owner count): an inflated active_owner_count is refused at commit KA004"; SEC-82 H :: "DENY SEC-DEPTH (inflate, remove, restore): a superuser-owned nested count raise, the demotion of the sole ACTIVE owner, and a nested restore are refused KA001 at the demotion" | SEC-53 H :: "OK SEC-DEPTH (multi-row): one statement adding two owners commits count + 2" |
 | R16 recurrence | GAP SEC-54 H :: "RACE SEC-DEPTH: two first captures of one agency, both orders held at the recurrence advisory lock, count = purchases"; SEC-110 H :: "RACE SEC-DEPTH (older transaction): a designation in a transaction older than a committed designation is refused KC001 and its retry commits with seq n+1" | GAP SEC-54t H :: "RACE SEC-DEPTH (commit timeout): a recurrence recount slowed past statement_timeout at COMMIT rolls back purchase, recurrence and consumption, and a retry commits" | N/A | GAP SEC-55 H :: "RACE SEC-DEPTH (commit): a recount failure at COMMIT leaves no purchase, recurrence or consumption" | N/A guard | GAP SEC-56 H :: "DENY SEC-DEPTH (superuser nested recurrence): a confirmation_count not equal to the purchases at commit is refused KC001"; SEC-86 H :: "DENY SEC-DEPTH (recurrence instant): a nested future last_confirmed_at in an otherwise valid designation is refused KC001 and the next designation commits" | N/A | SEC-57 H :: "OK SEC-DEPTH: the first designation (upsert before purchase insert) commits" |
@@ -253,6 +294,7 @@ race proof (rule 1).
 | R20 founding consumption (G8) | N/A covered by SEC-54 (same advisory lock) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-79 H :: "DENY SEC-DEPTH (superuser nested consumption): CONSUMED with no purchase naming it confirmed now is refused KC001" | N/A | N/A guard |
 | R21 qualifying purchase (G10) | N/A covered by SEC-54 | N/A guard | N/A | GAP SEC-111 H :: "DENY SEC-DEPTH (reservation reverse): a RESERVED_SLOT purchase whose reservation is not CONSUMED by its authorization at COMMIT is refused KC001" | N/A guard | GAP SEC-80 H :: "DENY SEC-DEPTH (superuser nested purchase): a purchase whose authorization was not born now, or whose amount, instant or basis differs from its facts, is refused KC001" | N/A | N/A guard |
 | R22 admission instants (G11/G12) | N/A guard (0044 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-81 S :: "DENY SEC-DEPTH (superuser nested admission): a future, past or unadmitted last_admission_at / last_admitted_at is refused KA082" | N/A | N/A guard |
+| R26 birth of derived columns (SDP-30) | N/A single statement | N/A | N/A | GAP SEC-118 M :: "RACE SEC-DEPTH (commit, empty ledger): a grant born and authorized with no money has its relation checked at COMMIT per grant; a failure there rolls the grant back"; SEC-119 M :: "RACE SEC-DEPTH (commit, empty allocation): an order born with no capture has its recount checked at COMMIT per order; a failure there rolls the order back" | N/A guard | GAP SEC-114 M :: "DENY SEC-DEPTH (superuser nested grant birth): a zero-money PREPARED pool born with ledger_seq = 9007199254740991 and no event is refused KA083"; SEC-115 M :: "DENY SEC-DEPTH (superuser nested order birth): an INTENT_CREATED order born with allocated_cents = 1, no capture and its event is refused KP002" | GAP SEC-116 S :: "DENY SEC-DEPTH (superuser nested lease birth): a lease born with cancel_version above 0 is refused KA005"; SEC-117 S :: "DENY SEC-DEPTH (superuser nested capacity birth): an agency ledger born with a last_admitted_at is refused KA082" | N/A (DENY SEC-114..117) |
 | R23 authorization bounds (G14) | N/A guard (B08's 0021/0022 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-106 S :: "DENY SEC-DEPTH (superuser definer flush): a superuser-owned definer consuming an ACTIVE authorization with no admission, with its event and SET CONSTRAINTS ALL IMMEDIATE, is refused KA081"; SEC-107 S :: "DENY SEC-DEPTH (superuser definer flush): CONSUMED to DELIVERED with no READY job and AVAILABLE package is refused KA081" | GAP SEC-108 S :: "OK SEC-DEPTH (real execution facts): consumption through queueJob and admitJob and delivery through publishJob commit for the oracle-free fixtures" | N/A guard |
 | R17 catalog gate | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A; S :: "SEC-DEPTH catalog: no kauro function reads pg_trigger_depth() or rolsuper, is_control_session() guards no value, no kauro function is SECURITY DEFINER, and the 11 history attachments equal kauro.commercial_machines" |
 
@@ -261,8 +303,9 @@ Timeout bound for SEC-38/46t/50t/54t/96t: the transaction's `SET LOCAL statement
 
 C1 Baseline proof. Must FAIL on 21b310f through base SQL only (the superuser-owned probe uses no new function or signature):
 SEC-24, 25, 28, 28b, 29, 30, 32, 34, 36, 39, 40, 40b, 48, 52, 56, 71, 73, 76, 78, 80, 18, and new in r9: SEC-82, 86, 90, 93, 94,
-95, 100, 101, 102, 104, 106, 107, 111, 113. New-ledger-only (no baseline object; fail with the B3 deferred checks reverted): SEC-92,
-SEC-96t, SEC-97. Supplemental (already refuse on main): SEC-79, SEC-81, SEC-85, SEC-88, SEC-59. OK siblings, RACE titles and R1/R2
+95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117. New-ledger-only (no baseline object; fail with the B3
+checks reverted): SEC-92, SEC-96t, SEC-97, SEC-114, SEC-118. SEC-119 fails with B4's per-order queue reverted. SEC-120/121/122/124
+fail (deadlock 40P01 or a held wait past the bound) with the B3 lock protocol reverted to the r9 order. Supplemental (already refuse on main): SEC-79, SEC-81, SEC-85, SEC-88, SEC-59. OK siblings, RACE titles and R1/R2
 checks other than SEC-18 are not baseline failures; SEC-103 additionally FAILS against the r8 literal B2 predicate (regression proof).
 
 C2 OK siblings (each DENY above -> the production-writer title that must commit; S/M/H as the DENY's file):
@@ -278,7 +321,9 @@ count 1"; SEC-85 -> "OK SEC-DEPTH: CreateAgency's founding owner is born ACTIVE"
 designation commits with last_confirmed_at = its confirmed_at"; SEC-76 -> "OK SEC-DEPTH: a step claim moves audits.fence by one to
 the step claimed now"; SEC-78/100/101 -> SEC-99; SEC-79 -> SEC-57; SEC-80/111 -> "OK SEC-DEPTH: designations with founding basis NONE,
 RESERVED_SLOT and UNBACKED commit with every column equal to its facts"; SEC-81 -> "OK SEC-DEPTH: an admission stamps
-last_admission_at and last_admitted_at with server_now"; SEC-106/107 -> SEC-108; SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
+last_admission_at and last_admitted_at with server_now"; SEC-106/107 -> SEC-108; SEC-114/115 -> "OK SEC-DEPTH (birth): a pool, a carve and an order born through their production writers
+commit with ledger_seq 0 and allocated_cents 0"; SEC-116 -> SEC-27b; SEC-117 -> "OK SEC-DEPTH (birth): an agency's first job
+creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
 clean runtime login and 0045 passes on a clean cluster".
 
 ## D. Accepted packages touched (A6: re-verify only these titles)
@@ -287,7 +332,7 @@ B06: S090/B06-R1 (journals-leases.test.ts:268, :312-316, :335; adapters-leases.t
 verification, aggregate-kinds.test.ts:445, adapters-journals-outbox.test.ts:265 (reconcileUsage now accounts; its grant must have
 room), S050/R2-043 via L3. B08: S056 (execution-migrations.test.ts:261; callers execution-adapters :331, execution-migrations :150),
 R2-046 (admission-instants.test.ts:218-286), R2-044/S041/IC-12 (audit-migrations.test.ts:89, audit-adapters :286,
-grant-reconciliation.test.ts:31, b08-end-to-end.test.ts:306), the D8-PEX-8 test (execution-migrations.test.ts:783-795, inverted),
+grant-reconciliation.test.ts:31 (sweep lock mode), b08-end-to-end.test.ts:306), the D8-PEX-8 test (execution-migrations.test.ts:783-795, inverted),
 FH-R2; audit fence (G6), admission instants (G11/G12). B09: R2-140, S058/S057 (b09-migrations.test.ts:278, :307), B09-F2
 (b09-critique.test.ts:346), S059 (b09-scenarios.test.ts:299). B10: d27uow, history, purchases, recurrence via L3; every 0028
 trigger (EXECUTE revoke); commission-support.ts:707 callers (b10-commission-service.test.ts:211, b10-failure-cells-accrual.test.ts
@@ -311,19 +356,20 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | K kit | src/testing/depth-probe.ts (`nestedAsSuperuser`, `slowCheckHook`), src/testing/execution-delivery.ts (`consumeThroughExecution`, `deliverThroughExecution`), src/testing/index.ts | - | 45 min, 90k | claude-sonnet-5-5 |
 | L0 fixtures | b09-critique.test.ts, apps/api/test/b09-scenarios.test.ts, apps/api/test/commission-support.ts | D1 | 40 min, 100k | claude-sonnet-5-5 |
 | L1 hardening | migrations/0045, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
-| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23 | 160 min, 380k | Opus |
-| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-d | 170 min, 420k | Opus |
+| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117) | 170 min, 400k | Opus |
+| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119) | 200 min, 480k | Opus |
 | L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21 | 140 min, 330k | Opus |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
 shown failing on 21b310f (log) and passing on the branch; C2 siblings green; full suites green in ci-local (WSL + Windows). Total
-about 10.4 h agent time, 1.48M tokens.
+about 11.1 h agent time, 1.56M tokens.
 
 ## F. Decisions and open questions
 
-- Q1 closed by B3 r9: money moves only through events, events only from their sources, both directions and the complete relation are
-  checked, and the evidence is frozen.
+- Q1 closed by B3 r10: money moves only through events, events only from their sources, both directions and the complete relation
+  (empty included, queued per grant) are checked, the grant is born at ledger_seq 0, the evidence is frozen, and one lock order
+  serialises every accounting actor.
 - Q2 (accepted) the port keeps `now`; every SQL `p_now` overload removed; SEC-33 keeps clock independence; port removal is a
   follow-up (B06 domain + 3 dispatchers).
 - Q3 withdrawn: per-source events, no SUM.
@@ -333,6 +379,7 @@ about 10.4 h agent time, 1.48M tokens.
 - Caveats turned into cells (no "by design" left to the reviewer): an over-ceiling reconciliation is refused and stays KNOWN
   (design §9 ceiling CHECK 0023:92, D8-GRANT-2; SEC-89p); an older-transaction designation is refused and retried, never recorded
   out of order (0028:458; SEC-110); the CLOSED edge now needs every request RECONCILED (the sweep already does so, F8; SEC-94).
+- Caveat turned into a cell: a reconciling writer outside the lock protocol is refused 55P03 and retried, never deadlocked (SEC-122).
 - No owner act is needed.
 
 ## Appendix. Handed to B14 (S-A, Terraform/IAM): requirements + Codex findings r4-r6 verbatim
