@@ -14,7 +14,7 @@
  * CMD052 ApproveCommissionPayout (the owner's) and the read GetCommissionStatement, each command answering 200 with its view.
  * B10-AGENCY-LIFECYCLE serves CMD002 ActivateAgency and CMD043 CloseAgency. Both answer 200 with their COMPLETED envelope (the agency is the
  * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202. CMD027 declares the 202 ACCEPTED envelope too: an included replacement whose
- * re-binding does not answer within its bound (D10-GAP-6).
+ * re-binding does not answer within its bound (D10-GAP-6a).
  */
 import { HEADERS } from "../api/envelope.js";
 import { PROBLEM_RESPONSE, type DeclaredResponse, type RouteResponses } from "../api/response-contract.js";

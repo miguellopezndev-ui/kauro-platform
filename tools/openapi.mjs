@@ -531,7 +531,7 @@ export function generateOpenApi(sources) {
     };
     if (reply.accepted) {
       responses["202"] = {
-        description: "ACCEPTED: the included replacement's re-binding did not answer within its bound; the replacement quote stays ISSUED with its journal entry open — the operation (the replacement quote), its state, the quote's status path and the polling guidance; retry with the same key (package B10 D10-GAP-6)",
+        description: "ACCEPTED: the included replacement's re-binding did not answer within its bound; the replacement quote stays ISSUED with its journal entry open — the operation (the replacement quote), its state, the quote's status path and the polling guidance; retry with the same key (package B10 D10-GAP-6a)",
         headers: REPLY_HEADERS,
         content: { "application/json": { schema: { $ref: `${COMPONENTS}AcceptedResponse` } } },
       };

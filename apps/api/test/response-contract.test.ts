@@ -211,7 +211,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE): both complete synchronously, no 202
       ["POST", "/api/v1/agencies/:agencyId/activate", "ActivateAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD002" } }],
       ["POST", "/api/v1/agencies/:agencyId/closure-requests", "CloseAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD043" } }],
-      // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE): 201 with its view; 202 for an included replacement whose re-binding timed out (D10-GAP-6)
+      // package B10's CreateQuote (mandate B10-COMMANDS-QUOTE): 201 with its view; 202 for an included replacement whose re-binding timed out (D10-GAP-6a)
       ["POST", "/api/v1/projects/:projectId/quotes", "CreateQuote", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD027" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       // package B10's prospects and attribution (mandate B10-COMMANDS-PROSPECTS): a registration and a claim create (201), an acceptance edits (200)
       ["POST", "/api/v1/sales/prospects", "RegisterProspect", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD045" } }],

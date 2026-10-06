@@ -251,7 +251,7 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
         if (!first.resumed) await co.hold?.("AFTER_INTENT");
         const role = held.membership === null ? null : held.membership.role;
         const settled = await settleReplacement(runtime, co, first.replacement, envelope.correlationId);
-        // the re-binding did not answer within its bound: the intent stays durable and the entry open; the same key resumes (202, D10-GAP-6)
+        // the re-binding did not answer within its bound: the intent stays durable and the entry open; the same key resumes (202, D10-GAP-6a)
         if (settled.kind === "PENDING") {
           return { kind: "ACCEPTED", status: 202, operationId: first.replacement.toQuoteId, state: "ISSUED", statusPath: `/api/v1/quotes/${first.replacement.toQuoteId}`, pollAfterSeconds: REPLACEMENT_POLL_AFTER_SECONDS };
         }
