@@ -1,5 +1,5 @@
 // Shared single-file Node test execution and workspace dependency ordering for the builder gates.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -142,21 +142,55 @@ export function testTarget(root, file) {
   return { file: rel.split(sep).join("/"), dir, manifest, compiled, concurrency };
 }
 
-export function runTest(target, concurrency = target.concurrency, { timeoutMs } = {}) {
+export async function runTest(target, concurrency = target.concurrency, { timeoutMs } = {}) {
   if (!existsSync(target.compiled)) throw new Error(`compiled test is missing: ${target.compiled}`);
   const eventsDir = mkdtempSync(join(tmpdir(), "kauro-events-"));
   const eventsFile = join(eventsDir, "events.jsonl");
+  const stdoutFile = join(eventsDir, "stdout");
+  const stderrFile = join(eventsDir, "stderr");
+  const stdout = openSync(stdoutFile, "w");
+  const stderr = openSync(stderrFile, "w");
+  const started = performance.now();
   try {
     // Default process isolation: a top-level throw or load error stays attributable to its file. The custom reporter
     // yields nothing, so its destination is stderr only to satisfy the pairing rule; events go to KAURO_TEST_EVENTS.
     const args = ["--test", "--test-reporter=spec", "--test-reporter-destination=stdout",
       `--test-reporter=${REPORTER}`, "--test-reporter-destination=stderr"];
     if (concurrency !== undefined) args.push(`--test-concurrency=${concurrency}`);
+    if (timeoutMs) args.push(`--test-timeout=${Math.max(1, Math.floor(timeoutMs * 0.8))}`);
     args.push(target.compiled);
-    const result = command(process.execPath, args, target.dir, { timeoutMs, env: { KAURO_TEST_EVENTS: eventsFile } });
+    const env = { ...process.env, CI: "true", FORCE_COLOR: "0", KAURO_TEST_EVENTS: eventsFile };
+    delete env.NODE_TEST_CONTEXT;
+    // A detached runner owns the process group containing its isolated per-file workers. Keep the outer
+    // timer in this process so Windows taskkill can find the live runner and traverse its descendants.
+    const result = await new Promise((resolveResult) => {
+      const child = spawn(process.execPath, args, { cwd: target.dir, env, detached: true, stdio: ["ignore", stdout, stderr] });
+      let timedOut = false;
+      let error;
+      const timer = timeoutMs ? setTimeout(() => {
+        timedOut = true;
+        if (process.platform === "win32") {
+          const killed = spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+          if (killed.error) error = killed.error;
+        } else {
+          try { process.kill(-child.pid, "SIGKILL"); } catch (cause) { if (cause.code !== "ESRCH") error = cause; }
+        }
+      }, timeoutMs) : undefined;
+      child.once("error", (cause) => { error = cause; });
+      child.once("close", (status, signal) => {
+        clearTimeout(timer);
+        resolveResult({ status, signal, timedOut,
+          output: readFileSync(stdoutFile, "utf8") + readFileSync(stderrFile, "utf8") + (error ? `\nError: ${error.message}` : ""),
+          durationMs: Math.round(performance.now() - started) });
+      });
+    });
     const summary = summarizeEvents(eventsFile, target.compiled);
     return { ...result, firstFailingAssertion: firstFailingAssertion(result.output) ?? summary.assertion, summary };
-  } finally { rmSync(eventsDir, { recursive: true, force: true }); }
+  } finally {
+    closeSync(stdout);
+    closeSync(stderr);
+    rmSync(eventsDir, { recursive: true, force: true });
+  }
 }
 
 // generate has already run. Avoid the contracts build script's redundant generation.

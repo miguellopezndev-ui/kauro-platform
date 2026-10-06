@@ -177,6 +177,36 @@ test("a diff that touches no reverted path is refused with exit 2", () => {
 });
 
 const HEAD = "import assert from 'node:assert/strict'; import {test, describe, before} from 'node:test'; import {value} from '../src/value.js';\n";
+test("a timed-out red-proof worker is dead before head runs and the gate returns", () => {
+  const f = fixture();
+  const pidFile = join(f.parent, "worker-pid");
+  let pid;
+  try {
+    f.put(file, HEAD + `import {readFileSync, writeFileSync} from 'node:fs';
+const pidFile = ${JSON.stringify(pidFile)};
+test('hang at base', () => {
+  if (value === 1) { writeFileSync(pidFile, String(process.pid)); return new Promise(() => setInterval(() => {}, 1000)); }
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  assert.throws(() => process.kill(pid, 0), {code: 'ESRCH'}, 'base worker must be dead at head');
+});
+`);
+    f.git("add", ".");
+    f.git("commit", "-qm", "hung regression");
+    const head = f.git("rev-parse", "HEAD");
+    const result = command(process.execPath, [script, f.base, head, "--tests", file, "--timeout-min", "0.03"], f.root, { env: { TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: "1" } });
+    pid = Number(readFileSync(pidFile, "utf8"));
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `worker ${pid} survived red-proof`);
+    assert.equal(result.status, 2, result.output);
+    const report = JSON.parse(readFileSync(join(f.root, "red-proof.json"), "utf8"));
+    assert.equal(report.tests[0].passedAtHead, true, result.output);
+    assert.match(report.inconclusive.join("\n"), /timed out/);
+    assert.deepEqual(readdirSync(f.scratch), []);
+  } finally {
+    if (pid) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
+    rmSync(f.parent, { recursive: true, force: true });
+  }
+});
+
 for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason] of [
   ["a before() hook failing at base is INCONCLUSIVE, not red",
     "before(() => { if (value === 1) throw new Error('fixture unavailable'); });\ntest('regression', () => {});\n", 2, "INCONCLUSIVE", false, true, /hook failed/],

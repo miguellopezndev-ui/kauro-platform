@@ -91,7 +91,7 @@ try {
   const manifest = JSON.parse(readFileSync(join(checkout, "package.json"), "utf8"));
   if (manifest.scripts?.generate) requireCommand("pnpm", ["run", "generate"], checkout);
 
-  function phase(withoutFix) {
+  async function phase(withoutFix) {
     const label = withoutFix ? "without fix" : "at head";
     try {
       // Remove emitted files each time: deleted/renamed source must never survive as stale dist output.
@@ -112,14 +112,14 @@ try {
     }
     for (let i = 0; i < targets.length; i++) {
       try {
-        const result = runTest(targets[i], undefined, { timeoutMs });
+        const result = await runTest(targets[i], undefined, { timeoutMs });
         const row = report.tests[i];
         const sum = result.summary;
         const ran = sum.leafPassed + sum.leafFailed;
         if (withoutFix) {
           // Red only when at least one real test body failed its own assertions. Hook failures, cancellations,
           // load errors, timeouts and runs that executed nothing prove nothing.
-          const timedOut = result.status === null && result.timedOut;
+          const timedOut = result.timedOut;
           row.failedWithoutFix = !timedOut && result.status !== 0 && sum.leafFailed >= 1;
           row.baseFailedNames = row.failedWithoutFix ? sum.bodyFailedNames : [];
           if (!row.failedWithoutFix && !(result.status === 0 && ran >= 1)) {
@@ -140,16 +140,16 @@ try {
         }
         console.log(`red-proof: ${targets[i].file} (${label}): ${result.status === 0 ? "PASS" : "FAIL"} (${result.durationMs} ms)`);
         if (result.status !== 0) console.log(result.output);
-        if (result.status === null && !(withoutFix && result.timedOut)) report.errors.push(`${label}: ${targets[i].file} ${result.timedOut ? `timed out after ${timeoutMin} min` : "did not exit normally"}`);
-        else if (result.status === null) report.inconclusive.push(`without fix: ${targets[i].file}: timed out after ${timeoutMin} min`);
+        if (result.timedOut && !withoutFix) report.errors.push(`${label}: ${targets[i].file} timed out after ${timeoutMin} min`);
+        else if (result.status === null && !result.timedOut) report.errors.push(`${label}: ${targets[i].file} did not exit normally`);
       } catch (error) { report.errors.push(`${label}: ${error.message}`); }
     }
   }
 
   if (report.revertedPaths.length) requireCommand("git", ["restore", `--source=${base}`, "--staged", "--worktree", "--", ...report.revertedPaths], checkout);
-  phase(true);
+  await phase(true);
   requireCommand("git", ["reset", "--hard", head], checkout);
-  phase(false);
+  await phase(false);
   if (!report.errors.length && report.tests.every((row) => row.failedWithoutFix && row.passedAtHead)) {
     report.verdict = "PASS";
     exitCode = 0;

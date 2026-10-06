@@ -39,7 +39,7 @@ concurrency ??= target.concurrency;
 const report = { file: resolve(file), iterations: count, concurrency: concurrency ?? "node-default", results: [], verdict: "FAIL" };
 try {
   for (let iteration = 1; iteration <= count; iteration++) {
-    const result = runTest(target, concurrency, { timeoutMs: timeoutMin * 60_000 });
+    const result = await runTest(target, concurrency, { timeoutMs: timeoutMin * 60_000 });
     const sum = result.summary;
     // Green needs a real passing test and no failure of any kind (body, hook, cancelled, file-level).
     const passed = result.status === 0 && !result.timedOut && sum.complete && sum.leafPassed >= 1 && !sum.anyFailure && sum.cancelled === 0 && sum.otherFailures === 0;

@@ -113,3 +113,25 @@ test("a hung iteration is killed by --timeout-min and fails with the reason", ()
     assert.match(report.results[0].reason, /timed out/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("a timed-out stress worker is dead before the next iteration and return", () => {
+  const root = fixture(`import {test} from 'node:test'; import {appendFileSync, readFileSync, existsSync} from 'node:fs';
+const path = new URL('./worker-pids', import.meta.url);
+if (existsSync(path)) for (const pid of readFileSync(path, 'utf8').trim().split('\\n').map(Number)) {
+  try { process.kill(pid, 0); appendFileSync(new URL('./overlap', import.meta.url), 'alive'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+}
+test('hang', () => { appendFileSync(path, process.pid + '\\n'); return new Promise(() => setInterval(() => {}, 1000)); });
+`);
+  let pids = [];
+  try {
+    const result = command(process.execPath, [script, "fake.test.mjs", "2", "--timeout-min", "0.03"], root);
+    assert.equal(result.status, 1, result.output);
+    pids = readFileSync(join(root, "worker-pids"), "utf8").trim().split("\n").map(Number);
+    assert.equal(pids.length, 2);
+    for (const pid of pids) assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `worker ${pid} survived the timeout`);
+    assert.throws(() => readFileSync(join(root, "overlap")), { code: "ENOENT" });
+  } finally {
+    for (const pid of pids) { try { process.kill(pid, "SIGKILL"); } catch { /* already dead */ } }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
