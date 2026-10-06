@@ -4,7 +4,10 @@
 // the member passing, fails this file). The duties: 5.1 first conflicting statement is the one that timed out with 57014 (and is never
 // answered); 5.2 no application bound is RED and a path that calls another binding is refused; 5.3 the target unit carries its witness with
 // the member's identity (another phase); 5.4 the completed step answered in the target unit with the identity params; 5.5 B's last statement
-// is the declared `blocks` receipt; the footprint is EXACTLY the rows the earlier units committed. Titles say the duty.
+// is the declared `blocks` receipt; 5.6 the act waits on the uncommitted revocation and is refused as declared; 5.7 the act waits while its
+// proof runs out, and the instant past the expiry is consumed by the PRODUCT's own judgment (the step-up verifier CMD052 calls, bound
+// through an instrumented proxy: no sink the member feeds itself); the target unit is the declared ordinal; the footprint is EXACTLY the
+// rows the earlier units committed, in both directions (a claimed row missing, an unclaimed row left behind). Titles say the duty.
 import { crashedAt, invariantsAfterEach, instrumentPort, runCell, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -13,12 +16,21 @@ import { bindFamily, memberCell, portHooks, Refused, runMember, type Member, typ
 import { approvePayout, bankCash, claimedCents, closeMonth, eligibleLines, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { completed, outcome, type Person, type Reply } from "./support.js";
 import type { UserId } from "@kauro/domain";
+import type { AssuranceVerifier } from "@kauro/application";
+import { createAssuranceVerifier } from "@kauro/authorization";
 
 let sw: StatementsWorld;
+/**
+ * CMD052's step-up verifier: the platform's own, reached through `stepUpPort`, which a 5.7 member points at an instrumented proxy of the
+ * same verifier for its act, so the instants the product judges the proof at are the cell's evidence (ADV-13).
+ */
+const platformStepUp = createAssuranceVerifier();
+let stepUpPort: AssuranceVerifier = platformStepUp;
+const stepUp: AssuranceVerifier = { verifyStepUp: (...args) => stepUpPort.verifyStepUp(...args) };
 // the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
 invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
-  sw = await statementsWorld();
+  sw = await statementsWorld({ commercial: { assurance: stepUp } });
   bindFamily({ oracle: sw.h.oracle, faults: sw.faults, open: (login) => openConnection(sw.h.pg.clientConfig(login)) });
 });
 after(async () => {
@@ -326,17 +338,17 @@ test("5.7 step-up expiry: an honest member passes (the proof runs out while the 
     code: "TPL_STEPUP",
     tag: "[tplstepup]",
     fixture: (label) => fixture(label, { proofIssuedMinutesAgo: 14 }),
-    // the api's process clock follows the cell's controlled clock while the act runs: crossing the deadline there crosses it in the application
+    // the api's process clock follows the cell's controlled clock while the act runs: crossing the deadline there crosses it in the
+    // application; CMD052's step-up verifier is the platform's, instrumented, so the instant it judges the proof at after the wait (approve-
+    // payout.ts, the judgment at the effect) is what consumes the deadline. Nothing here feeds the evidence itself.
     act: async (ctx, f, key) => {
       api.nowMs = () => Math.max(real.nowMs(), ctx.clock.nowMs());
       api.now = () => new Date(api.nowMs()).toISOString();
+      stepUpPort = instrumentPort(platformStepUp, ctx.points, "stepup");
       try {
         return await approve(f, key);
-      } catch (e) {
-        // the judgment of the proof at the cell's instant, an operation of its own (the act's wait scope closed once the wait was observed)
-        await ctx.operation("the proof judged past its expiry", async () => instrumentPort({ async judged(_at: string): Promise<void> {} }, ctx.points, "stepup").judged(ctx.clock.now()));
-        throw e;
       } finally {
+        stepUpPort = platformStepUp;
         api.nowMs = real.nowMs;
         api.now = real.now;
       }

@@ -20,7 +20,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
+import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
 import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
@@ -295,9 +295,11 @@ export interface ApiAssembly {
   /**
    * The platform ports of package B10 that replace the edition's (docs/design/B10-commercial-domain.md §11): the agency buyer type
    * (D58). A deployment of this edition binds none, so CMD047 refuses every attribution BUYER_TYPE_UNSET until B11 records the type;
-   * the acceptance tests bind the labelled contract fake of @kauro/application/testing (SIMULATED).
+   * the acceptance tests bind the labelled contract fake of @kauro/application/testing (SIMULATED). `assurance`: the step-up verifier of
+   * the statement and payout operations (CMD052 judges the proof at its request and again at its effect); absent, the platform's. The
+   * fault cells bind the platform's own verifier through an instrumented proxy, so the instant the product judges a proof at is evidence.
    */
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader };
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier };
   /**
    * CMD027 CreateQuote's collaborators that replace the edition's (package B10, mandate B10-COMMANDS-QUOTE): the recorded buyer type (the
    * edition records none, so a quote is refused BUYER_TYPE_UNSET until B11 binds it), the re-binder of a paid purchase (the payment service's
@@ -414,7 +416,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     sales: salesOf,
     serverNow: async (uow) => `${(await (uow as unknown as { serverInstant(): Promise<string> }).serverInstant()).slice(0, 23)}Z` as UtcInstant,
     authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }),
-    assurance: createAssuranceVerifier(),
+    assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(),
   });
   return createApiServer({
     environment: assembly.environment,
