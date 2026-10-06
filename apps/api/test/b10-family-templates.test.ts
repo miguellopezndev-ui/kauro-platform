@@ -225,6 +225,26 @@ test("5.3 forged: a witness whose identity params are not the member's is refuse
 test("the footprint is EXACT: a member claiming a row no earlier unit committed is refused", async () => {
   await assert.rejects(run(crash("TPL_FOOTPRINT", "[tplfoot]", "crash-before", INTENT_INSERT, { earlier: async () => ({ commission_statements: [{ not: "a row of the act" }] }) })), /gained exactly the rows the units before the target committed/);
 });
+test("the footprint is EXACT the other way: a crash-before that leaves a row no earlier unit claims (a residue in a footprint table) is refused", async () => {
+  // the forged act commits a change of its own statement's row in a unit of its own before the crashing approval: a residue no
+  // `earlier` claims (written as the superuser with triggers off, so the version the recovery expects is untouched)
+  const residue: M["act"] = async (ctx, f, key) => {
+    await sw.h.oracle.query("BEGIN");
+    try {
+      await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+      await sw.h.oracle.query("UPDATE kauro.commission_statements SET updated_at = updated_at + interval '1 second' WHERE statement_id = $1", [f.statementId]);
+      await sw.h.oracle.query("COMMIT");
+    } catch (e) {
+      await sw.h.oracle.query("ROLLBACK");
+      throw e;
+    }
+    return approve(f, key);
+  };
+  await assert.rejects(run(crash("TPL_RESIDUE", "[tplresidue]", "crash-before", INTENT_INSERT, { act: residue })), /kauro\.commission_statements gained exactly the rows the units before the target committed/);
+});
+test("5.3 forged: a target ordinal no unit of the act has is refused as another phase, even though unit 1 carries the witness (the target is found by its ordinal, never by its witness)", async () => {
+  await assert.rejects(run(member({ code: "TPL_CRB_ORDINAL", tag: "[tplcrbo]", point: { kind: "crash-before", unit: { ...unit1(INTENT_INSERT), ordinal: 2 } } })), /target unit is another phase — unit 2/);
+});
 
 // 5.4 partial -----------------------------------------------------------------------------------------------------------------------
 const partial = (code: string, tag: string, completedAt: Receipt<Fix>, failing: Receipt<Fix>): M => member({ code, tag, point: { kind: "partial", unit: unit1(INTENT_INSERT), completed: completedAt, failing } });
@@ -277,6 +297,27 @@ test("5.6 membership: an honest member passes (the revocation first refuses and 
   await run(m);
 });
 
+const membershipMember = (code: string, tag: string, over: Partial<Extract<M["point"], { kind: "membership" }>> = {}): M =>
+  member({
+    code,
+    tag,
+    roles: ROLES,
+    fixture: async (label, after?: Fix) => (after === undefined ? fixture(label, { own: true }) : fixture(label, { person: after.person, grantId: after.grantId })),
+    point: {
+      kind: "membership",
+      holdAfter: STMT_LOCK,
+      revoke: async (c: HarnessConnection, f: Fix) => void (await c.query(REVOKE_GRANT, [f.grantId])),
+      refusal: (e) => e instanceof Refused && e.code === "NOT_AUTHORIZED",
+      ...over,
+    },
+  });
+test("5.6 forged: a revocation that never blocks the act (it locks nothing the act reads) is refused: the act must be OBSERVED waiting on the uncommitted revocation", async () => {
+  await assert.rejects(run(membershipMember("TPL_REV_NOBLOCK", "[tplrevn]", { revoke: async (c: HarnessConnection) => void (await c.query("SELECT 1")) })), /TPL_REV_NOBLOCK: the act while the revocation is uncommitted (finished|failed).*without waiting/);
+});
+test("5.6 forged: a member whose declared refusal is not the act's is refused (the act that waited must be refused as the member declares)", async () => {
+  await assert.rejects(run(membershipMember("TPL_REV_REFUSAL", "[tplrevr]", { refusal: (e) => e instanceof Refused && e.code === "NOT_THE_REFUSAL" })), /TPL_REV_REFUSAL: the act that waited is refused as the member declares/);
+});
+
 // 5.7 step-up expiry (last: it moves the api's process clock past a proof's expiry) -----------------------------------------------
 test("5.7 step-up expiry: an honest member passes (the proof runs out while the act waits on the cash lock; refused, nothing written)", async () => {
   const api = sw.w.processClock as unknown as { now: () => unknown; nowMs: () => number };
@@ -313,4 +354,14 @@ test("5.7 step-up expiry: an honest member passes (the proof runs out while the 
     recover: async (_ctx, f, key) => approve({ ...f, body: { ...f.body, authorizationRef: await sw.w.stepUp(f.person) } }, key),
   });
   await run(m);
+});
+
+test("5.7 forged: a holder that blocks nothing the act needs (the act never waits while its proof runs out) is refused", async () => {
+  const m = member({
+    code: "TPL_STEPUP_NOWAIT",
+    tag: "[tplstepupn]",
+    fixture: (label) => fixture(label, { proofIssuedMinutesAgo: 14 }),
+    point: { kind: "step-up-expiry", waitOn: async (holder: HarnessConnection) => void (await holder.query("SELECT 1")), proofExpiresAt: (f: Fix) => f.expiresAt! },
+  });
+  await assert.rejects(run(m), /TPL_STEPUP_NOWAIT: the act while its step-up proof runs out (finished|failed).*without waiting/);
 });

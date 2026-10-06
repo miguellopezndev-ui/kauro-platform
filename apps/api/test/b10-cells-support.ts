@@ -517,7 +517,8 @@ const failureOfOutcome = (r: PromiseSettledResult<unknown>, what: string): unkno
   return r.reason;
 };
 let keys = 0;
-const keyOf = (m: Member<unknown, unknown>): string => `${m.code.toLowerCase()}-${process.pid}-${++keys}`;
+/** An Idempotency-Key of the accepted shape (16 to 128 of [A-Za-z0-9_-]) whatever the code's and the pid's lengths (a short pid made it 15). */
+const keyOf = (m: Member<unknown, unknown>): string => `${m.code.toLowerCase()}-${process.pid}-${++keys}`.padEnd(16, "0");
 
 // --- the port hook (section 5.2) --------------------------------------------------------------------------------------------------
 
