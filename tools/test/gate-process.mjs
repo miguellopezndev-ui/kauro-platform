@@ -27,11 +27,12 @@ export async function interruptedWorker(script, args, root, pidFile, signal, env
 }
 
 // Remove a fixture tree after a gate test. Windows can hold the cwd handle briefly after the process is gone, so removal
-// retries EPERM/EBUSY (bounded, about 2.75 s). A cleanup failure must never replace the test's own assertion error.
+// retries EPERM/EBUSY/ENOTEMPTY (bounded: ten retries, 50 ms longer each, about 2.75 s). Node 24's rmSync ignores maxRetries here,
+// so the retry is done explicitly. A cleanup failure must never replace the test's own assertion error.
 export async function withCleanup(root, body, remove = rmSync) {
   let failed = false;
   try { return await body(); } catch (error) { failed = true; throw error; } finally {
-    try { remove(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch (cleanup) { if (!failed) throw cleanup; }
+    try { await removeWithRetry(root, remove); } catch (cleanup) { if (!failed) throw cleanup; }
   }
 }
 
@@ -55,5 +56,14 @@ export function killUnconfirmed(pids, confirmed, kill = process.kill) {
   for (const pid of pids) {
     if (confirmed.has(pid)) continue;
     try { kill(pid, 'SIGKILL'); } catch { /* already terminated */ }
+  }
+}
+
+async function removeWithRetry(root, remove) {
+  for (let retry = 0; ; retry++) {
+    try { return remove(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch (error) {
+      if (retry >= 10 || !['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) throw error;
+      await delay(50 * (retry + 1));
+    }
   }
 }

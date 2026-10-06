@@ -60,3 +60,14 @@ test('assertDead confirms a dead pid and reports a live one as survived, even wh
   await assert.rejects(withCleanup('x', () => assertDead([process.pid], 'worker', 'SIGKILL', live, 2), remove), /worker \d+ survived SIGKILL/);
   assert.deepEqual([...live], []);
 });
+
+test('cleanup retries a transient EPERM/EBUSY itself (rmSync does not on Node 24) and then succeeds', async () => {
+  let calls = 0;
+  const remove = () => { if (++calls < 4) throw Object.assign(new Error('EPERM: handle rundown'), { code: 'EPERM' }); };
+  await withCleanup('x', async () => {}, remove);
+  assert.equal(calls, 4);
+  let persistent = 0;
+  await assert.rejects(withCleanup('x', async () => {}, () => { persistent++; throw Object.assign(new Error('EPERM forever'), { code: 'EPERM' }); }), /EPERM forever/);
+  assert.equal(persistent, 11, 'one attempt plus ten retries, then the error surfaces');
+  await assert.rejects(withCleanup('x', async () => {}, () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), /EACCES/);
+});
