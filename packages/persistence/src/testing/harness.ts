@@ -52,6 +52,7 @@ import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPayment
 import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 import { serverNow } from "./server-now.js";
+import { LOCK_WAIT_POLL_ATTEMPTS, LOCK_WAIT_POLL_INTERVAL_MS, raceStatementTimeoutMs } from "./faults/bounds.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
 export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(randomBytes(n)));
@@ -220,12 +221,13 @@ export async function start(): Promise<Harness> {
   const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
   const commissionPool = createPool({ ...base, max: 2, user: ROLES.commissionLogin, applicationName: "kauro-test-commission" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
-  const app = createUnitOfWorkFactory(appPool, { clock });
-  const control = createUnitOfWorkFactory(controlPool, { clock });
-  const payment = createUnitOfWorkFactory(paymentPool, { clock });
-  const commerce = createCommerceUnitOfWorkFactory({ app: appPool, payment: paymentPool }, { clock });
-  const execution = createExecutionUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
-  const audit = createAuditUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, { clock });
+  const transactionConfig = { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() };
+  const app = createUnitOfWorkFactory(appPool, transactionConfig);
+  const control = createUnitOfWorkFactory(controlPool, transactionConfig);
+  const payment = createUnitOfWorkFactory(paymentPool, transactionConfig);
+  const commerce = createCommerceUnitOfWorkFactory({ app: appPool, payment: paymentPool }, transactionConfig);
+  const execution = createExecutionUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, transactionConfig);
+  const audit = createAuditUnitOfWorkFactory({ app: appPool, payment: paymentPool, control: controlPool }, transactionConfig);
   const proofs = new PgAssuranceProofRecorder(assurancePool);
   const receipts = new PgValidationReceiptRecorder(validatorPool);
   const oracle = await pg.connect("postgres");
@@ -483,7 +485,7 @@ export async function start(): Promise<Harness> {
  * therefore discards the cached snapshot first.
  */
 export async function waitForLockWait(oracle: Client, applicationName: string, queryFragment: string): Promise<number> {
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < LOCK_WAIT_POLL_ATTEMPTS; i++) {
     await oracle.query("SELECT pg_stat_clear_snapshot()");
     const r = await oracle.query<{ pid: number }>(
       "SELECT pid FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock' AND query LIKE '%' || $2 || '%'",
@@ -491,7 +493,7 @@ export async function waitForLockWait(oracle: Client, applicationName: string, q
     );
     const pid = r.rows[0]?.pid;
     if (pid !== undefined) return pid;
-    await new Promise((res) => setTimeout(res, 25));
+    await new Promise((res) => setTimeout(res, LOCK_WAIT_POLL_INTERVAL_MS));
   }
   throw new Error(`no backend of ${applicationName} waited on a lock while running ${queryFragment}`);
 }

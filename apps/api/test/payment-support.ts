@@ -43,7 +43,7 @@ import {
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, CapabilityId, CausationId, CommerceUnitOfWork, CorrelationId, TargetInstanceRef, FiscalIssuerRef, FiscalProfileId, IdempotencyIdentity, JournalEntryId, MembershipId, PaymentAttemptId, PaymentEnvironment, PaymentOrderId, PlanId, ProjectId, RefundId, RevisionId, ServiceIdentity, UserId } from "@kauro/domain";
 import { DomainFailure, NotFoundFailure, deliveryPhaseOf, toUtcInstant } from "@kauro/domain";
-import { ROLES, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute } from "@kauro/persistence/testing";
 import { assembleApi, createBearerTokenAuthenticator, createPaymentService, loadContractSchemas, openPaymentPools, storeProviderQuery, type DispatchPass, type PaymentConsumerName, type PaymentHoldCommand, type PaymentHoldPoint, type PaymentPools, type PaymentService } from "../src/index.js";
 import { approveThroughRoute, call, clock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, type WorldOptions, world } from "./support.js";
 
@@ -147,7 +147,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean; re
   // the payment service over its three verified pools beside the api's request-handler pool (the composition's own assembly)
   const open = async (h: World["h"], db: World["db"]): Promise<{ readonly service: PaymentService; readonly pools: PaymentPools }> => {
     const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
-    const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)) });
+    const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
     const service = createPaymentService({
       assembly: { commerce: options.wrapCommerce === undefined ? pools.commerce : options.wrapCommerce(pools.commerce), ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, hold: (command, point) => holds.pass(command, point) },
       environment: "LOCAL",

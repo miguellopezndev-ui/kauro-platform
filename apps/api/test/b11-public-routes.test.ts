@@ -21,7 +21,7 @@ import type { FastifyInstance } from "fastify";
 import { REQUEST_LIMITS, type Problem } from "@kauro/application";
 import { INQUIRY_BUYER_TYPES, INQUIRY_DESTINATIONS, INQUIRY_RECORD_BANDS, INQUIRY_TIMINGS, createIdGenerator, toUtcInstant, type Clock } from "@kauro/domain";
 import { PgCapabilityPublication, PgInquiryStore } from "@kauro/persistence";
-import { ROLES, startHarness, waitForLockWait, type Harness } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, startHarness, waitForLockWait, type Harness } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, openDatabase, type DatabaseHandle } from "../src/index.js";
 
 const PUBLIC_ORIGIN = "https://www.kauro.test";
@@ -62,7 +62,7 @@ let objectId = "";
 before(async () => {
   h = await startHarness();
   db = await openDatabase({
-    database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: 10_000 },
+    database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
     migrateOnStart: null,
   });
   const base = {
@@ -80,7 +80,7 @@ before(async () => {
     logger: { level: "info", stream: { write: (line: string) => void logLines.push(line) } },
     publicApi: {
       origins: { public: PUBLIC_ORIGIN, app: APP_ORIGIN },
-      inquiries: new PgInquiryStore(db.pool),
+      inquiries: new PgInquiryStore(db.pool, raceStatementTimeoutMs()),
       capabilities: new PgCapabilityPublication(db.pool),
       hashKey: new Uint8Array(randomBytes(32)),
     },

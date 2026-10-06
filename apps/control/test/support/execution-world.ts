@@ -89,6 +89,7 @@ import {
   recordReviewedFiscalProfile,
   startHarness,
   waitForLockWait,
+  raceStatementTimeoutMs,
   type AgencyFixture,
   type Harness,
   type QualifiedRoute,
@@ -514,7 +515,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   const intelligence = new ContractFakeIntelligenceCore();
   const receipts: ValidationReceipts = new PgValidationReceiptRecorder(h.validatorPool);
   const host = new ContractFakeWorkerHost({ core, storage, uploads: holderOf(storage), scratchRoot, clock: hostClock, creationHorizonSeconds: 300 });
-  const units = new TestClockExecutionUnits({ app: h.appPool, payment: h.paymentPool, control: h.controlPool }, { clock });
+  const units = new TestClockExecutionUnits({ app: h.appPool, payment: h.paymentPool, control: h.controlPool }, { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() });
   const vault = new ContractFakeSessionVault();
   const journal = new ContractFakeAuthorityJournal({ path: join(scratch, "authority-journal.jsonl") });
   const scanner = new ContractFakeMalwareScanner({ databaseClock: () => Promise.resolve(clock.now()), read: (location, objectName, generation) => storage.read(location, objectName, generation) });
