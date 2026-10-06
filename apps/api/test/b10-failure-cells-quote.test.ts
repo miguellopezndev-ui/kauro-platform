@@ -65,9 +65,11 @@ interface Reservation {
   readonly release_reason: string | null;
   readonly consumed_by_authorization_id: string | null;
   readonly ends_at: string;
+  /** The same instant to the microsecond (the database compares it exactly: ends_at above is truncated to the millisecond). */
+  readonly ends_at_us: string;
 }
 const reservationsOf = (agencyId: string): Promise<Reservation[]> =>
-  oracleRows<Reservation & Record<string, unknown>>(iw, "SELECT reservation_id, quote_id, state, slot_no, release_reason, consumed_by_authorization_id, to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS ends_at FROM kauro.founding_slot_reservations WHERE agency_id = $1 ORDER BY created_at", [agencyId]);
+  oracleRows<Reservation & Record<string, unknown>>(iw, "SELECT reservation_id, quote_id, state, slot_no, release_reason, consumed_by_authorization_id, to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS ends_at, to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS ends_at_us FROM kauro.founding_slot_reservations WHERE agency_id = $1 ORDER BY created_at", [agencyId]);
 
 /** What an issuance writes for a project and its agency (the journal entry of the key included): the footprint a rolled-back issuance leaves unchanged. */
 async function footprint(a: Agent, plan: PlanFixture, key: string): Promise<Record<string, unknown>> {
@@ -227,8 +229,8 @@ const value = <T>(r: PromiseSettledResult<T>): T => {
   return r.value;
 };
 /** The QUOTE_EXPIRY pass standing a minute past the reservation's end, on `conn`. */
-const expiryPassOn = (ctx: Pick<FaultContext, "points">, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = [], expectFailure = false) =>
-  sweepOn(ctx, conn, "QUOTE_EXPIRY", steps, new Date(Date.parse(endsAt) + 60_000).toISOString(), expectFailure ? { expectFailure: true } : {});
+const expiryPassOn = (ctx: Pick<FaultContext, "points">, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = [], expectFailure = false, afterMs = 60_000) =>
+  sweepOn(ctx, conn, "QUOTE_EXPIRY", steps, afterMs === 0 ? endsAt : new Date(Date.parse(endsAt) + afterMs).toISOString(), expectFailure ? { expectFailure: true } : {});
 const quoteState = async (quoteId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [quoteId]))[0]!.state;
 
 faultCell(
@@ -550,53 +552,73 @@ faultCell(
     const r = await captureAgainstExpiry(ctx, "qe-sweep-first", "sweep");
     const report = value(r.swept) as { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> };
     const decided = report.items.filter((i) => i.subject === r.x.reservation.reservation_id).map((i) => i.outcome);
-    const end = neverBoth(r.outcome);
-    if (end === "RELEASED") {
-      assert.deepEqual(decided, ["RELEASED"], "the sweep released it");
-      assert.equal(r.outcome.purchases, r.captured.status === "fulfilled" ? 1 : 0, "a capture that committed is a purchase that consumed nothing");
-    } else {
-      assert.equal(r.captured.status, "fulfilled");
-    }
+    // the sweep decided first, holding the expired quote and its released slot: RELEASED is the one outcome of this order
+    assert.equal(neverBoth(r.outcome), "RELEASED", "the sweep released the slot; the capture that waited on it consumed nothing");
+    assert.deepEqual(decided, ["RELEASED"], "the sweep released it");
+    assert.equal(r.outcome.purchases, r.captured.status === "fulfilled" ? 1 : 0, "a capture that committed is a purchase that consumed nothing");
   },
 );
 
 faultCell(
   {
     id: "QE_CAPTURE_RACE",
-    step: "Qualifying-purchase trigger (reconciler transaction) / EXPIRY: T3 a capture confirmed at or after the reservation's 336-hour end",
+    step: "Qualifying-purchase trigger (reconciler transaction) / EXPIRY: T3 a capture confirmed at and after the reservation's 336-hour end",
     fault: "expiry",
     expect: "RACE: a capture confirmed at or after the reservation's 336-hour end consumes the slot or leaves it to the sweep's rule, and the sweep then releases it or finds it consumed: consumed once or released once, never both",
   },
   async (ctx) => {
-    const x = await foundingCheckout("qe-expiry");
-    const deadline = ctx.deadline(x.reservation.ends_at, "the founding reservation's 336-hour end");
-    ctx.clock.past(deadline);
-    const conn = await connect("kauro_payment_test");
-    let captured: PromiseSettledResult<{ readonly authorizationId: string }>;
-    try {
-      captured = await ctx.operation("the capture confirmed past the reservation's end", async (op) => {
-        // the reconciler's SERVICE unit stands on the cell's clock, past the end
-        iw.faults.clock = op.clock;
-        try {
-          return { status: "fulfilled" as const, value: await captureOn(ctx, conn, x.a, x.checkout) };
-        } catch (reason) {
-          return { status: "rejected" as const, reason };
-        } finally {
-          iw.faults.clock = null;
-        }
-      });
-    } finally {
-      await conn.end();
+    // the sweep alone, standing exactly AT the end of a reservation nothing captured: a reservation at its end is due and is released
+    {
+      const x = await foundingCheckout("qe-expiry-sweep-at");
+      const sweepConn = await open("kauro_commission_test");
+      let report: Report;
+      try {
+        report = await expiryPassOn(ctx, sweepConn, x.reservation.ends_at_us, [], false, 0);
+      } finally {
+        await sweepConn.end();
+      }
+      assert.deepEqual(report.items.filter((i) => i.subject === x.reservation.reservation_id).map((i) => i.outcome), ["RELEASED"], "the sweep at the reservation's end released it, never NOT_DUE");
+      assert.equal(neverBoth(await slotOutcome(x)), "RELEASED");
     }
-    const sweepConn = await open("kauro_commission_test");
-    try {
-      await expiryPassOn(ctx, sweepConn, x.reservation.ends_at);
-    } finally {
-      await sweepConn.end();
+    // exactly AT the end first (the clock moves only forward), then one millisecond past it: each member is its own founding checkout
+    for (const position of ["at", "past"] as const) {
+      const x = await foundingCheckout(`qe-expiry-${position}`);
+      const deadline = ctx.deadline(x.reservation.ends_at, `the founding reservation's 336-hour end (${position})`);
+      if (position === "at") ctx.clock.set(deadline);
+      else ctx.clock.past(deadline);
+      const conn = await connect("kauro_payment_test");
+      let captured: PromiseSettledResult<{ readonly authorizationId: string }>;
+      try {
+        captured = await ctx.operation(`the capture confirmed ${position === "at" ? "at" : "past"} the reservation's end`, async (op) => {
+          // the reconciler's SERVICE unit stands on the cell's clock, at or past the end
+          iw.faults.clock = op.clock;
+          try {
+            return { status: "fulfilled" as const, value: await captureOn(ctx, conn, x.a, x.checkout) };
+          } catch (reason) {
+            return { status: "rejected" as const, reason };
+          } finally {
+            iw.faults.clock = null;
+          }
+        });
+      } finally {
+        await conn.end();
+      }
+      const sweepConn = await open("kauro_commission_test");
+      let report: Report;
+      try {
+        // the sweep stands exactly at the end too in the first member: a reservation whose end is "now" is due
+        report = await expiryPassOn(ctx, sweepConn, position === "at" ? x.reservation.ends_at_us : x.reservation.ends_at, [], false, position === "at" ? 0 : 60_000);
+      } finally {
+        await sweepConn.end();
+      }
+      const decided = report.items.filter((i) => i.subject === x.reservation.reservation_id).map((i) => i.outcome);
+      const o = await slotOutcome(x);
+      const end = neverBoth(o);
+      // consumed: the sweep never lists a consumed reservation (or finds it settled); released: the sweep released it, a reservation at its end is due
+      if (end === "CONSUMED") assert.ok(decided.length === 0 || (decided.length === 1 && decided[0] === "SETTLED"), `${position}: the sweep left a consumed reservation alone: ${decided.join()}`);
+      else assert.deepEqual(decided, ["RELEASED"], `${position}: the sweep released it (a reservation at its end is due, never NOT_DUE)`);
+      if (end === "CONSUMED") assert.equal(captured.status, "fulfilled");
+      if (captured.status === "fulfilled" && end === "CONSUMED") assert.equal(o.reservation.consumed_by_authorization_id, captured.value.authorizationId);
     }
-    const o = await slotOutcome(x);
-    const end = neverBoth(o);
-    if (end === "CONSUMED") assert.equal(captured.status, "fulfilled");
-    if (captured.status === "fulfilled" && end === "CONSUMED") assert.equal(o.reservation.consumed_by_authorization_id, captured.value.authorizationId);
   },
 );
