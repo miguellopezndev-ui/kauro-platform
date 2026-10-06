@@ -10,7 +10,7 @@ import { interruptedWorker } from './gate-process.mjs';
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../red-proof.mjs");
 const file = "packages/cell/test/value.test.ts";
 
-function fixture(expected = 2, baseSource = "export const value = 1;\n") {
+function fixture(expected = 2, baseSource = "export const value = 1;\n", baseFiles = {}) {
   const parent = realpathSync.native(mkdtempSync(join(tmpdir(), "kauro-red-test-")));
   const root = join(parent, "repo");
   const scratch = join(parent, "scratch");
@@ -36,6 +36,7 @@ for (const dir of ['src', 'test']) {
 }
 `);
   put("packages/cell/src/value.ts", baseSource);
+  for (const [path, contents] of Object.entries(baseFiles)) put(path, contents);
   put("packages/cell/src/deleted.ts", "export const deleted = true;\n");
   put("packages/cell/src/old-name.ts", "export const renamed = true;\n");
   put("packages/persistence/migrations/0001.sql", "SELECT 1;\n");
@@ -210,6 +211,10 @@ for (const [name, baseSource, headSource, body, redNames] of [
 // a product frame is a genuine failure (RED).
 const LEDGER_BASE = 'export const value = 1; export class Ledger { post() { return "posted"; } } export function makeLedger() { return new Ledger(); }';
 const LEDGER_HEAD = 'export const value = 2; export class Ledger { post() { return "posted"; } cancel() { return "cancelled"; } } export function makeLedger() { return new Ledger(); }';
+const RECURSIVE_BUILD = [
+  "import {mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';",
+  "function copy(from, to) { mkdirSync(to, {recursive: true}); for (const name of readdirSync(from)) { const source = from + '/' + name; if (statSync(source).isDirectory()) copy(source, to + '/' + name); else writeFileSync(to + '/' + name.replace(/\\.ts$/, '.js'), readFileSync(source)); } }",
+  "for (const dir of ['src', 'test']) copy(dir, 'dist/' + dir);", ''].join('\n');
 const NO_VALUE = (body) => HEAD.replace(/import \{value\}[^\n]*\n/, '') + body;
 for (const [name, body, extra, reason] of [
   ['a method called on a new expression is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; test('cancel', () => assert.equal(new Ledger().cancel(), 'cancelled'));", {}, /\(intermediate value\)\.cancel is not a function/],
@@ -219,20 +224,16 @@ for (const [name, body, extra, reason] of [
   ['a missing method called through a call result is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; const f = () => new Ledger(); test('cancel', () => assert.equal(f().cancel(), 'cancelled'));", {}, /is not a function/],
   ['a missing method called from a test helper file is INCONCLUSIVE', "import {run} from './helper.js'; test('cancel', () => assert.equal(run(), 'cancelled'));", {helper: "import {Ledger} from '../src/value.js'; export function run() { return new Ledger().cancel(); }\n"}, /is not a function/],
   ['a missing method called from a test-support helper is INCONCLUSIVE', "import {run} from './test-support/helper.js'; test('cancel', () => assert.equal(run(), 'cancelled'));", {support: "import {Ledger} from '../../src/value.js'; export function run() { return new Ledger().cancel(); }\n"}, /is not a function/],
+  ['a missing method called from a src/testing support helper is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; import {drive} from '../src/testing/drive.js'; test('cancel', () => assert.equal(drive(new Ledger(), 'cancel'), 'cancelled'));", {baseFiles: {'packages/cell/src/testing/drive.ts': 'export function drive(o, m) { return o[m](); }\n'}}, /o\[m\] is not a function/],
+  ['a missing method called from a nested src/x/testing helper is INCONCLUSIVE', "import {Ledger} from '../src/value.js'; import {drive} from '../src/commerce/testing/faults/drive.js'; test('cancel', () => assert.equal(drive(new Ledger(), 'cancel'), 'cancelled'));", {baseFiles: {'packages/cell/src/commerce/testing/faults/drive.ts': 'export function drive(o, m) { return o[m](); }\n'}}, /o\[m\] is not a function/],
 ]) {
   test(name, () => {
-    const f = fixture(2, extra.base ?? LEDGER_BASE);
+    const f = fixture(2, extra.base ?? LEDGER_BASE, extra.baseFiles);
     try {
       f.put('packages/cell/src/value.ts', LEDGER_HEAD);
       if (extra.helper) f.put('packages/cell/test/helper.ts', extra.helper);
       if (extra.support) f.put('packages/cell/test/test-support/helper.ts', extra.support);
-      if (extra.support) {
-        // The suite's stand-in compiler copies flat directories; a nested test-support directory needs a recursive copy.
-        f.put('packages/cell/build.mjs', [
-          "import {mkdirSync, readdirSync, readFileSync, statSync, writeFileSync} from 'node:fs';",
-          "function copy(from, to) { mkdirSync(to, {recursive: true}); for (const name of readdirSync(from)) { const source = from + '/' + name; if (statSync(source).isDirectory()) copy(source, to + '/' + name); else writeFileSync(to + '/' + name.replace(/\\.ts$/, '.js'), readFileSync(source)); } }",
-          "for (const dir of ['src', 'test']) copy(dir, 'dist/' + dir);", ''].join('\n'));
-      }
+      if (extra.support || extra.baseFiles) f.put('packages/cell/build.mjs', RECURSIVE_BUILD);
       f.put(file, NO_VALUE(body));
       f.git('add', '.'); f.git('commit', '-qm', name);
       const result = command(process.execPath, [script, f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, {env: {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'}});
