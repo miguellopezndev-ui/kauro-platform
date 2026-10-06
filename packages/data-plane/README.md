@@ -28,7 +28,7 @@ tests too (S024 is decided by them). Every parse of an untrusted file runs in an
 The attempt envelope of a processing attempt (design `docs/design/B08-audit-approval-jobs.md` D8-STG-1..5, mandate
 B08-WORKER-HOST), real in tests too:
 
-- `AttemptScratchStore` — `ScratchStore` (kauro-migration-core 2.0.3's host contract "1.0.0"): one directory per attempt, a byte
+- `AttemptScratchStore` — `ScratchStore` (kauro-migration-core 3.0.0's host contract "1.0.0"): one directory per attempt, a byte
   quota checked before any byte lands, a SHA-256 per segment; SCRATCH_EXHAUSTED, SHORT_WRITE and CORRUPT_INTERMEDIATE are distinct
   terminal causes; cleanup removes exactly that directory and never follows a link (`removeAttemptScratch` for the janitor).
 - `FencedArtifactWriter` — `ArtifactWriter`: names only inside the capability's staging prefix, spools into the scratch quota,

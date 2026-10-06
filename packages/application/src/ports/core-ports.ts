@@ -9,7 +9,7 @@
  *
  * These signatures were checked against the two cores actually being released, not invented from the manual alone
  * (manual 04 "Architecture and dependency boundary", "executePlan", "verifyPackage"; 06 "Intelligence engine"):
- *   - kauro-migration-core 2.0.3 (`kauro-migration-core-release`, `src/index.ts`) exports `runMigration(input: RunInput):
+ *   - kauro-migration-core 3.0.0 (`kauro-migration-core-release`, `src/index.ts`) exports `runMigration(input: RunInput):
  *     RunResult` (synchronous) and `writePackage` / `promotePackage` / `verifyPackage(packageDir: string, options)`
  *     (synchronous, filesystem-directory calls) rather than the manual's separate `profileSources` / `validatePlan` /
  *     `dryRun` / `executePlan` methods threaded through an injected `ArtifactWriter`. Only `ScratchStore` is truly
@@ -143,7 +143,7 @@ export interface ScratchUsage {
 
 /**
  * Attempt-owned segments with a byte quota and a checksum per segment (D8-STG-2). Structurally the same contract
- * kauro-migration-core 2.0.3 requires of its own host-injected `ScratchStore` (contract version "1.0.0"), so the real
+ * kauro-migration-core 3.0.0 requires of its own host-injected `ScratchStore` (contract version "1.0.0"), so the real
  * implementer (`AttemptScratchStore`, B08-WORKER-HOST) can be handed to the core with no translation.
  */
 export interface ScratchStore {
