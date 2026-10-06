@@ -488,7 +488,10 @@ export class PgSalesRepository implements SalesRepository {
     const seller = (await execute<{ user_id: string }>(this.db, "SELECT user_id FROM kauro.sellers WHERE seller_id = $1", [sellerId])).rows[0];
     let identityVerifiedWithMfa = false;
     if (seller !== undefined) {
-      await awaitSalesTransition(this.db, "kauro.identities", seller.user_id);
+      // an identity change in flight commits before this read, but the read holds nothing to COMMIT: the identity's reader half is held from
+      // the write on, by sellers_activation_guard (KC005), so a withdrawal between this read and the write is judged there, and one arriving
+      // after the write waits for the activation's COMMIT (0045 identities_assurance_transition_lock; SELLER_IDENT_RACE)
+      await execute(this.db, "SELECT pg_advisory_lock_shared(x.k), pg_advisory_unlock_shared(x.k) FROM (SELECT kauro.transition_key('kauro.identities', $1) AS k) x", [seller.user_id]);
       const identity = await execute<{ verified: boolean }>(
         this.db,
         "SELECT state = 'ACTIVE' AND email_verified_at IS NOT NULL AND mfa_enrolled_at IS NOT NULL AS verified FROM kauro.identities WHERE user_id = $1",
