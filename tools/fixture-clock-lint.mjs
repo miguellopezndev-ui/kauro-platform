@@ -54,6 +54,14 @@ function* files(dir) {
 
 export function lintFixtures(base = root) {
   const sources = [...files(join(base, "packages/persistence/src/testing"))];
+  // the test-only provider fakes stamp external instants the database compares with its own clock (R2-080, adversary 12f5025 ADV-1)
+  const packages = join(base, "packages");
+  if (existsSync(packages)) {
+    for (const pkg of readdirSync(packages)) {
+      if (pkg === "persistence") continue;
+      sources.push(...[...files(join(packages, pkg, "src"))].filter((file) => /[\/]testing[\/]/.test(file)));
+    }
+  }
   const apps = join(base, "apps");
   if (existsSync(apps)) {
     for (const app of readdirSync(apps)) {
