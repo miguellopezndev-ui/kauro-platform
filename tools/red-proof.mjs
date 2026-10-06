@@ -3,7 +3,7 @@
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { buildPackage, command, dependencyOrder, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
+import { baseBuildSymbols, buildPackage, command, dependencyOrder, requireCommand, runTest, testTarget, workspacePackages } from "./test-runner.mjs";
 
 function usage(message) {
   console.error(`${message}\nUsage: node tools/red-proof.mjs <base> <head> --tests <file>[,<file>...] [--out red-proof.json] [--timeout-min 30]`);
@@ -111,9 +111,10 @@ try {
       report.errors.push(`${label} preparation: ${error.message}`);
       return; // A build/install failure is not a failing test and cannot prove red.
     }
+    const baseSymbols = withoutFix ? baseBuildSymbols(buildOrder) : undefined;
     for (let i = 0; i < targets.length; i++) {
       try {
-        const result = await runTest(targets[i], undefined, { timeoutMs });
+        const result = await runTest(targets[i], undefined, { timeoutMs, baseSymbols });
         const row = report.tests[i];
         if (result.killFailure) {
           report.inconclusive.push(`${label}: ${targets[i].file}: ${result.killFailure}`);
@@ -126,9 +127,9 @@ try {
           // Red only when at least one real test body failed its own assertions. Hook failures, cancellations,
           // load errors, timeouts and runs that executed nothing prove nothing.
           const timedOut = result.timedOut;
-          row.failedWithoutFix = !timedOut && !sum.inconclusiveFailures.length && result.status !== 0 && sum.leafFailed >= 1;
-          row.baseFailedNames = row.failedWithoutFix ? sum.bodyFailedNames : [];
-          row.baseFailedPaths = row.failedWithoutFix ? sum.bodyFailedPaths : [];
+          row.failedWithoutFix = !timedOut && result.status !== 0 && sum.redFailedPaths.length >= 1;
+          row.baseFailedNames = row.failedWithoutFix ? sum.redFailedNames : [];
+          row.baseFailedPaths = row.failedWithoutFix ? sum.redFailedPaths : [];
           if (!row.failedWithoutFix && !(result.status === 0 && ran >= 1)) {
             const why = timedOut ? `timed out after ${timeoutMin} min`
               : sum.inconclusiveFailures.length ? sum.inconclusiveFailures.join("; ")
@@ -138,7 +139,7 @@ try {
               : sum.cancelled || sum.otherFailures ? "tests were cancelled or failed without a test-body failure" : "no failing test body was identified";
             report.inconclusive.push(`without fix: ${targets[i].file}: ${why}`);
           }
-          row.firstFailingAssertion = row.failedWithoutFix ? sum.assertion : result.firstFailingAssertion;
+          row.firstFailingAssertion = row.failedWithoutFix ? sum.redAssertion : result.firstFailingAssertion;
           row.durations.withoutFixMs = result.durationMs;
         } else {
           const passedPaths = new Set(sum.passedPaths.map((path) => JSON.stringify(path)));

@@ -10,7 +10,7 @@ import { interruptedWorker } from './gate-process.mjs';
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../red-proof.mjs");
 const file = "packages/cell/test/value.test.ts";
 
-function fixture(expected = 2) {
+function fixture(expected = 2, baseSource = "export const value = 1;\n") {
   const parent = realpathSync.native(mkdtempSync(join(tmpdir(), "kauro-red-test-")));
   const root = join(parent, "repo");
   const scratch = join(parent, "scratch");
@@ -35,7 +35,7 @@ for (const dir of ['src', 'test']) {
   for (const file of readdirSync(dir)) writeFileSync('dist/' + dir + '/' + file.replace(/\\.ts$/, '.js'), readFileSync(dir + '/' + file));
 }
 `);
-  put("packages/cell/src/value.ts", "export const value = 1;\n");
+  put("packages/cell/src/value.ts", baseSource);
   put("packages/cell/src/deleted.ts", "export const deleted = true;\n");
   put("packages/cell/src/old-name.ts", "export const renamed = true;\n");
   put("packages/persistence/migrations/0001.sql", "SELECT 1;\n");
@@ -178,6 +178,34 @@ test("a diff that touches no reverted path is refused with exit 2", () => {
 });
 
 const HEAD = "import assert from 'node:assert/strict'; import {test, describe, before} from 'node:test'; import {value} from '../src/value.js';\n";
+for (const [name, baseSource, headSource, body, redNames] of [
+  ['an existing base symbol throwing is not a function is RED',
+    'export const value = 1; export const api = 1;', 'export const value = 2; export function api() {}',
+    "import {api} from '../src/value.js'; test('existing API regression', () => api());", ['existing API regression']],
+  ['an assertion mentioning ECONNREFUSED is RED',
+    'export const value = 1;', 'export const value = 2;',
+    "test('message regression', () => assert.equal(value, 2, 'ECONNREFUSED is the symptom under test'));", ['message regression']],
+  ['a mixed missing-API file preserves its genuine RED test',
+    'export const value = 1;', 'export const value = 2; export function headOnly() {}',
+    "import * as api from '../src/value.js'; test('missing API', () => api.headOnly()); test('real regression', () => assert.equal(value, 2, 'GENUINE RED'));", ['real regression']],
+]) {
+  test(name, () => {
+    const f = fixture(2, baseSource);
+    try {
+      f.put('packages/cell/src/value.ts', headSource);
+      f.put(file, HEAD + body);
+      f.git('add', '.'); f.git('commit', '-qm', name);
+      const result = command(process.execPath, [script, f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, {env: {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'}});
+      assert.equal(result.status, 0, result.output);
+      const report = JSON.parse(readFileSync(join(f.root, 'red-proof.json'), 'utf8'));
+      assert.equal(report.verdict, 'PASS');
+      assert.equal(report.tests[0].failedWithoutFix, true);
+      assert.deepEqual(report.tests[0].baseFailedNames, redNames);
+      if (name.startsWith('a mixed')) assert.match(report.tests[0].firstFailingAssertion, /AssertionError.*GENUINE RED/);
+      assert.deepEqual(readdirSync(f.scratch), []);
+    } finally { rmSync(f.parent, {recursive: true, force: true}); }
+  });
+}
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGKILL']) {
   test(`interrupting red-proof gate with ${signal} kills its worker`, { skip: (signal === 'SIGKILL' ? process.platform !== 'win32' : process.platform !== 'linux') && (signal === 'SIGKILL' ? 'Windows job-object test; Linux signals are tested separately' : 'Linux signal test; Windows has its own gate-kill test') }, async () => {
     const f = fixture();
@@ -271,10 +299,10 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason,
     "test('regression', async () => { if (value === 1) await import('../src/missing.js'); });\n", 2, "INCONCLUSIVE", false, true, /ERR_MODULE_NOT_FOUND/],
   ["a body-level refused connection at base is INCONCLUSIVE, not red",
     "test('regression', () => { if (value === 1) throw Object.assign(new Error('required service unavailable'), {code: 'ECONNREFUSED'}); });\n", 2, "INCONCLUSIVE", false, true, /ECONNREFUSED/],
-  ["a missing-module code in the failure message is INCONCLUSIVE, not red",
-    "test('regression', () => { if (value === 1) throw new Error('ERR_MODULE_NOT_FOUND: required module unavailable'); });\n", 2, "INCONCLUSIVE", false, true, /ERR_MODULE_NOT_FOUND/],
-  ["a refused-connection code in the failure message is INCONCLUSIVE, not red",
-    "test('regression', () => { if (value === 1) throw new Error('ECONNREFUSED: required service unavailable'); });\n", 2, "INCONCLUSIVE", false, true, /ECONNREFUSED/],
+  ["a missing-module code only in the failure message is RED",
+    "test('regression', () => { if (value === 1) throw new Error('ERR_MODULE_NOT_FOUND: required module unavailable'); });\n", 0, "PASS", true, true],
+  ["a refused-connection code only in the failure message is RED",
+    "test('regression', () => { if (value === 1) throw new Error('ECONNREFUSED: required service unavailable'); });\n", 0, "PASS", true, true],
 ]) {
   test(name, () => {
     const f = fixture();

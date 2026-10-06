@@ -41,9 +41,12 @@ and timeout cleanup uses `taskkill /T /F`.
 After a timeout kill, the runner has at most ten seconds to close. A kill error or unconfirmed stop is recorded with
 its reason; red-proof returns INCONCLUSIVE and stress-cells fails, without starting another phase or iteration.
 
-Body failures reporting `TypeError` with “is not a function” or “is not a constructor”, `ERR_MODULE_NOT_FOUND`, or
-`ECONNREFUSED` are also INCONCLUSIVE (exit 2), with the error recorded as the reason: base may lack an API added by the fix,
-an import, or a required service. This classification is conservative, not proof of causality. Residual: other exceptions,
+Body failures with error code `ERR_MODULE_NOT_FOUND` or `ECONNREFUSED` are INCONCLUSIVE (exit 2). A `TypeError` reporting
+“is not a function” or “is not a constructor” is INCONCLUSIVE only when its first stack frame is a direct call in the test
+file and the named identifier is absent from the base runtime build (excluding tests). An existing identifier or a product
+stack frame remains RED. Message text alone never identifies a missing module or service. Classification is per leaf test:
+a genuine red in a file with a missing-API sibling still proves red, and only genuine reds need recovery at head.
+This identifier inventory is conservative, not proof of causality. Residual: other exceptions,
 or assertions against missing API/data, can still appear red for a prerequisite failure; review the recorded assertion
 and keep regression fixtures and services available in both phases.
 

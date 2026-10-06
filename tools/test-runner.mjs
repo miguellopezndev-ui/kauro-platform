@@ -39,7 +39,8 @@ export default async function* testEventsWithErrorIdentity(source) {
       if (event.type === "test:fail") {
         const error = event.data.details?.error;
         const cause = error?.cause ?? error;
-        appendFileSync(process.env.KAURO_TEST_EVENTS, JSON.stringify({ event: "error", errorName: cause?.name, errorCode: cause?.code }) + "\n");
+        appendFileSync(process.env.KAURO_TEST_EVENTS, JSON.stringify({ event: "error", errorName: cause?.name, errorCode: cause?.code,
+          errorFrame: cause?.stack?.split(/\r?\n/).find((line) => /^\s+at /.test(line)) }) + "\n");
       }
       yield event;
     }
@@ -92,7 +93,7 @@ export function firstFailingAssertion(output) {
 // Summarises the structured events written by tools/test-events-reporter.mjs. Nothing here reads spec text.
 // A "leaf" is a real test with no subtests (details.type "test", not a suite, skipped or todo). The synthetic failure node:test
 // reports for a file that fails to load or throws at top level is named after the file and is never a leaf.
-export function summarizeEvents(path, file, identityFile = file) {
+export function summarizeEvents(path, file, identityFile = file, { baseSymbols } = {}) {
   let records = [];
   try { records = readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch { /* an absent or torn file means "no evidence" */ }
   const base = file.split(/[\\/]/).pop();
@@ -100,12 +101,13 @@ export function summarizeEvents(path, file, identityFile = file) {
     complete: records.some((record) => record.event === "summary"),
     passedNames: [], failedNames: [], bodyFailedNames: [], hookFailures: 0, cancelled: 0, otherFailures: 0, fileFailures: 0,
     passedPaths: [], bodyFailedPaths: [],
+    redFailedNames: [], redFailedPaths: [], redAssertion: null,
     leafPassed: 0, leafFailed: 0, skipped: 0, todo: 0, assertion: null, inconclusiveFailures: [],
   };
   // Completion events are in postorder: a parent's last child completes immediately before the parent,
   // at a deeper nesting level. This also covers parents made with test()/t.test(), not just describe().
   const completed = records.flatMap((record, index) => record.event === "pass" || record.event === "fail"
-    ? [{ ...record, ...(records[index - 1]?.event === "error" ? { errorName: records[index - 1].errorName, errorCode: records[index - 1].errorCode } : {}) }] : []);
+    ? [{ ...record, ...(records[index - 1]?.event === "error" ? records[index - 1] : {}), event: record.event }] : []);
   // Walking postorder backwards visits each parent before its children. Preserve every ancestor as
   // a separate path component, so identical names (or names containing separators) cannot collide.
   const ancestors = [];
@@ -126,11 +128,6 @@ export function summarizeEvents(path, file, identityFile = file) {
     }
     if (record.skip) { summary.skipped++; continue; }
     if (record.todo) { summary.todo++; continue; }
-    if (record.event === "fail" && ((record.errorName === "TypeError" && /\bis not a (?:function|constructor)\b/.test(record.message ?? ""))
-      || ["ERR_MODULE_NOT_FOUND", "ECONNREFUSED"].includes(record.errorCode)
-      || /\b(?:ERR_MODULE_NOT_FOUND|ECONNREFUSED)\b/.test(record.message ?? ""))) {
-      summary.inconclusiveFailures.push(`${record.errorName ?? "Error"}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}`);
-    }
     if (hasSubtests) {
       if (record.event === "fail") {
         if (record.failureType === "hookFailed") summary.hookFailures++;
@@ -144,8 +141,21 @@ export function summarizeEvents(path, file, identityFile = file) {
     if (record.failureType === "testCodeFailure") {
       summary.leafFailed++; summary.bodyFailedNames.push(record.name);
       summary.bodyFailedPaths.push(record.path);
-      summary.assertion ??= record.message == null ? null : record.errorName
+      const assertion = record.message == null ? null : record.errorName
         ? `${record.errorName}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}` : record.message;
+      summary.assertion ??= assertion;
+      // Only a direct call in this test to a symbol absent from the base runtime build is a missing API.
+      // Error text identifies that symbol, but never substitutes for the error's type or code.
+      const symbol = /^(?:[A-Za-z_$][\w$]*\.)*([A-Za-z_$][\w$]*) is not a (?:function|constructor)\b/.exec(record.message ?? '')?.[1];
+      const missingApi = record.errorName === 'TypeError' && symbol && baseSymbols && !baseSymbols.has(symbol)
+        && record.errorFrame?.replaceAll('\\', '/').includes(file.replaceAll('\\', '/') + ':');
+      if (missingApi || ['ERR_MODULE_NOT_FOUND', 'ECONNREFUSED'].includes(record.errorCode)) {
+        summary.inconclusiveFailures.push(assertion);
+      } else {
+        summary.redFailedNames.push(record.name);
+        summary.redFailedPaths.push(record.path);
+        summary.redAssertion ??= assertion;
+      }
     } else if (record.failureType === "hookFailed") summary.hookFailures++;
     else if (record.failureType === "cancelledByParent") summary.cancelled++;
     else summary.otherFailures++;
@@ -165,6 +175,26 @@ export function workspacePackages(root) {
     }
   }
   return packages;
+}
+
+// A conservative identifier inventory of emitted runtime code; tests cannot supply a missing base API.
+export function baseBuildSymbols(packages) {
+  const symbols = new Set();
+  function scan(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) { if (!['test', 'tests', 'node_modules'].includes(entry.name)) scan(path); }
+      else if (/\.[cm]?js$/.test(entry.name)) {
+        for (const symbol of readFileSync(path, 'utf8').match(/[A-Za-z_$][\w$]*/g) ?? []) symbols.add(symbol);
+      }
+    }
+  }
+  for (const pkg of packages) {
+    const dist = join(pkg.dir, 'dist');
+    scan(existsSync(dist) ? dist : join(pkg.dir, 'src'));
+  }
+  return symbols;
 }
 
 export function dependencyOrder(packages, selected = packages) {
@@ -213,7 +243,7 @@ export function testTarget(root, file) {
   return { file: rel.split(sep).join("/"), dir, manifest, compiled, concurrency };
 }
 
-export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000 } = {}) {
+export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000, baseSymbols } = {}) {
   if (!existsSync(target.compiled)) throw new Error(`compiled test is missing: ${target.compiled}`);
   const eventsDir = mkdtempSync(join(tmpdir(), "kauro-events-"));
   const eventsFile = join(eventsDir, "events.jsonl");
@@ -273,7 +303,7 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
         finish(status, signal);
       });
     });
-    const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled);
+    const summary = summarizeEvents(eventsFile, target.compiled, target.file ?? target.compiled, { baseSymbols });
     return { ...result, firstFailingAssertion: summary.assertion ?? firstFailingAssertion(result.output), summary };
   } finally {
     cleanup();
