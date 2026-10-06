@@ -1129,6 +1129,18 @@ test("the structural check refuses a LIMIT, OFFSET, FETCH or set operation anywh
   assert.deepEqual(nonAtomic("WITH w AS (SELECT u.k, sum(u.x) OVER (PARTITION BY u.k) AS s FROM u) SELECT 1 FROM w WHERE w.s > 0"), [], "a windowed aggregate is permitted");
 });
 
+test("the CASE-null and NOT-IN rules each refuse a snippet no other rule refuses (ADV-27 mutation coverage: deleting either rule fails here)", () => {
+  // each snippet trips exactly its own rule: no ELSE (so the CASE ... ELSE allowlist is silent), no outer join, and a NOT IN over one exact
+  // count (the only subquery the scalar-subquery rule lets stand after NOT IN), so only the NOT-IN rule sees it
+  const own: ReadonlyArray<readonly [string, string]> = [
+    ["CASE WHEN ... IS NULL", "SELECT 1 FROM t JOIN u ON true WHERE t.x > CASE WHEN u.x IS NULL THEN 0 END"],
+    ["CASE WHEN ... IS NULL", "SELECT 1 FROM t JOIN u ON true WHERE t.x > case when u.x is not null then u.x end"],
+    ["NOT IN (SELECT", "SELECT 1 FROM t WHERE t.x NOT IN (SELECT count(*) FROM u)"],
+    ["NOT IN (SELECT", "SELECT 1 FROM t WHERE t.x not in ( select count(*) FROM u WHERE u.k = t.k)"],
+  ];
+  for (const [rule, sql] of own) assert.deepEqual(nonAtomic(sql), [rule], `only ${rule} refuses: ${sql}`);
+});
+
 test("the lint source files contain no control bytes other than tab, newline and carriage return (ADV-23: a backspace had replaced a regex word boundary)", () => {
   for (const url of [new URL(import.meta.url), new URL("../../src/testing/invariants.js", import.meta.url)]) {
     const path = fileURLToPath(url).replace(/[\\/]dist[\\/]/, "/").replace(/\.js$/, ".ts");
