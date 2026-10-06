@@ -72,8 +72,8 @@ const JOURNAL_COMMIT: SqlStep = { label: "journal_commit", match: /UPDATE kauro\
 
 const registerProspect = (who: Person, key: string, body: Record<string, unknown>): Promise<Reply> => call(iw.w, { url: "/api/v1/sales/prospects", token: who.token, agency: null, key, body });
 const claimProspect = (who: Person, prospectId: string, key: string, body: Record<string, unknown>): Promise<Reply> => call(iw.w, { url: `/api/v1/sales/prospects/${prospectId}/claims`, token: who.token, agency: null, key, body });
-const acceptClaim = (claimId: string, allocationId: string, key: string): Promise<Reply> =>
-  call(iw.w, { url: `/api/v1/sales/claims/${claimId}/accept`, token: iw.owner.token, agency: null, key, body: { expectedVersion: 1, shareAllocationRef: allocationId } });
+const acceptClaim = (claimId: string, allocationId: string, key: string, expectedVersion = 1): Promise<Reply> =>
+  call(iw.w, { url: `/api/v1/sales/claims/${claimId}/accept`, token: iw.owner.token, agency: null, key, body: { expectedVersion, shareAllocationRef: allocationId } });
 const assignAccount = (agencyId: string, key: string, body: Record<string, unknown>): Promise<Reply> => call(iw.w, { url: `/api/v1/sales/agencies/${agencyId}/assignment`, token: iw.owner.token, agency: null, key, body });
 
 // --- what the superuser reads ----------------------------------------------------------------------------------------------------------
@@ -415,9 +415,13 @@ const LAPSE_UPDATE = (claimId: string): SqlStep => ({ label: "lapse_update", mat
 
 interface LapseOutcome {
   readonly accept: string;
+  /** Lapse first: an acceptance of the lapsed claim naming its current version, after the race. */
+  readonly acceptCurrent?: string;
   readonly item: string | undefined;
   readonly claim: ClaimRow;
   readonly frozen: boolean;
+  readonly claimId: string;
+  readonly allocationId: string;
 }
 type Itemized = { readonly items: ReadonlyArray<{ readonly subject: string; readonly outcome: string }> };
 const sweepOf = (ctx: FaultContext, claimId: string, at?: string): Actor => ({ name: "the CLAIM_WINDOWS pass", login: "kauro_commission_test", holdAt: "db.lapse_update.after", run: (conn) => sweepOn(ctx, conn, "CLAIM_WINDOWS", [LAPSE_UPDATE(claimId)], at) });
@@ -432,11 +436,15 @@ const acceptOf = (ctx: FaultContext, label: string, o: { readonly claimId: strin
 async function lapseFirst(ctx: FaultContext, label: string): Promise<LapseOutcome> {
   const lapsed = await dueOpportunity(`${label}-lapse-first`, -1);
   const one = await contend(ctx, sweepOf(ctx, lapsed.claimId), acceptOf(ctx, label, lapsed), "the lapse holds the claim, the acceptance waits");
+  const current = await claimOf(lapsed.claimId);
   return {
     accept: said(valueOf(one.waiter as PromiseSettledResult<Reply>, "the acceptance")),
+    acceptCurrent: said(await acceptClaim(lapsed.claimId, lapsed.allocationId, freshKey(`${label}-current`), current.version)),
     item: itemOf(mustHaveSettled(one.holder, "the CLAIM_WINDOWS pass") as Itemized, lapsed.claimId),
-    claim: await claimOf(lapsed.claimId),
+    claim: current,
     frozen: (await allocationOf(lapsed.allocationId)).frozen,
+    claimId: lapsed.claimId,
+    allocationId: lapsed.allocationId,
   };
 }
 /** Acceptance first: the claim is due 30 s from now, the acceptance (now, inside the review window) holds at its COMMIT and the sweep, standing a second past the deadline, is observed waiting on the claim. */
@@ -449,6 +457,8 @@ async function acceptFirst(ctx: FaultContext, label: string): Promise<LapseOutco
     item: itemOf(mustHaveSettled(two.waiter, "the CLAIM_WINDOWS pass") as Itemized, due.claimId),
     claim: await claimOf(due.claimId),
     frozen: (await allocationOf(due.allocationId)).frozen,
+    claimId: due.claimId,
+    allocationId: due.allocationId,
   };
 }
 
@@ -458,12 +468,14 @@ faultCell(
     step: "CMD047 AcceptAttribution / RACE: W2 claim lapse against the CLAIM_WINDOWS sweep",
     fault: "race",
     expect:
-      "RACE: AcceptAttribution racing the CLAIM_WINDOWS lapse of the same claim at its deadline: one wins in both orders with the lock wait observed; accepting a lapsed claim is 409 CLAIM_EXPIRED and writes no allocation (the claim EXPIRED, the allocation unfrozen); an acceptance that committed inside the review window keeps the claim ACCEPTED with its allocation frozen",
+      "RACE: AcceptAttribution racing the CLAIM_WINDOWS lapse of the same claim at its deadline: one wins in both orders with the lock wait observed; the acceptance that waited on the lapse is refused (its claim moved on) and accepting the lapsed claim is 409 CLAIM_EXPIRED, writing no allocation (the claim EXPIRED, the allocation unfrozen); an acceptance that committed inside the review window keeps the claim ACCEPTED with its allocation frozen",
   },
   async (ctx) => {
     const one = await lapseFirst(ctx, "lapse-accept-cmd047");
     assert.deepEqual([one.claim.state, one.frozen], ["EXPIRED", false], "lapse first: the claim EXPIRED, no allocation frozen");
-    assert.equal(one.accept, "409 PRECONDITION_FAILED CLAIM_EXPIRED", "lapse first: accepting the lapsed claim is CLAIM_EXPIRED");
+    assert.match(one.accept, /^409 (STALE_VERSION -|PRECONDITION_FAILED CLAIM_EXPIRED)$/, "lapse first: the acceptance that waited on the lapse is refused (the claim it read moved on)");
+    assert.equal(one.acceptCurrent, "409 PRECONDITION_FAILED CLAIM_EXPIRED", "lapse first: accepting the lapsed claim at its current version is CLAIM_EXPIRED");
+    assert.deepEqual([(await claimOf(one.claimId)).state, (await allocationOf(one.allocationId)).frozen], ["EXPIRED", false], "lapse first: still no allocation");
     const two = await acceptFirst(ctx, "lapse-accept-cmd047");
     assert.deepEqual([two.accept, two.claim.state, two.frozen], ["200", "ACCEPTED", true], "acceptance first: the claim ACCEPTED under its frozen allocation");
   },
