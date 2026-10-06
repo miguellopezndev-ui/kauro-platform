@@ -201,9 +201,9 @@ envía registros crudos, credenciales ni secretos, y el modelo no toma decisione
 |---|---|---|---|
 | Amazon Web Services, Inc. | Alojamiento, base de datos, almacenamiento, identidad, registros y modelos de lenguaje (Amazon Bedrock) | Todos los de la sección 6 que la plataforma guarda; archivos de CRM como subencargado | Estados Unidos |
 | Resend | Correo transaccional del servicio | Correo y nombre del usuario y contenido mínimo del aviso | Estados Unidos |
-| Google LLC (Google Workspace) | Correo corporativo de Kauro (soporte, ventas, administración) | Datos de contacto y contenido de la correspondencia | Según la infraestructura de Google |
+| Google LLC (Google Workspace) | Correo corporativo de Kauro (soporte, ventas, administración) y registros internos de solicitudes, incidentes y formación | Datos de contacto, contenido de la correspondencia y datos de los registros internos (sin archivos de CRM) | Según la infraestructura de Google |
 | Proveedor de facturación electrónica que Kauro use ante la DIAN | Emisión y validación de facturas y notas | Datos de facturación (sección 6.2) | Colombia |
-<!-- auth: A9 §1 y §3; 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md; 15 §Accounting integration decision (Alegra candidato o ruta DIAN) · resolución de silencio S-05 (proveedor fiscal no elegido) -->
+<!-- registros internos de Google Workspace: INTERNAL_DATA_MANUAL §8 (resolución de silencio S-20) · auth: A9 §1 y §3; 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md; 15 §Accounting integration decision (Alegra candidato o ruta DIAN) · resolución de silencio S-05 (proveedor fiscal no elegido) -->
 
 13.2. Kauro comunica datos de pago a **PayPal** y a **Wise**, y opera con su banco **Bancolombia**; estas entidades tratan esos
 datos como responsables independientes según sus propias políticas, porque prestan servicios financieros regulados. Kauro también

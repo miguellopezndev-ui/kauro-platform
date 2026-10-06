@@ -4,7 +4,7 @@ Checklist for Kauro's customer-facing legal texts (owner decision D-08b, option 
 lawyer, checked against official sources, adversarial review by Codex afterwards, owner's written acceptance before B19).
 
 Files covered: `TERMS_OF_SERVICE.md` (ToS), `DATA_PROCESSING_POLICY.md` (POL), `PRIVACY_NOTICE.md` (AVISO), `DPA.md` /
-`DPA_EN.md` (DPA), `LAWYER_LATER.md`. The rows are in English for the reviewer; the clauses they point to are in Spanish (and
+`DPA_EN.md` (DPA), `INTERNAL_DATA_MANUAL.md` (MAN, internal), `PIA_BEDROCK.md` (PIA, internal), `LAWYER_LATER.md`. The rows are in English for the reviewer; the clauses they point to are in Spanish (and
 English in DPA_EN). Every source below was consulted on **2026-10-06** unless stated otherwise.
 
 Status values:
@@ -31,8 +31,8 @@ Status values:
 | C-09b | Decreto 1074 art. 2.2.2.25.4.4 | Controller and processor designate a person or area for data protection | POL §11 | C-09 source | COVERED (legal representative; see silence S-14) |
 | C-10 | Ley 1581 arts. 14, 15 | Queries: 10 business days + 5. Claims: completeness request in 5 days, withdrawal after 2 months, transfer in 2 business days if not competent, "reclamo en trámite" legend in 2 business days, 15 business days + 8 | POL §10.2, §10.3 | C-01 source | COVERED_IF_BUILT: requests handled by a recorded case (19 §Rights requests) (A-02) |
 | C-11 | Decreto 1074 art. 2.2.2.25.2.6 | Revocation/suppression by claim; not when a legal or contractual duty to remain; free, easy mechanism | POL §10.4; ToS §19.4 | C-03 source | COVERED |
-| C-12 | Ley 1581 art. 17 | Controller duties (a)–(o), incl. require security from processors (i), internal manual (k), report breaches (n) | POL §4, §13.3, §14, §18; DPA §4 (customer as controller) | C-01 source | COVERED in the texts; the internal manual is C-24 (OPEN) |
-| C-13 | Ley 1581 art. 18 | Processor duties (a)–(l): security, timely updates, update within 5 business days, handle claims, internal manual, legends, restricted access, report breaches to SIC | DPA §5, §11.3, §12.2 | C-01 source | COVERED in the texts; internal manual is C-24 (OPEN) |
+| C-12 | Ley 1581 art. 17 | Controller duties (a)–(o), incl. require security from processors (i), internal manual (k), report breaches (n) | POL §4, §13.3, §14, §18; DPA §4 (customer as controller); MAN §5.5 (i), §5.4 (n) | C-01 source | COVERED; internal manual (k) is C-24 |
+| C-13 | Ley 1581 art. 18 | Processor duties (a)–(l): security, timely updates, update within 5 business days, handle claims, internal manual, legends, restricted access, report breaches to SIC | DPA §5, §11.3, §12.2; MAN §5.2 (5-business-day update, claims) | C-01 source | COVERED; internal manual (f) is C-24 |
 | C-14 | Ley 1581 arts. 17(n), 18(k) | Report security-code violations to the SIC | DPA §11.3; POL §18 | C-01 source | COVERED |
 | C-15 | SIC Circular Única, Título V, numeral 2.1 lit. f(ii) | Controllers not obliged to the RNBD **and processors** report incidents through the SIC application or channels within **15 business days** of detection | DPA §11.3; POL §18 | [SIC, Título V versión 29-09-2022](https://www.sic.gov.co/sites/default/files/normatividad/092022/T%C3%ADtulo%20V%20Versi%C3%B3n%2029-09-2022.pdf) | COVERED (pending 2026 draft does not change this numeral, see §6) |
 | C-16 | Decreto 1074 art. 2.2.2.26.1.2, modified by Decreto 090 de 2018 | RNBD registration only for companies with total assets **above 100,000 UVT** (and public entities). UVT 2026 = COP 52,374 (DIAN Res. 000238 de 2025), so the threshold is COP 5,237,400,000. A newly incorporated S.A.S. is far below it: **registration is not required** | POL §19 | C-09 source (pr026, art. 2.2.2.26.1.2 with Decreto 90 note); [DIAN, valores 2026 (UVT $52.374)](https://www.dian.gov.co/aduanas/Documents/Cuadro-Valores-Patrimonio-Garantias-UA-2026.pdf) | N/A today (re-check yearly against the balance sheet) |
@@ -43,10 +43,10 @@ Status values:
 | C-21 | Decreto 1074 art. 2.2.2.25.5.2 | Transmission contract states scope, activities and processor duties; processor applies controller's policy and purposes, (1) principles, (2) security, (3) confidentiality | DPA preamble, §3, §5, §6, §7, Annex I | C-09 source | COVERED for Kauro↔customer. Kauro↔AWS/Resend/Google rely on the providers' standard DPAs: LAWYER_LATER L-01 |
 | C-22 | Ley 1581 art. 26; SIC Circular Única Título V cap. 3 numeral 3.2 | Transfers only to adequate countries; the **United States of America is on the SIC list** | DPA §10.2; POL §13.3; AVISO | [SIC, Circular Externa 005 de 2017 (adds cap. 3 to Título V)](https://www.sic.gov.co/sites/default/files/normatividad/072017/Transferencia-internacional-de-datos-PFR2.pdf); [SIC sede electrónica, ficha de la norma](https://sedeelectronica.sic.gov.co/transparencia/normativa/adicionar-un-capitulo-tercero-al-titulo-v-de-la-circular-unica-transferencia-de-datos-personales-terceros-paises); C-15 source | COVERED |
 | C-23 | Título V cap. 3 numeral 3.2, parágrafo primero | Even toward adequate countries, the controller must demonstrate appropriate and effective measures | DPA §10.2, Annex II | C-22 sources | COVERED |
-| C-24 | Ley 1581 arts. 17(k), 18(f); Decreto 1074 arts. 2.2.2.25.6.1–2.2.2.25.6.2 | Internal manual of policies and procedures; demonstrated accountability proportional to size | Referenced in DPA §5(f) | C-09 source | **OPEN**: the internal manual (request handling, incident, retention, access) is not a customer text and does not exist yet; B19 activation item A-03 |
+| C-24 | Ley 1581 arts. 17(k), 18(f); Decreto 1074 arts. 2.2.2.25.6.1–2.2.2.25.6.2; SIC accountability guide | Internal manual of policies and procedures; demonstrated accountability proportional to size: proportional structure, internal mechanisms with training, processes for queries and claims; SIC guide programme (commitment and data-protection officer, operational procedures, database inventory, risk management, training, incident protocol, processor management, annual supervision and review) | MAN §3 (roles: legal representative = data-protection officer), §4 (inventory: R-01..R-08 controller, E-01..E-02 processor), §5.1–§5.2 (requests with legal deadlines), §5.4 (incidents: customer 72 h, SIC 15 business days), §5.5 (subprocessors), §5.6 (retention and deletion), §5.10 (training), §9 (annual review); DPA §5(f) | C-09 source (arts. 2.2.2.25.6.1–6.2 read in pr026); [SIC, Guía para la implementación del principio de responsabilidad demostrada (accountability)](https://www.sic.gov.co/sites/default/files/files/Publicaciones/Guia-Accountability.pdf) (image-only PDF, read page by page) | COVERED (signature and the registers of MAN §8 before activation: A-03) |
 | C-25 | Decreto 1074 art. 2.2.2.25.2.8 | Keep data only as long as reasonable and necessary; documented retention and deletion procedures | POL §15; ToS §13; DPA §13, Annex IV | C-03 source | COVERED (procedures exist in authority 09; owner-set periods for own data, see S-13) |
 | C-26 | Decreto 1074 art. 2.2.2.25.2.2 ¶3 | Communicate substantial policy changes before implementing; new authorization if the purpose changes | POL §20; AVISO | C-03 source | COVERED |
-| C-27 | SIC Circular Externa 002 de 2024 (21-ago-2024), AI guidelines | Before processing personal data with AI, a privacy impact assessment (description of operations, risk assessment, mitigation measures); processors that use AI do it jointly with the controller | DPA §12.3 (assistance), Annex I.2.4, Annex II (model row) | [SIC, Circular Externa 002 de 2024](https://sedeelectronica.sic.gov.co/sites/default/files/normativa/Circular%20Externa%20No.%20002%20del%2021%20de%20agosto%20de%202024.pdf) | **OPEN**: a written privacy impact assessment of the Bedrock step (minimized L0–L2 context) is needed before activation; item A-04. The texts do not claim it exists |
+| C-27 | SIC Circular Externa 002 de 2024 (21-ago-2024), AI guidelines | Instruction I: weigh suitability, necessity, reasonableness, strict proportionality; II: precaution; III: risk management; **IV: before design/development, where a high risk is likely, a documented privacy impact study with at least (a) detailed description of the operations, (b) identification and classification of specific risks, (c) planned measures**; V: data quality; VI: privacy by design; VII: information to data subjects; VIII: auditable security. Footnote 2: addressed to controllers **and processors** (the earlier wording "jointly with the controller" is not in the text and was removed) | PIA §1 (a), §2–§3 (I), §4 (b, III), §5 (c, II, V, VI, VIII), §6 (VII), §7 residual risk, §9 sign-off; MAN §5.8; DPA §12.3, Annex I.2.4, Annex II | [SIC, Circular Externa 002 de 2024](https://sedeelectronica.sic.gov.co/sites/default/files/normativa/Circular%20Externa%20No.%20002%20del%2021%20de%20agosto%20de%202024.pdf) (scanned PDF, read page by page) | COVERED_IF_BUILT: PIA measures M4/M5 and the Bedrock transport need A-09, A-10, A-12 (plus A-06) before the first customer datum reaches Bedrock; signature A-04 |
 | C-28 | Decreto 255 de 2022 (binding corporate rules) | Only for groups using BCRs | — | Noted as modification on the Función Pública page of Ley 1581 (C-01) | N/A (no corporate group) |
 | C-29 | Ley 1266 de 2008 / Ley 2157 de 2021 / Ley 2573 de 2026 (financial habeas data) | Credit-reporting regime | — | C-01 (art. 2(e) excludes these databases); SIC draft resolution 2026 (§6) | N/A (Kauro is not a source, operator or user of credit information) |
 
@@ -102,6 +102,9 @@ determine whether a given agency meets a state law's thresholds; the terms are o
 | V-05 | Resend acts as processor; primary processing in the United States (DPA updated 2025-12-31) | DPA Annex III; POL §13.1 | [Resend DPA](https://resend.com/legal/dpa) | 2026-10-06 |
 | V-06 | PayPal's privacy notice names the PayPal entity of the user's jurisdiction as controller of the payment data it processes | DPA §8.3; POL §13.2 | [PayPal Colombia, Aviso de Privacidad](https://www.paypal.com/co/legalhub/paypal/privacy-full) | 2026-10-06 |
 | V-07 | Wise group companies act as controllers of the data of their customers, payers and recipients | DPA §8.3; POL §13.2 | [Wise, Business Customer Privacy Policy](https://wise.com/gb/legal/privacy-notice-business-en) | 2026-10-06 |
+| V-09 | AWS and third-party model providers do not use Bedrock inputs or outputs to train any models; inputs and outputs are not shared with model providers | PIA M8 | [Amazon Bedrock FAQs](https://aws.amazon.com/bedrock/faqs/) | 2026-10-06 |
+| V-10 | Model invocation logging is disabled by default; when enabled it stores full request/response bodies in S3 or CloudWatch until deleted; read with GetModelInvocationLoggingConfiguration; only `bedrock-runtime` calls are logged | PIA M5; A-10 | [Bedrock model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html) | 2026-10-06 |
+| V-11 | Data retention mode is set per Region at account level (`PUT /data-retention` on the control plane; IAM `bedrock:PutAccountDataRetention` / `bedrock:GetAccountDataRetention`); `none` = nothing written to durable storage; a model whose minimum mode is above the effective mode fails with ValidationException; an SCP can deny any mode other than `none`; the control plane exposes no per-model retention signal | PIA M4; A-09 | [Bedrock data retention](https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html) | 2026-10-06 |
 | V-08 | AWS: the customer chooses the Region where content is stored; AWS does not move it outside the chosen Region except as necessary to provide the service or to comply with law | DPA §9 | [AWS Data Privacy FAQ](https://aws.amazon.com/compliance/data-privacy-faq/) | 2026-10-06 |
 
 ## 6. Currency check: norms modified or pending
@@ -128,12 +131,16 @@ determine whether a given agency meets a state law's thresholds; the terms are o
 |---|---|---|
 | A-01 | Onboarding and fit form show consent with links to POL and AVISO, store user, document version and time of acceptance of ToS, DPA and POL; DPA chain (agency–end client or two-party) recorded per end client (R2-111) | B11 / B19 |
 | A-02 | Data-subject requests recorded as cases with type, received date, statutory deadline, verification, response (19 §Rights requests) | B12 / B19 |
-| A-03 | Internal manual of personal-data policies and procedures (C-24) | builder, before B19 |
-| A-04 | Written privacy impact assessment of the model step (C-27) | builder, before B19 / B04 live |
+| A-03 | MAN signed by the legal representative (F-06); registers of MAN §8 created (requests, incidents, subprocessors, own-data deletion, training); owner's first training entry (MAN §5.10) | owner, before B19 |
+| A-04 | PIA signed by the legal representative (F-06) after A-06, A-09, A-10 and A-12 pass | owner, before the first customer datum reaches Bedrock |
 | A-05 | Checkout shows identity, total price with taxes, Quote terms and these documents before payment (C-37) | B11 / B19 |
 | A-06 | AWS Region(s) bound in IaC are US Regions; Bedrock called in a US Region or US geographic profile, account retention mode `none`, invocation logging off, no model requiring retention (DPA §9, Annex II) | B14 / B04 |
 | A-07 | Contracts with AWS (Service Terms + DPA), Resend (DPA) and Google Workspace accepted under the company and filed | owner / B19 |
-| A-08 | Owner fill-ins F-01..F-05 completed and effective date set | owner |
+| A-08 | Owner fill-ins F-01..F-06 completed and effective date set | owner |
+| A-09 | **Build**: a probe reads back `GET /data-retention` = `none` (IAM `bedrock:GetAccountDataRetention`) in every source Region used (us-east-1, us-west-2) before each B04 stage and at every production deploy, refusing otherwise; the account policy/SCP denies `bedrock:PutAccountDataRetention` with any mode other than `none`. Not built: IC `tools/campaign/aws-probes.mjs` at b819658 has no such probe (P8 only records the data-protection page) and its least-privilege policy lacks the read action (PIA M4, V-11) | IC B04 (campaign) / B14–B15 (production) |
+| A-10 | **Build/config**: probe P4 (`GetModelInvocationLoggingConfiguration`, OFF only when there is no `loggingConfig`) passes in every source Region used, before each B04 stage (exists in IC `tools/campaign/aws-probes.mjs`) **and** at every production deploy (platform side not built) (PIA M5, V-10) | IC B04 / B14–B15 |
+| A-11 | Owner holds working access to the SIC incident-report channel usable by a company not registered in the RNBD (MAN §5.4 step 5); channel to be confirmed (LAWYER_LATER L-17) | owner, before B19 |
+| A-12 | **Build**: the Bedrock transport (IC branch `ic/b04-integrate`, not on IC main b3d0cc6) is merged, released and consumed by the platform, and the live privacy suite (sentinels on the real Bedrock wire) passes in the B04 smoke (PIA M3, M7) | IC B04 / B05 |
 
 ## 8. Silences and contradictions in the authority, with the resolution used
 
@@ -156,6 +163,9 @@ determine whether a given agency meets a state law's thresholds; the terms are o
 | S-15 | Website analytics and cookies | 01 CH-006 mentions analytics with minimum facts; 08 only session cookies; B11 design: session cookie only, Next.js telemetry off | Policy states only a strictly necessary session cookie and no third-party advertising/tracking cookies (POL §16); adding analytics requires updating POL first |
 | S-16 | Language | D54: product copy is English; D-08b asks for Spanish texts plus an English DPA | Spanish texts prevail except the DPA (EN and ES equal). US customers accept English UI; English versions of ToS and POL are needed before the first US customer: LAWYER_LATER L-11 |
 | S-17 | Mandatory phone number in the policy vs the four allowed placeholders | Decreto 1074 art. 2.2.2.25.3.1 num. 1 requires a phone | Added a fifth placeholder [teléfono], listed as owner fill-in F-05 |
+| S-19 | Training and annual review of the data programme | No authority section sets them (12 covers seller training only) | Annual owner training and annual review per the SIC accountability guide IV.A (MAN §5.10, §9) |
+| S-20 | Where the internal registers (requests, incidents, subprocessors, training) live before the platform has them | 19 §Rights requests and §Incident obligations require the records, not the system | Company Google Workspace, owner-only access, no CRM content (MAN §8); POL §13.1 Google row widened to say so |
+| S-21 | Who approves a support break-glass grant in a one-person company | 08 §Support access requires requester and approver | Same person; the written reason in the grant is reviewed in the annual review; no record access at all until B16 ships the grant (MAN §5.7) |
 | S-18 | Colombian customers' COP route | A8 §2 rule 6 says "their own route" without naming it | ToS §7.4: "por la ruta que Kauro indique en su Cotización" |
 
 ## 9. Count
@@ -164,12 +174,13 @@ Obligation rows: 53 (C-01..C-70 in sections 1–4, counting C-09b and C-62b).
 
 | Status | Rows |
 |---|---|
-| COVERED | 36 |
-| COVERED_IF_BUILT | 10 |
-| OPEN | 2 (C-24 internal manual, C-27 AI impact assessment) |
+| COVERED | 37 |
+| COVERED_IF_BUILT | 11 |
+| OPEN | 0 |
 | N/A | 4 (C-16 RNBD, C-28, C-29, C-70) |
 | UNVERIFIED | 1 (C-67) |
 
-The texts cover 46 of the 48 applicable obligations (COVERED + COVERED_IF_BUILT; applicable = 53 minus 4 N/A minus 1
-UNVERIFIED). The two OPEN rows are internal artifacts, not clauses, and block activation until done. Several COVERED rows also
-carry a residual LAWYER_LATER question, noted in the row.
+The texts cover all 48 applicable obligations (COVERED + COVERED_IF_BUILT; applicable = 53 minus 4 N/A minus 1 UNVERIFIED).
+C-24 (internal manual) is COVERED by MAN and C-27 (AI impact assessment) is COVERED_IF_BUILT by PIA, because the PIA's
+retention and logging measures need the build checks A-09, A-10 and A-12; both documents still need the legal representative's
+signature (A-03, A-04). Several COVERED rows also carry a residual LAWYER_LATER question, noted in the row.
