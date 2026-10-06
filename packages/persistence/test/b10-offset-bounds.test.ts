@@ -11,6 +11,7 @@ import { after, before, test } from "node:test";
 import { recomputePool, type AdjustmentReason, type CommissionLineId, type EventId, type NewCommissionAdjustment } from "@kauro/domain";
 import { PgCommissionLedgerRepository } from "../src/index.js";
 import { clock } from "../src/testing/harness.js";
+import { recordHold } from "../src/testing/index.js";
 import { invariantsAfterEach } from "../src/testing/invariants.js";
 import {
   accrue,
@@ -81,7 +82,7 @@ async function refundTo(ag: Agency, p: Purchase, basisCents: bigint, agreementVe
  * a 100000 basis) refunded to 3000 (basis 75000) — a 1000-cent negative position each — and ELIGIBLE receiving lines of the cents given (the first
  * purchase's FIRST line at 1000 bps on ten times those cents, then one REPEAT purchase at 400 bps per further receiving line).
  */
-async function sellerWith(label: string, negatives: number, receiving: ReadonlyArray<number>): Promise<{ seller: Seller; negativeLines: string[]; receivingLines: string[] }> {
+async function sellerWith(label: string, negatives: number, receiving: ReadonlyArray<number>): Promise<{ seller: Seller; agencyId: string; negativeLines: string[]; receivingLines: string[] }> {
   const seller = await activeSeller(w, `${label}-seller`, { offsetTerms: "SIGNED_FUTURE_OFFSET" });
   const a = await acquired(w, `${label} agency`, [{ seller, shareBps: 10000 }]);
   const entitlementId = a.entitlements.get(seller.sellerId)!;
@@ -114,7 +115,7 @@ async function sellerWith(label: string, negatives: number, receiving: ReadonlyA
     assert.equal(row.position, 1000, "a 1000-cent negative position");
     negativeLines.push(lineId);
   }
-  return { seller, negativeLines, receivingLines };
+  return { seller, agencyId: a.ag.agencyId, negativeLines, receivingLines };
 }
 
 /** The commission service records an offset of a negative line against a receiving line of its seller. */
@@ -159,11 +160,42 @@ test("DENY: two negative lines of one seller each offset within its own position
   assert.deepEqual(await offsetsOf(seller), [[n1, r, 700], [n2, r, 700], [n1, r, 300]]);
 });
 
-test("DENY: two distinct negative lines of one seller, each within its own position, whose offsets against ONE receiving line together exceed that line's unpaid-minus-held capacity are refused at the cent that exceeds it", async () => {
+test("DENY: two distinct negative lines of one seller, each within its own position, whose offsets against ONE receiving line together exceed that line's unpaid amount are refused at the cent that exceeds it", async () => {
   const { seller, negativeLines: [n1, n2], receivingLines: [r] } = await sellerWith("bounds-receiving-aggregate", 2, [1000]);
   await offset(seller, n1!, r!, 600);
   await assert.rejects(offset(seller, n2!, r!, 401), amountRefused, "the receiving line has 400 unpaid left after the first line's offset");
   assert.deepEqual(await offsetsOf(seller), [[n1, r, 600]], "the refused offset wrote nothing");
   await offset(seller, n2!, r!, 400);
   assert.deepEqual(await offsetsOf(seller), [[n1, r, 600], [n2, r, 400]]);
+});
+
+// The receiving line's capacity is its unpaid amount LESS its OPEN holds (R2-102: a partial hold leaves the line on its path and the statement
+// withholds exactly the held cents; composeStatement clips an offset to unpaid - held, so an offset admitted beyond that is durable, consumes
+// the negative position in full, and is never applied: owner money lost). Adversary ADV-3; migration 0045 is the guard that refuses it.
+test("DENY: an offset beyond the receiving line's unpaid amount less its OPEN partial hold is refused commission_offsets_amount (the statement would clip the excess and the negative position would be consumed in full)", async () => {
+  const { seller, negativeLines: [n], receivingLines: [r] } = await sellerWith("bounds-open-hold", 1, [1000]);
+  await recordHold(w.h, { ownerUserId: w.kora, lineId: r!, amountCents: 100n });
+  await assert.rejects(offset(seller, n!, r!, 901), amountRefused, "1000 unpaid, 100 held OPEN: 900 is the capacity, 901 exceeds it by one cent");
+  assert.deepEqual(await offsetsOf(seller), [], "the refused offset wrote nothing");
+  await offset(seller, n!, r!, 900);
+  assert.deepEqual(await offsetsOf(seller), [[n, r, 900]]);
+});
+
+test("DENY: the capacity less an OPEN hold is shared by every offset against the line: a second negative line's offset beyond what the first left of unpaid-minus-held is refused", async () => {
+  const { seller, negativeLines: [n1, n2], receivingLines: [r] } = await sellerWith("bounds-open-hold-aggregate", 2, [1000]);
+  await recordHold(w.h, { ownerUserId: w.kora, lineId: r!, amountCents: 100n });
+  await offset(seller, n1!, r!, 500);
+  await assert.rejects(offset(seller, n2!, r!, 401), amountRefused, "900 capacity, 500 offset already: 401 exceeds the 400 left");
+  assert.deepEqual(await offsetsOf(seller), [[n1, r, 500]], "the refused offset wrote nothing");
+  await offset(seller, n2!, r!, 400);
+});
+
+test("a RELEASED hold withholds nothing: the offset may use the line's whole unpaid amount again", async () => {
+  const { seller, agencyId, negativeLines: [n], receivingLines: [r] } = await sellerWith("bounds-released-hold", 1, [1000]);
+  const hold = await recordHold(w.h, { ownerUserId: w.kora, lineId: r!, amountCents: 100n });
+  await within(w.commission, service(agencyId), async (c) => {
+    assert.equal((await new PgCommissionLedgerRepository(c, ids).resolveHold(hold.holdId, 1, "RELEASED", clock.now())).kind, "APPLIED");
+  });
+  await offset(seller, n!, r!, 1000);
+  assert.deepEqual(await offsetsOf(seller), [[n, r, 1000]]);
 });
