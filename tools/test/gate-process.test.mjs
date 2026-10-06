@@ -19,20 +19,22 @@ test('cleanup failure is reported when the body succeeded, and removal is retrie
   await assert.rejects(withCleanup('x', async () => {}, () => { throw new Error('EPERM during cleanup'); }), /EPERM during cleanup/);
 });
 
-test('the gate helper waits for the runner (ppid) as well as the worker, and fails if the runner survives', async () => {
+// A long-lived detached child spawned here would inherit handles of other test files' children on Windows
+// (libuv inherits handles) and keep their fixture directories locked: the very flake this guards. Linux only.
+test('the gate helper waits for the runner (ppid) as well as the worker, and fails if the runner survives', { skip: process.platform === 'win32' && 'a detached survivor leaks handles into concurrent Windows tests' }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'kauro-gate-helper-'));
   const signal = process.platform === 'win32' ? 'SIGKILL' : 'SIGTERM';
   // The "gate" writes "<worker pid> <runner pid>"; the runner is a detached process that outlives the gate.
   writeFileSync(join(root, 'gate.mjs'), `import {spawn} from 'node:child_process'; import {writeFileSync} from 'node:fs';
 process.on('SIGTERM', () => process.exit(143));
-const runner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {detached: true, stdio: 'ignore'});
+const runner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {detached: true, stdio: 'ignore', cwd: process.argv[2]});
 runner.unref();
 writeFileSync('pid', process.pid + ' ' + runner.pid);
 setInterval(() => {}, 1000);
 `);
   let runnerPid;
   try {
-    const failure = await interruptedWorker(join(root, 'gate.mjs'), [], root, join(root, 'pid'), signal).then(() => null, (error) => error);
+    const failure = await interruptedWorker(join(root, 'gate.mjs'), [tmpdir()], root, join(root, 'pid'), signal).then(() => null, (error) => error);
     runnerPid = Number((await import('node:fs')).readFileSync(join(root, 'pid'), 'utf8').split(' ')[1]);
     assert.ok(failure, 'a surviving runner must fail the helper');
     assert.match(failure.message, /survived/);

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { command, requireCommand } from "../test-runner.mjs";
-import { interruptedWorker } from './gate-process.mjs';
+import { interruptedWorker, withCleanup } from './gate-process.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), "../red-proof.mjs");
 const file = "packages/cell/test/value.test.ts";
@@ -264,12 +264,12 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGKILL']) {
   test(`interrupting red-proof gate with ${signal} kills its worker`, { skip: (signal === 'SIGKILL' ? process.platform !== 'win32' : process.platform !== 'linux') && (signal === 'SIGKILL' ? 'Windows job-object test; Linux signals are tested separately' : 'Linux signal test; Windows has its own gate-kill test') }, async () => {
     const f = fixture();
     const pidFile = join(f.parent, 'pid');
-    try {
-      f.put(file, HEAD + `import {writeFileSync} from 'node:fs'; test('hang', () => { writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); return new Promise(() => setInterval(() => {}, 1000)); });`);
+    await withCleanup(f.parent, async () => {
+      f.put(file, HEAD + `import {writeFileSync} from 'node:fs'; test('hang', () => { writeFileSync(${JSON.stringify(pidFile)}, process.pid + ' ' + process.ppid); return new Promise(() => setInterval(() => {}, 1000)); });`);
       f.git('add', '.'); f.git('commit', '-qm', 'hung worker');
       await interruptedWorker(script, [f.base, f.git('rev-parse', 'HEAD'), '--tests', file], f.root, pidFile, signal, {TMPDIR: f.scratch, NODE_DISABLE_COMPILE_CACHE: '1'});
       if (signal !== 'SIGKILL') assert.deepEqual(readdirSync(f.scratch), []);
-    } finally { rmSync(f.parent, {recursive: true, force: true}); }
+    });
   });
 }
 test("red proof records the deciding body assertion ahead of a failing hook", () => {
