@@ -1,8 +1,16 @@
-# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r11
+# SEC-DEPTH-PROVENANCE: trigger depth is no provenance (design + failure matrix), r12
 
 Target path: `docs/design/SEC-DEPTH-PROVENANCE.md`. Base: kauro-platform `main` 21b310f. Closes Codex p0-admission-r2 (on 0217109)
 findings 1-3 and the 0015 analogue. r2-r9 answered design reviews 062a982 .. 84ef1e6. r8 stepped back to P1 (below).
-r11 answers Codex design r10 (7e9174c, REJECT: SDP-21/29 FIXED, SDP-26/30 PARTIAL, SDP-31/32/33 new) by changing the METHOD: section 3
+r12 answers Codex design r11 (96e2e98, REJECT: SDP-21/29/31/32/33 FIXED, SDP-26/30 PARTIAL, SDP-34/35 new). Method: completeness is
+MACHINE-CHECKED. `tools/sec/guard-reads.mjs` extracts, from the migration SQL, every table and column the lane's 41 guard functions
+(section 1 plus their kauro callees) read or write, and flags learned-once (NULL->value) columns; section 3b is generated from that
+inventory, and `tools/test/sec-guard-reads.test.mjs` fails when any inventory column has no 3b cell, a learned-once column has no
+first-assignment binding, or a table has neither a line nor a residual entry. On 21b310f: 39 tables, 306 columns, 47 first
+assignments, 0 unmapped (33 tables mapped, 6 residual).
+- SDP-34: every learned-once column is first assigned only by the operation that owns it, with the DB value (B12; 3b "first:").
+- SDP-35: founding_slots (read by 0028:311) is row 25: birth only by its 0028 seed (B11), so no extra discounted slot can be minted.
+r11 answered Codex design r10 (7e9174c, REJECT: SDP-21/29 FIXED, SDP-26/30 PARTIAL, SDP-31/32/33 new) by changing the METHOD: section 3
 is a per-table LIFETIME matrix (birth, every guarded transition, DELETE, TRUNCATE, identity, deferred queue per parent and child)
 over every table a G1-G14 guard or a B binding reads or protects; the R27 cells are generated from it (rule 15).
 - SDP-31: both capacity ledgers refuse DELETE/TRUNCATE, the platform singleton refuses INSERT after its seed (its only birth), the
@@ -135,6 +143,7 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | BIRTH: a derived column bound at UPDATE only, or a deferred relation queued only per child (11, at birth) | SDP-30 (after SDP-20/28) | every derived/bookkeeping column of section 1 and the capacity ledgers: F13 | fixed: ledger_seq (B3), allocated_cents (B4), last_admitted_at (B9), cancel_version (B2); deferred relations queued per parent on INSERT and UPDATE and per child: ledger (B3), allocation (B4), owner count, recurrence (B5), capacity (0021:406-413, plus the platform INSERT queue, B9); bound already: the F13 list |
 | LIFETIME: birth or transitions bound, but DELETE/TRUNCATE, replacement or identity change left open; a counter bound only by "no decrease" (15) | SDP-31, SDP-32 (third round) | every table of section 3, enumerated row by row | fixed by section 3 + B11 (uniform DELETE/TRUNCATE refusal, config freeze), B9 (capacity identity, singleton birth), B2 (cancel +1 by its operation) |
 | LOCK ORDER: an added lock that reverses an existing actor's order, or upgrades a weaker lock (14) | SDP-29 (after SEC-109) | sweep (grant -> requests), reservation (grant -> upstream requests), HOLD/RELEASE (carve -> pool), every reconciling writer, FK KEY SHARE | fixed: one global order and one grant lock mode (B3 lock protocol); a writer outside it fails fast with NOWAIT, never waits; R12e covers each pair in both orders |
+| FIRST ASSIGNMENT / UNLISTED TABLE: a learned-once column taken as operation-bound, or a read table missing from the hand-built list (15) | SDP-34, SDP-35 | every table and column extracted by tools/sec/guard-reads.mjs (3b) | fixed: B12 (47 first assignments), founding_slots row 25 (B11); completeness test fails on any unmapped entry |
 | IDENTITY exemption (single; P1) | SDP-23 | grep of F1 | only G14 (removed) and G5 (authorisation, kept) |
 
 ## 3. Lifetime matrix (rule 15): every table a G1-G14 guard or a B binding reads or protects
@@ -170,11 +179,53 @@ exact permitted transition. Queue = the deferred relation checks and what queues
 | 22 | execution_capacity | the migration seed (0021:294) is its only birth; INSERT refused after 0046 (B9) | active/waiting = recount (0021:410); last_admission_at = now, later, with an admission now (G11) | frozen (B9) | frozen (B9) | ledger_id CHECK = 1 (0021:287) | AFTER INSERT (new) and UPDATE (0021:410) / per job (0021:406-408) |
 | 23 | agency_execution_capacity | live_jobs 0, last_admitted_at NULL (B9) | live_jobs = recount (0021:412); last_admitted_at = now, later, with an admission of this agency now (G12) | frozen (B9) | frozen (B9) | agency_id immutable (B9, new) | INSERT/UPDATE (0021:412) / per job (0021:406-408) |
 | 24 | package_versions | initial state (0022:223), workflow (0022:509) | state: listed; available_at once (0022:221); publication guard (0022:576) | frozen (B11) | frozen (B11) | ids (0022:219) | per job READY (0022:594) / per authorization (0022:619) |
+| 25 | founding_slots | the 0028 seed (0028:158) is its only birth; INSERT refused after it (B11, SDP-35) | held, live_reservation_id, live_agency_id: founding_slots_guard (0028:344), settled (0028:375); policy_version, slot_no: key, not updatable (0028:344) | refused (0028:345) | refused (0028:346) | PK (policy_version, slot_no) | reservation <-> slot (0028:321) |
 
-Scope and completeness: the matrix is complete for the 35 tables that a G1-G14 guard or a B binding reads or protects. Tables
-read only by guards outside this inventory are NOT in it and stay with their owners: retention_anchors, retention_records,
-dataset_revisions (read by B08's admission bound 0021:700), domain_events and aggregate_kinds (B06 event binding 0005), identities,
-quotes and approvals (FK targets). Residual, lane B-LIFETIME-2 (a later lifetime pass over the whole schema with this rule).
+Scope: rows 1-25 (36 tables). Completeness is not asserted by hand: 3b is the machine-checked inventory.
+
+### 3b Column inventory (generated from `node tools/sec/guard-reads.mjs`; checked by `tools/test/sec-guard-reads.test.mjs`)
+
+One line per inventory table: imm = immutable (forbid_column_change); bound = the column's permitted transition and its guard;
+first = a learned-once column (NULL->value) and the ONLY operation that may first assign it, with its value (B12). A residual table
+is read by a covered guard (processing_jobs_workflow at queueing, B08's admission bound 0021:700) as an authority fact owned by
+B07/B09; its lifetime is deferred to lane B-LIFETIME-2 with this rule (risk: a forged approval, quote, target contract, revision
+or retention fact would admit a job; owners B07/B09, their own guards stand meanwhile). Re-run the generator when 0045-0052 land:
+the test then also covers the new bindings' reads.
+
+- `agencies` (row 1) imm: `agency_id` `created_by_user_id`; bound: `active_owner_count` B5a recount; `state` listed edge by an owner (0002:91, :126).
+- `agency_execution_capacity` (row 23) bound: `agency_id` immutable (B9); `last_admitted_at` G12/B9 (born NULL); `live_jobs` recount (0021:412), born 0 (B9); `updated_at` now() (touch_updated_at).
+- `agency_recurrence` (row 18) bound: B5b (birth and update): `agency_id` `confirmation_count` `created_at` `first_authorization_id` `first_capture_id` `first_confirmed_at` `first_project_id` `first_seq` `last_confirmed_at` `updated_at`.
+- `attribution_claims` (row 17) imm: `claim_id` `created_at`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump); first: `agency_id` no binding needed: CORPORATE scope never copies it into history (B7) and no lane guard decides on it.
+- `audit_steps` (row 13) imm: `agency_id` `audit_id` `claimed_at` `fence` `kind` `step_id`; first: `evidence_class` the record UPDATE only (B12); `evidence_hash` the record UPDATE only (B12); `outcome` the record UPDATE only, with the other three (B12); `recorded_at` the record UPDATE := now (0023:601).
+- `audits` (row 12) imm: `absolute_deadline_at` `agency_id` `audit_id` `created_at` `grant_id` `revision_id` `started_at` `target_contract_id`; bound: `cancel_version` +1 on cancellation_wins only (0023:458); `fence` B6; `finding_codes` only on ->NEEDS_DECISION/UNSUPPORTED (0023:473); `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump); first: `cancel_actor_kind` cancellation_wins with cancel_version +1 (0023:458); `candidate_manifest_hash` only on the audits_workflow edge that requires it (B12); `draft_plan_id` only on the draft-ready edge (0023:648, B12); `interpretation_deadline_at` ->INTERPRETING := least(now + 1200 s, absolute) (0023:511); `interpreting_at` ->INTERPRETING := now (0023:510); `profile_evidence_hash` only on the audits_workflow edge that requires it (B12); `profiling_at` ->PROFILING := now (0023:505); `terminal_at` terminal edges := now (0023:482); `terminal_reason` terminal edges only (B12); `validating_at` ->VALIDATING := now (0023:513).
+- `capture_facts` (row 4) imm: `agency_id` `amount_cents` `capture_id` `order_id`; bound: `allocated_service_cents` fixed at PENDING->COMPLETED (0015:388); `allocated_tax_cents` fixed at PENDING->COMPLETED (0015:388); `status` listed (0015:402); first: `provider_completed_at` PENDING->COMPLETED or a COMPLETED birth only, <= now (B12).
+- `commercial_authorizations` (row 20) imm: `agency_id` `approval_id` `authorization_id` `capture_id` `order_id` `project_id` `quote_id`; bound: `state` listed + B10; first: `consumed_at` ACTIVE->CONSUMED = its job's admitted_at = now (B10); `delivered_at` ->DELIVERED = its job's ready_at = now (B10); `job_ref` ACTIVE->CONSUMED = the job admitted now (B10).
+- `commercial_transitions` (row 14) bound: append-only, bound at INSERT (B7): `actor_user_id` `agency_id` `from_state` `machine` `recorded_at` `subject_id` `subject_version` `to_state`.
+- `commission_entitlements` (row 17) imm: `agency_id` `created_at` `entitlement_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `commission_holds` (row 17) imm: `agency_id` `created_at` `hold_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `commission_lines` (row 17) imm: `agency_id` `created_at` `line_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `commission_periods` (row 17) imm: `created_at` `period_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `commission_statements` (row 17) imm: `created_at` `statement_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `cost_grants` (row 8) imm: `agency_id` `ceiling_cents` `created_at` `expires_at` `grant_id` `grant_kind` `pool_grant_id`; bound: `reconciled_spend_cents` B3 event; `reserved_cents` B3 event; `state` listed + B3 close rule; `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump); first: `authorization_ref` PREPARED->AUTHORIZED; AUDIT = its pool (0023:172); `authorized_at` ->AUTHORIZED := now (0023:175); `closed_at` ->CLOSED := now (0023:200); `expired_at` ->EXPIRED := now (0023:186).
+- `execution_capacity` (row 22) bound: `active_jobs` recount (0021:410); `last_admission_at` G11; `ledger_id` CHECK = 1 (0021:287); `updated_at` now() (touch_updated_at); `waiting_jobs` recount (0021:410).
+- `founding_slot_reservations` (row 16) imm: `agency_id` `created_at` `ends_at` `policy_version` `quote_id` `reservation_id` `slot_no`; bound: `state` listed + 0028:237, :270, :290; `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump); first: `consumed_at` ->CONSUMED := now (B8); `consumed_by_authorization_id` ->CONSUMED = the purchase's authorization (B8).
+- `founding_slots` (row 25) bound: `live_reservation_id` founding_slots_guard (0028:344), settled (0028:375); `policy_version` birth only by the 0028 seed (B11); founding_slots_guard (0028:344); `slot_no` birth only by the 0028 seed (B11); founding_slots_guard (0028:344).
+- `leases` (row 7) imm: `cost_authority_id` `created_at` `deadline_at` `resource_id` `resource_kind` `subject_hash`; bound: `cancel_version` +1 alone, JOB_ATTEMPT with a job cancel request (B2); `checkpoint_hash` kept once stored (B2); `expires_at` B2; `fence` +1 after expiry (B2); `heartbeat_at` now (B2); `owner_id` takeover after expiry (B2); `updated_at` now() (touch_updated_at).
+- `memberships` (row 2) imm: `agency_id` `user_id`; bound: `role` listed + authority (0002:307) + B5a; `state` listed + authority + B5a.
+- `model_tasks` (row 11) bound: append-only (0023:675): `agency_id` `audit_id` `grant_id` `interpretation_deadline_at` `maximum_cost_cents` `model_task_id`.
+- `package_versions` (row 24) imm: `agency_id` `job_id` `package_version_id`; bound: `state` listed (0022:225); first: `available_at` ->AVAILABLE := now (0022:488, B12).
+- `payment_orders` (row 3) imm: `agency_id` `created_at` `expected_amount_cents` `expected_service_cents` `expected_tax_cents` `order_id`; bound: `allocated_cents` B4 (born 0).
+- `payout_intents` (row 17) imm: `created_at` `intent_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `price_eligibility_snapshots` (row 21) bound: append-only (0014:400): `agency_id` `founding_discount_bps` `founding_slot_ref` `policy_version` `quote_id`.
+- `processing_attempts` (row 6) imm: `agency_id` `attempt_id` `created_at` `job_id` `ordinal`; bound: `launch_recorded_at` only with a launch_state change, := now (B12); `launch_state` launch edges (0021:620-622); `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); first: `claimed_at` CREATED->CLAIMED := now (0021:643); `ended_at` terminal edges := now (0021:665, :669); `fence` CREATED->CLAIMED = the lease fence it owns (0021:613, B1); `launch_intent_at` ->STARTING := now (0021:657); `manifest_object_name` ->STARTING, under its staging_prefix (B12); `provider_job_id` launch_state ->LAUNCHED only (0021:620, B12); `staged_at` ->STAGED := now (0021:661); `started_at` ->RUNNING := now (0021:659); `terminal_cause` terminal edges only (B12); `verifying_at` ->VERIFYING := now (0021:663).
+- `processing_jobs` (row 5) imm: `agency_id` `approval_id` `authorization_id` `capture_id` `created_at` `delivery_deadline_at` `input_binding_hash` `job_id` `project_id` `queued_at` `revision_hash` `validation_receipt_hash`; bound: `attempt_count` B1; `cancel_version` +1 on ->CANCEL_REQUESTED only (0021:470-476); `current_attempt_id` B1; `fence` B1; `holds` from state (0021:479-522); `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump); first: `admitted_at` QUEUED->ADMITTED := now (0021:486); `cancel_actor_kind` ->CANCEL_REQUESTED with cancel_version +1 (0021:471); `cancel_reason_code` ->CANCEL_REQUESTED with cancel_version +1 (0021:471); `cancel_requested_at` ->CANCEL_REQUESTED := now (0021:474); `execution_deadline_at` WAITING->ACTIVE := least(now + 8 h, delivery deadline) (0021:521-523); `published_package_id` ->READY = the package made AVAILABLE now (0022:594, B12); `ready_at` ->READY := now (0021:506); `started_at` ->RUNNING := now (0021:492); `terminal_at` terminal edges := now (0021:489); `terminal_reason` terminal edges only (B12); `verifying_at` ->VERIFYING := now (0021:499).
+- `prospects` (row 17) imm: `created_at` `prospect_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `qualifying_purchases` (row 19) bound: insert-only, every column from facts (B8): `agency_id` `allocated_service_cents` `authorization_id` `capture_id` `confirmation_seq` `confirmed_at` `created_at` `founding_basis` `founding_reservation_id` `order_created_at` `order_id` `project_id` `provider_completed_at` `quote_id`.
+- `request_journal` (row 10) imm: `agency_id` `cost_grant_id` `fence` `request_id` `reserved_cents` `task_id`; bound: `response_artifact_hash` once (0006:149); `state` 0006:143-159; `usage_state` frozen once RECONCILED (B3).
+- `seller_payout_destinations` (row 17) imm: `created_at` `destination_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `sellers` (row 17) imm: `created_at` `seller_id`; bound: `state` listed edge (enforce_listed_transition); `updated_at` now() (touch_updated_at); `version` +1 (enforce_version_bump).
+- `state_machines` (row 15) bound: config frozen (B11): `initial_state` `machine`.
+Residual B-LIFETIME-2: `approvals` `dataset_revisions` `quotes` `retention_anchors` `retention_records` `target_contracts`.
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
@@ -324,7 +375,13 @@ replacement birth is not supported) and its recount is also queued AFTER INSERT.
 (0021:406-413).
 B11 lifetime freeze (rule 15), `0052_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
-INSERT and UPDATE. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
+INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
+seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).
+B12 first assignment (SDP-34), in the workflow copies of the owning lanes (processing_jobs, processing_attempts, audits,
+audit_steps, package_versions in `0046`; cost_grants, capture_facts in `0048`/`0049`): for every learned-once column of 3b, `NEW.c IS
+DISTINCT FROM OLD.c` is refused (KA004) unless this UPDATE is the operation its "first:" cell names; on that operation an instant
+is assigned by the workflow (`:= now` or the stated expression, a caller value is overwritten) and an id, hash or code must satisfy
+the cell's fact. commercial_authorizations and founding_slot_reservations first assignments are already fact-bound by B10 and B8. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
 B10 authorization bounds (G14), in `0046`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
 0022:606-608). The fact checks themselves are unchanged and now bind every role, the oracle included.
 
@@ -368,6 +425,7 @@ race proof (rule 1).
 | R22 admission instants (G11/G12) | N/A guard (0044 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-81 S :: "DENY SEC-DEPTH (superuser nested admission): a future, past or unadmitted last_admission_at / last_admitted_at is refused KA082" | N/A | N/A guard |
 | R26 birth of derived columns (SDP-30) | N/A single statement | N/A | N/A | GAP SEC-118 M :: "RACE SEC-DEPTH (commit, empty ledger): a grant born and authorized with no money has its relation checked at COMMIT per grant; a failure there rolls the grant back"; SEC-119 M :: "RACE SEC-DEPTH (commit, empty allocation): an order born with no capture has its recount checked at COMMIT per order; a failure there rolls the order back" | N/A guard | GAP SEC-114 M :: "DENY SEC-DEPTH (superuser nested grant birth): a zero-money PREPARED pool born with ledger_seq = 9007199254740991 and no event is refused KA083"; SEC-115 M :: "DENY SEC-DEPTH (superuser nested order birth): an INTENT_CREATED order born with allocated_cents = 1, no capture and its event is refused KP002" | GAP SEC-116 S :: "DENY SEC-DEPTH (superuser nested lease birth): a lease born with cancel_version above 0 is refused KA005"; SEC-117 S :: "DENY SEC-DEPTH (superuser nested capacity birth): an agency ledger born with a last_admitted_at is refused KA082" | N/A (DENY SEC-114..117) |
 | R27 lifetime: DELETE/TRUNCATE (section 3, all rows) | N/A single statement | N/A | N/A | N/A | N/A | N/A | GAP SEC-L01..SEC-L24 T :: "DENY SEC-DEPTH (lifetime <table>): a superuser-owned nested DELETE of a row and a TRUNCATE are refused and the row survives", one title per section 3 row (row 17 iterates its 10 tables, row 15 its 3); OK sibling: none, no production writer deletes (F14) | N/A (DENY) |
+| R29 first assignment (SDP-34, 3b "first:") | N/A guard | N/A | N/A | N/A | N/A | GAP SEC-F01..SEC-F47 T :: "DENY SEC-DEPTH (first assignment <table>.<column>): a superuser-owned nested UPDATE assigning it outside its owning operation is refused KA004", one title per 3b first: entry, generated from the inventory; SEC-133 S :: "DENY SEC-DEPTH (forged admission instant): a nested admitted_at on a QUEUED job with its event, then both admission instants moved, is refused KA004 at the first write"; SEC-134 S :: "DENY SEC-DEPTH (forged ready instant): a nested ready_at = 10000-01-01 on a RUNNING ACTIVE job is refused and jobRecord still reads the job" | GAP SEC-135 H :: "DENY SEC-DEPTH (founding slot birth): a nested INSERT of founding slot 4 for R2-INITIAL is refused, and a later eligible quote gets no founding rate" | N/A (DENY) |
 | R28 lifetime: replacement, identity, counters (SDP-31/32, config) | N/A covered by SEC-50/54/70 locks | N/A | N/A | N/A | N/A | GAP SEC-125 S :: "DENY SEC-DEPTH (platform ledger replacement): a nested DELETE and re-INSERT of execution_capacity with matching counts and last_admission_at = infinity is refused, and the next admission commits"; SEC-126 S :: "DENY SEC-DEPTH (agency ledger replacement): a nested DELETE and re-INSERT of an agency ledger with matching live_jobs and NULL last_admitted_at is refused"; SEC-127 S :: "DENY SEC-DEPTH (agency ledger reparent): a nested UPDATE of a zero-live ledger's agency_id to another agency is refused KA004" | GAP SEC-128 S :: "DENY SEC-DEPTH (lease cancel jump): kauro_control setting a live lease's cancel_version to 9007199254740991 with heartbeat_at = server_now is refused KA005"; SEC-129 S :: "DENY SEC-DEPTH (lease cancel source): cancel_lease on a JOB_ATTEMPT lease whose job has no cancel request is refused KA005"; SEC-130 S :: "DENY SEC-DEPTH (config freeze): a nested INSERT of a state_transitions edge or a commercial_machines row, and an UPDATE of a registry scope, are refused" | N/A (DENY) |
 | R23 authorization bounds (G14) | N/A guard (B08's 0021/0022 race rows stand) | N/A guard | N/A | N/A guard | N/A guard | GAP SEC-106 S :: "DENY SEC-DEPTH (superuser definer flush): a superuser-owned definer consuming an ACTIVE authorization with no admission, with its event and SET CONSTRAINTS ALL IMMEDIATE, is refused KA081"; SEC-107 S :: "DENY SEC-DEPTH (superuser definer flush): CONSUMED to DELIVERED with no READY job and AVAILABLE package is refused KA081" | GAP SEC-108 S :: "OK SEC-DEPTH (real execution facts): consumption through queueJob and admitJob and delivery through publishJob commit for the oracle-free fixtures" | N/A guard |
 | R17 catalog gate | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A; S :: "SEC-DEPTH catalog: no kauro function reads pg_trigger_depth() or rolsuper, is_control_session() guards no value, no kauro function is SECURITY DEFINER, and the 11 history attachments equal kauro.commercial_machines" |
@@ -377,7 +435,8 @@ Timeout bound for SEC-38/46t/50t/54t/96t: the transaction's `SET LOCAL statement
 
 C1 Baseline proof. Must FAIL on 21b310f through base SQL only (the superuser-owned probe uses no new function or signature):
 SEC-24, 25, 28, 28b, 29, 30, 32, 34, 36, 39, 40, 40b, 48, 52, 56, 71, 73, 76, 78, 80, 18, and new in r9: SEC-82, 86, 90, 93, 94,
-95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117, and in r11 SEC-125, 126, 127, 128, 130 and every
+95, 100, 101, 102, 104, 106, 107, 111, 113, and in r10 SEC-115, 116, 117, and in r11 SEC-125, 126, 127, 128, 130, and in r12 SEC-133, 134, 135 and every
+SEC-Fnn whose owning operation is not already the only writer on main, and every
 SEC-Lnn whose row says "frozen (B11)" or "frozen (B9)". New-ledger-only (no baseline object; fail with the B3
 checks reverted): SEC-92, SEC-96t, SEC-97, SEC-114, SEC-118. SEC-119 fails with B4's per-order queue reverted; SEC-129 fails with B2's source rule
 reverted. SEC-Lnn of rows already refused on main (11 DELETE, 14, 16-19, 21 DELETE) are supplemental. SEC-120/121/122/124
@@ -399,7 +458,9 @@ the step claimed now"; SEC-78/100/101 -> SEC-99; SEC-79 -> SEC-57; SEC-80/111 ->
 RESERVED_SLOT and UNBACKED commit with every column equal to its facts"; SEC-81 -> "OK SEC-DEPTH: an admission stamps
 last_admission_at and last_admitted_at with server_now"; SEC-106/107 -> SEC-108; SEC-114/115 -> "OK SEC-DEPTH (birth): a pool, a carve and an order born through their production writers
 commit with ledger_seq 0 and allocated_cents 0"; SEC-116 -> SEC-27b; SEC-117 -> "OK SEC-DEPTH (birth): an agency's first job
-creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-125/126 -> "OK SEC-DEPTH (capacity): an admission and a job end move both ledgers and
+creates its ledger with no last admission and its admission stamps it"; SEC-122 -> SEC-120; SEC-Fnn -> "OK SEC-DEPTH (first assignment <table>.<column>): its owning operation assigns it" (one
+per entry, same generator); SEC-133/134 -> SEC-108 (real admission and publication); SEC-135 -> "OK SEC-DEPTH (founding): the first
+three eligible agencies reserve slots 1-3 of the seeded cohort"; SEC-125/126 -> "OK SEC-DEPTH (capacity): an admission and a job end move both ledgers and
 the admission instants"; SEC-127 -> the same; SEC-128/129 -> "OK SEC-DEPTH (lease cancel): cancel_command then
 mirrorCancellation advances the JOB_ATTEMPT lease's cancel_version by one"; SEC-130 -> "OK SEC-DEPTH (config): a fresh migration
 run seeds every machine and registry row"; SEC-132 -> SEC-120; SEC-Lnn -> none (F14); SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
@@ -416,7 +477,7 @@ grant-reconciliation.test.ts:31 (sweep lock mode), b08-end-to-end.test.ts:306), 
 FH-R2; audit fence (G6), admission instants (G11/G12). B09: R2-140, S058/S057 (b09-migrations.test.ts:278, :307), B09-F2
 (b09-critique.test.ts:346), S059 (b09-scenarios.test.ts:299). B10: d27uow, history, purchases, recurrence via L3; every 0028
 trigger (EXECUTE revoke); commission-support.ts:707 callers (b10-commission-service.test.ts:211, b10-failure-cells-accrual.test.ts
-:507, :766). B07: none.
+:507, :766). B07: none. B10: R2-136 (b10-recurrence-adapters.test.ts:592-595) seeds its synthetic one-slot cohort under DISABLE TRIGGER (B11).
 
 D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, never the oracle):
 - execution-migrations.test.ts:783-795: the stand-in now expects KA081 at COMMIT (title "D8-PEX-8 withdrawn: the superuser oracle is
@@ -436,15 +497,16 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | K kit | src/testing/depth-probe.ts (`nestedAsSuperuser`, `slowCheckHook`), src/testing/execution-delivery.ts (`consumeThroughExecution`, `deliverThroughExecution`), src/testing/index.ts | - | 45 min, 90k | claude-sonnet-5-5 |
 | L0 fixtures | b09-critique.test.ts, apps/api/test/b09-scenarios.test.ts, apps/api/test/commission-support.ts | D1 | 40 min, 100k | claude-sonnet-5-5 |
 | L1 hardening | migrations/0045, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
-| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129) | 190 min, 440k | Opus |
-| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119) | 215 min, 510k | Opus |
+| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129), B12 jobs/attempts/audits/steps/packages, SEC-133/134 | 220 min, 500k | Opus |
+| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
 | L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21 | 140 min, 330k | Opus |
-| L4 lifetime | migrations/0052, T | R27, SEC-130 | 110 min, 240k | claude-sonnet-5-5 |
+| L4 lifetime | migrations/0052, T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130 | 150 min, 320k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
 shown failing on 21b310f (log) and passing on the branch; C2 siblings green; full suites green in ci-local (WSL + Windows). Total
-about 13.5 h agent time, 1.87M tokens (r10: 11.1 h, 1.56M).
+about 14.8 h agent time, 2.03M tokens (r11: 13.5 h, 1.87M; r10: 11.1 h, 1.56M). The completeness tool and its test
+are done in this commit.
 
 ## F. Decisions and open questions
 
@@ -454,7 +516,7 @@ about 13.5 h agent time, 1.87M tokens (r10: 11.1 h, 1.56M).
 - Q2 (accepted) the port keeps `now`; every SQL `p_now` overload removed; SEC-33 keeps clock independence; port removal is a
   follow-up (B06 domain + 3 dispatchers).
 - Q3 withdrawn: per-source events, no SUM.
-- Q7 Section 3 is complete for this lane's 35 tables; the rest of the schema is residual B-LIFETIME-2 (section 3 note).
+- Q7 Completeness is machine-checked (3b; 0 unmapped on 21b310f); 6 tables are explicit residual B-LIFETIME-2 (3b preamble).
 - Q4 Section A is hardening; P2 states the guard-execution boundary and enforces the runtime half.
 - Q5 answered by the B7 registry table (11 attachments, scope, stamps).
 - Q6 REVERSED by the coordinator in r9: both `rolsuper` skips are removed (B10); D1 lists the fixture moves.
