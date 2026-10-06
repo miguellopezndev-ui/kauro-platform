@@ -44,13 +44,19 @@ After a timeout kill, the runner has at most ten seconds to close. A kill error 
 its reason; red-proof returns INCONCLUSIVE and stress-cells fails, without starting another phase or iteration.
 
 Body failures with error code `ERR_MODULE_NOT_FOUND` or `ECONNREFUSED` are INCONCLUSIVE (exit 2). A `TypeError` reporting
-“is not a function” or “is not a constructor” is INCONCLUSIVE only when its first stack frame is a direct call in the test
-file and the named identifier is absent from the base runtime build (excluding tests). An existing identifier or a product
-stack frame remains RED. Message text alone never identifies a missing module or service. Classification is per leaf test:
-a genuine red in a file with a missing-API sibling still proves red, and only genuine reds need recovery at head.
-This identifier inventory is conservative, not proof of causality. Residual: other exceptions,
-or assertions against missing API/data, can still appear red for a prerequisite failure; review the recorded assertion
-and keep regression fixtures and services available in both phases.
+“is not a function” or “is not a constructor” is classified by where it was thrown (the first stack frame), never by the
+name in its message, and only in the without-fix phase. A frame in the test file, in a file under a `test/`, `tests/`,
+`__tests__/`, `test-support/`, `test-utils/` or `testing/` directory (this includes `src/testing` and `dist/src/testing`
+support code), or without a file location is INCONCLUSIVE: the API the test calls is absent, so its behaviour assertion
+never ran. A frame under `src/` or `dist/src/` (product code) or any other path is RED. The nearest path segment decides.
+Message text alone never identifies a missing module or service. Classification is per leaf test: a genuine red in a file
+with a missing-API sibling still proves red, and only genuine reds need recovery at head.
+Residuals (read the recorded assertion): a product TypeError raised from a helper under a test directory is INCONCLUSIVE
+(fail closed; make an assertion decide). The converse is not detectable by frame: base product code that calls a member the
+test's fake lacks (for example `this.port.lookup is not a function` in product code, with the head test fake providing only
+the new method) is RED and can be certified although the behaviour assertion never ran. Other exceptions, or assertions
+against missing API/data, can also appear red for a prerequisite failure; keep regression fixtures and services available
+in both phases. Reviewers must read the deciding assertion; this residual belongs in the PR description.
 
 The JSON report contains resolved commits, reverted paths, each test's two outcomes and durations in milliseconds, the
 first error/assertion line, preparation errors, and a `PASS`/`FAIL` verdict. Exit codes are 0 for PASS, 1 for FAIL and 2 for
