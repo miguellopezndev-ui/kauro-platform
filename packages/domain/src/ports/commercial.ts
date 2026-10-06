@@ -265,6 +265,13 @@ export interface AgencyLifecycleRepository {
   recordAcceptance(acceptance: NewAgreementAcceptance): Promise<AgreementAcceptanceRecord>;
   acceptancesOf(agencyId: AgencyId): Promise<ReadonlyArray<AgreementAcceptanceRecord>>;
   /**
+   * The agency's exclusive transition half, held to COMMIT, taken by a transition writer BEFORE the agency's row lock (D10-TX-1: the
+   * transition subject, then its row). A reader holds the shared half and then takes the agency row's KEY SHARE through each foreign
+   * key it inserts; a writer holding the row FOR UPDATE that only then asks for the exclusive half closes a cycle with it (40P01:
+   * CMD043 against the continuation of CMD028). Re-entrant within the transaction.
+   */
+  lockTransition(agencyId: AgencyId): Promise<void>;
+  /**
    * The obligations inventory of a closure, read after the agency's exclusive transition half (taken here, so a payment order or refund
    * committing meanwhile is wholly seen; D10-AGY-2, D10-AGY-4). `activeWork` is B06's ActiveWorkInspector count of the agency (the
    * handler sums it over the agency's clients); every other member is read in this call.

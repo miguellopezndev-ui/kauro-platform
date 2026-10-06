@@ -10,6 +10,7 @@ import type { AgencyActivationView } from "@kauro/application";
 import type { AgencyId, FiscalIssuerRef, FiscalProfileId, UserId } from "@kauro/domain";
 import { publishAgreementVersions, recordReviewedFiscalProfile, type AgencyFixture, type PublishedAgreements } from "@kauro/persistence/testing";
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, sha, waitForApiLockWait, world, type Person, type World } from "./support.js";
+import { tenantWriter } from "./writers.js";
 
 let w: World;
 let versions: PublishedAgreements;
@@ -189,7 +190,7 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   // the retry under the same key activates it once; the identical retry replays the journaled 200 byte for byte
   const first = await activate(d, { key, body });
   completed<AgencyActivationView>(first, 200);
-  assert.equal(await acceptancesOf(d.agency.agencyId), 1);
+  assert.equal(await w.count("agency_agreement_acceptances", "agency_id = $1", [d.agency.agencyId]), 1);
   const replay = await activate(d, { key, body });
   assert.equal(replay.status, 200, replay.text);
   assert.equal(replay.text, replayTextOf(first));
@@ -198,7 +199,7 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   // the same key naming another billing profile is another request: a conflict, and nothing happens
   const other = await draftAgency("cmd002-race-other");
   assert.equal(outcome(w, await activate(d, { key, body: bodyFor(other.profileId) })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
-  assert.equal(await acceptancesOf(d.agency.agencyId), 1);
+  assert.equal(await w.count("agency_agreement_acceptances", "agency_id = $1", [d.agency.agencyId]), 1);
   assert.equal((await agencyRow(d.agency.agencyId))?.version, "2");
 
   // two keys racing on one expectedVersion: A holds inside its unit of work with the agency's row written; B blocks on the agency's row
@@ -220,4 +221,24 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   assert.deepEqual(asProblem(w, b).current, { version: 2, state: "ACTIVE" });
   assert.equal(await acceptancesOf(racing.agency.agencyId), 1, "one acceptance for one activation");
   assert.deepEqual((await w.events("agency", racing.agency.agencyId)).map((e) => e.type), ["agency.created.v1", "agency.activated.v1"]);
+});
+
+test("RACE (D10-TX-1, 40P01): ActivateAgency against a reader of the DRAFT agency that holds the agency's shared half and then inserts a row referencing it (the row's KEY SHARE, as CMD009 and CMD011 do) — the activation is observed waiting for the reader's half before it locks the row, the reader's insert proceeds, and once the reader ends the agency is ACTIVE; neither deadlocks", async () => {
+  const d = await draftAgency("cmd002-race-reader");
+  const reader = await tenantWriter(w, d.agency);
+  try {
+    await reader.query("SELECT kauro.await_transition('kauro.agencies', $1)", [d.agency.agencyId]);
+    const activating = activate(d, { key: freshKey("cmd002-race-reader"), body: bodyFor(d.profileId) });
+    // the activation waits on the agency (its exclusive half, before any row lock)
+    await waitForApiLockWait(w, "kauro.agencies");
+    // the reader's insert takes the agency row's KEY SHARE through its foreign key: the activation holds no row lock yet
+    // (CMD009's first write: the processing authority of a client of the DRAFT agency)
+    await reader.query("INSERT INTO kauro.processing_authorities (processing_authority_id, agency_id, recorded_by_membership_id, recorded_at) VALUES ($1, $2, $3, now())", [ids.next(), d.agency.agencyId, d.agency.ownerMembershipId]);
+    await reader.close();
+    assert.equal(completed<AgencyActivationView>(await activating, 200).data.agency.version, 2);
+  } finally {
+    await reader.close();
+  }
+  assert.equal((await agencyRow(d.agency.agencyId))?.state, "ACTIVE");
+  assert.equal(await w.count("agency_agreement_acceptances", "agency_id = $1", [d.agency.agencyId]), 1);
 });

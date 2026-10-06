@@ -395,8 +395,9 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.deepEqual(await footprint(s.agency.agencyId), afterFirst, "no effect");
   assert.equal((await w.row<{ state: string }>("quotes", "quote_id = $1", [quote.quoteId]))?.state, "WITHDRAWN");
 
-  // the order commits first: the order's intent holds the agency (its shared half and its row, read for sharing) and waits before its
-  // commit; CloseAgency waits for the agency's row lock (observed in pg_stat_activity), reads the order once it commits and refuses
+  // the order commits first: the order's intent holds the agency (its shared half, and its row's KEY SHARE through the rows it inserts)
+  // and waits before its commit; CloseAgency waits for the agency's exclusive half, which it takes before its row lock (D10-TX-1;
+  // observed in pg_stat_activity), reads the order once it commits and refuses
   const a = await sellingAgency("cmd043-race-order-first");
   const quoteA = await issuedQuote(a, "cmd043-race-order-first-quote");
   const proofA = await w.stepUp(a.owner);
@@ -405,7 +406,7 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   await hold.reached;
   const closing = close(a, { proof: proofA });
   try {
-    await waitForApiLockWait(w, "FROM kauro.agencies");
+    await waitForApiLockWait(w, "transition_key('kauro.agencies'");
   } finally {
     hold.release();
   }
@@ -435,4 +436,50 @@ test("RACE: an identical retry replays the 200, the same key with another assura
   assert.equal(outcome(w, orderB), "409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE");
   assert.equal(await w.count("payment_orders", "quote_id = $1", [quoteB.quoteId]), 0);
   assert.equal((await agencyRow(b.agency.agencyId))?.state, "CLOSING");
+});
+
+test("RACE (D10-TX-1, 40P01): CloseAgency against the continuation of the agency's payment order — the order paused at each point of its protocol after its intent committed (before the claim, after the claim, after the provider call, after the settlement), the closure holding the agency until its inventory — the closure takes the agency's exclusive half before its row, so the order's next unit of work, whose shared half and inserts (the row's KEY SHARE) need the agency, is observed waiting on the closure or finishes without it; the closure is 409 CLOSURE_OBLIGATIONS_UNRECONCILED and the order 201, never a deadlock", async () => {
+  const { w } = pw;
+  // AFTER_SETTLE: the order's last unit of work (the journal's answer) needs nothing of the agency's; every earlier point must wait
+  const points = [
+    { point: "AFTER_INTENT", waits: true },
+    { point: "AFTER_CLAIM", waits: true },
+    { point: "AFTER_CALL", waits: true },
+    { point: "AFTER_SETTLE", waits: false },
+  ] as const;
+  for (const { point, waits } of points) {
+    const s = await sellingAgency(`cmd043-cont-${point}`);
+    const quote = await issuedQuote(s, `cmd043-cont-${point}-quote`);
+    const proof = await w.stepUp(s.owner);
+    const paused = pw.holds.arm("CMD028", point, "PAUSE");
+    const ordering = call(w, { url: paymentRoutes.createPaymentOrder(quote.quoteId), token: s.billing.token, agency: s.agency.agencyId, key: freshKey(`cmd043-cont-${point}`), body: { termsHash: quote.termsHash } });
+    await paused.reached;
+    // the closure holds the agency (its exclusive half and its row) and pauses at the active-work inspection, before its inventory
+    const inspecting = w.holds.arm("collaborator");
+    const closing = close(s, { proof });
+    await inspecting.reached;
+    paused.release();
+    let settled = false;
+    const order = ordering.finally(() => {
+      settled = true;
+    });
+    let waited = false;
+    try {
+      for (let i = 0; i < 400 && !settled && !waited; i++) {
+        await w.h.oracle.query("SELECT pg_stat_clear_snapshot()");
+        const r = await w.h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'");
+        waited = r.rows.length > 0;
+        if (!waited) await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    } finally {
+      inspecting.release();
+    }
+    assert.equal(waited, waits, `${point}: the order's continuation ${waits ? "waits for" : "finishes without"} the closure (pg_stat_activity)`);
+    const [ordered, closed] = await Promise.all([order, closing]);
+    assert.equal(ordered.status, 201, `${point}: ${ordered.text}`);
+    assert.equal(outcome(w, closed), "409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED", `${point}: ${closed.text}`);
+    assert.equal((await agencyRow(s.agency.agencyId))?.state, "ACTIVE");
+    assert.equal(await w.count("payment_orders", "quote_id = $1", [quote.quoteId]), 1);
+    assert.equal(await w.count("agency_closures", "agency_id = $1", [s.agency.agencyId]), 0);
+  }
 });

@@ -66,6 +66,9 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.assuranceProofRef as AssuranceProofId, now);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `closing an agency needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const life = co.lifecycle(uow);
+          // the agency's exclusive half, then its row (D10-TX-1); the row first would deadlock with a payment order's continuation, which
+          // holds the shared half while its inserts wait for the row's KEY SHARE (40P01)
+          await life.lockTransition(agencyId);
           const agency = await uow.agencies.lock(agencyId);
           if (agency === null) throw new NotFoundFailure("agency");
           checkExpectedVersion(agency, body.expectedVersion);
