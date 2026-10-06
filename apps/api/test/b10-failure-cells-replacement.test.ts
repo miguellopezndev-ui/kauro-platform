@@ -646,7 +646,7 @@ faultCell(
     step: "CMD027 included-replacement protocol / TIMEOUT: S2 PurchaseRebinder held past its bound, its unit abandoned",
     fault: "timeout",
     expect:
-      "RACE (replacement): a re-binding that outlives its bound answers the retriable 202 with the replacement ISSUED and the journal entry open, and the abandoned SERVICE unit still ends: its late COMMIT before the retry, or racing it, or its late failure (reported, not swallowed), leaves the same key observing the final state by identity: exactly one re-binding, allowance ordinal 1, never re-bound twice",
+      "RACE (replacement): a re-binding that outlives its bound answers the retriable 202 with the replacement ISSUED and the journal entry open, and the abandoned SERVICE unit still ends: its late COMMIT before the retry, or racing it, or its late failure (reported, not swallowed) before the retry or under a retry already waiting on its locks, leaves the same key observing the final state by identity: exactly one re-binding, allowance ordinal 1, never re-bound twice",
   },
   async (ctx) => {
     // 1. the abandoned unit commits after the 202, then the same key retries: the re-binding it made is observed by its identity
@@ -710,6 +710,35 @@ faultCell(
       const resumed = view(await quoteCall(x.a, x.plan, key));
       assert.equal(resumed.replacement?.outcome, "REBOUND");
       reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+    }
+    // 4. the retry waits on the abandoned unit's locks and the unit ROLLS BACK (member 2 is the COMMIT): the retry re-binds exactly once, ordinal 1,
+    //    and never enters the observation branch (nothing was re-bound by the abandoned unit); the late failure is reported once
+    {
+      const x = await fixture("repl-tmo-retry-waits-rollback");
+      const key = freshKey("repl-tmo-retry-waits-rollback");
+      const lateBefore = iw.lateFailures.length;
+      const { pause } = await abandonedRebinding(ctx, x, key, "retry waits, abandoned unit rolls back");
+      const holder = await oracleRows<{ pid: number }>(iw, "SELECT pid FROM pg_stat_activity WHERE application_name LIKE 'kauro-api-payment%' AND state = 'idle in transaction'");
+      assert.equal(holder.length, 1, "the abandoned SERVICE unit stands open with its writes");
+      const retry = ctx.operation("the same key retried while the abandoned re-binding is in flight and about to roll back", () => quoteCall(x.a, x.plan, key)).then(
+        (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+        (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+      );
+      const waiting = await blockedBy(iw.h.oracle, holder[0]!.pid, "kauro-api-payment");
+      assert.match(waiting.application, /^kauro-api-payment/, "the retry's re-binding waits on the abandoned unit's locks");
+      pause.crash();
+      const answer = await retry;
+      assert.equal(answer.status, "fulfilled");
+      if (answer.status === "fulfilled" && answer.value.status !== 201) assert.fail(`the retry answered ${answer.value.status} ${answer.value.text}: ${JSON.stringify(iw.w.internalErrors.slice(-2).map((e) => String((e.error as Error)?.message ?? e.error)))}`);
+      const resumed = view(answer.status === "fulfilled" ? answer.value : (undefined as never));
+      assert.equal(resumed.replacement?.outcome, "REBOUND", "the retry re-bound the purchase itself");
+      const after = await stateOf(x, key);
+      reboundOnce(x, after, resumed.quote.quoteId);
+      assert.equal(after.journal, "COMMITTED");
+      await until("the abandoned re-binding's failure was reported", async () => iw.lateFailures.length > lateBefore);
+      const late = iw.lateFailures.slice(lateBefore).filter((l) => l.call === "CMD027.rebind");
+      assert.equal(late.length, 1, "one late failure, the abandoned unit's");
+      assert.equal(simulatedCrashOf(late[0]!.error)?.point, "pay.rebindings.record.after", "the reported failure is the one that ended the abandoned unit");
     }
   },
 );
