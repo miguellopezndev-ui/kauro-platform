@@ -150,7 +150,11 @@ export class KauroPool {
     this.#pool.on("error", (error: Error) => this.#sink({ pool: config.applicationName, connection: "IDLE", ...classifyError(error) }));
   }
 
-  /** The underlying pg pool (tests and diagnostics only; units of work go through `acquire`). */
+  /**
+   * The underlying pg pool. Units of work go through `acquire`; the one production use of `raw` is the side connection that ends an abandoned
+   * unit's backend (endAbandonedBackend, ADV-8/ADV-13), which runs a signalling statement only and so needs no role verification. Otherwise
+   * tests and diagnostics only: `raw` skips acquire's verification and the in-use error listener.
+   */
   get raw(): Pool {
     return this.#pool;
   }

@@ -8,6 +8,7 @@ import { after, before, test } from "node:test";
 import { DomainFailure, abandonWorkOf, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
 import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
 import { ROLES } from "../src/testing/index.js";
+import { END_BACKEND_WAIT_MS, endAbandonedBackend } from "../src/unit-of-work.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
 let h: Harness;
@@ -373,6 +374,44 @@ test("work that returns normally after the caller gave it up is refused INTEGRIT
     if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
   }
   assert.equal(alive, false, "the abandoned unit's backend ended (its client was destroyed, never returned to the pool)");
+});
+
+test("the explicit end of an abandoned backend is fenced by pid AND start instant: a recycled pid (another backend start) is never terminated, the named backend is (ADV-13)", async () => {
+  const { client } = await h.appPool.acquire();
+  let released = false;
+  try {
+    const named = (await client.query("SELECT pg_backend_pid() AS pid, (SELECT extract(epoch FROM backend_start)::text FROM pg_stat_get_activity(pg_backend_pid())) AS started")).rows[0] as { pid: number; started: string };
+    const alive = async (): Promise<boolean> => {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      return (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [named.pid])).rows.length === 1;
+    };
+    // the pid is this session's but the start instant is another backend's: the pid was recycled, the session must not be signalled
+    await endAbandonedBackend(h.appPool, { pid: named.pid, startedAt: "1.000000" });
+    assert.equal(await alive(), true, "a pid with another start instant is left alone");
+    assert.equal((await client.query("SELECT 1 AS ok")).rows[0].ok, 1, "and the session still answers");
+    // the same pid with the start instant it was named with is ended
+    await endAbandonedBackend(h.appPool, { pid: named.pid, startedAt: named.started });
+    const gone = Date.now() + 5_000;
+    while ((await alive()) && Date.now() < gone) await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(await alive(), false, "the backend that matches both is terminated");
+    client.release(new Error("terminated by the test"));
+    released = true;
+  } finally {
+    if (!released) client.release();
+  }
+});
+
+test("the explicit end is skipped when the side connection is not in hand within the wait: a connection that arrives late is released unused, no statement runs late (ADV-13)", async () => {
+  const statements: string[] = [];
+  let releases = 0;
+  const side = { query: async (sql: string) => void statements.push(sql), release: () => void releases++, on: () => side, off: () => side };
+  const stand = { raw: { connect: () => new Promise((resolve) => setTimeout(() => resolve(side), END_BACKEND_WAIT_MS + 500)) } };
+  const began = Date.now();
+  await endAbandonedBackend(stand as never, { pid: 1, startedAt: "1.0" });
+  assert.ok(Date.now() - began < END_BACKEND_WAIT_MS + 400, "the answer does not wait for the side connection beyond the wait");
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  assert.deepEqual(statements, [], "no signalling statement ran after the wait");
+  assert.equal(releases, 1, "the late connection went back to the pool unused");
 });
 
 test("compare-and-swap writes: a stale expected version applies nothing and returns the current safe version and state; an invisible row is NOT_FOUND", async () => {

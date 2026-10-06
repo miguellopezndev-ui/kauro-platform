@@ -298,14 +298,24 @@ export class PgUnitOfWork implements UnitOfWork {
  * through the columns granted to kauro_control. Every context starts without a finance scope: only the commerce unit of work of
  * an OPERATOR adopts one (kauro.finance_agency_id; decisions D-CTX-B1, D-CTX-B2, D-SCOPE-B1 of docs/design/B09-payments-fiscal.md).
  */
-async function bindContext(client: PoolClient, context: ExecutionContext): Promise<void> {
+async function bindContext(client: PoolClient, context: ExecutionContext): Promise<BackendIdentity | null> {
   const agencyId = context.kind === "TENANT" ? context.agencyId : context.kind === "SYSTEM" ? (context.agencyId ?? "") : "";
   const userId = userIdOf(context) ?? "";
-  await execute(
+  // the same round trip names the backend (ADV-13): its pid and the exact start instant, which together fence a later signal to this session
+  const bound = await execute(
     client,
-    "SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true), set_config('kauro.finance_agency_id', '', true)",
+    `SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true), set_config('kauro.finance_agency_id', '', true),
+            pg_backend_pid() AS backend_pid, (SELECT extract(epoch FROM backend_start)::text FROM pg_stat_get_activity(pg_backend_pid())) AS backend_start`,
     [agencyId, userId],
   );
+  const row = bound.rows?.[0] as { backend_pid?: unknown; backend_start?: unknown } | undefined;
+  return typeof row?.backend_pid === "number" && typeof row.backend_start === "string" ? { pid: row.backend_pid, startedAt: row.backend_start } : null;
+}
+
+/** A backend of the server: its pid and its start instant (epoch seconds, microsecond text). A pid alone can be recycled once the backend exits. */
+export interface BackendIdentity {
+  readonly pid: number;
+  readonly startedAt: string;
 }
 
 /** A SYSTEM context binds only an agency id the platform minted (UUIDv7): anything else would be a malformed tenant setting. */
@@ -436,13 +446,13 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
     }
     let destroy: Error | undefined;
     let unit: U | undefined;
-    // the backend this unit runs on, captured when the unit opens (the startup message's key data, no round trip): an abandoned unit's
-    // backend is ended explicitly once its client is destroyed (ADV-8)
-    const backendPid = (client as PoolClient & { processID?: number }).processID;
+    // the backend this unit runs on, named in the context-binding round trip: an abandoned unit's backend is ended explicitly once its client
+    // is destroyed (ADV-8), fenced by pid AND start instant (ADV-13)
+    let backend: BackendIdentity | null = null;
     try {
       await execute(client, `BEGIN ISOLATION LEVEL ${ISOLATION_SQL[isolation]}`);
       await execute(client, `SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
-      await bindContext(client, context);
+      backend = await bindContext(client, context);
       const ids = new TrackingIdGenerator(createIdGenerator(this.deps.clock, this.#random));
       const uow = open(client, ids);
       unit = uow;
@@ -473,29 +483,53 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       throw asFailure(e, context.correlationId);
     } finally {
       client.release(destroy);
-      if (unit?.abandonedWork != null && typeof backendPid === "number") await endBackend(pool, backendPid);
+      if (unit?.abandonedWork != null && backend !== null) await endAbandonedBackend(pool, backend);
     }
   }
 }
 
 /** The longest an abandoned unit's answer waits for its backend to be ended: the answer never waits on a busy pool. */
-const END_BACKEND_WAIT_MS = 1_000;
+export const END_BACKEND_WAIT_MS = 1_000;
 
 /**
  * ADV-8: destroying the client of an abandoned unit closes the socket, but a backend blocked in a lock wait does not read its socket, so
  * it would keep every lock of the abandoned transaction until its statement ends (the lock is granted, or statement_timeout fires). A
  * pooled side connection of the same login role cancels the statement and then terminates the backend, so the locks go at once.
+ *
+ * ADV-13: the signal is fenced by the backend's pid AND its start instant (pg_stat_activity), so a pid the operating system recycled for
+ * another session is never signalled; and it is skipped entirely when the side connection is not in hand within END_BACKEND_WAIT_MS (a
+ * connection that arrives later is released unused, never run late against a pid that may be someone else's by then). Assumes a DIRECT
+ * connection: behind a transaction pooler the pid is not the backend's (D10-GAP-6a; B14 obligation).
  * Best effort: the backend ends by itself at the latest when its statement does, so a failure here is never the unit's failure.
  */
-async function endBackend(pool: KauroPool, pid: number): Promise<void> {
+export async function endAbandonedBackend(pool: KauroPool, backend: BackendIdentity): Promise<void> {
   // a pool that does not expose its pg pool does not own the connections it hands out (a test harness routes its own connection through a
   // stand-in pool): the unit never ends a backend it does not own
   const raw = (pool as { readonly raw?: KauroPool["raw"] }).raw;
   if (raw === undefined) return;
+  let expired = false;
   const ended = Promise.resolve()
-    .then(() => raw.query("SELECT pg_cancel_backend($1) AS cancelled, pg_terminate_backend($1) AS terminated", [pid]))
+    .then(() => raw.connect())
     .then(
-      () => undefined,
+      async (side) => {
+        if (expired) {
+          side.release();
+          return;
+        }
+        const ignore = (): void => undefined; // an error of the side connection while it is held is not the unit's failure
+        side.on("error", ignore);
+        try {
+          await side.query(
+            "SELECT pg_cancel_backend(pid), pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = $1 AND extract(epoch FROM backend_start)::text = $2",
+            [backend.pid, backend.startedAt],
+          );
+        } catch {
+          // best effort
+        } finally {
+          side.off("error", ignore);
+          side.release();
+        }
+      },
       () => undefined,
     );
   let timer: NodeJS.Timeout | undefined;
@@ -504,6 +538,7 @@ async function endBackend(pool: KauroPool, pid: number): Promise<void> {
   });
   await Promise.race([ended, bound]);
   clearTimeout(timer);
+  expired = true;
 }
 
 export function createUnitOfWorkFactory(pool: KauroPool, deps: UnitOfWorkDependencies): PgUnitOfWorkFactory {
