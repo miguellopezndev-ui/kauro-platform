@@ -224,6 +224,18 @@ for (const [name, body, status, verdict, failedWithoutFix, passedAtHead, reason]
     "test('regression', () => {});\nif (value === 1) throw new Error('top-level failure');\n", 2, "INCONCLUSIVE", false, true, /failed to load or threw/],
   ["a different test passing at head does not recover the test that failed at base",
     "test(value === 1 ? 'regression' : 'renamed', () => assert.equal(value, 2));\n", 1, "FAIL", true, false],
+  ["a missing function at base is INCONCLUSIVE, not red",
+    "test('regression', () => { const api = value === 2 ? () => {} : undefined; api(); });\n", 2, "INCONCLUSIVE", false, true, /TypeError.*is not a function/],
+  ["a missing constructor at base is INCONCLUSIVE, not red",
+    "test('regression', () => { const Api = value === 2 ? class {} : undefined; new Api(); });\n", 2, "INCONCLUSIVE", false, true, /TypeError.*is not a constructor/],
+  ["a body-level missing module at base is INCONCLUSIVE, not red",
+    "test('regression', async () => { if (value === 1) await import('../src/missing.js'); });\n", 2, "INCONCLUSIVE", false, true, /ERR_MODULE_NOT_FOUND/],
+  ["a body-level refused connection at base is INCONCLUSIVE, not red",
+    "test('regression', () => { if (value === 1) throw Object.assign(new Error('required service unavailable'), {code: 'ECONNREFUSED'}); });\n", 2, "INCONCLUSIVE", false, true, /ECONNREFUSED/],
+  ["a missing-module code in the failure message is INCONCLUSIVE, not red",
+    "test('regression', () => { if (value === 1) throw new Error('ERR_MODULE_NOT_FOUND: required module unavailable'); });\n", 2, "INCONCLUSIVE", false, true, /ERR_MODULE_NOT_FOUND/],
+  ["a refused-connection code in the failure message is INCONCLUSIVE, not red",
+    "test('regression', () => { if (value === 1) throw new Error('ECONNREFUSED: required service unavailable'); });\n", 2, "INCONCLUSIVE", false, true, /ECONNREFUSED/],
 ]) {
   test(name, () => {
     const f = fixture();

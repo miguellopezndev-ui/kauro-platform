@@ -28,12 +28,18 @@ the caller's pnpm store, trying frozen offline installation first and retrying o
 Only the named packages and their workspace dependency closure are built. Plain TypeScript builds emit with `--noCheck`:
 head tests can refer to types introduced by the fix, so the negative control must reach execution; `verify:fast` checks types.
 Each named file must fail with reverted source
-and pass with unchanged head source. Both gates read structured events from `tools/test-events-reporter.mjs` (a custom
-`node:test` reporter writing JSON lines to `KAURO_TEST_EVENTS`), never spec text. Red means at least one leaf test failed
+and pass with unchanged head source. Both gates read structured events from the reporter exported by `tools/test-runner.mjs`,
+which adds error identity to `tools/test-events-reporter.mjs`'s JSON lines in `KAURO_TEST_EVENTS`, never spec text. Red means at least one leaf test failed
 its own body (`testCodeFailure`); hook failures, cancellations, load errors, timeouts and runs that executed no test are
 INCONCLUSIVE (exit 2). Green at head needs at least one passing leaf test, no failure, and every base-failing test passing. Preparation errors cannot count as a failing test. Added, removed and renamed source
 paths are restored correctly; emitted artifacts are cleared before each phase. The caller's worktree and Git metadata are
 untouched, including when `.git` is read-only. Temporary clone and worktree cleanup runs on success, errors and handled signals.
+
+Body failures reporting `TypeError` with “is not a function” or “is not a constructor”, `ERR_MODULE_NOT_FOUND`, or
+`ECONNREFUSED` are also INCONCLUSIVE (exit 2), with the error recorded as the reason: base may lack an API added by the fix,
+an import, or a required service. This classification is conservative, not proof of causality. Residual: other exceptions,
+or assertions against missing API/data, can still appear red for a prerequisite failure; review the recorded assertion
+and keep regression fixtures and services available in both phases.
 
 The JSON report contains resolved commits, reverted paths, each test's two outcomes and durations in milliseconds, the
 first error/assertion line, preparation errors, and a `PASS`/`FAIL` verdict. Exit codes are 0 for PASS, 1 for FAIL and 2 for

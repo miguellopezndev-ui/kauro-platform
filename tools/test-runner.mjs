@@ -1,11 +1,28 @@
 // Shared single-file Node test execution and workspace dependency ordering for the builder gates.
 import { spawn, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
+import testEvents from "./test-events-reporter.mjs";
 
-const REPORTER = new URL("./test-events-reporter.mjs", import.meta.url).href;
+const REPORTER = import.meta.url;
+
+// Preserve error identity alongside the existing reporter's bounded first message. In particular,
+// a missing module's message does not contain ERR_MODULE_NOT_FOUND, although its code does.
+export default async function* testEventsWithErrorIdentity(source) {
+  async function* annotated() {
+    for await (const event of source) {
+      if (event.type === "test:fail") {
+        const error = event.data.details?.error;
+        const cause = error?.cause ?? error;
+        appendFileSync(process.env.KAURO_TEST_EVENTS, JSON.stringify({ event: "error", errorName: cause?.name, errorCode: cause?.code }) + "\n");
+      }
+      yield event;
+    }
+  }
+  yield* testEvents(annotated());
+}
 
 export function command(program, args, cwd, { env = {}, timeoutMs } = {}) {
   const started = performance.now();
@@ -59,11 +76,12 @@ export function summarizeEvents(path, file) {
   const summary = {
     complete: records.some((record) => record.event === "summary"),
     passedNames: [], failedNames: [], bodyFailedNames: [], hookFailures: 0, cancelled: 0, otherFailures: 0, fileFailures: 0,
-    leafPassed: 0, leafFailed: 0, skipped: 0, todo: 0, assertion: null,
+    leafPassed: 0, leafFailed: 0, skipped: 0, todo: 0, assertion: null, inconclusiveFailures: [],
   };
   // Completion events are in postorder: a parent's last child completes immediately before the parent,
   // at a deeper nesting level. This also covers parents made with test()/t.test(), not just describe().
-  const completed = records.filter((record) => record.event === "pass" || record.event === "fail");
+  const completed = records.flatMap((record, index) => record.event === "pass" || record.event === "fail"
+    ? [{ ...record, ...(records[index - 1]?.event === "error" ? { errorName: records[index - 1].errorName, errorCode: records[index - 1].errorCode } : {}) }] : []);
   for (let index = 0; index < completed.length; index++) {
     const record = completed[index];
     const hasSubtests = completed[index - 1]?.nesting > record.nesting;
@@ -75,6 +93,11 @@ export function summarizeEvents(path, file) {
     }
     if (record.skip) { summary.skipped++; continue; }
     if (record.todo) { summary.todo++; continue; }
+    if (record.event === "fail" && ((record.errorName === "TypeError" && /\bis not a (?:function|constructor)\b/.test(record.message ?? ""))
+      || ["ERR_MODULE_NOT_FOUND", "ECONNREFUSED"].includes(record.errorCode)
+      || /\b(?:ERR_MODULE_NOT_FOUND|ECONNREFUSED)\b/.test(record.message ?? ""))) {
+      summary.inconclusiveFailures.push(`${record.errorName ?? "Error"}${record.errorCode ? ` [${record.errorCode}]` : ""}: ${record.message}`);
+    }
     if (hasSubtests) {
       if (record.event === "fail") {
         if (record.failureType === "hookFailed") summary.hookFailures++;

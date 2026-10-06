@@ -120,10 +120,11 @@ try {
           // Red only when at least one real test body failed its own assertions. Hook failures, cancellations,
           // load errors, timeouts and runs that executed nothing prove nothing.
           const timedOut = result.timedOut;
-          row.failedWithoutFix = !timedOut && result.status !== 0 && sum.leafFailed >= 1;
+          row.failedWithoutFix = !timedOut && !sum.inconclusiveFailures.length && result.status !== 0 && sum.leafFailed >= 1;
           row.baseFailedNames = row.failedWithoutFix ? sum.bodyFailedNames : [];
           if (!row.failedWithoutFix && !(result.status === 0 && ran >= 1)) {
             const why = timedOut ? `timed out after ${timeoutMin} min`
+              : sum.inconclusiveFailures.length ? sum.inconclusiveFailures.join("; ")
               : sum.fileFailures ? "the test file failed to load or threw at top level (import/syntax/missing export)"
               : sum.hookFailures ? "a before/after hook failed, so no test body proved the regression"
               : ran === 0 ? "no test executed (zero, all skipped, todo or suites only)"
