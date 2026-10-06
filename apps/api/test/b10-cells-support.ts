@@ -441,32 +441,58 @@ export function registerFamily(members: ReadonlyArray<Member<never, never>>, opt
 
 // --- the footprint (section 4, r2 R8) ------------------------------------------------------------------------------------------------
 
-type Snapshot = ReadonlyMap<string, ReadonlySet<string>>;
+interface Snapshot {
+  readonly rows: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Each table's primary-key columns: a row's durable identity, by which a removed row is matched to the update that replaced it. */
+  readonly keys: ReadonlyMap<string, ReadonlyArray<string>>;
+}
 async function snapshot(tables: ReadonlyArray<string>): Promise<Snapshot> {
-  const out = new Map<string, Set<string>>();
+  const rows = new Map<string, Set<string>>();
+  const keys = new Map<string, string[]>();
   for (const t of new Set([...tables, ...ALWAYS])) {
     if (!/^[a-z_]+$/.test(t)) throw new Error(`footprint table ${t} is not a kauro table name`);
     const r = await familyOf().oracle.query<{ j: string }>(`SELECT row_to_json(x)::text AS j FROM kauro.${t} x`);
-    out.set(t, new Set(r.rows.map((row) => row.j)));
+    rows.set(t, new Set(r.rows.map((row) => row.j)));
+    const k = await familyOf().oracle.query<{ col: string }>(
+      "SELECT a.attname AS col FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey::int2[]) WHERE i.indrelid = ('kauro.' || $1)::regclass AND i.indisprimary ORDER BY array_position(i.indkey::int2[], a.attnum)",
+      [t],
+    );
+    keys.set(t, k.rows.map((row) => row.col));
   }
-  return out;
+  return { rows, keys };
 }
 const canonical = (row: Record<string, unknown>): string => JSON.stringify(row);
+/** A row's durable identity: its primary-key values (null when the table has none: then no removal can be matched). */
+const identityOf = (key: ReadonlyArray<string>, row: Record<string, unknown>): string | null => (key.length === 0 ? null : JSON.stringify(key.map((c) => row[c] ?? null)));
 /**
  * The footprint rule: after a fault the footprint is the one before plus EXACTLY the rows the units before the target committed (a row an
  * earlier unit changed shows as its new version; its old version is the only row that may leave). The target unit's writes are absent.
+ * A removed row is matched by IDENTITY (its primary key) to a declared earlier row it is the previous version of, once: a deletion of an
+ * unrelated row never hides behind a legitimate insertion (B10-KIT-PR1-01).
  */
 async function assertFootprint(what: string, before: Snapshot, tables: ReadonlyArray<string>, earlier: RowSet): Promise<void> {
   const after = await snapshot(tables);
-  for (const [t, rows] of after) {
-    const was = before.get(t) ?? new Set<string>();
+  for (const [t, rows] of after.rows) {
+    const was = before.rows.get(t) ?? new Set<string>();
     const added = [...rows].filter((j) => !was.has(j)).map((j) => canonical(JSON.parse(j) as Record<string, unknown>)).sort();
-    const removed = [...was].filter((j) => !rows.has(j));
-    const expected = (earlier[t] ?? []).map((row) => canonical(JSON.parse(JSON.stringify(row)) as Record<string, unknown>)).sort();
+    const removed = [...was].filter((j) => !rows.has(j)).map((j) => JSON.parse(j) as Record<string, unknown>);
+    const declared = (earlier[t] ?? []).map((row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>);
+    const expected = declared.map(canonical).sort();
     assert.deepEqual(added, expected, `${what}: kauro.${t} gained exactly the rows the units before the target committed`);
-    assert.ok(removed.length <= added.length, `${what}: kauro.${t} lost ${removed.length} row(s) no earlier unit replaced`);
+    const key = after.keys.get(t) ?? [];
+    const updatable = new Map<string, number>();
+    for (const row of declared) {
+      const id = identityOf(key, row);
+      if (id !== null) updatable.set(id, (updatable.get(id) ?? 0) + 1);
+    }
+    for (const row of removed) {
+      const id = identityOf(key, row);
+      const left = id === null ? 0 : (updatable.get(id) ?? 0);
+      assert.ok(left > 0, `${what}: kauro.${t} lost a row that is not the previous version of a row an earlier unit updated (${key.length === 0 ? "the table has no primary key to match it by" : `key ${key.join(",")} = ${id}`})`);
+      updatable.set(id!, left - 1);
+    }
   }
-  for (const t of Object.keys(earlier)) assert.ok(after.has(t), `${what}: the earlier rows of ${t} are outside the member's footprint tables`);
+  for (const t of Object.keys(earlier)) assert.ok(after.rows.has(t), `${what}: the earlier rows of ${t} are outside the member's footprint tables`);
 }
 
 // --- routing of the act ---------------------------------------------------------------------------------------------------------------
