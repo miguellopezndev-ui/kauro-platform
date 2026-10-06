@@ -14,15 +14,17 @@ import type { CreateQuoteView } from "@kauro/application";
 import { commercialSourceReadsOf } from "@kauro/persistence";
 import { faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, open, sweepOn } from "./b10-cells-support.js";
+import { bindCells, failureOf, open, sweepOn } from "./b10-cells-support.js";
 import { checkoutOf, quoteFactsOf, type Checkout } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
+import { routedUnitsIssueWithTheRegistryPolicy } from "./b10-cells-6a-support.js";
 import { call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
+  routedUnitsIssueWithTheRegistryPolicy();
 });
 after(async () => {
   await iw.stop();
@@ -226,7 +228,8 @@ const value = <T>(r: PromiseSettledResult<T>): T => {
   return r.value;
 };
 /** The QUOTE_EXPIRY pass standing a minute past the reservation's end, on `conn`. */
-const expiryPassOn = (ctx: FaultContext, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = []) => sweepOn(ctx, conn, "QUOTE_EXPIRY", steps, new Date(Date.parse(endsAt) + 60_000).toISOString());
+const expiryPassOn = (ctx: FaultContext, conn: HarnessConnection, endsAt: string, steps: ReadonlyArray<SqlStep> = [], expectFailure = false) =>
+  sweepOn(ctx, conn, "QUOTE_EXPIRY", steps, new Date(Date.parse(endsAt) + 60_000).toISOString(), expectFailure ? { expectFailure: true } : {});
 const quoteState = async (quoteId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [quoteId]))[0]!.state;
 
 faultCell(
@@ -432,13 +435,20 @@ function neverBoth(o: SlotOutcome): "CONSUMED" | "RELEASED" {
 async function captureAgainstExpiry(ctx: FaultContext, label: string, first: "capture" | "sweep") {
   const x = await foundingCheckout(label);
   const capture = { login: "kauro_payment_test" as const, run: (c: HarnessConnection) => captureOn(ctx, c, x.a, x.checkout, [AUTHORIZATION_INSERT]) };
-  const sweep = { login: "kauro_commission_test" as const, run: (c: HarnessConnection) => expiryPassOn(ctx, c, x.reservation.ends_at, [SLOT_FREE]) };
+  const sweep = { login: "kauro_commission_test" as const, run: (c: HarnessConnection) => expiryPassOn(ctx, c, x.reservation.ends_at, [SLOT_FREE], true) };
   const raced: Raced =
     first === "capture"
       ? await holdAndWait(ctx, "the QUOTE_EXPIRY pass while the capture's designation holds the reservation", capture, sweep, "db.authorization.after")
       : await holdAndWait(ctx, "the capture while the QUOTE_EXPIRY pass holds the expired quote and its released slot", sweep, capture, "db.slot_free.after");
   const captured = (first === "capture" ? raced.held : raced.waited) as PromiseSettledResult<{ readonly authorizationId: string }>;
   const swept = (first === "capture" ? raced.waited : raced.held) as PromiseSettledResult<Report>;
+  // the raced pass may report its item FAILED (it hands the error to the sink): the cell names that failure
+  if (swept.status === "fulfilled") {
+    for (const item of swept.value.items.filter((i) => i.outcome.startsWith("FAILED"))) {
+      const e = failureOf(item.subject);
+      assert.fail(`the raced QUOTE_EXPIRY pass failed its item ${item.subject} (${item.outcome}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   // a later pass past the end decides anything left
   const conn = await open("kauro_commission_test");
   try {

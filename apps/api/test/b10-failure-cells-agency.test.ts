@@ -17,12 +17,14 @@ import { agentOf, anotherClient, bought, integrationWorld, oracleRows, planOf, q
 import { bindCells, open } from "./b10-cells-support.js";
 import { paymentRoutes } from "./commerce-support.js";
 import type { SqlStep } from "./fault-support.js";
+import { blockedBy, routedUnitsIssueWithTheRegistryPolicy } from "./b10-cells-6a-support.js";
 import { call, completed, freshKey, ids, outcome, routes, type Person, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
+  routedUnitsIssueWithTheRegistryPolicy();
   await publishAgreementVersions(iw.h, { terms: "TERMS-6A-1", privacy: "PRIVACY-6A-1" });
 });
 after(async () => {
@@ -347,15 +349,28 @@ faultCell(
       await intentOnly(ctx, x, key);
       const closeKey = freshKey("quote-close-s2r-close");
       const body = await closureBody(x.a);
-      const raced = await refusing(() =>
-        holdAndWait(
-          ctx,
-          "the refused replacement's withdrawal while CloseAgency holds the replacement",
-          { login: "kauro_app_test", run: (c) => closeOn(ctx, c, x.a, closeKey, body) },
-          { login: "kauro_app_test", run: (c) => quoteOn(ctx, c, x.a, x.plan, key) },
-          "uow.before-commit",
-        ),
-      );
+      // the recovery's re-binding runs in the payment service's own SERVICE unit (its pool, which the harness cannot route over a connection of
+      // its own): that unit is what waits on the closure, observed here in pg_stat_activity; the harness-counted wait is the other order's
+      const hc = await connect("kauro_app_test");
+      const wc = await connect("kauro_app_test");
+      const raced = await refusing(async () => {
+        try {
+          const pause = ctx.points.pause("uow.before-commit");
+          const closing = ctx.operation("CloseAgency holding the ISSUED replacement it withdrew (holder)", () => closeOn(ctx, hc, x.a, closeKey, body));
+          await pause.reachedBy(closing);
+          const recovering = ctx.operation("the same key's recovery, refused by the payment service", () => quoteOn(ctx, wc, x.a, x.plan, key)).then(
+            (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+            (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+          );
+          const waiting = await blockedBy(iw.h.oracle, connectionPid(hc), "kauro-api-payment");
+          assert.match(waiting.application, /^kauro-api-payment/, "the payment service's re-binding waits on the closure");
+          pause.release();
+          return { held: { status: "fulfilled", value: await closing } as PromiseSettledResult<Reply>, waited: await recovering };
+        } finally {
+          await hc.end();
+          await wc.end();
+        }
+      });
       const c = closed(value(raced.held));
       assert.deepEqual([c.agency.state, c.obligations.openQuotesWithdrawn], ["CLOSING", 1], "the closure withdrew the ISSUED replacement");
       assert.deepEqual(await replacementsOf(x.paidQuoteId), ["WITHDRAWN"]);

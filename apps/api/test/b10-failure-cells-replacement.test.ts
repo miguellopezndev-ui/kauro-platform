@@ -16,7 +16,7 @@ import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
 import { bindCells, contend, open } from "./b10-cells-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { call, completed, freshKey, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
+import { call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -142,17 +142,18 @@ faultCell(
       "RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders: exactly one re-binding and one allowance ordinal, the other refused with nothing written and, retried, REPLACEMENT_ALLOWANCE_SPENT",
   },
   async (ctx) => {
-    for (const order of ["first plan holds", "second plan holds"] as const) {
-      const x = await fixture(`repl-race-${order === "first plan holds" ? "a" : "b"}`);
-      const other = await replacementPlanOf(iw, x.a, x.paid, { units: 46_000, seed: `repl-race-other-${order}` });
-      const [holderPlan, waiterPlan] = order === "first plan holds" ? [x.plan, other] : [other, x.plan];
-      const holderKey = freshKey("repl-race-holder");
-      const waiterKey = freshKey("repl-race-waiter");
+    // one corrected revision is current at a time, so both keys replace with the one approved plan; each order is its own paid purchase
+    for (const order of ["key A holds", "key B holds"] as const) {
+      const x = await fixture(`repl-race-${order === "key A holds" ? "a" : "b"}`);
+      const keyA = freshKey("repl-race-a");
+      const keyB = freshKey("repl-race-b");
+      const [holderKey, waiterKey] = order === "key A holds" ? [keyA, keyB] : [keyB, keyA];
+      const waiterPlan = x.plan;
       const raced = await contend(
         ctx,
         // the holder stops before its intent's COMMIT: its replacement ISSUED and the paid quote's row locked
-        { name: `the replacement of ${order}`, login: "kauro_app_test", holdAt: "uow.before-commit", run: (conn) => quoteOn(ctx, conn, x, holderKey, [], holderPlan) },
-        { name: "the other key's replacement", login: "kauro_app_test", holdAt: "-", run: (conn) => quoteOn(ctx, conn, x, waiterKey, [], waiterPlan) },
+        { name: `the replacement of ${order}`, login: "kauro_app_test", holdAt: "uow.before-commit", run: (conn) => quoteOn(ctx, conn, x, holderKey) },
+        { name: "the other key's replacement", login: "kauro_app_test", holdAt: "-", run: (conn) => quoteOn(ctx, conn, x, waiterKey) },
         `two replacement intents on one paid purchase (${order})`,
       );
       assert.equal(raced.holder.status, "fulfilled");
@@ -429,9 +430,11 @@ faultCell(
     assert.equal(replay.status, 201);
     assert.equal(replay.text, replayTextOf(first), "the replay answers the journaled 201 WITHDRAWN byte for byte");
     assert.deepEqual(await stateOf(x, key), before, "the replay wrote nothing and did not re-bind");
-    // the same key with another body is another request
-    const other = await replacementPlanOf(iw, x.a, x.paid, { units: 46_000, seed: "repl-refuse-retry-other" });
-    assert.equal(outcome(iw.w, await ctx.attempt(() => quoteCall(x.a, other, key))), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
+    // the same key with another body (another billing profile reference) is another request
+    const conflict = await ctx.attempt(() =>
+      call(iw.w, { url: `/api/v1/projects/${x.plan.projectId}/quotes`, token: x.a.billing.token, agency: x.a.s.agency.agencyId, key, body: { planId: x.plan.planId, billingProfileRef: ids.next() } }),
+    );
+    assert.equal(outcome(iw.w, conflict), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
     assert.deepEqual(await stateOf(x, key), before, "the conflict wrote nothing");
   },
 );
