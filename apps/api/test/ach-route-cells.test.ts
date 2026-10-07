@@ -27,7 +27,7 @@ import { connectionPid, crashedAt, openConnection, runCell, SimulatedCrash, type
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
-import { call, completed, freshKey, outcome, routes, type Reply } from "./support.js";
+import { call, completed, freshKey, outcome, rawEvent, routes, type Reply } from "./support.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -154,6 +154,19 @@ async function withdrawPlan(b: Buyer): Promise<void> {
   const [plan] = await q<{ version: string }>("SELECT version::text FROM kauro.plans WHERE plan_id::text = $1", [b.planId]);
   completed(await call(bw.iw.w, { url: routes.withdrawApproval(b.planId), token: b.a.s.owner.token, agency: b.a.s.agency.agencyId, key: freshKey("withdraw"), body: { expectedVersion: Number(plan!.version), reasonCode: "OWNER_DECISION" } }), 200);
 }
+/**
+ * The billing member's membership revoked the way B06 writes the listed Membership edge (pipeline-authorization / cmd044 fixtures): the
+ * agency owner acting as itself (tenant context of `c`'s transaction), ACTIVE -> REVOKED with its version bump AND its
+ * membership.revoked.v1 event in the same transaction (the membership triggers refuse an actor-less write, KA010, and an event-less one).
+ */
+async function revokeBilling(c: { query: HarnessConnection["query"] }, a: Agent): Promise<void> {
+  const agency = a.s.agency;
+  await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agency.agencyId, agency.ownerUserId]);
+  const moved = await c.query<{ membership_id: string; version: string }>("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE' RETURNING membership_id::text, version::text", [a.billing.userId, agency.agencyId]);
+  assert.equal(moved.rowCount, 1, "the billing membership moved ACTIVE -> REVOKED");
+  const { membership_id: membershipId, version } = moved.rows[0]!;
+  await rawEvent(c as never, { aggregateKind: "membership", aggregateId: membershipId, aggregateVersion: Number(version), agencyId: agency.agencyId, eventType: "membership.revoked.v1", actorUserId: agency.ownerUserId, payload: { membershipId, agencyId: agency.agencyId, byMembershipId: agency.ownerMembershipId, reasonCode: "OFFBOARDED" } });
+}
 const issueBody = (b: { readonly quote: CreateQuoteView }, r: RouteView) => ({ termsHash: b.quote.quote.termsHash, routeKind: "BANK_TRANSFER", routeId: r.routeId });
 const issue = (b: { readonly a: Agent; readonly quote: CreateQuoteView }, r: RouteView, options: { readonly key?: string; readonly body?: unknown; readonly token?: string } = {}): Promise<Reply> =>
   call(bw.iw.w, { url: bankRoutes.order(b.quote.quote.quoteId), token: options.token ?? b.a.billing.token, agency: b.a.s.agency.agencyId, key: options.key ?? freshKey("bank-issue"), body: options.body ?? issueBody(b, r) });
@@ -164,7 +177,7 @@ async function issuedFootprint(projectId: string): Promise<{ orders: number; ins
   return {
     orders: await n("SELECT 1 FROM kauro.payment_orders WHERE project_id::text = $1", [projectId]),
     instructions: await n("SELECT 1 FROM kauro.bank_transfer_instructions i JOIN kauro.payment_orders o ON o.order_id = i.order_id WHERE o.project_id::text = $1", [projectId]),
-    accepted: await n("SELECT 1 FROM kauro.quotes WHERE project_id::text = $1 AND state = 'ACCEPTED'", [projectId]),
+    accepted: await n("SELECT 1 FROM kauro.quotes WHERE project_id::text = $1 AND state = 'ACCEPTED_FOR_CHECKOUT'", [projectId]),
     events: await n("SELECT 1 FROM kauro.domain_events e JOIN kauro.payment_orders o ON o.order_id::text = e.aggregate_id::text WHERE o.project_id::text = $1", [projectId]),
   };
 }
@@ -254,11 +267,18 @@ cell(`RACE ACH-M-R1-TIMEOUT (time): ${R1}`, "timeout", async (ctx) => {
   const r = await configured("r1timeout");
   let release!: () => void;
   const stalled = new Promise<void>((resolve) => (release = resolve));
-  const reply = await withStoreHook(await detailsRefOf(r.routeId), () => stalled, () =>
+  // the read is reached only after the product armed its bound (timer.start precedes store.get): the clock moves once it is armed
+  let armed!: () => void;
+  const readStarted = new Promise<void>((resolve) => (armed = resolve));
+  const reply = await withStoreHook(await detailsRefOf(r.routeId), () => {
+    armed();
+    return stalled;
+  }, () =>
     ctx.operation("verify whose details read never answers", async (op) => {
       const started = op.clock.nowMs();
       ctx.deadline(started + PROVIDER_CALL_TIMEOUT_MS, "details read bound");
       const pending = owner(bankRoutes.verify(r.routeId), await verifyBody(r));
+      await readStarted;
       ctx.clock.advance(PROVIDER_CALL_TIMEOUT_MS + 1);
       const out = await pending;
       release();
@@ -380,18 +400,22 @@ cell(`DENY ACH-M-R1-REVOCATION (revocation): ${R1}`, "revocation", async (ctx) =
 });
 
 cell(`RACE ACH-M-R1-PARTIAL (partial): ${R1}`, "partial", async (ctx) => {
-  // the account number reads, a later field does not: no partial snapshot, the route unqualified
+  // complete (valid) replacement details: incomplete ones are refused up front as malformed evidence (a DENY, no commit to crash at).
+  // The verify's route and version reads answer, then its details read fails (the classifier is a frozen contract fake: no seam inside the
+  // parse): no partial snapshot, the route unqualified
   const r = await configured("r1partial");
-  const broken = await detailsArtifact((await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref, { routingNumber: null });
+  const broken = await detailsArtifact((await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref);
   const replaced = completed<{ route: RouteView }>(await owner(bankRoutes.details(r.routeId), { expectedVersion: 1, detailsArtifactRef: broken.artifactRef, detailsEvidenceHash: broken.evidenceHash, authorizationRef: await proof() }), 200).data.route;
   const conn = await open();
   try {
-    await ctx.partial("verify of incomplete details", "uow.before-commit", () => on(ctx, conn, async () => {
-      const reply = await owner(bankRoutes.verify(r.routeId), await verifyBody(replaced));
+    const steps: ReadonlyArray<SqlStep> = [{ label: "version_read", match: /FROM kauro\.bank_route_versions/ }];
+    const body = await verifyBody(replaced);
+    await ctx.partial("verify whose details parse fails after its reads", "details-read.parse", () => withStoreHook(broken.artifactRef, () => ctx.points.pass("details-read.parse"), () => on(ctx, conn, async () => {
+      const reply = await owner(bankRoutes.verify(r.routeId), body);
       // the route answers 500 and reports the failure it hid: the cell sees the injected crash itself (crashedAt)
       if (reply.status >= 500) throw bw.iw.w.internalErrors.at(-1)?.error ?? new Error(String(reply.status));
       return reply;
-    }));
+    }, steps)));
   } finally {
     await conn.end();
   }
@@ -419,7 +443,9 @@ cell(`RACE ACH-M-R2-RACE (concurrency): ${R2}`, "race", async (ctx) => {
   }
 });
 
-cell(`RACE ACH-M-R2-TIMEOUT (time): ${R2}`, "timeout", async (ctx) => {
+cell(`RACE ACH-M-R2-TIMEOUT (time): ${R2}`, "race", async (ctx) => {
+  // a DATABASE bound (statement_timeout, SQLSTATE 57014), not a controlled-clock deadline: the kit's lock-timeout form (b10-cells-support
+  // kindOf: lock-timeout -> race; CLOSE_TMO) proves the wait on the holder (mustWait) and that it ended while the holder still held
   const r = await verified("r2timeout");
   const key = freshKey("r2timeout");
   const body = await enableBody(r, [bw.iw.w.A.agencyId]);
@@ -430,7 +456,8 @@ cell(`RACE ACH-M-R2-TIMEOUT (time): ${R2}`, "timeout", async (ctx) => {
     bw.iw.faults.statementTimeoutMs = 200;
     const conn = await open();
     try {
-      const timedOut = await ctx.attempt(() => ctx.operation("enable past its lock timeout", () => on(ctx, conn, () => owner(bankRoutes.enable(r.routeId), body, { key }))));
+      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => owner(bankRoutes.enable(r.routeId), body, { key })), "enable past its lock timeout");
+      const timedOut = ok(await waiting.pending);
       assert.ok(timedOut.status === 503 || timedOut.status === 500, "the lock wait timed out");
     } finally {
       bw.iw.faults.statementTimeoutMs = null;
@@ -599,15 +626,16 @@ cell(`DENY ACH-M-R2-REVOCATION (revocation): ${R2}`, "revocation", async (ctx) =
 });
 
 cell(`RACE ACH-M-R2-PARTIAL (partial): ${R2}`, "partial", async (ctx) => {
-  // fail each later write of the enable: participants, the version/state update, the event, the outbox, the journal
+  // the enable's writes in the command's real order (route-config.ts enable: update, appendParticipants, publish, journal); each LATER write
+  // fails in turn — the first write (the version/state update) has no earlier completed step, so a failure there is not partial (I2 form)
   const steps: ReadonlyArray<SqlStep> = [
-    { label: "participants", match: /INSERT INTO kauro\.bank_route_participants/ },
     { label: "route_update", match: /UPDATE kauro\.bank_routes/ },
+    { label: "participants", match: /INSERT INTO kauro\.bank_route_participants/ },
     { label: "event", match: /INSERT INTO kauro\.domain_events/ },
     { label: "outbox", match: /INSERT INTO kauro\.outbox_records/ },
     { label: "journal", match: /UPDATE kauro\.command_journal/ },
   ];
-  for (const step of steps) {
+  for (const step of steps.slice(1)) {
     const r = await verified(`r2partial-${step.label}`);
     const key = freshKey(`r2partial-${step.label}`);
     const body = await enableBody(r, [bw.iw.w.A.agencyId]);
@@ -666,7 +694,9 @@ cell(`RACE ACH-M-I1-RACE (concurrency): ${I1}`, "race", async (ctx) => {
   }
 });
 
-cell(`RACE ACH-M-I1-TIMEOUT (time): ${I1}`, "timeout", async (ctx) => {
+cell(`RACE ACH-M-I1-TIMEOUT (time): ${I1}`, "race", async (ctx) => {
+  // a DATABASE bound (statement_timeout, SQLSTATE 57014), not a controlled-clock deadline: the kit's lock-timeout form (b10-cells-support
+  // kindOf: lock-timeout -> race; CLOSE_TMO) proves the wait on the holder (mustWait) and that it ended while the holder still held
   const b = await buyer("i1timeout");
   const r = await enabled("i1timeout", [b.a.s.agency.agencyId]);
   const holder = await openHolder();
@@ -676,7 +706,8 @@ cell(`RACE ACH-M-I1-TIMEOUT (time): ${I1}`, "timeout", async (ctx) => {
     bw.iw.faults.statementTimeoutMs = 200;
     const conn = await open();
     try {
-      const reply = await ctx.attempt(() => ctx.operation("issuance whose readiness read times out", () => on(ctx, conn, () => issue(b, r))));
+      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => issue(b, r)), "issuance whose readiness read times out");
+      const reply = ok(await waiting.pending);
       assert.equal(code(reply), "503 CAPACITY_UNAVAILABLE -", "unknown capacity is not permission: retryable refusal");
     } finally {
       bw.iw.faults.statementTimeoutMs = null;
@@ -775,7 +806,7 @@ cell(`RACE ACH-M-I1-RETRY (retry): ${I1}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I1-REVOCATION (revocation): ${I1}`, "revocation", async (ctx) => {
   // each binding prerequisite withdrawn while the readiness read waits on the project lock
   const withdrawals: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => holder.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
     ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["route enabled state", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["plan approval", async (b) => withdrawPlan(b as Buyer), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
@@ -840,7 +871,9 @@ cell(`RACE ACH-M-I2-RACE (concurrency): ${I2}`, "race", async (ctx) => {
   }
 });
 
-cell(`RACE ACH-M-I2-TIMEOUT (time): ${I2}`, "timeout", async (ctx) => {
+cell(`RACE ACH-M-I2-TIMEOUT (time): ${I2}`, "race", async (ctx) => {
+  // a DATABASE bound (statement_timeout, SQLSTATE 57014), not a controlled-clock deadline: the kit's lock-timeout form (b10-cells-support
+  // kindOf: lock-timeout -> race; CLOSE_TMO) proves the wait on the holder (mustWait) and that it ended while the holder still held
   const b = await buyer("i2timeout");
   const r = await enabled("i2timeout", [b.a.s.agency.agencyId]);
   const key = freshKey("i2timeout");
@@ -851,7 +884,8 @@ cell(`RACE ACH-M-I2-TIMEOUT (time): ${I2}`, "timeout", async (ctx) => {
     bw.iw.faults.statementTimeoutMs = 200;
     const conn = await open();
     try {
-      const reply = await ctx.attempt(() => ctx.operation("issuance past its statement timeout", () => on(ctx, conn, () => issue(b, r, { key }))));
+      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => issue(b, r, { key })), "issuance past its statement timeout");
+      const reply = ok(await waiting.pending);
       assert.ok(reply.status >= 500, "timed out");
     } finally {
       bw.iw.faults.statementTimeoutMs = null;
@@ -958,7 +992,7 @@ cell(`RACE ACH-M-I2-RETRY (retry): ${I2}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I2-REVOCATION (revocation): ${I2}`, "revocation", async (ctx) => {
   // each issuance prerequisite revoked while Kinstructions waits at the route lock; a replaced route version re-reads its window (I2Δ)
   const revocations: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => holder.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
     ["route details replaced", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'PENDING_VERIFICATION', current_version = current_version + 1 WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
   ];
@@ -1093,10 +1127,17 @@ cell(`RACE ACH-M-I3-TIMEOUT (time): ${I3}`, "timeout", async (ctx) => {
   const ref = await detailsRefOf(x.r.routeId);
   let release!: () => void;
   const stalled = new Promise<void>((resolve) => (release = resolve));
-  const reply = await withStoreHook(ref, () => stalled, () =>
+  // the artifact read is reached only after the product armed its bound (timer.start precedes store.get): the clock moves once it is armed
+  let armed!: () => void;
+  const readStarted = new Promise<void>((resolve) => (armed = resolve));
+  const reply = await withStoreHook(ref, () => {
+    armed();
+    return stalled;
+  }, () =>
     ctx.operation("guarded read whose artifact read never answers", async (op) => {
       ctx.deadline(op.clock.nowMs() + PROVIDER_CALL_TIMEOUT_MS, "artifact read bound");
       const pending = readInstructions(x.b, x.orderId);
+      await readStarted;
       ctx.clock.advance(PROVIDER_CALL_TIMEOUT_MS + 1);
       const out = await pending;
       release();
@@ -1184,10 +1225,7 @@ cell(`DENY ACH-M-I3-REVOCATION (revocation): ${I3}`, "revocation", async (ctx) =
   }
   const bearer = (x: Issued, withdraw: () => Promise<unknown>): Reader => ({ read: () => readInstructions(x.b, x.orderId), withdraw });
   const withdrawals: ReadonlyArray<readonly [string, (x: Issued) => Promise<Reader>, (r: Reply) => boolean]> = [
-    ["membership", async (x) => bearer(x, async () => {
-      const moved = await bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [x.b.a.billing.userId, x.b.a.s.agency.agencyId]);
-      assert.equal(moved.rowCount, 1, "the billing membership moved ACTIVE -> REVOKED");
-    }), (r) => code(r) === "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["membership", async (x) => bearer(x, () => bw.iw.w.asTenant(x.b.a.s.agency, (c) => revokeBilling(c, x.b.a))), (r) => code(r) === "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
     ["route enabled", async (x) => bearer(x, () => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [x.r.routeId])), (r) => code(r) === "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["details artifact", async (x) => bearer(x, async () => bw.evidence.corrupt(await detailsRefOf(x.r.routeId), new TextEncoder().encode("{}"))), (r) => code(r) === "422 INTEGRITY_FAILURE HASH_MISMATCH"],
   ];
@@ -1215,17 +1253,19 @@ cell(`DENY ACH-M-I3-REVOCATION (revocation): ${I3}`, "revocation", async (ctx) =
 });
 
 cell(`RACE ACH-M-I3-PARTIAL (partial): ${I3}`, "partial", async (ctx) => {
-  // authorization passed, the artifact decrypt fails: fail closed, no body fragment, nothing logged
+  // the snapshot and route reads answered, the artifact decrypt fails: fail closed, no body fragment, nothing logged. The projection's real
+  // order (instructions.ts) is snapshot, route, version, artifact read, then authorization: the crash is the decrypt's own point, after them
   const x = await issuedOrder("i3partial");
   const ref = await detailsRefOf(x.r.routeId);
-  const steps: ReadonlyArray<SqlStep> = [{ label: "guard", match: /FROM kauro\.bank_routes/ }];
+  const steps: ReadonlyArray<SqlStep> = [
+    { label: "snapshot", match: /FROM kauro\.bank_transfer_instructions/ },
+    { label: "guard", match: /FROM kauro\.bank_routes/ },
+  ];
   const conn = await open();
   let reply: Reply | undefined;
   try {
-    await ctx.partial("projection failing at the artifact read after its guard", "db.guard.after", async () => {
-      reply = await withStoreHook(ref, async () => {
-        throw new SimulatedCrash("details-store.decrypt");
-      }, () => on(ctx, conn, () => readInstructions(x.b, x.orderId), steps));
+    await ctx.partial("projection failing at the artifact decrypt after its reads", "details-store.decrypt", async () => {
+      reply = await withStoreHook(ref, () => ctx.points.pass("details-store.decrypt"), () => on(ctx, conn, () => readInstructions(x.b, x.orderId), steps));
       if (reply.status >= 500) throw bw.iw.w.internalErrors.at(-1)?.error ?? new Error(String(reply.status));
       return reply;
     });
