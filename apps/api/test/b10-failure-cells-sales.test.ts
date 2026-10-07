@@ -425,6 +425,54 @@ faultCell(
   },
 );
 
+
+// CLAIM_LAPSE_ACCEPT (X, ADV-1): the listed claim's window ending while TerminateSeller waits on the agency's recurrence lock
+faultCell(
+  {
+    id: "CLAIM_LAPSE_ACCEPT",
+    step: "CMD050 TerminateSeller / RACE: X manifest entry whose claim lapses while the termination waits on the agency's recurrence lock",
+    fault: "race",
+    expect:
+      "RACE: TerminateSeller whose database clock stands before its listed ACCEPTED claim's acceptance-window end when it starts, and that waits on the agency's recurrence lock (held exclusively, as a refund's completion or a capture's reversal holds it, 0028) until the window has ended, writes no tail entry: 409 TAIL_NOT_ENUMERATED, the seller ACTIVE at its version, the claim ACCEPTED, no tail; KC011 judges the window at the instant of its statement after the wait (kauro.effect_now()) and again at COMMIT",
+  },
+  async (ctx) => {
+    const s = await seller(iw, "lapse-during-wait");
+    const op = await opportunityOf(iw, s, "lapse-during-wait");
+    const [row] = await oracleRows<{ expires_at: string }>(iw, `SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS expires_at FROM kauro.attribution_claims WHERE claim_id = $1`, [op.claimId]);
+    const body = await terminationBody(iw, s.sellerId, [op.claimId]);
+    const before = await sellerRow(s.sellerId);
+    // the termination's server clock half a second before the claim's window ends, from its seller lock on
+    ctx.clock.set(msOf(row!.expires_at) - 500);
+    const holder = await open("kauro_app_test");
+    const waiter = await open("kauro_app_test");
+    const key = freshKey("lapse-during-wait");
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agency_recurrence', $1))", [op.a.s.agency.agencyId]);
+      const pause = ctx.points.pause("db.seller_lock.before");
+      const waiting = await ctx.mustWait(iw.h.oracle, { waiter, holder: connectionPid(holder) }, async (conn) => {
+        const running = routed(ctx, conn, [SELLER_LOCK], () => terminate(s.sellerId, key, body));
+        try {
+          await pause.reachedBy(running);
+          await ctx.clock.onServer(conn);
+        } finally {
+          pause.release();
+        }
+        return running;
+      }, "the termination while the agency's recurrence lock is held");
+      // the claim's window ends while the termination waits (its effect clock runs on with its transaction)
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await holder.query("COMMIT");
+      assert.equal(said(valueOf(await waiting.pending, "TerminateSeller")), "409 PRECONDITION_FAILED TAIL_NOT_ENUMERATED", "a window that ended during the wait enumerates no tail");
+    } finally {
+      await holder.end();
+      await waiter.end();
+    }
+    assert.deepEqual(await sellerRow(s.sellerId), before, "the seller stays ACTIVE at its version");
+    assert.deepEqual([...(await claimStates([op.claimId])), await tailsOf(s.sellerId)], ["ACCEPTED", 0]);
+    assert.notEqual(await journalState(key), "COMMITTED");
+  },
+);
 // =====================================================================================================================================
 // CMD049 ActivateSeller: SELLER_IDENT_RACE, CORP_REV, CMD_EXP_ASSURE
 // =====================================================================================================================================
@@ -744,7 +792,7 @@ faultCell(
     step: "CMD045 RegisterProspect / REVOCATION: W prospect + source-evidence binding (one COMMIT)",
     fault: "revocation",
     expect:
-      "RACE: TerminateSeller racing RegisterProspect of the seller in both orders with the lock wait observed: a registration that committed first is handled by the termination (the prospect left unowned, counted in prospectsUnassigned); a registration that waited on the termination is refused 403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING (a seller who may not act, D10-CTX-1) and writes no prospect; every registration of the terminated seller after it is refused the same way",
+      "RACE: TerminateSeller racing RegisterProspect of the seller in both orders with the lock wait observed: a registration that committed first is handled by the termination (the prospect left unowned, counted in prospectsUnassigned); a registration that waited on the termination is refused 403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING (a seller who may not act: the seller authorizer, packages/application/src/commercial/authorizer.ts) and writes no prospect; every registration of the terminated seller after it is refused the same way",
   },
   async (ctx) => {
     for (const order of ["WRITE_FIRST", "TERMINATION_FIRST"] as const) {
