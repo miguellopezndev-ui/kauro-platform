@@ -343,9 +343,8 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
     if (id === undefined) return null;
     const locked = await this.quotes.lock(id);
     // the caller holds the live quote's lock (CMD027 lockLiveQuote): a quote no longer live here is a changed project, never a missing one
-    if (locked === null || !isLive(locked)) {
-      throw new DomainFailure("STALE_VERSION", "the project's live quote changed under this request", locked === null ? {} : { currentVersion: locked.version, currentState: locked.state }, true);
-    }
+    if (locked === null) throw new LiveQuoteChangedFailure("the project's live quote is no longer visible under this request");
+    if (!isLive(locked)) throw new DomainFailure("STALE_VERSION", "the project's live quote changed under this request", { currentVersion: locked.version, currentState: locked.state }, true);
     const write = await this.quotes.transition(locked.quoteId, locked.version, { state: "SUPERSEDED", supersededByQuoteId: request.quoteId }, request.issuedAt);
     if (write.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the previous quote of the project changed", { currentVersion: write.currentVersion, currentState: write.currentState }, true);
     return write.record;
