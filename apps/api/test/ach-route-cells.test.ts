@@ -27,7 +27,7 @@ import { connectionPid, crashedAt, openConnection, runCell, SimulatedCrash, type
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
-import { call, completed, freshKey, outcome, rawEvent, routes, type Reply } from "./support.js";
+import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type Reply } from "./support.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -1414,6 +1414,10 @@ function advCell(title: string, id: string, fault: FaultKind, body: (ctx: FaultC
   });
 }
 const DAY_MS = 86_400_000;
+/** Coordinator ruling RR-2 (r1): the one I3 refusal for an existing visible order whose instructions are not readable. */
+const INSTRUCTIONS_NOT_AVAILABLE = "409 PRECONDITION_FAILED INSTRUCTIONS_NOT_AVAILABLE";
+/** What I3 answers a foreign agency's member for another agency's order (observed on a50db87; ACH-02: no existence signal). */
+const FOREIGN_I3 = "404 NOT_FOUND -";
 const iso = (ms: number): string => new Date(ms).toISOString();
 const QUOTE_LOCK: SqlStep = { label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/ };
 
@@ -1531,18 +1535,18 @@ advCell(`ADV-PV1R-2 DENY ACH-M-I3-EXPIRY (details validity): the instructions ar
       bw.iw.faults.clock = null;
     }
   });
-  // RULING NEEDED (r1): the design names no I3 code for expired details; either refusal is accepted, a 200 is not
-  assert.ok(["409 PRECONDITION_FAILED DETAILS_EXPIRED", "409 PRECONDITION_FAILED INSTRUCTIONS_EXPIRED"].includes(code(reply)), `expired details are hidden (got ${code(reply)})`);
+  // coordinator ruling RR-2: one code for every not-readable reason of an existing visible order (order not open, details expired)
+  assert.equal(code(reply), INSTRUCTIONS_NOT_AVAILABLE, "expired details are hidden");
   noAccountDigits(reply, "details expired");
 });
 
 advCell(`ADV-PV1R-3 DENY ACH-M-I3-REVOCATION (bank order state): the transfer instructions are hidden once the bank order is CAPTURED, RECEIVED_REVIEW or EXPIRED before its deadline, at the held read and at the next read`, "ACH-M-I3-REVOCATION", "revocation", async (ctx) => {
   // D-ACH-05: EXPIRED stops instructions; RECEIVED_REVIEW is closed to further instructions; CAPTURED is paid. Only AWAITING_TRANSFER and
   // PARTIALLY_RECEIVED are open. The state moves (as the payment service would) while the projection is held at its artifact read.
-  // RULING NEEDED (r1): the design names no refusal code; any 409 with no account digit and no reference fragment is accepted
+  // coordinator ruling RR-2: exactly 409 PRECONDITION_FAILED INSTRUCTIONS_NOT_AVAILABLE, no account digit and no reference fragment
   for (const state of ["CAPTURED", "RECEIVED_REVIEW", "EXPIRED"] as const) {
     const x = await issuedOrder(`adv3-${state.toLowerCase()}`);
-    const refused = (r: Reply): boolean => r.status === 409 && !r.text.includes(ACCOUNT_DIGITS) && !r.text.includes("026073150");
+    const refused = (r: Reply): boolean => code(r) === INSTRUCTIONS_NOT_AVAILABLE && !r.text.includes(ACCOUNT_DIGITS) && !r.text.includes("026073150") && !r.text.includes(x.reference);
     let reached!: () => void;
     let go!: () => void;
     const atRead = new Promise<void>((resolve) => (reached = resolve));
@@ -1622,15 +1626,18 @@ advCell(`ADV-PV1R-5 DENY ACH-M-I2-REVOCATION (allowlist narrowed by re-enable): 
 });
 
 test(`ADV-PV1R-5 DENY ACH-M-I3-REVOCATION (allowlist narrowed by re-enable): the instructions of an order issued before its agency was dropped from the CONTROLLED allowlist are hidden after the re-enable`, async () => {
-  // RULING NEEDED (r1): the coordinator packet requires the dropped agency's instructions to be refused; the adversary text says the agency
-  // keeps access "through its own existing instructions" (route-row visibility). This test encodes the packet.
+  // coordinator ruling RR-3: refused with exactly the answer a foreign agency gets for the same order (no existence signal; ACH-ROUTE.md:81
+  // CONTROLLED allowlist, ACH-02 "foreign reads expose no details")
   const x = await buyer("adv5-i3");
   const r = await enabled("adv5-i3", [x.a.s.agency.agencyId, bw.iw.w.A.agencyId]);
   const order = completed<IssuedView>(await issue(x, r), 201).data.order;
   assert.equal((await readInstructions(x, order.orderId)).status, 200, "served while the agency is on the list");
   completed(await owner(bankRoutes.enable(r.routeId), await enableBody(r, [bw.iw.w.A.agencyId])), 200);
+  const foreign = await agentOf(bw.iw, `adv5-i3-foreign-${++seq}`);
+  const foreignRead = await readInstructions({ a: foreign }, order.orderId);
+  assert.equal(code(foreignRead), FOREIGN_I3, "the foreign-agency answer (I3-RETRY)");
   const hidden = await readInstructions(x, order.orderId);
-  assert.equal(code(hidden), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED", "a dropped agency is served no account details");
+  assert.equal(code(hidden), code(foreignRead), "a dropped agency gets the foreign-agency answer");
   noAccountDigits(hidden, "dropped agency");
 });
 
@@ -1793,4 +1800,40 @@ test(`ADV-PV1R-11 DENY ACH-M-R1-RETRY (integration class and provider bound at e
   );
   assert.equal(code(providerRefused), "409 PRECONDITION_FAILED DETAILS_ACCOUNT_MISMATCH", "another provider's evidence never replaces the route's");
   assert.deepEqual((({ state, current_version, versions, events }) => [state, current_version, versions, events])(await routeRow(r2.routeId)), ["PENDING_VERIFICATION", 1, 1, 1]);
+});
+
+test(`ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session): a browser session revoked while the instructions read is held at its artifact read is refused with no account digits, exactly as a read after the revocation`, async () => {
+  // a sessions-enabled bank world (KIT opt-in, coordinator ruling RR-4); the file's helpers run on it while this test swaps `bw`
+  const main = bw;
+  const sessionsWorld = await bankWorld({ sessions: true });
+  bw = sessionsWorld;
+  try {
+    const x = await issuedOrder("adv6-session");
+    const idf = bw.iw.w.identity();
+    const session = await idf.signIn(x.b.a.billing);
+    const cookieRead = (): Promise<Reply> => call(bw.iw.w, { method: "GET", url: bankRoutes.instructions(x.orderId), token: null, agency: x.b.a.s.agency.agencyId, key: null, contentType: null, headers: { cookie: session.cookie, origin: idf.origin } });
+    const live = await cookieRead();
+    assert.equal(live.status, 200, `served under a live session (${code(live)})`);
+    let reached!: () => void;
+    let go!: () => void;
+    const atRead = new Promise<void>((resolve) => (reached = resolve));
+    const released = new Promise<void>((resolve) => (go = resolve));
+    const running = withStoreHook(await detailsRefOf(x.r.routeId), async () => {
+      reached();
+      await released;
+    }, cookieRead);
+    await atRead;
+    const revoked = await call(bw.iw.w, { url: sessionPaths.revoke, token: null, agency: null, key: null, headers: { cookie: session.cookie, origin: idf.origin, "x-kauro-csrf": session.view.csrfToken } });
+    assert.equal(revoked.status, 204, `the session is revoked through the product (${code(revoked)})`);
+    go();
+    const held = await running;
+    const next = await cookieRead();
+    assert.equal(next.status, 401, `a read after the revocation is unauthenticated (${code(next)})`);
+    assert.equal(code(held), code(next), "the held read is refused like a read after the revocation");
+    noAccountDigits(held, "session revoked during the read");
+    noAccountDigits(next, "next read");
+  } finally {
+    bw = main;
+    await sessionsWorld.stop();
+  }
 });

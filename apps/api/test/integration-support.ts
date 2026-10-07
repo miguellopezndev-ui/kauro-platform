@@ -78,10 +78,11 @@ const cellProviderTimer: ProviderCallTimer = {
   },
 };
 
-export async function integrationWorld(): Promise<IntegrationWorld> {
+/** `sessions: true` (opt-in, PV1 L-ROUTE r1 RR-4) binds the B11 session boundary; absent, the world is built exactly as before. */
+export async function integrationWorld(options: { readonly sessions?: boolean } = {}): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
   const lateFailures: LateFailure[] = [];
-  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) } });
+  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) }, ...(options.sessions === true ? { sessions: true } : {}) });
   return Object.assign(sw, { buyers, lateFailures });
 }
 

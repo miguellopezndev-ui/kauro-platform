@@ -38,6 +38,7 @@ Tests: `packages/persistence/test/bank-route-migrations.test.ts` covers the paym
 | `apps/api/test/fault-support.ts` | `effectInstant` of a unit of work is repositioned on the cell's step clock while one is set (`clock.onServer`, then `kauro.server_now()`). This applies to routed units of any context and to the api's own units. It is test-harness only. |
 | `apps/api/test/support.ts` | `World.bank` (the late-bound evidence store) and `ApiAssembly.bank` with the CONTRACT_FAKE classifier. |
 | `apps/api/test/bank-support.ts` (KIT) | `bankWorld` binds its evidence fake as the api's store. |
+| `apps/api/test/bank-support.ts`, `integration-support.ts`, `statements-support.ts`, `payment-support.ts` (KIT; r1, coordinator ruling RR-4) | Opt-in `sessions?: boolean`, passed through to `world({ sessions: true })` (the B11 session boundary). Additive: off by default, so every existing caller builds the same world. Proof: bank-kit 5/5 before and after; ach-route-cells, the same 50 cells pass. Used only by `ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session)`. |
 
 ## Lock order (rule 13) recorded in 0046
 
@@ -57,7 +58,7 @@ Reads of the internal evidence store happen inside the transaction where the cel
 **Wrong test path (docs lane).** The case map (ACH-01..03, ACH-case-map.md:25-27) and ACH-ROUTE.md §7.29 cite `packages/persistence/test/ach-route-cells.test.ts`. The cells are in `apps/api/test/ach-route-cells.test.ts`; the migration facts are in `packages/persistence/test/bank-route-migrations.test.ts`. Both documents belong to the docs lane (pv1/docs), not this worktree. The correction goes to that lane with this note.
 
 **§7.1-§7.3 rows.** Each design cell R1, R2, I1, I2 and I3 x {RACE, TIMEOUT, EXPIRY, CRASH-BEFORE, CRASH-AFTER, RETRY, REVOCATION, PARTIAL} is C in `apps/api/test/ach-route-cells.test.ts` under its exact title, `<VERB> ACH-M-<row>-<column> (<family>): <row label>`, plus the r1 cells prefixed `ADV-PV1R-<n>`. Sub-cases that are not run are GAP:
-- I3-REVOCATION / I3-EXPIRY session half: GAP, needs a sessions-enabled bank world (KIT). RULING NEEDED (r1-red).
+- I3-REVOCATION session half: C, `ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session)` (RR-4). I3-EXPIRY session-expiry half: GAP.
 - R2-GENERAL with a reconciled credit (P1/P2): GAP -> L-INBOUND.
 - R2-GENERAL with a refund DECLARED / UNCERTAIN / RECORDED (X1/G2): GAP -> L-REFUND. The title claims more than is run; the comment discloses it.
 - I1/I2-REVOCATION capability and source withdrawals: GAP. I2-delta with a different window: GAP, because no product command changes the window (replaceDetails copies it).
@@ -72,3 +73,5 @@ Reads of the internal evidence store happen inside the transaction where the cel
 E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CANCELLED` (0015 transition list) and snapshot `order_state` -> EXPIRED (`transfer_deadline_reached`). Cells: ACH-M-E1-*, L-INBOUND.
 
 **Lock order.** The "Lock order (rule 13) recorded in 0046" section above describes a50db87 (quote, then route, then access). ADV-PV1R-1 rejects that order. The builder's fix must rewrite this section, the 0046 comment and §7.28 to the order the code takes. The red cell is `ADV-PV1R-1 RACE ACH-M-I1-RACE ...`.
+
+**ADV-PV1R-5 / RR-6.** The allowlist version is checked twice: by isParticipant (bank-routes.ts:251) and by the tenant read policy (0046:271). The narrowing cell goes red only when both are reverted.

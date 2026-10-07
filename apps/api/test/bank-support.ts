@@ -74,8 +74,9 @@ export interface BankWorld {
   stop(): Promise<void>;
 }
 
-export async function bankWorld(options: { readonly world?: IntegrationWorld } = {}): Promise<BankWorld> {
-  const iw = options.world ?? (await integrationWorld());
+export async function bankWorld(options: { readonly world?: IntegrationWorld; readonly sessions?: boolean } = {}): Promise<BankWorld> {
+  // sessions: opt-in (PV1 L-ROUTE r1, RR-4), the B11 session boundary of the world built here; absent, unchanged
+  const iw = options.world ?? (await integrationWorld(options.sessions === true ? { sessions: true } : {}));
   const evidence = createBankEvidenceFake({ clock, environment: BANK_ENVIRONMENT, accountRef: BANK_ACCOUNT, payeeDigest: BANK_PAYEE_DIGEST });
   // the api reads the bank route's details artifacts from this store (lane L-ROUTE; ApiAssembly.bank, bound at call time)
   iw.w.bank.evidence = evidence;
