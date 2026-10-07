@@ -15,11 +15,19 @@
 --   Kroute (configure excepted): the route row FOR UPDATE is taken FIRST — before the owner's access decision (identity, grant transition
 --     locks) and the journal — so a revocation of the owner's grant issued while the command waits for the route is never blocked by it
 --     (covered by ACH-M-R2-REVOCATION). Verify and details replacement read the details evidence before the route lock (R1).
---   Kinstructions: the project row FOR NO KEY UPDATE (the subject lock), then the route row FOR SHARE (conflicts with Kroute's FOR
---     UPDATE, not with another issuance), then the member's access decision, the journal and the B09 subject reads.
+--   Kinstructions (D-ACH-04 "locks checkout facts in B09 order", the order of the provider CMD028): the member's access decision
+--     (identity, membership halves), the journal, the project row FOR NO KEY UPDATE (one issuance of a project at a time; before the
+--     subject halves, as every project writer takes it: CreateRevision locks the project, then the agency, then the revision), the
+--     purchased subject's shared halves (agency, capability, approval, source revision, target contract), the route row FOR SHARE
+--     (conflicts with Kroute's FOR UPDATE, not with another issuance), and the quote row FOR UPDATE LAST. CMD043 close-agency takes the
+--     agency's exclusive half and then the quote: an issuance waits at the agency half holding no quote, so no cycle (ACH-M-I1-RACE).
 --   No actor holding a route lock takes L1..L4 of §7.28.
 -- Reads of the internal evidence store (a store of the platform, not an external call-out) run inside the transaction where the cells
--- require it (coordinator decision (c)): Kroute's enable after the route lock, I3 before its access decision.
+-- require it (coordinator decision (c)): Kroute's enable after the route lock; I3 after a first access decision in its own transaction
+-- (no evidence byte for a caller who is not a member) and before the access decision and route guard that judge the answer.
+-- Tenant columns: an agency session selects only what issuance and I3 need; the owner identifiers (created_by, verified_by) and the
+-- verification evidence reference are written by the owner's commands and selected by no request role (they are in the owner-only
+-- route events), so kauro_app holds column grants without them.
 
 -- --- agency-less aggregates: the event binding (decision #1) -------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
@@ -139,15 +147,18 @@ CREATE TABLE kauro.bank_route_versions (
   verification_evidence_ref   text CHECK (verification_evidence_ref IS NULL OR (length(verification_evidence_ref) BETWEEN 1 AND 128 AND verification_evidence_ref ~ '^[A-Za-z0-9._:-]+$')),
   verified_at                 timestamptz,
   verified_by                 uuid,
+  -- the validity of the details evidence the verify classified (ACH-ROUTE "any shorter validity deadline"): it bounds every issuance
+  details_valid_until         timestamptz,
   created_by                  uuid NOT NULL,
   created_at                  timestamptz NOT NULL DEFAULT kauro.server_now(),
   PRIMARY KEY (route_id, route_version),
-  CONSTRAINT bank_route_versions_verification_whole CHECK ((verified_at IS NULL) = (verified_by IS NULL) AND (verified_at IS NULL) = (verification_evidence_ref IS NULL))
+  CONSTRAINT bank_route_versions_verification_whole CHECK ((verified_at IS NULL) = (verified_by IS NULL) AND (verified_at IS NULL) = (verification_evidence_ref IS NULL)
+    AND (verified_at IS NULL) = (details_valid_until IS NULL))
 );
 CREATE TRIGGER bank_route_versions_immutable BEFORE UPDATE ON kauro.bank_route_versions
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('route_id,route_version,details_artifact_ref,details_evidence_hash,payee_digest,accepted_rails,minimum_transfer_window_ms,instruction_lifetime_ms,provider_time_tolerance_ms,fee_policy_version,timing_source_url,timing_source_accessed_on,created_by,created_at');
 CREATE TRIGGER bank_route_versions_verified_once BEFORE UPDATE ON kauro.bank_route_versions
-  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_reassignment('verified_at,verified_by,verification_evidence_ref');
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_reassignment('verified_at,verified_by,verification_evidence_ref,details_valid_until');
 
 -- the agencies a CONTROLLED rollout admits (K-9): each enable appends the allowlist of its aggregate version (set_version) and names it in
 -- bank_routes.participants_version; a request handler holds no DELETE (an earlier allowlist simply stops being the one in force)
@@ -283,9 +294,16 @@ CREATE POLICY bank_transfer_instructions_payment ON kauro.bank_transfer_instruct
   USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
 
 -- --- grants -------------------------------------------------------------------------------------------------------------------------
-GRANT SELECT, INSERT ON kauro.bank_routes, kauro.bank_route_versions, kauro.bank_route_participants TO kauro_app;
+-- tenant columns (adversary r1 ADV-PV1R-10): no SELECT of created_by, verified_by or verification_evidence_ref for any request role
+GRANT INSERT ON kauro.bank_routes, kauro.bank_route_versions, kauro.bank_route_participants TO kauro_app;
+GRANT SELECT ON kauro.bank_route_participants TO kauro_app;
+GRANT SELECT (route_id, agency_id, environment, account_ref, provider, integration_class, currency, payment_route_id, state, rollout, current_version,
+  participants_version, version, created_at, updated_at) ON kauro.bank_routes TO kauro_app;
+GRANT SELECT (route_id, route_version, details_artifact_ref, details_evidence_hash, payee_digest, accepted_rails, minimum_transfer_window_ms,
+  instruction_lifetime_ms, provider_time_tolerance_ms, fee_policy_version, timing_source_url, timing_source_accessed_on, verified_at,
+  details_valid_until, created_at) ON kauro.bank_route_versions TO kauro_app;
 GRANT UPDATE (state, rollout, current_version, participants_version, version, updated_at) ON kauro.bank_routes TO kauro_app;
-GRANT UPDATE (verified_at, verified_by, verification_evidence_ref) ON kauro.bank_route_versions TO kauro_app;
+GRANT UPDATE (verified_at, verified_by, verification_evidence_ref, details_valid_until) ON kauro.bank_route_versions TO kauro_app;
 GRANT SELECT, INSERT ON kauro.bank_transfer_instructions TO kauro_app;
 GRANT SELECT ON kauro.bank_transfer_instructions TO kauro_payment;
 GRANT UPDATE (order_state, version, updated_at) ON kauro.bank_transfer_instructions TO kauro_payment;

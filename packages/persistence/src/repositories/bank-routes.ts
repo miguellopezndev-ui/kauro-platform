@@ -3,8 +3,10 @@
  * versions and participants, and the transfer instructions an issuance freezes. Every statement runs in the caller's unit of work under
  * its policies: the corporate owner configures (OPERATOR context), an agency member locks and reads what it may buy through (TENANT).
  *
- * Locks (migration 0046 lock-order note): `lockForUpdate` is Kroute's route lock (taken before the owner's access decision), `lockKeyShare`
- * the issuance's and the projection's (it conflicts with Kroute, never with another issuance), `lockProject` the issuance's subject lock.
+ * Locks (migration 0046 lock-order note): `lockForUpdate` is Kroute's route lock (taken before the owner's access decision), `lockShare`
+ * the issuance's and the projection's (it conflicts with Kroute, never with another issuance), `lockProject` the issuance's project lock
+ * (after its access decision and journal, before the purchased subject's shared halves). Tenant sessions hold no SELECT on the owner
+ * identifiers and the verification reference (column grants of 0046), so no statement here names them.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { BankRouteRecord, BankRouteVersionRecord, BankTransferInstructionRecord } from "@kauro/domain";
@@ -58,9 +60,10 @@ interface VersionRow {
   timing_source_url: string;
   timing_source_accessed_on: string;
   verified_at: Date | null;
+  details_valid_until: Date | null;
 }
 const VERSION_COLUMNS =
-  "route_id, route_version, details_artifact_ref, details_evidence_hash, payee_digest, accepted_rails, minimum_transfer_window_ms, instruction_lifetime_ms, provider_time_tolerance_ms, fee_policy_version, timing_source_url, to_char(timing_source_accessed_on, 'YYYY-MM-DD') AS timing_source_accessed_on, verified_at";
+  "route_id, route_version, details_artifact_ref, details_evidence_hash, payee_digest, accepted_rails, minimum_transfer_window_ms, instruction_lifetime_ms, provider_time_tolerance_ms, fee_policy_version, timing_source_url, to_char(timing_source_accessed_on, 'YYYY-MM-DD') AS timing_source_accessed_on, verified_at, details_valid_until";
 
 function versionOf(r: VersionRow): BankRouteVersionRecord {
   return {
@@ -77,6 +80,7 @@ function versionOf(r: VersionRow): BankRouteVersionRecord {
     timingSourceUrl: r.timing_source_url,
     timingSourceAccessedOn: r.timing_source_accessed_on,
     verifiedAt: r.verified_at === null ? null : instant(r.verified_at),
+    detailsValidUntil: r.details_valid_until === null ? null : instant(r.details_valid_until),
   };
 }
 
@@ -231,11 +235,11 @@ export class PgBankRoutes {
     return routeOf(row);
   }
 
-  async markVerified(routeId: string, routeVersion: number, evidenceRef: string, userId: string, at: UtcInstant): Promise<void> {
+  async markVerified(routeId: string, routeVersion: number, evidenceRef: string, userId: string, at: UtcInstant, detailsValidUntil: UtcInstant): Promise<void> {
     const r = await execute(
       this.db,
-      "UPDATE kauro.bank_route_versions SET verification_evidence_ref = $3, verified_by = $4, verified_at = $5 WHERE route_id = $1 AND route_version = $2 AND verified_at IS NULL",
-      [routeId, routeVersion, evidenceRef, userId, at],
+      "UPDATE kauro.bank_route_versions SET verification_evidence_ref = $3, verified_by = $4, verified_at = $5, details_valid_until = $6 WHERE route_id = $1 AND route_version = $2 AND verified_at IS NULL",
+      [routeId, routeVersion, evidenceRef, userId, at, detailsValidUntil],
     );
     if (r.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "the route version was verified twice");
   }
@@ -254,7 +258,26 @@ export class PgBankRoutes {
     return (r.rowCount ?? 0) > 0;
   }
 
-  /** The issuance's subject lock (FOR NO KEY UPDATE on the project): one issuance of a project at a time. False: not visible. */
+  /**
+   * Runs `work` under a savepoint rolled back once it settled: whatever it locked (a transition lock's shared half, a row) is released at
+   * once and nothing it wrote survives; its answer (or its failure) is the caller's. The projection's first access decision runs here, so
+   * no membership half is held across the store read that follows it.
+   */
+  async released<T>(work: () => Promise<T>): Promise<T> {
+    await execute(this.db, "SAVEPOINT kauro_bank_access");
+    try {
+      return await work();
+    } finally {
+      await execute(this.db, "ROLLBACK TO SAVEPOINT kauro_bank_access");
+      await execute(this.db, "RELEASE SAVEPOINT kauro_bank_access");
+    }
+  }
+
+  /**
+   * The issuance's project lock (FOR NO KEY UPDATE): one issuance of a project at a time. Taken after the access decision and the journal
+   * and BEFORE the purchased subject's shared halves, the order of every project writer (CreateRevision: project, then agency, then
+   * revision), so no writer holding the project waits for a half the issuance holds. False: not visible.
+   */
   async lockProject(agencyId: string, projectId: string): Promise<boolean> {
     const r = await execute(this.db, "SELECT 1 FROM kauro.projects WHERE agency_id = $1 AND project_id = $2 FOR NO KEY UPDATE", [agencyId, projectId]);
     return (r.rowCount ?? 0) > 0;

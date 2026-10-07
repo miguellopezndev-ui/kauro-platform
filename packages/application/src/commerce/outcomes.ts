@@ -88,6 +88,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PAYMENT_PENDING", "OPEN_ORDER_EXISTS", "the project already has an open order (of any route): no second checkout"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_WITHDRAWN", "the quoted plan's approval was withdrawn"),
     outcome("COMMAND", "PRECONDITION_FAILED", "TRANSFER_WINDOW_TOO_SHORT", "the time left before the instruction deadline is shorter than the route's minimum transfer window"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "DETAILS_EXPIRED", "the validity of the route version's verified account details passed at the effect instant: no order and no instructions"),
     outcome("COMMAND", "CAPACITY_UNAVAILABLE", "EVIDENCE_UNAVAILABLE", "no bank route integration is bound in this deployment; retry later"),
   ],
   CMD029: [

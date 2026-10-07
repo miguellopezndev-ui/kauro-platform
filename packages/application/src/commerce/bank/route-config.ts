@@ -23,7 +23,7 @@
 import type { CommandId, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { rawDigest } from "@kauro/contracts";
 import type { AssuranceProofId, BankRouteDetails, CausationId, BankRouteRecord, BankRouteVersionRecord, CommerceUnitOfWork, CorrelationId, Environment, OperatorContext, UserId } from "@kauro/domain";
-import { COMMERCE_POLICY_VERSION, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf, isUuidV7 } from "@kauro/domain";
+import { COMMERCE_POLICY_VERSION, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf, isUuidV7, toUtcInstant } from "@kauro/domain";
 import type { AuthenticatedSubject, CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { problemOf, type Problem } from "../../api/problems.js";
@@ -141,14 +141,29 @@ export const evidenceUnavailable = (): DomainFailure => new DomainFailure("CAPAC
 
 // --- the details evidence (R1) ------------------------------------------------------------------------------------------------------
 
+/** What an evidence read binds: the account and environment always; the route's provider and integration class once it exists. */
+export interface EvidenceBinding {
+  readonly accountRef: string;
+  readonly environment: string;
+  readonly provider?: string;
+  readonly integrationClass?: BankRouteRecord["integrationClass"];
+}
+
+/** The route class an artifact stands for: a contract fake stays a contract fake; a provider integration and owner-supplied manual evidence are a real account. */
+export function integrationClassOf(evidence: Pick<StoredBankEvidence, "integrationClass">): BankRouteRecord["integrationClass"] {
+  return evidence.integrationClass === "CONTRACT_FAKE" ? "CONTRACT_FAKE" : "PROVIDER";
+}
+
 /**
  * Reads the details artifact from the restricted store under the provider-call bound and classifies it: the stored envelope must be the
- * expected hash, its bytes classify (fail closed), and the account and environment must be the route's. Any failure is a DomainFailure;
- * an unexpected exception (a crash of the store) propagates untouched.
+ * expected hash, its bytes classify (fail closed), and the account and environment must be the route's; once the route exists (verify,
+ * enable, replacement, I3) its provider and integration class are bound too (adversary r1 ADV-PV1R-11): a contract fake never stands for
+ * provider evidence, nor one provider's artifact for another's — DETAILS_ACCOUNT_MISMATCH. Any failure is a DomainFailure; an unexpected
+ * exception (a crash of the store) propagates untouched.
  */
-export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: { readonly accountRef: string; readonly environment: string }): Promise<{ readonly details: BankRouteDetails; readonly evidence: StoredBankEvidence }>;
-export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: { readonly accountRef: string; readonly environment: string }, options: { readonly classify: false }): Promise<{ readonly details: BankRouteDetails | null; readonly evidence: StoredBankEvidence }>;
-export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: { readonly accountRef: string; readonly environment: string }, options: { readonly classify: boolean } = { classify: true }): Promise<{ readonly details: BankRouteDetails | null; readonly evidence: StoredBankEvidence }> {
+export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: EvidenceBinding): Promise<{ readonly details: BankRouteDetails; readonly evidence: StoredBankEvidence }>;
+export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: EvidenceBinding, options: { readonly classify: false }): Promise<{ readonly details: BankRouteDetails | null; readonly evidence: StoredBankEvidence }>;
+export async function readRouteDetails(co: BankRouteCollaborators, ref: string, expectedHash: string, route: EvidenceBinding, options: { readonly classify: boolean } = { classify: true }): Promise<{ readonly details: BankRouteDetails | null; readonly evidence: StoredBankEvidence }> {
   const store = co.evidence();
   const classifier = co.classifier();
   if (store === null || classifier === null) throw evidenceUnavailable();
@@ -165,6 +180,9 @@ export async function readRouteDetails(co: BankRouteCollaborators, ref: string, 
   if (evidence.sha256 !== expectedHash) throw new DomainFailure("INTEGRITY_FAILURE", "the details artifact is not the evidence the route cites", { reason: "HASH_MISMATCH" });
   if (evidence.accountRef !== route.accountRef || evidence.environment !== route.environment) {
     throw new DomainFailure("PRECONDITION_FAILED", "the details evidence is of another account", { reason: "DETAILS_ACCOUNT_MISMATCH" });
+  }
+  if (route.provider !== undefined && route.integrationClass !== undefined && (evidence.provider !== route.provider || integrationClassOf(evidence) !== route.integrationClass)) {
+    throw new DomainFailure("PRECONDITION_FAILED", "the details evidence is of another integration", { reason: "DETAILS_ACCOUNT_MISMATCH" });
   }
   const classified = classifier.classifyAccountDetails(evidence);
   if (!options.classify) {
@@ -243,7 +261,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (evidence.integrationClass === "CONTRACT_FAKE" && body.environment === "LIVE") throw new DomainFailure("PRECONDITION_FAILED", "a contract fake never carries live money", { reason: "ROUTE_NOT_VERIFIED" });
           if ((await repo.findByAccount(body.environment, body.accountRef)) !== null) throw new DomainFailure("PRECONDITION_FAILED", "the account already has a route", { reason: "UNLISTED_TRANSITION" });
           // a contract fake stays a contract fake; a provider integration and owner-supplied manual evidence are a real account
-          const integrationClass = evidence.integrationClass === "CONTRACT_FAKE" ? "CONTRACT_FAKE" : "PROVIDER";
+          const integrationClass = integrationClassOf(evidence);
           const routeId = uow.ids.next();
           const paymentRouteId = uow.ids.next();
           await repo.registerPaymentRoute({ paymentRouteId, provider: body.provider, environment: body.environment, merchantRef: routeId, payeeDigest: bankPayeeDigest(body.environment, body.accountRef), integrationClass });
@@ -299,7 +317,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (Date.parse(effect) >= Date.parse(details.validUntil)) throw new DomainFailure("PRECONDITION_FAILED", "the details evidence expired", { reason: "DETAILS_EXPIRED" });
           await assureAt(co, uow, envelope.userId, body.authorizationRef, effect);
           const verified = await repo.update(routeId, route.version, { state: "VERIFIED", rollout: null, currentVersion: route.currentVersion });
-          await repo.markVerified(routeId, route.currentVersion, body.verificationEvidenceRef, envelope.userId, effect);
+          await repo.markVerified(routeId, route.currentVersion, body.verificationEvidenceRef, envelope.userId, effect, toUtcInstant(Date.parse(details.validUntil)));
           await publish(uow, causationId, verified, "bank_route.verified.v1", { routeVersion: verified.currentVersion, detailsEvidenceHash: seenVersion.detailsEvidenceHash, previousState: route.state });
           return { status: 200, view: { route: bankRouteView(verified, await currentVersionOf(uow, verified)) }, version: verified.version, resourceKind: "bank_route", resourceId: routeId, allowFact: STEP_UP_ALLOW };
         },

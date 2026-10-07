@@ -147,6 +147,14 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     if (selector !== undefined && !isUuid(selector)) return { kind: "PROBLEM", problem: invalid("AGENCY_SELECTOR_INVALID", correlationId) };
     const subject = await deps.authenticator.authenticate(headers);
     if (subject === null) return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };
-    return readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]! });
+    // the same credentials again at the projection's guard instant (ADV-PV1R-6): a session revoked or expired during the read is refused
+    // exactly as a request after it (the authenticator reads the session as it stands; the bearer token as it stands)
+    const stillAuthenticated = async (): Promise<boolean> => {
+      const again = await deps.authenticator.authenticate(headers);
+      return again !== null && again.identity.userId === subject.identity.userId;
+    };
+    const answer = await readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]!, stillAuthenticated });
+    if (answer.kind === "UNAUTHENTICATED") return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };
+    return answer;
   });
 }

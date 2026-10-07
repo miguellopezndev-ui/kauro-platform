@@ -62,9 +62,14 @@ export interface BankRouteRepository {
   insertRoute(route: NewBankRouteInput): Promise<BankRouteRecord>;
   insertVersion(v: NewBankRouteVersionInput): Promise<void>;
   update(routeId: string, expectedVersion: number, to: { readonly state: BankRouteRecord["state"]; readonly rollout: BankRouteRecord["rollout"]; readonly currentVersion: number; readonly participantsVersion?: number }): Promise<BankRouteRecord>;
-  markVerified(routeId: string, routeVersion: number, evidenceRef: string, userId: string, at: UtcInstant): Promise<void>;
+  /** Marks the version verified with the validity of the details evidence the verify classified (set once, with the verification). */
+  markVerified(routeId: string, routeVersion: number, evidenceRef: string, userId: string, at: UtcInstant, detailsValidUntil: UtcInstant): Promise<void>;
   appendParticipants(routeId: string, setVersion: number, agencyIds: ReadonlyArray<string>): Promise<void>;
   isParticipant(route: Pick<BankRouteRecord, "routeId" | "participantsVersion">, agencyId: string): Promise<boolean>;
+  /** The issuance's project lock (FOR NO KEY UPDATE), taken before the purchased subject's shared halves; false: not visible. */
+  lockProject(agencyId: string, projectId: string): Promise<boolean>;
+  /** Runs `work` under a savepoint rolled back once it settled: every lock it took is released, nothing it wrote survives. */
+  released<T>(work: () => Promise<T>): Promise<T>;
   insertInstructions(i: NewTransferInstructionsInput): Promise<BankTransferInstructionRecord | null>;
   instructionsOf(orderId: string): Promise<BankTransferInstructionRecord | null>;
 }

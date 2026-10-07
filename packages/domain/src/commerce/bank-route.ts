@@ -68,12 +68,15 @@ export function isTransferReference(value: string): boolean {
 export type TransferWindow = { readonly kind: "ISSUABLE"; readonly transferExpiresAtMs: number; readonly sendByMs: number } | { readonly kind: "TOO_SHORT" };
 
 /**
- * The deadline of new instructions is the earlier of the route's instruction lifetime from the effect instant and the quote's price
- * expiry (never an extension of the price); the buyer must be left at least the minimum window: `deadline - effectNow < window` is
- * TRANSFER_WINDOW_TOO_SHORT, otherwise sendBy = deadline - window (frozen in the snapshot).
+ * The deadline of new instructions (D-ACH-04 "Freeze transferExpiresAt"): the earliest of the route's instruction lifetime from the effect
+ * instant and every fixed validity deadline the caller names (the quote's price expiry, the source availability deadline, the verified
+ * details' validity, any shorter one), never an extension of any of them; an unreadable deadline issues nothing. The buyer must be left
+ * at least the minimum window (DV1-07): `deadline - effectNow < window` is TRANSFER_WINDOW_TOO_SHORT, otherwise sendBy = deadline - window
+ * (frozen in the snapshot).
  */
-export function transferWindowOf(effectNowMs: number, quoteExpiresAtMs: number, route: { readonly instructionLifetimeMs: number; readonly minimumTransferWindowMs: number }): TransferWindow {
-  const deadline = Math.min(quoteExpiresAtMs, effectNowMs + route.instructionLifetimeMs);
+export function transferWindowOf(effectNowMs: number, deadlinesMs: ReadonlyArray<number>, route: { readonly instructionLifetimeMs: number; readonly minimumTransferWindowMs: number }): TransferWindow {
+  if (deadlinesMs.some((d) => !Number.isFinite(d))) return { kind: "TOO_SHORT" };
+  const deadline = Math.min(effectNowMs + route.instructionLifetimeMs, ...deadlinesMs);
   if (deadline - effectNowMs < route.minimumTransferWindowMs) return { kind: "TOO_SHORT" };
   return { kind: "ISSUABLE", transferExpiresAtMs: deadline, sendByMs: deadline - route.minimumTransferWindowMs };
 }
@@ -128,6 +131,8 @@ export interface BankRouteVersionRecord {
   readonly timingSourceUrl: string;
   readonly timingSourceAccessedOn: string;
   readonly verifiedAt: string | null;
+  /** The validity of the details evidence the verify classified, set with verifiedAt (null while unverified). */
+  readonly detailsValidUntil: string | null;
 }
 
 export interface BankTransferInstructionRecord {
