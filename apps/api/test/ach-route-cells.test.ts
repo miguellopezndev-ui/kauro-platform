@@ -27,7 +27,7 @@ import { connectionPid, crashedAt, openConnection, runCell, SimulatedCrash, type
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
-import { call, completed, freshKey, outcome, type Reply } from "./support.js";
+import { call, completed, freshKey, outcome, routes, type Reply } from "./support.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -137,10 +137,20 @@ async function routeRow(routeId: string): Promise<{ state: string; rollout: stri
 const routesOf = (accountRef: string): Promise<number> => n("SELECT 1 FROM kauro.bank_routes WHERE account_ref = $1", [accountRef]);
 
 /** A buyer with an approved plan and an issued quote: an agency's billing member. */
-async function buyer(label: string): Promise<{ readonly a: Agent; readonly quote: CreateQuoteView }> {
+interface Buyer {
+  readonly a: Agent;
+  readonly quote: CreateQuoteView;
+  readonly planId: string;
+}
+async function buyer(label: string): Promise<Buyer> {
   const a = await agentOf(bw.iw, `${label}-${++seq}`);
   const plan = await planOf(bw.iw, a, `${label}-plan`);
-  return { a, quote: await quoted(bw.iw, a, plan) };
+  return { a, quote: await quoted(bw.iw, a, plan), planId: plan.planId };
+}
+/** The plan's approval withdrawn through the real CMD026 route by the agency owner (APPROVED -> WITHDRAWN, the listed edge). */
+async function withdrawPlan(b: Buyer): Promise<void> {
+  const [plan] = await q<{ version: string }>("SELECT version::text FROM kauro.plans WHERE plan_id::text = $1", [b.planId]);
+  completed(await call(bw.iw.w, { url: routes.withdrawApproval(b.planId), token: b.a.s.owner.token, agency: b.a.s.agency.agencyId, key: freshKey("withdraw"), body: { expectedVersion: Number(plan!.version), reasonCode: "OWNER_DECISION" } }), 200);
 }
 const issueBody = (b: { readonly quote: CreateQuoteView }, r: RouteView) => ({ termsHash: b.quote.quote.termsHash, routeKind: "BANK_TRANSFER", routeId: r.routeId });
 const issue = (b: { readonly a: Agent; readonly quote: CreateQuoteView }, r: RouteView, options: { readonly key?: string; readonly body?: unknown; readonly token?: string } = {}): Promise<Reply> =>
@@ -439,11 +449,11 @@ cell(`DENY ACH-M-R2-EXPIRY (time): ${R2}`, "expiry", async (ctx) => {
   // the step-up proof crosses its freshness bound after the route lock wait; the effect clock is read after the wait
   const r = await verified("r2expiry");
   const body = await enableBody(r, [bw.iw.w.A.agencyId]);
-  const proofAt = Date.parse((await q<{ at: string }>("SELECT issued_at::text AS at FROM kauro.assurance_proofs WHERE proof_id::text = $1", [body.authorizationRef]))[0]!.at);
+  const proofExpiresAt = (await q<{ at: Date }>("SELECT expires_at AS at FROM kauro.assurance_proofs WHERE proof_id::text = $1", [body.authorizationRef]))[0]!.at.getTime();
   const reply = await ctx.operation("enable with a step-up that expires during the lock wait", async (op) => {
     bw.iw.faults.clock = op.clock;
     try {
-      const boundary = ctx.deadline(proofAt + 15 * 60_000, "step-up freshness");
+      const boundary = ctx.deadline(proofExpiresAt, "step-up proof expiry");
       const holder = await open();
       await holder.query("BEGIN");
       await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR UPDATE", [r.routeId]);
@@ -521,36 +531,62 @@ cell(`RACE ACH-M-R2-RETRY (retry): ${R2}`, "retry", async (ctx) => {
 });
 
 cell(`DENY ACH-M-R2-REVOCATION (revocation): ${R2}`, "revocation", async (ctx) => {
-  // each qualification prerequisite revoked separately while enable holds... is held behind the route lock: grant, step-up, details, verification
-  const revocations: ReadonlyArray<readonly [string, (r: RouteView) => Promise<unknown>, string]> = [
-    ["owner grant", async () => bw.iw.h.oracle.query("UPDATE kauro.corporate_grants SET state = 'REVOKED' WHERE user_id = $1 AND role = 'KAURO_OWNER'", [bw.iw.owner.userId]), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING"],
-    ["step-up proof", async () => bw.iw.h.oracle.query("UPDATE kauro.assurance_proofs SET revoked_at = now() WHERE user_id = $1", [bw.iw.owner.userId]), "403 ASSURANCE_REQUIRED STEP_UP_MISSING"],
+  // each qualification prerequisite withdrawn separately while the enable is held behind the route lock: the owner's KAURO_OWNER grant
+  // (a throw-away owner, revoked through the listed ACTIVE -> REVOKED edge, never re-activated), the step-up proof (append-only: it
+  // lapses at its expires_at on the controlled effect clock), the details evidence and the verification
+  const REVOKE_GRANT = "UPDATE kauro.corporate_roles SET state = 'REVOKED', revoked_at = now() WHERE grant_id = $1 AND state = 'ACTIVE'";
+  interface Actor {
+    readonly token: string;
+    readonly proof: string;
+    readonly grantId: string | null;
+  }
+  const kinds: ReadonlyArray<readonly [string, (r: RouteView, who: Actor, op: { readonly clock: unknown }) => Promise<unknown>, string]> = [
+    ["owner grant", async (_r, who) => {
+      const moved = await bw.iw.h.oracle.query(REVOKE_GRANT, [who.grantId]);
+      assert.equal(moved.rowCount, 1, "the grant moved ACTIVE -> REVOKED");
+    }, "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING"],
+    ["step-up proof", async (_r, who) => {
+      const expiresAt = (await q<{ at: Date }>("SELECT expires_at AS at FROM kauro.assurance_proofs WHERE proof_id::text = $1", [who.proof]))[0]!.at.getTime();
+      const boundary = ctx.deadline(expiresAt, "step-up proof expiry");
+      ctx.clock.set(Date.parse(boundary) + 1);
+    }, "403 ASSURANCE_REQUIRED STEP_UP_STALE"],
     ["details evidence", async (r) => bw.evidence.corrupt(await detailsRefOf(r.routeId), new TextEncoder().encode("{}")), "422 INTEGRITY_FAILURE HASH_MISMATCH"],
     ["verification", async (r) => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'PENDING_VERIFICATION' WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_VERIFIED"],
   ];
-  for (const [what, revoke, refusal] of revocations) {
+  for (const [what, revoke, refusal] of kinds) {
     const r = await verified(`r2rev-${what.split(" ")[0]}`);
-    const body = await enableBody(r, [bw.iw.w.A.agencyId]);
-    const holder = await open();
-    const wc = await open();
-    try {
-      await holder.query("BEGIN");
-      await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR UPDATE", [r.routeId]);
-      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => owner(bankRoutes.enable(r.routeId), body)), `enable held behind the route lock (${what})`);
-      await ctx.revoked(what, () => revoke(r));
-      await holder.query("ROLLBACK");
-      await ctx.fenced(`enable after ${what}`, async () => {
-        const reply = ok(await waiting.pending);
-        throw reply;
-      }, (e) => (e as Reply).status >= 400 && code(e as Reply) === refusal);
-    } finally {
-      await holder.end();
-      await wc.end();
-      await bw.iw.h.oracle.query("UPDATE kauro.corporate_grants SET state = 'ACTIVE' WHERE user_id = $1 AND role = 'KAURO_OWNER'", [bw.iw.owner.userId]);
+    let who: Actor = { token: bw.iw.owner.token, proof: await proof(), grantId: null };
+    if (what === "owner grant") {
+      const person = await bw.iw.w.person(`r2rev-owner-${++seq}`);
+      const grantId = await bw.iw.h.grantKauroOwner(person.userId as never);
+      who = { token: person.token, proof: await bw.iw.w.stepUp(person), grantId };
     }
+    const body = { expectedVersion: r.routeVersion, rollout: "CONTROLLED", participants: [bw.iw.w.A.agencyId], authorizationRef: who.proof };
+    await ctx.operation(`enable held behind the route lock (${what})`, async (op) => {
+      if (what === "step-up proof") {
+        bw.iw.faults.clock = op.clock;
+        ctx.clock.set(Date.now());
+      }
+      const holder = await open();
+      const wc = await open();
+      try {
+        await holder.query("BEGIN");
+        await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR UPDATE", [r.routeId]);
+        const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => owner(bankRoutes.enable(r.routeId), body, { token: who.token })), `enable held behind the route lock (${what})`);
+        await ctx.revoked(what, () => revoke(r, who, op));
+        await holder.query("ROLLBACK");
+        await ctx.fenced(`enable after ${what}`, async () => {
+          throw ok(await waiting.pending);
+        }, (e) => (e as Reply).status >= 400 && code(e as Reply) === refusal);
+      } finally {
+        bw.iw.faults.clock = null;
+        await holder.end();
+        await wc.end();
+      }
+    });
     const row = await routeRow(r.routeId);
     assert.notEqual(row.state, "ENABLED", `${what}: enable blocked`);
-    assert.equal(await n("SELECT 1 FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), 0);
+    assert.equal(await n("SELECT 1 FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), 0, `${what}: no participant written`);
   }
   // a disable is retained whatever was revoked: the safety stop needs no qualification
   const live = await enabled("r2rev-disable", [bw.iw.w.A.agencyId]);
@@ -727,10 +763,10 @@ cell(`RACE ACH-M-I1-RETRY (retry): ${I1}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I1-REVOCATION (revocation): ${I1}`, "revocation", async (ctx) => {
   // each binding prerequisite withdrawn while the readiness read waits on the project lock
   const withdrawals: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView) => Promise<unknown>, string]> = [
-    ["billing membership", async (b) => bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED' WHERE user_id = $1 AND agency_id = $2", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b) => bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
     ["route participant", async (_b, r) => bw.iw.h.oracle.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["route enabled state", async (_b, r) => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
-    ["plan approval", async (b) => bw.iw.h.oracle.query("UPDATE kauro.plans SET state = 'WITHDRAWN' WHERE project_id::text = $1", [projectOf(b as never)]), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
+    ["plan approval", async (b) => withdrawPlan(b as Buyer), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
   ];
   for (const [what, withdraw, refusal] of withdrawals) {
     const b = await buyer(`i1rev-${what.split(" ")[1]}`);
@@ -907,7 +943,7 @@ cell(`RACE ACH-M-I2-RETRY (retry): ${I2}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I2-REVOCATION (revocation): ${I2}`, "revocation", async (ctx) => {
   // each issuance prerequisite revoked while Kinstructions waits at the route lock; a replaced route version re-reads its window (I2Δ)
   const revocations: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView) => Promise<unknown>, string]> = [
-    ["billing membership", async (b) => bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED' WHERE user_id = $1 AND agency_id = $2", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b) => bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [b.a.billing.userId, b.a.s.agency.agencyId]), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
     ["route details replaced", async (_b, r) => {
       const d = await detailsArtifact((await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref, { accountNumber: "333333333333" });
       return bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'PENDING_VERIFICATION', current_version = current_version + 1 WHERE route_id = $1 RETURNING $2::text", [r.routeId, d.artifactRef]);
@@ -1122,14 +1158,27 @@ test(`OK ACH-M-I3-RETRY (retry): ${I3}`, async () => {
 });
 
 cell(`DENY ACH-M-I3-REVOCATION (revocation): ${I3}`, "revocation", async (ctx) => {
-  const withdrawals: ReadonlyArray<readonly [string, (x: Awaited<ReturnType<typeof issuedOrder>>) => Promise<unknown>, (r: Reply) => boolean]> = [
-    ["membership", async (x) => bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED' WHERE user_id = $1 AND agency_id = $2", [x.b.a.billing.userId, x.b.a.s.agency.agencyId]), (r) => code(r) === "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
-    ["session", async (x) => bw.iw.h.oracle.query("UPDATE kauro.sessions SET revoked_at = now() WHERE user_id = $1", [x.b.a.billing.userId]), (r) => code(r) === "401 AUTHENTICATION_REQUIRED -"],
-    ["route enabled", async (x) => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [x.r.routeId]), (r) => code(r) === "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
-    ["details artifact", async (x) => bw.evidence.corrupt(await detailsRefOf(x.r.routeId), new TextEncoder().encode("{}")), (r) => code(r) === "422 INTEGRITY_FAILURE HASH_MISMATCH"],
+  // each visibility prerequisite withdrawn while the projection is held at its artifact read: membership, route, details artifact.
+  // The SESSION prerequisite is not exercised here (stated gap): bearer requests never read kauro.web_sessions, and bankWorld (KIT
+  // bank-support.ts over statementsWorld) is built without the B11 session boundary (world({ sessions: true })), so no cookie request can
+  // run in this file without changing support files outside the lane. It needs a sessions-enabled bank world (KIT/coordinator).
+  type Issued = Awaited<ReturnType<typeof issuedOrder>>;
+  interface Reader {
+    read(): Promise<Reply>;
+    withdraw(): Promise<unknown>;
+  }
+  const bearer = (x: Issued, withdraw: () => Promise<unknown>): Reader => ({ read: () => readInstructions(x.b, x.orderId), withdraw });
+  const withdrawals: ReadonlyArray<readonly [string, (x: Issued) => Promise<Reader>, (r: Reply) => boolean]> = [
+    ["membership", async (x) => bearer(x, async () => {
+      const moved = await bw.iw.h.oracle.query("UPDATE kauro.memberships SET state = 'REVOKED', revoked_at = now(), version = version + 1 WHERE user_id = $1 AND agency_id = $2 AND state = 'ACTIVE'", [x.b.a.billing.userId, x.b.a.s.agency.agencyId]);
+      assert.equal(moved.rowCount, 1, "the billing membership moved ACTIVE -> REVOKED");
+    }), (r) => code(r) === "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["route enabled", async (x) => bearer(x, () => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [x.r.routeId])), (r) => code(r) === "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
+    ["details artifact", async (x) => bearer(x, async () => bw.evidence.corrupt(await detailsRefOf(x.r.routeId), new TextEncoder().encode("{}"))), (r) => code(r) === "422 INTEGRITY_FAILURE HASH_MISMATCH"],
   ];
-  for (const [what, withdraw, refused] of withdrawals) {
+  for (const [what, readerOf, refused] of withdrawals) {
     const x = await issuedOrder(`i3rev-${what.split(" ")[0]}`);
+    const reader = await readerOf(x);
     let reached!: () => void;
     let go!: () => void;
     const atRead = new Promise<void>((resolve) => (reached = resolve));
@@ -1137,14 +1186,16 @@ cell(`DENY ACH-M-I3-REVOCATION (revocation): ${I3}`, "revocation", async (ctx) =
     const running = withStoreHook(await detailsRefOf(x.r.routeId), async () => {
       reached();
       await released;
-    }, () => ctx.operation(`projection held (${what})`, () => readInstructions(x.b, x.orderId)));
+    }, () => ctx.operation(`projection held (${what})`, () => reader.read()));
     await atRead;
-    await ctx.revoked(what, () => withdraw(x));
+    await ctx.revoked(what, () => reader.withdraw());
     go();
     await ctx.fenced(`projection after ${what}`, async () => {
       throw await running;
     }, (e) => refused(e as Reply));
-    noAccountDigits(await readInstructions(x.b, x.orderId), `${what}: next read`);
+    const next = await reader.read();
+    assert.ok(refused(next), `${what}: the next read is refused too (${next.status})`);
+    noAccountDigits(next, `${what}: next read`);
   }
 });
 
