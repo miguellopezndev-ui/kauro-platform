@@ -15,10 +15,9 @@ import { createPurchaseRebinder } from "../src/index.js";
 import type { PurchaseRebinder } from "@kauro/application";
 import { agentOf, anotherClient, bought, integrationWorld, oracleRows, planOf, quoted, replacementPlanOf, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, open } from "./b10-cells-support.js";
-import { paymentRoutes } from "./commerce-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { blockedBy } from "./b10-cells-6a-support.js";
-import { call, completed, freshKey, ids, outcome, routes, type Person, type PlanFixture, type Reply } from "./support.js";
+import { call, completed, freshKey, outcome, routes, type Person, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -48,31 +47,6 @@ async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder: { read
   } finally {
     await hc.end();
     await wc.end();
-  }
-}
-/**
- * Holds `holder` at `at` (before its COMMIT), runs `other` to its answer while the holder is held (nothing in the product makes it wait, and the
- * harness does not require a wait), lets `whileHeld` observe the database at that moment, then releases the holder.
- */
-async function holdThenRun<H, O>(ctx: FaultContext, what: string, holder: { readonly login: Login; run(c: HarnessConnection): Promise<H> }, other: { readonly login: Login; run(c: HarnessConnection): Promise<O> }, at: string, whileHeld: () => Promise<void>): Promise<{ readonly held: PromiseSettledResult<H>; readonly other: O }> {
-  const hc = await connect(holder.login);
-  const oc = await connect(other.login);
-  try {
-    const pause = ctx.points.pause(at);
-    const running = ctx.operation(`${what} (held)`, () => holder.run(hc));
-    const settledHolder = running.then<PromiseSettledResult<H>, PromiseSettledResult<H>>((v) => ({ status: "fulfilled", value: v }), (reason: unknown) => ({ status: "rejected", reason }));
-    await pause.reachedBy(running);
-    let answered: O;
-    try {
-      answered = await ctx.operation(`${what} (running)`, () => other.run(oc));
-      await whileHeld();
-    } finally {
-      pause.release();
-    }
-    return { held: await settledHolder, other: answered };
-  } finally {
-    await hc.end();
-    await oc.end();
   }
 }
 const value = <T>(r: PromiseSettledResult<T>): T => {
@@ -551,93 +525,12 @@ faultCell(
   },
 );
 
-faultCell(
-  {
-    id: "CLOSE_INFLIGHT",
-    step: "CMD043 CloseAgency / RACE: W3 obligation inventory read (captures, refunds, authorizations arriving mid-way)",
-    fault: "race",
-    expect: "RACE (decided, kit PR1 / D10-TX-1 / W3 of the failure matrix): a refund is not serialized with the closure (CMD031 takes no agency shared half), so in every order the refund request and the closure each commit and answer on their own: a refund committed before the inventory is listed (openRefunds 1); a refund that commits after the inventory, or that is still uncommitted when the closure commits, is missing from the closure record and continues during CLOSING (refund rights survive, D10-AGY-4); a closure that commits without a refund is allowed only while that refund was not committed at its inventory; and the later CLOSED transition is refused by KC006 REFUND while the refund is open",
-  },
-  async (ctx) => {
-    // The assertions changed with the DECIDED product semantics (kit PR1, D10-TX-1, W3 and item 69 of docs/design/B10-failure-matrix.md): the agency
-    // row is locked FOR NO KEY UPDATE and a refund request takes no agency shared half, so neither order waits on the other (the old cell asserted that
-    // the closure waited on the refund's lock and never omitted it). What is still true is asserted: a refund committed before the inventory is
-    // listed; KC006 refuses CLOSED over any committed open refund. (A payment order, checkout or capture is wholly seen or ordered after the closure: [a43race].)
-    const refundRequest = (a: Agent, projectId: string) => (c: HarnessConnection) =>
-      iw.faults.on(c, "kauro_app", ctx.points, [], () => call(iw.w, { url: paymentRoutes.requestRefund(projectId), token: a.billing.token, agency: a.s.agency.agencyId, key: freshKey("close-inflight-refund"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } }));
-    const openRefunds = async (agencyId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.refunds WHERE agency_id = $1 AND state IN ('REQUESTED', 'APPROVED')", [agencyId]))[0]!.n;
-    const stateOf = async (agencyId: string): Promise<string> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.agencies WHERE agency_id = $1", [agencyId]))[0]!.state;
-    /** CLOSING to CLOSED as the agency's owner would write it: refused by KC006 (0028 agencies_closure_residuals) naming the open REFUND; the agency stays CLOSING. */
-    const closedIsRefusedByTheOpenRefund = async (a: Agent): Promise<void> => {
-      const conn = await connect("kauro_app_test");
-      try {
-        await conn.query("BEGIN");
-        await conn.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [a.s.agency.agencyId, a.s.agency.ownerUserId]);
-        const version = Number((await conn.query<{ version: string }>("SELECT version FROM kauro.agencies WHERE agency_id = $1", [a.s.agency.agencyId])).rows[0]!.version);
-        await assert.rejects(
-          conn.query("UPDATE kauro.agencies SET state = 'CLOSED', version = $2 WHERE agency_id = $1", [a.s.agency.agencyId, version + 1]),
-          (e: unknown) => (e as { code?: string }).code === "KC006" && String((e as Error).message).includes("REFUND"),
-          "CLOSED is refused by KC006 while the refund is open",
-        );
-      } finally {
-        await conn.query("ROLLBACK").catch(() => undefined);
-        await conn.end();
-      }
-      assert.equal(await stateOf(a.s.agency.agencyId), "CLOSING", "the agency stays CLOSING");
-    };
-    // 1. the refund committed BEFORE the closure's inventory: the closure lists it
-    {
-      const a = await agentOf(iw, "close-inflight-refund-before");
-      const paid = await bought(iw, a, "close-inflight-refund-before", { units: 50_000 });
-      const key = freshKey("close-inflight-refund-before");
-      const body = await closureBody(a);
-      const conn = await connect("kauro_app_test");
-      try {
-        assert.equal((await ctx.operation("the refund request", () => refundRequest(a, paid.purchase.projectId)(conn))).status, 201, "the refund request committed");
-      } finally {
-        await conn.end();
-      }
-      const c = closed(await closeCall(a, key, body));
-      assert.deepEqual([c.obligations.openRefunds, c.obligations.liveAuthorizations], [1, 1], "the closure lists the refund request committed before its inventory");
-      assert.equal(await openRefunds(a.s.agency.agencyId), 1);
-      await closedIsRefusedByTheOpenRefund(a);
-    }
-    // 2. the refund request UNCOMMITTED (held before its COMMIT) while the closure runs to its COMMIT: the closure waits on nothing and commits CLOSING
-    //    without it, allowed because the refund is not committed; the refund then commits and continues during CLOSING; KC006 refuses CLOSED
-    {
-      const a = await agentOf(iw, "close-inflight-refund-held");
-      const paid = await bought(iw, a, "close-inflight-refund-held", { units: 50_000 });
-      const key = freshKey("close-inflight-refund-held");
-      const body = await closureBody(a);
-      const raced = await holdThenRun(ctx, "CloseAgency while the refund request is uncommitted", { login: "kauro_app_test", run: refundRequest(a, paid.purchase.projectId) }, { login: "kauro_app_test", run: (c) => closeOn(ctx, c, a, key, body) }, "uow.before-commit", async () => {
-        assert.equal(await openRefunds(a.s.agency.agencyId), 0, "at the closure's COMMIT the refund is not committed");
-        assert.equal(await stateOf(a.s.agency.agencyId), "CLOSING", "the closure committed without waiting on the refund");
-      });
-      const c = closed(raced.other);
-      assert.deepEqual([c.obligations.openRefunds, c.obligations.liveAuthorizations], [0, 1], "the closure record omits the refund that was not committed");
-      assert.equal(value(raced.held).status, 201, "the refund request commits during CLOSING (refund rights survive the closure)");
-      assert.equal(await openRefunds(a.s.agency.agencyId), 1);
-      await closedIsRefusedByTheOpenRefund(a);
-    }
-    // 3. the closure held before its COMMIT (its inventory read) while the refund request commits: the refund does not wait on the closure's agency
-    //    lock, commits first, and is missing from the closure record that then commits; the refund continues during CLOSING, KC006 refuses CLOSED
-    {
-      const a = await agentOf(iw, "close-inflight-closure-held");
-      const paid = await bought(iw, a, "close-inflight-closure-held", { units: 50_000 });
-      const key = freshKey("close-inflight-closure-held");
-      const body = await closureBody(a);
-      const raced = await holdThenRun(ctx, "the refund request while CloseAgency is held before its COMMIT", { login: "kauro_app_test", run: (c) => closeOn(ctx, c, a, key, body) }, { login: "kauro_app_test", run: refundRequest(a, paid.purchase.projectId) }, "uow.before-commit", async () => {
-        assert.equal(await openRefunds(a.s.agency.agencyId), 1, "the refund committed while the closure holds the agency: it takes no agency half");
-        assert.equal(await stateOf(a.s.agency.agencyId), "ACTIVE", "the closure has not committed yet");
-      });
-      assert.equal(raced.other.status, 201, "the refund request was answered without waiting for the closure");
-      const c = closed(value(raced.held));
-      assert.deepEqual([c.obligations.openRefunds, c.obligations.liveAuthorizations], [0, 1], "the closure's inventory predates the refund: it is not in the record");
-      assert.equal(await openRefunds(a.s.agency.agencyId), 1, "the refund is still open after CLOSING");
-      await closedIsRefusedByTheOpenRefund(a);
-    }
-  },
-);
+// CLOSE_INFLIGHT W3 (a refund request landing between the obligations inventory and COMMIT) is NOT a 6a cell any more: moved to kit PR2.
+// Under the decided semantics (kit PR1, D10-TX-1, W3 and item 69 of docs/design/B10-failure-matrix.md) a refund (CMD031) takes no agency shared half, so
+// no order of the refund and the closure waits on a lock, and the harness's race kind proves its fault only by an observed lock wait (matrix.ts
+// assertInjected: observedWaits). The kit has no fault kind for a forced interleaving without a wait, so this cell cannot be declared honestly here;
+// the old cell asserted the superseded serialization and is deleted rather than kept weaker. KC006 refusing CLOSED over an open REFUND is proved at the
+// database in packages/persistence/test/b10-recurrence-migrations.test.ts (CMD043 at the database).
 
 // --- CMD002: ACT_PAR, AGREEMENT_EXP ---------------------------------------------------------------------------------------------------
 
