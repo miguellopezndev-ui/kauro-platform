@@ -2,9 +2,8 @@
  "package": "B00",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B00-case-map.md",
+  "sha256": "1d1d7179f06a331e9b8f7661c920861a50c94846e1a4480e5f1be8db505fcafa"
  },
  "rows": [
   {
@@ -13,23 +12,31 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "NOT_EXECUTED"
   },
   {
    "case": "R2-116",
-   "class": "NOT_EXECUTED",
-   "test": [],
-   "commit": null,
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "tools/test/ledger-b00.test.mjs :: R2-116: the edition transition R2 → A4/A5/A6/A8/A9 is recorded with the PROVENANCE hashes; every amendment applies prospectively and leaves the vendored registry byte-identical; an amendment file in this repository matches its recorded hash",
+    "tools/test/ledger-b00.test.mjs :: R2-116: work accepted before the transition keeps its clock and scope — its accepted subject survives the amendments, and a forged change of the registry is refused"
+   ],
+   "commit": "798e90f",
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
   },
   {
    "case": "R2-117",
-   "class": "NOT_EXECUTED",
-   "test": [],
-   "commit": null,
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "tools/test/ledger-b00.test.mjs :: R2-117: a claim is never acceptance — the README's statuses are observations the ledger recomputes from review records; a status, row or repair claimed without an accepting review is refused or stays a claim"
+   ],
+   "commit": "798e90f",
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
   },
   {
    "case": "R2-118",
@@ -37,7 +44,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "NOT_EXECUTED"
   }
  ]
 }

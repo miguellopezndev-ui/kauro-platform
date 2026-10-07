@@ -293,3 +293,14 @@ test("conversion: a table row takes its class from the status column, its review
     ["S055", "EXECUTED_LOCAL", null, null, []],
   ]);
 });
+
+test("every sidecar citation of a tools/test file names a test that exists in that file under exactly that title", () => {
+  for (const s of readSidecars(root)) {
+    for (const r of s.rows) {
+      for (const t of r.test.filter((x) => x.startsWith("tools/test/"))) {
+        const [file, ...title] = t.split(" :: ");
+        assert.ok(read(file).includes(`test(${JSON.stringify(title.join(" :: "))}`), `${s.package} ${r.case}: ${t}`);
+      }
+    }
+  }
+});

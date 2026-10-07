@@ -1,6 +1,6 @@
 | Package | Cases | Status | Accepted subject (commit · review) | Review rounds | Waiting for |
 |---|---|---|---|---|---|
-| B00 Observed baseline and business readiness | 4: 4 NOT_EXECUTED | NOT_STARTED | — | — | — |
+| B00 Observed baseline and business readiness | 4: 2 EXECUTED_LOCAL, 2 NOT_EXECUTED | IN_PROGRESS | — | — | — |
 | B01 Migration semantics and hostile inputs | 33: 29 EXECUTED_LOCAL, 3 PARTIAL, 1 PLANNED | IN_PROGRESS | — | — | — |
 | B02 Migration qualification and distribution | 7: 4 EXECUTED_LOCAL, 1 SIMULATED, 2 PLANNED | IN_PROGRESS | — | — | — |
 | B03 Intelligence offline kernel and compiler | 50: 50 MISSING | INCOMPLETE_MAP | — | — | — |

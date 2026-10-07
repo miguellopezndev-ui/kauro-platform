@@ -13,7 +13,7 @@
    "case": "R2-116",
    "package": "B00",
    "gate": "G-FACTS",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -22,7 +22,7 @@
    "case": "R2-117",
    "package": "B00",
    "gate": "G-FACTS",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3976,9 +3976,10 @@
    "title": "Observed baseline and business readiness",
    "cases": 4,
    "counts": {
-    "NOT_EXECUTED": 4
+    "NOT_EXECUTED": 2,
+    "EXECUTED_LOCAL": 2
    },
-   "status": "NOT_STARTED",
+   "status": "IN_PROGRESS",
    "acceptedSubject": null,
    "rounds": [],
    "waitingFor": ""
