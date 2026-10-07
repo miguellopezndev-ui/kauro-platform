@@ -2,7 +2,7 @@
 // every site that builds a pool or a client in apps/ and packages/*/src; each non-persistence site must call connectionSecurityOf
 // (the one rule), and the persistence sites must derive ssl only from sslOptionsOf (rejectUnauthorized: true).
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
@@ -14,9 +14,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..
 
 const EXTENSIONS = [".ts", ".tsx", ".js", ".mjs", ".cjs"];
 
+/** Build output, vendored and generated directories are never source (verify produces apps/web/.next/standalone/.../server.js, for one). */
+const NOT_SOURCE: ReadonlySet<string> = new Set(["node_modules", "dist", "build", ".next", "out", "coverage", "vendor", ".turbo", ".git", "test"]);
+
 function sources(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name === "dist" || entry.name === "test") continue;
+    if (NOT_SOURCE.has(entry.name)) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) sources(path, out);
     else if (EXTENSIONS.some((e) => entry.name.endsWith(e)) && !entry.name.endsWith(".d.ts")) out.push(path);
@@ -96,6 +99,20 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
   try {
     for (const name of ["a.ts", "b.js", "c.mjs", "d.cjs"]) writeFileSync(join(dir, name), forms["new pg.Pool("] ?? "");
     assert.deepEqual(sources(dir).map((f) => relative(dir, f)).sort(), ["a.ts", "b.js", "c.mjs", "d.cjs"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("scan self-test: only source is scanned: a connection-looking file under .next/, dist/, build/ or node_modules/ is ignored, one under src/ is caught", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kauro-scan-src-"));
+  const looks = ['import pg from "pg";', "export const p = new pg.Pool({});"].join("\n");
+  try {
+    for (const where of ["src", ".next/standalone/apps/web", "dist/src", "build", "node_modules/pg", "coverage", "out"]) {
+      mkdirSync(join(dir, where), { recursive: true });
+      writeFileSync(join(dir, where, "server.js"), looks);
+    }
+    assert.deepEqual(sources(dir).map((f) => relative(dir, f).split("\\").join("/")), ["src/server.js"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
