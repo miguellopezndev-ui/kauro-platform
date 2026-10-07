@@ -131,7 +131,7 @@ las partes no resuelven la objeción, el Cliente puede terminar los Pedidos afec
 reembolso de lo pagado por ellos.
 <!-- auth: 19 §Subprocessor register ("Provider changes require data-flow and contract review, customer notice where applicable, technical qualification and an exit/deletion plan") · law: C-66 (C.R.S. 6-1-1305(3)(b), texto 2026: oportunidad de objetar; Virginia B.5 exige solo contrato escrito, la objeción va más allá) · resolución de silencio S-07 -->
 
-8.3. **Lo que no son subencargados.** Los proveedores de pagos (PayPal, Wise) y el banco de Kauro actúan como responsables
+8.3. **Lo que no son subencargados.** El proveedor de pagos (Wise) y el banco de Kauro actúan como responsables
 independientes de los datos de pago que tratan para sus propios fines regulados y no reciben Datos del Cliente. Los
 colaboradores comerciales de Kauro no reciben Datos del Cliente.
 <!-- auth: 19 §Subprocessor register ("A provider can be an independent controller for certain payment or compliance functions"; "Listing every vendor as a subprocessor would be inaccurate"); 13 §Privacy in reports and downloads; A8 §1 -->
@@ -231,7 +231,8 @@ Plataforma avisa antes de cada eliminación para que el Cliente pueda descargar.
 13.2. Kauro emite un comprobante de eliminación por el alcance que controla, con el alcance pedido, la versión de la política,
 los plazos, la revocación de accesos, las generaciones de objetos enumeradas y los resultados de eliminación y de ausencia. El
 comprobante no contiene valores de los registros eliminados y no cubre copias ya descargadas ni importaciones hechas por el
-Cliente.
+Cliente. Una copia eliminada puede persistir unos días tras el borrado en el almacenamiento del proveedor, hasta su expiración
+automática; Kauro no la usa ni la restaura.
 
 13.3. Cuando la ley obliga a conservar algún dato, Kauro lo conserva solo para ese fin, separado y sin contenido de CRM. Los
 registros financieros y de seguridad de Kauro no contienen Datos del Cliente.
@@ -370,8 +371,8 @@ Medidas existentes en el diseño aprobado del servicio. Kauro no declara certifi
 Proveedores de Kauro que **no** son subencargados de Datos del Cliente: Resend (correo transaccional; es encargado de Kauro para
 los datos de los usuarios del Cliente —correo, nombre y contenido mínimo del aviso—, que según la sección 1.3 no son Datos del
 Cliente; no recibe registros de CRM y conserva los datos de envío por un periodo propio, 30 días en el plan observado), Google LLC
-(Google Workspace: correo corporativo de Kauro; el Cliente no debe enviar registros por correo), Cloudflare, Inc. (registro de dominio y DNS), PayPal y Wise (responsables
-independientes de datos de pago), Bancolombia (banco de Kauro) y el proveedor de facturación electrónica de Kauro (datos de
+(Google Workspace: correo corporativo de Kauro; el Cliente no debe enviar registros por correo), Cloudflare, Inc. (registro de dominio y DNS), Wise (responsable
+independiente de datos de pago), Bancolombia (banco de Kauro) y el proveedor de facturación electrónica de Kauro (datos de
 facturación del Cliente, no Datos del Cliente). Google Cloud no se usa en producción.
 <!-- auth: A9 §1 (Google Workspace, Cloudflare, Resend sin cambio; GCP fuera del camino crítico); A4 §Owner acts (Cloudflare registrar y DNS); A8 §1; 15 §Accounting integration decision -->
 

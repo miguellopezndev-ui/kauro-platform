@@ -76,7 +76,7 @@ repositorios ni servicios de modelos no pagados.
 - **Titulares:** representantes y contactos de facturación de los clientes; personas que figuran en pagos y transferencias.
 - **Datos:** razón social, identificación tributaria, dirección de facturación, contacto de facturación, datos del pedido,
   referencias y estados del pago, nombre y referencia del ordenante en transferencias recibidas, reembolsos y disputas. Kauro no
-  recibe ni guarda números completos de tarjetas: el pago con tarjeta se hace en PayPal.
+  recibe ni guarda números de tarjeta.
 - **Finalidades:** cobrar, conciliar pagos, emitir factura electrónica y notas, gestionar reembolsos y disputas, llevar la
   contabilidad y cumplir obligaciones tributarias y comerciales.
 <!-- auth: 15 §Money vocabulary; 15 §FiscalProfile ("collects only billing facts necessary"); 15 §Disputes and chargebacks; A8 §1, §3 -->
@@ -238,7 +238,7 @@ envía registros crudos, credenciales ni secretos, y el modelo no toma decisione
 | Proveedor de facturación electrónica que Kauro use ante la DIAN | Emisión y validación de facturas y notas | Datos de facturación (sección 6.2) | Colombia |
 <!-- registros internos de Google Workspace: INTERNAL_DATA_MANUAL §8 (resolución de silencio S-20) · auth: A9 §1 y §3; 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md; 15 §Accounting integration decision (Alegra candidato o ruta DIAN) · resolución de silencio S-05 (proveedor fiscal no elegido) -->
 
-13.2. Kauro comunica datos de pago a **PayPal** y a **Wise**, y opera con su banco **Bancolombia**; estas entidades tratan esos
+13.2. Kauro comunica datos de pago a **Wise**, y opera con su banco **Bancolombia**; estas entidades tratan esos
 datos como responsables independientes según sus propias políticas, porque prestan servicios financieros regulados. Kauro también
 entrega a la DIAN la información que la ley tributaria exige.
 <!-- auth: A8 §1; 19 §Subprocessor register (proveedor como responsable independiente); 15 §TaxDocument state machine -->

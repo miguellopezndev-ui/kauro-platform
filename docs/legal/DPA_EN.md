@@ -122,7 +122,7 @@ Customer may object in writing, on reasonable data-protection grounds, within th
 objection, the Customer may terminate the affected Orders not yet executed and receive a refund of what it paid for them.
 <!-- auth: 19 §Subprocessor register · law: C-66 (C.R.S. 6-1-1305(3)(b), 2026 text: opportunity to object; Virginia B.5 requires only a written contract, the objection right goes further) -->
 
-8.3. **Who is not a sub-processor.** Payment providers (PayPal, Wise) and Kauro's bank act as independent controllers of the
+8.3. **Who is not a sub-processor.** The payment provider (Wise) and Kauro's bank act as independent controllers of the
 payment data they process for their own regulated purposes and do not receive Customer Data. Kauro's sales collaborators do not
 receive Customer Data.
 <!-- auth: 19 §Subprocessor register; 13 §Privacy in reports and downloads; A8 §1 -->
@@ -220,7 +220,8 @@ so the Customer can download.
 
 13.2. Kauro issues a deletion receipt for the scope it controls, with the requested scope, policy version, deadlines, access
 revocation, enumerated object generations and deletion and absence results. The receipt contains no values of deleted records and
-does not cover copies already downloaded or imports made by the Customer.
+does not cover copies already downloaded or imports made by the Customer. A deleted copy may persist for a few days after
+deletion in the provider's storage until it expires automatically; Kauro does not use or restore it.
 
 13.3. Where the law requires keeping some data, Kauro keeps it only for that purpose, separately and without CRM content. Kauro's
 financial and security records contain no Customer Data.
@@ -356,7 +357,7 @@ Measures that exist in the approved service design. Kauro does not claim certifi
 Kauro providers that are **not** sub-processors of Customer Data: Resend (transactional email; Kauro's processor for the
 Customer's users' data —email, name and minimal notice content—, which under section 1.3 is not Customer Data; it receives no CRM
 records and keeps sending data for its own period, 30 days on the observed plan), Google LLC (Google Workspace: Kauro's corporate
-email; the Customer must not send records by email), Cloudflare, Inc. (domain registration and DNS), PayPal and Wise (independent controllers
+email; the Customer must not send records by email), Cloudflare, Inc. (domain registration and DNS), Wise (independent controller
 of payment data), Bancolombia (Kauro's bank) and Kauro's e-invoicing provider (Customer billing data, not Customer Data). Google
 Cloud is not used in production.
 

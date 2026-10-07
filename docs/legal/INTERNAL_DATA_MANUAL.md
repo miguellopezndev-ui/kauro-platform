@@ -51,7 +51,7 @@ clientes. No hay empleados, ni áreas, ni comités. Los vendedores independiente
 | Responsable / encargado | Kauro Data S.A.S. | Según la sección 4 |
 | **Oficial de protección de datos** (persona que asume la función de protección de datos y tramita las solicitudes) | **El representante legal** | Aprobar y revisar este Manual y la evaluación de impacto; recibir y resolver consultas y reclamos (sección 5.1); trasladar las solicitudes sobre Datos del Cliente (5.2); dirigir la respuesta a incidentes y hacer los reportes a la SIC y los avisos a Clientes (5.4); aprobar subencargados (5.5); vigilar la conservación y supresión (5.6); formarse y formar (5.10); hacer la revisión anual (sección 9); responder los requerimientos de la SIC con la evidencia del programa |
 | Encargados de Kauro | AWS, Resend, Google (Workspace) y el proveedor de facturación electrónica | Según sus contratos (sección 5.5; POL §13.1; DPA Anexo III) |
-| Responsables independientes | PayPal, Wise, Bancolombia, DIAN | Tratan datos de pago o tributarios para sus propios fines; no son encargados (POL §13.2) |
+| Responsables independientes | Wise, Bancolombia, DIAN | Tratan datos de pago o tributarios para sus propios fines; no son encargados (POL §13.2) |
 | Vendedores independientes | Colaboradores comerciales | Solo datos de prospectos de agencias; aceptan las reglas de manejo de datos antes de activarse (sección 5.10) |
 | Asistentes de programación (Claude, Codex) | Herramientas del constructor | Ningún dato de clientes, prospectos o titulares; los defectos se reproducen con datos sintéticos |
 <!-- law: C-09b (Decreto 1074 art. 2.2.2.25.4.4: responsable y encargado designan persona o área) · auth: 19 §Business readiness gate ("a responsible person for obligations"); 19 §Subprocessor register; 08 §Model boundary; 12 §Seller onboarding and access lifecycle (aceptación de manejo de datos y formación antes de ACTIVE) · resolución de silencio S-14 · fuente: Guía SIC, III.1.1 (alta dirección designa la persona o área) y III.1.2 (oficial de protección de datos) -->
@@ -260,7 +260,7 @@ Todo este procedimiento es MANUAL.
 ## 6. Seguridad
 
 Las medidas técnicas y organizativas son las de DPA Anexo II y POL §14. Este Manual añade solo las obligaciones del representante
-legal: MFA en todas las cuentas de Kauro (AWS, Google Workspace, GitHub, Resend, PayPal, Wise, Cloudflare); sin llaves estáticas
+legal: MFA en todas las cuentas de Kauro (AWS, Google Workspace, GitHub, Resend, Wise, Cloudflare); sin llaves estáticas
 de larga vida; revisar cada mes los accesos activos de vendedores y retirar los que no se usan. Las medidas deben poder mostrarse a
 la SIC (evidencia de configuración y de pruebas).
 <!-- law: C-12 (art. 17 lit. d), C-13 (art. 18 lit. b) · auth: 08 §Authentication and assurance; 08 §Secrets and supply chain; 12 §Seller onboarding and access lifecycle · fuente: SIC Circular 002 de 2024, instrucción VIII (medidas auditables); Decreto 1074 art. 2.2.2.25.6.1 (evidencia de las medidas de seguridad a solicitud de la SIC) -->

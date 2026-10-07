@@ -262,22 +262,23 @@ mismo total. El precio informado coincide con el cobrado; si aparecen dos precio
 ## 8. Pagos
 
 8.1. **Medios de pago.** Kauro trabaja por proyecto: no hay suscripciones ni cargos recurrentes automáticos. Para clientes de
-Estados Unidos, la Plataforma ofrece, cuando están habilitados:
-- **Transferencia bancaria en EE. UU. / ACH**, recibida en la cuenta empresarial de Kauro en Wise, con una referencia única por
-  Pedido. Esta opción solo se muestra mientras está habilitada; Kauro puede no ofrecerla.
-- **PayPal / tarjeta**, mediante PayPal Business.
+Estados Unidos, la Plataforma ofrece un único medio de pago, **cuando esté habilitada**: **transferencia bancaria en EE. UU.
+(ACH o transferencia doméstica a los mismos datos)**, recibida en la cuenta empresarial de Kauro, con una referencia única por
+Pedido. Esta opción solo se muestra mientras está habilitada; Kauro puede no ofrecerla, y la Plataforma no ofrece pago con
+tarjeta ni otros medios.
 
 Un Cliente que paga mediante una plataforma de cuentas por pagar paga a los datos bancarios que Kauro haya indicado para ese
 Pedido. Kauro no está integrado con esas plataformas.
-<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 y §2 (reglas 2, 3, 4, 5); 15 §Initial payment decision -->
+<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 y §2 (reglas 2, 3, 4, 5); 15 §Initial payment decision · Payments V1 (decisión del dueño 2026-10-07): PayPal fuera del lanzamiento, no se ofrece tarjeta; una sola ruta condicionada -->
 
 8.2. **Cuándo un Pedido está pagado.** Una página de retorno del proveedor no prueba el pago. Un Pedido está pagado solo cuando
-Kauro confirma la captura con el proveedor (PayPal) o concilia un crédito entrante por el **monto exacto y en la moneda** del
-Pedido (ACH). Los cargos que cobre el banco o la plataforma del Cliente por enviar el pago corren por cuenta del Cliente; las
+Kauro concilia un crédito entrante, con evidencia del banco, por el **monto exacto y en la moneda** del Pedido. Un crédito
+confirmado después del vencimiento del Pedido se trata según las reglas de vencimiento de la Cotización (sección 6) y, si no
+puede acreditarse al mismo precio, se devuelve. Los cargos que cobre el banco o la plataforma del Cliente por enviar el pago corren por cuenta del Cliente; las
 comisiones de recepción y de procesamiento del lado de Kauro corren por cuenta de Kauro y no se suman al total.
 <!-- auth: 02 §7 ("Payment return pages do not assert payment success"); A8 §3 ("the order paid only on a reconciled credit of the exact amount and currency"); 15 §Money vocabulary ("only explicitly disclosed permitted charges"); 15 §Fee reference and example · resolución de silencio S-09 -->
 
-8.3. **Sin doble cobro.** Una falla en la comunicación con el proveedor no produce un segundo cobro; los pagos inciertos se
+8.3. **Sin doble cobro.** Kauro no pide un segundo pago mientras un pago enviado no esté conciliado; los pagos inciertos se
 concilian antes de cualquier reintento.
 <!-- auth: 01 CH-007; 15 §Webhooks and reconciliation -->
 
@@ -330,8 +331,8 @@ no impone penalidades que no estén en estos Términos. Si el Cliente es consumi
 
 10.3. **Defecto de Kauro.** El remedio por defecto de Kauro se rige por la sección 11.
 
-10.4. **Forma del reembolso.** Los reembolsos se pagan por el mismo medio de pago cuando sea posible (los de ACH, como
-transferencia saliente aprobada por Kauro). El total reembolsado nunca excede lo efectivamente capturado menos reembolsos y
+10.4. **Forma del reembolso.** Los reembolsos se pagan por el mismo medio de pago cuando sea posible (los de transferencia
+bancaria, como transferencia saliente aprobada por Kauro, cuando la ejecución real esté comprobada). El total reembolsado nunca excede lo efectivamente capturado menos reembolsos y
 reversiones anteriores. Un reembolso parcial identifica el componente del servicio afectado y ajusta el impuesto de forma
 coherente, con la nota crédito correspondiente.
 <!-- auth: 15 §Refund policy and calculation; A8 §3 ("refunds as outbound transfers under owner approval"); 15 §TaxDocument state machine -->
@@ -415,7 +416,8 @@ primero nuevas cargas, envíos al modelo, procesamientos, publicaciones y descar
 las generaciones registradas (cuarentena, aceptados, derivados, provisionales, entregas, comprobantes y copias de soporte),
 comparándolas con el inventario del proveedor. Kauro entrega un comprobante de eliminación para el alcance que controla; no puede
 eliminar copias ya descargadas por el Cliente ni importaciones hechas en su CRM. Si una operación del proveedor falla, la
-eliminación queda parcial y visible, y se reintenta.
+eliminación queda parcial y visible, y se reintenta. Una copia eliminada puede persistir unos días tras el borrado en el
+almacenamiento del proveedor, hasta su expiración automática; Kauro no la usa ni la restaura.
 <!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration -->
 
 13.5. **Copias de respaldo.** Las copias de respaldo de la base de datos contienen metadatos y referencias, no el contenido de
@@ -613,7 +615,9 @@ todo lo pagado, sin retenciones ni descuentos, dentro de los quince (15) días c
 Kauro supera el plazo, el consumidor tiene el mismo derecho de terminar y recibir la devolución en quince (15) días calendario.
 
 25.7. **Reversión del pago.** Se aplica cuando el consumidor pagó por comercio electrónico con tarjeta de crédito, débito u otro
-instrumento de pago electrónico y tanto Kauro como el emisor del instrumento están domiciliados en Colombia. Causales: fraude,
+instrumento de pago electrónico y tanto Kauro como el emisor del instrumento están domiciliados en Colombia. La Plataforma no ofrece hoy
+pago con tarjeta ni con otros instrumentos electrónicos (sección 8.1); esta sección recoge el derecho legal y solo se aplica si
+un pago de ese tipo llegara a existir. Causales: fraude,
 operación no solicitada, servicio no recibido, o servicio que no corresponde a lo pedido o es defectuoso. El consumidor presenta
 queja a Kauro por la Plataforma, por correo a [correo de notificaciones] o verbalmente, **dentro de los cinco (5) días hábiles
 siguientes** a: la fecha en que tuvo noticia de la operación fraudulenta o no solicitada; la fecha en que debió recibir el
