@@ -127,3 +127,19 @@ turn its cell red, for the reason given in the r1 status table below.
 | ADV-PV1R-11 | readRouteDetails binding (verify/enable/replace/I3) | ADV-PV1R-11 R1-RETRY (replace path) | fix-proof #12 |
 | ADV-PV1R-12 | PARTIALLY_RECEIVED in open set | MISSING (GAP -> L-INBOUND or fail closed) | - |
 | ADV-PV1R-13 | 0046 per-column grants | MISSING (per-column assertions) | - |
+
+## r3 micro-verify ef79a2e
+
+Delta `abd5555..ef79a2e` only (src: instructions.ts open set + doc comment; test: ach-route-cells.test.ts; docs). Verdict: **PASS**.
+
+| Item | Status | Evidence |
+|---|---|---|
+| ADV-PV1R-12 | CLOSED | `OPEN_BANK_ORDER_STATES = {AWAITING_TRANSFER}` (instructions.ts:240), judged at the guard re-read (:308); cell red on abd5555 (r2-red.md, read answered 200 with full amount), green on Linux. Sweep: the only other bankState emitter is the CMD028 create view (instructions.ts:217), issuance-time AWAITING_TRANSFER, committed-result replay, no account digits. GAP (remaining amount) owned by L-INBOUND E1 in touched-B06. |
+| ADV-PV1R-13 | CLOSED | One SELECT per withheld column, each `assert.equal(got, "42501")` (strictly stronger than the old denied-or-NULL); red with single-column re-grant of created_by. Positive check on details_artifact_ref matches the 0046:302 grant list (column already granted; not new exposure). |
+| ADV-PV1R-14 | CLOSED | 20 s named allowance bounds setup only; validUntil still crosses during the lock wait (DB `clock_timestamp() > validUntil` asserted) and the verify txn starts before validUntil, so effectInstant = transaction_timestamp() stays red. Per-test timeout 150 s; no product assertion changed. |
+| ADV-PV1R-6 expiry | CLOSED | Only mutation is `idle_expires_at = last_seen_at + 1 ms` (no revoked_at), held at the artifact read; guard re-auth (bank-route-routes.ts:152) refuses; next read 401 proves the authenticator judges idle expiry. Red with the re-auth disabled. Distinct from the revocation cell. |
+| ADV-PV1R-1 nit | CLOSED | `code(issued) === "409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE"` (was 404-or-409); touched-B06 lock-order wording corrected. |
+| finding-3 GAP owner | CLOSED | "Open GAPs with owner lane": PARTIALLY_RECEIVED remaining amount and payment_orders open half, both L-INBOUND E1, with the cell E1 must add. |
+| Relaxations | NONE | test-repairs r2 RELAXED 0 confirmed against the diff. |
+| Linux counts | CONFIRMED (nit) | 29 / 42 / 64 pass, 0 fail, in tools/ci-local/logs/pv1-route-ef79a2e...-linux.log (receipt verify-linux-pv1-route-focused, exit 0). The cited heavy log holds only the exit line; cite the clone log in evidence. |
+| New issues in delta | NONE | Design ACH-ROUTE:379-383 (PARTIALLY_RECEIVED payable) now deliberately narrower: list it as a disclosed caveat with cell ADV-PV1R-12 in the Codex prompt. |
