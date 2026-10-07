@@ -918,8 +918,10 @@ faultCell(
     assert.deepEqual(await stateOf(x, refusedKey).then((s) => s.replacements), ["ACCEPTED_FOR_CHECKOUT"], "no quote written");
     assert.deepEqual(await moneyRows(), before, "no money or entitlement row changed");
     // (b) the refund completed: the ordinary issuance supersedes the refunded replacement, money untouched, the allowance still spent
-    const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
-    assert.equal(executed.status, 200, executed.text);
+    await ctx.revoked("the full service refund completed (the re-bound entitlement REVOKED)", async () => {
+      const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+      assert.equal(executed.status, 200, executed.text);
+    });
     assert.equal(await authorizationState(live.authorization_id), "REVOKED", "the completed full refund revoked the re-bound entitlement");
     const afterRefund = await moneyRows();
     const issuedKey = freshKey("repl-refund-after");
