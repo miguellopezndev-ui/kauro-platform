@@ -1098,12 +1098,13 @@ test("W3 supersession order is not creation order: an issuance whose transaction
 
 /**
  * The instants a host clock that stepped back writes (the WSL host stepped back at least 228 ms on the stress gate): each later quote of the
- * chain gets an EARLIER created_at and issued_at than the one it superseded. Written by the database owner with triggers off (a forced
+ * chain gets an EARLIER created_at than the one it superseded. Written by the database owner with triggers off (a forced
  * state: the product stamps transaction_timestamp(), and the host clock, not the product, decides it).
  */
 async function stepClockBack(quoteIds: ReadonlyArray<string>, stepMs = 228): Promise<void> {
   for (const [i, quoteId] of quoteIds.entries()) {
-    await ownerWrite("UPDATE kauro.quotes SET created_at = created_at - make_interval(secs => $2::double precision), issued_at = issued_at - make_interval(secs => $2::double precision) WHERE quote_id = $1", [quoteId, ((i + 1) * stepMs) / 1000 + 10]);
+    // created_at only: issued_at is bound to the 336-hour schedule by quotes_r2_initial_schedule (a stepped clock moves both together)
+    await ownerWrite("UPDATE kauro.quotes SET created_at = created_at - make_interval(secs => $2::double precision) WHERE quote_id = $1", [quoteId, ((i + 1) * stepMs) / 1000 + 10]);
   }
 }
 
