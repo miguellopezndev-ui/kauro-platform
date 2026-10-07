@@ -94,3 +94,9 @@ Full text: `docs/authority/decisions/2026-10-07-PAYMENTS-V1.md` (branch docs/pay
   relates to a payment in transit (quote expiry vs. an invoice already issued: propose the rule with its R2/B09 citation, B
   confirms before you build); (d) partial / over / wrong-reference payments shown as "under review", never as paid.
   Generic route model only (no Wise-specific screens or names in contracts).
+- **R-E2 correction (owner 2026-10-07, wording of ACH/wire timing):** do not write "ACH takes 1-3 business days". Use only
+  Wise's official help text (https://wise.com/help/articles/2827506/how-do-i-receive-money-with-my-usd-account-details,
+  accessed 2026-10-07): "ACH: Usually within hours, and up to 4 working days." / "Wire: Usually within minutes, and up to 1
+  working day." The same domestic USD account details receive both ACH and wire from US senders; receiving ACH has no fee
+  ("No fees for ACH or 6.11 USD for wires"), a domestic wire has a receiving fee. Show timing as data (versioned config with
+  source URL and access date, A8 rule 7), never hard-coded; design the pending state for up to 4 working days.
