@@ -51,3 +51,24 @@ Kinstructions takes locks in this order:
 The RACE and REVOCATION cells already cover this order: ACH-M-R2-REVOCATION, ACH-M-I1-REVOCATION and ACH-M-I2-REVOCATION.
 
 Reads of the internal evidence store happen inside the transaction where the cells require it (decision c): Kroute enable after the lock, and I3 before its access decision.
+
+## Lane departures and matrix status (r1, ADV-PV1R-9)
+
+**Wrong test path (docs lane).** The case map (ACH-01..03, ACH-case-map.md:25-27) and ACH-ROUTE.md §7.29 cite `packages/persistence/test/ach-route-cells.test.ts`. The cells are in `apps/api/test/ach-route-cells.test.ts`; the migration facts are in `packages/persistence/test/bank-route-migrations.test.ts`. Both documents belong to the docs lane (pv1/docs), not this worktree. The correction goes to that lane with this note.
+
+**§7.1-§7.3 rows.** Each design cell R1, R2, I1, I2 and I3 x {RACE, TIMEOUT, EXPIRY, CRASH-BEFORE, CRASH-AFTER, RETRY, REVOCATION, PARTIAL} is C in `apps/api/test/ach-route-cells.test.ts` under its exact title, `<VERB> ACH-M-<row>-<column> (<family>): <row label>`, plus the r1 cells prefixed `ADV-PV1R-<n>`. Sub-cases that are not run are GAP:
+- I3-REVOCATION / I3-EXPIRY session half: GAP, needs a sessions-enabled bank world (KIT). RULING NEEDED (r1-red).
+- R2-GENERAL with a reconciled credit (P1/P2): GAP -> L-INBOUND.
+- R2-GENERAL with a refund DECLARED / UNCERTAIN / RECORDED (X1/G2): GAP -> L-REFUND. The title claims more than is run; the comment discloses it.
+- I1/I2-REVOCATION capability and source withdrawals: GAP. I2-delta with a different window: GAP, because no product command changes the window (replaceDetails copies it).
+- R2-REVOCATION identity and fee-config withdrawals: GAP.
+
+**Departure 8 (undeclared until r1): the B09 payment route of a bank route stays CONFIGURED, never QUALIFIED.** D-ACH-02 says the route becomes QUALIFIED when ENABLED and SUSPENDED when disabled. The lane registers the payment_routes row as CONFIGURED (0046 `payment_routes_register_bank`) and never moves it. Instead, issuance passes `paymentRoute: { state: "QUALIFIED" }` to `checkoutBlockers` (instructions.ts:112), and the bank route's own state is the gate. Consequence: any B09 reader that requires a QUALIFIED payment route (capture, reconciliation, authorization issuance) will refuse or skip bank orders until L-INBOUND binds them. Owner: L-ROUTE (this declaration), L-INBOUND (capture path). Codex prompt: list it.
+
+**Departure 6 consequences (no sweep for bank orders before L-INBOUND E1).** The bank order is `payment_orders.state = INTENT_CREATED` (the vendored machine is not extended). Past `transferExpiresAt` it stays INTENT_CREATED until E1 (ACH-10/11/21) runs. Until then it:
+1. blocks every new order of the project (`findOpenForProject` -> `409 PAYMENT_PENDING OPEN_ORDER_EXISTS`, across routes);
+2. blocks agency closure (`commercial-agency-lifecycle.ts:283`, `409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED`; asserted by `ADV-PV1R-1 RACE ACH-M-I1-RACE ...`, issuance-first order);
+3. counts as open in the plan inspections (`commerce-inspections.ts:40`).
+E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CANCELLED` (0015 transition list) and snapshot `order_state` -> EXPIRED (`transfer_deadline_reached`). Cells: ACH-M-E1-*, L-INBOUND.
+
+**Lock order.** The "Lock order (rule 13) recorded in 0046" section above describes a50db87 (quote, then route, then access). ADV-PV1R-1 rejects that order. The builder's fix must rewrite this section, the 0046 comment and §7.28 to the order the code takes. The red cell is `ADV-PV1R-1 RACE ACH-M-I1-RACE ...`.

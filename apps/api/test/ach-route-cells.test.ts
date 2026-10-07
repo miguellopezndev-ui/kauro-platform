@@ -86,7 +86,8 @@ const open = (): Promise<HarnessConnection> => openConnection(bw.iw.h.pg.clientC
 /** A revocation cell's lock holder (the superuser): the revocation's own statements run in the holder's transaction and commit while it holds. */
 const openHolder = (): Promise<HarnessConnection> => openConnection(bw.iw.h.pg.clientConfig("postgres"));
 /** The B09/B10 outcome convention: "status CODE REASON" (FailureCode + closed reason; "-" when none). */
-const code = (r: Reply): string => outcome(bw.iw.w, r);
+/** A success reads "<status> SUCCESS -" (r1: a red cell names what the product answered instead of failing inside the helper). */
+const code = (r: Reply): string => (r.status < 400 ? `${r.status} SUCCESS -` : outcome(bw.iw.w, r));
 
 /** An owner-supplied account-details artifact in the restricted store (V1 R1 evidence) for a fresh account of this cell. */
 async function detailsArtifact(accountRef: string, over: { readonly accountNumber?: string; readonly validUntil?: string; readonly routingNumber?: string | null } = {}): Promise<{ readonly artifactRef: string; readonly evidenceHash: string }> {
@@ -99,9 +100,11 @@ interface Cfg {
   readonly accountRef: string;
   readonly windowMs?: number;
   readonly lifetimeMs?: number;
+  /** The details artifact's validUntil (default 30 days ahead). */
+  readonly validUntil?: string;
 }
 const configureBody = async (cfg: Cfg) => {
-  const d = await detailsArtifact(cfg.accountRef);
+  const d = await detailsArtifact(cfg.accountRef, cfg.validUntil === undefined ? {} : { validUntil: cfg.validUntil });
   return { provider: BANK_FAKE_PROVIDER, environment: bw.environment, accountRef: cfg.accountRef, currency: "USD", acceptedRails: ["ACH", "DOMESTIC_WIRE"], detailsArtifactRef: d.artifactRef, detailsEvidenceHash: d.evidenceHash, minimumTransferWindowMs: cfg.windowMs ?? 4 * 86_400_000, instructionLifetimeMs: cfg.lifetimeMs ?? 10 * 86_400_000, providerTimeToleranceMs: 86_400_000, feePolicyVersion: "bank-fee-v1", timingSource: { url: "https://wise.com/help/articles/2827506", accessedOn: "2026-10-07" } };
 };
 const owner = (url: string, body: unknown, options: { readonly key?: string; readonly token?: string } = {}): Promise<Reply> =>
@@ -149,11 +152,6 @@ async function buyer(label: string): Promise<Buyer> {
   const plan = await planOf(bw.iw, a, `${label}-plan`);
   return { a, quote: await quoted(bw.iw, a, plan), planId: plan.planId };
 }
-/** The plan's approval withdrawn through the real CMD026 route by the agency owner (APPROVED -> WITHDRAWN, the listed edge). */
-async function withdrawPlan(b: Buyer): Promise<void> {
-  const [plan] = await q<{ version: string }>("SELECT version::text FROM kauro.plans WHERE plan_id::text = $1", [b.planId]);
-  completed(await call(bw.iw.w, { url: routes.withdrawApproval(b.planId), token: b.a.s.owner.token, agency: b.a.s.agency.agencyId, key: freshKey("withdraw"), body: { expectedVersion: Number(plan!.version), reasonCode: "OWNER_DECISION" } }), 200);
-}
 /**
  * The billing member's membership revoked the way B06 writes the listed Membership edge (pipeline-authorization / cmd044 fixtures): the
  * agency owner acting as itself (tenant context of `c`'s transaction), ACTIVE -> REVOKED with its version bump AND its
@@ -182,6 +180,8 @@ async function issuedFootprint(projectId: string): Promise<{ orders: number; ins
   };
 }
 const NOTHING_ISSUED = { orders: 0, instructions: 0, accepted: 0, events: 0 };
+/** The order-aggregate events of ONE issuance (r1, ADV-PV1R-8): the order's creation and bank_transfer_instruction.issued.v1. Exact, so a duplicated or missing event fails. */
+const ISSUED_EVENTS = 2;
 const projectOf = (b: { readonly quote: CreateQuoteView }): string => (b.quote.quote as unknown as { projectId: string }).projectId;
 const noAccountDigits = (r: Reply, what: string): void => {
   assert.ok(!r.text.includes(ACCOUNT_DIGITS) && !r.text.includes("026073150"), `${what}: no account or routing number in the body`);
@@ -204,12 +204,12 @@ async function withStoreHook<T>(artifactRef: string | null, hook: () => Promise<
 const detailsRefOf = async (routeId: string): Promise<string> => (await q<{ details_artifact_ref: string }>("SELECT details_artifact_ref FROM kauro.bank_route_versions WHERE route_id = $1 ORDER BY route_version DESC LIMIT 1", [routeId]))[0]!.details_artifact_ref;
 
 /** Holder command paused at `at` on its own connection; waiter observed (pg_stat_activity) blocked by it; holder released. */
-async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder: () => Promise<H>, waiter: () => Promise<W>, at = "uow.before-commit"): Promise<{ held: PromiseSettledResult<H>; waited: PromiseSettledResult<W> }> {
+async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder: () => Promise<H>, waiter: () => Promise<W>, at = "uow.before-commit", holderSteps: ReadonlyArray<SqlStep> = []): Promise<{ held: PromiseSettledResult<H>; waited: PromiseSettledResult<W> }> {
   const hc = await open();
   const wc = await open();
   try {
     const pause = ctx.points.pause(at);
-    const running = ctx.operation(`${what} (holder)`, () => on(ctx, hc, holder));
+    const running = ctx.operation(`${what} (holder)`, () => on(ctx, hc, holder, holderSteps));
     const heldP = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
     await pause.reachedBy(running);
     const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, () => on(ctx, wc, waiter), what);
@@ -224,6 +224,71 @@ const ok = <T>(r: PromiseSettledResult<T>): T => {
   if (r.status !== "fulfilled") throw r.reason;
   return r.value;
 };
+
+/**
+ * r1 revocation form (ADV-PV1R-1, ADV-PV1R-5): the withdrawal takes its OWN lock and commits while the issuance waits on it, so the cell
+ * holds whatever order the issuance takes its locks in (a holder of the quote row that then revoked a membership deadlocks with an issuance
+ * that takes the membership's shared half first, the B09 order D-ACH-04 mandates). Either SQL in a holder transaction committed by
+ * ctx.revoked, or a product command paused before its COMMIT and released by ctx.revoked (its 200 asserted).
+ */
+type Withdrawal = { readonly sql: (holder: HarnessConnection) => Promise<unknown> } | { readonly command: () => Promise<Reply> };
+async function waitBehindWithdrawal(ctx: FaultContext, what: string, waiter: () => Promise<Reply>, withdrawal: Withdrawal): Promise<Reply> {
+  const wc = await open();
+  try {
+    if ("sql" in withdrawal) {
+      const holder = await openHolder();
+      try {
+        await holder.query("BEGIN");
+        await withdrawal.sql(holder);
+        const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, waiter), `waits behind the ${what}`);
+        await ctx.revoked(what, () => holder.query("COMMIT"));
+        return ok(await waiting.pending);
+      } finally {
+        await holder.end();
+      }
+    }
+    const hc = await open();
+    try {
+      const pause = ctx.points.pause("uow.before-commit");
+      const running = ctx.operation(`${what} (holder)`, () => on(ctx, hc, withdrawal.command));
+      const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+      await pause.reachedBy(running);
+      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, () => on(ctx, wc, waiter), `waits behind the ${what}`);
+      await ctx.revoked(what, async () => {
+        pause.release();
+        const done = ok(await settled);
+        assert.equal(done.status, 200, `${what}: the withdrawal commits (${code(done)})`);
+      });
+      return ok(await waiting.pending);
+    } finally {
+      await hc.end();
+    }
+  } finally {
+    await wc.end();
+  }
+}
+/** CMD026 approval withdrawal as a raw reply (the r1 command form). */
+async function withdrawPlanCall(b: Buyer): Promise<Reply> {
+  const [plan] = await q<{ version: string }>("SELECT version::text FROM kauro.plans WHERE plan_id::text = $1", [b.planId]);
+  return call(bw.iw.w, { url: routes.withdrawApproval(b.planId), token: b.a.s.owner.token, agency: b.a.s.agency.agencyId, key: freshKey("withdraw"), body: { expectedVersion: Number(plan!.version), reasonCode: "OWNER_DECISION" } });
+}
+/** The allowlist narrowed through the product: re-enable ENABLED -> ENABLED with `participants` (departure 2: a new participant set). */
+const narrowTo = (r: RouteView, participants: ReadonlyArray<string>): Withdrawal => ({ command: async () => owner(bankRoutes.enable(r.routeId), await enableBody(r, participants)) });
+/** The billing member's identity disabled (its state update takes the identity's transition half, which the authorizer awaits). */
+const disableIdentity = (a: Agent): Withdrawal => ({
+  sql: async (holder) => {
+    const moved = await holder.query("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1 AND state = 'ACTIVE'", [a.billing.userId]);
+    assert.equal(moved.rowCount, 1, "the billing identity moved ACTIVE -> DISABLED");
+  },
+});
+/** The project's target contract superseded (B09 fixture form, b09-payment-service), in the agency owner's tenant context. */
+const supersedeTarget = (b: Buyer): Withdrawal => ({
+  sql: async (holder) => {
+    await holder.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [b.a.s.agency.agencyId, b.a.s.agency.ownerUserId]);
+    const moved = await holder.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE agency_id = $1 AND project_id = $2 AND superseded_at IS NULL", [b.a.s.agency.agencyId, projectOf(b)]);
+    assert.ok((moved.rowCount ?? 0) >= 1, "the target contract superseded");
+  },
+});
 
 /** One matrix cell with its exact design title, run by the harness (fault evidence enforced). */
 function cell(title: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>, at?: string): void {
@@ -685,7 +750,7 @@ cell(`RACE ACH-M-I1-RACE (concurrency): ${I1}`, "race", async (ctx) => {
     const fp = await issuedFootprint(projectOf(b));
     if (first === "issue") {
       assert.equal(issued.status, 201);
-      assert.deepEqual(fp, { orders: 1, instructions: 1, accepted: 1, events: fp.events });
+      assert.deepEqual(fp, { orders: 1, instructions: 1, accepted: 1, events: ISSUED_EVENTS }, "exactly one issuance and its events");
       assert.equal(code(await readInstructions(b, completed<IssuedView>(issued, 201).data.order.orderId)), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED", "the order stays, its details are hidden");
     } else {
       assert.equal(code(issued), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED");
@@ -800,38 +865,28 @@ cell(`RACE ACH-M-I1-RETRY (retry): ${I1}`, "retry", async (ctx) => {
   const again = completed<{ route: RouteView }>(await owner(bankRoutes.enable(r.routeId), await enableBody({ ...r, state: "VERIFIED" }, [b.a.s.agency.agencyId])), 200).data.route;
   const issued = completed<IssuedView>(await ctx.attempt(() => issue(b, again, { key: freshKey("i1retry-2") })), 201);
   assert.equal(issued.data.transfer.routeVersion, again.routeVersion, "the readiness read binds the current route version");
-  assert.deepEqual(await issuedFootprint(projectOf(b)), { orders: 1, instructions: 1, accepted: 1, events: (await issuedFootprint(projectOf(b))).events });
+  assert.deepEqual(await issuedFootprint(projectOf(b)), { orders: 1, instructions: 1, accepted: 1, events: ISSUED_EVENTS }, "one issuance after the refused attempt, with exactly its events");
 });
 
 cell(`DENY ACH-M-I1-REVOCATION (revocation): ${I1}`, "revocation", async (ctx) => {
-  // each binding prerequisite withdrawn while the readiness read waits on the project lock
-  const withdrawals: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "404 NOT_FOUND NOT_A_MEMBER"],
-    ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
-    ["route enabled state", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
-    ["plan approval", async (b) => withdrawPlan(b as Buyer), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
+  // each binding prerequisite withdrawn by a writer holding its own lock while the readiness read waits on it (r1 form: waitBehindWithdrawal;
+  // the participant removed through the product's re-enable with a shorter allowlist, never a raw DELETE)
+  const withdrawals: ReadonlyArray<readonly [string, (b: Buyer, r: RouteView) => Withdrawal, string]> = [
+    ["billing membership", (b) => ({ sql: (holder) => revokeBilling(holder, b.a) }), "404 NOT_FOUND NOT_A_MEMBER"],
+    ["billing identity", (b) => disableIdentity(b.a), "403 NOT_AUTHORIZED IDENTITY_DISABLED"],
+    ["route participant", (_b, r) => narrowTo(r, [bw.iw.w.A.agencyId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
+    ["route enabled state", (_b, r) => ({ sql: (holder) => holder.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [r.routeId]) }), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
+    ["plan approval", (b) => ({ command: () => withdrawPlanCall(b) }), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
+    ["target contract", (b) => supersedeTarget(b), "422 TARGET_STALE -"],
   ];
-  for (const [what, withdraw, refusal] of withdrawals) {
+  for (const [what, withdrawal, refusal] of withdrawals) {
     const b = await buyer(`i1rev-${what.split(" ")[1]}`);
     const r = await enabled(`i1rev-${what.split(" ")[1]}`, [b.a.s.agency.agencyId]);
-    const holder = await openHolder();
-    const wc = await open();
-    try {
-      await holder.query("BEGIN");
-      await holder.query("SELECT 1 FROM kauro.quotes WHERE quote_id::text = $1 FOR NO KEY UPDATE", [b.quote.quote.quoteId]);
-      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => issue(b, r)), `issuance held at readiness (${what})`);
-      // the revocation commits while the holder still holds the subject lock; the holder then releases
-      await ctx.revoked(what, async () => {
-        await withdraw(b, r, holder);
-        await holder.query("COMMIT");
-      });
-      await ctx.fenced(`issuance after ${what}`, async () => {
-        throw ok(await waiting.pending);
-      }, (e) => code(e as Reply) === refusal);
-    } finally {
-      await holder.end();
-      await wc.end();
-    }
+    const reply = await waitBehindWithdrawal(ctx, what, () => issue(b, r), withdrawal(b, r));
+    assert.equal(code(reply), refusal, `${what}: the issuance behind the withdrawal is refused`);
+    await ctx.fenced(`issuance after ${what}`, async () => {
+      throw reply;
+    }, (e) => code(e as Reply) === refusal);
     assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, `${what}: nothing issued`);
   }
 });
@@ -990,33 +1045,25 @@ cell(`RACE ACH-M-I2-RETRY (retry): ${I2}`, "retry", async (ctx) => {
 });
 
 cell(`DENY ACH-M-I2-REVOCATION (revocation): ${I2}`, "revocation", async (ctx) => {
-  // each issuance prerequisite revoked while Kinstructions waits at the route lock; a replaced route version re-reads its window (I2Δ)
-  const revocations: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "404 NOT_FOUND NOT_A_MEMBER"],
-    ["route details replaced", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'PENDING_VERIFICATION', current_version = current_version + 1 WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
-    ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
+  // each issuance prerequisite revoked by a writer holding its own lock while Kinstructions waits on it (r1 form); the details replaced and
+  // the participant removed through the product commands (replaceDetails, re-enable with a shorter allowlist), never raw writes
+  const revocations: ReadonlyArray<readonly [string, (b: Buyer, r: RouteView) => Promise<Withdrawal>, string]> = [
+    ["billing membership", async (b) => ({ sql: (holder) => revokeBilling(holder, b.a) }), "404 NOT_FOUND NOT_A_MEMBER"],
+    ["billing identity", async (b) => disableIdentity(b.a), "403 NOT_AUTHORIZED IDENTITY_DISABLED"],
+    ["route details replaced", async (_b, r) => {
+      const d = await detailsArtifact((await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref, { accountNumber: "333333333333" });
+      return { command: async () => owner(bankRoutes.details(r.routeId), { expectedVersion: r.routeVersion, detailsArtifactRef: d.artifactRef, detailsEvidenceHash: d.evidenceHash, authorizationRef: await proof() }) };
+    }, "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
+    ["route participant", async (_b, r) => narrowTo(r, [bw.iw.w.A.agencyId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
   ];
-  for (const [what, revoke, refusal] of revocations) {
+  for (const [what, revocation, refusal] of revocations) {
     const b = await buyer(`i2rev-${what.split(" ")[1]}`);
     const r = await enabled(`i2rev-${what.split(" ")[1]}`, [b.a.s.agency.agencyId]);
-    const holder = await openHolder();
-    const wc = await open();
-    try {
-      await holder.query("BEGIN");
-      await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
-      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => issue(b, r)), `issuance at the route lock (${what})`);
-      // the revocation commits while the holder still holds the route lock (its statements commit with the release)
-      await ctx.revoked(what, async () => {
-        await revoke(b, r, holder);
-        await holder.query("COMMIT");
-      });
-      await ctx.fenced(`issuance after ${what}`, async () => {
-        throw ok(await waiting.pending);
-      }, (e) => code(e as Reply) === refusal);
-    } finally {
-      await holder.end();
-      await wc.end();
-    }
+    const reply = await waitBehindWithdrawal(ctx, what, () => issue(b, r), await revocation(b, r));
+    assert.equal(code(reply), refusal, `${what}: the issuance behind the revocation is refused`);
+    await ctx.fenced(`issuance after ${what}`, async () => {
+      throw reply;
+    }, (e) => code(e as Reply) === refusal);
     assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, `${what}: no issuance`);
   }
 });
@@ -1054,12 +1101,13 @@ cell(`RACE ACH-M-I2-PARTIAL (partial): ${I2}`, "partial", async (ctx) => {
 
 test("DENY ACH-M-I2D-EXPIRY (transfer window): Issue transfer instructions with a minimum window", async () => {
   await runCell({ id: "ACH-M-I2D-EXPIRY", step: "Issue transfer instructions with a minimum window", fault: "expiry", expect: "window -1 ms refused TRANSFER_WINDOW_TOO_SHORT, = window issued with sendBy = deadline - window" }, async (ctx) => {
-    // the deadline is the quote price expiry (lifetime longer); effectNow is read after the route-lock wait
+    // the deadline is the earliest fixed deadline of the quote: min(price expiry, source availability) (D-ACH-04; r1 ADV-PV1R-2: the
+    // fixture's source deadline is ~50 min before its price expiry, so the old price-only expectation encoded the defect); lifetime longer
     for (const delta of [-1, 0] as const) {
       const b = await buyer(`i2d-${delta}`);
       const windowMs = 2 * 86_400_000;
       const r = await enabled(`i2d-${delta}`, [b.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * 86_400_000 });
-      const deadline = Date.parse(b.quote.quote.expiresAt);
+      const deadline = Math.min(Date.parse(b.quote.quote.expiresAt), Date.parse(b.quote.quote.sourceAvailableUntil));
       const reply = await ctx.operation(`issuance with deadline - effectNow = window ${delta} ms`, async (op) => {
         bw.iw.faults.clock = op.clock;
         try {
@@ -1322,9 +1370,15 @@ test("ACH-02 DENY: disabled, expired or foreign reads expose no account details;
   assert.equal(code(await owner(bankRoutes.configure(), { ...(await configureBody({ accountRef: nextAccount("ach02-eur") })), currency: "EUR" })), "400 INVALID_REQUEST SCHEMA_VIOLATION");
   completed(await owner(bankRoutes.disable(x.r.routeId), await disableBody(x.r)), 200);
   noAccountDigits(await readInstructions(x.b, x.orderId), "disabled");
-  // expired: a second order whose route is re-enabled, read after its deadline on the database clock
-  await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET transfer_expires_at = now() - interval '1 millisecond' WHERE order_id::text = $1", [x.orderId]);
-  noAccountDigits(await readInstructions(x.b, x.orderId), "expired");
+  // expired (r1, ADV-PV1R-8): a SECOND order on a route that stays ENABLED, read after its deadline on the database clock, so the
+  // deadline check itself decides (the disabled route above would refuse first)
+  const y = await issuedOrder("ach02-expired");
+  assert.equal((await readInstructions(y.b, y.orderId)).status, 200, "served before its deadline");
+  await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET transfer_expires_at = now() - interval '1 millisecond' WHERE order_id::text = $1", [y.orderId]);
+  assert.equal((await routeRow(y.r.routeId)).state, "ENABLED", "the route is still ENABLED");
+  const expired = await readInstructions(y.b, y.orderId);
+  assert.equal(code(expired), "409 PRECONDITION_FAILED INSTRUCTIONS_EXPIRED", "an expired order's details are hidden on an ENABLED route");
+  noAccountDigits(expired, "expired");
 });
 
 test("ACH-03 RACE: one immutable intent and 23-character reference per order; collisions retried before commit; a conflicting key is refused", async () => {
@@ -1349,4 +1403,394 @@ test("ACH-03 RACE: one immutable intent and 23-character reference per order; co
   // a collision with an existing reference is retried before commit: a pre-seeded reference never appears twice
   assert.equal(await n("SELECT reference FROM kauro.bank_transfer_instructions GROUP BY environment, account_ref, reference HAVING count(*) > 1"), 0, "account/environment-wide uniqueness");
   assert.equal(code(await issue(b, r, { key, body: { ...issueBody(b, r), routeId: "00000000-0000-0000-0000-000000000000" } })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS", "a conflicting key is refused");
+});
+
+// === adversary r1 (docs/review/pv1-route-adversary-r1.md): one cell per finding, each title prefixed with its finding id ===========
+
+/** A cell whose title starts with its finding id: the matrix row it extends is named explicitly. */
+function advCell(title: string, id: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>): void {
+  test(title, async () => {
+    await runCell({ id, step: title.slice(title.indexOf(": ") + 2), fault, expect: title }, body);
+  });
+}
+const DAY_MS = 86_400_000;
+const iso = (ms: number): string => new Date(ms).toISOString();
+const QUOTE_LOCK: SqlStep = { label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/ };
+
+/**
+ * One issuance whose effect instant is `effectAt` on the step clock, read after a route-lock wait (the I2D form): the clock stands at
+ * `before` while the issuance is dispatched, moves to `effectAt` while it waits, and the route lock is released.
+ */
+async function issueAt(ctx: FaultContext, b: Buyer, r: RouteView, boundary: { readonly at: number; readonly what: string }, before: number, effectAt: (boundary: number) => number): Promise<Reply> {
+  return ctx.operation(`issuance across ${boundary.what}`, async (op) => {
+    bw.iw.faults.clock = op.clock;
+    try {
+      const at = Date.parse(ctx.deadline(boundary.at, boundary.what));
+      ctx.clock.set(before);
+      const holder = await openHolder();
+      const wc = await open();
+      await holder.query("BEGIN");
+      await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
+      const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => issue(b, r)), "issuance waits for the route lock");
+      ctx.clock.set(effectAt(at));
+      await holder.query("ROLLBACK");
+      await holder.end();
+      const out = ok(await waiting.pending);
+      await wc.end();
+      return out;
+    } finally {
+      bw.iw.faults.clock = null;
+    }
+  });
+}
+
+advCell(`ADV-PV1R-1 RACE ACH-M-I1-RACE (lock order, CMD043 close-agency vs bank issuance, both orders): closure and issuance of one agency never deadlock; closure first withdraws the quote and the issuance is refused with nothing issued, issuance first commits its order and the closure is refused CLOSURE_OBLIGATIONS_UNRECONCILED`, "ACH-M-I1-RACE", "race", async (ctx) => {
+  // close-agency takes the agency row and its EXCLUSIVE half (close-agency.ts:75) and only then the open quotes FOR UPDATE (:114). The holder
+  // pauses at the quote-lock statement: the closure BEFORE it (agency held, quote free), the issuance AFTER it (its quote lock held). An
+  // issuance that locks the quote before the agency's shared half (a50db87, instructions.ts:85) closes a cycle with the closure: 40P01, which
+  // the unit of work answers 503 CAPACITY_UNAVAILABLE. The D-ACH-04/B09 order (subject halves, then the route, then the quote) has no cycle.
+  for (const first of ["close", "issue"] as const) {
+    const b = await buyer(`adv1-${first}`);
+    const r = await enabled(`adv1-${first}`, [b.a.s.agency.agencyId]);
+    const agencyId = b.a.s.agency.agencyId;
+    const [agencyRow] = await q<{ version: string }>("SELECT version::text FROM kauro.agencies WHERE agency_id::text = $1", [agencyId]);
+    const closeBody = { expectedVersion: Number(agencyRow!.version), assuranceProofRef: await bw.iw.w.stepUp(b.a.s.owner) };
+    const closing = () => call(bw.iw.w, { url: `/api/v1/agencies/${agencyId}/closure-requests`, token: b.a.s.owner.token, agency: null, key: freshKey("adv1-close"), body: closeBody });
+    const issuing = () => issue(b, r);
+    const { held, waited } =
+      first === "close"
+        ? await holdAndWait(ctx, "issuance waits behind the closure's agency half", closing, issuing, "db.quote_lock.before", [QUOTE_LOCK])
+        : await holdAndWait(ctx, "closure waits behind the issuance", issuing, closing, "db.quote_lock.after", [QUOTE_LOCK]);
+    const closed = ok(first === "close" ? held : waited);
+    const issued = ok(first === "close" ? waited : held);
+    const replies = `${first} first: closure ${code(closed)}, issuance ${code(issued)}`;
+    assert.ok(![500, 503].includes(closed.status) && ![500, 503].includes(issued.status), `no deadlock (40P01 -> 503 CAPACITY_UNAVAILABLE) and no crash: ${replies}`);
+    const [quote] = await q<{ state: string }>("SELECT state FROM kauro.quotes WHERE quote_id::text = $1", [b.quote.quote.quoteId]);
+    const [agency] = await q<{ state: string }>("SELECT state FROM kauro.agencies WHERE agency_id::text = $1", [agencyId]);
+    if (first === "close") {
+      assert.equal(closed.status, 200, replies);
+      assert.deepEqual([agency!.state, quote!.state], ["CLOSING", "WITHDRAWN"], "the closure withdrew the open quote");
+      assert.ok(issued.status === 404 || issued.status === 409, `the issuance behind it is refused: ${replies}`);
+      assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
+    } else {
+      assert.equal(issued.status, 201, replies);
+      assert.equal(code(closed), "409 PRECONDITION_FAILED CLOSURE_OBLIGATIONS_UNRECONCILED", replies);
+      assert.deepEqual([agency!.state, quote!.state], ["ACTIVE", "ACCEPTED_FOR_CHECKOUT"], "the agency stays ACTIVE with its accepted quote");
+      assert.deepEqual(await issuedFootprint(projectOf(b)), { orders: 1, instructions: 1, accepted: 1, events: ISSUED_EVENTS });
+    }
+  }
+});
+
+advCell(`ADV-PV1R-2 DENY ACH-M-I2-EXPIRY (source availability deadline): transferExpiresAt is the quote's source availability deadline when it precedes the price expiry and the lifetime; window - 1 ms before it is refused TRANSFER_WINDOW_TOO_SHORT with nothing issued, = window issues with transferExpiresAt = source deadline and sendBy = source deadline - window`, "ACH-M-I2-EXPIRY", "expiry", async (ctx) => {
+  for (const delta of [-1, 0] as const) {
+    const b = await buyer(`adv2-src-${delta}`);
+    const source = Date.parse(b.quote.quote.sourceAvailableUntil);
+    const price = Date.parse(b.quote.quote.expiresAt);
+    assert.ok(source < price, `fixture: the source deadline (${b.quote.quote.sourceAvailableUntil}) precedes the price expiry (${b.quote.quote.expiresAt})`);
+    const windowMs = 2 * DAY_MS;
+    const r = await enabled(`adv2-src-${delta}`, [b.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * DAY_MS });
+    // effectNow after the wait = source - window - delta: the window left before the source deadline is window + delta
+    const reply = await issueAt(ctx, b, r, { at: source - windowMs, what: "latest issuance instant before the source deadline" }, source - windowMs - 2, (at) => at - delta);
+    if (delta === -1) {
+      assert.equal(code(reply), "409 PRECONDITION_FAILED TRANSFER_WINDOW_TOO_SHORT", "window - 1 ms before the source deadline: refused");
+      assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
+    } else {
+      const t = completed<IssuedView>(reply, 201).data.transfer;
+      assert.deepEqual([t.transferExpiresAt, t.sendBy], [iso(source), iso(source - windowMs)], "the source deadline bounds the transfer");
+    }
+  }
+});
+
+advCell(`ADV-PV1R-2 DENY ACH-M-I2-EXPIRY (details validity): the route version's details validUntil bounds the transfer; validUntil crossing while the issuance waits at the route lock is refused DETAILS_EXPIRED with nothing issued, and an issuance window before it gets transferExpiresAt = validUntil`, "ACH-M-I2-EXPIRY", "expiry", async (ctx) => {
+  const windowMs = 2 * DAY_MS;
+  // (1) validUntil 5 days ahead (price 14 d, source ~14 d, lifetime 10 d): it passes during the route-lock wait
+  const validUntil = Date.now() + 5 * DAY_MS;
+  const b = await buyer("adv2-valid");
+  const r = await enabled("adv2-valid", [b.a.s.agency.agencyId], { windowMs, validUntil: iso(validUntil) });
+  const crossed = await issueAt(ctx, b, r, { at: validUntil, what: "details validity" }, validUntil - 1, (at) => at);
+  assert.equal(code(crossed), "409 PRECONDITION_FAILED DETAILS_EXPIRED", "details expired at the effect instant: nothing issued");
+  assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
+  // (2) issued exactly one window before validUntil: transferExpiresAt = validUntil, sendBy = validUntil - window
+  const v2 = Date.now() + 5 * DAY_MS;
+  const b2 = await buyer("adv2-valid-cap");
+  const r2 = await enabled("adv2-valid-cap", [b2.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * DAY_MS, validUntil: iso(v2) });
+  const capped = completed<IssuedView>(await issueAt(ctx, b2, r2, { at: v2 - windowMs, what: "latest issuance instant before the details validity" }, v2 - windowMs - 2, (at) => at), 201).data.transfer;
+  assert.deepEqual([capped.transferExpiresAt, capped.sendBy], [iso(v2), iso(v2 - windowMs)], "the details validity bounds the transfer");
+});
+
+advCell(`ADV-PV1R-2 DENY ACH-M-I3-EXPIRY (details validity): the instructions are hidden once the route version's details validUntil passes at the artifact read, before the instruction deadline`, "ACH-M-I3-EXPIRY", "expiry", async (ctx) => {
+  const validUntil = Date.now() + 5 * DAY_MS;
+  const x = await issuedOrder("adv2-i3", { validUntil: iso(validUntil) });
+  const reply = await ctx.operation("guarded read across the details validity", async (op) => {
+    bw.iw.faults.clock = op.clock;
+    try {
+      ctx.clock.set(validUntil - 1);
+      const boundary = ctx.deadline(validUntil, "details validity");
+      return await withStoreHook(await detailsRefOf(x.r.routeId), async () => void ctx.clock.set(Date.parse(boundary)), () => readInstructions(x.b, x.orderId));
+    } finally {
+      bw.iw.faults.clock = null;
+    }
+  });
+  // RULING NEEDED (r1): the design names no I3 code for expired details; either refusal is accepted, a 200 is not
+  assert.ok(["409 PRECONDITION_FAILED DETAILS_EXPIRED", "409 PRECONDITION_FAILED INSTRUCTIONS_EXPIRED"].includes(code(reply)), `expired details are hidden (got ${code(reply)})`);
+  noAccountDigits(reply, "details expired");
+});
+
+advCell(`ADV-PV1R-3 DENY ACH-M-I3-REVOCATION (bank order state): the transfer instructions are hidden once the bank order is CAPTURED, RECEIVED_REVIEW or EXPIRED before its deadline, at the held read and at the next read`, "ACH-M-I3-REVOCATION", "revocation", async (ctx) => {
+  // D-ACH-05: EXPIRED stops instructions; RECEIVED_REVIEW is closed to further instructions; CAPTURED is paid. Only AWAITING_TRANSFER and
+  // PARTIALLY_RECEIVED are open. The state moves (as the payment service would) while the projection is held at its artifact read.
+  // RULING NEEDED (r1): the design names no refusal code; any 409 with no account digit and no reference fragment is accepted
+  for (const state of ["CAPTURED", "RECEIVED_REVIEW", "EXPIRED"] as const) {
+    const x = await issuedOrder(`adv3-${state.toLowerCase()}`);
+    const refused = (r: Reply): boolean => r.status === 409 && !r.text.includes(ACCOUNT_DIGITS) && !r.text.includes("026073150");
+    let reached!: () => void;
+    let go!: () => void;
+    const atRead = new Promise<void>((resolve) => (reached = resolve));
+    const released = new Promise<void>((resolve) => (go = resolve));
+    const running = withStoreHook(await detailsRefOf(x.r.routeId), async () => {
+      reached();
+      await released;
+    }, () => ctx.operation(`projection held (order ${state})`, () => readInstructions(x.b, x.orderId)));
+    await atRead;
+    await ctx.revoked(`order ${state}`, async () => {
+      const moved = await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET order_state = $2 WHERE order_id::text = $1 AND order_state = 'AWAITING_TRANSFER'", [x.orderId, state]);
+      assert.equal(moved.rowCount, 1, `the bank order moved AWAITING_TRANSFER -> ${state}`);
+    });
+    go();
+    const held = await running;
+    assert.ok(refused(held), `order ${state}: the held read is refused with no account digit (got ${code(held)})`);
+    await ctx.fenced(`projection after order ${state}`, async () => {
+      throw held;
+    }, (e) => refused(e as Reply));
+    const next = await readInstructions(x.b, x.orderId);
+    assert.ok(refused(next), `order ${state}: the next read is refused too (${code(next)})`);
+    assert.equal((await q<{ order_state: string; at: Date }>("SELECT order_state, transfer_expires_at AS at FROM kauro.bank_transfer_instructions WHERE order_id::text = $1", [x.orderId]))[0]!.order_state, state);
+  }
+});
+
+advCell(`ADV-PV1R-4 RACE ACH-M-R1-RACE (stale evidence naming the replacement's version): a verify that read version-1 evidence before a replacement committed is refused STALE_VERSION even when its expectedVersion is 2, and version 2 stays unverified until a verify reads its own evidence`, "ACH-M-R1-RACE", "race", async (ctx) => {
+  // the seen-version guard decides (route-config.ts:296): expectedVersion = 2 equals the locked current version, so only the version whose
+  // evidence the verify read (1) refuses it. Without that guard the verify marks version 2 VERIFIED on version-1 evidence.
+  const r = await configured("adv4-stale");
+  const account = (await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref;
+  const replacement = await detailsArtifact(account, { accountNumber: "555555555555" });
+  const replace = async () => owner(bankRoutes.details(r.routeId), { expectedVersion: 1, detailsArtifactRef: replacement.artifactRef, detailsEvidenceHash: replacement.evidenceHash, authorizationRef: await proof() });
+  const v1Ref = await detailsRefOf(r.routeId);
+  const v1Reads = (): number => bw.evidence.calls.filter((c) => c.identity === v1Ref && c.operation === "GET").length;
+  const before = v1Reads();
+  const verifyNaming2 = async () => owner(bankRoutes.verify(r.routeId), await verifyBody(r, 2));
+  const { held, waited } = await holdAndWait(ctx, "verify naming version 2 waits for the replacement", replace, verifyNaming2);
+  assert.equal(ok(held).status, 200, "the replacement commits");
+  assert.equal(v1Reads(), before + 1, "the waiting verify read version 1's evidence before the lock");
+  assert.equal(code(ok(waited)), "409 STALE_VERSION ROUTE_VERSION_CHANGED", "evidence of version 1 never verifies version 2");
+  const row = await routeRow(r.routeId);
+  assert.deepEqual([row.state, row.current_version, row.versions], ["PENDING_VERIFICATION", 2, 2]);
+  assert.equal(await n("SELECT 1 FROM kauro.bank_route_versions WHERE route_id = $1 AND verified_at IS NOT NULL", [r.routeId]), 0, "no version verified");
+  const again = completed<{ route: RouteView }>(await owner(bankRoutes.verify(r.routeId), await verifyBody(r, 2)), 200).data.route;
+  assert.deepEqual([again.state, again.routeVersion, again.detailsEvidenceHash], ["VERIFIED", 2, replacement.evidenceHash], "a verify that reads version 2's evidence qualifies it");
+});
+
+test(`ADV-PV1R-4 DENY ACH-M-R1-PARTIAL (incomplete details at verify): a replacement whose details lack the routing number is accepted unqualified (departure 3), and the verify that reads and classifies it is refused 422 INTEGRITY_FAILURE MALFORMED_EVIDENCE with no version verified`, async () => {
+  // closest real hook to the design's "after account number read": the store read of the version-2 artifact (bw.evidence.get), immediately
+  // before the frozen contract-fake classifier parses it; the hook proves the refusal comes from classifying THAT artifact
+  const r = await configured("adv4-malformed");
+  const account = (await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref;
+  const incomplete = await detailsArtifact(account, { routingNumber: null });
+  const replaced = completed<{ route: RouteView }>(await owner(bankRoutes.details(r.routeId), { expectedVersion: 1, detailsArtifactRef: incomplete.artifactRef, detailsEvidenceHash: incomplete.evidenceHash, authorizationRef: await proof() }), 200).data.route;
+  assert.deepEqual([replaced.state, replaced.routeVersion], ["PENDING_VERIFICATION", 2], "the replacement binds the account only");
+  let reads = 0;
+  const refused = await withStoreHook(incomplete.artifactRef, async () => void reads++, async () => owner(bankRoutes.verify(r.routeId), await verifyBody(replaced)));
+  assert.equal(reads, 1, "the verify read the version-2 artifact");
+  assert.equal(code(refused), "422 INTEGRITY_FAILURE MALFORMED_EVIDENCE", "unclassifiable evidence never qualifies");
+  const row = await routeRow(r.routeId);
+  assert.deepEqual([row.state, row.current_version, row.versions], ["PENDING_VERIFICATION", 2, 2]);
+  assert.equal(await n("SELECT 1 FROM kauro.bank_route_versions WHERE route_id = $1 AND verified_at IS NOT NULL", [r.routeId]), 0, "no verification fact");
+});
+
+advCell(`ADV-PV1R-5 DENY ACH-M-I2-REVOCATION (allowlist narrowed by re-enable): an agency dropped from a CONTROLLED allowlist by a re-enable that commits while its issuance waits at the route lock is refused ROUTE_NOT_ENABLED with nothing issued, stays refused afterwards, and the agency kept on the list issues`, "ACH-M-I2-REVOCATION", "revocation", async (ctx) => {
+  const x = await buyer("adv5-dropped");
+  const y = await buyer("adv5-kept");
+  const r = await enabled("adv5", [x.a.s.agency.agencyId, y.a.s.agency.agencyId]);
+  const reply = await waitBehindWithdrawal(ctx, "allowlist narrowed to the kept agency", () => issue(x, r), narrowTo(r, [y.a.s.agency.agencyId]));
+  await ctx.fenced("issuance of the dropped agency", async () => {
+    throw reply;
+  }, (e) => code(e as Reply) === "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED");
+  assert.deepEqual(await issuedFootprint(projectOf(x)), NOTHING_ISSUED, "dropped agency: nothing issued");
+  assert.deepEqual((({ state, rollout, current_version }) => [state, rollout, current_version])(await routeRow(r.routeId)), ["ENABLED", "CONTROLLED", r.routeVersion], "the route stays ENABLED at the same details version");
+  assert.equal(code(await issue(x, r)), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED", "a later issuance of the dropped agency is refused too");
+  assert.equal(completed<IssuedView>(await issue(y, r), 201).data.transfer.bankState, "AWAITING_TRANSFER", "the kept agency issues");
+});
+
+test(`ADV-PV1R-5 DENY ACH-M-I3-REVOCATION (allowlist narrowed by re-enable): the instructions of an order issued before its agency was dropped from the CONTROLLED allowlist are hidden after the re-enable`, async () => {
+  // RULING NEEDED (r1): the coordinator packet requires the dropped agency's instructions to be refused; the adversary text says the agency
+  // keeps access "through its own existing instructions" (route-row visibility). This test encodes the packet.
+  const x = await buyer("adv5-i3");
+  const r = await enabled("adv5-i3", [x.a.s.agency.agencyId, bw.iw.w.A.agencyId]);
+  const order = completed<IssuedView>(await issue(x, r), 201).data.order;
+  assert.equal((await readInstructions(x, order.orderId)).status, 200, "served while the agency is on the list");
+  completed(await owner(bankRoutes.enable(r.routeId), await enableBody(r, [bw.iw.w.A.agencyId])), 200);
+  const hidden = await readInstructions(x, order.orderId);
+  assert.equal(code(hidden), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED", "a dropped agency is served no account details");
+  noAccountDigits(hidden, "dropped agency");
+});
+
+advCell(`ADV-PV1R-7 DENY ACH-M-R1-EXPIRY (product effect clock, no step clock): details whose validUntil passes in real time while the verify waits at the route lock are refused DETAILS_EXPIRED, judged by kauro.effect_now() after the wait, not by the transaction start`, "ACH-M-R1-EXPIRY", "race", async (ctx) => {
+  // no step clock is set, so the harness proxy (fault-support.ts repositioned) calls the product effectInstant SQL itself; the deadline is
+  // crossed by the database's own clock between the transaction's start and the effect read: red if effectInstant reads transaction_timestamp()
+  assert.equal(bw.iw.faults.clock, null, "no step clock: the product effect instant answers");
+  const validUntil = Date.now() + 4_000;
+  const r = await configured("adv7", { validUntil: iso(validUntil) });
+  const body = await verifyBody(r);
+  const holder = await openHolder();
+  const wc = await open();
+  try {
+    await holder.query("BEGIN");
+    await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
+    const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => owner(bankRoutes.verify(r.routeId), body)), "verify waits at the route lock");
+    assert.ok(Date.now() < validUntil, "the verify started and waits before the validity passes");
+    await new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, validUntil - Date.now() + 300)));
+    assert.equal((await q<{ crossed: boolean }>("SELECT clock_timestamp() > $1::timestamptz AS crossed", [iso(validUntil)]))[0]!.crossed, true, "the database clock passed validUntil during the wait");
+    await holder.query("ROLLBACK");
+    const reply = ok(await waiting.pending);
+    assert.equal(code(reply), "409 PRECONDITION_FAILED DETAILS_EXPIRED", "the effect instant after the wait decides");
+  } finally {
+    await holder.end();
+    await wc.end();
+  }
+  assert.deepEqual((({ state, versions, events }) => [state, versions, events])(await routeRow(r.routeId)), ["PENDING_VERIFICATION", 1, 1]);
+});
+
+advCell(`ADV-PV1R-8 RACE ACH-M-R2-RACE (two configures of one account): two owners configuring the same account race at its route row; one route exists, the configure that waited is refused UNLISTED_TRANSITION and writes nothing`, "ACH-M-R2-RACE", "race", async (ctx) => {
+  // the two commands are the same command (symmetric): one order is both orders
+  const account = nextAccount("adv8-configure");
+  const a = await configureBody({ accountRef: account });
+  const other = await configureBody({ accountRef: account });
+  const { held, waited } = await holdAndWait(ctx, "the second configure of the account waits", () => owner(bankRoutes.configure(), a), () => owner(bankRoutes.configure(), other));
+  assert.equal(ok(held).status, 201, "the first configure commits");
+  assert.equal(code(ok(waited)), "409 PRECONDITION_FAILED UNLISTED_TRANSITION", "the account already has a route");
+  assert.equal(await routesOf(account), 1, "one route per account");
+  assert.equal(await n("SELECT 1 FROM kauro.bank_route_versions v JOIN kauro.bank_routes r ON r.route_id = v.route_id WHERE r.account_ref = $1", [account]), 1, "one version");
+});
+
+test(`ADV-PV1R-8 OK ACH-03 (forced reference collision): an issuance whose first reference draw collides with an existing reference of the same account draws again before COMMIT and issues once with a different reference`, async () => {
+  // the collision is injected in the database: a one-shot BEFORE INSERT trigger rewrites the next snapshot's reference to an existing one, so
+  // ON CONFLICT ... DO NOTHING answers no row and the issuance must draw again (red with MAX_REFERENCE_DRAWS = 1: 503 CAPACITY_UNAVAILABLE)
+  const b1 = await buyer("adv8-collide-1");
+  const b2 = await buyer("adv8-collide-2");
+  const r = await enabled("adv8-collide", [b1.a.s.agency.agencyId, b2.a.s.agency.agencyId]);
+  const first = completed<IssuedView>(await issue(b1, r), 201).data.transfer.reference;
+  const account = (await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.account_ref;
+  const o = bw.iw.h.oracle;
+  await o.query("CREATE TABLE IF NOT EXISTS public.adv8_reference_collision (account_ref text PRIMARY KEY, reference text NOT NULL, fired integer NOT NULL DEFAULT 0)");
+  await o.query(`CREATE OR REPLACE FUNCTION public.adv8_collide() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
+    DECLARE forced text;
+    BEGIN
+      UPDATE public.adv8_reference_collision SET fired = fired + 1 WHERE account_ref = NEW.account_ref AND fired = 0 RETURNING reference INTO forced;
+      IF forced IS NOT NULL THEN NEW.reference := forced; END IF;
+      RETURN NEW;
+    END $$`);
+  await o.query("CREATE TRIGGER adv8_collide BEFORE INSERT ON kauro.bank_transfer_instructions FOR EACH ROW EXECUTE FUNCTION public.adv8_collide()");
+  try {
+    await o.query("INSERT INTO public.adv8_reference_collision (account_ref, reference) VALUES ($1, $2)", [account, first]);
+    const second = completed<IssuedView>(await issue(b2, r), 201).data.transfer.reference;
+    assert.equal((await q<{ fired: number }>("SELECT fired FROM public.adv8_reference_collision WHERE account_ref = $1", [account]))[0]!.fired, 1, "the first draw collided");
+    assert.notEqual(second, first, "a different reference after the collision");
+    assert.match(second, REFERENCE);
+    assert.deepEqual((({ orders, instructions }) => [orders, instructions])(await issuedFootprint(projectOf(b2))), [1, 1], "issued once");
+    assert.equal(await n("SELECT 1 FROM kauro.bank_transfer_instructions WHERE account_ref = $1 AND reference = $2", [account, first]), 1, "the existing reference is never reused");
+  } finally {
+    await o.query("DROP TRIGGER IF EXISTS adv8_collide ON kauro.bank_transfer_instructions");
+    await o.query("DROP FUNCTION IF EXISTS public.adv8_collide()");
+    await o.query("DROP TABLE IF EXISTS public.adv8_reference_collision");
+  }
+});
+
+test(`ADV-PV1R-10 DENY ACH-M-I3-RETRY (authorize before the evidence read): a caller who is not a member of the agency it names is refused 404 NOT_A_MEMBER and the details artifact is never read from the store`, async () => {
+  const x = await issuedOrder("adv10-i3");
+  const ref = await detailsRefOf(x.r.routeId);
+  const gets = (): number => bw.evidence.calls.filter((c) => c.identity === ref && c.operation === "GET").length;
+  const before = gets();
+  const foreign = await agentOf(bw.iw, `adv10-foreign-${++seq}`);
+  const reply = await readInstructions(x.b, x.orderId, foreign.billing.token, x.b.a.s.agency.agencyId);
+  assert.equal(code(reply), "404 NOT_FOUND NOT_A_MEMBER");
+  noAccountDigits(reply, "foreign caller");
+  assert.equal(gets(), before, "no store read for a caller whose membership was not established");
+});
+
+test(`ADV-PV1R-10 DENY ACH-M-I1-RETRY (authorize before locking): a caller who is not a member of the agency it names is refused 404 NOT_A_MEMBER without waiting on that agency's quote row`, async () => {
+  const b = await buyer("adv10-lock");
+  const r = await enabled("adv10-lock", [b.a.s.agency.agencyId]);
+  const foreign = await agentOf(bw.iw, `adv10-lock-foreign-${++seq}`);
+  const holder = await openHolder();
+  try {
+    await holder.query("BEGIN");
+    await holder.query("SELECT 1 FROM kauro.quotes WHERE quote_id::text = $1 FOR NO KEY UPDATE", [b.quote.quote.quoteId]);
+    const pending = issue(b, r, { token: foreign.billing.token });
+    // bounded: an authorized-first issuance answers in well under 3 s; one that locks the quote first waits for this holder
+    const raced = await Promise.race([pending, new Promise<"WAITING">((resolve) => setTimeout(() => resolve("WAITING"), 3_000))]);
+    await holder.query("ROLLBACK");
+    const reply = raced === "WAITING" ? await pending : raced;
+    assert.notEqual(raced, "WAITING", `the non-member's issuance waited on the victim's quote row (then answered ${code(reply)})`);
+    assert.equal(code(reply), "404 NOT_FOUND NOT_A_MEMBER");
+  } finally {
+    await holder.end();
+  }
+  assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
+});
+
+test(`ADV-PV1R-10 DENY RLS (tenant columns of a bank route): a participant agency's session reads no owner identifier or evidence reference of the route or its versions, and a non-participant agency reads no route or version row`, async () => {
+  const b = await buyer("adv10-rls");
+  const r = await enabled("adv10-rls", [b.a.s.agency.agencyId]);
+  const asAgency = <T>(agency: Agent["s"]["agency"], sql: string): Promise<T[] | string> =>
+    bw.iw.w.asTenant(agency, async (c) => {
+      try {
+        return (await c.query(sql, [r.routeId])).rows as T[];
+      } catch (e) {
+        return String((e as { code?: string }).code);
+      }
+    });
+  const versions = await asAgency<Record<string, unknown>>(b.a.s.agency, "SELECT verified_by::text AS a, created_by::text AS b, verification_evidence_ref AS c, details_artifact_ref AS d FROM kauro.bank_route_versions WHERE route_id = $1");
+  const route = await asAgency<Record<string, unknown>>(b.a.s.agency, "SELECT created_by::text AS a FROM kauro.bank_routes WHERE route_id = $1");
+  const hidden = (x: Record<string, unknown>[] | string): boolean => x === "42501" || (Array.isArray(x) && x.every((row) => Object.values(row).every((v) => v === null)));
+  assert.ok(hidden(versions), `participant: version owner ids and evidence refs are denied or NULL (got ${JSON.stringify(versions)})`);
+  assert.ok(hidden(route), `participant: route owner id denied or NULL (got ${JSON.stringify(route)})`);
+  const outsider = await agentOf(bw.iw, `adv10-rls-outsider-${++seq}`);
+  assert.deepEqual(await asAgency(outsider.s.agency, "SELECT route_id FROM kauro.bank_routes WHERE route_id = $1"), [], "non-participant: no route row");
+  assert.deepEqual(await asAgency(outsider.s.agency, "SELECT route_version FROM kauro.bank_route_versions WHERE route_id = $1"), [], "non-participant: no version row");
+});
+
+/** Runs `fn` with the store's reads of `refs` answering evidence whose metadata is overridden by `over` (bytes and hash unchanged). */
+async function withEvidenceAs<T>(refs: ReadonlySet<string>, over: Record<string, unknown>, fn: () => Promise<T>): Promise<T> {
+  const store = bw.evidence as unknown as { get: (ref: string) => Promise<unknown> };
+  const real = store.get;
+  store.get = async (ref: string) => {
+    const evidence = await real.call(bw.evidence, ref);
+    return refs.has(ref) && evidence !== null && typeof evidence === "object" ? { ...(evidence as object), ...over } : evidence;
+  };
+  try {
+    return await fn();
+  } finally {
+    store.get = real;
+  }
+}
+
+test(`ADV-PV1R-11 DENY ACH-M-R1-RETRY (integration class and provider bound at every evidence read): a replacement artifact of the route's account and environment but of another integration class or another provider is refused DETAILS_ACCOUNT_MISMATCH and writes nothing`, async () => {
+  // (1) a PROVIDER-class route (its configure artifact reads back as provider-integration evidence) and a CONTRACT_FAKE replacement
+  const account = nextAccount("adv11-class");
+  const body = await configureBody({ accountRef: account });
+  const r = await withEvidenceAs(new Set([body.detailsArtifactRef]), { integrationClass: "PROVIDER" }, async () => completed<{ route: RouteView }>(await owner(bankRoutes.configure(), body), 201).data.route);
+  assert.equal((await q<{ c: string }>("SELECT integration_class AS c FROM kauro.bank_routes WHERE route_id = $1", [r.routeId]))[0]!.c, "PROVIDER");
+  const fake = await detailsArtifact(account, { accountNumber: "666666666666" });
+  const classRefused = await owner(bankRoutes.details(r.routeId), { expectedVersion: 1, detailsArtifactRef: fake.artifactRef, detailsEvidenceHash: fake.evidenceHash, authorizationRef: await proof() });
+  assert.equal(code(classRefused), "409 PRECONDITION_FAILED DETAILS_ACCOUNT_MISMATCH", "a contract fake never replaces provider evidence");
+  assert.deepEqual((({ state, current_version, versions, events }) => [state, current_version, versions, events])(await routeRow(r.routeId)), ["PENDING_VERIFICATION", 1, 1, 1]);
+  // (2) a CONTRACT_FAKE route and a replacement artifact of the same account whose provider is another one
+  const r2 = await configured("adv11-provider");
+  const account2 = (await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [r2.routeId]))[0]!.account_ref;
+  const foreignProvider = await detailsArtifact(account2, { accountNumber: "777777777777" });
+  const providerRefused = await withEvidenceAs(new Set([foreignProvider.artifactRef]), { provider: "another-bank-provider" }, async () =>
+    owner(bankRoutes.details(r2.routeId), { expectedVersion: 1, detailsArtifactRef: foreignProvider.artifactRef, detailsEvidenceHash: foreignProvider.evidenceHash, authorizationRef: await proof() }),
+  );
+  assert.equal(code(providerRefused), "409 PRECONDITION_FAILED DETAILS_ACCOUNT_MISMATCH", "another provider's evidence never replaces the route's");
+  assert.deepEqual((({ state, current_version, versions, events }) => [state, current_version, versions, events])(await routeRow(r2.routeId)), ["PENDING_VERIFICATION", 1, 1, 1]);
 });

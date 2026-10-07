@@ -49,6 +49,8 @@ Codex's design-time review of the B10 matrix (r1, 17 findings) found the same fe
 
 13. **Every new lock names its place in the lock order and the locks already held there.** A new row, advisory or table lock names its position in the documented lock order and the locks the actor already holds at that point; a lock taken while another is held needs a RACE cell forcing the opposite order (both actors), red without the ordering guard. A lock that cannot be placed in the order is only tried (never waited for) after the other is held, and its refusal is a declared retryable outcome (P0 of main 8f4f2f3, ADV-5 of 3154481: the first-issuance lock waited for behind a quote row lock deadlocked two CreateQuotes).
 
+14. **A test repair keeps the behaviour it touches, and a count must be able to fail.** A test repair that removes or replaces a case must keep a case for the same behaviour, and every footprint/count assertion must have a fixture where the expected value is non-zero. An expected value read back from the result it checks (`events: fp.events`) is not an assertion (PV1 L-ROUTE adversary r1, ADV-PV1R-4/-5/-8: the incomplete-details case dropped by a repair, participant removals by raw DELETE, self-equal event counts).
+
 ## Kit lints
 
 K1. **SQL-shape lints are allowlists of exact permitted forms, never denylists.** A lint over oracle or guard SQL (the nonAtomic() check of B10-KIT-SUITES 2.1) names the exact forms it permits (a scalar subquery only as a row source or one exact count; a CASE ELSE only in its pinned shapes; the shared CTEs as their pinned text) and refuses everything else; a denylist grows one finding per bypass (B10 kit PR1 ADV-19, ADV-21, ADV-22). A quoted identifier is refused in a branch except COLLATE "C".
