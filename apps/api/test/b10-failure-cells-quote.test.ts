@@ -1055,3 +1055,32 @@ faultCell(
   },
 );
 
+
+// --- the supersession chain does not follow the creation instants ------------------------------------------------------------------
+
+test("W3 supersession order is not creation order: an issuance whose transaction started before the quote it supersedes (held after its BEGIN, before its live-quote read, while another key issues) supersedes it once; the chain is read by its supersession links, never by created_at (stress gate 1/20 on LIVE_QUOTE_RACE, a178581 and 728c405: q1 created 77 ms before q0 under CPU load)", async () => {
+  const { a, plan } = await fresh("chain-order");
+  const q0 = (await quoted(iw, a, plan)).quote.quoteId;
+  const points = new FaultPoints();
+  const conn = await open("kauro_app_test");
+  let b: string;
+  let qa: string;
+  try {
+    const before = points.pause("db.b_live_read_1.before");
+    const held = iw.faults.on(conn, "kauro_app", points, [{ ...LIVE_READ(1), label: "b_live_read_1" }], () => quoteCall(a, plan, freshKey("chain-order-b")));
+    await before.reachedBy(held);
+    // B's transaction is open (its instant taken); A issues and supersedes q0 meanwhile
+    qa = (await quoted(iw, a, plan)).quote.quoteId;
+    before.release();
+    const reply = await held;
+    b = view(reply).quote.quoteId;
+    assert.equal(view(reply).supersededQuoteId, qa, "B supersedes the quote A issued after B's transaction began");
+  } finally {
+    await conn.end();
+  }
+  const c = (await quoted(iw, a, plan)).quote.quoteId;
+  const instants = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
+  assert.deepEqual(instants.map((r) => r.quote_id), [q0, b, qa, c], "B's creation instant precedes A's: creation order is not supersession order");
+  assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", qa], [qa, "SUPERSEDED", b], [b, "SUPERSEDED", c], [c, "ISSUED", null]], `the chain q0 -> A -> B -> C: ${await chainDetail(plan)}`);
+  await giveSlotBack(a, plan);
+});
