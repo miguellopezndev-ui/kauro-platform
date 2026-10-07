@@ -34,6 +34,7 @@ import type {
   ProjectId,
   ProjectRecord,
   QuoteIssuance,
+  QuoteRecord,
   ResolvedMembership,
   TaxRuleSnapshot,
 } from "@kauro/domain";
@@ -93,6 +94,30 @@ export interface QuotedSubject {
 
 const refuse = (reason: NonNullable<DomainFailure["details"]["reason"]>, message: string, details: Partial<DomainFailure["details"]> = {}): DomainFailure =>
   new DomainFailure("PRECONDITION_FAILED", message, { reason, ...details });
+
+/** A quote `quotes_one_live_per_project` counts as the project's live one (the predicate of liveQuoteOf). */
+const isLiveQuote = (q: QuoteRecord): boolean => q.state === "ACCEPTED_FOR_CHECKOUT" || (q.replacesQuoteId === undefined && (q.state === "DRAFT" || q.state === "ISSUED"));
+
+/** The rounds lockLiveQuote re-reads the live quote: each needs another transaction to change the project's live quote meanwhile and commit. */
+const LIVE_QUOTE_LOCK_ROUNDS = 3;
+
+/**
+ * The project's live quote, FOR UPDATE and still live once the lock is held. liveQuoteOf is a plain read: the quote it names may be
+ * superseded before the lock is taken (a re-binding committing between the read and the FOR UPDATE, or updating the row before a waiter
+ * woken by an earlier COMMIT takes it; main run 37557133856), and the superseded paid quote would send a replacement down the ordinary
+ * issuance path, refused by quotes_one_live_per_project as INTEGRITY_FAILURE. The live quote is read again under the lock just taken;
+ * a project whose live quote keeps changing is refused OPERATION_PENDING with nothing written.
+ */
+async function lockLiveQuote(uow: CommerceUnitOfWork, co: QuoteCollaborators, agencyId: AgencyRecord["agencyId"], projectId: ProjectId): Promise<QuoteRecord | null> {
+  const reads = co.reads(uow);
+  for (let round = 0; round < LIVE_QUOTE_LOCK_ROUNDS; round += 1) {
+    const liveId = await reads.liveQuoteOf(agencyId, projectId);
+    if (liveId === null) return null;
+    const locked = await uow.commerce.quotes.lock(liveId);
+    if (locked !== null && isLiveQuote(locked)) return locked;
+  }
+  throw refuse("OPERATION_PENDING", "the project's live quote changed while this request locked it");
+}
 
 function eligibilityOf(issued: QuoteIssuance): QuoteEligibilityView {
   const s = issued.eligibility.snapshot;
@@ -198,10 +223,8 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           if (membership === null) throw new DomainFailure("INTEGRITY_FAILURE", "a quote was authorized without a membership");
           const subject = await subjectOf(uow);
           const c = uow.commerce;
-          const reads = co.reads(uow);
-          // the project's live quote FOR UPDATE (§10: after the shared halves, before the recurrence lock)
-          const liveId = await reads.liveQuoteOf(agencyId, projectId);
-          const live = liveId === null ? null : await c.quotes.lock(liveId);
+          // the project's live quote FOR UPDATE (§10: after the shared halves, before the recurrence lock), live once its lock is held
+          const live = await lockLiveQuote(uow, co, agencyId, projectId);
           const authorization = live === null ? null : await c.authorizations.findByQuote(live.quoteId);
           if (live !== null && authorization !== null && authorization.state !== "REVOKED") {
             const replacement = await issueReplacement(uow, co, { entryId, envelope, membership, subject, live, authorization });
