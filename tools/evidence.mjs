@@ -53,6 +53,8 @@ export const SUITES = [
   // package B11: the design tokens and accessible primitives, and the web runtime's node:test suites (the browser suite is outside verify)
   { name: "ui", cwd: "packages/ui", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "web", cwd: "apps/web", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  // package B13: the verified report model over Migration Core 3.0.0 packages
+  { name: "reports", cwd: "packages/reports", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "tools", cwd: ".", script: null, args: ["tools/test/**/*.test.mjs"] },
 ];
 
