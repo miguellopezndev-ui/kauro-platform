@@ -506,12 +506,12 @@ faultCell(
       const q1 = view(firstReply).quote.quoteId;
       assert.equal(view(firstReply).supersededQuoteId, undefined, "X expired: nothing to supersede");
       assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
-      assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q1, "ISSUED", null]], "the refused key wrote nothing");
+      await assertChain(plan, [[x, "EXPIRED", null], [q1, "ISSUED", null]], "the refused key wrote nothing");
       // R's retry then supersedes F's quote once, and F replays its one quote
       const q2 = view(await quoteCall(a, plan, rowKey));
       assert.equal(q2.supersededQuoteId, q1);
       assert.equal(view(await quoteCall(a, plan, firstKey)).quote.quoteId, q1, "F replays its quote");
-      assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
+      await assertChain(plan, [[x, "EXPIRED", null], [q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
       assert.deepEqual(await moneyRows(), money);
     }
     // no first-issuance holder: R holds X's row, finds X expired and no live quote, takes the first-issuance lock (tried, free) and issues 201
@@ -542,7 +542,7 @@ faultCell(
       assert.equal(reply.status >= 400 ? outcome(iw.w, reply) : `${reply.status}`, "201", "the tried first-issuance lock is free: R issues");
       const q = view(reply);
       assert.equal(q.supersededQuoteId, undefined);
-      assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q.quote.quoteId, "ISSUED", null]]);
+      await assertChain(plan, [[x, "EXPIRED", null], [q.quote.quoteId, "ISSUED", null]]);
     }
   },
 );
@@ -581,7 +581,7 @@ faultCell(
     assert.equal(answered.status, "fulfilled");
     await assertStaleWithCurrent(answered.status === "fulfilled" ? answered.value : (undefined as never), q0, "the issuance whose release lost");
     assert.equal((await iw.w.journal(key))?.state ?? null, null);
-    assert.deepEqual(await chainOf(plan), [[q0, "ISSUED", null]], "nothing written");
+    await assertChain(plan, [[q0, "ISSUED", null]], "nothing written");
     const next = view(await quoteCall(a, plan, key));
     assert.equal(next.supersededQuoteId, q0, "the same key then supersedes once");
     await giveSlotBack(a, plan);
@@ -621,7 +621,7 @@ faultCell(
     assert.equal(answered.status, "fulfilled");
     await assertStaleWithCurrent(answered.status === "fulfilled" ? answered.value : (undefined as never), q0, "the issuance refused by the live index");
     assert.equal((await iw.w.journal(key))?.state ?? null, null);
-    assert.deepEqual(await chainOf(plan), [[q0, "ISSUED", null]], "nothing written");
+    await assertChain(plan, [[q0, "ISSUED", null]], "nothing written");
     // the same key then supersedes the quote made live (its reservation released): the agency is left consistent for the passes that follow
     const next = view(await quoteCall(a, plan, key));
     assert.equal(next.supersededQuoteId, q0);
@@ -887,11 +887,20 @@ const moneyRows = async (): Promise<Record<string, unknown>> =>
               (SELECT count(*) FROM kauro.commercial_authorizations)::int AS authorizations, (SELECT count(*) FROM kauro.purchase_rebindings)::int AS rebindings`,
     )
   )[0]!;
-/** The project's quotes, superseded ones first in creation order, the live one last (a held issuance may have started before the one it supersedes). */
+/**
+ * The project's quotes as (quote, state, successor) rows in quote-id order: a chain is its supersession links, never its creation instants
+ * (an issuance's transaction may start before the quote it supersedes; under CPU load one did by 77 ms, stress gate on a178581 and 728c405).
+ */
 const chainOf = async (plan: PlanFixture): Promise<Array<readonly [string, string, string | null]>> =>
-  (await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY state = 'ISSUED', created_at", [plan.projectId])).map(
+  (await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY quote_id", [plan.projectId])).map(
     (q) => [q.quote_id, q.state, q.superseded_by_quote_id] as const,
   );
+/** The project's chain is exactly `expected` (the rows compared in quote-id order, so the links decide, not the order written); the rows printed when not. */
+async function assertChain(plan: PlanFixture, expected: ReadonlyArray<readonly [string, string, string | null]>, message = "the project's quotes"): Promise<void> {
+  const byId = (rows: ReadonlyArray<readonly [string, string, string | null]>) => [...rows].sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+  const actual = await chainOf(plan);
+  if (JSON.stringify(actual) !== JSON.stringify(byId(expected))) assert.deepEqual(actual, byId(expected), `${message}: ${await chainDetail(plan)}`);
+}
 
 /** The project's quote rows for a failure message: state, successor, replaced quote, created_at to the microsecond, and the journal key and state that issued each. */
 const chainDetail = async (plan: PlanFixture): Promise<string> =>
@@ -955,7 +964,7 @@ faultCell(
       const live = (await oracleRows<{ version: number }>(iw, "SELECT version::int AS version FROM kauro.quotes WHERE quote_id = $1", [q3]))[0]!;
       assert.deepEqual(problem.current, { version: live.version, state: "ISSUED" }, "current is the project's live quote, read after the last round");
       // nothing written by the late request: its journal entry, no quote, issuance or event of its own
-      assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "ISSUED", null]], `only the three superseding issuances wrote quotes: q0..q3 ${JSON.stringify([q0, q1, q2, q3])}, late key ${lateKey}, rows ${await chainDetail(plan)}`);
+      await assertChain(plan, [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "ISSUED", null]], `only the three superseding issuances wrote quotes: q0..q3 ${JSON.stringify([q0, q1, q2, q3])}, late key ${lateKey}, rows ${await chainDetail(plan)}`);
       assert.equal((await iw.w.journal(lateKey))?.state ?? null, null, "the refused key journaled nothing");
       const issuances = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE project_id = $1", [plan.projectId]);
       assert.equal(issuances[0]!.n, 4);
@@ -970,7 +979,7 @@ faultCell(
       const replay = await quoteCall(a, plan, lateKey);
       assert.equal(view(replay).quote.quoteId, issued[lateKey], "the same key replays its one quote");
       const [r1, r2] = (order === "same key first" ? [issued[lateKey], issued[freshKeyOf]] : [issued[freshKeyOf], issued[lateKey]]) as [string, string];
-      assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "SUPERSEDED", r1], [r1, "SUPERSEDED", r2], [r2, "ISSUED", null]], "each retry issued exactly once");
+      await assertChain(plan, [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "SUPERSEDED", r1], [r1, "SUPERSEDED", r2], [r2, "ISSUED", null]], "each retry issued exactly once");
       const after = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE project_id = $1", [plan.projectId]);
       assert.equal(after[0]!.n, 6);
       assert.deepEqual(await moneyRows(), money, "no order, capture, refund, ledger entry, entitlement or re-binding changed");
@@ -1014,7 +1023,7 @@ faultCell(
         const q1 = view(first).quote.quoteId;
         const q2 = view(second);
         assert.equal(q2.supersededQuoteId, q1, "the second supersedes the first");
-        assert.deepEqual(await chainOf(plan), [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
+        await assertChain(plan, [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
         assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
         assert.equal((await iw.w.journal(secondKey))?.state, "COMMITTED");
         assert.deepEqual(await moneyRows(), money, "no order, capture, refund, ledger entry, entitlement or re-binding changed");
@@ -1045,7 +1054,7 @@ faultCell(
         assert.equal(reply.status, 201, `the held issuance supersedes the first, never 422: ${reply.status === 201 ? "" : outcome(iw.w, reply)}`);
         const q2 = view(reply);
         assert.equal(q2.supersededQuoteId, q1);
-        assert.deepEqual(await chainOf(plan), [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
+        await assertChain(plan, [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
         assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
         assert.equal((await iw.w.journal(secondKey))?.state, "COMMITTED");
         assert.deepEqual(await moneyRows(), money);
@@ -1081,6 +1090,6 @@ test("W3 supersession order is not creation order: an issuance whose transaction
   const c = (await quoted(iw, a, plan)).quote.quoteId;
   const instants = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
   assert.deepEqual(instants.map((r) => r.quote_id), [q0, b, qa, c], "B's creation instant precedes A's: creation order is not supersession order");
-  assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", qa], [qa, "SUPERSEDED", b], [b, "SUPERSEDED", c], [c, "ISSUED", null]], `the chain q0 -> A -> B -> C: ${await chainDetail(plan)}`);
+  await assertChain(plan, [[q0, "SUPERSEDED", qa], [qa, "SUPERSEDED", b], [b, "SUPERSEDED", c], [c, "ISSUED", null]], `the chain q0 -> A -> B -> C: ${await chainDetail(plan)}`);
   await giveSlotBack(a, plan);
 });
