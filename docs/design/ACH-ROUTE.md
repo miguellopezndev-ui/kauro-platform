@@ -1,5 +1,9 @@
 # ACH bank-transfer route — owner amendment A8
 
+Design revision **r10** (2026-10-07): r9 plus the fixes of Codex design r9 (ACH-R8-01, ACH-R7-03 partial): DV1-11 (canonical
+fingerprint encoding and named normalization; durable append-only execution offers), §7.22c cells and §12 (r9 → r10 list).
+Everything else in r9 is unchanged. The r9 paragraph below is history.
+
 Design revision **r9** (2026-10-07): r8 plus the fixes of Codex design r8 (ACH-R7-03 partial, ACH-R8-01): DV1-10 (destination
 proof by keyed fingerprint, correlation overrides exclusions, negative evidence only from explained debits), §6 `DestinationEvidence`,
 §7.22b cells and §11 (r8 → r9 list). Everything Codex marked fixed in r8 is unchanged. The r8 paragraph below is history.
@@ -155,7 +159,7 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
   present and unused across both scopes; **E-AMT** amount and currency equal the attempt; **E-TIME** `executedAt` present and
   `≥ declaredAt` (strict, no tolerance); **E-DEST** destination proven (`accountDigest` equal, or `accountLast4` and `routingDigest`
   both equal) and **no E-DEST-CONFLICT** (no present destination field differs); [SUPERSEDED r9: E-DEST is DP-FULL or DP-RECIPIENT and any differing partial field is a conflict, DV1-10] **no E-REF-CONFLICT** (a present reference equals the
-  attempt's). A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. If real artifacts never carry a
+  attempt's). A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. [r10: it commits only the durable offer row and the case; no money, attempt or refund state changes, DV1-11.] If real artifacts never carry a
   destination field, G2 cannot complete and the attempt stays frozen for X3 with stronger evidence (K-8, K-10): nothing completes on
   weaker evidence.
 - **Window (X2).** DECLARED with `effectNow ≥ declaredAt + manualExecutionWindow` (route data) → UNCERTAIN, UNCERTAIN_EFFECT case;
@@ -195,7 +199,7 @@ This is stated in the acceptance ledger and in every Codex prompt.
 of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTIAL exclusion rule. All other DV1-08 text stands.
 - **Approved destination, captured once.** At approval (F2) the owner enters the destination's **full routing number, full account
   number and account holder name** from the restricted destination evidence (D-ACH-13). Kauro stores only the encrypted evidence
-  artifact and a **keyed destination fingerprint** `DF = HMAC(destinationKey_v, routing ‖ account ‖ normalizedHolderName)` with its key
+  artifact and a **keyed destination fingerprint** `DF = HMAC(destinationKey_v, routing ‖ account ‖ normalizedHolderName)` [SUPERSEDED r10: canonical length-prefixed encoding, DV1-11] with its key
   version `v` (key in the platform secret store, never in an adapter, log or event). Name normalization (versioned): Unicode NFKC,
   case fold, punctuation removed, whitespace collapsed. The full numbers are never displayed again: the owner queue and every
   response show only the masked account (last four) and the holder name. X1 and X4 freeze `DF` and `v` into the attempt and refuse
@@ -216,7 +220,7 @@ of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTI
     anything.**
 - **Correlation overrides every exclusion (ACH-R7-03).** A debit is **correlated** with an attempt if any of: its reference equals
   the attempt's (CORR-REF); its `recipientRef` equals the bound one (CORR-RECIPIENT); its `bankExecutionId` was offered for this attempt
-  in a refused G2/G4/X3 (CORR-OFFERED); its `DF` equals the attempt's (CORR-DF). A correlated debit always blocks NOT_EXECUTED and keeps
+  in a refused G2/G4/X3 (CORR-OFFERED); [r10: read from the durable `execution_offers` rows, and any offer row blocks NOT_EXECUTED, DV1-11] its `DF` equals the attempt's (CORR-DF). A correlated debit always blocks NOT_EXECUTED and keeps
   the attempt UNCERTAIN (`CONTRADICTORY_EVIDENCE`), whatever its currency, destination or links.
 - **Negative evidence (NX-NO-POTENTIAL, replaces r8).** In `[declaredAt, effectNow − coverageLag]` every debit of the account must be
   **explained** and none correlated: explained = linked by bank transaction id to another RECORDED attempt or to a recorded settlement
@@ -229,6 +233,43 @@ of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTI
 - **Qualification.** ACH-REFUND-LIVE-01's send evidence must satisfy DP-FULL or DP-RECIPIENT. If the real Wise artifacts give
   neither (K-8), the refund stays UNCERTAIN and GENERAL is not enabled: an owner-visible blocker, never a weaker proof.
 Cells: §7.22b.
+
+**DV1-11 — Canonical fingerprint encoding and durable execution offers (r10: ACH-R8-01, ACH-R7-03).** Supersedes in DV1-10 the
+`DF` formula and the CORR-OFFERED definition, and in DV1-08 the sentence "a failing predicate … changes nothing". Everything else
+in DV1-08 and DV1-10 stands.
+- **Normalization (`destination-norm-v1`, versioned).** Routing: remove ASCII spaces and hyphens; the result must be exactly 9 ASCII
+  digits passing the ABA check-digit rule, else `DESTINATION_INVALID`. Account: remove ASCII spaces and hyphens; the result must be
+  1–17 ASCII digits (leading zeros are significant and kept), else `DESTINATION_INVALID`. Holder name: Unicode NFC; Unicode default
+  full case folding (CaseFolding.txt statuses C and F, Unicode version pinned by the normalizer version); strip leading and trailing
+  White_Space; collapse each internal run of White_Space to one U+0020; must be 1–140 code points, else `DESTINATION_INVALID`.
+  Punctuation is kept. The same function normalizes F2 input, recipient-record artifacts and DP-FULL evidence.
+- **Canonical encoding (unambiguous by construction).** `DF = HMAC-SHA256(key(keyId, keyVersion), M)` with
+  `M = enc("kauro.destination-fingerprint") ‖ enc(normVersion) ‖ enc(keyId) ‖ enc(decimal keyVersion) ‖ enc(routing) ‖ enc(account) ‖
+  enc(holder)`, where `enc(s)` = 4-byte unsigned big-endian length of the UTF-8 bytes of `s`, then those bytes. Every field is
+  length-prefixed in a fixed order, so `M` is injective over the tuple: two distinct normalized destinations never yield the same `M`
+  and therefore share a `DF` only by an HMAC-SHA256 collision. The attempt stores `DF`, `keyId`, `keyVersion`, `normVersion`; a
+  comparison is valid only under the same four values (a rotated key or normalizer recomputes from the restricted evidence).
+- **Recipient binding (DP-RECIPIENT).** X1/X4 refuse `RECIPIENT_ALIAS` when the bound recipient-record artifact's full details do
+  not give exactly the attempt's `DF` under the canonical encoding (closes the r9 reproduction: account 12341234 / holder "1234M"
+  versus account 123412341234 / holder "M" at routing 021000021).
+- **Execution offers are durable (CORR-OFFERED).** Every G2, G4 or X3-EXECUTED request that passes the actor's authority guards and
+  reaches its effect transaction inserts one append-only `execution_offers` row: attempt, `bankExecutionId` (null when the evidence
+  was REJECTED by the classifier), evidence hash and ref, command, actor, `offeredAt` (DB clock), outcome code. The row is written
+  **in the same transaction, under L1 → L2 → L3**, and that transaction **commits in both outcomes**: on success with the RECORDED
+  footprint, on a failed predicate with only the offer row and the REVIEW case (no money, attempt or refund state change). A refusal because the
+  attempt is already NOT_EXECUTED also commits its row, opens REFUND_TERMINAL_CONTRADICTED and sets `execution_frozen` on the open
+  refunds of the source. Rows are
+  unique by `(attemptId, evidenceHash, command)`; never updated or deleted. Unauthorized requests write nothing here (they take the
+  separate DENY-fact path).
+- **Effect on NOT_EXECUTED.** X3 NOT_EXECUTED reads `execution_offers` for the attempt under L1 and is refused
+  `CONTRADICTORY_EVIDENCE` if any row exists, whatever its outcome or later use of the same execution id elsewhere (an execution id
+  offered for A and later RECORDED for B still blocks A: the owner claimed A was executed). Such an attempt stays UNCERTAIN until it
+  is RECORDED with proof; clearing a contradictory offer is LATER 2026-11-30 with UNDECLARED_OUTBOUND (fail closed).
+- **Failure columns of the offer write.** CRASH-BEFORE (before the effect COMMIT): no offer, no case; the client has no answer and the
+  replay inserts the one row. CRASH-AFTER and TIMEOUT: the replay with the same key returns the committed outcome and finds the one row.
+  RETRY: same key replays; the same evidence under another key hits the unique row (no second row) and gets the same outcome. RACE:
+  X3 and the offering command serialize on L1 (cells both orders). PARTIAL: a failure at the case insert rolls back the offer row too.
+Cells: §7.22c.
 
 **V1 vs LATER (ACH-17).** V1 (22 rows, 176 cells): R1 (owner-supplied details evidence, no API fetch), R2, I1, I2 (+DV1-07), I3,
 C4, C5, C6, S3 (actor SI2), M1, M2, P1 (+DV1-06), P2, E1, F1, F2, G1, G2, G3, G4, G6, P3. **LATER 2026-11-30, provider API** (8 rows,
@@ -1062,6 +1103,31 @@ Interleavings with the statement import (rule 1; both orders, held at L1):
 
 `RFG-P-NX-EXCLUDED` (r8) is **[SUPERSEDED r9]** by `RFG-P-NX-EXPLAINED` and the denial controls above; the r8 title is not written.
 
+### 7.22c Canonical fingerprint and durable execution offers (DV1-11) — r10, V1 (tier 1)
+`packages/persistence/test/refund-generic-cells.test.ts` unless named; offers are exercised through the real refusal and recovery
+paths, never a seeded association.
+
+Fingerprint (rule 12 controls):
+- "DENY RFG-P-DF-CONCAT-COLLISION (routing 021000021, account 12341234, holder 1234M versus account 123412341234, holder M): distinct destinations give distinct fingerprints"
+- "DENY RFG-P-DEST-RECIPIENT-ALIAS (a recipient record whose full details give another fingerprint, including the concatenation-collision pair): Declare manual refund execution"
+- "OK RFG-P-DF-NORMALIZATION (spaces and hyphens in routing and account, NFC and case variants of the holder give one fingerprint; leading zeros stay significant)"
+- "DENY RFG-P-DF-INVALID (routing not 9 digits or failing the ABA check digit, account empty, over 17 digits or with a letter, empty holder): Capture approved destination"
+- "DENY RFG-P-DF-KEY-VERSION (a fingerprint under another key id, key version or normalizer version never compares equal): Record a declared execution"
+- `packages/domain/test/destination-fingerprint.test.ts` :: "OK destination-norm-v1 vectors: fixed inputs give fixed canonical bytes M and fixed fingerprints under a test key"
+
+Execution offers (failure columns of the offer write; both orders at L1):
+- "RACE RFG-M-OFFER-RACE (both orders): a refused offer of execution id X for attempt A against X3 NOT_EXECUTED of A — offer first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, then the offer is recorded and opens REFUND_TERMINAL_CONTRADICTED, freezing open refunds of the source"
+- "RACE RFG-M-OFFER-TIMEOUT (lock or COMMIT timeout): Record a declared execution — nothing or the committed outcome; the same key finds one offer row"
+- "RACE RFG-M-OFFER-CRASH-BEFORE (crash before the effect COMMIT of a refusal): Record a declared execution — no offer row, no case; the replay writes exactly one"
+- "RACE RFG-M-OFFER-CRASH-AFTER (lost refusal answer): Record a declared execution — the replay returns the same refusal and the one offer row"
+- "RACE RFG-M-OFFER-RETRY (same key, same evidence under another key, other evidence): Record a declared execution — one row per evidence and command; other evidence adds its own row"
+- "RACE RFG-M-OFFER-PARTIAL (case insert fails after the offer row): Record a declared execution — both rolled back"
+- "DENY RFG-M-OFFER-UNAUTHORIZED (an offer by a non-owner or without step-up): Record a declared execution — no offer row; DENY fact only"
+- "DENY RFG-P-NX-CORR-OFFERED-REPRO (X offered for A and refused on destination proof, X then recorded for B, its debit imported without reference or recipient): Resolve uncertain execution — NOT_EXECUTED of A refused CONTRADICTORY_EVIDENCE"
+- "DENY RFG-P-NX-OFFER-REJECTED-EVIDENCE (an authorized offer whose evidence the classifier rejected): Resolve uncertain execution — NOT_EXECUTED refused"
+
+The r9 control "DENY RFG-P-NX-CORR-OFFERED" is kept and now reads the durable `execution_offers` row (no seeding).
+
 ### 7.23 Owner statement import (DV1-02; replaces API sweeps; realises S3) — r7, V1
 File `packages/persistence/test/ach-inbound-cells.test.ts`. SI2 locks the account/environment statement stream, then the
 credit/execution identity locks shared with C6, G2 and X3.
@@ -1255,6 +1321,15 @@ Delta only: everything Codex marked fixed in r8 (ACH-R7-01, 02, 04, 05, 06; PV1 
 | 2 | ACH-R7-03 PARTIAL | Correlation (reference, recipient, offered execution id, fingerprint) overrides every exclusion and keeps the attempt UNCERTAIN; NOT_EXECUTED requires every debit in the interval explained by another RECORDED attempt or a recorded settlement; other-currency, conflicting-destination and all-null debits block; account dedicated to Kauro (K-12). RFG-P-NX-EXCLUDED superseded | RFG-P-NX-CORR-REF, -CORR-LINKED, -CORR-OFFERED, -OTHER-CURRENCY, -UNEXPLAINED, -EXPLAINED; RFG-M-NX-SI2-CORR |
 | 3 | Types | `DestinationEvidence` gains restricted `full` details and `recipientRef`/`recipientVersion`; the attempt stores `destinationFingerprint` + key version instead of digests/last four | — |
 | 4 | Qualification | ACH-REFUND-LIVE-01 needs DP-FULL or DP-RECIPIENT; otherwise GENERAL stays off (owner-visible blocker) | ACH-M-R2-GENERAL (unchanged title) |
+
+## 12. r9 → r10 change list (Codex design r9, `tools/review/out/ach-design-r9-07c88cdbbedb`: ACH-R8-01, ACH-R7-03 partial)
+
+Delta only; everything else in r9 is unchanged.
+
+| # | Finding | Change (by construction) | Cells |
+|---|---|---|---|
+| 1 | ACH-R8-01 | DV1-11: named normalization `destination-norm-v1` (routing 9 digits + ABA check, account 1–17 digits with leading zeros, holder NFC + default case folding + whitespace rule); canonical length-prefixed encoding with domain tag, normalizer version, key id and key version, injective over the tuple; X1/X4 refuse `RECIPIENT_ALIAS` | RFG-P-DF-CONCAT-COLLISION, RFG-P-DEST-RECIPIENT-ALIAS, RFG-P-DF-NORMALIZATION, RFG-P-DF-INVALID, RFG-P-DF-KEY-VERSION, destination-norm-v1 vectors |
+| 2 | ACH-R7-03 | DV1-11: append-only `execution_offers` written in the recording transaction under L1 → L2 → L3, committed on success and on a failed predicate; any offer row blocks X3 NOT_EXECUTED; failure columns defined | RFG-M-OFFER-RACE, -TIMEOUT, -CRASH-BEFORE, -CRASH-AFTER, -RETRY, -PARTIAL, -UNAUTHORIZED; RFG-P-NX-CORR-OFFERED-REPRO, RFG-P-NX-OFFER-REJECTED-EVIDENCE |
 
 ## Appendix A. Phase 2 (post-launch): automated Wise outbound — not designed here
 
