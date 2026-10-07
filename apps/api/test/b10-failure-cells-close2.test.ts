@@ -6,6 +6,7 @@
 //
 // The months of this file close at LATER (2027-01-10, after every 2026 month's 5th banking day) so twelve months are available and the
 // PERIODS sweep of the sweep cells (which opens the month it stands in) never meets a month a cell uses.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
@@ -21,6 +22,8 @@ import { createPeriodsSweep, periodCloseKey } from "../src/commissions/periods.j
 import { asProblem, completed, freshKey, ids, outcome, sha, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

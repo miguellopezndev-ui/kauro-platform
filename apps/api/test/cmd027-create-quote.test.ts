@@ -7,6 +7,7 @@
 // own selling agency (ACTIVE, a reviewed fiscal profile, plans approved through CMD025). The founding cohort has three slots for the whole
 // cluster, so the tests that take them run in an order that leaves each the slots it needs. Nothing sleeps: interleavings are held at
 // named points and every wait is observed in pg_stat_activity.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, RequestRefundView } from "@kauro/application";
@@ -66,6 +67,8 @@ class QuoteHolds {
 }
 
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 const holds = new QuoteHolds();
 const buyer = new ContractFakeBuyerTypeReader({ clock });
 /** The re-binder the payment service runs: B09's, with B07's lineage — or, for a test of a refusal, without it (the lineage is then missing). */
@@ -378,34 +381,44 @@ test("OK (not stacked): a founding-eligible agency with two qualifying prior pro
   assert.equal(await w.count("qualifying_purchases", "agency_id = $1", [s.agency.agencyId]), 2);
   // Two designations make the agency ineligible for the founding cohort (D10-FOUND-3: no qualifying purchase), so production cannot
   // reach this title's state. The state is built, labelled, as the superuser: the agency's recurrence row removed with triggers off,
-  // leaving the two purchases in the set and no purchase on the cohort's books.
+  // leaving the two purchases in the set and no purchase on the cohort's books. The forged state is the test's only: the row is restored,
+  // the same way, before the test ends, so the B10 state oracle (INV-S-14 first designation) reads the state production can reach.
   const sup = oracle();
-  await sup.query("BEGIN");
+  const forged = async (sql: string, params: ReadonlyArray<unknown>): Promise<Array<{ row: unknown }>> => {
+    await sup.query("BEGIN");
+    try {
+      await sup.query("SET LOCAL session_replication_role = replica");
+      const r = await sup.query<{ row: unknown }>(sql, [...params]);
+      await sup.query("COMMIT");
+      return r.rows;
+    } catch (e) {
+      await sup.query("ROLLBACK");
+      throw e;
+    }
+  };
+  const removed = await forged("DELETE FROM kauro.agency_recurrence r WHERE r.agency_id = $1 RETURNING to_jsonb(r.*) AS row", [s.agency.agencyId]);
+  assert.equal(removed.length, 1, "the agency's recurrence row was removed");
   try {
-    await sup.query("SET LOCAL session_replication_role = replica");
-    await sup.query("DELETE FROM kauro.agency_recurrence WHERE agency_id = $1", [s.agency.agencyId]);
-    await sup.query("COMMIT");
-  } catch (e) {
-    await sup.query("ROLLBACK");
-    throw e;
+    const plan = await approvedPlan(s, "not-stacked-3", { units: 40_000 });
+    const view = issuedView(await createQuote(s, plan));
+    assert.deepEqual([view.quote.discount, view.quote.baseServiceCents, view.quote.discountCents, view.quote.serviceCents], [{ bps: 2500, basis: "FOUNDING" }, "69500", "17375", "52125"], "the one highest rate, 2500, never 3000");
+    assert.equal(view.eligibility.qualifyingProjectCount, 2);
+    assert.equal(view.eligibility.repeatDiscountBps, 500);
+    assert.equal(view.eligibility.foundingOffer, "RESERVED");
+    assert.equal(view.eligibility.appliedDiscountBps, 2500);
+    const snapshot = await snapshotRow(view.quote.quoteId);
+    assert.deepEqual([snapshot.qualifying_project_ids.slice().sort(), snapshot.repeat_discount_bps, snapshot.founding_discount_bps, snapshot.applied_discount_bps], [[first.projectId, second.projectId].sort(), 500, 2500, 2500]);
+    const lookback = (await rows<{ ok: boolean }>("SELECT s.lookback_starts_at = s.as_of - interval '8760 hours' AND s.as_of = q.issued_at AS ok FROM kauro.price_eligibility_snapshots s JOIN kauro.quotes q USING (quote_id) WHERE q.quote_id = $1", [view.quote.quoteId]))[0]!;
+    assert.equal(lookback.ok, true, "the lookback starts 8760 hours before the issuance instant");
+    assert.ok(Date.parse(view.eligibility.lookbackStartsAt) < Date.parse(view.quote.issuedAt));
+    assert.equal((await reservationOfQuote(view.quote.quoteId))?.state, "RESERVED");
+    // the slot is given back: the agency's own next quote supersedes this one (R2-127 shows the release in full)
+    const again = issuedView(await createQuote(s, plan));
+    assert.equal(again.supersededQuoteId, view.quote.quoteId);
+    assert.equal((await reservationOfQuote(view.quote.quoteId))?.state, "RELEASED");
+  } finally {
+    await forged("INSERT INTO kauro.agency_recurrence SELECT * FROM jsonb_populate_record(NULL::kauro.agency_recurrence, $1::jsonb)", [JSON.stringify(removed[0]!.row)]);
   }
-  const plan = await approvedPlan(s, "not-stacked-3", { units: 40_000 });
-  const view = issuedView(await createQuote(s, plan));
-  assert.deepEqual([view.quote.discount, view.quote.baseServiceCents, view.quote.discountCents, view.quote.serviceCents], [{ bps: 2500, basis: "FOUNDING" }, "69500", "17375", "52125"], "the one highest rate, 2500, never 3000");
-  assert.equal(view.eligibility.qualifyingProjectCount, 2);
-  assert.equal(view.eligibility.repeatDiscountBps, 500);
-  assert.equal(view.eligibility.foundingOffer, "RESERVED");
-  assert.equal(view.eligibility.appliedDiscountBps, 2500);
-  const snapshot = await snapshotRow(view.quote.quoteId);
-  assert.deepEqual([snapshot.qualifying_project_ids.slice().sort(), snapshot.repeat_discount_bps, snapshot.founding_discount_bps, snapshot.applied_discount_bps], [[first.projectId, second.projectId].sort(), 500, 2500, 2500]);
-  const lookback = (await rows<{ ok: boolean }>("SELECT s.lookback_starts_at = s.as_of - interval '8760 hours' AND s.as_of = q.issued_at AS ok FROM kauro.price_eligibility_snapshots s JOIN kauro.quotes q USING (quote_id) WHERE q.quote_id = $1", [view.quote.quoteId]))[0]!;
-  assert.equal(lookback.ok, true, "the lookback starts 8760 hours before the issuance instant");
-  assert.ok(Date.parse(view.eligibility.lookbackStartsAt) < Date.parse(view.quote.issuedAt));
-  assert.equal((await reservationOfQuote(view.quote.quoteId))?.state, "RESERVED");
-  // the slot is given back: the agency's own next quote supersedes this one (R2-127 shows the release in full)
-  const again = issuedView(await createQuote(s, plan));
-  assert.equal(again.supersededQuoteId, view.quote.quoteId);
-  assert.equal((await reservationOfQuote(view.quote.quoteId))?.state, "RELEASED");
 });
 
 // ===================================================================================================================================

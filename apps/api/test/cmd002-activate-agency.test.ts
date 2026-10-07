@@ -9,7 +9,8 @@ import { after, before, test } from "node:test";
 import type { AgencyActivationView } from "@kauro/application";
 import type { AgencyId, FiscalIssuerRef, FiscalProfileId, UserId } from "@kauro/domain";
 import { publishAgreementVersions, recordReviewedFiscalProfile, type AgencyFixture, type PublishedAgreements } from "@kauro/persistence/testing";
-import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, sha, waitForApiLockWait, world, type Person, type World } from "./support.js";
+import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, routes, sha, waitForApiLockWait, world, type Person, type Reply, type World } from "./support.js";
+import { apiIdleInTransaction, disarm, otherWaitsExactlyOn, readerCell, track, until, waitsExactlyOnOther, type CellOutcome } from "./agency-lock-cells.js";
 
 let w: World;
 let versions: PublishedAgreements;
@@ -189,7 +190,7 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   // the retry under the same key activates it once; the identical retry replays the journaled 200 byte for byte
   const first = await activate(d, { key, body });
   completed<AgencyActivationView>(first, 200);
-  assert.equal(await acceptancesOf(d.agency.agencyId), 1);
+  assert.equal(await w.count("agency_agreement_acceptances", "agency_id = $1", [d.agency.agencyId]), 1);
   const replay = await activate(d, { key, body });
   assert.equal(replay.status, 200, replay.text);
   assert.equal(replay.text, replayTextOf(first));
@@ -198,19 +199,19 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   // the same key naming another billing profile is another request: a conflict, and nothing happens
   const other = await draftAgency("cmd002-race-other");
   assert.equal(outcome(w, await activate(d, { key, body: bodyFor(other.profileId) })), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
-  assert.equal(await acceptancesOf(d.agency.agencyId), 1);
+  assert.equal(await w.count("agency_agreement_acceptances", "agency_id = $1", [d.agency.agencyId]), 1);
   assert.equal((await agencyRow(d.agency.agencyId))?.version, "2");
 
-  // two keys racing on one expectedVersion: A holds inside its unit of work with the agency's row written; B blocks on the agency's row
-  // already at its journal reservation (the entry's agency foreign key waits for A's transaction; observed in pg_stat_activity), reads
-  // the agency at version 2 after A commits and answers STALE_VERSION with the current state
+  // two keys racing on one expectedVersion: A holds inside its unit of work with the agency's row written; B's journal reservation (the
+  // agency's KEY SHARE) passes beside A's NO KEY row lock and B blocks on the agency's row lock (FOR NO KEY UPDATE, observed in
+  // pg_stat_activity), reads the agency at version 2 after A commits and answers STALE_VERSION with the current state
   const racing = await draftAgency("cmd002-race-two");
   const hold = w.holds.arm("journal.commit");
   const requestA = activate(racing, { key: freshKey("cmd002-race-a"), body: bodyFor(racing.profileId) });
   await hold.reached;
   const requestB = activate(racing, { key: freshKey("cmd002-race-b"), body: bodyFor(racing.profileId) });
   try {
-    await waitForApiLockWait(w, "INSERT INTO kauro.command_journal");
+    await waitForApiLockWait(w, "FOR NO KEY UPDATE");
   } finally {
     hold.release();
   }
@@ -220,4 +221,62 @@ test("RACE: an identical retry replays the 200 without a second acceptance, the 
   assert.deepEqual(asProblem(w, b).current, { version: 2, state: "ACTIVE" });
   assert.equal(await acceptancesOf(racing.agency.agencyId), 1, "one acceptance for one activation");
   assert.deepEqual((await w.events("agency", racing.agency.agencyId)).map((e) => e.type), ["agency.created.v1", "agency.activated.v1"]);
+});
+
+
+const activationAnswer = (reply: Reply): string => (reply.status < 300 ? String(reply.status) : outcome(w, reply));
+const settledAnswer = (r: PromiseSettledResult<Reply>): string => (r.status === "fulfilled" ? activationAnswer(r.value) : `threw ${String(r.reason)}`);
+
+test("RACE (D10-TX-1, 40P01) reader KEY_SHARE_THEN_SHARED, production: CreateClient (CMD009) on the DRAFT agency reserved its journal entry (the agency's KEY SHARE) and pauses before reading the agency after its shared half; ActivateAgency then locks the row FOR NO KEY UPDATE beside that KEY SHARE, writes the state (the exclusive half through the transition trigger) and reaches its commit without waiting for the client's backend; CreateClient's shared half waits for the activation's backend, the activation commits 200 and the client is created 201 in the ACTIVE agency — never a deadlock (red at 593c47f: the exclusive half first, then the row FOR UPDATE waits for the KEY SHARE while CreateClient's shared half waits for the exclusive half, 40P01)", async () => {
+  const d = await draftAgency("cmd002-reserved-client");
+  const reserved = w.holds.arm("journal.reserved");
+  const creating = track(call(w, { url: routes.createClient(d.agency.agencyId), token: d.owner.token, agency: null, key: freshKey("cmd002-reserved-client"), body: { displayName: "Reserved Client", processingAuthorityRef: ids.next() } }));
+  await reserved.reached;
+  const idle = await apiIdleInTransaction(w);
+  assert.equal(idle.length, 1, "only CreateClient's reserved unit of work is inside a transaction");
+  const clientPid = idle[0]!;
+  const commit = w.holds.arm("journal.commit");
+  const committing = track(commit.reached);
+  const activating = track(activate(d, { key: freshKey("cmd002-reserved-client-activation"), body: bodyFor(d.profileId) }));
+  let activationWaited = false;
+  let clientWaited = false;
+  try {
+    await until("the activation reaches its commit, or waits for CreateClient's backend", async () => committing.done() || activating.done() || (activationWaited = await otherWaitsExactlyOn(w, clientPid)));
+  } finally {
+    reserved.release();
+  }
+  try {
+    await until("CreateClient finishes, or its backend waits", async () => creating.done() || (clientWaited = await waitsExactlyOnOther(w, clientPid)));
+  } finally {
+    commit.release();
+  }
+  const [created, activated] = await Promise.all([creating.settled, activating.settled]);
+  await disarm(w, "journal.commit", committing.done());
+  assert.deepEqual(
+    { activationWaitedForTheClient: activationWaited, clientWaitedForTheActivation: clientWaited, activation: settledAnswer(activated), client: settledAnswer(created) },
+    { activationWaitedForTheClient: false, clientWaitedForTheActivation: true, activation: "200", client: "201" },
+  );
+  assert.equal((await agencyRow(d.agency.agencyId))?.state, "ACTIVE");
+});
+
+test("RACE (D10-TX-1, 40P01) lock-order matrix: ActivateAgency against a reader of the DRAFT agency in both orders (SHARED_THEN_KEY_SHARE — no DRAFT reader of production has this order today, the cell guards one; KEY_SHARE_THEN_SHARED — CMD009, CMD011) and both interleavings (the activation first, holding the row and the exclusive half at its commit; the reader first, holding its first lock) — every cell completes: the activation 200, the reader's statements succeed, and who waited for whom (both backend pids) is the NO KEY row lock's (red at c9f7f95 in the SHARED_THEN_KEY_SHARE reader-first cell and at 593c47f in the KEY_SHARE_THEN_SHARED reader-first cell, 40P01)", async () => {
+  const cells: Record<string, CellOutcome> = {};
+  const states: Array<string | undefined> = [];
+  for (const shape of ["SHARED_THEN_KEY_SHARE", "KEY_SHARE_THEN_SHARED"] as const) {
+    for (const first of ["WRITER_FIRST", "READER_FIRST"] as const) {
+      const d = await draftAgency(`cmd002-cell-${shape}-${first}`);
+      cells[`${shape} ${first}`] = await readerCell(w, { agency: d.agency, start: () => activate(d, { key: freshKey(`cmd002-cell-${shape}-${first}`), body: bodyFor(d.profileId) }), rowHold: "journal.commit" }, shape, first, activationAnswer);
+      states.push((await agencyRow(d.agency.agencyId))?.state);
+    }
+  }
+  assert.deepEqual(cells, {
+    // the activation holds the row and the exclusive half at its commit: the reader's shared half waits for it, its insert passes
+    "SHARED_THEN_KEY_SHARE WRITER_FIRST": { writer: "200", reader: "OK", readerWaited: true, writerWaited: false },
+    // the activation's state change (the exclusive half) waits for the reader's shared half; the reader's insert passes beside the row
+    "SHARED_THEN_KEY_SHARE READER_FIRST": { writer: "200", reader: "OK", readerWaited: false, writerWaited: true },
+    "KEY_SHARE_THEN_SHARED WRITER_FIRST": { writer: "200", reader: "OK", readerWaited: true, writerWaited: false },
+    // the activation passes beside the reader's KEY SHARE to its commit; the reader's shared half waits for it
+    "KEY_SHARE_THEN_SHARED READER_FIRST": { writer: "200", reader: "OK", readerWaited: true, writerWaited: false },
+  });
+  assert.deepEqual(states, ["ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE"]);
 });

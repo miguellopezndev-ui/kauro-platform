@@ -5,6 +5,7 @@
 // PostgreSQL 17 through the runtime login roles; the superuser only reads. The sellers are recorded with every activation fact by the
 // corporate owner, the allocations prepared by the owner (test/sales-support.ts), the agency's purchase by B09's adapter-written
 // fixtures. The agency's buyer type is the labelled contract fake of BuyerTypeReader (SIMULATED, D10-FAKE-1): B11 records the real one.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AttributionView } from "@kauro/application";
@@ -17,6 +18,8 @@ import { SimulatedCrash, asProblem, call, clock, completed, freshKey, ids, outco
 
 const buyerTypes = new ContractFakeBuyerTypeReader({ clock });
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 before(async () => {
   pw = await paymentsWorld({ commercial: { buyerTypes } });
 });

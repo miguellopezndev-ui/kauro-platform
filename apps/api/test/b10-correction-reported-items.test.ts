@@ -2,6 +2,7 @@
 // refunded paid line (its adjustment, its recovery item and the negative balance) beside a payable line, its payout FAILED or RETURNED and
 // superseded automatically in CMD053's COMMIT (D10-GAP-12). Its own world: the months of 2026 the fixtures close are few (January to
 // September), and this file closes three per payout outcome. PostgreSQL 17 through the runtime login roles; the superuser only reads.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView } from "@kauro/application";
@@ -9,6 +10,8 @@ import { approvePayout, bankCash, claimedCents, closeMonth, commissionContext, S
 import { completed } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

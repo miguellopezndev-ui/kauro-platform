@@ -4,6 +4,7 @@
 // verified payment and tax facts, verified identity with MFA and the owner's step-up, repeated by the database (KC005)"). The real route,
 // the real authorizers, B06's step-up verifier, the sales adapters and PostgreSQL 17 through the runtime login roles; the superuser only
 // reads. The activation facts are written by the owner and the seller through their own sessions (sellers-support); nothing is faked.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { SellerView } from "@kauro/application";
@@ -14,6 +15,8 @@ import { asPerson, candidateSeller, type CandidateGaps, type CandidateSeller } f
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Reply } from "./support.js";
 
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 before(async () => {
   pw = await paymentsWorld();
 });

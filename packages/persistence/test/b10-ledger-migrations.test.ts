@@ -5,6 +5,7 @@
 // service; the superuser only reads, and probes a refusal no grant stands in front of. Amounts are the worked examples' integer cents,
 // written here as the oracle. Every guard is shown by the forbidden write refused beside the legitimate write that commits (21
 // "Positive and negative symmetry"). The tests assert the raw KC SQLSTATEs; their translation is the stage-2 lanes' (design §12).
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -55,6 +56,8 @@ import {
 } from "./b10-commission-support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 /** The October 2026 period every payout of this file closes into (one statement per seller): dated by example 21's fixture calendar. */
 let october: string;
 
@@ -632,11 +635,26 @@ test("B10G-R1 r2 at the database: one live PAYABLE item per line is the statemen
   await issueStatement(w, october, s, [lineId]);
   // the line forced out of PAYABLE behind the machine's back (the superuser, triggers off): the old statement still itemizes it PAYABLE
   assert.match(lineId, /^[0-9a-f-]{36}$/);
+  // (the forged state is this test's only: the line's state and owner are restored, the same way, before the test ends — the B10 state
+  // oracle runs after every test of this file)
+  const was = (await w.h.oracle.query<{ state: string; owner: string | null }>("SELECT state, payable_statement_id AS owner FROM kauro.commission_lines WHERE line_id = $1", [lineId])).rows[0]!;
   await w.h.oracle.query(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE kauro.commission_lines SET state = 'ELIGIBLE', payable_statement_id = NULL WHERE line_id = '${lineId}'; COMMIT;`);
-  // November's period (the B10G-R1 test above records it when it runs first)
-  const november = (await w.h.oracle.query<{ id: string }>("SELECT period_id AS id FROM kauro.commission_periods WHERE period_month = '2026-11-01'")).rows[0]?.id;
-  const later = november ?? (await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01"));
-  await assert.rejects(within(w.commission, corporate, (c) => statementFor(c, later, s, [lineId], { payLines: false })), refusedWith("KC019"), "a second live statement itemizing the line PAYABLE");
+  try {
+    // November's period (the B10G-R1 test above records it when it runs first)
+    const november = (await w.h.oracle.query<{ id: string }>("SELECT period_id AS id FROM kauro.commission_periods WHERE period_month = '2026-11-01'")).rows[0]?.id;
+    const later = november ?? (await september(w, await fixtureCalendar(w), "TEST_FIXTURE", ["2026-12-07", "2026-12-14"], "2026-11-01"));
+    await assert.rejects(within(w.commission, corporate, (c) => statementFor(c, later, s, [lineId], { payLines: false })), refusedWith("KC019"), "a second live statement itemizing the line PAYABLE");
+  } finally {
+    await w.h.oracle.query("BEGIN");
+    try {
+      await w.h.oracle.query("SET LOCAL session_replication_role = replica");
+      await w.h.oracle.query("UPDATE kauro.commission_lines SET state = $2, payable_statement_id = $3 WHERE line_id = $1", [lineId, was.state, was.owner]);
+      await w.h.oracle.query("COMMIT");
+    } catch (e) {
+      await w.h.oracle.query("ROLLBACK");
+      throw e;
+    }
+  }
 });
 
 test("B10G-R7 at the database: a step-up proof that expires during the approving transaction refuses the intent at its write (the expiry is compared with the statement's clock, not the transaction's start)", async () => {

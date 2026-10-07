@@ -95,6 +95,35 @@ export interface UnitOfWork {
   readonly userId: UserId | null;
 }
 
+/**
+ * A unit of work whose in-flight work its caller can give up (D10-GAP-6a): when a bound on a call made inside the unit elapses, the call
+ * keeps running on the unit's connection, so the connection must never go back to the pool. `abandonWork` marks the unit: it then ends
+ * in a failure, its connection is destroyed (never rolled back through the queue the abandoned call blocks, never returned), and what
+ * the abandoned call still tries on that connection fails there.
+ */
+export interface AbandonableWork {
+  abandonWork(reason: string): void;
+  /**
+   * Limits the lifetime of the WHOLE transaction from now on (ms), or lifts the limit (null): the database itself ends the session when it
+   * elapses, whatever statement it is in and whatever the unit's own statement timeout says (statement_timeout restarts with every
+   * statement; a call that runs several statements would otherwise hold the unit's locks past its bound). Armed before a bounded call and
+   * lifted when the call answered in time; an abandoned unit is never lifted (D10-GAP-6a).
+   */
+  limitWork(ms: number | null): Promise<void>;
+}
+
+/** Gives up the in-flight work of `uow` when it supports it (a unit of work of @kauro/persistence); other implementations have nothing to destroy. */
+/** Limits (or, with null, lifts the limit of) the transaction's remaining lifetime when the unit of work supports it; other implementations have nothing to limit. */
+export async function limitWorkOf(uow: object, ms: number | null): Promise<void> {
+  const candidate = uow as Partial<AbandonableWork>;
+  if (typeof candidate.limitWork === "function") await candidate.limitWork(ms);
+}
+
+export function abandonWorkOf(uow: object, reason: string): void {
+  const candidate = uow as Partial<AbandonableWork>;
+  if (typeof candidate.abandonWork === "function") candidate.abandonWork(reason);
+}
+
 export interface UnitOfWorkFactory {
   /**
    * Runs `work` inside one transaction bound to `context`; commits when it returns, rolls back when it throws and rethrows.

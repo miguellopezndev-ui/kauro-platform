@@ -1,4 +1,5 @@
 // Reproduce a database clock behind Node on Linux, without timing sleeps or changing a production guard.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { toUtcInstant, type UserId } from "@kauro/domain";
@@ -11,6 +12,8 @@ import {
 import { ids, sha } from "./support.js";
 
 let cw: CommissionWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => cw.h.oracle);
 let selling: Selling;
 let attribution: Attribution;
 

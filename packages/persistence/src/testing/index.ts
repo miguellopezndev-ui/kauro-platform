@@ -93,3 +93,5 @@ export { fundPlatformPool } from "./audit-fixtures.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
 // the common fault harness (docs/design/FAULT-HARNESS.md): controlled clock, crash and pause points, interleavings, matrix cells
 export * from "./faults/index.js";
+export { B10_INVARIANTS, assertInvariants, invariantsAfterEach, invariantRows } from "./invariants.js";
+export type { Invariant } from "./invariants.js";

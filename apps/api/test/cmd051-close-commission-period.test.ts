@@ -6,6 +6,7 @@
 // controlled fixture: weekends and 2026-10-12 nonbanking. Each test closes its own month; the close stands at a chosen instant only through the
 // labelled TEST CLOCK, never behind the real clock. The worked examples' integer cents are written here as the oracle. Interleavings are
 // held at named points and every wait is observed in pg_stat_activity; nothing sleeps.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CommissionStatementView, ExecuteRefundView, PeriodCloseView } from "@kauro/application";
@@ -38,6 +39,8 @@ import {
 import { asProblem, completed, freshKey, ids, outcome, replayTextOf, sha } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });
