@@ -135,3 +135,5 @@ export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // what its sweeps find across agencies before each item is settled in a unit of work that adopts the item's agency
 export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.js";
 export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";
+export { sslOptionsOf } from "./tls.js";
+export type { DatabaseTls, VerifiedSslOptions } from "./tls.js";

@@ -28,11 +28,12 @@ import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } fro
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
-import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
+import type { ApplyResult, DatabaseTls, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
+import { readFileSync } from "node:fs";
 import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
-import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
+import { ConfigError, DB_TLS_CA_FILE_VARIABLE, type ApiConfig, type IdentityConfig, type MigratorConfig } from "./config.js";
 import { activeWorkInspector, commerceEdition, commercialConsequencesInspector, commercialScopeInspector, externalActionInspector, planServices, sourceLineageReader } from "./edition.js";
 import { createIdentityTokenVerifier, type IdentityKeySource } from "./identity-verifier.js";
 import { assertIdentityConfig, createSessionAuthenticator, type SessionAssembly } from "./sessions.js";
@@ -100,14 +101,29 @@ export interface DatabaseDependencies {
   readonly onPoolError?: PoolErrorSink;
 }
 
+/** I-2: the CA the database's certificate must chain to, read from the file KAURO_DB_TLS_CA_FILE names (a mounted bundle). */
+export function tlsOf(caFile: string | undefined): DatabaseTls | undefined {
+  if (caFile === undefined) return undefined;
+  let ca: string;
+  try {
+    ca = readFileSync(caFile, "utf8");
+  } catch (e) {
+    const code = e instanceof Error && typeof (e as NodeJS.ErrnoException).code === "string" ? String((e as NodeJS.ErrnoException).code) : "unreadable";
+    throw new ConfigError(DB_TLS_CA_FILE_VARIABLE, `names a file that cannot be read (${code})`);
+  }
+  if (!ca.includes("-----BEGIN CERTIFICATE-----")) throw new ConfigError(DB_TLS_CA_FILE_VARIABLE, "names a file that holds no PEM certificate");
+  return { ca };
+}
+
 /**
  * Applies every pending migration as `migrator` on its own bounded connection (R37), closed afterwards: the LOCAL migrations on
  * start and the one-shot migration job (migration-job.ts). `password` is handed to that connection only; nothing keeps it.
  */
 export function applyMigrationsWith(migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
-  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, ...connection } = migrator;
+  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, tlsCaFile, ...connection } = migrator;
+  const tls = tlsOf(tlsCaFile);
   return applyMigrationsAs(
-    { ...connection, ...(password === undefined ? {} : { password }), applicationName: `${API_APPLICATION_NAME}-migrator` },
+    { ...connection, ...(password === undefined ? {} : { password }), ...(tls === undefined ? {} : { tls }), applicationName: `${API_APPLICATION_NAME}-migrator` },
     { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
   );
 }
@@ -128,8 +144,9 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const codeSchemaVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
   let migrations: ApplyResult | null = null;
   if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.migrateOnStart, deps.migratorPassword);
-  const { poolMax, statementTimeoutMs, ...connection } = config.database;
-  const pool = createPool({ ...connection, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+  const { poolMax, statementTimeoutMs, tlsCaFile, ...connection } = config.database;
+  const tls = tlsOf(tlsCaFile);
+  const pool = createPool({ ...connection, ...(tls === undefined ? {} : { tls }), max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {
     const { client, connection: verified } = await pool.acquire();
     client.release();
@@ -144,7 +161,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const boundary = config.identity?.assuranceDatabase;
   if (boundary !== undefined) {
     const { poolMax: boundaryMax, ...login } = boundary;
-    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, ...(tls === undefined ? {} : { tls }), max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
     try {
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();

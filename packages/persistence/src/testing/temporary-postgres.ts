@@ -9,7 +9,7 @@
  * C:\Tools\pgsql17\bin on Windows, /usr/lib/postgresql/17/bin on Linux.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +42,8 @@ export interface TemporaryPostgres {
   readonly port: number;
   readonly dataDir: string;
   readonly migrations: ApplyResult;
+  /** Present when started with `tls: true`: the CA file to hand to KAURO_DB_TLS_CA_FILE and the host name the certificate names. */
+  readonly tls?: { readonly caFile: string; readonly host: "localhost" };
   /** A connected client as the given role (LOGIN roles only). The caller ends it. */
   connect(role: LoginRole): Promise<Client>;
   /** The connection settings of a client as the given role, for a connection someone else opens (the fault harness's openConnection). */
@@ -94,6 +96,11 @@ export interface StartOptions {
   readonly testClock?: boolean;
   /** Where the server port comes from (default: a probed free 127.0.0.1 port). The harness's own test hands it a port in use. */
   readonly portSource?: () => Promise<number>;
+  /**
+   * Serve TLS (I-2): a CA and a server certificate for the host name `localhost` are generated with openssl into the cluster's
+   * directory; the result names the CA file. Plain connections stay accepted, so the harness itself connects as before.
+   */
+  readonly tls?: boolean;
 }
 
 /** How many ports a start tries when the probed one was taken before the server bound it. */
@@ -119,6 +126,23 @@ $$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(curren
 
 export const TEST_CLOCK_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: transaction_timestamp() plus the transaction-local kauro_test.clock_offset_seconds; never present in a deployment";
 
+function openssl(args: string[], cwd: string): void {
+  const r = spawnSync("openssl", args, { cwd, encoding: "utf8", windowsHide: true, timeout: 60_000 });
+  if (r.status !== 0) throw new Error(`openssl ${args.join(" ")} failed: ${r.stdout ?? ""}${r.stderr ?? ""} (the tls option of the temporary cluster needs openssl on PATH)`);
+}
+
+/** A throw-away CA and a server certificate for DNS:localhost, the server's copies installed in the data directory. */
+function generateTlsFiles(base: string, dataDir: string): NonNullable<TemporaryPostgres["tls"]> {
+  openssl(["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.crt", "-days", "2", "-subj", "/CN=kauro-test-ca"], base);
+  writeFileSync(join(base, "server.ext"), "subjectAltName=DNS:localhost" + "\n");
+  openssl(["req", "-newkey", "rsa:2048", "-nodes", "-keyout", "server.key", "-out", "server.csr", "-subj", "/CN=localhost"], base);
+  openssl(["x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial", "-out", "server.crt", "-days", "2", "-extfile", "server.ext"], base);
+  copyFileSync(join(base, "server.crt"), join(dataDir, "server.crt"));
+  copyFileSync(join(base, "server.key"), join(dataDir, "server.key"));
+  if (process.platform !== "win32") spawnSync("chmod", ["600", join(dataDir, "server.key")]);
+  return { caFile: join(base, "ca.crt"), host: "localhost" };
+}
+
 export async function startTemporaryPostgres(options: StartOptions = {}): Promise<TemporaryPostgres> {
   // A cluster default reaches every runtime pool; transaction-local clock settings still override it.
   const offsetMs = Number(process.env["KAURO_TEST_CLOCK_OFFSET_MS"] ?? 0);
@@ -130,11 +154,14 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   // The free port is probed, released and then bound by the server: another process can take it in between (ci-local 89f7b90,
   // "could not bind": Address already in use on Linux, "Only one usage of each socket address" on Windows). That bind failure,
   // and only that one, starts again on a newly probed port.
+  let tls: TemporaryPostgres["tls"];
+  if (options.tls === true) tls = generateTlsFiles(base, dataDir);
   const nextPort = options.portSource ?? freePort;
   let port = 0;
   for (let attempt = 1; ; attempt++) {
     port = await nextPort();
     const serverOptions = [`-p ${port}`, "-c listen_addresses=127.0.0.1", "-c fsync=off", "-c synchronous_commit=off", "-c full_page_writes=off", "-c max_connections=40"];
+    if (tls !== undefined) serverOptions.push("-c ssl=on");
     if (options.testClock !== false && offsetMs !== 0) serverOptions.push(`-c ${TEST_CLOCK_OFFSET_SETTING}=${offsetMs / 1000}`);
     if (process.platform !== "win32") serverOptions.push(`-k ${base}`);
     const logFile = join(base, `postgres-${attempt}.log`);
@@ -204,6 +231,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
       port,
       dataDir,
       migrations,
+      ...(tls === undefined ? {} : { tls }),
       connect: (role) => connect(role),
       clientConfig: (role) => clientConfig(role),
       stop,

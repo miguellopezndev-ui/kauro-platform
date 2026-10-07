@@ -70,6 +70,9 @@ Cloud Run's ten-second SIGTERM grace) and closes what remains.
 
 The composition root binds the PostgreSQL adapters: `loadConfig` reads and validates the environment (`KAURO_ENVIRONMENT`,
 `KAURO_DB_*` with a required `KAURO_DB_POOL_MAX` of 1..4 — the API's share of the 07 connection budget —,
+`KAURO_DB_PASSWORD_FILE` (a mounted secret; one trailing newline trimmed; the plain `KAURO_DB_PASSWORD` is accepted in LOCAL only, as N7 does for the migrator's)
+and `KAURO_DB_TLS_CA_FILE` (PEM path of the CA of the database certificate; required outside LOCAL: the pool and the migration connection use
+`rejectUnauthorized: true` and verify the host name, so outside LOCAL `KAURO_DB_HOST` is a DNS name, not an IP literal; AWS-DELTA I-2, I-3),
 `KAURO_DB_MIGRATE_ON_START` with its own `KAURO_DB_MIGRATOR_USER` and `KAURO_DB_MIGRATOR_{CONNECT,STATEMENT,LOCK}_TIMEOUT_MS`,
 `KAURO_HTTP_HOST`, `KAURO_HTTP_PORT`, `KAURO_HTTP_TRUSTED_PROXY_HOPS` (required outside LOCAL), `KAURO_HTTP_REQUEST_TIMEOUT_MS`,
 `KAURO_HTTP_CONNECTION_TIMEOUT_MS`, `KAURO_SHUTDOWN_DEADLINE_MS`, and in LOCAL only `KAURO_AUTH_BEARER_TOKENS_FILE`);
@@ -87,7 +90,7 @@ The browser session boundary (B11 W2, `docs/design/B11-agency-app.md` D-AUTH-1..
 names it (`KAURO_IDENTITY_KEY_SOURCE` = `GOOGLE_X509`, or `CONTRACT_FAKE` in LOCAL only with `KAURO_IDENTITY_FAKE_JWKS_FILE`
 and the optional `KAURO_IDENTITY_FAKE_ENDPOINT`, the path of the application origin its edge routes to the fake;
 `KAURO_IDENTITY_PROJECT_ID`; `KAURO_APP_ORIGINS`, the exact browser origins;
-`KAURO_DB_ASSURANCE_USER`/`_PASSWORD`/`_POOL_MAX`, a login of `kauro_assurance` whose pool shares the four connections of
+`KAURO_DB_ASSURANCE_USER`/`_PASSWORD_FILE`/`_POOL_MAX` (`_PASSWORD` in LOCAL only), a login of `kauro_assurance` whose pool shares the four connections of
 the budget): `POST /api/v1/sessions`, `GET /api/v1/sessions/current`, `POST /api/v1/sessions/current/revoke`,
 `POST /api/v1/assurance/step-ups` and `GET /api/v1/public/identity-config`, and the SessionAuthenticator, which authenticates
 the `__Host-kauro_session` cookie of every command and read beside the LOCAL bearer file (a cookie and a bearer token

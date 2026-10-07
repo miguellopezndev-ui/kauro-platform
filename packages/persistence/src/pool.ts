@@ -20,6 +20,7 @@
  * parameter — to the configured sink, by default one line on stderr.
  */
 import { Pool, type PoolClient } from "pg";
+import { sslOptionsOf, type DatabaseTls } from "./tls.js";
 
 export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission";
 
@@ -33,6 +34,8 @@ export interface PoolConfig {
   /** The LOGIN role; must be a member of exactly one runtime group role (RUNTIME_ROLES). */
   readonly user: string;
   readonly password?: string;
+  /** Verified TLS (I-2): the CA that signed the server certificate; rejectUnauthorized is always true. Absent only in LOCAL. */
+  readonly tls?: DatabaseTls;
   /** Connection ceiling of this instance (07 connection budget). Required: the budget is a decision, not a default. */
   readonly max: number;
   readonly applicationName: string;
@@ -137,6 +140,7 @@ export class KauroPool {
       database: config.database,
       user: config.user,
       ...(config.password === undefined ? {} : { password: config.password }),
+      ...(config.tls === undefined ? {} : { ssl: sslOptionsOf(config.tls) }),
       max: config.max,
       application_name: config.applicationName,
       idleTimeoutMillis: config.idleTimeoutMs ?? 30_000,

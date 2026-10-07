@@ -245,9 +245,9 @@ test("configuration of the operating limits: the api pool stays inside the four-
   }
   assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"), "a password file without migrations on start");
   // the job's own configuration: the password in its environment or as a file, never both, and never configuration
-  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET }), {
+  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" }), {
     environment: "LIVE",
-    migrator: { host: "10.0.0.5", port: 5432, database: "kauro", user: ROLES.owner, connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
+    migrator: { host: "10.0.0.5", port: 5432, database: "kauro", user: ROLES.owner, tlsCaFile: "ca.pem", connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
   });
   assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
   assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
@@ -275,7 +275,7 @@ test("R44/N7: bootstrap never holds the owner's credential in an environment —
 });
 
 test("N7: a serving process (node dist/src/main.js) given the owner's password in its environment exits 1 before it listens, naming the variable and never the value; the one-shot job (node dist/src/migrate.js) migrates a fresh database, exits 0, and a second run applies nothing", async () => {
-  const fresh = await startTemporaryPostgres({ migrate: false });
+  const fresh = await startTemporaryPostgres({ migrate: false, tls: true });
   try {
     const serving = await envOf(fresh, { KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET });
     const refused = await runProcess(MAIN_ENTRY, serving, "the serving process given the owner's password");
@@ -283,7 +283,7 @@ test("N7: a serving process (node dist/src/main.js) given the owner's password i
     assert.match(refused.stderr, /kauro-api failed to start: ConfigError: KAURO_DB_MIGRATOR_PASSWORD: is never accepted by the serving process/);
     assert.ok(!refused.stderr.includes(MIGRATOR_SECRET) && !refused.stdout.includes(MIGRATOR_SECRET), "never the value");
     assert.ok(!refused.stderr.includes("listening"), "it never listened");
-    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "127.0.0.1", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET };
+    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: fresh.tls?.host ?? "", KAURO_DB_TLS_CA_FILE: fresh.tls?.caFile ?? "", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET };
     const first = await runProcess(MIGRATE_ENTRY, job, "the migration job on a fresh database");
     assert.equal(first.code, 0, first.stderr);
     assert.equal(first.stdout, `kauro-migrate LIVE: migrations applied: ${listMigrations().length}, already applied: 0\n`);

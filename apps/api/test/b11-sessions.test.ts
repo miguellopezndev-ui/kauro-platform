@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import type { AgencyMembershipView, Page } from "@kauro/application";
 import { ContractFakeIdentityIssuer, testClock } from "@kauro/application/testing";
-import { ROLES } from "@kauro/persistence/testing";
+import { ROLES, startTemporaryPostgres } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, ConfigError, assembleApi, bootstrap, createIdentityTokenVerifier, loadConfig, type IdentityTokenVerifierOptions } from "../src/index.js";
 import { startFakeIdentityServer } from "./support/fake-identity-server.js";
 import { selfSignedCertificatePem } from "./support/x509.js";
@@ -522,7 +522,7 @@ test("W2 identity configuration: GET /api/v1/public/identity-config announces th
   const config = loadConfig(base);
   assert.deepEqual(config.identity, { keySource: "CONTRACT_FAKE", projectId: "kauro-local", appOrigins: ["https://localhost:44300"], fakeJwksFile: "jwks.json", fakeEndpoint: "/__kauro-identity", assuranceDatabase: { user: "kauro_session", poolMax: 1 } });
   const refusedBy = (variable: string) => (e: unknown) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
-  const live = { ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_IDENTITY_FAKE_JWKS_FILE: undefined, KAURO_IDENTITY_FAKE_ENDPOINT: undefined };
+  const live = { ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem", KAURO_IDENTITY_FAKE_JWKS_FILE: undefined, KAURO_IDENTITY_FAKE_ENDPOINT: undefined };
   assert.throws(() => loadConfig(live), refusedBy("KAURO_IDENTITY_KEY_SOURCE"), "CONTRACT_FAKE outside LOCAL");
   assert.equal(loadConfig({ ...live, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }).identity?.keySource, "GOOGLE_X509");
   assert.throws(() => loadConfig({ ...live, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "http://app.kauro.example" }), refusedBy("KAURO_APP_ORIGINS"), "plain http outside LOCAL");
@@ -729,11 +729,18 @@ test("W2 deployment path: bootstrap binds the session boundary from the environm
     // outside LOCAL the verifier's key source is Google's (live qualification is B15's): the process starts and announces it
     const cursorKey = join(dir, "cursor.key");
     writeFileSync(cursorKey, Buffer.alloc(32, 7));
-    const sandbox = await bootstrap({ ...base, KAURO_ENVIRONMENT: "SANDBOX", KAURO_HTTP_PORT: String(await freePort()), KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: cursorKey, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }, { logger: false });
+    // I-2: outside LOCAL the database is reached over verified TLS, so this start runs against a cluster that serves it
+    const tlsCluster = await startTemporaryPostgres({ tls: true });
+    let sandbox: Awaited<ReturnType<typeof bootstrap>>;
+    try {
+    sandbox = await bootstrap({ ...base, KAURO_DB_HOST: tlsCluster.tls?.host, KAURO_DB_PORT: String(tlsCluster.port), KAURO_DB_TLS_CA_FILE: tlsCluster.tls?.caFile, KAURO_ENVIRONMENT: "SANDBOX", KAURO_HTTP_PORT: String(await freePort()), KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: cursorKey, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }, { logger: false });
     try {
       assert.deepEqual(await (await fetch(`${sandbox.address}/api/v1/public/identity-config`)).json(), { adapter: "IDENTITY_PLATFORM", projectId: "kauro-boot" });
     } finally {
       await sandbox.close();
+    }
+    } finally {
+      await tlsCluster.stop();
     }
     // the boundary's login must be a member of kauro_assurance: a request handler's login cannot keep the sessions
     await assert.rejects(

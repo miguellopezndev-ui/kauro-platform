@@ -23,6 +23,8 @@ export interface DatabaseConnectionConfig {
   readonly database: string;
   readonly user: string;
   readonly password?: string;
+  /** KAURO_DB_TLS_CA_FILE (I-2): the PEM file of the CA that signed the database's certificate; required outside LOCAL. */
+  readonly tlsCaFile?: string;
 }
 
 /** The HTTP side: where to listen, whom to trust for the client address, and every deadline of a request's life. */
@@ -45,6 +47,8 @@ export interface MigratorConfig {
   readonly port: number;
   readonly database: string;
   readonly user: string;
+  /** KAURO_DB_TLS_CA_FILE (I-2): required outside LOCAL. */
+  readonly tlsCaFile?: string;
   /** R37: bounds of the migrator's connection start-up, of each statement, and of each lock wait. */
   readonly connectTimeoutMs: number;
   readonly statementTimeoutMs: number;
@@ -123,6 +127,7 @@ export const IDENTITY_VARIABLES = Object.freeze([
   "KAURO_IDENTITY_FAKE_ENDPOINT",
   "KAURO_DB_ASSURANCE_USER",
   "KAURO_DB_ASSURANCE_PASSWORD",
+  "KAURO_DB_ASSURANCE_PASSWORD_FILE",
   "KAURO_DB_ASSURANCE_POOL_MAX",
 ]);
 
@@ -145,6 +150,24 @@ export const SHUTDOWN_DEADLINE_CEILING_MS = 9_000;
  * credential for its whole life.
  */
 export const MIGRATOR_PASSWORD_VARIABLE = "KAURO_DB_MIGRATOR_PASSWORD";
+/** I-2: the CA of the database's certificate, a file path; every non-LOCAL connection verifies the server against it. */
+export const DB_TLS_CA_FILE_VARIABLE = "KAURO_DB_TLS_CA_FILE";
+
+/**
+ * I-3: a runtime database password reaches the process as a mounted-secret file only. The plain variable is accepted in LOCAL alone
+ * (the same rule as N7 for the migrator's); both forms together are refused. Neither the value nor the path is ever logged.
+ */
+function passwordOf(env: Env, environment: Environment, plain: string, file: string): string | undefined {
+  const plainValue = optional(env, plain);
+  const path = optional(env, file);
+  if (plainValue !== undefined && path !== undefined) throw new ConfigError(file, `is exclusive with ${plain}`);
+  if (plainValue !== undefined) {
+    if (environment !== "LOCAL") throw new ConfigError(plain, `is accepted in the LOCAL environment only: SANDBOX and LIVE receive the password as a mounted secret file (${file})`);
+    return plainValue;
+  }
+  return path === undefined ? undefined : readSecretFile(file, path);
+}
+
 /** The migrator's password as a file (a mounted secret): the one-shot job, or LOCAL migrations on start (N7). */
 export const MIGRATOR_PASSWORD_FILE_VARIABLE = "KAURO_DB_MIGRATOR_PASSWORD_FILE";
 
@@ -218,6 +241,7 @@ function roleName(env: Env, name: string): string {
 }
 
 function migratorOf(env: Env, host: string, port: number, database: string, runtimeUser: string | undefined): MigratorConfig {
+  const tlsCaFile = optional(env, DB_TLS_CA_FILE_VARIABLE);
   const migratorUser = roleName(env, "KAURO_DB_MIGRATOR_USER");
   if (migratorUser === runtimeUser) throw new ConfigError("KAURO_DB_MIGRATOR_USER", "must differ from KAURO_DB_USER (migration roles are separate from runtime)");
   return {
@@ -225,6 +249,7 @@ function migratorOf(env: Env, host: string, port: number, database: string, runt
     port,
     database,
     user: migratorUser,
+    ...(tlsCaFile === undefined ? {} : { tlsCaFile }),
     connectTimeoutMs: integer(env, "KAURO_DB_MIGRATOR_CONNECT_TIMEOUT_MS", DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, 100, 60_000),
     statementTimeoutMs: integer(env, "KAURO_DB_MIGRATOR_STATEMENT_TIMEOUT_MS", DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS, 1_000, 3_600_000),
     lockTimeoutMs: integer(env, "KAURO_DB_MIGRATOR_LOCK_TIMEOUT_MS", DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, 100, 600_000),
@@ -260,7 +285,8 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   const port = integer(env, "KAURO_DB_PORT", 5432, 1, 65535);
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
   const runtimeUser = roleName(env, "KAURO_DB_USER");
-  const runtimePassword = optional(env, "KAURO_DB_PASSWORD");
+  const runtimePassword = passwordOf(env, environment, "KAURO_DB_PASSWORD", "KAURO_DB_PASSWORD_FILE");
+  const tlsCaFile = optional(env, DB_TLS_CA_FILE_VARIABLE);
   const migrate = flag(env, "KAURO_DB_MIGRATE_ON_START", false);
   let migrateOnStart: MigratorConfig | null = null;
   if (migrate) {
@@ -290,6 +316,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
       database,
       user: runtimeUser,
       ...(runtimePassword === undefined ? {} : { password: runtimePassword }),
+      ...(tlsCaFile === undefined ? {} : { tlsCaFile }),
       poolMax: integer(env, "KAURO_DB_POOL_MAX", undefined, 1, API_POOL_CEILING),
       statementTimeoutMs: statementTimeoutOf(env, environment),
     },
@@ -307,6 +334,8 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   }
   // every instance behind the load balancer must open the cursors another one sealed (10 "Pagination, search and exports")
   if (config.cursorKeyFile === null && environment !== "LOCAL") throw new ConfigError(CURSOR_KEY_FILE_VARIABLE, "is required outside LOCAL: every instance seals and opens the same list cursors");
+  // I-2: outside LOCAL the database is reached over verified TLS or not at all
+  if (tlsCaFile === undefined && environment !== "LOCAL") throw new ConfigError(DB_TLS_CA_FILE_VARIABLE, "is required outside LOCAL: the database connection verifies the server certificate against this CA");
   return identity === null ? config : { ...config, identity };
 }
 
@@ -346,7 +375,7 @@ function identityOf(env: Env, environment: Environment, runtimeUser: string, run
   if (runtimePoolMax + poolMax > API_POOL_CEILING) {
     throw new ConfigError("KAURO_DB_ASSURANCE_POOL_MAX", `with KAURO_DB_POOL_MAX it exceeds the api's ${API_POOL_CEILING} connections per instance (07 connection budget)`);
   }
-  const password = optional(env, "KAURO_DB_ASSURANCE_PASSWORD");
+  const password = passwordOf(env, environment, "KAURO_DB_ASSURANCE_PASSWORD", "KAURO_DB_ASSURANCE_PASSWORD_FILE");
   return { keySource, projectId, appOrigins: origins, fakeJwksFile, fakeEndpoint, assuranceDatabase: { user, ...(password === undefined ? {} : { password }), poolMax } };
 }
 
@@ -413,5 +442,7 @@ export function loadMigrationJobConfig(env: Env = process.env): MigrationJobConf
   const host = optional(env, "KAURO_DB_HOST") ?? "127.0.0.1";
   const port = integer(env, "KAURO_DB_PORT", 5432, 1, 65535);
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
-  return { environment, migrator: migratorOf(env, host, port, database, optional(env, "KAURO_DB_USER")) };
+  const migrator = migratorOf(env, host, port, database, optional(env, "KAURO_DB_USER"));
+  if (migrator.tlsCaFile === undefined && environment !== "LOCAL") throw new ConfigError(DB_TLS_CA_FILE_VARIABLE, "is required outside LOCAL: the migration connection verifies the server certificate against this CA");
+  return { environment, migrator };
 }

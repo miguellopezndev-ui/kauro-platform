@@ -20,6 +20,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 import type { KauroPool } from "../pool.js";
+import { sslOptionsOf, type DatabaseTls } from "../tls.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -275,6 +276,8 @@ export interface MigratorConnection {
   /** The owner role of the kauro objects (LOGIN, not SUPERUSER, not BYPASSRLS); never a runtime login role. */
   readonly user: string;
   readonly password?: string;
+  /** Verified TLS (I-2): the CA that signed the server certificate; rejectUnauthorized is always true. Absent only in LOCAL. */
+  readonly tls?: DatabaseTls;
   readonly applicationName?: string;
 }
 
@@ -302,6 +305,7 @@ export async function applyMigrationsAs(connection: MigratorConnection, options:
     database: connection.database,
     user: connection.user,
     ...(connection.password === undefined ? {} : { password: connection.password }),
+    ...(connection.tls === undefined ? {} : { ssl: sslOptionsOf(connection.tls) }),
     application_name: connection.applicationName ?? "kauro-migrator",
     connectionTimeoutMillis: millis(options.connectTimeoutMs, DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS),
     // session defaults for the statements outside the runner's own transactions (the role check below)
