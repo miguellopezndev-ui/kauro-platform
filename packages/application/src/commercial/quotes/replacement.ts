@@ -37,7 +37,7 @@ import type {
   IdempotencyIdentity,
   TenantContext,
 } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, baseServiceCents, quoteTermsHash, registryPricePolicy, termsMoney } from "@kauro/domain";
+import { DomainFailure, LiveQuoteChangedFailure, NotFoundFailure, baseServiceCents, quoteTermsHash, registryPricePolicy, termsMoney } from "@kauro/domain";
 import type { CommandEnvelope } from "../../api/envelope.js";
 import { quoteViewOf } from "../../commerce/request/checkout.js";
 import { providerServicesUnavailable, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
@@ -114,7 +114,10 @@ export async function issueReplacement(
   if ((await c.rebindings.listForCapture(authorization.captureId)).length >= allowance) {
     throw refuse("REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement is spent", { currentVersion: live.version, currentState: live.state });
   }
-  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) throw refuse("OPERATION_PENDING", "a replacement of the paid quote is still pending");
+  // retryable: the pending replacement settles or is withdrawn, and the retry then reads the allowance spent or free
+  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) {
+    throw new DomainFailure("PRECONDITION_FAILED", "a replacement of the paid quote is still pending", { reason: "OPERATION_PENDING" }, true);
+  }
 
   const paidSnapshot = await c.quotes.snapshot(live.quoteId);
   if (paidSnapshot === null) throw new DomainFailure("INTEGRITY_FAILURE", "the paid quote has no eligibility snapshot");
@@ -232,6 +235,13 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
     // while this one waited on its locks) failed on a state that is no failure: observe it by the replacement's identity, never repeat it.
     if (e instanceof DomainFailure && (e.details.reason === "REPLACEMENT_NOT_ALLOWED" || e.code === "STALE_VERSION")) {
       if (await reboundByIdentity(factory, service, ctx)) return { kind: "REBOUND" };
+      // a re-binder's stale write that is no re-binding of this replacement: the purchase changed under the request (an execution admission, a
+      // refund). CMD027's STALE_VERSION names the project's live quote as current, never the row the re-binder lost on (D10-GAP-25, ADV-11)
+      if (e.code === "STALE_VERSION") {
+        const changed = new LiveQuoteChangedFailure("the paid purchase changed while it was re-bound");
+        changed.cause = e;
+        throw changed;
+      }
     }
     throw e;
   }

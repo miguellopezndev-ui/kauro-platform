@@ -760,12 +760,14 @@ test("RACE: an identical retry replays the 201 with the same quote, the same key
   const [replyOne, replyTwo] = await Promise.all([one, two]);
   const viewOne = issuedView(replyOne);
   const viewTwo = issuedView(replyTwo);
-  const chain = await rows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>("SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
-  assert.deepEqual(chain.map((q) => [q.state, q.superseded_by_quote_id]), [
-    ["SUPERSEDED", viewOne.quote.quoteId],
-    ["SUPERSEDED", viewTwo.quote.quoteId],
-    ["ISSUED", null],
-  ], "each quote superseded exactly once; one live quote");
+  // compared by its supersession links in quote-id order, never by created_at (a host clock can step back, ADV-17)
+  const chain = await rows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>("SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY quote_id", [plan.projectId]);
+  const links = [
+    [issued.data.quote.quoteId, "SUPERSEDED", viewOne.quote.quoteId],
+    [viewOne.quote.quoteId, "SUPERSEDED", viewTwo.quote.quoteId],
+    [viewTwo.quote.quoteId, "ISSUED", null],
+  ].sort((x, y) => (String(x[0]) < String(y[0]) ? -1 : 1));
+  assert.deepEqual(chain.map((q) => [q.quote_id, q.state, q.superseded_by_quote_id]), links, "each quote superseded exactly once; one live quote");
   assert.equal(viewOne.supersededQuoteId, issued.data.quote.quoteId);
   assert.equal(viewTwo.supersededQuoteId, viewOne.quote.quoteId);
   assert.equal(await w.count("quotes", "project_id = $1 AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')", [plan.projectId]), 1);

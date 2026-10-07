@@ -34,12 +34,14 @@ import type {
   ProjectId,
   ProjectRecord,
   QuoteIssuance,
+  QuoteRecord,
   ResolvedMembership,
   TaxRuleSnapshot,
 } from "@kauro/domain";
 import {
   DomainFailure,
   IdempotencyConflictFailure,
+  LiveQuoteChangedFailure,
   NotFoundFailure,
   OFFERED_CAPABILITY_STATES,
   baseServiceCents,
@@ -68,7 +70,7 @@ import type { CreateQuoteView, QuoteEligibilityView } from "../views.js";
 import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
 import { requireMembershipOf } from "../agency/shared.js";
 import { completeReplacement, issueReplacement, replacementContextOf, settleReplacement, type ReplacementContext } from "./replacement.js";
-import type { QuoteCollaborators } from "./runtime.js";
+import type { QuoteCollaborators, QuoteReads } from "./runtime.js";
 
 /** The seconds a caller waits before it retries a replacement whose re-binding did not answer (the 202's polling guidance). */
 const REPLACEMENT_POLL_AFTER_SECONDS = 5;
@@ -93,6 +95,51 @@ export interface QuotedSubject {
 
 const refuse = (reason: NonNullable<DomainFailure["details"]["reason"]>, message: string, details: Partial<DomainFailure["details"]> = {}): DomainFailure =>
   new DomainFailure("PRECONDITION_FAILED", message, { reason, ...details });
+
+/** A quote `quotes_one_live_per_project` counts as the project's live one (the predicate of liveQuoteOf). */
+const isLiveQuote = (q: QuoteRecord): boolean => q.state === "ACCEPTED_FOR_CHECKOUT" || (q.replacesQuoteId === undefined && (q.state === "DRAFT" || q.state === "ISSUED"));
+
+/** The rounds lockLiveQuote re-reads the live quote: each needs another transaction to change the project's live quote meanwhile and commit. */
+const LIVE_QUOTE_LOCK_ROUNDS = 3;
+
+/**
+ * The retryable STALE_VERSION of CMD027 (outcomes.ts: "the project's live quote changed under this request", current ALWAYS; design §12,
+ * D10-GAP-25): current is the project's quote as it stands (the live one, else the latest), read in `reads`' own transaction.
+ */
+async function staleLiveQuote(reads: QuoteReads, agencyId: AgencyRecord["agencyId"], projectId: ProjectId): Promise<DomainFailure> {
+  const current = await reads.currentQuoteOf(agencyId, projectId);
+  const details = current === null ? {} : { currentVersion: current.version, currentState: current.state };
+  return new DomainFailure("STALE_VERSION", "the project's live quote changed under this request", details, true);
+}
+
+/**
+ * The project's live quote, FOR UPDATE and still live once the lock is held (D10-GAP-25). liveQuoteOf is a plain read: the quote it names
+ * may be superseded before the lock is taken (a re-binding committing between the read and the FOR UPDATE, or updating the row before a
+ * waiter woken by an earlier COMMIT takes it; main run 37557133856), and the superseded paid quote would send a replacement down the
+ * ordinary issuance path, refused by quotes_one_live_per_project. The live quote is read again under the lock just taken. A project with no
+ * live quote has no row to lock: its first issuance is serialized on the project's issuance subject (an exclusive transaction-level
+ * advisory lock only CreateQuote takes, so it orders nothing else), then read again, so two first issuances supersede one another and
+ * never collide on the index. A project whose live quote keeps changing is refused the retryable STALE_VERSION with nothing written.
+ */
+async function lockLiveQuote(uow: CommerceUnitOfWork, co: QuoteCollaborators, agencyId: AgencyRecord["agencyId"], projectId: ProjectId): Promise<QuoteRecord | null> {
+  const reads = co.reads(uow);
+  let serialized = false;
+  for (let round = 0; round < LIVE_QUOTE_LOCK_ROUNDS; ) {
+    const liveId = await reads.liveQuoteOf(agencyId, projectId);
+    if (liveId === null) {
+      if (serialized) return null;
+      // lock order (D10-GAP-25): the first-issuance lock is waited for only before any quote row lock (round 0); after a quote row lock of an
+      // earlier round it is only tried, and a project whose first issuance another request holds is the retryable STALE_VERSION, nothing written
+      if (!(await reads.serializeFirstIssuance(agencyId, projectId, round === 0))) throw await staleLiveQuote(reads, agencyId, projectId);
+      serialized = true;
+      continue;
+    }
+    const locked = await uow.commerce.quotes.lock(liveId);
+    if (locked !== null && isLiveQuote(locked)) return locked;
+    round += 1;
+  }
+  throw await staleLiveQuote(reads, agencyId, projectId);
+}
 
 function eligibilityOf(issued: QuoteIssuance): QuoteEligibilityView {
   const s = issued.eligibility.snapshot;
@@ -190,7 +237,9 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           if (reservation.kind === "PENDING") {
             // a replacement whose intent committed and whose answer did not: it resumes from the issuance its journal entry recorded
             const issuance = await co.recurrence(uow).issuanceOfEntry(reservation.entry.entryId);
-            if (issuance === null || issuance.replacesQuoteId === undefined) throw refuse("OPERATION_PENDING", "the same logical operation is still pending");
+            // the ordinary issuance commits its answer with its quote and a replacement's intent commits its issuance with the entry: an open entry
+            // without a replacement issuance is a breach that never clears, never a retryable pending operation (D10-GAP-25)
+            if (issuance === null || issuance.replacesQuoteId === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a journal entry is open without the replacement issuance it commits with");
             return { kind: "REPLACEMENT", replacement: await replacementContextOf(uow, co, issuance), resumed: true };
           }
           const entryId = reservation.entryId;
@@ -198,10 +247,8 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           if (membership === null) throw new DomainFailure("INTEGRITY_FAILURE", "a quote was authorized without a membership");
           const subject = await subjectOf(uow);
           const c = uow.commerce;
-          const reads = co.reads(uow);
-          // the project's live quote FOR UPDATE (§10: after the shared halves, before the recurrence lock)
-          const liveId = await reads.liveQuoteOf(agencyId, projectId);
-          const live = liveId === null ? null : await c.quotes.lock(liveId);
+          // the project's live quote FOR UPDATE (§10: after the shared halves, before the recurrence lock), live once its lock is held
+          const live = await lockLiveQuote(uow, co, agencyId, projectId);
           const authorization = live === null ? null : await c.authorizations.findByQuote(live.quoteId);
           if (live !== null && authorization !== null && authorization.state !== "REVOKED") {
             const replacement = await issueReplacement(uow, co, { entryId, envelope, membership, subject, live, authorization });
@@ -260,6 +307,12 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
         return { kind: "COMPLETED", status: 201, view: view.view, version: versionOfView(view.view), replayed: view.replayed };
       } catch (e) {
         if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
+        // a second live quote refused by quotes_one_live_per_project (sqlstate.ts: STALE_VERSION without the row) answers with the project's quote
+        if (e instanceof LiveQuoteChangedFailure) {
+          const stale = await runtime.unitOfWork.run(context, (uow) => staleLiveQuote(co.reads(uow), agencyId, projectId));
+          stale.cause = e;
+          return resultOf<CreateQuoteView>(stale, envelope.correlationId);
+        }
         if (accessDenied || DENIAL_CODES.has(e.code)) await recordCommerceDenial(runtime, context, spec.id, e, agencyId);
         return resultOf<CreateQuoteView>(e, envelope.correlationId);
       }

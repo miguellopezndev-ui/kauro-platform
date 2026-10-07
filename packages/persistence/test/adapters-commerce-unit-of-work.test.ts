@@ -295,3 +295,8 @@ test("the queries behind B06's inspectors: a plan's live quotes, open orders and
   assert.deepEqual(await h.commerce.run(h.tenant(A.agencyId, A.ownerUserId), (uow) => commercialInspectionsOf(uow).liveAuthorizationsOfClient(clientC)), 0);
   assert.throws(() => commercialInspectionsOf({} as UnitOfWork), integrity);
 });
+
+test("SQLSTATE translation: a second live quote of a project (23505 quotes_one_live_per_project) is the retryable STALE_VERSION the design names (§12), never INTEGRITY_FAILURE", () => {
+  const f = failureOfSqlState(SQLSTATE.UNIQUE_VIOLATION, "quotes_one_live_per_project");
+  assert.deepEqual([f?.code, f?.retryable], ["STALE_VERSION", true]);
+});
