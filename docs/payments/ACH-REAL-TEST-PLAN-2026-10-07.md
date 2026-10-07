@@ -43,3 +43,12 @@ ACH.
 ## Costo esperado
 ACH entrante: sin comisión de Wise (ayuda oficial). Salida de la devolución: la que muestre la cuenta Wise al ejecutarla (se
 registra). Ningún gasto sin línea en `.kauro/grants.md` si supera lo que el dueño autorice.
+
+## Ajuste del dueño (2026-10-07) — vigente
+- Un solo pago de prueba sirve para el cobro y la devolución.
+- El cobro se HABILITA cuando: (a) el ACH de ese pago está recibido y conciliado en Kauro, y (b) la devolución de ese mismo
+  pago está ENVIADA desde Wise y registrada en Kauro con el comprobante de envío de Wise. No se espera a que llegue a la cuenta
+  del pagador; un rebote posterior sigue el flujo normal de rebote (nunca un reenvío mientras esté incierto).
+- Pagador: el dueño lo confirma cuando la SAS esté registrada (D-25). Sin pago desde cuenta propia del dueño (R2 15).
+- D-26: sin cobro habilitado no hay producción; si Wise no está vivo el 12-oct 20:00, se mueve la fecha.
+- Paso 5 y el criterio de éxito de arriba se leen con este ajuste (la devolución cuenta con el comprobante de envío).
