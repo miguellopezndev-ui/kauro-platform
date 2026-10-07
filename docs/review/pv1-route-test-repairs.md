@@ -69,3 +69,9 @@ Product code unchanged (a50db87). Red and guard evidence: `docs/review/pv1-route
   - New cell: `ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session)`. It swaps `bw` to a sessions-enabled bank world for the test, then restores `bw` and stops that world.
 - **Coordinator ruling RR-5 (dissents accepted).** ADV-7 uses a real-time cell, with no harness change. ADV-1 has no CMD026 or provider-CMD028 cells. ADV-8(4), I2-delta, is GAP as unreachable. All three are recorded in `pv1-route-r1-red.md`.
 - **Coordinator ruling RR-6 (ADV-5 note).** The tenant read policy (0046:271) also checks the allowlist version. The narrowing test goes red only when both checks are reverted. Recorded in `pv1-route-r1-red.md` and `pv1-route-touched-B06.md`.
+
+### r1-fix: coordinator repair C-1 (ADV-PV1R-2 DENY ACH-M-I2-EXPIRY, details validity)
+Defect: part (2) set `v2 = Date.now() + 5 d` after part (1) had advanced the controlled clock to about +5 d, so its first step
+(`v2 - window - 2 ms` = +3 d) moved the clock backwards and the harness threw RangeError before the product was called.
+Change: `v2 = Date.now() + 9 d` (window 2 d, so the issuance instant +7 d is after part (1)). Assertions unchanged
+(transferExpiresAt = validUntil, sendBy = validUntil - window). Harness-use repair, not a weakening; found by the r1 fix builder.

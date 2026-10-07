@@ -1515,7 +1515,8 @@ advCell(`ADV-PV1R-2 DENY ACH-M-I2-EXPIRY (details validity): the route version's
   assert.equal(code(crossed), "409 PRECONDITION_FAILED DETAILS_EXPIRED", "details expired at the effect instant: nothing issued");
   assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
   // (2) issued exactly one window before validUntil: transferExpiresAt = validUntil, sendBy = validUntil - window
-  const v2 = Date.now() + 5 * DAY_MS;
+  // part (1) left the controlled clock near validUntil (+5 d); part (2) starts after it so the clock only moves forward
+  const v2 = Date.now() + 9 * DAY_MS;
   const b2 = await buyer("adv2-valid-cap");
   const r2 = await enabled("adv2-valid-cap", [b2.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * DAY_MS, validUntil: iso(v2) });
   const capped = completed<IssuedView>(await issueAt(ctx, b2, r2, { at: v2 - windowMs, what: "latest issuance instant before the details validity" }, v2 - windowMs - 2, (at) => at), 201).data.transfer;
