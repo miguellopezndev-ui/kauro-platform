@@ -4424,46 +4424,6 @@
    "kind": "PLANNED_OUTSIDE_B20_B21",
    "subject": "R2-063",
    "detail": "docs/acceptance/case-maps/B11.json: PLANNED (**MISSING** — PLANNED (W9))"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "S085",
-   "detail": "B20: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-106",
-   "detail": "B20: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-107",
-   "detail": "B20: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-108",
-   "detail": "B20: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-112",
-   "detail": "B21: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-120",
-   "detail": "B21: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-121",
-   "detail": "B21: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "OWNER_DATE_MISSING",
-   "subject": "R2-122",
-   "detail": "B21: PLANNED_POST_B19 without the owner's date"
   }
  ]
 }

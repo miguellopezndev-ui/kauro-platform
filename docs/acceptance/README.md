@@ -23,7 +23,7 @@ operator host).
 | B07 Upload, inspection and source lifecycle | 23: 11 EXECUTED_LOCAL, 12 PARTIAL | REVIEW_ACCEPTED | `d9bbfd0` · B07-round7-d9bbfd0 | 7: REJECT 0f15636 → REJECT 6b670e3 → REJECT 77d5fa6 → REJECT 09faf25 → ACCEPT d23af32 → ACCEPT 4b33e26 → ACCEPT d9bbfd0 | B06 → B05 → B02, B04 → B01, B03 → B00 |
 | B08 Audit, approval and processing authority | 15: 7 EXECUTED_LOCAL, 8 PARTIAL | REVIEW_ACCEPTED | `88cf29d` · B08-round3-88cf29d | 3: REJECT f49ca76 → ACCEPT d9bbfd0 → ACCEPT 88cf29d | B07 → B06 → B05 → B02, B04 → B01, B03 → B00 |
 | B09 Payments and fiscal workflow | 30: 7 EXECUTED_LOCAL, 23 PARTIAL | REVIEW_ACCEPTED | `d9bbfd0` · B09-round5-d9bbfd0 | 5: REJECT 0f15636 → ACCEPT 6b670e3 → ACCEPT d23af32 → ACCEPT 4b33e26 → ACCEPT d9bbfd0 | B06 → B05 → B02, B04 → B01, B03 → B00 |
-| B10 Agency recurrence and commission domain | 64: 54 EXECUTED_LOCAL, 10 PARTIAL | IN_PROGRESS | — | — | — |
+| B10 Agency recurrence and commission domain | 64: 53 EXECUTED_LOCAL, 11 PARTIAL | IN_PROGRESS | — | — | — |
 | B11 Public and agency application | 13: 2 EXECUTED_LOCAL, 8 PARTIAL, 3 PLANNED | IN_PROGRESS | — | — | — |
 | B12 Seller and owner application | 20: 20 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B13 Reports and package experience | 9: 9 NOT_EXECUTED | NOT_STARTED | — | — | — |
