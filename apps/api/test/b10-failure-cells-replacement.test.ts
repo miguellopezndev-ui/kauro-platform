@@ -17,6 +17,8 @@ import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replace
 import { bindCells, contend, open } from "./b10-cells-support.js";
 import { blockedBy } from "./b10-cells-6a-support.js";
 import type { SqlStep } from "./fault-support.js";
+import { paymentRoutes } from "./commerce-support.js";
+import { execute } from "./payment-support.js";
 import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
@@ -859,5 +861,55 @@ faultCell(
       assert.equal(late.length, 1, "one late failure, the abandoned unit's");
       assert.equal(simulatedCrashOf(late[0]!.error)?.point, "pay.rebindings.record.after", "the reported failure is the one that ended the abandoned unit");
     }
+  },
+);
+
+// --- REPL_REFUND_SUPERSEDE, REPL_CRB corrupt entry (D10-GAP-25, adversary ADV-6, ADV-8) -------------------------------------------
+
+/** Every money and entitlement row of this file's database: what an ordinary issuance over a refunded replacement must leave as it is. */
+const moneyRows = async (): Promise<Record<string, unknown>> =>
+  (
+    await oracleRows(
+      iw,
+      `SELECT (SELECT count(*) FROM kauro.payment_orders)::int AS orders, (SELECT count(*) FROM kauro.capture_facts)::int AS captures,
+              (SELECT string_agg(state, ',' ORDER BY created_at) FROM kauro.refunds) AS refunds, (SELECT count(*) FROM kauro.ledger_entries)::int AS ledger,
+              (SELECT string_agg(state || ':' || coalesce(revocation_code, '-'), ',' ORDER BY created_at) FROM kauro.commercial_authorizations) AS authorizations,
+              (SELECT count(*) FROM kauro.purchase_rebindings)::int AS rebindings`,
+    )
+  )[0]!;
+
+faultCell(
+  {
+    id: "REPL_CRB",
+    step: "CMD027 included-replacement protocol / CRASH-BEFORE: S2 settle, the open journal entry found without its issuance",
+    fault: "crash-before-commit",
+    at: "uow",
+    expect:
+      "RACE (crash before COMMIT): a replacement left open by a crash before its SERVICE COMMIT whose journal entry then has no issuance (an invariant breach, injected) is answered 422 INTEGRITY_FAILURE, not retryable, never a retryable OPERATION_PENDING a client would retry forever; nothing is written",
+  },
+  async (ctx) => {
+    const x = await fixture("repl-corrupt-entry");
+    const key = freshKey("repl-corrupt-entry");
+    ctx.points.crash("uow.before-commit");
+    const crashed = await ctx.operation("the replacement whose re-binding dies before its SERVICE COMMIT", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key)));
+    assert.equal(outcome(iw.w, crashed), "500 INTERNAL_ERROR -");
+    assert.equal((await stateOf(x, key)).journal, "RESERVED", "the intent's journal entry stays open");
+    const replacementId = await replacementOf(x);
+    // the injected breach: the entry's issuance gone (the database owner, triggers off; never a product step)
+    const owner = await iw.h.pg.connect("postgres");
+    try {
+      await owner.query("BEGIN");
+      await owner.query("SET LOCAL session_replication_role = replica");
+      await owner.query("DELETE FROM kauro.quote_issuances WHERE quote_id = $1", [replacementId]);
+      await owner.query("COMMIT");
+    } finally {
+      await owner.end();
+    }
+    const before = await moneyRows();
+    const reply = await quoteCall(x.a, x.plan, key);
+    assert.equal(outcome(iw.w, reply), "422 INTEGRITY_FAILURE -", `an open entry without its issuance is an integrity failure: ${reply.text}`);
+    assert.equal(asProblem(iw.w, reply).retryable, false, "not retryable: the state never clears by itself");
+    assert.equal((await stateOf(x, key)).journal, "RESERVED");
+    assert.deepEqual(await moneyRows(), before);
   },
 );
