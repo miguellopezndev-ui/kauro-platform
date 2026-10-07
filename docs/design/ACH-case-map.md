@@ -1,6 +1,6 @@
 # ACH / bank-transfer route — case map (Payments V1)
 
-Design-time map for [ACH-ROUTE r11](ACH-ROUTE.md) under the owner decision Payments V1
+Design-time map for [ACH-ROUTE r12](ACH-ROUTE.md) under the owner decision Payments V1
 (`docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`, "PV1"). Every proposed bank-route case and every registry case whose
 remainder PV1 re-targets is listed with its **target evidence class**, its current status and the tests that will carry it, as
 `file :: "exact title"`. No test exists yet: every row is **PLANNED** until its lane lands; the lane then rewrites the status

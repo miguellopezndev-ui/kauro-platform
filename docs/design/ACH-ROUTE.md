@@ -1,5 +1,9 @@
 # ACH bank-transfer route — owner amendment A8
 
+Design revision **r12** (2026-10-07): r11 plus the Codex r11 verify item ACH-R10-02 (partial): ASCII-only digit controls and
+positive normalization-equivalence cells through approval, full-detail evidence and recipient binding (§7.22c, §7.22d, §14).
+Design closed (one review + one verify); the cells are verified at each lane's code review. The r11 paragraph below is history.
+
 Design revision **r11** (2026-10-07): r10 plus the fixes of Codex design r10 (ACH-R10-01, ACH-R7-03, ACH-R10-02; family
 `evidence`): one normative text for destination normalization and offers (superseded r9/r10 sentences deleted, quoted in §13),
 offers committed before classification, §7.22c rewritten, coverage table §7.22d, §13 (r10 → r11). The r10 paragraph below is history.
@@ -1116,6 +1120,12 @@ Fingerprint and normalization (rule 12: one control per atomic predicate):
 - "DENY RFG-P-DF-HYPHEN (holder A-B captured at F2 versus AB in DP-FULL evidence and in a recipient artifact): one outcome — distinct fingerprints, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS"
 - "DENY RFG-P-DF-FULLWIDTH (holder in full-width letters versus ASCII letters): one outcome — distinct fingerprints under NFC, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS"
 - "OK RFG-P-DF-NORMALIZATION (spaces and hyphens in routing and account, NFC-equivalent and case variants of the holder give one fingerprint; leading zeros stay significant)"
+- "DENY RFG-P-DF-ROUTING-UNICODE-DIGITS (routing written with Arabic-Indic digits and with full-width digits): Capture approved destination — DESTINATION_INVALID"
+- "DENY RFG-P-DF-ACCOUNT-UNICODE-DIGITS (account written with Arabic-Indic digits and with full-width digits): Capture approved destination — DESTINATION_INVALID"
+- "DENY RFG-P-DF-UNICODE-DIGITS-EVIDENCE (DP-FULL evidence or a recipient artifact whose routing or account uses Arabic-Indic or full-width digits): Record a declared execution — DESTINATION_UNPROVEN, and X1 and X4 refuse the binding"
+- "OK RFG-P-DF-EQUIV-CASE (holder ALICE SMITH at approval, alice smith in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient"
+- "OK RFG-P-DF-EQUIV-NFC (holder with precomposed U+00E9 at approval, e followed by U+0301 in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient"
+- "OK RFG-P-DF-EQUIV-WHITESPACE (holder with leading, trailing and inner White_Space runs including a tab and U+00A0 at approval, single spaces in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient"
 - "OK RFG-P-DF-BOUNDS (routing of 9 digits with a valid ABA check digit, account of 1 and of 17 digits, holder of 1 and of 140 code points after normalization): Capture approved destination"
 - "DENY RFG-P-DF-ROUTING-LENGTH (routing of 8 and of 10 digits): Capture approved destination"
 - "DENY RFG-P-DF-ROUTING-ABA (9 digits with a wrong ABA check digit): Capture approved destination"
@@ -1161,6 +1171,8 @@ RETURN and RESEND attempts. Titles abbreviated by code; each code is exactly one
 |---|---|---|---|
 | Destination capture, normalization, bounds (routing 9 + ABA, account 1–17, holder 1–140; 0/141 refused) | F2 (Capture approved destination) | both scopes | RFG-P-DF-BOUNDS, RFG-P-DF-ROUTING-LENGTH, RFG-P-DF-ROUTING-ABA, RFG-P-DF-ACCOUNT-EMPTY, RFG-P-DF-ACCOUNT-18, RFG-P-DF-ACCOUNT-NONDIGIT, RFG-P-DF-HOLDER-EMPTY, RFG-P-DF-HOLDER-141, RFG-P-DF-NORMALIZATION; norm-v1 vectors |
 | Same normalization in evidence (DP-FULL, recipient artifact) | G2, G4, X3-EXECUTED; X1, X4 (artifact) | both scopes, both kinds | RFG-P-DF-INVALID-EVIDENCE, RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
+| ASCII-only digits in routing and account (Unicode digits refused) | F2; G2, G4, X3-EXECUTED; X1, X4 (artifact) | both scopes, both kinds | RFG-P-DF-ROUTING-UNICODE-DIGITS, RFG-P-DF-ACCOUNT-UNICODE-DIGITS, RFG-P-DF-UNICODE-DIGITS-EVIDENCE |
+| Normalization equivalence through proof and binding (case folding, NFC, White_Space collapse) | F2, G2, G4, X3-EXECUTED, X1, X4 | both scopes, both kinds | RFG-P-DF-EQUIV-CASE, RFG-P-DF-EQUIV-NFC, RFG-P-DF-EQUIV-WHITESPACE |
 | Canonical encoding injective; key/normalizer version | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-DF-CONCAT-COLLISION, RFG-P-DF-KEY-VERSION; norm-v1 vectors |
 | DESTINATION_NOT_CAPTURED | X1, X4 | both scopes | RFG-P-DEST-NOT-CAPTURED |
 | RECIPIENT_ALIAS | X1 | both scopes | RFG-P-DEST-RECIPIENT-ALIAS, RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
@@ -1413,6 +1425,14 @@ Delta only; everything else in r9 is unchanged.
 - §7.22 r8 title RFG-P-NX-EXCLUDED: "- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution" **[SUPERSEDED r9: not written; see §7.22b RFG-P-NX-EXPLAINED]**"
 - §7.22b note on RFG-P-NX-EXCLUDED: "`RFG-P-NX-EXCLUDED` (r8) is **[SUPERSEDED r9]** by `RFG-P-NX-EXPLAINED` and the denial controls above; the r8 title is not written."
 - §7.22c r10 (whole subsection: single-transaction offer cells, compound RFG-P-DF-INVALID): "see r10 commit 6c0e5d7"
+
+## 14. r11 → r12 change list (Codex verify on r11, `tools/review/out/ach-design-r11-a3b16a8996bd`)
+
+| # | Finding | Change | Cells |
+|---|---|---|---|
+| 1 | ACH-R10-02 (partial) | Discriminating ASCII-only controls (Arabic-Indic and full-width digits refused in routing and account at approval and in evidence/recipient artifacts) and positive equivalence cells (case folding, NFC composition, White_Space collapse) through approval, DP-FULL recording and X1/X4 recipient binding; two coverage rows added to §7.22d | RFG-P-DF-ROUTING-UNICODE-DIGITS, RFG-P-DF-ACCOUNT-UNICODE-DIGITS, RFG-P-DF-UNICODE-DIGITS-EVIDENCE, RFG-P-DF-EQUIV-CASE, RFG-P-DF-EQUIV-NFC, RFG-P-DF-EQUIV-WHITESPACE |
+
+R10-01 and R7-03 were verified FIXED; no other text changed. The design is closed: no further Codex design round (owner rule).
 
 ## Appendix A. Phase 2 (post-launch): automated Wise outbound — not designed here
 
