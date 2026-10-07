@@ -1,0 +1,77 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/payments/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+    "specVersion": "2.12",
+    "specSha256": "ecd8bc60e133bd4bc54de10daae3011a451e3a69e971ddf19c09213aa0f15c21",
+    "pointer": "paths//v2/payments/captures/{capture_id}/get/responses/200/examples/capture_get_with_paypal_fee_receivable_currency",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Show Captured Payment Details",
+  "http": {
+    "method": "GET",
+    "path": "/v2/payments/captures/{capture_id}",
+    "status": 200,
+    "body": {
+      "id": "74L756601X447022Y",
+      "amount": {
+        "currency_code": "USD",
+        "value": "100.00"
+      },
+      "final_capture": true,
+      "seller_protection": {
+        "status": "ELIGIBLE",
+        "dispute_categories": [
+          "ITEM_NOT_RECEIVED",
+          "UNAUTHORIZED_TRANSACTION"
+        ]
+      },
+      "seller_receivable_breakdown": {
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "100.00"
+        },
+        "paypal_fee": {
+          "currency_code": "USD",
+          "value": "3.98"
+        },
+        "net_amount": {
+          "currency_code": "USD",
+          "value": "96.02"
+        }
+      },
+      "invoice_id": "OrderInvoice-23_10_2024_12_27_32_pm",
+      "status": "COMPLETED",
+      "supplementary_data": {
+        "related_ids": {
+          "order_id": "25M43554V9523650M",
+          "authorization_id": "0T620041CK889853A"
+        }
+      },
+      "payee": {
+        "email_address": "merchant@example.com",
+        "merchant_id": "YXZY75W2GKDQE"
+      },
+      "create_time": "2024-10-23T20:55:19Z",
+      "update_time": "2024-10-23T20:55:19Z",
+      "links": [
+        {
+          "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/74L756601X447022Y",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/74L756601X447022Y/refund",
+          "rel": "refund",
+          "method": "POST"
+        },
+        {
+          "href": "https://api-m.sandbox.paypal.com/v2/payments/authorizations/0T620041CK889853A",
+          "rel": "up",
+          "method": "GET"
+        }
+      ]
+    }
+  }
+}

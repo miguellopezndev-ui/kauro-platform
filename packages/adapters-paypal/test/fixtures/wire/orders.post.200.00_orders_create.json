@@ -1,0 +1,35 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/orders/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/checkout_orders_v2.json",
+    "specVersion": "2.32",
+    "specSha256": "14db0b9e0d7440e38595b823724599edc7ab8b7a2b41ac442463e81b7d477fd6",
+    "pointer": "paths//v2/checkout/orders/post/responses/200/examples/00_orders_create",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Create Order - PayPal Wallet as Payment Source, Resulting in PAYER_ACTION_REQUIRED Response",
+  "http": {
+    "method": "POST",
+    "path": "/v2/checkout/orders",
+    "status": 200,
+    "body": {
+      "id": "5O190127TN364715T",
+      "payment_source": {
+        "paypal": {}
+      },
+      "links": [
+        {
+          "href": "https://api-m.paypal.com/v2/checkout/orders/5O190127TN364715T",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://www.paypal.com/checkoutnow?token=5O190127TN364715T",
+          "rel": "payer-action",
+          "method": "GET"
+        }
+      ]
+    }
+  }
+}

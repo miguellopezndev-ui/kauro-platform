@@ -1,0 +1,86 @@
+{
+  "provenance": {
+    "class": "DERIVED_FROM_OFFICIAL_EXAMPLE",
+    "derivedFrom": [
+      "webhooks.post.request.verify_webhook_signature.json",
+      "derived.payments.get.200.capture-3C679366HH908993F.json"
+    ],
+    "edits": [
+      "envelope keys of the official webhook_event example (id, create_time, resource_type, event_type, summary, resource, links); values replaced",
+      "resource: the capture resource above",
+      "event_type PAYMENT.CAPTURE.COMPLETED, resource_type capture"
+    ],
+    "retrievedAt": "2026-10-07"
+  },
+  "http": {
+    "method": "POST",
+    "path": "(webhook delivery)",
+    "body": {
+      "id": "WH-58D329510W468432D-8HN650336L201105X",
+      "create_time": "2024-10-23T20:55:21Z",
+      "resource_type": "capture",
+      "event_type": "PAYMENT.CAPTURE.COMPLETED",
+      "summary": "Payment completed for $ 100.0 USD",
+      "resource": {
+        "id": "3C679366HH908993F",
+        "amount": {
+          "currency_code": "USD",
+          "value": "100.00"
+        },
+        "final_capture": true,
+        "seller_protection": {
+          "status": "ELIGIBLE",
+          "dispute_categories": [
+            "ITEM_NOT_RECEIVED",
+            "UNAUTHORIZED_TRANSACTION"
+          ]
+        },
+        "seller_receivable_breakdown": {
+          "gross_amount": {
+            "currency_code": "USD",
+            "value": "100.00"
+          },
+          "paypal_fee": {
+            "currency_code": "USD",
+            "value": "3.00"
+          },
+          "net_amount": {
+            "currency_code": "USD",
+            "value": "97.00"
+          }
+        },
+        "invoice_id": "OrderInvoice-23_10_2024_12_27_32_pm",
+        "status": "COMPLETED",
+        "supplementary_data": {
+          "related_ids": {
+            "order_id": "5O190127TN364715T"
+          }
+        },
+        "payee": {
+          "email_address": "merchant@example.com",
+          "merchant_id": "YXZY75W2GKDQE"
+        },
+        "create_time": "2024-10-23T20:55:19Z",
+        "update_time": "2024-10-23T20:55:19Z",
+        "links": [
+          {
+            "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/3C679366HH908993F",
+            "rel": "self",
+            "method": "GET"
+          },
+          {
+            "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/3C679366HH908993F/refund",
+            "rel": "refund",
+            "method": "POST"
+          },
+          {
+            "href": "https://api-m.sandbox.paypal.com/v2/payments/authorizations/0T620041CK889853A",
+            "rel": "up",
+            "method": "GET"
+          }
+        ]
+      },
+      "links": []
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/payments/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+    "specVersion": "2.12",
+    "specSha256": "ecd8bc60e133bd4bc54de10daae3011a451e3a69e971ddf19c09213aa0f15c21",
+    "pointer": "paths//v2/payments/captures/{capture_id}/refund/post/responses/200/examples/captures_refund_200_idempotent_response",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Refund Captured Payment - 200 idempotent response",
+  "http": {
+    "method": "POST",
+    "path": "/v2/payments/captures/{capture_id}/refund",
+    "status": 200,
+    "body": {
+      "id": "0K35355239430361V",
+      "amount": {
+        "currency_code": "USD",
+        "value": "1.00"
+      },
+      "seller_payable_breakdown": {
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "1.00"
+        },
+        "paypal_fee": {
+          "currency_code": "USD",
+          "value": "0.00"
+        },
+        "net_amount": {
+          "currency_code": "USD",
+          "value": "1.00"
+        },
+        "total_refunded_amount": {
+          "currency_code": "USD",
+          "value": "11.00"
+        }
+      },
+      "invoice_id": "RefundInvoice-14_10_2024_4_58_32_pm",
+      "custom_id": "RefundCustom-14_10_2024_4_58_32_pm",
+      "status": "COMPLETED",
+      "create_time": "2024-10-14T14:58:34-07:00",
+      "update_time": "2024-10-14T14:58:34-07:00",
+      "links": [
+        {
+          "href": "https://api.paypal.com/v2/payments/refunds/0K35355239430361V",
+          "rel": "self",
+          "method": "GET"
+        },
+        {
+          "href": "https://api.paypal.com/v2/payments/captures/7TK53561YB803214S",
+          "rel": "up",
+          "method": "GET"
+        }
+      ]
+    }
+  }
+}

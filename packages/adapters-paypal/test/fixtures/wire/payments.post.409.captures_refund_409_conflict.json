@@ -1,0 +1,28 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/payments/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+    "specVersion": "2.12",
+    "specSha256": "ecd8bc60e133bd4bc54de10daae3011a451e3a69e971ddf19c09213aa0f15c21",
+    "pointer": "paths//v2/payments/captures/{capture_id}/refund/post/responses/409/examples/captures_refund_409_conflict",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Refund Captured Payment - 409 Conflict - Operation in Progress Error",
+  "http": {
+    "method": "POST",
+    "path": "/v2/payments/captures/{capture_id}/refund",
+    "status": 409,
+    "body": {
+      "name": "RESOURCE_CONFLICT",
+      "debug_id": "b1d1f06c7246c",
+      "message": "The server has detected a conflict while processing this request.",
+      "details": [
+        {
+          "issue": "PREVIOUS_REQUEST_IN_PROGRESS",
+          "description": "A previous request on this resource is currently in progress. Please wait for some time and try again. It is best to space out the initial and the subsequent request(s) to avoid receiving this error."
+        }
+      ]
+    }
+  }
+}

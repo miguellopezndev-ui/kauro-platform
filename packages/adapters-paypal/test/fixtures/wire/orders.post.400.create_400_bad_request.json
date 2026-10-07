@@ -1,0 +1,37 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/orders/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/checkout_orders_v2.json",
+    "specVersion": "2.32",
+    "specSha256": "14db0b9e0d7440e38595b823724599edc7ab8b7a2b41ac442463e81b7d477fd6",
+    "pointer": "paths//v2/checkout/orders/post/responses/400/examples/create_400_bad_request",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Create Order - 400 Bad Request Error - Purchase Unit is Empty",
+  "http": {
+    "method": "POST",
+    "path": "/v2/checkout/orders",
+    "status": 400,
+    "body": {
+      "name": "INVALID_REQUEST",
+      "message": "Request is not well-formed, syntactically incorrect, or violates schema.",
+      "debug_id": "10398537340c8",
+      "details": [
+        {
+          "field": "/purchase_units",
+          "value": "[]",
+          "location": "body",
+          "issue": "INVALID_ARRAY_MIN_ITEMS",
+          "description": "The number of items in an array parameter is too small."
+        }
+      ],
+      "links": [
+        {
+          "href": "https://developer.paypal.com/api/orders/v2/#error-INVALID_ARRAY_MIN_ITEMS",
+          "rel": "information_link"
+        }
+      ]
+    }
+  }
+}

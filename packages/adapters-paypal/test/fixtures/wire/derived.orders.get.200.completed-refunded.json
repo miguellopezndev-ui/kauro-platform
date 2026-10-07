@@ -1,0 +1,158 @@
+{
+  "provenance": {
+    "class": "DERIVED_FROM_OFFICIAL_EXAMPLE",
+    "derivedFrom": [
+      "derived.orders.get.200.completed.json",
+      "payments.post.201.captures_refund_with_prefer_header.json"
+    ],
+    "edits": [
+      "purchase_units[0].payments.refunds: the refund example, its up link pointed at capture 3C679366HH908993F"
+    ],
+    "retrievedAt": "2026-10-07"
+  },
+  "http": {
+    "method": "GET",
+    "path": "/v2/checkout/orders/{id}",
+    "status": 200,
+    "body": {
+      "id": "5O190127TN364715T",
+      "payment_source": {
+        "paypal": {
+          "name": {
+            "given_name": "John",
+            "surname": "Doe"
+          },
+          "email_address": "customer@example.com",
+          "account_id": "QYR5Z8XDVJNXQ"
+        }
+      },
+      "purchase_units": [
+        {
+          "reference_id": "d9f80740-38f0-11e8-b467-0ed5f89f718b",
+          "shipping": {
+            "address": {
+              "address_line_1": "2211 N First Street",
+              "address_line_2": "Building 17",
+              "admin_area_2": "San Jose",
+              "admin_area_1": "CA",
+              "postal_code": "95131",
+              "country_code": "US"
+            }
+          },
+          "payments": {
+            "captures": [
+              {
+                "id": "3C679366HH908993F",
+                "status": "COMPLETED",
+                "amount": {
+                  "currency_code": "USD",
+                  "value": "100.00"
+                },
+                "seller_protection": {
+                  "status": "ELIGIBLE",
+                  "dispute_categories": [
+                    "ITEM_NOT_RECEIVED",
+                    "UNAUTHORIZED_TRANSACTION"
+                  ]
+                },
+                "final_capture": true,
+                "seller_receivable_breakdown": {
+                  "gross_amount": {
+                    "currency_code": "USD",
+                    "value": "100.00"
+                  },
+                  "paypal_fee": {
+                    "currency_code": "USD",
+                    "value": "3.00"
+                  },
+                  "net_amount": {
+                    "currency_code": "USD",
+                    "value": "97.00"
+                  }
+                },
+                "create_time": "2018-04-01T21:20:49Z",
+                "update_time": "2018-04-01T21:20:49Z",
+                "links": [
+                  {
+                    "href": "https://api-m.paypal.com/v2/payments/captures/3C679366HH908993F",
+                    "rel": "self",
+                    "method": "GET"
+                  },
+                  {
+                    "href": "https://api-m.paypal.com/v2/payments/captures/3C679366HH908993F/refund",
+                    "rel": "refund",
+                    "method": "POST"
+                  }
+                ]
+              }
+            ],
+            "refunds": [
+              {
+                "id": "1JU08902781691411",
+                "amount": {
+                  "value": "10.99",
+                  "currency_code": "USD"
+                },
+                "status": "COMPLETED",
+                "note": "Defective product",
+                "seller_payable_breakdown": {
+                  "gross_amount": {
+                    "value": "10.99",
+                    "currency_code": "USD"
+                  },
+                  "paypal_fee": {
+                    "value": "0",
+                    "currency_code": "USD"
+                  },
+                  "net_amount": {
+                    "value": "10.99",
+                    "currency_code": "USD"
+                  },
+                  "total_refunded_amount": {
+                    "value": "10.99",
+                    "currency_code": "USD"
+                  }
+                },
+                "invoice_id": "INVOICE-123",
+                "create_time": "2018-09-11T23:24:19Z",
+                "update_time": "2018-09-11T23:24:19Z",
+                "links": [
+                  {
+                    "rel": "self",
+                    "method": "GET",
+                    "href": "https://api-m.paypal.com/v2/payments/refunds/1JU08902781691411"
+                  },
+                  {
+                    "rel": "up",
+                    "method": "GET",
+                    "href": "https://api-m.paypal.com/v2/payments/captures/3C679366HH908993F"
+                  }
+                ]
+              }
+            ]
+          },
+          "payee": {
+            "email_address": "merchant@example.com",
+            "merchant_id": "YXZY75W2GKDQE"
+          }
+        }
+      ],
+      "payer": {
+        "name": {
+          "given_name": "John",
+          "surname": "Doe"
+        },
+        "email_address": "customer@example.com",
+        "payer_id": "QYR5Z8XDVJNXQ"
+      },
+      "links": [
+        {
+          "href": "https://api-m.paypal.com/v2/checkout/orders/5O190127TN364715T",
+          "rel": "self",
+          "method": "GET"
+        }
+      ],
+      "status": "COMPLETED"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/payments/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+    "specVersion": "2.12",
+    "specSha256": "ecd8bc60e133bd4bc54de10daae3011a451e3a69e971ddf19c09213aa0f15c21",
+    "pointer": "paths//v2/payments/captures/{capture_id}/refund/post/responses/201/examples/captures_refund_with_prefer_header",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Refund Captured Payment",
+  "http": {
+    "method": "POST",
+    "path": "/v2/payments/captures/{capture_id}/refund",
+    "status": 201,
+    "body": {
+      "id": "1JU08902781691411",
+      "amount": {
+        "value": "10.99",
+        "currency_code": "USD"
+      },
+      "status": "COMPLETED",
+      "note": "Defective product",
+      "seller_payable_breakdown": {
+        "gross_amount": {
+          "value": "10.99",
+          "currency_code": "USD"
+        },
+        "paypal_fee": {
+          "value": "0",
+          "currency_code": "USD"
+        },
+        "net_amount": {
+          "value": "10.99",
+          "currency_code": "USD"
+        },
+        "total_refunded_amount": {
+          "value": "10.99",
+          "currency_code": "USD"
+        }
+      },
+      "invoice_id": "INVOICE-123",
+      "create_time": "2018-09-11T23:24:19Z",
+      "update_time": "2018-09-11T23:24:19Z",
+      "links": [
+        {
+          "rel": "self",
+          "method": "GET",
+          "href": "https://api-m.paypal.com/v2/payments/refunds/1JU08902781691411"
+        },
+        {
+          "rel": "up",
+          "method": "GET",
+          "href": "https://api-m.paypal.com/v2/payments/captures/2GG279541U471931P"
+        }
+      ]
+    }
+  }
+}

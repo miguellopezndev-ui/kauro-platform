@@ -1,0 +1,28 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/payments/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+    "specVersion": "2.12",
+    "specSha256": "ecd8bc60e133bd4bc54de10daae3011a451e3a69e971ddf19c09213aa0f15c21",
+    "pointer": "paths//v2/payments/captures/{capture_id}/refund/post/responses/422/examples/captures_refund_422_transaction_disputed",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Refund Captured Payment - 422 Unprocessable Entity - Capture Disputed Partial Refund Error",
+  "http": {
+    "method": "POST",
+    "path": "/v2/payments/captures/{capture_id}/refund",
+    "status": 422,
+    "body": {
+      "name": "UNPROCESSABLE_ENTITY",
+      "message": "The requested action could not be performed, semantically incorrect, or failed business validation.",
+      "debug_id": "90bff07028f7f",
+      "details": [
+        {
+          "issue": "TRANSACTION_DISPUTED",
+          "description": "Partial refunds cannot be offered at this time because there is an open case on this transaction. Visit the PayPal Resolution Center to review this case."
+        }
+      ]
+    }
+  }
+}

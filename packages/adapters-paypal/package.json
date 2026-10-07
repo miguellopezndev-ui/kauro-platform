@@ -1,0 +1,36 @@
+{
+  "name": "@kauro/adapters-paypal",
+  "version": "0.1.0",
+  "description": "Kauro PayPal adapters (package B15): the PROVIDER binding of the PaymentProviderAdapter port over PayPal Orders v2 and Payments v2, and of the WebhookVerifier port over PayPal's verify-webhook-signature postback. No runtime dependency: HTTP goes through an injected transport (fetch by default), so tests run against a recorded wire built from PayPal's official API examples and never reach the network; the live sandbox runs only under KAURO_LIVE_SANDBOX=1.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/application": "workspace:*",
+    "@kauro/contracts": "workspace:*",
+    "@kauro/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

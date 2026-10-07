@@ -1,0 +1,36 @@
+{
+  "provenance": {
+    "class": "OFFICIAL_DOC_EXAMPLE",
+    "documentation": "https://developer.paypal.com/docs/api/orders/v2/",
+    "source": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/checkout_orders_v2.json",
+    "specVersion": "2.32",
+    "specSha256": "14db0b9e0d7440e38595b823724599edc7ab8b7a2b41ac442463e81b7d477fd6",
+    "pointer": "paths//v2/checkout/orders/{id}/capture/post/responses/422/examples/capture_422_unprocessable_entity",
+    "retrievedAt": "2026-10-07"
+  },
+  "summary": "Capture Order - 422 Unprocessable Entity Error - Action Does Not Match Intent",
+  "http": {
+    "method": "POST",
+    "path": "/v2/checkout/orders/{id}/capture",
+    "status": 422,
+    "body": {
+      "name": "UNPROCESSABLE_ENTITY",
+      "details": [
+        {
+          "location": "body",
+          "issue": "ACTION_DOES_NOT_MATCH_INTENT",
+          "description": "The order was created with an intent of `AUTHORIZE`. To complete authorization, use `/v2/checkout/orders/{order_id}/authorize`. Or, alternately create an order with an intent of `CAPTURE`."
+        }
+      ],
+      "message": "The requested action could not be performed, semantically incorrect, or failed business validation.",
+      "debug_id": "90957fca61718",
+      "links": [
+        {
+          "href": "https://developer.paypal.com/api/orders/v2/#error-ACTION_DOES_NOT_MATCH_INTENT",
+          "rel": "information_link",
+          "method": "GET"
+        }
+      ]
+    }
+  }
+}
