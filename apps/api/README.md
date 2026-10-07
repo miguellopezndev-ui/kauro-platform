@@ -107,3 +107,14 @@ the database integrity guards through the routes (`database-integrity.test.ts`),
 serialization of the seven routes (`response-contract.test.ts`, `sentinel-serialization.test.ts`), the transport
 (`transport.test.ts`), and the deployment path and its operation (`composition.test.ts`, `operability.test.ts`: bootstrap
 over a real socket) — see `docs/design/B06-case-map.md`.
+
+## Database credentials and TLS: operating notes (AWS-DELTA I-2, I-3)
+
+- One rule, `connectionSecurityOf` (`@kauro/persistence`), applies at every site that opens a PostgreSQL connection (api, commission,
+  payment, control, validator, migration job). Outside LOCAL: `KAURO_DB_TLS_CA_FILE` required, `rejectUnauthorized: true`, the host a DNS
+  name, the password only as a file. `apps/api/test/db-connection-sites.test.ts` fails when a connection site or a TLS setting appears outside it.
+- Password files are read once, when the connection is opened at start. **B14 obligation:** a secret rotation (database password or CA
+  bundle) triggers a rolling restart of every instance; nothing re-reads the file while the process runs.
+- Known and unchanged (N7): the one-shot migration job still accepts the owner's password as the plain `KAURO_DB_MIGRATOR_PASSWORD` in
+  every environment, including LIVE (it is a job, not a serving process; the serving process refuses it by name). Prefer
+  `KAURO_DB_MIGRATOR_PASSWORD_FILE` in the job definition.

@@ -130,9 +130,9 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const codeSchemaVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
   let migrations: ApplyResult | null = null;
   if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.environment, config.migrateOnStart, deps.migratorPassword);
-  const { poolMax, statementTimeoutMs, tlsCaFile, ...connection } = config.database;
-  const { tls } = connectionSecurityOf(config.environment, { host: connection.host, ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
-  const pool = createPool({ ...connection, ...(tls === undefined ? {} : { tls }), max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+  const { poolMax, statementTimeoutMs, tlsCaFile, password, passwordFile, ...connection } = config.database;
+  const security = connectionSecurityOf(config.environment, { host: connection.host, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+  const pool = createPool({ ...connection, ...security, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {
     const { client, connection: verified } = await pool.acquire();
     client.release();
@@ -146,8 +146,9 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   let assurancePool: KauroPool | null = null;
   const boundary = config.identity?.assuranceDatabase;
   if (boundary !== undefined) {
-    const { poolMax: boundaryMax, ...login } = boundary;
-    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, ...(tls === undefined ? {} : { tls }), max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    const { poolMax: boundaryMax, user: boundaryUser, password: boundaryPassword, passwordFile: boundaryPasswordFile } = boundary;
+    const boundarySecurity = connectionSecurityOf(config.environment, { host: connection.host, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } });
+    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...boundarySecurity, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
     try {
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();

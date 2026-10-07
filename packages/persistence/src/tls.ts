@@ -32,10 +32,14 @@ export interface ConnectionSecurityInput {
   readonly passwordFile?: string;
   /** The CA file (KAURO_DB_TLS_CA_FILE); required outside LOCAL (I-2). */
   readonly tlsCaFile?: string;
+  /** Check the shape of the configuration (what is required, refused, exclusive) without reading any file: the start-up check of a configuration loader. */
+  readonly validateOnly?: boolean;
+  /** The variables the deployment names these inputs by, for the refusal text (default: the runtime login's). */
+  readonly names?: { readonly password: string; readonly passwordFile: string };
 }
 
 export class ConnectionSecurityError extends Error {
-  constructor(variable: string, problem: string) {
+  constructor(readonly variable: string, readonly problem: string) {
     super(`${variable}: ${problem}`);
     this.name = "ConnectionSecurityError";
   }
@@ -49,13 +53,18 @@ export class ConnectionSecurityError extends Error {
  */
 export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", input: ConnectionSecurityInput): { readonly password?: string; readonly tls?: DatabaseTls } {
   const local = environment === "LOCAL";
-  if (input.password !== undefined && input.passwordFile !== undefined) throw new ConnectionSecurityError("KAURO_DB_PASSWORD_FILE", "is exclusive with the plain password");
-  if (input.password !== undefined && !local) throw new ConnectionSecurityError("KAURO_DB_PASSWORD", "is accepted in the LOCAL environment only: SANDBOX and LIVE receive the password as a mounted secret file (KAURO_DB_PASSWORD_FILE)");
+  const names = input.names ?? { password: "KAURO_DB_PASSWORD", passwordFile: "KAURO_DB_PASSWORD_FILE" };
+  if (input.password !== undefined && input.passwordFile !== undefined) throw new ConnectionSecurityError(names.passwordFile, `is exclusive with ${names.password}`);
+  if (input.password !== undefined && !local) throw new ConnectionSecurityError(names.password, `is accepted in the LOCAL environment only: SANDBOX and LIVE receive the password as a mounted secret file (${names.passwordFile})`);
   if (!local && isIP(input.host) !== 0) throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a DNS name outside LOCAL: the certificate is verified against the host name dialled");
+  if (input.validateOnly === true) {
+    if (input.tlsCaFile === undefined && !local) throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "is required outside LOCAL: the database connection verifies the server certificate against this CA");
+    return {};
+  }
   let password = input.password;
   if (input.passwordFile !== undefined) {
-    password = readFileOf("KAURO_DB_PASSWORD_FILE", input.passwordFile).replace(/\r?\n$/, "");
-    if (password === "") throw new ConnectionSecurityError("KAURO_DB_PASSWORD_FILE", "names an empty file");
+    password = readFileOf(names.passwordFile, input.passwordFile).replace(/\r?\n$/, "");
+    if (password === "") throw new ConnectionSecurityError(names.passwordFile, "names an empty file");
   }
   let tls: DatabaseTls | undefined;
   if (input.tlsCaFile !== undefined) {

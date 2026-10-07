@@ -14,7 +14,20 @@ import { MigratorRoleError, applyMigrationsAs, createPool, sslOptionsOf } from "
 const PGBIN = process.env["PGBIN"] && existsSync(process.env["PGBIN"]) ? process.env["PGBIN"] : process.platform === "win32" ? "C:/Tools/pgsql17/bin" : "/usr/lib/postgresql/17/bin";
 const exe = (name: string): string => join(PGBIN, process.platform === "win32" ? `${name}.exe` : name);
 const openssl = spawnSync("openssl", ["version"], { encoding: "utf8", windowsHide: true });
-const SKIP = openssl.status === 0 && existsSync(exe("initdb")) ? false : "openssl or PostgreSQL 17 binaries are not available on this runner";
+const MISSING = openssl.status === 0 && existsSync(exe("initdb")) ? false : "openssl or PostgreSQL 17 binaries are not available on this runner";
+
+/** ADV-3: a missing tool skips the handshake test on a developer machine and FAILS it under CI (env CI set), never a silent pass. */
+export function skipReason(missing: string | false, ci: string | undefined): string | false {
+  return missing !== false && (ci === undefined || ci === "") ? missing : false;
+}
+const SKIP = skipReason(MISSING, process.env["CI"]);
+
+test("ADV-3: under CI a missing openssl or PostgreSQL is a failure, not a skip", () => {
+  assert.equal(skipReason("missing", undefined), "missing");
+  assert.equal(skipReason("missing", ""), "missing");
+  assert.equal(skipReason("missing", "true"), false, "CI set: the handshake test runs (and fails on the missing tool)");
+  assert.equal(skipReason(false, undefined), false);
+});
 
 test("I-2: sslOptionsOf carries the CA bytes and rejectUnauthorized true, and nothing without a CA", () => {
   assert.equal(sslOptionsOf(undefined), undefined);
@@ -79,6 +92,7 @@ function freePort(): Promise<number> {
 
 before(async () => {
   if (SKIP) return;
+  if (MISSING) throw new Error(`CI requires the handshake test to run: ${MISSING}`);
   base = mkdtempSync(join(tmpdir(), "kauro-tls-"));
   makeCa(base, "ca");
   makeCa(base, "other-ca");

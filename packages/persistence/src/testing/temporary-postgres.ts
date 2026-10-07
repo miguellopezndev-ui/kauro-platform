@@ -98,7 +98,8 @@ export interface StartOptions {
   readonly portSource?: () => Promise<number>;
   /**
    * Serve TLS (I-2): a CA and a server certificate for the host name `localhost` are generated with openssl into the cluster's
-   * directory; the result names the CA file. Plain connections stay accepted, so the harness itself connects as before.
+   * directory; the result names the CA file. The server refuses every connection without TLS (hostnossl reject), and the harness's
+   * own connections are TLS and verified.
    */
   readonly tls?: boolean;
 }
@@ -137,6 +138,9 @@ function generateTlsFiles(base: string, dataDir: string): NonNullable<TemporaryP
   writeFileSync(join(base, "server.ext"), "subjectAltName=DNS:localhost" + "\n");
   openssl(["req", "-newkey", "rsa:2048", "-nodes", "-keyout", "server.key", "-out", "server.csr", "-subj", "/CN=localhost"], base);
   openssl(["x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial", "-out", "server.crt", "-days", "2", "-extfile", "server.ext"], base);
+  // a connection without TLS is refused by the server itself: a site that skips its TLS wiring cannot connect at all (ADV-1)
+  const hba = join(dataDir, "pg_hba.conf");
+  writeFileSync(hba, `hostnossl all all 127.0.0.1/32 reject\nhostnossl all all ::1/128 reject\n${readFileSync(hba, "utf8")}`);
   copyFileSync(join(base, "server.crt"), join(dataDir, "server.crt"));
   copyFileSync(join(base, "server.key"), join(dataDir, "server.key"));
   if (process.platform !== "win32") spawnSync("chmod", ["600", join(dataDir, "server.key")]);
@@ -174,7 +178,9 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
     }
   }
 
-  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
+  // a TLS cluster is dialled by its certificate's name and verified, like every deployment connection
+  const verified = tls === undefined ? {} : { ssl: { ca: readFileSync(tls.caFile, "utf8"), rejectUnauthorized: true } };
+  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: tls === undefined ? "127.0.0.1" : tls.host, port, user: role, database, application_name: `kauro-test-${role}`, ...verified });
   const connect = async (role: string, database: string = ROLES.database): Promise<Client> => {
     const c = new Client(clientConfig(role, database));
     await c.connect();

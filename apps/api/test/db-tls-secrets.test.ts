@@ -61,15 +61,15 @@ test("I-2: the one-shot migration job and its connection carry the CA, required 
 
 test("I-3: KAURO_DB_PASSWORD_FILE is read with one trailing newline trimmed; the plain KAURO_DB_PASSWORD is refused outside LOCAL", () => {
   const config = loadConfig(cursorEnv());
-  assert.equal(config.database.password, "runtime-secret-value");
+  assert.equal(config.database.passwordFile, pwFile);
+  assert.ok(!("password" in config.database) && !JSON.stringify(config).includes("runtime-secret-value"), "the file is named, never read into the configuration: the composition resolves it through connectionSecurityOf");
   assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD: "plain-secret-value" })), refused("KAURO_DB_PASSWORD", "plain-secret-value"));
-  assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD_FILE: join(dir, "missing") })), refused("KAURO_DB_PASSWORD_FILE"));
 });
 
 test("I-3: LOCAL still accepts the plain variable, refuses both forms at once, and the file works in LOCAL too", () => {
   const local = { KAURO_ENVIRONMENT: "LOCAL", KAURO_DB_USER: "kauro_app_login", KAURO_DB_POOL_MAX: "4" };
   assert.equal(loadConfig({ ...local, KAURO_DB_PASSWORD: "local-pw" }).database.password, "local-pw");
-  assert.equal(loadConfig({ ...local, KAURO_DB_PASSWORD_FILE: pwFile }).database.password, "runtime-secret-value");
+  assert.equal(loadConfig({ ...local, KAURO_DB_PASSWORD_FILE: pwFile }).database.passwordFile, pwFile);
   assert.throws(() => loadConfig({ ...local, KAURO_DB_PASSWORD: "x", KAURO_DB_PASSWORD_FILE: pwFile }), refused("KAURO_DB_PASSWORD_FILE"));
 });
 
@@ -88,15 +88,13 @@ function identityEnv(extra: Record<string, string | undefined>): Record<string, 
 
 test("I-3: KAURO_DB_ASSURANCE_PASSWORD_FILE is read and trimmed; the plain variable is refused outside LOCAL; both directions in LOCAL", () => {
   const config = loadConfig(identityEnv({}));
-  assert.equal(config.identity?.assuranceDatabase.password, "assurance-secret-value");
+  assert.equal(config.identity?.assuranceDatabase.passwordFile, assurancePwFile);
   assert.throws(() => loadConfig(identityEnv({ KAURO_DB_ASSURANCE_PASSWORD: "plain-assurance" })), refused("KAURO_DB_ASSURANCE_PASSWORD", "plain-assurance"));
 });
 
-test("I-3: a refusal never carries a secret's value; an unreadable or empty file is refused by variable name", () => {
-  const empty = join(dir, "empty");
-  writeFileSync(empty, "\n");
-  assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD_FILE: empty })), refused("KAURO_DB_PASSWORD_FILE"));
-  assert.ok(!JSON.stringify(loadConfig(cursorEnv()).environment).includes("secret"));
+test("I-3: a refusal never carries a secret's value; the files are read when the connection opens, by the one rule", () => {
+  assert.ok(!JSON.stringify(loadConfig(cursorEnv())).includes("secret"), "the configuration names files, never holds a secret");
+  assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD: "plain-secret-value" })), refused("KAURO_DB_PASSWORD", "plain-secret-value"));
 });
 
 test("I-2: outside LOCAL the database host is a DNS name (pg verifies an IP literal against 'localhost'); LOCAL keeps its IP", () => {
