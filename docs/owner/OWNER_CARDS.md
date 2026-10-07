@@ -5,7 +5,7 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (D-15 SUPERSEDED en lo de PayPal por Pagos V1; D-22; D-23 cancelada; D-24 A).
+Última actualización: 2026-10-07 (D-25 nueva: pagador EE. UU. para prueba ACH; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
 
 
 ## D-15 Regla de tolerancia de reloj del proveedor (ejemplo 10) — [SUPERSEDED 2026-10-07 en lo específico de PayPal (Pagos V1); la regla genérica de tolerancia nombrada y versionada sigue obligatoria para todo rail, incluido el crédito ACH] — antes de B15 en vivo (≈ 12-oct); desbloquea POLICY-PROVIDER-SKEW
@@ -54,3 +54,16 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **¿Cambia R2?:** A **no** (es lo que R2 15 ya exige: UNCERTAIN retiene la reserva y agotar reintentos deja un caso visible). B **sí** (requiere enmendar R2 15).
 - **Cómo responder:** "D-24 A" o "D-24 B".
 - **RESPUESTA 2026-10-07: D-24 A** (confirmada dos veces). Un reembolso incierto tras 30 días de re-chequeo queda reservado con caso abierto hasta resolución manual del dueño con evidencia del panel de PayPal (auditada); nunca liberación automática. Aplica también si finanzas corrigió primero. R2 sin cambios.
+
+## D-25 Pagador en EE. UU. para la prueba real de ACH (Pagos V1) — antes del 10-oct; desbloquea la confirmación del rail V1 y el gate de B19
+- **Decisión exacta:** ¿quién en EE. UU. hará un ACH real de **USD 25** a los datos USD de Wise Business de KAURO DATA S.A.S. y aceptará recibir la devolución de prueba?
+- **Recomendación:** **una persona o empresa de confianza en EE. UU. con cuenta bancaria de EE. UU.** (conocido o cliente piloto), con su consentimiento por escrito de que es una prueba con devolución. Plan completo: `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` (rama docs/payments-v1-decision).
+- **Qué habilita:** confirmar el rail V1 de punta a punta (cobro ACH real + conciliación + devolución controlada con evidencia), que es el gate de B19, y recién entonces poder decir públicamente que Kauro acepta ACH.
+- **Si dices no / no hay pagador:** el rail V1 no puede confirmarse; producción tendría que salir con el cobro deshabilitado (ruta ACH en estado pendiente) hasta que aparezca un pagador o el primer cliente real acepte ser la prueba. Alternativas reales: (a) primer cliente real de bajo monto con consentimiento explícito de prueba; (b) una cuenta bancaria propia en EE. UU. si existiera (no se abre ninguna nueva sin tu decisión). No se reintroduce PayPal.
+- **Impacto en dinero:** USD 25 que vuelven con la devolución; la recepción ACH no tiene comisión de Wise según su ayuda oficial; la salida de la devolución cuesta lo que muestre la cuenta al ejecutarla (se registra).
+- **Impacto en seguridad:** el pagador solo recibe los datos USD de la cuenta y la referencia de pago; ningún acceso a Kauro ni a Wise. La devolución exige tu autorización en Kauro y queda auditada.
+- **Impacto en fecha:** la prueba solo puede hacerse con la sociedad registrada (D-14) y Wise aprobado; si el pagador está listo antes, la prueba se hace el mismo día que Wise habilite los datos USD (el ACH puede tardar hasta 4 días hábiles). Sin pagador, el gate de B19 queda bloqueado.
+- **Ejemplo:** un conocido en Texas envía USD 25 por ACH desde su banco con la referencia KAU-TEST-0001; llega a Wise en horas o hasta 4 días hábiles; tú lo concilias en Kauro con el comprobante; autorizas la devolución; envías USD 25 desde Wise; Kauro la marca devuelta solo con el comprobante de salida.
+- **Riesgos:** el pagador se equivoca de referencia o de monto (se prueba justo el caso "en revisión, no pagado"); el ACH tarda hasta 4 días; Wise retiene la primera recepción para revisión (posible en cuentas nuevas).
+- **¿Cambia R2?:** no.
+- **Cómo responder:** "D-25 <nombre o tipo de pagador>" (no necesito datos bancarios aquí; los gestionas tú directamente con el pagador), o "D-25 no hay pagador".
