@@ -5,8 +5,14 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (D-22 respondida; D-23 cancelada: solo fuentes oficiales públicas; D-24 A).
+Última actualización: 2026-10-07 (D-15 SUPERSEDED en lo de PayPal por Pagos V1; D-22; D-23 cancelada; D-24 A).
 
+
+## D-15 Regla de tolerancia de reloj del proveedor (ejemplo 10) — [SUPERSEDED 2026-10-07 en lo específico de PayPal (Pagos V1); la regla genérica de tolerancia nombrada y versionada sigue obligatoria para todo rail, incluido el crédito ACH] — antes de B15 en vivo (≈ 12-oct); desbloquea POLICY-PROVIDER-SKEW
+- Qué pasa: hoy una compra posterior se marca HELD (PROVIDER_TIME_UNVERIFIED) si la hora de completado que reporta PayPal es aunque sea 1 ms posterior a nuestra confirmación. En producción los relojes de PayPal y de la base difieren entre milisegundos y segundos, y PayPal reporta con resolución de segundos: habrá retenciones falsas de comisiones (seguras, pero son cola operativa y demoras para los vendedores).
+- Pregunta: ¿aceptamos como "plausible" una hora del proveedor hasta N segundos después de nuestra confirmación (y N antes de la creación de la orden)? Recomiendo N = 120 s, como constante de política con nombre y pruebas en N−1 y N+1. Cambia una expectativa escrita del ejemplo 10 (hoy "1 s después = HELD"), por eso necesita tu decisión.
+- Costo: ninguno. Responder "D-15 sí 120 s" o "D-15 no".
+- Añadido 06-oct (plan IC-B04): una vez abierta la cuenta, en la misma sesión: (1) Bedrock → Model access → habilitar Claude Sonnet 5.5 y Opus 5.5 y enviar el formulario de primer uso de Anthropic; (2) Service Quotas → pedir aumento de tokens/min de Sonnet y Opus 5.5 en el perfil de inferencia US (las cuentas nuevas arrancan bajas); (3) IAM Identity Center → crear un usuario "builder" (sin acceso raíz). Sin esto la campaña B04 (≤ USD 160) no puede correr del 13 al 16-oct.
 
 ## D-22 Columna numérica sin separador decimal declarado (B03 CAP04) — antes del 10-oct; desbloquea el resellado del corpus B04 (lanes K/P)
 - Qué decide R2 (no es tu decisión): R2 03 "Numbers and currency-like fields" exige una gramática explícita: un locale declarado o una interpretación por campo ya resuelta, y prohíbe elegirla por una muestra o por mayoría. MC 3.0.0 hace lo mismo: sin separador declarado solo acepta dígitos planos y marca el resto AMBIGUOUS (`transform/transformations.ts:441`). Por eso IC ya no puede adivinar la coma a partir de los datos, y mientras no haya gramática la columna se pregunta a la agencia y se preserva sin transformar (KEEP).
