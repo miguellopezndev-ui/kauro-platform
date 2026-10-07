@@ -893,6 +893,19 @@ const chainOf = async (plan: PlanFixture): Promise<Array<readonly [string, strin
     (q) => [q.quote_id, q.state, q.superseded_by_quote_id] as const,
   );
 
+/** The project's quote rows for a failure message: state, successor, replaced quote, created_at to the microsecond, and the journal key and state that issued each. */
+const chainDetail = async (plan: PlanFixture): Promise<string> =>
+  JSON.stringify(
+    await oracleRows(
+      iw,
+      `SELECT q.quote_id, q.state, q.superseded_by_quote_id, q.replaces_quote_id, to_char(q.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US') AS created_at,
+              j.idempotency_key, j.state AS journal_state
+         FROM kauro.quotes q LEFT JOIN kauro.quote_issuances i ON i.quote_id = q.quote_id LEFT JOIN kauro.command_journal j ON j.entry_id = i.entry_id
+        WHERE q.project_id = $1 ORDER BY q.created_at, q.quote_id`,
+      [plan.projectId],
+    ),
+  );
+
 faultCell(
   {
     id: "LIVE_QUOTE_RACE",
@@ -942,7 +955,7 @@ faultCell(
       const live = (await oracleRows<{ version: number }>(iw, "SELECT version::int AS version FROM kauro.quotes WHERE quote_id = $1", [q3]))[0]!;
       assert.deepEqual(problem.current, { version: live.version, state: "ISSUED" }, "current is the project's live quote, read after the last round");
       // nothing written by the late request: its journal entry, no quote, issuance or event of its own
-      assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "ISSUED", null]], "only the three superseding issuances wrote quotes");
+      assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "ISSUED", null]], `only the three superseding issuances wrote quotes: q0..q3 ${JSON.stringify([q0, q1, q2, q3])}, late key ${lateKey}, rows ${await chainDetail(plan)}`);
       assert.equal((await iw.w.journal(lateKey))?.state ?? null, null, "the refused key journaled nothing");
       const issuances = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE project_id = $1", [plan.projectId]);
       assert.equal(issuances[0]!.n, 4);
