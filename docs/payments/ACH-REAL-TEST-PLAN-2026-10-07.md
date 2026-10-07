@@ -1,54 +1,52 @@
-# Plan de la prueba real de ACH (entregable 9b, Pagos V1) — borrador 2026-10-07
+# Real ACH test plan (deliverable 9b, Payments V1) — draft 2026-10-07
 
-Objetivo: confirmar la capacidad del rail V1 de punta a punta (Pagos V1 §2 a-f): un cobro ACH real de un pagador en EE. UU.
-a los datos USD de Wise Business de KAURO DATA S.A.S., su conciliación en Kauro, y una devolución controlada con evidencia.
+Goal: confirm the V1 rail end to end (Payments V1 §2 a-f): one real ACH collection from a US payer into the Wise Business
+USD details of KAURO DATA S.A.S., its reconciliation in Kauro, and a controlled refund of that same payment with evidence.
 
-## Precondiciones (todas reales, ninguna supuesta)
-1. KAURO DATA S.A.S. registrada (NIT/RUT) — D-14.
-2. Wise Business aprobado a nombre de la sociedad; datos USD visibles en la cuenta; la cuenta indica recepción ACH.
-3. Kauro en un entorno con la ruta ACH configurada en estado VERIFIED-pending (no ENABLED para clientes).
-4. Respuestas del contador sobre cómo registrar el cobro y la devolución (cambiario y DIAN) — o al menos sobre la prueba.
+## Preconditions (all real, none assumed)
+1. KAURO DATA S.A.S. registered (NIT/RUT) — D-14.
+2. Wise Business approved in the company's name; USD details visible in the account; the account shows ACH receiving.
+3. Kauro running in an environment with the ACH route configured and not ENABLED for customers.
+4. The accountant's answers on how to record the collection and the refund (foreign exchange and DIAN) — at least for this
+   test (`ACCOUNTANT-QUESTIONS-2026-10-07.md`, question 15).
 
-## Pagador
-- Necesitamos **una persona o empresa en EE. UU. con cuenta bancaria de EE. UU.** que haga un ACH (no tarjeta, no Zelle a
-  persona, no PayPal) a los datos USD de Wise. Debe aceptar recibir la devolución.
-- **Bloqueo si no existe:** es un dato del dueño (tarjeta D-25). Alternativas reales: (a) un conocido/cliente piloto en
-  EE. UU.; (b) un primer cliente real de bajo monto con su consentimiento explícito de prueba; (c) una cuenta bancaria propia
-  en EE. UU. (si el dueño tuviera una) — no se crea ninguna cuenta nueva solo para esto sin decisión del dueño.
+## Payer (D-25)
+- One **person or company in the US with a US bank account** that sends an ACH (not card, not person-to-person Zelle, not
+  PayPal) to the Wise USD details and agrees in writing to receive the refund.
+- The test collection is a **real low-value invoice the owner specifically authorises**, carrying the **reference Kauro
+  generates**. Paying from an owner-held US account is not allowed (R2 15 forbids self-payment).
+- Owner D-25 (2026-10-07): a possible US payer exists; the owner confirms once the company is registered.
 
-## Monto
-- Recomendado: **USD 25** (cubre que la devolución se vea como transacción normal; costo de la prueba bajo). Una factura de
-  Kauro por USD 25 con referencia única.
+## Amount
+- Recommended: **USD 25** (the refund looks like a normal transaction; low test cost). One Kauro invoice for USD 25 with a
+  unique reference.
 
-## Pasos
-1. Kauro emite la factura de prueba (USD 25) con los datos USD y una referencia única; se registra la orden en Kauro.
-2. El pagador envía ACH con la referencia. Se registra fecha/hora de envío.
-3. Llegada a Wise (esperado: horas, hasta 4 días hábiles según la ayuda oficial). Se descarga el comprobante/extracto.
-4. Conciliación en Kauro (entrada manual del rol owner con el comprobante): la orden pasa a pagada **solo** con monto y moneda
-   exactos; evidencia guardada; revenue/cash y comisión del vendedor (si aplica) se registran.
-5. Devolución controlada: autorización del owner en Kauro; se registra el reembolso (idempotente) **antes** de ejecutar; el
-   owner envía desde Wise el reembolso al pagador (USD 25, o el monto que el contador indique si hay costos); se guarda el
-   comprobante de salida; Kauro marca "refunded" **solo** con ese comprobante; se ajustan revenue/cash, comisión y evidencia
-   fiscal (nota crédito si el contador lo indica).
-6. Pruebas negativas en la misma ventana (sin dinero extra): repetir el registro del reembolso con la misma clave no crea un
-   segundo reembolso; un reembolso en estado incierto no ofrece "reenviar".
-7. Evidencia final: paquete con factura, comprobantes de Wise de entrada y salida, registros de Kauro (orden, conciliación,
-   reembolso, asientos), y el resultado de la conciliación sin diferencias.
+## Steps
+1. Kauro issues the test invoice (USD 25) with the USD details and a unique reference; the order is recorded in Kauro.
+2. The payer sends the ACH with the reference. Send date/time is recorded.
+3. Arrival at Wise (official Wise help: "ACH: Usually within hours, and up to 4 working days"). The receipt/statement is
+   downloaded.
+4. Reconciliation in Kauro (owner-role manual entry with the receipt): the order becomes paid **only** on exact amount and
+   currency; evidence stored; revenue/cash and seller commission (if any) recorded.
+5. Controlled refund of that same payment: owner authorisation in Kauro; the refund is recorded (idempotent) **before**
+   execution; the owner sends the refund from Wise to the payer (USD 25, or the amount the accountant indicates if there are
+   costs); the Wise send receipt is stored; Kauro records the refund as sent **only** with that receipt; revenue/cash,
+   commission and fiscal evidence are adjusted (credit note if the accountant says so).
+6. Negative checks in the same window (no extra money): recording the refund again with the same key creates no second
+   refund; a refund in an uncertain state never offers "resend" (NEVER-RESEND, any rail).
+7. Final evidence: package with invoice, Wise incoming and outgoing receipts, Kauro records (order, reconciliation, refund,
+   ledger entries) and the reconciliation result with zero differences.
 
-## Criterio de éxito
-Los seis puntos de Pagos V1 §2 se cumplen; cero diferencias en la conciliación; un solo cobro y una sola devolución
-registrados; evidencia archivada. Solo entonces la ruta ACH puede pasar a ENABLED y Kauro puede decir públicamente que acepta
-ACH.
+## Success criterion (owner adjustment 2026-10-07, binding)
+- One test payment serves for both the collection and the refund.
+- Collection is ENABLED when: (a) that payment's ACH is received and reconciled in Kauro, and (b) the refund of that same
+  payment is SENT from Wise and recorded in Kauro with the Wise send receipt. Arrival in the payer's account is not awaited;
+  a later return follows the normal return flow (never a resend while uncertain).
+- Zero reconciliation differences; exactly one collection and one refund recorded; evidence archived. Only then may the ACH
+  route move to ENABLED and Kauro state publicly that it accepts ACH.
+- D-26 (owner, decided in advance): no production without collection enabled; if Wise USD details are not live on
+  2026-10-12 20:00 Bogota, the production date moves.
 
-## Costo esperado
-ACH entrante: sin comisión de Wise (ayuda oficial). Salida de la devolución: la que muestre la cuenta Wise al ejecutarla (se
-registra). Ningún gasto sin línea en `.kauro/grants.md` si supera lo que el dueño autorice.
-
-## Ajuste del dueño (2026-10-07) — vigente
-- Un solo pago de prueba sirve para el cobro y la devolución.
-- El cobro se HABILITA cuando: (a) el ACH de ese pago está recibido y conciliado en Kauro, y (b) la devolución de ese mismo
-  pago está ENVIADA desde Wise y registrada en Kauro con el comprobante de envío de Wise. No se espera a que llegue a la cuenta
-  del pagador; un rebote posterior sigue el flujo normal de rebote (nunca un reenvío mientras esté incierto).
-- Pagador: el dueño lo confirma cuando la SAS esté registrada (D-25). Sin pago desde cuenta propia del dueño (R2 15).
-- D-26: sin cobro habilitado no hay producción; si Wise no está vivo el 12-oct 20:00, se mueve la fecha.
-- Paso 5 y el criterio de éxito de arriba se leen con este ajuste (la devolución cuenta con el comprobante de envío).
+## Expected cost
+Incoming ACH: no Wise fee (official help, see `WISE-FEES-2026-10-07.md`). Outgoing refund: whatever the Wise account shows
+when it is executed (recorded). No spend without a line in `.kauro/grants.md`.

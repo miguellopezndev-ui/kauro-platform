@@ -1,3 +1,6 @@
+> Copia secundaria en español para la reunión con el contador. El documento maestro es
+> `../ACCOUNTANT-QUESTIONS-2026-10-07.md` (inglés); si difieren, prevalece el inglés.
+
 # Preguntas para el contador — cobro a clientes de EE. UU. vía Wise (entregable 9c, Pagos V1)
 
 Contexto para el contador: KAURO DATA S.A.S. (Colombia) venderá servicios de software/migración de datos a empresas de
