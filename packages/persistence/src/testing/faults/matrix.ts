@@ -224,7 +224,10 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
     operation: (name, fn) => own(name, (scope) => fn({ id: scope.id, name, clock: stepClock(scope, name) })),
     withClock: (what, operation) => ctx.operation(what, (op) => operation(op.clock)),
     async mustWait(oracle, probe, operation, what, limitMs) {
-      const waiting = await own(`wait: ${what}`, () => mustWait(oracle, probe, operation, what, limitMs));
+      // the waited operation runs in an operation scope of this cell of its own, open until IT settles (the wait's scope closes once the
+      // wait is observed): what the operation does after its wait — the instant its product path judges a deadline at, its statements — is
+      // this cell's evidence, so a deadline crossed during the wait is consumed by the operation itself, never by a sink the cell feeds
+      const waiting = await own(`wait: ${what}`, () => mustWait(oracle, probe, (client) => own(`waited: ${what}`, () => operation(client)), what, limitMs));
       observedWaits += 1;
       return waiting;
     },

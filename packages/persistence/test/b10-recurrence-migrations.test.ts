@@ -5,6 +5,7 @@
 // refusal that no grant stands in front of. Every guard is shown by the forbidden write refused beside the legitimate write that
 // commits (21 "Positive and negative symmetry"); interleavings are fixed by hold points and observed lock waits, never by a sleep.
 // The tests assert the raw KC SQLSTATEs; their translation into failure reasons is the stage-2 lanes' (design §12).
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -39,6 +40,8 @@ import {
 import { constraintOf, ids, project, sha, sqlState, stepUpProof } from "./support.js";
 
 let h: Harness;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => h.oracle);
 let app: Client;
 let control: Client;
 let assurance: Client;

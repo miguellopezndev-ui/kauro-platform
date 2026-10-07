@@ -4,6 +4,7 @@
 // and at the payout (CMD052 refuses a statement whose payable line's funds are not AVAILABLE). The cells run the whole path through the public
 // commands, as the worked examples do: the real consumer, the ELIGIBILITY pass, CMD051, CMD052 and CMD053 on a seller with a nonzero line.
 // The ELIGIBLE-then-HELD interleaving itself (the sweep committing before the HELD fact) is the ELIG_REV cell `[geligfact]`.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
@@ -17,6 +18,8 @@ import { completed, outcome } from "./support.js";
 import { providerReports } from "./integration-support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);

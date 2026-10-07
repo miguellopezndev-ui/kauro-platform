@@ -34,7 +34,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
+import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
 import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
@@ -551,8 +551,8 @@ export interface WorldOptions {
    * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
    */
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
-  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader; test/sales-support.ts). */
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader };
+  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader, test/sales-support.ts; the statements' step-up verifier, test/b10-family-templates.test.ts). */
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier };
   /** Package B10 (CMD027 CreateQuote): the collaborators the api binds beyond the edition's (the buyer type fake, the replacement hold, a re-binder). */
   readonly quotes?: (h: Harness) => Partial<QuoteCollaborators>;
   /**

@@ -3,6 +3,7 @@
 // each project and adjustment without exposing customer CRM data"; example 25). The real route under its closed response schema (the send
 // guard refuses any other reply), the commercial authorizer and PostgreSQL 17 through the runtime login roles: the seller's own session reads
 // only its own statement and items (0031), so another seller's statement answers as an id nobody holds. The superuser only reads.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CommissionStatementView, PeriodCloseView } from "@kauro/application";
@@ -13,6 +14,8 @@ import { closeMonth, eligibleLines, readStatement, seller, statementsOfSeller, s
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

@@ -4,6 +4,7 @@
 // or customer history route to conflict review"). The real route, the real authorizers, the sales and attribution adapters and PostgreSQL
 // 17 through the runtime login roles; the superuser only reads. The sellers are recorded with every activation fact by the corporate
 // owner and the prospects by their registrars (@kauro/persistence/testing); claim evidence is each seller's own (test/sales-support.ts).
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AttributionClaimView } from "@kauro/application";
@@ -12,6 +13,8 @@ import { asOperator, recordClaimEvidence, salesWorld, type Seller, type SalesWor
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Person } from "./support.js";
 
 let sw: SalesWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.w.h.oracle);
 before(async () => {
   sw = await salesWorld({}, "cmd046");
 });

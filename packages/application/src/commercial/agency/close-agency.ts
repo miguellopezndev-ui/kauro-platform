@@ -66,7 +66,12 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.assuranceProofRef as AssuranceProofId, now);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `closing an agency needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const life = co.lifecycle(uow);
-          const agency = await uow.agencies.lock(agencyId);
+          // the agency's row FOR NO KEY UPDATE (never FOR UPDATE: the KEY SHARE of a reader's insert must not wait for it), then at once
+          // its exclusive half, before the first read of the inventory: a project or job started on a client already inspected would
+          // otherwise commit beside the closure and be missing from it (D10-TX-1, D10-AGY-6)
+          const locked = await life.lockAgencyRow(agencyId);
+          if (locked) await life.lockAgencyTransition(agencyId);
+          const agency = locked ? await uow.agencies.get(agencyId) : null;
           if (agency === null) throw new NotFoundFailure("agency");
           checkExpectedVersion(agency, body.expectedVersion);
           if (!CLOSABLE.has(agency.state)) {
