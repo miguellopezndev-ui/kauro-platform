@@ -878,15 +878,9 @@ const moneyRows = async (): Promise<Record<string, unknown>> =>
     )
   )[0]!;
 
-faultCell(
-  {
-    id: "REPL_REVOKE",
-    step: "CMD027 included-replacement protocol / REVOCATION: an ordinary CreateQuote over a re-bound replacement whose entitlement a full refund revoked",
-    fault: "revocation",
-    expect:
-      "RACE (replacement): after the re-binding, a full service refund of the purchase approved and not yet executed leaves the re-bound entitlement ACTIVE (B09 design CommercialAuthorization: authority_revoked on a full service refund, at its completion; 0016 quotes_release_guard reads COMPLETED refunds), so CreateQuote of the project is the replacement protocol's 409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT with nothing written; once the refund completed (the entitlement REVOKED) it issues 201 superseding the replacement exactly once; no capture, refund, ledger, entitlement or re-binding row changes in either phase and the allowance stays spent",
-  },
-  async (ctx) => {
+test(
+  "REPL_REVOKE (sequence, no fault injected) CMD027 included-replacement protocol / REVOCATION: an ordinary CreateQuote over a re-bound replacement whose entitlement a full refund revoked -> RACE (replacement): after the re-binding, a full service refund of the purchase approved and not yet executed leaves the re-bound entitlement ACTIVE (B09 design CommercialAuthorization: authority_revoked on a full service refund, at its completion; 0016 quotes_release_guard reads COMPLETED refunds), so CreateQuote of the project is the replacement protocol's 409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT with nothing written; once the refund completed (the entitlement REVOKED) it issues 201 superseding the replacement exactly once; no capture, refund, ledger, entitlement or re-binding row changes in either phase and the allowance stays spent",
+  async () => {
     const x = await fixture("repl-refund-supersede");
     const rebound = view(await quoteCall(x.a, x.plan, freshKey("repl-refund-rebind")));
     assert.equal(rebound.replacement?.outcome, "REBOUND");
@@ -911,21 +905,19 @@ faultCell(
     // (a) the refund not executed: the paid purchase stands and its one included replacement is spent
     const before = await moneyRows();
     const refusedKey = freshKey("repl-refund-before");
-    const refused = await ctx.operation("an ordinary CreateQuote before the refund executes", () => quoteCall(x.a, x.plan, refusedKey));
+    const refused = await quoteCall(x.a, x.plan, refusedKey);
     assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT", `the paid purchase stands: ${refused.status >= 400 ? "" : refused.text}`);
     assert.equal((await iw.w.journal(refusedKey))?.state ?? null, null, "nothing journaled");
     assert.deepEqual((await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [replacementId])).map((r) => r.state), ["ACCEPTED_FOR_CHECKOUT"]);
     assert.deepEqual(await stateOf(x, refusedKey).then((s) => s.replacements), ["ACCEPTED_FOR_CHECKOUT"], "no quote written");
     assert.deepEqual(await moneyRows(), before, "no money or entitlement row changed");
     // (b) the refund completed: the ordinary issuance supersedes the refunded replacement, money untouched, the allowance still spent
-    await ctx.revoked("the full service refund completed (the re-bound entitlement REVOKED)", async () => {
-      const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
-      assert.equal(executed.status, 200, executed.text);
-    });
+    const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+    assert.equal(executed.status, 200, executed.text);
     assert.equal(await authorizationState(live.authorization_id), "REVOKED", "the completed full refund revoked the re-bound entitlement");
     const afterRefund = await moneyRows();
     const issuedKey = freshKey("repl-refund-after");
-    const issued = view(await ctx.operation("an ordinary CreateQuote after the refund completed", () => quoteCall(x.a, x.plan, issuedKey)));
+    const issued = view(await quoteCall(x.a, x.plan, issuedKey));
     assert.equal(issued.supersededQuoteId, replacementId, "the refunded replacement is superseded");
     assert.equal(issued.replacement, undefined, "an ordinary quote, not a replacement");
     assert.deepEqual(await moneyRows(), afterRefund, "no capture, refund, ledger, entitlement or re-binding row changed");
