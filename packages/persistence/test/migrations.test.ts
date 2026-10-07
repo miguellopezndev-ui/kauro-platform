@@ -103,6 +103,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0043_payout_funds_fence.sql",
     // P0 R2-046: an older ledger waiter retries with a fresh transaction instant.
     "0044_admission_instants.sql",
+    // Payments V1 bank-transfer route, lane KIT (tables and vocabulary only; provisional number, renumbered at merge)
+    "0045_bank_transfer_kit.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
