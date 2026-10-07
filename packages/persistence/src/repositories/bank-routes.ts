@@ -49,7 +49,7 @@ interface VersionRow {
   route_version: number;
   details_artifact_ref: string;
   details_evidence_hash: string;
-  payee_digest: string;
+  payee_digest: string | null;
   accepted_rails: string[];
   minimum_transfer_window_ms: string;
   instruction_lifetime_ms: string;
@@ -68,7 +68,7 @@ function versionOf(r: VersionRow): BankRouteVersionRecord {
     routeVersion: int(r.route_version),
     detailsArtifactRef: r.details_artifact_ref,
     detailsEvidenceHash: r.details_evidence_hash as Sha256Hex,
-    payeeDigest: r.payee_digest as Sha256Hex,
+    payeeDigest: r.payee_digest as Sha256Hex | null,
     acceptedRails: r.accepted_rails,
     minimumTransferWindowMs: int(r.minimum_transfer_window_ms),
     instructionLifetimeMs: int(r.instruction_lifetime_ms),
@@ -132,7 +132,7 @@ export interface NewBankRouteVersion {
   readonly routeVersion: number;
   readonly detailsArtifactRef: string;
   readonly detailsEvidenceHash: string;
-  readonly payeeDigest: string;
+  readonly payeeDigest: string | null;
   readonly acceptedRails: ReadonlyArray<string>;
   readonly minimumTransferWindowMs: number;
   readonly instructionLifetimeMs: number;
@@ -172,9 +172,9 @@ export class PgBankRoutes {
     return r.rows[0] ? routeOf(r.rows[0]) : null;
   }
 
-  /** The issuance's and the projection's route lock (FOR KEY SHARE), held to COMMIT. */
-  async lockKeyShare(routeId: string): Promise<BankRouteRecord | null> {
-    const r = await execute<RouteRow>(this.db, `SELECT ${ROUTE_COLUMNS} FROM kauro.bank_routes WHERE route_id = $1 FOR KEY SHARE`, [routeId]);
+  /** The issuance's and the projection's route lock (FOR SHARE: it conflicts with Kroute's FOR UPDATE and any writer's row lock, never with another issuance), held to COMMIT. */
+  async lockShare(routeId: string): Promise<BankRouteRecord | null> {
+    const r = await execute<RouteRow>(this.db, `SELECT ${ROUTE_COLUMNS} FROM kauro.bank_routes WHERE route_id = $1 FOR SHARE`, [routeId]);
     return r.rows[0] ? routeOf(r.rows[0]) : null;
   }
 

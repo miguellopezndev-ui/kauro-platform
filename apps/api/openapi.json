@@ -6633,6 +6633,362 @@
         }
       }
     },
+    "/api/v1/operations/bank-routes": {
+      "post": {
+        "operationId": "configureBankRoute",
+        "summary": "Configure a bank-transfer route: the account, its owner-supplied details evidence and the instruction policy (PENDING_VERIFICATION)",
+        "description": "Authority: ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/configureBankRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configureBankRouteResponse201"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-routes/{routeId}": {
+      "get": {
+        "operationId": "getBankRoute",
+        "summary": "A bank-transfer route as the corporate owner sees it",
+        "description": "Authority: ACH-ROUTE r12 §7.1; KAURO_OWNER",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The route.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getBankRouteResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-routes/{routeId}/details": {
+      "post": {
+        "operationId": "replaceBankRouteDetails",
+        "summary": "Replace the details evidence of a route: a new version, unqualified (PENDING_VERIFICATION); issued orders keep their snapshot",
+        "description": "Authority: ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/replaceBankRouteDetailsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/replaceBankRouteDetailsResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-routes/{routeId}/disable": {
+      "post": {
+        "operationId": "disableBankRoute",
+        "summary": "Disable an enabled route (VERIFIED): no new instructions, no sensitive details served",
+        "description": "Authority: ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/disableBankRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/disableBankRouteResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-routes/{routeId}/enable": {
+      "post": {
+        "operationId": "enableBankRoute",
+        "summary": "Enable a verified route for a CONTROLLED allowlist, or GENERAL once its enable condition holds (ENABLED)",
+        "description": "Authority: ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/enableBankRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/enableBankRouteResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-routes/{routeId}/verify": {
+      "post": {
+        "operationId": "verifyBankRoute",
+        "summary": "Qualify a route: its current details evidence read, classified and still valid; the owner verification evidence (VERIFIED)",
+        "description": "Authority: ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/verifyBankRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/verifyBankRouteResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operations/refunds/{refundId}": {
       "get": {
         "operationId": "GetRefundReview",
@@ -8209,6 +8565,57 @@
                 "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
               }
             ]
+          }
+        }
+      }
+    },
+    "/api/v1/payment-orders/{orderId}/transfer-instructions": {
+      "get": {
+        "operationId": "getTransferInstructions",
+        "summary": "The bank-transfer instructions of an order, served only while its route is enabled at the snapshot version and before its deadline",
+        "description": "Authority: ACH-ROUTE r12 §7.3 (I3), D-ACH-16; an agency member (X-Kauro-Agency); never cached",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account details of the route version the order was issued on, with the exact amount, reference and send-by instant of the order.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getTransferInstructionsResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -14859,7 +15266,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 13 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 17 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -14957,6 +15364,30 @@
                 "reason": "FISCAL_TREATMENT_CHANGED",
                 "layer": "COMMAND",
                 "meaning": "the reviewed treatment is no longer the one the quote was priced with: a new quote is required"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "ROUTE_NOT_ENABLED",
+                "layer": "COMMAND",
+                "meaning": "the named bank route is not ENABLED at a verified version for this agency (CONTROLLED allowlist or GENERAL): no order and no instructions"
+              },
+              {
+                "code": "PAYMENT_PENDING",
+                "reason": "OPEN_ORDER_EXISTS",
+                "layer": "COMMAND",
+                "meaning": "the project already has an open order (of any route): no second checkout"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PLAN_WITHDRAWN",
+                "layer": "COMMAND",
+                "meaning": "the quoted plan's approval was withdrawn"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "TRANSFER_WINDOW_TOO_SHORT",
+                "layer": "COMMAND",
+                "meaning": "the time left before the instruction deadline is shorter than the route's minimum transfer window"
               }
             ]
           },
@@ -15055,7 +15486,7 @@
             ]
           },
           "503": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -15083,6 +15514,12 @@
                 "reason": "DELIVERY_CAPACITY_UNAVAILABLE",
                 "layer": "COMMAND",
                 "meaning": "the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "EVIDENCE_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "no bank route integration is bound in this deployment; retry later"
               }
             ]
           }
@@ -29826,6 +30263,16 @@
           "termsHash": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "routeKind": {
+            "type": "string",
+            "enum": [
+              "BANK_TRANSFER"
+            ]
+          },
+          "routeId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD028"
@@ -29847,6 +30294,66 @@
           "quote": {
             "$ref": "#/components/schemas/QuoteView",
             "description": "The quote, ACCEPTED_FOR_CHECKOUT."
+          },
+          "transfer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "routeId",
+              "routeVersion",
+              "bankState",
+              "reference",
+              "amountCents",
+              "currency",
+              "transferExpiresAt",
+              "sendBy"
+            ],
+            "properties": {
+              "routeId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "routeVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "bankState": {
+                "type": "string",
+                "enum": [
+                  "AWAITING_TRANSFER",
+                  "PARTIALLY_RECEIVED",
+                  "RECEIVED_REVIEW",
+                  "CAPTURED",
+                  "EXPIRED"
+                ]
+              },
+              "reference": {
+                "type": "string",
+                "pattern": "^K[0-9A-HJKMNP-TV-Z]{22}$"
+              },
+              "amountCents": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,15})$"
+              },
+              "currency": {
+                "type": "string",
+                "enum": [
+                  "USD"
+                ]
+              },
+              "transferExpiresAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "sendBy": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              }
+            },
+            "description": "Payments V1 (routeKind BANK_TRANSFER): the frozen transfer snapshot — route version, bank order state, the 23-character reference, the exact amount, the deadline and the frozen sendBy; never an account or routing number (GET .../transfer-instructions serves those)."
           }
         }
       },
@@ -36522,6 +37029,217 @@
           }
         }
       },
+      "configureBankRouteRequest": {
+        "title": "configureBankRoute request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider",
+          "environment",
+          "accountRef",
+          "currency",
+          "acceptedRails",
+          "detailsArtifactRef",
+          "detailsEvidenceHash",
+          "minimumTransferWindowMs",
+          "instructionLifetimeMs",
+          "providerTimeToleranceMs",
+          "feePolicyVersion",
+          "timingSource"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "SANDBOX",
+              "LIVE"
+            ]
+          },
+          "accountRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "acceptedRails": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACH",
+                "DOMESTIC_WIRE"
+              ]
+            }
+          },
+          "detailsArtifactRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detailsEvidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "minimumTransferWindowMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 34560000000
+          },
+          "instructionLifetimeMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 34560000000
+          },
+          "providerTimeToleranceMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 34560000000
+          },
+          "feePolicyVersion": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,64}$"
+          },
+          "timingSource": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "accessedOn"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "maxLength": 2048,
+                "pattern": "^https://[A-Za-z0-9.-]+(/[!-~]*)?$"
+              },
+              "accessedOn": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:configureBankRoute"
+      },
+      "configureBankRouteResponse201": {
+        "title": "configureBankRoute 201",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route"
+            ],
+            "properties": {
+              "route": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "routeId",
+                  "routeVersion",
+                  "version",
+                  "state",
+                  "rollout",
+                  "environment",
+                  "accountRef",
+                  "detailsEvidenceHash",
+                  "verified"
+                ],
+                "properties": {
+                  "routeId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "routeVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING_VERIFICATION",
+                      "VERIFIED",
+                      "ENABLED",
+                      "DISABLED"
+                    ]
+                  },
+                  "rollout": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "CONTROLLED",
+                      "GENERAL",
+                      null
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "LIVE"
+                    ]
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "detailsEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:configureBankRoute:201"
+      },
       "createInquiryRequest": {
         "title": "createInquiry request",
         "description": "A fit inquiry from a visitor without an account. The buyer type never changes price or admission (A3 3.7).",
@@ -36658,6 +37376,362 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:createStepUp:201"
+      },
+      "disableBankRouteRequest": {
+        "title": "disableBankRoute request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "authorizationRef"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:disableBankRoute"
+      },
+      "disableBankRouteResponse200": {
+        "title": "disableBankRoute 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route"
+            ],
+            "properties": {
+              "route": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "routeId",
+                  "routeVersion",
+                  "version",
+                  "state",
+                  "rollout",
+                  "environment",
+                  "accountRef",
+                  "detailsEvidenceHash",
+                  "verified"
+                ],
+                "properties": {
+                  "routeId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "routeVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING_VERIFICATION",
+                      "VERIFIED",
+                      "ENABLED",
+                      "DISABLED"
+                    ]
+                  },
+                  "rollout": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "CONTROLLED",
+                      "GENERAL",
+                      null
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "LIVE"
+                    ]
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "detailsEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:disableBankRoute:200"
+      },
+      "enableBankRouteRequest": {
+        "title": "enableBankRoute request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "rollout",
+          "participants",
+          "authorizationRef"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "rollout": {
+            "type": "string",
+            "enum": [
+              "CONTROLLED",
+              "GENERAL"
+            ]
+          },
+          "participants": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "qualificationOrderId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:enableBankRoute"
+      },
+      "enableBankRouteResponse200": {
+        "title": "enableBankRoute 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route"
+            ],
+            "properties": {
+              "route": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "routeId",
+                  "routeVersion",
+                  "version",
+                  "state",
+                  "rollout",
+                  "environment",
+                  "accountRef",
+                  "detailsEvidenceHash",
+                  "verified"
+                ],
+                "properties": {
+                  "routeId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "routeVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING_VERIFICATION",
+                      "VERIFIED",
+                      "ENABLED",
+                      "DISABLED"
+                    ]
+                  },
+                  "rollout": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "CONTROLLED",
+                      "GENERAL",
+                      null
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "LIVE"
+                    ]
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "detailsEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:enableBankRoute:200"
+      },
+      "getBankRouteResponse200": {
+        "title": "getBankRoute 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "route"
+        ],
+        "properties": {
+          "route": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "routeId",
+              "routeVersion",
+              "version",
+              "state",
+              "rollout",
+              "environment",
+              "accountRef",
+              "detailsEvidenceHash",
+              "verified"
+            ],
+            "properties": {
+              "routeId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "routeVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "PENDING_VERIFICATION",
+                  "VERIFIED",
+                  "ENABLED",
+                  "DISABLED"
+                ]
+              },
+              "rollout": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "CONTROLLED",
+                  "GENERAL",
+                  null
+                ]
+              },
+              "environment": {
+                "type": "string",
+                "enum": [
+                  "SANDBOX",
+                  "LIVE"
+                ]
+              },
+              "accountRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              },
+              "detailsEvidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getBankRoute:200"
       },
       "getCapabilityPublicationResponse200": {
         "title": "getCapabilityPublication 200",
@@ -36979,6 +38053,88 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getReadiness:503"
       },
+      "getTransferInstructionsResponse200": {
+        "title": "getTransferInstructions 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instructions"
+        ],
+        "properties": {
+          "instructions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "beneficiaryName",
+              "bankName",
+              "routingNumber",
+              "accountNumber",
+              "accountType",
+              "amountCents",
+              "currency",
+              "reference",
+              "sendBy",
+              "transferExpiresAt",
+              "routeVersion"
+            ],
+            "properties": {
+              "beneficiaryName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "bankName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "routingNumber": {
+                "type": "string",
+                "pattern": "^[0-9]{9}$"
+              },
+              "accountNumber": {
+                "type": "string",
+                "pattern": "^[0-9]{4,17}$"
+              },
+              "accountType": {
+                "type": "string",
+                "enum": [
+                  "CHECKING",
+                  "SAVINGS"
+                ]
+              },
+              "amountCents": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,15})$"
+              },
+              "currency": {
+                "type": "string",
+                "enum": [
+                  "USD"
+                ]
+              },
+              "reference": {
+                "type": "string",
+                "pattern": "^K[0-9A-HJKMNP-TV-Z]{22}$"
+              },
+              "sendBy": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+              },
+              "transferExpiresAt": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+              },
+              "routeVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:getTransferInstructions:200"
+      },
       "openSessionRequest": {
         "title": "openSession request",
         "type": "object",
@@ -37054,6 +38210,279 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:openSession:201"
+      },
+      "replaceBankRouteDetailsRequest": {
+        "title": "replaceBankRouteDetails request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "detailsArtifactRef",
+          "detailsEvidenceHash",
+          "authorizationRef"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "detailsArtifactRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "detailsEvidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:replaceBankRouteDetails"
+      },
+      "replaceBankRouteDetailsResponse200": {
+        "title": "replaceBankRouteDetails 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route"
+            ],
+            "properties": {
+              "route": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "routeId",
+                  "routeVersion",
+                  "version",
+                  "state",
+                  "rollout",
+                  "environment",
+                  "accountRef",
+                  "detailsEvidenceHash",
+                  "verified"
+                ],
+                "properties": {
+                  "routeId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "routeVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING_VERIFICATION",
+                      "VERIFIED",
+                      "ENABLED",
+                      "DISABLED"
+                    ]
+                  },
+                  "rollout": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "CONTROLLED",
+                      "GENERAL",
+                      null
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "LIVE"
+                    ]
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "detailsEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:replaceBankRouteDetails:200"
+      },
+      "verifyBankRouteRequest": {
+        "title": "verifyBankRoute request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "verificationEvidenceRef",
+          "authorizationRef"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "verificationEvidenceRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:verifyBankRoute"
+      },
+      "verifyBankRouteResponse200": {
+        "title": "verifyBankRoute 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route"
+            ],
+            "properties": {
+              "route": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "routeId",
+                  "routeVersion",
+                  "version",
+                  "state",
+                  "rollout",
+                  "environment",
+                  "accountRef",
+                  "detailsEvidenceHash",
+                  "verified"
+                ],
+                "properties": {
+                  "routeId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "routeVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING_VERIFICATION",
+                      "VERIFIED",
+                      "ENABLED",
+                      "DISABLED"
+                    ]
+                  },
+                  "rollout": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "CONTROLLED",
+                      "GENERAL",
+                      null
+                    ]
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "LIVE"
+                    ]
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "detailsEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:verifyBankRoute:200"
       }
     },
     "parameters": {

@@ -55,6 +55,7 @@ import type { ProtocolPoint } from "../core/provider-effects.js";
 import type { PurchasedSubjectReader } from "../core/subject.js";
 import type { DurableOperation } from "../protocol.js";
 import type { CommerceReadOperationId } from "../response-schemas.js";
+import type { BankRouteCollaborators } from "../bank/ports.js";
 
 // --- the ports the request side reads through ------------------------------------------------------------------------------------
 
@@ -94,6 +95,8 @@ export interface CommerceRequestCollaborators {
   readonly sources: SourceAvailabilityReader | null;
   /** Test-only hold of the provider-effect protocol (never bound by a deployment; D-REQ-B6). */
   readonly protocolHold?: ProtocolHold;
+  /** The bank-transfer route (Payments V1, lane L-ROUTE); absent or null: CMD028 BANK_TRANSFER answers EVIDENCE_UNAVAILABLE. */
+  readonly bank?: BankRouteCollaborators | null;
 }
 
 /** What every request-side handler and read needs beside its collaborators. */

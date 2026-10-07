@@ -15,7 +15,7 @@
 --   Kroute (configure excepted): the route row FOR UPDATE is taken FIRST — before the owner's access decision (identity, grant transition
 --     locks) and the journal — so a revocation of the owner's grant issued while the command waits for the route is never blocked by it
 --     (covered by ACH-M-R2-REVOCATION). Verify and details replacement read the details evidence before the route lock (R1).
---   Kinstructions: the project row FOR NO KEY UPDATE (the subject lock), then the route row FOR KEY SHARE (conflicts with Kroute's FOR
+--   Kinstructions: the project row FOR NO KEY UPDATE (the subject lock), then the route row FOR SHARE (conflicts with Kroute's FOR
 --     UPDATE, not with another issuance), then the member's access decision, the journal and the B09 subject reads.
 --   No actor holding a route lock takes L1..L4 of §7.28.
 -- Reads of the internal evidence store (a store of the platform, not an external call-out) run inside the transaction where the cells
@@ -127,7 +127,8 @@ CREATE TABLE kauro.bank_route_versions (
   route_version               integer NOT NULL CHECK (route_version >= 1),
   details_artifact_ref        text NOT NULL CHECK (length(details_artifact_ref) BETWEEN 1 AND 128 AND details_artifact_ref ~ '^[A-Za-z0-9._:-]+$'),
   details_evidence_hash       text NOT NULL CHECK (kauro.is_sha256_hex(details_evidence_hash)),
-  payee_digest                text NOT NULL CHECK (kauro.is_sha256_hex(payee_digest)),
+  -- the payee digest the classified details declare; NULL while the version's evidence has not classified (verify refuses it then)
+  payee_digest                text CHECK (payee_digest IS NULL OR kauro.is_sha256_hex(payee_digest)),
   accepted_rails              text[] NOT NULL CHECK (cardinality(accepted_rails) >= 1 AND accepted_rails <@ ARRAY['ACH', 'DOMESTIC_WIRE']::text[]),
   minimum_transfer_window_ms  bigint NOT NULL CHECK (minimum_transfer_window_ms > 0),
   instruction_lifetime_ms     bigint NOT NULL CHECK (instruction_lifetime_ms > 0),
@@ -184,8 +185,7 @@ CREATE TABLE kauro.bank_transfer_instructions (
   updated_at           timestamptz NOT NULL DEFAULT kauro.server_now(),
   FOREIGN KEY (agency_id, order_id) REFERENCES kauro.payment_orders (agency_id, order_id),
   FOREIGN KEY (route_id, route_version) REFERENCES kauro.bank_route_versions (route_id, route_version),
-  CONSTRAINT bank_transfer_instructions_reference_unique UNIQUE (environment, account_ref, reference),
-  CONSTRAINT bank_transfer_instructions_send_by CHECK (send_by < transfer_expires_at)
+  CONSTRAINT bank_transfer_instructions_reference_unique UNIQUE (environment, account_ref, reference)
 );
 CREATE INDEX bank_transfer_instructions_by_route ON kauro.bank_transfer_instructions (route_id);
 CREATE TRIGGER bank_transfer_instructions_touch BEFORE UPDATE ON kauro.bank_transfer_instructions FOR EACH ROW EXECUTE FUNCTION kauro.touch_updated_at();
@@ -262,7 +262,7 @@ CREATE POLICY bank_route_participants_owner ON kauro.bank_route_participants FOR
 CREATE POLICY bank_transfer_instructions_owner_read ON kauro.bank_transfer_instructions FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
 
 -- an agency session sees a route it may buy through (a participant, a GENERAL rollout) or one its orders were issued on; it may lock it
--- (FOR KEY SHARE, the issuance's and the projection's route lock) and never change it (WITH CHECK false)
+-- (FOR SHARE, the issuance's and the projection's route lock) and never change it (WITH CHECK false)
 CREATE OR REPLACE FUNCTION kauro.bank_route_visible_to_tenant(p_route_id uuid, p_rollout text, p_participants_version bigint) RETURNS boolean
   LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
 $$

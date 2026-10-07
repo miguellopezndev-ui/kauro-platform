@@ -208,6 +208,17 @@ export interface PaymentOrderDetailView {
 export interface CreatePaymentOrderView {
   readonly order: PaymentOrderView;
   readonly quote: QuoteView;
+  /** The frozen transfer instructions of a bank-transfer order (routeKind BANK_TRANSFER; never an account number). */
+  readonly transfer?: {
+    readonly routeId: string;
+    readonly routeVersion: number;
+    readonly bankState: string;
+    readonly reference: string;
+    readonly amountCents: string;
+    readonly currency: "USD";
+    readonly transferExpiresAt: UtcInstant;
+    readonly sendBy: UtcInstant;
+  };
 }
 
 export interface CapturePaymentView {

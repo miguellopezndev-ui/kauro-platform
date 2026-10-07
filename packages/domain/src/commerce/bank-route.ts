@@ -118,7 +118,8 @@ export interface BankRouteVersionRecord {
   readonly routeVersion: number;
   readonly detailsArtifactRef: string;
   readonly detailsEvidenceHash: Sha256Hex;
-  readonly payeeDigest: Sha256Hex;
+  /** Null while the version's evidence has not classified. */
+  readonly payeeDigest: Sha256Hex | null;
   readonly acceptedRails: ReadonlyArray<string>;
   readonly minimumTransferWindowMs: number;
   readonly instructionLifetimeMs: number;

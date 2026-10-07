@@ -41,3 +41,5 @@ export {
   classifyFakeOutbound,
   classifyFakeStatement,
 } from "./bank-evidence-fake.js";
+// the CONTRACT_FAKE account-details classifier of the bank-transfer route (lane L-ROUTE, R1)
+export { classifyFakeAccountDetails, contractFakeBankDetailsClassifier } from "./bank-details-fake.js";

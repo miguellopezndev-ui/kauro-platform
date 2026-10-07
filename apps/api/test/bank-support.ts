@@ -77,6 +77,8 @@ export interface BankWorld {
 export async function bankWorld(options: { readonly world?: IntegrationWorld } = {}): Promise<BankWorld> {
   const iw = options.world ?? (await integrationWorld());
   const evidence = createBankEvidenceFake({ clock, environment: BANK_ENVIRONMENT, accountRef: BANK_ACCOUNT, payeeDigest: BANK_PAYEE_DIGEST });
+  // the api reads the bank route's details artifacts from this store (lane L-ROUTE; ApiAssembly.bank, bound at call time)
+  iw.w.bank.evidence = evidence;
   const open = (login: BankLogin): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
   const held = new Set<HeldLock>();
 
