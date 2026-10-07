@@ -38,10 +38,27 @@ const SITE_FORMS: ReadonlyArray<RegExp> = [
   /\bcreatePool\b/,
   /\bapplyMigrationsAs\b/,
   /\bconnectionString\b/,
+  // a re-export of the driver's classes, a CommonJS require made inside an ES module, any other PostgreSQL driver or data layer
+  /\bexport\s+(?!type\b)(?:\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}|\*(?:\s+as\s+[\w$]+)?)\s*from\s*["']pg["']/,
+  /\bcreateRequire\b/,
+  /(?:\bfrom\s*|\brequire\(\s*|\bimport\(\s*)["'](?:postgres|pg-promise|pg-native|pg-pool|pg-cursor|@neondatabase\/[\w-]+|@vercel\/postgres|@databases\/pg[\w-]*|slonik|knex|kysely|typeorm|sequelize|drizzle-orm[\w/-]*|@prisma\/client|@supabase\/[\w-]+)["']/,
 ];
 
+/** The constructors only: a persistence file that holds one must derive ssl from sslOptionsOf; one without is a re-export. */
+const CONSTRUCTS = /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client)\s*\(/;
+
 /** TLS settings are written in tls.ts and nowhere else: `ssl:` only as `ssl: sslOptionsOf(`, no identity-check override. */
-const TLS_FORMS: ReadonlyArray<RegExp> = [/\bssl\s*:(?!\s*sslOptionsOf\()/, /\bcheckServerIdentity\b/, /\brejectUnauthorized\b/, /NODE_TLS_REJECT_UNAUTHORIZED/];
+const TLS_FORMS: ReadonlyArray<RegExp> = [
+  /\bssl\s*:(?!\s*sslOptionsOf\()/,
+  /["']ssl["']\s*:/,
+  /\.\s*ssl\s*=(?!=)/,
+  /\[\s*["']ssl["']\s*\]\s*=(?!=)/,
+  /[{,]\s*ssl\s*[,}]/,
+  /\bcheckServerIdentity\b/,
+  /\brejectUnauthorized\b/,
+  /NODE_TLS_REJECT_UNAUTHORIZED/,
+  /\bPG(?:SSLMODE|SSLROOTCERT|SSLCERT|SSLKEY|PASSWORD|PASSFILE|SERVICE)\b/,
+];
 
 function isSite(text: string): boolean {
   const c = code(text);
@@ -64,9 +81,17 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "createPool alias": 'import { createPool as mk } from "@kauro/persistence";',
     "applyMigrationsAs alias": 'import { applyMigrationsAs as run } from "@kauro/persistence";',
     "connectionString": 'export const x = { connectionString: process.env.DATABASE_URL };',
+    "export { Pool } from pg": 'export { Pool } from "pg";',
+    "export { Client as X } from pg": 'export { Client as Db } from "pg";',
+    "export * from pg": 'export * from "pg";',
+    "createRequire": 'import { createRequire } from "node:module";\nconst pg = createRequire(import.meta.url)("pg");',
+    "postgres driver": 'import postgres from "postgres";',
+    "pg-promise": 'const pgp = require("pg-promise")();',
+    "neon driver": 'import { Pool } from "@neondatabase/serverless";',
+    "knex": 'import knex from "knex";',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
-  for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;"]) assert.ok(!isSite(text), text);
+  for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'export const superuser = "postgres";']) assert.ok(!isSite(text), text);
   const dir = mkdtempSync(join(tmpdir(), "kauro-scan-"));
   try {
     for (const name of ["a.ts", "b.js", "c.mjs", "d.cjs"]) writeFileSync(join(dir, name), forms["new pg.Pool("] ?? "");
@@ -77,7 +102,19 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
 });
 
 test("scan self-test: a TLS setting outside tls.ts is caught in every form", () => {
-  const bad = ["const o = { ssl: { rejectUnauthorized: false } };", "const o = { ssl: true };", "const o = { ssl: { ca, checkServerIdentity: () => undefined } };", "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';", "const o = { rejectUnauthorized: true };"];
+  const bad = [
+    "const o = { ssl: { rejectUnauthorized: false } };",
+    "const o = { ssl: true };",
+    "const o = { ssl: { ca, checkServerIdentity: () => undefined } };",
+    "process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';",
+    "const o = { rejectUnauthorized: true };",
+    "config.ssl = { ca };",
+    "config['ssl'] = true;",
+    'const o = { "ssl": true };',
+    "const o = { host, ssl, port };",
+    "process.env.PGSSLMODE = 'disable';",
+    "process.env.PGPASSWORD = x;",
+  ];
   for (const text of bad) assert.ok(tlsViolations(text).length > 0, text);
   assert.deepEqual(tlsViolations("const o = { ...(tls === undefined ? {} : { ssl: sslOptionsOf(tls) }) };"), []);
 });
@@ -107,6 +144,7 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
       "apps/api/src/payments/assembly.ts",
       "apps/control/src/audit/receipts.ts",
       "apps/control/src/composition.ts",
+      "apps/web/scripts/next.mjs",
       "packages/persistence/src/index.ts",
       "packages/persistence/src/migrations/runner.ts",
       "packages/persistence/src/pool.ts",
@@ -114,9 +152,12 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
     "a new connection site must be listed here and covered by connectionSecurityOf",
   );
   for (const [rel, text] of found) {
-    if (rel === "packages/persistence/src/index.ts") continue; // re-exports only
-    if (rel.startsWith("packages/persistence/src/")) {
-      assert.ok(text.includes("sslOptionsOf("), `${rel} derives ssl from sslOptionsOf`);
+    if (rel === "apps/web/scripts/next.mjs") {
+      // createRequire there only resolves the `next` binary; nothing in it may open a database connection
+      assert.ok(!SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text))), `${rel} opens no database connection`);
+    } else if (rel.startsWith("packages/persistence/src/")) {
+      // by content: a file that constructs a Pool or Client derives ssl from sslOptionsOf; a file that does not only re-exports
+      if (CONSTRUCTS.test(code(text))) assert.ok(text.includes("sslOptionsOf("), `${rel} derives ssl from sslOptionsOf`);
     } else {
       assert.ok(text.includes("connectionSecurityOf("), `${rel} applies connectionSecurityOf before it connects`);
     }
