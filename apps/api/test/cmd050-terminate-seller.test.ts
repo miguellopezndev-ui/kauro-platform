@@ -5,6 +5,7 @@
 // through the runtime login roles; the superuser only reads. The sellers, prospects, claims, allocations, entitlements and purchases are
 // the adapter-written fixtures of @kauro/persistence/testing and sellers-support, each written by the role that owns it; the purchase that
 // closes an opportunity is B09's. The provider is B09's labelled contract fake (SIMULATED): nothing here is a provider fact.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { SalesAccountView, SellerTerminationView } from "@kauro/application";
@@ -15,6 +16,8 @@ import { candidateSeller, digest, paidProject, prepareManifest, prepareTerminati
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Person, type Reply } from "./support.js";
 
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 before(async () => {
   pw = await paymentsWorld();
 });

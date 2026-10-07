@@ -265,9 +265,27 @@ export interface AgencyLifecycleRepository {
   recordAcceptance(acceptance: NewAgreementAcceptance): Promise<AgreementAcceptanceRecord>;
   acceptancesOf(agencyId: AgencyId): Promise<ReadonlyArray<AgreementAcceptanceRecord>>;
   /**
-   * The obligations inventory of a closure, read after the agency's exclusive transition half (taken here, so a payment order or refund
-   * committing meanwhile is wholly seen; D10-AGY-2, D10-AGY-4). `activeWork` is B06's ActiveWorkInspector count of the agency (the
-   * handler sums it over the agency's clients); every other member is read in this call.
+   * The agency transition writer's row lock (CMD002, CMD043): SELECT ... FOR NO KEY UPDATE, held to COMMIT; the caller reads the row
+   * in its next statement. A transition changes no key column, and FOR UPDATE would conflict with the KEY SHARE every insert
+   * referencing the agency takes (a journal reservation, an order, an event): with the shared/exclusive transition halves that closes a
+   * cycle in either half order (40P01; D10-TX-1, template rule 11a "row locks are FOR NO KEY UPDATE unless the key changes"). Writers
+   * still serialize on it; readers serialize with writers through the transition halves only. False when the agency is not visible.
+   */
+  lockAgencyRow(agencyId: AgencyId): Promise<boolean>;
+  /**
+   * The agency's exclusive transition half, held to COMMIT, taken by CMD043 right after lockAgencyRow and before the first read of its
+   * inventory (the active-work inspection included, D10-AGY-6): every reader that relies on the agency's state (CMD011, a job start,
+   * CMD028) takes the shared half, so its work is committed and counted or it waits and reads CLOSING. Row, then exclusive half: the order
+   * of the trigger (D10-TX-1), deadlock-free against both reader orders because the row lock is NO KEY. Re-entrant in the transaction.
+   */
+  lockAgencyTransition(agencyId: AgencyId): Promise<void>;
+  /**
+   * The obligations inventory of a closure, read under the agency's exclusive transition half (D10-AGY-2, D10-AGY-4): a payment order,
+   * a checkout or a capture — whose writers take the agency's shared half — is wholly seen or ordered after the closure. A refund is
+   * not: CMD031 and the refund claim take no agency shared half, so one committing between this read and the closure's COMMIT is
+   * missing from the inventory and simply continues during CLOSING (refund rights survive the closure by design); KC006 refuses
+   * CLOSED over any committed open refund (B16; the in-flight CMD031 at the CLOSED commit is lane LOCK-NOKEY-P1). `activeWork` is B06's
+   * ActiveWorkInspector count of the agency (the handler sums it over the agency's clients); every other member is read in this call.
    */
   closureObligations(agencyId: AgencyId, activeWork: number): Promise<ClosureObligations>;
   /**

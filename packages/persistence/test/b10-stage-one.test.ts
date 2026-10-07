@@ -4,6 +4,7 @@
 // the superuser reading the catalog and calling the pure functions only as the oracle: every enumerated column of 0028..0031 admits
 // exactly the tokens COMMERCIAL_VOCABULARY declares for it, the domain's banking-day ordinal answers what kauro.banking_day_after
 // answers for the same stored calendar, and kauro.eligibility_findings reports only findings the domain declares.
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
@@ -13,6 +14,8 @@ import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/i
 
 let pg: TemporaryPostgres;
 let oracle: Client;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => oracle);
 
 before(async () => {
   pg = await startTemporaryPostgres();

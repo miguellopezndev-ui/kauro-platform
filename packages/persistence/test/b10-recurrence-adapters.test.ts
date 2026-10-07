@@ -10,6 +10,7 @@
 // The tests share one cluster and one R2-INITIAL founding cohort of three slots, in file order: the issuance core takes slot 1
 // (Fenix); R2-127 reserves and releases slot 2 (Gaia), consumes slot 1 by payment (Fenix) and holds slot 2 for reconciliation
 // (Kestrel); R2-090 races for slot 3, the last free slot; R2-091 consumes the cohort.
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import type { UtcInstant } from "@kauro/contracts";
 import { after, before, test } from "node:test";
@@ -66,6 +67,8 @@ const SYNTHETIC: PricePolicy = {
 };
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 let units: PgCommercialUnitOfWorkFactory;
 let route: QualifiedRoute;
 const reader = new PgFoundingOfferReader();

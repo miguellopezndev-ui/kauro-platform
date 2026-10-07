@@ -9,6 +9,7 @@
 // integer cents are written here, never read back from the code under test. Nothing sleeps: interleavings are held at named points and
 // every wait is observed in pg_stat_activity. The founding cohort's three slots serve the whole cluster; the window sweeps, which stand
 // a year ahead, run last.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ExecuteRefundView, WebhookAck } from "@kauro/application";
@@ -47,6 +48,8 @@ import { deliver, execute, postWebhook, reconcile, storeQuery } from "./payment-
 import { clock, completed, ids } from "./support.js";
 
 let cw: CommissionWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => cw.h.oracle);
 before(async () => {
   cw = await commissionWorld();
 });

@@ -4,6 +4,7 @@
 // route, the commercial authorizer, B06's step-up verifier, the statement adapters and PostgreSQL 17 through the runtime login roles; the
 // superuser only reads. Statements are issued by the real CMD051 route of the commission service; bank-available cash is a settlement
 // observation of the payment service with bank evidence (B09). No transfer is made: the payout adapter is B15's.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
@@ -28,6 +29,8 @@ import {
 import { SimulatedCrash, asProblem, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });
