@@ -1,5 +1,9 @@
 # ACH bank-transfer route — owner amendment A8
 
+Design revision **r9** (2026-10-07): r8 plus the fixes of Codex design r8 (ACH-R7-03 partial, ACH-R8-01): DV1-10 (destination
+proof by keyed fingerprint, correlation overrides exclusions, negative evidence only from explained debits), §6 `DestinationEvidence`,
+§7.22b cells and §11 (r8 → r9 list). Everything Codex marked fixed in r8 is unchanged. The r8 paragraph below is history.
+
 Design revision **r8** (2026-10-07): r7 plus the fixes of Codex design r7 (REJECT, six MAJOR: ACH-R7-01..06) and the PV1 owner
 Addendum (no production without collection; one real payment for both qualification legs; R2 15 §Initial payment decision
 paragraph 1 superseded). Changed: DV1-04, DV1-06, DV1-08, §6 evidence types, §7.21–§7.22 (X1, X4, X2, G2Δ/G4Δ, X3, NR,
@@ -131,7 +135,7 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
   D-ACH-19): kind RETURN (a refund or treasury refund) or RESEND (re-send of a bounced return). Machine: DECLARED → UNCERTAIN;
   DECLARED or UNCERTAIN → RECORDED or NOT_EXECUTED. Frozen at declaration: kind, source, refund or parent bounce, amount, currency,
   `declaredAt` (DB clock), declared destination (`accountDigest`, `accountLast4`, `routingDigest`, computed from the approved destination
-  evidence) and reference `kauro-refund-<refundId>-<n>` (n = attempt number of that refund; 1 for its RETURN).
+  evidence) [SUPERSEDED r9: the keyed destination fingerprint `DF` and key version captured at F2, DV1-10] and reference `kauro-refund-<refundId>-<n>` (n = attempt number of that refund; 1 for its RETURN).
 - **Declare.** **X1** (RETURN): Refund APPROVED → SUBMITTING `manual_execution_declared` and attempt DECLARED; no PaymentAttempt.
   **X4** (RESEND): only after G3 recorded a bounce of the same source (evidence that the previous execution's money came back), with
   amount ≤ that bounce's open REFUND_PAYABLE `O` less other open attempts; the Refund stays COMPLETED (D-ACH-18); attempt DECLARED.
@@ -150,7 +154,7 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
   (D-FISC-B2); RESEND: REFUND_PAYABLE settled) only if each predicate holds (rule 12, one control each): **E-ID** `bankExecutionId`
   present and unused across both scopes; **E-AMT** amount and currency equal the attempt; **E-TIME** `executedAt` present and
   `≥ declaredAt` (strict, no tolerance); **E-DEST** destination proven (`accountDigest` equal, or `accountLast4` and `routingDigest`
-  both equal) and **no E-DEST-CONFLICT** (no present destination field differs); **no E-REF-CONFLICT** (a present reference equals the
+  both equal) and **no E-DEST-CONFLICT** (no present destination field differs); [SUPERSEDED r9: E-DEST is DP-FULL or DP-RECIPIENT and any differing partial field is a conflict, DV1-10] **no E-REF-CONFLICT** (a present reference equals the
   attempt's). A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. If real artifacts never carry a
   destination field, G2 cannot complete and the attempt stays frozen for X3 with stronger evidence (K-8, K-10): nothing completes on
   weaker evidence.
@@ -162,7 +166,7 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
   contiguous over `[declaredAt, effectNow − coverageLag]`, and **NX-NO-POTENTIAL** no potentially matching debit lies in it. A debit
   is **excluded** only if it is linked to another RECORDED attempt, has another currency, or has E-DEST-CONFLICT against this attempt;
   every other debit — including one with null reference and null destination — is potentially matching and keeps the attempt
-  UNCERTAIN (`POTENTIAL_MATCH_UNRESOLVED`).
+  UNCERTAIN (`POTENTIAL_MATCH_UNRESOLVED`). [SUPERSEDED r9: the exclusion rule above is replaced by DV1-10 — correlation overrides every exclusion; only debits explained by another RECORDED attempt or a recorded settlement are excluded.]
 - **Undeclared debits (ACH-R7-01).** SI2 links a debit only to a RECORDED attempt by `bankExecutionId`. An unlinked debit that is
   potentially matching (definition above) for a refund of the account that is APPROVED, has an open attempt, or reached a terminal
   state within the covered interval, and that was executed before any declaration of it, opens UNDECLARED_OUTBOUND naming them and
@@ -186,6 +190,45 @@ R2-061's webhook half belong to an automated provider rail (PayPal, parked). The
 self-tests are "simulator self-test, not V1 rail evidence"); their live remainder is DEFERRED with the parked rail, no date. The
 bank route's own equivalents are C6/P1 (capture), C5/C6 (no webhook), X1/G2/NR (refund execution) and SI2/C6 (reconciliation).
 This is stated in the acceptance ledger and in every Codex prompt.
+
+**DV1-10 — Destination proof and negative evidence (r9: ACH-R8-01, ACH-R7-03).** Supersedes in DV1-08 the destination fields
+of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTIAL exclusion rule. All other DV1-08 text stands.
+- **Approved destination, captured once.** At approval (F2) the owner enters the destination's **full routing number, full account
+  number and account holder name** from the restricted destination evidence (D-ACH-13). Kauro stores only the encrypted evidence
+  artifact and a **keyed destination fingerprint** `DF = HMAC(destinationKey_v, routing ‖ account ‖ normalizedHolderName)` with its key
+  version `v` (key in the platform secret store, never in an adapter, log or event). Name normalization (versioned): Unicode NFKC,
+  case fold, punctuation removed, whitespace collapsed. The full numbers are never displayed again: the owner queue and every
+  response show only the masked account (last four) and the holder name. X1 and X4 freeze `DF` and `v` into the attempt and refuse
+  `DESTINATION_NOT_CAPTURED` without it. Send details (amount, reference, masked destination) are shown only after that COMMIT.
+- **What proves "sent to the approved destination" (E-DEST, replaces r8).** One of:
+  - **DP-FULL** — the classified execution evidence carries the full recipient routing number, account number and holder name
+    (restricted fields of `DestinationEvidence.full`, e.g. a provider transfer export with full recipient details); the application
+    computes `DF` with key `v` in memory, discards the plaintext and requires equality.
+  - **DP-RECIPIENT** — at declaration the owner binds the provider's recipient record (`recipientRef`, `recipientVersion`) together
+    with a classified recipient-record artifact whose full details give `DF`; the execution evidence carries the same `recipientRef`
+    **and** the same `recipientVersion`. A provider that exposes no recipient version cannot use DP-RECIPIENT. A recipient record
+    changed after declaration (other version) proves nothing.
+  - Anything else — last four, routing, holder name, recipient id without version, or no destination field — is **DESTINATION_UNPROVEN**:
+    G2/G4 refuse, the attempt stays DECLARED or UNCERTAIN with its share or payable held, and a DESTINATION_UNPROVEN case goes to the
+    owner. X3 EXECUTED requires DP-FULL or DP-RECIPIENT as well; with weaker evidence the attempt stays UNCERTAIN (never recorded as
+    executed, never NOT_EXECUTED while its debit exists). A partial field that differs from the approved destination (last four,
+    routing digest, holder name) is **E-DEST-CONFLICT**: refused, REVIEW, attempt frozen. **No partial match proves or releases
+    anything.**
+- **Correlation overrides every exclusion (ACH-R7-03).** A debit is **correlated** with an attempt if any of: its reference equals
+  the attempt's (CORR-REF); its `recipientRef` equals the bound one (CORR-RECIPIENT); its `bankExecutionId` was offered for this attempt
+  in a refused G2/G4/X3 (CORR-OFFERED); its `DF` equals the attempt's (CORR-DF). A correlated debit always blocks NOT_EXECUTED and keeps
+  the attempt UNCERTAIN (`CONTRADICTORY_EVIDENCE`), whatever its currency, destination or links.
+- **Negative evidence (NX-NO-POTENTIAL, replaces r8).** In `[declaredAt, effectNow − coverageLag]` every debit of the account must be
+  **explained** and none correlated: explained = linked by bank transaction id to another RECORDED attempt or to a recorded settlement
+  (ST2), or a fee line of such a linked record. Any unexplained debit — another currency, a conflicting destination, a different
+  amount, all fields null — blocks NOT_EXECUTED (`UNEXPLAINED_DEBIT`). The V1 route account is therefore dedicated to Kauro (K-12):
+  any other outgoing payment from it blocks owner NOT_EXECUTED resolutions until explained. The r8 "potentially matching" test of
+  undeclared debits (DV1-08) reads "unexplained or correlated" with these definitions.
+- **Locks.** Unchanged (§7.28): DP checks run inside G2/G4/X3 under L1 → L2 → L3 → L4; recipient-record artifacts are read outside any
+  transaction like every evidence read and re-verified by hash under the locks.
+- **Qualification.** ACH-REFUND-LIVE-01's send evidence must satisfy DP-FULL or DP-RECIPIENT. If the real Wise artifacts give
+  neither (K-8), the refund stays UNCERTAIN and GENERAL is not enabled: an owner-visible blocker, never a weaker proof.
+Cells: §7.22b.
 
 **V1 vs LATER (ACH-17).** V1 (22 rows, 176 cells): R1 (owner-supplied details evidence, no API fetch), R2, I1, I2 (+DV1-07), I3,
 C4, C5, C6, S3 (actor SI2), M1, M2, P1 (+DV1-06), P2, E1, F1, F2, G1, G2, G3, G4, G6, P3. **LATER 2026-11-30, provider API** (8 rows,
@@ -659,8 +702,11 @@ interface CreditPage {
   readonly coverageStart: UtcInstant; readonly coverageEnd: UtcInstant;
 }
 // r8 (ACH-R7-03): destination fields as the evidence shows them; null when absent, never inferred.
+// r9 (DV1-10): `full` is restricted (never persisted in clear, logged or put in events); the application keys it into DF in memory.
 type DestinationEvidence = { readonly accountDigest: Sha256Hex | null; readonly accountLast4: string | null;
-  readonly routingDigest: Sha256Hex | null };
+  readonly routingDigest: Sha256Hex | null;
+  readonly full: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string } | null;
+  readonly recipientRef: string | null; readonly recipientVersion: string | null };
 interface OutboundEvidence extends Evidence { // classified manual execution artifact, e.g. a send receipt (D-ACH-21, DV1-08)
   readonly bankExecutionId: string; readonly accountRef: BankAccountRef; readonly destination: DestinationEvidence;
   readonly reference: string | null; readonly executedAt: UtcInstant | null; // r8 E-REF-CONFLICT, E-TIME
@@ -984,7 +1030,37 @@ G2Δ and G4Δ are deltas on the r6 rows G2/G4 (their r6 cells stay; these add th
 - "DENY RFG-P-NX-LAG (one ms before declaredAt + window + coverageLag): Resolve uncertain execution"
 - "DENY RFG-P-NX-COVERAGE (a one-day gap in imported coverage): Resolve uncertain execution"
 - "DENY RFG-P-NX-POTENTIAL (one unlinked debit with null reference and null destination in the interval): Resolve uncertain execution"
-- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution"
+- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution" **[SUPERSEDED r9: not written; see §7.22b RFG-P-NX-EXPLAINED]**
+
+### 7.22b Destination proof and negative evidence (DV1-10) — r9, V1 (tier 1)
+`packages/persistence/test/refund-generic-cells.test.ts`; each cell runs both source scopes and both attempt kinds. Predicate
+controls (rule 12; one forged control each):
+- "DENY RFG-P-DEST-SAME-LAST4 (a different full account sharing routing and last four): Record a declared execution"
+- "DENY RFG-P-DEST-ROUTING (same account number, different routing number): Record a declared execution"
+- "DENY RFG-P-DEST-NAME (same routing and account, different normalized holder name): Record a declared execution"
+- "DENY RFG-P-DEST-RECIPIENT-CHANGED (recipient record bound at declaration, execution evidence carries another recipient version): Record a declared execution"
+- "DENY RFG-P-DEST-RECIPIENT-UNVERSIONED (recipient id without a version): Record a declared execution"
+- "DENY RFG-P-DEST-ABSENT (send receipt with no destination fields): Record a declared execution — attempt stays DECLARED or UNCERTAIN, DESTINATION_UNPROVEN case, share held"
+- "DENY RFG-P-DEST-PARTIAL-ONLY (last four and routing only, both equal): Record a declared execution"
+- "OK RFG-P-DEST-FULL (full recipient details whose keyed fingerprint equals the approved one): Record a declared execution"
+- "OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution): Record a declared execution"
+- "DENY RFG-P-DEST-NOT-CAPTURED (approval without a captured destination fingerprint): Declare manual refund execution"
+- "DENY RFG-P-X3-EXECUTED-PARTIAL (owner resolution offering only last four and routing): Resolve uncertain execution — stays UNCERTAIN"
+- "DENY RFG-P-NX-CORR-REF (a debit with the attempt's reference and a conflicting destination): Resolve uncertain execution"
+- "DENY RFG-P-NX-CORR-LINKED (a debit linked to another RECORDED attempt but carrying this attempt's reference): Resolve uncertain execution"
+- "DENY RFG-P-NX-CORR-OFFERED (a debit whose execution id was offered for this attempt and refused): Resolve uncertain execution"
+- "DENY RFG-P-NX-OTHER-CURRENCY (an unexplained debit in another currency): Resolve uncertain execution"
+- "DENY RFG-P-NX-UNEXPLAINED (an unexplained debit of another amount with a conflicting destination): Resolve uncertain execution"
+- "OK RFG-P-NX-EXPLAINED (only debits linked to other RECORDED attempts or a recorded settlement, none correlated): Resolve uncertain execution"
+- "DENY RFG-P-FINGERPRINT-SECRECY (no full routing or account number in responses, logs, events, outbox, telemetry or the owner queue; fingerprints keyed and versioned): Declare manual refund execution"
+
+Interleavings with the statement import (rule 1; both orders, held at L1):
+- "RACE RFG-M-DEST-SI2 (both orders): Record a declared execution with partial-destination evidence against a statement import of its debit — in neither order is the attempt recorded; the debit stays correlated, NOT_EXECUTED is refused, the share stays held"
+- "RACE RFG-M-DEST-SI2-FULL (both orders): Record a declared execution with full-destination evidence against a statement import of its debit — one RECORDED attempt, one link, one refund.completed"
+- "RACE RFG-M-DEST-RECIPIENT (both orders): a recipient-record artifact with a new version imported against G2 recording through DP-RECIPIENT — G2 first records only on the declared version carried by the execution evidence; artifact first changes no bound version and G2 still requires the declared version"
+- "RACE RFG-M-NX-SI2-CORR (both orders): X3 NOT_EXECUTED against a statement import of a correlated debit with a conflicting destination — import first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, the import opens REFUND_TERMINAL_CONTRADICTED and freezes every open refund of the source (no further share is released)"
+
+`RFG-P-NX-EXCLUDED` (r8) is **[SUPERSEDED r9]** by `RFG-P-NX-EXPLAINED` and the denial controls above; the r8 title is not written.
 
 ### 7.23 Owner statement import (DV1-02; replaces API sweeps; realises S3) — r7, V1
 File `packages/persistence/test/ach-inbound-cells.test.ts`. SI2 locks the account/environment statement stream, then the
@@ -1100,7 +1176,7 @@ registry. The matrix and acceptance cases below are proposals for that implement
 | RFG-02 (r7) | No path marks a refund COMPLETED without classified execution evidence; no execution id completes two refunds; NEVER-RESEND on every entry point | G1–G2, X1–X3, NR |
 | RFG-03 (r7) | D-24 A: an UNCERTAIN refund stays reserved until the owner resolves it with evidence | X2–X3 |
 | RFG-04 (r8) | A bounced refund is re-sent only through a new declared attempt after the bounce is recorded; never while an attempt of the source is DECLARED or UNCERTAIN; the resend is recorded only against that attempt | G3, X4, G2Δ/G4Δ, X2, X3, NR |
-| ACH-REFUND-LIVE-01 (r8) | The refund of **the same** ACH-LIVE-01 payment: approve (owner, step-up), declare (X1), **send** from Wise with the reference, record (G2) with Wise's send receipt as classified execution evidence (all G2 predicates); one `refund.completed`; exact revenue/cash/commission/credit-note cents; replay adds nothing; reference-field fidelity recorded (K-10). Arrival at the payer is not awaited; a later bounce follows G3 then X4. With ACH-LIVE-01 it is the CONTROLLED→GENERAL condition (DV1-04) | F1–F2, X1, G1–G2, P3 (SI2 later, not a condition) |
+| ACH-REFUND-LIVE-01 (r8) | The refund of **the same** ACH-LIVE-01 payment: approve (owner, step-up), declare (X1), **send** from Wise with the reference, record (G2) with Wise's send receipt as classified execution evidence (all G2 predicates); one `refund.completed`; exact revenue/cash/commission/credit-note cents; replay adds nothing; reference-field fidelity recorded (K-10). Arrival at the payer is not awaited; a later bounce follows G3 then X4. With ACH-LIVE-01 it is the CONTROLLED→GENERAL condition (DV1-04); r9: its send evidence must satisfy DP-FULL or DP-RECIPIENT (DV1-10) | F1–F2, X1, G1–G2, P3 (SI2 later, not a condition) |
 
 **r7 updates of the rows above.** ACH-01's "PayPal-only launch works" reads "launch with the route not ENABLED works: no details,
 no order (K-9)" [SUPERSEDED r7: PayPal-only]. ACH-11's "ACH retirement→PayPal" reads "explicit retirement before any other
@@ -1168,6 +1244,17 @@ Not changed: every r6 cell text and test title; D-ACH-03, 05, 07, 09, 11, 12, 13
 | 8 | PV1 Addendum 2 | One payment, both legs: reconciled credit + refund of that payment SENT and recorded with Wise's send receipt; arrival not awaited; bounce → G3 then X4 | ACH-M-R2-GENERAL; ACH-LIVE-01, ACH-REFUND-LIVE-01 |
 | 9 | PV1 Addendum 3–4 | R2 15 §Initial payment decision paragraph 1 superseded; paragraph 3 governs the "commercially live" label only | — |
 | 10 | Legal | Plain-language DV1-06 text for ToS 8.2: `docs/review/dv1-06-for-legal.md` | — |
+
+## 11. r8 → r9 change list (Codex design r8, `tools/review/out/ach-design-r8-97b5bb8b034d`: ACH-R7-03 PARTIAL, ACH-R8-01 new)
+
+Delta only: everything Codex marked fixed in r8 (ACH-R7-01, 02, 04, 05, 06; PV1 Addendum) is unchanged.
+
+| # | Finding | Change (by construction) | Cells |
+|---|---|---|---|
+| 1 | ACH-R8-01 HONESTY | DV1-10: approved destination captured once at F2 (full routing, full account, holder name) as a keyed, versioned fingerprint, frozen by X1/X4 before send details are shown, never displayed in full. Proof only by DP-FULL (full recipient details in the execution evidence) or DP-RECIPIENT (recipient record bound at declaration, same version at execution). Last four, routing, name or unversioned recipient id alone = DESTINATION_UNPROVEN: refused, attempt frozen, owner case | RFG-P-DEST-* (10), RFG-P-X3-EXECUTED-PARTIAL, RFG-P-FINGERPRINT-SECRECY, RFG-M-DEST-SI2, RFG-M-DEST-SI2-FULL, RFG-M-DEST-RECIPIENT |
+| 2 | ACH-R7-03 PARTIAL | Correlation (reference, recipient, offered execution id, fingerprint) overrides every exclusion and keeps the attempt UNCERTAIN; NOT_EXECUTED requires every debit in the interval explained by another RECORDED attempt or a recorded settlement; other-currency, conflicting-destination and all-null debits block; account dedicated to Kauro (K-12). RFG-P-NX-EXCLUDED superseded | RFG-P-NX-CORR-REF, -CORR-LINKED, -CORR-OFFERED, -OTHER-CURRENCY, -UNEXPLAINED, -EXPLAINED; RFG-M-NX-SI2-CORR |
+| 3 | Types | `DestinationEvidence` gains restricted `full` details and `recipientRef`/`recipientVersion`; the attempt stores `destinationFingerprint` + key version instead of digests/last four | — |
+| 4 | Qualification | ACH-REFUND-LIVE-01 needs DP-FULL or DP-RECIPIENT; otherwise GENERAL stays off (owner-visible blocker) | ACH-M-R2-GENERAL (unchanged title) |
 
 ## Appendix A. Phase 2 (post-launch): automated Wise outbound — not designed here
 

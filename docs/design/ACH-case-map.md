@@ -1,6 +1,6 @@
 # ACH / bank-transfer route — case map (Payments V1)
 
-Design-time map for [ACH-ROUTE r8](ACH-ROUTE.md) under the owner decision Payments V1
+Design-time map for [ACH-ROUTE r9](ACH-ROUTE.md) under the owner decision Payments V1
 (`docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`, "PV1"). Every proposed bank-route case and every registry case whose
 remainder PV1 re-targets is listed with its **target evidence class**, its current status and the tests that will carry it, as
 `file :: "exact title"`. No test exists yet: every row is **PLANNED** until its lane lands; the lane then rewrites the status
@@ -51,7 +51,7 @@ Lanes (PAYMENTS-V1-REPLAN §9): KIT, L-ROUTE, L-INBOUND, L-REFUND, L-SETTLE, S-B
 | DV1-01 | EXECUTED_LOCAL | PLANNED | KIT | — | `packages/application/test/bank-route-genericity.test.ts` :: "DENY DV1-01 genericity: no type, table, column, enum value or event type added for the bank-transfer route names a provider" |
 | K-9 | EXECUTED_LOCAL | PLANNED | S-E | — | `apps/web/test/checkout-bank-transfer.test.ts` :: "DENY no enabled route for the buyer: no instructions, no order" |
 | ACH-LIVE-01 | LIVE | BLOCKED_OWNER (D-14, D-13, D-25) | B15 | I2, C4–C6, M1–M2, P1–P2 | the qualification payment (route ENABLED, rollout CONTROLLED): its ACH credit received and reconciled in Kauro; restricted evidence per `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` |
-| ACH-REFUND-LIVE-01 | LIVE | BLOCKED_OWNER (after ACH-LIVE-01) | B15 | F1–F2, X1, G1–G2, P3 | the refund of **that same payment** declared (X1), SENT from Wise and recorded (G2) with Wise's send receipt as execution evidence; arrival at the payer is not awaited; a later bounce follows G3 then X4. ACH-LIVE-01 + ACH-REFUND-LIVE-01 = the CONTROLLED→GENERAL enable condition (ACH-ROUTE DV1-04; `ach-route-cells.test.ts` :: "DENY ACH-M-R2-GENERAL …") |
+| ACH-REFUND-LIVE-01 | LIVE | BLOCKED_OWNER (after ACH-LIVE-01) | B15 | F1–F2, X1, G1–G2, P3 | the refund of **that same payment** declared (X1), SENT from Wise and recorded (G2) with Wise's send evidence proving the destination by DP-FULL or DP-RECIPIENT (ACH-ROUTE DV1-10; partial details leave it UNCERTAIN and GENERAL off); arrival at the payer is not awaited; a later bounce follows G3 then X4. ACH-LIVE-01 + ACH-REFUND-LIVE-01 = the CONTROLLED→GENERAL enable condition (ACH-ROUTE DV1-04; `ach-route-cells.test.ts` :: "DENY ACH-M-R2-GENERAL …") |
 
 ## 2. Registry cases re-targeted by PV1 (titles of accepted tests unchanged)
 
